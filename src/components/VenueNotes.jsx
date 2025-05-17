@@ -21,7 +21,10 @@ import {
     Select,
     MenuItem,
     Tabs,
-    Tab
+    Tab,
+    useMediaQuery,
+    useTheme,
+    Divider
 } from '@mui/material';
 import { 
     PieChart, 
@@ -37,12 +40,15 @@ import {
     Scatter,
     ReferenceLine,
     ReferenceArea,
+    Legend
 } from 'recharts';
 import BowlingAnalysis from './BowlingAnalysis';
 import FantasyPointsTable from './FantasyPointsTable';
 import FantasyPointsBarChart from './FantasyPointsBarChart';
+import MatchHistory from './MatchHistory';
+import Matchups from './Matchups';
 
-const BattingScatter = ({ data }) => {
+const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
     const [phase, setPhase] = useState('overall');
     const [plotType, setPlotType] = useState('avgsr');
@@ -152,12 +158,18 @@ const BattingScatter = ({ data }) => {
     const maxY = Math.ceil(Math.max(...axisData.map(d => d.y)) * (1 + padding));
 
     return (
-        <Box sx={{ width: '100%', height: 600, pt: 2 }}>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ px: 2, mb: 2 }}>
-                <Typography variant="h6" sx={{ flexGrow: 1 }}>
-                    Batting Performance Analysis
-                </Typography>
-                <Box sx={{ width: 200 }}>
+        <Box sx={{ width: '100%', height: isMobile ? 450 : 550, pt: 2 }}>
+            <Typography variant="h6" sx={{ px: 2, mb: 2 }}>
+                Batting Performance Analysis
+            </Typography>
+            
+            <Stack 
+                direction={isMobile ? "column" : "row"} 
+                spacing={2} 
+                alignItems={isMobile ? "stretch" : "center"} 
+                sx={{ px: 2, mb: 2 }}
+            >
+                <Box sx={{ width: isMobile ? "100%" : 200 }}>
                     <Typography variant="body2" gutterBottom>
                         Minimum Innings: {minInnings}
                     </Typography>
@@ -165,11 +177,11 @@ const BattingScatter = ({ data }) => {
                         value={minInnings}
                         onChange={(_, value) => setMinInnings(value)}
                         min={1}
-                        max={50}
+                        max={20}
                         step={1}
                     />
                 </Box>
-                <FormControl sx={{ width: 150 }}>
+                <FormControl sx={{ width: isMobile ? "100%" : 150 }}>
                     <InputLabel>Phase</InputLabel>
                     <Select
                         value={phase}
@@ -181,7 +193,7 @@ const BattingScatter = ({ data }) => {
                         ))}
                     </Select>
                 </FormControl>
-                <FormControl sx={{ width: 200 }}>
+                <FormControl sx={{ width: isMobile ? "100%" : 200 }}>
                     <InputLabel>Plot Type</InputLabel>
                     <Select
                         value={plotType}
@@ -195,127 +207,130 @@ const BattingScatter = ({ data }) => {
                 </FormControl>
             </Stack>
 
-            <ResponsiveContainer>
-                <ScatterChart margin={{ top: 20, right: 30, bottom: 50, left: 60 }}>
-                    {plotType === 'avgsr' ? (
-                        <>
-                            <ReferenceArea
-                                x1={avgBatter[metrics.xKey]}
-                                x2={maxX}
-                                y1={avgBatter[metrics.yKey]}
-                                y2={maxY}
-                                fill="#77DD77"
-                                opacity={0.3}
-                            />
-                            <ReferenceArea
-                                x1={avgBatter[metrics.xKey]}
-                                x2={maxX}
-                                y1={minY}
-                                y2={avgBatter[metrics.yKey]}
-                                fill="#FFB347"
-                                opacity={0.3}
-                            />
-                            <ReferenceArea
-                                x1={minX}
-                                x2={avgBatter[metrics.xKey]}
-                                y1={avgBatter[metrics.yKey]}
-                                y2={maxY}
-                                fill="#FFB347"
-                                opacity={0.3}
-                            />
-                            <ReferenceArea
-                                x1={minX}
-                                x2={avgBatter[metrics.xKey]}
-                                y1={minY}
-                                y2={avgBatter[metrics.yKey]}
-                                fill="#FF6961"
-                                opacity={0.3}
-                            />
-                        </>
-                    ) : (
-                        <>
-                            <ReferenceArea
-                                x1={minX}
-                                x2={avgBatter[metrics.xKey]}
-                                y1={avgBatter[metrics.yKey]}
-                                y2={maxY}
-                                fill="#77DD77"
-                                opacity={0.3}
-                            />
-                            <ReferenceArea
-                                x1={minX}
-                                x2={avgBatter[metrics.xKey]}
-                                y1={minY}
-                                y2={avgBatter[metrics.yKey]}
-                                fill="#FFB347"
-                                opacity={0.3}
-                            />
-                            <ReferenceArea
-                                x1={avgBatter[metrics.xKey]}
-                                x2={maxX}
-                                y1={avgBatter[metrics.yKey]}
-                                y2={maxY}
-                                fill="#FFB347"
-                                opacity={0.3}
-                            />
-                            <ReferenceArea
-                                x1={avgBatter[metrics.xKey]}
-                                x2={maxX}
-                                y1={minY}
-                                y2={avgBatter[metrics.yKey]}
-                                fill="#FF6961"
-                                opacity={0.3}
-                            />
-                        </>
-                    )}
-
-                    <XAxis 
-                        type="number" 
-                        dataKey={metrics.xKey}
-                        name={metrics.xLabel}
-                        label={{ value: metrics.xLabel, position: 'bottom' }}
-                        domain={[minX, maxX]}
-                    />
-                    <YAxis 
-                        type="number" 
-                        dataKey={metrics.yKey}
-                        name={metrics.yLabel}
-                        label={{ value: metrics.yLabel, angle: -90, position: 'left' }}
-                        domain={[minY, maxY]}
-                    />
-                    
-                    <ReferenceLine x={avgBatter[metrics.xKey]} stroke="#666" strokeDasharray="3 3" />
-                    <ReferenceLine y={avgBatter[metrics.yKey]} stroke="#666" strokeDasharray="3 3" />
-
-                    <Tooltip content={<CustomTooltip />} />
-
-                    <Scatter
-                        data={[...filteredData, avgBatter]}
-                        shape={(props) => {
-                            const { cx, cy, fill, payload } = props;
-                            return (
-                                <>
-                                    <circle
-                                        cx={cx}
-                                        cy={cy}
-                                        r={6}
-                                        fill={fill || '#000'}
-                                    />
-                                    <text
-                                        x={cx}
-                                        y={cy + 15}
-                                        textAnchor="middle"
-                                        fontSize={12}
-                                        fill="#000"
-                                    >
-                                        {payload.name}
-                                    </text>
-                                </>
-                            );
+            <Box sx={{ height: isMobile ? 350 : 450, width: '100%' }}>
+                <ResponsiveContainer>
+                    <ScatterChart 
+                        margin={{ 
+                            top: 20, 
+                            right: isMobile ? 20 : 30, 
+                            bottom: isMobile ? 30 : 50, 
+                            left: isMobile ? 40 : 60 
                         }}
-                    />
-                </ScatterChart>
-            </ResponsiveContainer>
+                    >
+                        {plotType === 'avgsr' ? (
+                            <>
+                                <ReferenceArea
+                                    x1={avgBatter[metrics.xKey]}
+                                    x2={maxX}
+                                    y1={avgBatter[metrics.yKey]}
+                                    y2={maxY}
+                                    fill="#77DD77"
+                                    opacity={0.3}
+                                />
+                                <ReferenceArea
+                                    x1={avgBatter[metrics.xKey]}
+                                    x2={maxX}
+                                    y1={minY}
+                                    y2={avgBatter[metrics.yKey]}
+                                    fill="#FFB347"
+                                    opacity={0.3}
+                                />
+                                <ReferenceArea
+                                    x1={minX}
+                                    x2={avgBatter[metrics.xKey]}
+                                    y1={avgBatter[metrics.yKey]}
+                                    y2={maxY}
+                                    fill="#FFB347"
+                                    opacity={0.3}
+                                />
+                                <ReferenceArea
+                                    x1={minX}
+                                    x2={avgBatter[metrics.xKey]}
+                                    y1={minY}
+                                    y2={avgBatter[metrics.yKey]}
+                                    fill="#FF6961"
+                                    opacity={0.3}
+                                />
+                            </>
+                        ) : (
+                            <>
+                                <ReferenceArea
+                                    x1={minX}
+                                    x2={avgBatter[metrics.xKey]}
+                                    y1={avgBatter[metrics.yKey]}
+                                    y2={maxY}
+                                    fill="#77DD77"
+                                    opacity={0.3}
+                                />
+                                <ReferenceArea
+                                    x1={minX}
+                                    x2={avgBatter[metrics.xKey]}
+                                    y1={minY}
+                                    y2={avgBatter[metrics.yKey]}
+                                    fill="#FFB347"
+                                    opacity={0.3}
+                                />
+                                <ReferenceArea
+                                    x1={avgBatter[metrics.xKey]}
+                                    x2={maxX}
+                                    y1={avgBatter[metrics.yKey]}
+                                    y2={maxY}
+                                    fill="#FFB347"
+                                    opacity={0.3}
+                                />
+                                <ReferenceArea
+                                    x1={avgBatter[metrics.xKey]}
+                                    x2={maxX}
+                                    y1={minY}
+                                    y2={avgBatter[metrics.yKey]}
+                                    fill="#FF6961"
+                                    opacity={0.3}
+                                />
+                            </>
+                        )}
+
+                        <XAxis 
+                            type="number" 
+                            dataKey={metrics.xKey}
+                            name={metrics.xLabel}
+                            label={isMobile ? null : { value: metrics.xLabel, position: 'bottom' }}
+                            domain={[minX, maxX]}
+                            tick={{ fontSize: isMobile ? 10 : 12 }}
+                        />
+                        <YAxis 
+                            type="number" 
+                            dataKey={metrics.yKey}
+                            name={metrics.yLabel}
+                            label={isMobile ? null : { value: metrics.yLabel, angle: -90, position: 'left' }}
+                            domain={[minY, maxY]}
+                            tick={{ fontSize: isMobile ? 10 : 12 }}
+                        />
+                        
+                        <ReferenceLine x={avgBatter[metrics.xKey]} stroke="#666" strokeDasharray="3 3" />
+                        <ReferenceLine y={avgBatter[metrics.yKey]} stroke="#666" strokeDasharray="3 3" />
+
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+
+                        <Scatter
+                            name="Players"
+                            data={filteredData.slice(0, 15)} // Limit to top 15 players to prevent overcrowding
+                            fill="#8884d8"
+                        >
+                            {filteredData.slice(0, 15).map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.fill || '#8884d8'} />
+                            ))}
+                        </Scatter>
+                        
+                        <Scatter
+                            name="Average Batter"
+                            data={[avgBatter]}
+                            fill="#000"
+                            shape="star"
+                        />
+                    </ScatterChart>
+                </ResponsiveContainer>
+            </Box>
         </Box>
     );
 };
@@ -444,12 +459,16 @@ const VenueNotes = ({
     selectedTeam1, 
     selectedTeam2, 
     venueFantasyStats, 
-    venuePlayerHistory 
+    venuePlayerHistory,
+    matchHistory,
+    isMobile 
   }) => {
 
     const [fantasyTabValue, setFantasyTabValue] = useState(0);
 
 const WinPercentagesPie = ({ data }) => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const totalDecisiveMatches = data.batting_first_wins + data.batting_second_wins;
     const battingFirstPct = totalDecisiveMatches > 0 ? 
         (data.batting_first_wins / totalDecisiveMatches) * 100 : 0;
@@ -460,17 +479,39 @@ const WinPercentagesPie = ({ data }) => {
         { 
             name: 'Won Batting First', 
             value: battingFirstPct,
-            label: `Won Batting First (${battingFirstPct.toFixed(1)}%)`
+            count: data.batting_first_wins
         },
         { 
             name: 'Won Fielding First', 
             value: fieldingFirstPct,
-            label: `Won Fielding First (${fieldingFirstPct.toFixed(1)}%)`
+            count: data.batting_second_wins
         }
     ];
 
+    const COLORS = ['#003f5c', '#bc5090'];
+
+    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, count }) => {
+      const RADIAN = Math.PI / 180;
+      const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+      const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    
+      return (
+        <text 
+          x={x} 
+          y={y} 
+          fill="white" 
+          textAnchor="middle" 
+          dominantBaseline="central"
+          fontSize={isMobile ? 12 : 14}
+        >
+          {`${pieData[index].count} (${(percent * 100).toFixed(1)}%)`}
+        </text>
+      );
+    };
+
     return (
-        <Box sx={{ width: '100%', height: 350 }}>
+        <Box sx={{ width: '100%', height: isMobile ? 250 : 350 }}>
             <Typography variant="subtitle1" align="center" gutterBottom>
                 Match Results Distribution
             </Typography>
@@ -480,27 +521,22 @@ const WinPercentagesPie = ({ data }) => {
                         data={pieData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={110}
+                        innerRadius={isMobile ? 40 : 60}
+                        outerRadius={isMobile ? 80 : 110}
                         paddingAngle={2}
                         dataKey="value"
-                        label={({ label, x, y }) => (
-                            <text 
-                                x={x} 
-                                y={y} 
-                                fill="#000" 
-                                textAnchor={x > 250 ? 'start' : 'end'}
-                                dominantBaseline="middle"
-                                style={{ fontSize: '12px' }}
-                            >
-                                {label}
-                            </text>
-                        )}
+                        nameKey="name"
+                        labelLine={false}
+                        label={renderCustomizedLabel}
                     >
-                        <Cell fill="#003f5c" />
-                        <Cell fill="#bc5090" />
+                        {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
                     </Pie>
-                    <Tooltip />
+                    <Legend />
+                    <Tooltip 
+                        formatter={(value, name, props) => [`${props.payload.count} (${value.toFixed(1)}%)`, name]}
+                    />
                 </PieChart>
             </ResponsiveContainer>
         </Box>
@@ -508,6 +544,8 @@ const WinPercentagesPie = ({ data }) => {
 };
 
 const ScoresBarChart = ({ data }) => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const scoreData = [
         {
             name: '1st Innings Avg',
@@ -543,41 +581,65 @@ const ScoresBarChart = ({ data }) => {
         }
     ];
 
+    // Filter out zero values which might be causing display issues
+    const filteredScoreData = scoreData.filter(item => item.value > 0);
+    
     const formatTooltip = (value, name) => [value, name];
 
+    // Custom bar label component to ensure values are displayed
+    const CustomBarLabel = (props) => {
+        const { x, y, width, value, height } = props;
+        return (
+            <text 
+                x={x + width + 5} 
+                y={y + height / 2} 
+                fill="#666"
+                fontSize={isMobile ? 10 : 12}
+                textAnchor="start"
+                dominantBaseline="middle"
+            >
+                {value}
+            </text>
+        );
+    };
+
     return (
-        <Box sx={{ width: '100%', height: 350 }}>
+        <Box sx={{ width: '100%', height: isMobile ? 250 : 350 }}>
             <Typography variant="subtitle1" align="center" gutterBottom>
                 Innings Scores Analysis
             </Typography>
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                    data={scoreData}
+                    data={filteredScoreData}
                     layout="vertical"
-                    margin={{ top: 20, right: 50, left: 20, bottom: 20 }}
+                    margin={{ 
+                        top: 20, 
+                        right: isMobile ? 50 : 70, // Increased right margin to accommodate labels
+                        left: isMobile ? 10 : 20, 
+                        bottom: 20 
+                    }}
                 >
                     <XAxis 
                         type="number" 
                         domain={[0, 'dataMax + 20']}
                         axisLine={true}
                         grid={false}
+                        tick={{ fontSize: isMobile ? 10 : 12 }}
                     />
                     <YAxis 
                         type="category" 
                         dataKey="name" 
-                        width={120}
+                        width={isMobile ? 90 : 120}
                         axisLine={false}
                         tickLine={false}
+                        tick={{ fontSize: isMobile ? 9 : 12 }}
                     />
                     <Tooltip formatter={formatTooltip} />
                     <Bar 
                         dataKey="value" 
                         fill="#E6E6FA"  // Pastel purple
-                        label={{ 
-                            position: 'right',
-                            formatter: (value) => `${value}`,
-                            fill: '#666'
-                        }}
+                        label={<CustomBarLabel />}
+                        isAnimationActive={false}  // Disable animation to ensure labels render immediately
                     />
                 </BarChart>
             </ResponsiveContainer>
@@ -585,7 +647,7 @@ const ScoresBarChart = ({ data }) => {
     );
 };
 
-const PhaseWiseStrategy = ({ data }) => {
+const PhaseWiseStrategy = ({ data, isMobile }) => {
     const PHASE_OVERS = [
         { start: 0, end: 6, label: 'powerplay' },
         { start: 6, end: 10, label: 'middle1' },
@@ -609,7 +671,7 @@ const PhaseWiseStrategy = ({ data }) => {
 
     const renderPhase = (phaseData, title) => (
         <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>{title}</Typography>
+            <Typography variant={isMobile ? "body1" : "subtitle2"} sx={{ mb: 1 }}>{title}</Typography>
             <Box sx={{ 
                 display: 'flex',
                 flexDirection: 'column',
@@ -618,7 +680,7 @@ const PhaseWiseStrategy = ({ data }) => {
                 <Box sx={{ 
                     display: 'flex',
                     width: '100%',
-                    height: 50,
+                    height: isMobile ? 40 : 50,
                     backgroundColor: '#f5f5f5',
                     borderRadius: '4px 4px 0 0',
                     overflow: 'hidden'
@@ -633,18 +695,18 @@ const PhaseWiseStrategy = ({ data }) => {
                                 justifyContent: 'center',
                                 backgroundColor: index % 2 === 0 ? '#5a8691' : '#55ae6a',
                                 color: 'white',
-                                fontSize: '0.875rem',
+                                fontSize: isMobile ? '0.7rem' : '0.875rem',
                                 borderRight: index < phaseData.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none'
                             }}
                         >
-                            {`${Math.round(phase.stats.runs_per_innings)}-${Math.round(phase.stats.wickets_per_innings)} (${Math.round(phase.stats.balls_per_innings)})`}
+                            {`${Math.round(phase.stats.runs_per_innings)}-${Math.round(phase.stats.wickets_per_innings)}${!isMobile ? ` (${Math.round(phase.stats.balls_per_innings)})` : ''}`}
                         </Box>
                     ))}
                 </Box>
                 <Box sx={{ 
                     display: 'flex',
                     width: '100%',
-                    height: 20,
+                    height: isMobile ? 16 : 20,
                     borderTop: '1px solid #ddd'
                 }}>
                     {phaseData.map((phase, index) => (
@@ -655,7 +717,7 @@ const PhaseWiseStrategy = ({ data }) => {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontSize: '0.75rem',
+                                fontSize: isMobile ? '0.65rem' : '0.75rem',
                                 color: '#666',
                                 borderRight: index < phaseData.length - 1 ? '1px solid #ddd' : 'none'
                             }}
@@ -673,7 +735,7 @@ const PhaseWiseStrategy = ({ data }) => {
 
     return (
         <Box sx={{ mt: 2 }}>
-            <Typography variant="h6" gutterBottom>Phase-wise Strategy</Typography>
+            <Typography variant={isMobile ? "h6" : "h5"} gutterBottom>Phase-wise Strategy</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {renderPhase(firstInningsData, "Batting First")}
                 {renderPhase(secondInningsData, "Chasing")}
@@ -685,8 +747,8 @@ const PhaseWiseStrategy = ({ data }) => {
 if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
 
 return (
-    <Box sx={{ p: 2 }}>
-        <Typography variant="h4" gutterBottom>
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+        <Typography variant={isMobile ? "h5" : "h4"} gutterBottom>
             {venue === "All Venues" ? 
                 `All Venues - ${venueStats.total_matches} T20s` : 
                 `${venue} - ${venueStats.total_matches} T20s`
@@ -695,120 +757,168 @@ return (
                 {startDate} to {endDate}
             </Typography>
         </Typography>
-        <Grid container spacing={3}>
+        <Grid container spacing={isMobile ? 2 : 3}>
             <Grid item xs={12} md={6}>
-                <Card sx={{ p: 2, width: '100%' }}>
+                <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
                     <WinPercentagesPie data={venueStats} />
                 </Card>
             </Grid>
             <Grid item xs={12} md={6}>
-                <Card sx={{ p: 2, width: '100%' }}>
+                <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
                     <ScoresBarChart data={venueStats} />
                 </Card>
             </Grid>
             <Grid item xs={12} md={12}>
-                <Card sx={{ p: 2, width: '100%' }}>
-                    <PhaseWiseStrategy data={venueStats} />
+                <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
+                    <PhaseWiseStrategy data={venueStats} isMobile={isMobile} />
                 </Card>
             </Grid>
+            {selectedTeam1 && selectedTeam2 && matchHistory && (
+                <>
+                    <Grid item xs={12}>
+                        <Typography variant="h5" gutterBottom sx={{ mt: 2, mb: 1 }}>
+                            Team Performance Analysis
+                        </Typography>
+                    </Grid>
+                    
+                    <Grid item xs={12}>
+                        <MatchHistory 
+                            venue={venue}
+                            team1={selectedTeam1.abbreviated_name}
+                            team2={selectedTeam2.abbreviated_name}
+                            venueResults={matchHistory.venue_results}
+                            team1Results={matchHistory.team1_results}
+                            team2Results={matchHistory.team2_results}
+                            h2hStats={matchHistory.h2h_stats}
+                            isMobile={isMobile}
+                        />
+                    </Grid>
+                </>
+            )}
+            
+            {selectedTeam1 && selectedTeam2 && (
+                <>
+                    <Grid item xs={12}>
+                        <Divider sx={{ my: 3 }} />
+                        <Typography variant="h5" gutterBottom>
+                            Player Matchups
+                        </Typography>
+                        <Matchups
+                            team1={selectedTeam1.full_name}
+                            team2={selectedTeam2.full_name}
+                            startDate={startDate}
+                            endDate={endDate}
+                            isMobile={isMobile}
+                        />
+                    </Grid>
+
+                    <Grid item xs={12} md={12}>
+                        <Card sx={{ p: 2, width: '100%', mt: 3 }}>
+                            <Typography variant="h6" gutterBottom>
+                                Fantasy Points Analysis
+                            </Typography>
+                            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                                <Tabs value={fantasyTabValue} onChange={(e, newValue) => setFantasyTabValue(newValue)}>
+                                    <Tab label="Team Comparison" />
+                                    <Tab label="Venue History" />
+                                </Tabs>
+                            </Box>
+                            <Box sx={{ mt: 2 }}>
+                                {fantasyTabValue === 0 && (
+                                    <>
+                                        <Grid container spacing={isMobile ? 1 : 2}>
+                                            <Grid item xs={12} md={6}>
+                                                <FantasyPointsTable 
+                                                    players={venueFantasyStats?.team1_players || []} 
+                                                    title={`${selectedTeam1.abbreviated_name} Fantasy Points at ${venue}`} 
+                                                    isMobile={isMobile}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <FantasyPointsTable 
+                                                    players={venueFantasyStats?.team2_players || []} 
+                                                    title={`${selectedTeam2.abbreviated_name} Fantasy Points at ${venue}`} 
+                                                    isMobile={isMobile}
+                                                />
+                                            </Grid>
+                                        </Grid>         
+                                        <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: 2 }}>
+                                            <Grid item xs={12} md={6}>
+                                                <FantasyPointsBarChart 
+                                                    players={venueFantasyStats?.team1_players || []} 
+                                                    title={`${selectedTeam1.abbreviated_name} Fantasy Points Breakdown`} 
+                                                    isMobile={isMobile}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <FantasyPointsBarChart 
+                                                    players={venueFantasyStats?.team2_players || []} 
+                                                    title={`${selectedTeam2.abbreviated_name} Fantasy Points Breakdown`} 
+                                                    isMobile={isMobile}
+                                                />
+                                            </Grid>
+                                        </Grid> 
+                                    </>
+                                )}
+                                {fantasyTabValue === 1 && (
+                                    <>
+                                        <FantasyPointsTable 
+                                            players={venuePlayerHistory?.players || []} 
+                                            title={`Player Fantasy History at ${venue}`} 
+                                            isMobile={isMobile}
+                                        />
+                                        <FantasyPointsBarChart 
+                                            players={venuePlayerHistory?.players || []} 
+                                            title={`Top Players at ${venue}`} 
+                                            isMobile={isMobile}
+                                        />
+                                    </>
+                                )}
+                            </Box>
+                        </Card>
+                    </Grid>
+                </>
+            )}
+            
             {statsData?.batting_leaders && statsData.batting_leaders.length > 0 && (
                 <Grid item xs={12} md={6}>
-                    <Card sx={{ p: 2, width: '100%' }}>
-                        <BattingLeaders data={statsData.batting_leaders} />
+                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%', overflowX: 'auto' }}>
+                        <BattingLeaders data={statsData.batting_leaders} isMobile={isMobile} />
                     </Card>
                 </Grid>
             )}
             {statsData?.bowling_leaders && statsData.bowling_leaders.length > 0 && (
                 <Grid item xs={12} md={6}>
-                    <Card sx={{ p: 2, width: '100%' }}>
-                        <BowlingLeaders data={statsData.bowling_leaders} />
+                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%', overflowX: 'auto' }}>
+                        <BowlingLeaders data={statsData.bowling_leaders} isMobile={isMobile} />
+                    </Card>
+                </Grid>
+            )}
+            
+            {statsData?.batting_scatter && statsData.batting_scatter.length > 0 && (
+                <Grid item xs={12} md={12}>
+                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
+                        <BattingScatter data={statsData.batting_scatter} isMobile={isMobile} />
                     </Card>
                 </Grid>
             )}
             {statsData?.batting_scatter && statsData.batting_scatter.length > 0 && (
                 <Grid item xs={12} md={12}>
-                    <Card sx={{ p: 2, width: '100%' }}>
-                        <BattingScatter data={statsData.batting_scatter} />
-                    </Card>
-                </Grid>
-            )}
-            {statsData?.batting_scatter && statsData.batting_scatter.length > 0 && (
-                <Grid item xs={12} md={12}>
-                    <Card sx={{ p: 2, width: '100%' }}>
+                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
                         <Typography variant="h6" gutterBottom>
                             Bowling Type Analysis
                         </Typography>
                         {/* Wrap BowlingAnalysis in error boundary */}
                         <Box sx={{ position: 'relative' }}>
                             <BowlingAnalysis 
-                                venue={venue}
-                                startDate={startDate}
-                                endDate={endDate}
-                            />
+                            venue={venue}
+                            startDate={startDate}
+                            endDate={endDate}
+                                isMobile={isMobile}
+                        />
                         </Box>
                     </Card>
                 </Grid>
-            )}
-            {selectedTeam1 && selectedTeam2 && (
-            <Grid item xs={12} md={12}>
-                <Card sx={{ p: 2, width: '100%' }}>
-                <Typography variant="h6" gutterBottom>
-                    Fantasy Points Analysis
-                </Typography>
-                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-                    <Tabs value={fantasyTabValue} onChange={(e, newValue) => setFantasyTabValue(newValue)}>
-                        <Tab label="Team Comparison" />
-                        <Tab label="Venue History" />
-                    </Tabs>
-                    </Box>
-                    <Box sx={{ mt: 2 }}>
-                    {fantasyTabValue === 0 && (
-                    <>
-                        <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                            <FantasyPointsTable 
-                            players={venueFantasyStats?.team1_players || []} 
-                            title={`${selectedTeam1.abbreviated_name} Fantasy Points at ${venue}`} 
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <FantasyPointsTable 
-                            players={venueFantasyStats?.team2_players || []} 
-                            title={`${selectedTeam2.abbreviated_name} Fantasy Points at ${venue}`} 
-                            />
-                        </Grid>
-                        </Grid>         
-                        <Grid container spacing={2} sx={{ mt: 2 }}>
-                        <Grid item xs={12} md={6}>
-                            <FantasyPointsBarChart 
-                            players={venueFantasyStats?.team1_players || []} 
-                            title={`${selectedTeam1.abbreviated_name} Fantasy Points Breakdown`} 
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <FantasyPointsBarChart 
-                            players={venueFantasyStats?.team2_players || []} 
-                            title={`${selectedTeam2.abbreviated_name} Fantasy Points Breakdown`} 
-                            />
-                        </Grid>
-                        </Grid> 
-                    </>
-                    )}
-                    {fantasyTabValue === 1 && (
-                      <>
-                        <FantasyPointsTable 
-                        players={venuePlayerHistory?.players || []} 
-                        title={`Player Fantasy History at ${venue}`} 
-                        />
-                        <FantasyPointsBarChart 
-                        players={venuePlayerHistory?.players || []} 
-                        title={`Top Players at ${venue}`} 
-                        />
-                     </>
-                     )}
-                    </Box>
-                </Card>
-            </Grid>
             )}
         </Grid>
     </Box>

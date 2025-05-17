@@ -23,7 +23,8 @@ const BowlingAnalysis = ({
     venue,
     startDate,
     endDate,
-    statsData
+    statsData,
+    isMobile
 }) => {
     const [selectedPhase, setSelectedPhase] = useState('overall');
     const [selectedMetric, setSelectedMetric] = useState('ballsPercentage');
@@ -105,12 +106,25 @@ const BowlingAnalysis = ({
     return (
         <Box>
             {/* Phase Selection */}
-            <Stack spacing={2} sx={{ mb: 3 }}>
+            <Stack 
+                direction={{ xs: 'column', md: 'row' }} 
+                spacing={2} 
+                sx={{ mb: 3 }}
+                alignItems="center"
+            >
                 <ToggleButtonGroup
                     value={selectedPhase}
                     exclusive
                     onChange={(_, value) => value && setSelectedPhase(value)}
-                    sx={{ mb: 2 }}
+                    sx={{ 
+                        mb: { xs: 1, md: 2 },
+                        flexWrap: 'wrap',
+                        '& .MuiToggleButton-root': {
+                            px: { xs: 1, md: 2 },
+                            py: { xs: 0.5, md: 1 },
+                            fontSize: { xs: '0.7rem', md: '0.875rem' }
+                        }
+                    }}
                 >
                     {Object.entries(phases).map(([phase, label]) => (
                         <ToggleButton key={phase} value={phase}>
@@ -123,6 +137,14 @@ const BowlingAnalysis = ({
                     value={selectedMetric}
                     exclusive
                     onChange={(_, value) => value && setSelectedMetric(value)}
+                    sx={{ 
+                        flexWrap: 'wrap',
+                        '& .MuiToggleButton-root': {
+                            px: { xs: 1, md: 2 },
+                            py: { xs: 0.5, md: 1 },
+                            fontSize: { xs: '0.7rem', md: '0.875rem' }
+                        }
+                    }}
                 >
                     {Object.entries(metrics).map(([key, { label }]) => (
                         <ToggleButton key={key} value={key}>
@@ -134,13 +156,13 @@ const BowlingAnalysis = ({
 
             {/* Charts */}
             {bowlingData && (
-                <Stack spacing={3}>
+                <Stack spacing={isMobile ? 2 : 3}>
                     {/* Pace vs Spin Overview */}
                     <Box>
-                        <Typography variant="h6" gutterBottom>
+                        <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
                             Pace vs Spin Comparison
                         </Typography>
-                        <Box sx={{ height: 400 }}>
+                        <Box sx={{ height: isMobile ? 300 : 400 }}>
                             <ResponsiveContainer>
                                 <BarChart
                                     data={[
@@ -155,8 +177,8 @@ const BowlingAnalysis = ({
                                     ]}
                                 >
                                     <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="type" />
-                                    <YAxis />
+                                    <XAxis dataKey="type" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                                    <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} />
                                     <Tooltip 
                                         formatter={(value) => {
                                             if (selectedMetric.includes('Percentage')) {
@@ -174,7 +196,7 @@ const BowlingAnalysis = ({
                                     <Bar 
                                         dataKey="value" 
                                         fill="#8884d8"
-                                        label={{
+                                        label={isMobile ? false : {
                                             position: 'top',
                                             formatter: (value) => value.toFixed(1)
                                         }}
@@ -186,17 +208,17 @@ const BowlingAnalysis = ({
 
                     {/* Detailed Bowling Types */}
                     <Box>
-                        <Typography variant="h6" gutterBottom>
+                        <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
                             Bowling Type Breakdown
                         </Typography>
-                        <Box sx={{ height: 400 }}>
+                        <Box sx={{ height: isMobile ? 300 : 400 }}>
                             <ResponsiveContainer>
                                 <BarChart
                                     data={bowlingData?.bowlingTypes?.[selectedPhase] || []}
                                 >
                                     <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="bowlingType" />
-                                    <YAxis />
+                                    <XAxis dataKey="bowlingType" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                                    <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} />
                                     <Tooltip 
                                         formatter={(value) => {
                                             if (selectedMetric.includes('Percentage')) {
@@ -214,7 +236,7 @@ const BowlingAnalysis = ({
                                     <Bar 
                                         dataKey={metrics[selectedMetric].key} 
                                         fill="#82ca9d"
-                                        label={{
+                                        label={isMobile ? false : {
                                             position: 'top',
                                             formatter: (value) => value.toFixed(1)
                                         }}

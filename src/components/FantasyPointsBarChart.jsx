@@ -2,7 +2,7 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const FantasyPointsBarChart = ({ players, title }) => {
+const FantasyPointsBarChart = ({ players, title, isMobile }) => {
   // Prepare data for chart
   // Ensure players is an array and has necessary properties
   const validPlayers = Array.isArray(players) ? players.filter(player => 
@@ -19,16 +19,16 @@ const FantasyPointsBarChart = ({ players, title }) => {
   
   return (
     <div className="fantasy-points-chart mb-4">
-      <h4>{title}</h4>
-      <ResponsiveContainer width="100%" height={400}>
+      {isMobile ? <h5>{title}</h5> : <h4>{title}</h4>}
+      <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
         <BarChart
           layout="vertical"
           data={data}
-          margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
+          margin={{ top: 20, right: 30, left: isMobile ? 60 : 100, bottom: 5 }}
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis type="number" label={{ value: 'Fantasy Points', position: 'insideBottom', offset: -5 }} />
-          <YAxis type="category" dataKey="name" />
+          <YAxis type="category" dataKey="name" tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 60 : 100} />
           <Tooltip formatter={(value) => value.toFixed(1)} />
           <Legend />
           <Bar dataKey="batting" stackId="a" fill="#8884d8" name="Batting" />

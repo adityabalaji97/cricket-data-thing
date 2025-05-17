@@ -12,7 +12,7 @@ import {
 import axios from 'axios';
 import config from '../config';
 
-const CompetitionFilter = ({ onFilterChange }) => {
+const CompetitionFilter = ({ onFilterChange, isMobile }) => {
     const [includeInternational, setIncludeInternational] = useState(false);
     const [topTeams, setTopTeams] = useState(10);
     const [selectedLeagues, setSelectedLeagues] = useState([]);
@@ -77,7 +77,7 @@ const CompetitionFilter = ({ onFilterChange }) => {
 
     return (
         <Box sx={{ mb: 2 }}>
-            <FormGroup row>
+            <FormGroup sx={{ flexDirection: isMobile ? 'column' : 'row', gap: 2, alignItems: 'flex-start' }}>
                 <Autocomplete
                     multiple
                     value={selectedLeagues}
@@ -94,7 +94,7 @@ const CompetitionFilter = ({ onFilterChange }) => {
                     renderInput={(params) => (
                         <TextField {...params} label="Select Leagues" />
                     )}
-                    sx={{ width: 400, mr: 2 }}
+                    sx={{ width: isMobile ? '100%' : 400, mb: isMobile ? 1 : 0, mr: isMobile ? 0 : 2 }}
                 />
                 <FormControlLabel
                     control={
@@ -110,18 +110,21 @@ const CompetitionFilter = ({ onFilterChange }) => {
                     label="Include International Matches"
                 />
                 {includeInternational && (
-                    <TextField
-                        type="number"
-                        label="Top Teams"
-                        value={topTeams}
-                        onChange={(e) => {
-                            const newValue = parseInt(e.target.value);
-                            setTopTeams(newValue);
-                            handleSelectionChange(selectedLeagues, includeInternational, newValue);
-                        }}
-                        inputProps={{ min: 1, max: 20 }}
-                        sx={{ width: 100 }}
-                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', width: isMobile ? '100%' : 'auto', mt: isMobile ? 1 : 0 }}>
+                        <TextField
+                            type="number"
+                            label="Top Teams"
+                            value={topTeams}
+                            onChange={(e) => {
+                                const newValue = parseInt(e.target.value);
+                                setTopTeams(newValue);
+                                handleSelectionChange(selectedLeagues, includeInternational, newValue);
+                            }}
+                            inputProps={{ min: 1, max: 20 }}
+                            sx={{ width: isMobile ? '100%' : 100 }}
+                            fullWidth={isMobile}
+                        />
+                    </Box>
                 )}
             </FormGroup>
         </Box>

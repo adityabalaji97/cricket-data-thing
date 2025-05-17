@@ -9,9 +9,15 @@ import {
   Typography,
   Button,
   Tabs,
-  Tab
+  Tab,
+  IconButton,
+  Menu,
+  MenuItem,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import MenuIcon from '@mui/icons-material/Menu';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import VenueNotes from './components/VenueNotes';
 import MatchHistory from './components/MatchHistory';
 import Matchups from './components/Matchups';
@@ -24,7 +30,13 @@ import config from './config';
 const DEFAULT_START_DATE = "2024-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
 
-const App = () => {
+// Wrap the main content with this to access navigation
+const AppContent = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
   const [venues, setVenues] = useState([]);
   const [teams, setTeams] = useState([]);
   const [selectedVenue, setSelectedVenue] = useState("All Venues");
@@ -44,9 +56,31 @@ const App = () => {
   });
   const [statsData, setStatsData] = useState(null);
   const [currentTab, setCurrentTab] = useState(0);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
 
   const [venueFantasyStats, setVenueFantasyStats] = useState({ team1_players: [], team2_players: [] });
   const [venuePlayerHistory, setVenuePlayerHistory] = useState({ players: [] });
+
+  const handleMenuClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleNavigate = (path) => {
+    handleMenuClose();
+    navigate(path);
+    setCurrentTab(path === '/' ? 0 : path === '/player' ? 1 : 2);
+  };
+
+  useEffect(() => {
+    // Set current tab based on location
+    const path = location.pathname;
+    setCurrentTab(path === '/' ? 0 : path === '/player' ? 1 : 2);
+  }, [location]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -257,177 +291,239 @@ const App = () => {
     setCurrentTab(newValue);
   };
 
+  // Create page title based on current tab
+  const getPageTitle = () => {
+    return currentTab === 0 ? 'Venue Analysis' : 
+           currentTab === 1 ? 'Player Profile' : 'Matchups';
+  };
+
   return (
-    <Router>
-      <Container maxWidth="xl">
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-          <Tabs value={currentTab} onChange={handleTabChange}>
+    <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
+      <Box sx={{ 
+        borderBottom: 1, 
+        borderColor: 'divider', 
+        mb: 3, 
+        display: 'flex', 
+        alignItems: 'center',
+        flexDirection: 'row',
+        flexWrap: 'nowrap'
+      }}>
+        {isMobile ? (
+          <>
+            <IconButton
+              aria-label="menu"
+              aria-controls="navigation-menu"
+              aria-haspopup="true"
+              onClick={handleMenuClick}
+              size="large"
+            >
+              <MenuIcon />
+            </IconButton>
+            <Menu
+              id="navigation-menu"
+              anchorEl={anchorEl}
+              open={open}
+              onClose={handleMenuClose}
+            >
+              <MenuItem onClick={() => handleNavigate('/')}>
+                Venue Analysis
+              </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/player')}>
+                Player Profile
+              </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/matchups')}>
+                Matchups
+              </MenuItem>
+            </Menu>
+            <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap' }}>
+              {getPageTitle()}
+            </Typography>
+          </>
+        ) : (
+          <Tabs 
+            value={currentTab} 
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+            sx={{ width: '100%' }}
+          >
             <Tab label="Venue Analysis" component={Link} to="/" />
             <Tab label="Player Profile" component={Link} to="/player" />
             <Tab label="Matchups" component={Link} to="/matchups" />
           </Tabs>
-        </Box>
+        )}
+      </Box>
 
-        <Routes>
-          <Route path="/player" element={<PlayerProfile />} />
-          <Route path="/matchups" element={<MatchupsTab />} />
-          <Route path="/" element={
-            <Box sx={{ my: 3 }}>
-              {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {error}
-                </Alert>
-              )}
+      <Routes>
+        <Route path="/player" element={<PlayerProfile isMobile={isMobile} />} />
+        <Route path="/matchups" element={<MatchupsTab isMobile={isMobile} />} />
+        <Route path="/" element={
+          <Box sx={{ my: 3 }}>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+            
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: { xs: 'column', md: 'row' },
+              gap: 2, 
+              mb: 2 
+            }}>
+              <Autocomplete
+                value={selectedVenue}
+                onChange={(event, newValue) => {
+                  setSelectedVenue(newValue || "All Venues");
+                  setShowVisualizations(false);
+                }}
+                options={venues}
+                sx={{ width: '100%' }}
+                loading={loading}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Select Venue"
+                    required
+                    fullWidth
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                          {params.InputProps.endAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+              />
               
-              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+              <TextField
+                label="Start Date"
+                type="date"
+                value={startDate}
+                onChange={(e) => handleDateChange(e.target.value, true)}
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ max: endDate }}
+                required
+                fullWidth
+              />
+              
+              <TextField
+                label="End Date"
+                type="date"
+                value={endDate}
+                onChange={(e) => handleDateChange(e.target.value, false)}
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ max: TODAY }}
+                required
+                fullWidth
+              />
+            </Box>
+
+            <CompetitionFilter onFilterChange={handleFilterChange} isMobile={isMobile} />
+
+            {startDate && endDate && !error && (
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 2, 
+                mb: 2 
+              }}>
                 <Autocomplete
-                  value={selectedVenue}
+                  value={selectedTeam1}
                   onChange={(event, newValue) => {
-                    setSelectedVenue(newValue || "All Venues");
+                    setSelectedTeam1(newValue);
                     setShowVisualizations(false);
                   }}
-                  options={venues}
-                  sx={{ width: 300 }}
-                  loading={loading}
+                  options={teams}
+                  sx={{ width: '100%' }}
+                  getOptionLabel={(option) => option?.abbreviated_name || ''}
+                  renderOption={(props, option) => (
+                    <li {...props}>
+                      <Typography>
+                        {option.abbreviated_name} - {option.full_name}
+                      </Typography>
+                    </li>
+                  )}
                   renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Select Venue"
-                      required
-                      InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                          <>
-                            {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                            {params.InputProps.endAdornment}
-                          </>
-                        ),
-                      }}
-                    />
+                    <TextField {...params} label="Team 1" fullWidth />
                   )}
+                  isOptionEqualToValue={(option, value) => 
+                    option?.full_name === value?.full_name
+                  }
                 />
                 
-                <TextField
-                  label="Start Date"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => handleDateChange(e.target.value, true)}
-                  InputLabelProps={{ shrink: true }}
-                  inputProps={{ max: endDate }}
-                  required
+                <Autocomplete
+                  value={selectedTeam2}
+                  onChange={(event, newValue) => {
+                    setSelectedTeam2(newValue);
+                    setShowVisualizations(false);
+                  }}
+                  options={teams.filter(team => team?.full_name !== selectedTeam1?.full_name)}
+                  sx={{ width: '100%' }}
+                  getOptionLabel={(option) => option?.abbreviated_name || ''}
+                  renderOption={(props, option) => (
+                    <li {...props}>
+                      <Typography>
+                        {option.abbreviated_name} - {option.full_name}
+                      </Typography>
+                    </li>
+                  )}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Team 2" fullWidth />
+                  )}
+                  isOptionEqualToValue={(option, value) => 
+                    option?.full_name === value?.full_name
+                  }
                 />
-                
-                <TextField
-                  label="End Date"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => handleDateChange(e.target.value, false)}
-                  InputLabelProps={{ shrink: true }}
-                  inputProps={{ max: TODAY }}
-                  required
-                />
+
+                <Button 
+                  variant="contained"
+                  onClick={() => setShowVisualizations(true)}
+                  disabled={loading || error}
+                  sx={{ 
+                    mt: { xs: 1, md: 0 },
+                    width: { xs: '100%', md: 'auto' },
+                    height: { xs: 'auto', md: '56px' }  // Match the height of Autocomplete
+                  }}
+                >
+                  Go
+                </Button>
               </Box>
+            )}
 
-              <CompetitionFilter onFilterChange={handleFilterChange} />
+            {showVisualizations && !loading && !error && (
+              <>
+                <VenueNotes 
+                  venue={selectedVenue}
+                  startDate={startDate} 
+                  endDate={endDate}
+                  venueStats={venueStats}
+                  statsData={statsData}
+                  selectedTeam1={selectedTeam1} 
+                  selectedTeam2={selectedTeam2} 
+                  venueFantasyStats={venueFantasyStats}
+                  venuePlayerHistory={venuePlayerHistory}
+                  matchHistory={matchHistory}
+                  isMobile={isMobile}
+                />
+                {/* The VenueNotes component will handle displaying these sections in the right order now */}
+              </>
+            )}
+          </Box>
+        } />
+      </Routes>
+    </Container>
+  );
+};
 
-              {startDate && endDate && !error && (
-                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                  <Autocomplete
-                    value={selectedTeam1}
-                    onChange={(event, newValue) => {
-                      setSelectedTeam1(newValue);
-                      setShowVisualizations(false);
-                    }}
-                    options={teams}
-                    sx={{ width: 200 }}
-                    getOptionLabel={(option) => option?.abbreviated_name || ''}
-                    renderOption={(props, option) => (
-                      <li {...props}>
-                        <Typography>
-                          {option.abbreviated_name} - {option.full_name}
-                        </Typography>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField {...params} label="Team 1" />
-                    )}
-                    isOptionEqualToValue={(option, value) => 
-                      option?.full_name === value?.full_name
-                    }
-                  />
-                  
-                  <Autocomplete
-                    value={selectedTeam2}
-                    onChange={(event, newValue) => {
-                      setSelectedTeam2(newValue);
-                      setShowVisualizations(false);
-                    }}
-                    options={teams.filter(team => team?.full_name !== selectedTeam1?.full_name)}
-                    sx={{ width: 200 }}
-                    getOptionLabel={(option) => option?.abbreviated_name || ''}
-                    renderOption={(props, option) => (
-                      <li {...props}>
-                        <Typography>
-                          {option.abbreviated_name} - {option.full_name}
-                        </Typography>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField {...params} label="Team 2" />
-                    )}
-                    isOptionEqualToValue={(option, value) => 
-                      option?.full_name === value?.full_name
-                    }
-                  />
-
-                  <Button 
-                    variant="contained"
-                    onClick={() => setShowVisualizations(true)}
-                    disabled={loading || error}
-                  >
-                    Go
-                  </Button>
-                </Box>
-              )}
-
-              {showVisualizations && !loading && !error && (
-                <>
-                  <VenueNotes 
-                    venue={selectedVenue}
-                    startDate={startDate} 
-                    endDate={endDate}
-                    venueStats={venueStats}
-                    statsData={statsData}
-                    selectedTeam1={selectedTeam1} 
-                    selectedTeam2={selectedTeam2} 
-                    venueFantasyStats={venueFantasyStats}
-                    venuePlayerHistory={venuePlayerHistory}
-                  />
-                  {matchHistory && selectedTeam1 && selectedTeam2 && (
-                    <>
-                      <MatchHistory 
-                        venue={selectedVenue}
-                        team1={selectedTeam1.abbreviated_name}
-                        team2={selectedTeam2.abbreviated_name}
-                        venueResults={matchHistory.venue_results}
-                        team1Results={matchHistory.team1_results}
-                        team2Results={matchHistory.team2_results}
-                        h2hStats={matchHistory.h2h_stats}
-                      />
-                      <Matchups
-                        team1={selectedTeam1.full_name}
-                        team2={selectedTeam2.full_name}
-                        startDate={startDate}
-                        endDate={endDate}
-                      />
-                    </>
-                  )}
-                </>
-              )}
-            </Box>
-          } />
-        </Routes>
-      </Container>
+const App = () => {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 };

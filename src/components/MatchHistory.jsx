@@ -1,12 +1,12 @@
 import React from 'react';
 import { Box, Card, Typography, Divider, Grid } from '@mui/material';
 
-const HeadToHeadStats = ({ team1, team2, stats }) => {
+const HeadToHeadStats = ({ team1, team2, stats, isMobile }) => {
     if (!stats) return null;
     
     return (
         <Card sx={{ mb: 2, p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="h6" gutterBottom>
+            <Typography variant={isMobile ? "h6" : "h5"} gutterBottom>
                 Head to Head Stats
             </Typography>
             <Box sx={{ 
@@ -16,7 +16,7 @@ const HeadToHeadStats = ({ team1, team2, stats }) => {
                 py: 2
             }}>
                 <Box>
-                    <Typography variant="h3" color="primary">
+                    <Typography variant={isMobile ? "h5" : "h3"} color="primary">
                         {stats.team1_wins || 0}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -24,7 +24,7 @@ const HeadToHeadStats = ({ team1, team2, stats }) => {
                     </Typography>
                 </Box>
                 <Box>
-                    <Typography variant="h3">
+                    <Typography variant={isMobile ? "h5" : "h3"}>
                         {stats.draws || 0}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -32,7 +32,7 @@ const HeadToHeadStats = ({ team1, team2, stats }) => {
                     </Typography>
                 </Box>
                 <Box>
-                    <Typography variant="h3" color="secondary">
+                    <Typography variant={isMobile ? "h5" : "h3"} color="secondary">
                         {stats.team2_wins || 0}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -89,9 +89,9 @@ const HeadToHeadStats = ({ team1, team2, stats }) => {
     );
 };
 
-const ResultsSection = ({ title, matches, showVenue = true }) => (
+const ResultsSection = ({ title, matches, showVenue = true, isMobile }) => (
     <Card sx={{ mb: 2, p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Typography variant="h6" gutterBottom>
+        <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
             {title}
         </Typography>
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
@@ -139,7 +139,7 @@ const ResultsSection = ({ title, matches, showVenue = true }) => (
     </Card>
 );
 
-const MatchHistory = ({ venue, team1, team2, venueResults, team1Results, team2Results, h2hStats }) => (
+const MatchHistory = ({ venue, team1, team2, venueResults, team1Results, team2Results, h2hStats, isMobile }) => (
     <Box sx={{ mt: 3 }}>
         <Grid container spacing={2}>
             <Grid item xs={12} lg={6}>
@@ -147,6 +147,7 @@ const MatchHistory = ({ venue, team1, team2, venueResults, team1Results, team2Re
                     team1={team1} 
                     team2={team2} 
                     stats={h2hStats} 
+                    isMobile={isMobile}
                 />
             </Grid>
             <Grid item xs={12} lg={6}>
@@ -154,18 +155,21 @@ const MatchHistory = ({ venue, team1, team2, venueResults, team1Results, team2Re
                     title={`Recent matches at ${venue}`}
                     matches={venueResults}
                     showVenue={false}
+                    isMobile={isMobile}
                 />
             </Grid>
             <Grid item xs={12} md={6}>
                 <ResultsSection 
                     title={`${team1} - Recent Form`}
                     matches={team1Results} 
+                    isMobile={isMobile}
                 />
             </Grid>
             <Grid item xs={12} md={6}>
                 <ResultsSection 
                     title={`${team2} - Recent Form`}
                     matches={team2Results} 
+                    isMobile={isMobile}
                 />
             </Grid>
         </Grid>

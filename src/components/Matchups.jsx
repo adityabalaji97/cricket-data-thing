@@ -13,18 +13,12 @@ import {
     TableContainer, 
     TableHead, 
     TableRow,
-    Paper,
-    Tooltip,
-    Grid,
-    Tabs,
-    Tab
+    Tooltip
 } from '@mui/material';
 
-import FantasyPointsTable from './FantasyPointsTable';
-import FantasyPointsBarChart from './FantasyPointsBarChart';
 import { Info as InfoIcon } from 'lucide-react';
 
-const MetricCell = ({ data }) => {
+const MetricCell = ({ data, isMobile }) => {
     if (!data) return <TableCell align="center">-</TableCell>;
 
     const getColor = (sr, balls) => {
@@ -34,15 +28,17 @@ const MetricCell = ({ data }) => {
         return 'warning.main';
     };
 
-    const displayValue = `${data.runs}-${data.wickets} (${data.balls}) @ ${data.strike_rate.toFixed(1)}`;
+    const displayValue = isMobile
+        ? `${data.runs}-${data.wickets} (${data.balls})`
+        : `${data.runs}-${data.wickets} (${data.balls}) @ ${data.strike_rate.toFixed(1)}`;
 
     return (
         <TableCell 
             align="center" 
             sx={{ 
                 color: getColor(data.strike_rate, data.balls),
-                fontSize: '0.875rem',
-                padding: '8px'
+                fontSize: isMobile ? '0.75rem' : '0.875rem',
+                padding: isMobile ? '4px' : '8px'
             }}
         >
             <Tooltip
@@ -64,7 +60,7 @@ const MetricCell = ({ data }) => {
     );
 };
 
-const MatchupMatrix = ({ batting_team, bowling_team, matchups }) => {
+const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
     const batters = Object.keys(matchups);
     const bowlers = Array.from(
         new Set(
@@ -77,7 +73,7 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups }) => {
     return (
         <Card sx={{ p: 2, mb: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                <Typography variant="h6">
+                <Typography variant={isMobile ? "subtitle1" : "h6"}>
                     {decodeURIComponent(batting_team)} vs {decodeURIComponent(bowling_team)} Matchups
                 </Typography>
                 <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
@@ -85,7 +81,7 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups }) => {
                 </Tooltip>
             </Box>
             <TableContainer>
-                <Table size="small">
+                <Table size={isMobile ? "small" : "medium"}>
                     <TableHead>
                         <TableRow>
                             <TableCell 
@@ -107,7 +103,7 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups }) => {
                                     sx={{ 
                                         fontWeight: 'bold',
                                         whiteSpace: 'nowrap',
-                                        minWidth: '120px'
+                                        minWidth: isMobile ? '80px' : '120px'
                                     }}
                                 >
                                     {bowler}
@@ -133,9 +129,10 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups }) => {
                                     {batter}
                                 </TableCell>
                                 {bowlers.map(bowler => (
-                                    <MetricCell 
+                    <MetricCell 
                                         key={`${batter}-${bowler}`}
                                         data={matchups[batter]?.[bowler]}
+                                        isMobile={isMobile}
                                     />
                                 ))}
                             </TableRow>
@@ -147,91 +144,46 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups }) => {
     );
 };
 
-const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_players }) => {
+const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_players, isMobile }) => {
     const [matchupData, setMatchupData] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
 
-    const [venueFantasyStats, setVenueFantasyStats] = React.useState({ team1_players: [], team2_players: [] });
-    const [venuePlayerHistory, setVenuePlayerHistory] = React.useState({ players: [] });
-    const [fantasyTabValue, setFantasyTabValue] = React.useState(0);
-
     React.useEffect(() => {
         const fetchMatchups = async () => {
-            // In the fetchMatchups function in Matchups.jsx
-            // In the fetchMatchups function in Matchups.jsx
-        try {
-            setLoading(true);
-            setError(null);
-
-            // Build URL parameters properly
-            const params = new URLSearchParams();
-            params.append('start_date', startDate);
-            params.append('end_date', endDate);
-            
-            // Add custom team players if provided
-            if (team1_players && team1_players.length > 0) {
-                team1_players.forEach(player => {
-                    params.append('team1_players', player);
-                });
-            }
-            
-            if (team2_players && team2_players.length > 0) {
-                team2_players.forEach(player => {
-                    params.append('team2_players', player);
-                });
-            }
-            
-            // Get the matchups data
-            const matchupsResponse = await axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/${encodeURIComponent(team2)}/matchups?${params.toString()}`);
-            
-            setMatchupData(matchupsResponse.data);
-            
             try {
-                // Use different fantasy endpoints based on whether we're using custom teams
-                if (team1_players && team1_players.length > 0 && team2_players && team2_players.length > 0) {
-                    // For custom teams, use the custom-matchups endpoint
-                    // Add all players to the params for the fantasy stats
-                    const fantasyParams = new URLSearchParams(params);
-                    
-                    // Add all players to the 'players' parameter
-                    [...team1_players, ...team2_players].forEach(player => {
-                        fantasyParams.append('players', player);
+                setLoading(true);
+                setError(null);
+
+                // Build URL parameters properly
+                const params = new URLSearchParams();
+                params.append('start_date', startDate);
+                params.append('end_date', endDate);
+                
+                // Add custom team players if provided
+                if (team1_players && team1_players.length > 0) {
+                    team1_players.forEach(player => {
+                        params.append('team1_players', player);
                     });
-                    
-                    const fantasyResponse = await axios.get(`${config.API_URL}/custom-matchups/fantasy_stats?${fantasyParams.toString()}`);
-                    
-                    setVenueFantasyStats(fantasyResponse.data);
-                    
-                    // Combine players from both teams for player history
-                    setVenuePlayerHistory({
-                        players: [
-                            ...(fantasyResponse.data.team1_players || []), 
-                            ...(fantasyResponse.data.team2_players || [])
-                        ]
-                    });
-                } else {
-                    // For regular teams, use the team-based endpoints
-                    const [fantasyResponse, playerHistoryResponse] = await Promise.all([
-                        axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/${encodeURIComponent(team2)}/fantasy_stats?start_date=${startDate}&end_date=${endDate}`),
-                        axios.get(`${config.API_URL}/players/fantasy_history?team1=${encodeURIComponent(team1)}&team2=${encodeURIComponent(team2)}&${params.toString()}`)
-                    ]);
-                    
-                    setVenueFantasyStats(fantasyResponse.data);
-                    setVenuePlayerHistory(playerHistoryResponse.data);
                 }
-            } catch (fantasyError) {
-                console.log('Fantasy stats not available:', fantasyError);
-                setVenueFantasyStats({ team1_players: [], team2_players: [] });
-                setVenuePlayerHistory({ players: [] });
+                
+                if (team2_players && team2_players.length > 0) {
+                    team2_players.forEach(player => {
+                        params.append('team2_players', player);
+                    });
+                }
+                
+                // Get the matchups data
+                const matchupsResponse = await axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/${encodeURIComponent(team2)}/matchups?${params.toString()}`);
+                
+                setMatchupData(matchupsResponse.data);
+            } catch (error) {
+                console.error('Error fetching matchups:', error);
+                setError(error.response?.data?.detail || 'Error fetching matchups');
+            } finally {
+                setLoading(false);
             }
-        } catch (error) {
-            console.error('Error fetching matchups:', error);
-            setError(error.response?.data?.detail || 'Error fetching matchups');
-        } finally {
-            setLoading(false);
         };
-    }
 
         fetchMatchups();
     }, [team1, team2, startDate, endDate, team1_players, team2_players]);
@@ -278,65 +230,14 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
                 batting_team={matchupData.team1.name}
                 bowling_team={matchupData.team2.name}
                 matchups={matchupData.team1.batting_matchups}
+                isMobile={isMobile}
             />
             <MatchupMatrix 
                 batting_team={matchupData.team2.name}
                 bowling_team={matchupData.team1.name}
                 matchups={matchupData.team2.batting_matchups}
+                isMobile={isMobile}
             />
-            
-            {/* New Fantasy Points Section */}
-            <Card sx={{ p: 2, mt: 3 }}>
-                <Box sx={{ mb: 2 }}>
-                    <Typography variant="h6" gutterBottom>
-                        Fantasy Points Analysis
-                    </Typography>
-                    
-                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-                        <Tabs 
-                            value={fantasyTabValue} 
-                            onChange={(e, newValue) => setFantasyTabValue(newValue)}
-                        >
-                            <Tab label="Team Comparison" />
-                        </Tabs>
-                    </Box>
-                    
-                    <Box sx={{ mt: 2 }}>
-                        {fantasyTabValue === 0 && (
-                            <>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12} md={6}>
-                                        <FantasyPointsTable 
-                                            players={venueFantasyStats?.team1_players || []} 
-                                            title={`${matchupData.team1.name} Fantasy Points`} 
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <FantasyPointsTable 
-                                            players={venueFantasyStats?.team2_players || []} 
-                                            title={`${matchupData.team2.name} Fantasy Points`} 
-                                        />
-                                    </Grid>
-                                </Grid>         
-                                <Grid container spacing={2} sx={{ mt: 2 }}>
-                                    <Grid item xs={12} md={6}>
-                                        <FantasyPointsBarChart 
-                                            players={venueFantasyStats?.team1_players || []} 
-                                            title={`${matchupData.team1.name} Fantasy Points Breakdown`} 
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <FantasyPointsBarChart 
-                                            players={venueFantasyStats?.team2_players || []} 
-                                            title={`${matchupData.team2.name} Fantasy Points Breakdown`} 
-                                        />
-                                    </Grid>
-                                </Grid> 
-                            </>
-                        )}
-                    </Box>
-                </Box>
-            </Card>
         </Box>
     );
 };
