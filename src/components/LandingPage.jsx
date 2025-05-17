@@ -343,18 +343,32 @@ const LandingPage = () => {
         
         <Grid container spacing={4} alignItems="center">
           <Grid item xs={12} md={6}>
-            <img 
-              src="/cricket-og-image.svg" 
-              alt="Cricket Data Visualization" 
-              style={{ 
-                width: '100%', 
-                maxWidth: '500px', 
-                display: 'block',
+            {/* Use a direct SVG or component instead of trying to load an image */}
+            <Box
+              sx={{
+                width: '100%',
+                maxWidth: '500px',
+                height: '300px',
                 margin: '0 auto',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#0057b7',
                 borderRadius: '8px',
+                color: 'white',
+                position: 'relative',
+                overflow: 'hidden',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-              }} 
-            />
+              }}
+            >
+              <SportsCricketIcon sx={{ fontSize: 100, opacity: 0.2, position: 'absolute', right: 20, bottom: 20 }} />
+              <Typography variant="h5" component="div" sx={{ fontWeight: 'bold', textAlign: 'center', p: 2 }}>
+                Cricket Data Thing
+                <Typography component="div" variant="body1" sx={{ mt: 1 }}>
+                  Advanced Analytics & Visualization
+                </Typography>
+              </Typography>
+            </Box>
           </Grid>
           
           <Grid item xs={12} md={6}>
