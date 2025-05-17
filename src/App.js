@@ -179,13 +179,13 @@ const App = () => {
           try {
             const [historyResponseResult, fantasyResponseResult, playerHistoryResponseResult] = await Promise.allSettled([
               axios.get(
-                `http://localhost:8000/venues/${encodeURIComponent(selectedVenue)}/teams/${encodeURIComponent(selectedTeam1.full_name)}/${encodeURIComponent(selectedTeam2.full_name)}/history?${params.toString()}`
+                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/teams/${encodeURIComponent(selectedTeam1.full_name)}/${encodeURIComponent(selectedTeam2.full_name)}/history?${params.toString()}`
               ),
               axios.get(
-                `http://localhost:8000/venues/${encodeURIComponent(selectedVenue)}/teams/${encodeURIComponent(selectedTeam1.full_name)}/${encodeURIComponent(selectedTeam2.full_name)}/fantasy_stats?${params.toString()}`
+                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/teams/${encodeURIComponent(selectedTeam1.full_name)}/${encodeURIComponent(selectedTeam2.full_name)}/fantasy_stats?${params.toString()}`
               ),
               axios.get(
-                `http://localhost:8000/venues/${encodeURIComponent(selectedVenue)}/players/fantasy_history?team1=${encodeURIComponent(selectedTeam1.full_name)}&team2=${encodeURIComponent(selectedTeam2.full_name)}&${params.toString()}`
+                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/players/fantasy_history?team1=${encodeURIComponent(selectedTeam1.full_name)}&team2=${encodeURIComponent(selectedTeam2.full_name)}&${params.toString()}`
               )
             ]);
             
