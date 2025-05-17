@@ -1,0 +1,667 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import axios from 'axios';
+import { 
+    Box, 
+    TextField, 
+    Tab, 
+    Tabs, 
+    Autocomplete, 
+    CircularProgress, 
+    Alert,
+    Typography,
+    Button,
+    Paper,
+    Chip,
+    Divider,
+    Card,
+    CardContent,
+    IconButton,
+    List,
+    ListItem,
+    ListItemText,
+    Grid,
+    ListItemIcon,
+    Checkbox,
+    InputAdornment
+} from '@mui/material';
+import { 
+    Add as AddIcon, 
+    Delete as DeleteIcon, 
+    Search as SearchIcon,
+    KeyboardArrowRight as KeyboardArrowRightIcon,
+    KeyboardArrowLeft as KeyboardArrowLeftIcon 
+} from '@mui/icons-material';
+import { FixedSizeList } from 'react-window';
+import debounce from 'lodash/debounce';
+import Matchups from './Matchups';
+import TeamBowlingTypeMatchups from './TeamBowlingTypeMatchups';
+
+const DEFAULT_START_DATE = "2024-01-01";
+const TODAY = new Date().toISOString().split('T')[0];
+
+const MatchupsTab = () => {
+    // Helper function to format team name for URL
+    const formatTeamNameForUrl = (teamName) => {
+        // Replace special characters and spaces that might cause URL issues
+        return encodeURIComponent(teamName.trim());
+    };
+    // State for mode selection (0 = Team vs Team, 1 = Custom Teams)
+    const [mode, setMode] = useState(0);
+    
+    // State for team vs team mode
+    const [teams, setTeams] = useState([]);
+    const [selectedTeam1, setSelectedTeam1] = useState(null);
+    const [selectedTeam2, setSelectedTeam2] = useState(null);
+    
+    // State for custom teams mode
+    const [players, setPlayers] = useState([]);
+    const [selectedPlayer, setSelectedPlayer] = useState(null);
+    const [customTeam1, setCustomTeam1] = useState([]);
+    const [customTeam2, setCustomTeam2] = useState([]);
+    const [customTeam1Name, setCustomTeam1Name] = useState('Custom Team 1');
+    const [customTeam2Name, setCustomTeam2Name] = useState('Custom Team 2');
+    
+    // Transfer list state
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    const [checked, setChecked] = useState([]);
+    
+    // Create a debounced search function
+    const debouncedSearch = useMemo(
+      () =>
+        debounce((value) => {
+          setDebouncedSearchTerm(value);
+        }, 300),
+      []
+    );
+    
+    // Shared state
+    const [startDate, setStartDate] = useState(DEFAULT_START_DATE);
+    const [endDate, setEndDate] = useState(TODAY);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [showMatchups, setShowMatchups] = useState(false);
+
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                
+                const [teamsResponse, playersResponse] = await Promise.all([
+                    axios.get('http://localhost:8000/teams/'),
+                    axios.get('http://localhost:8000/players/')
+                ]);
+                
+                if (Array.isArray(teamsResponse.data)) {
+                    setTeams(teamsResponse.data.sort((a, b) => a.full_name.localeCompare(b.full_name)));
+                }
+                
+                if (Array.isArray(playersResponse.data)) {
+                    setPlayers(playersResponse.data.sort());
+                }
+            } catch (error) {
+                console.error('Error fetching initial data:', error);
+                setError('Failed to load initial data. Please try again later.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchInitialData();
+    }, []);
+    
+    // Effect for fetching team players for bowling type matchups
+    useEffect(() => {
+        const fetchTeamPlayers = async () => {
+            if (showMatchups && mode === 0 && selectedTeam1 && selectedTeam2) {
+                try {
+                    const response = await axios.get(
+                        `http://localhost:8000/teams/${selectedTeam1.full_name}/${selectedTeam2.full_name}/matchups?start_date=${startDate}&end_date=${endDate}`
+                    );
+                    
+                    if (response.data && response.data.team1 && response.data.team2) {
+                        setTeam1Players(response.data.team1.players || []);
+                        setTeam2Players(response.data.team2.players || []);
+                    }
+                } catch (error) {
+                    console.error('Error fetching team players:', error);
+                }
+            }
+        };
+
+        fetchTeamPlayers();
+    }, [showMatchups, mode, selectedTeam1, selectedTeam2, startDate, endDate]);
+    
+    // Memoize filtered players list
+    const filteredPlayers = useMemo(() => {
+        if (!players.length) return [];
+        
+        // Create Sets for faster lookups
+        const team1Set = new Set(customTeam1);
+        const team2Set = new Set(customTeam2);
+        
+        return players.filter(player => 
+            player.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) &&
+            !team1Set.has(player) && 
+            !team2Set.has(player)
+        );
+    }, [players, debouncedSearchTerm, customTeam1, customTeam2]);
+
+    const handleDateChange = (value, isStartDate) => {
+        const newDate = value;
+        if (isStartDate) {
+            if (newDate > endDate) {
+                setError("Start date cannot be after end date");
+                return;
+            }
+            setStartDate(newDate);
+        } else {
+            if (newDate < startDate) {
+                setError("End date cannot be before start date");
+                return;
+            }
+            if (newDate > TODAY) {
+                setError("End date cannot be in the future");
+                return;
+            }
+            setEndDate(newDate);
+        }
+        setError(null);
+        setShowMatchups(false);
+    };
+
+    // Handle search input change
+    const handleSearchChange = (event) => {
+        setSearchTerm(event.target.value);
+        debouncedSearch(event.target.value);
+    };
+
+    // Check/uncheck items for transfer
+    const handleToggle = useCallback((value) => () => {
+        const currentIndex = checked.indexOf(value);
+        const newChecked = [...checked];
+        
+        if (currentIndex === -1) {
+            newChecked.push(value);
+        } else {
+            newChecked.splice(currentIndex, 1);
+        }
+        
+        setChecked(newChecked);
+    }, [checked]);
+
+    // Row renderer for virtualized list of available players
+    const PlayerRow = useCallback(({ index, style }) => {
+        const player = filteredPlayers[index];
+        return (
+            <ListItem 
+                style={style}
+                role="listitem"
+                button
+                onClick={handleToggle(player)}
+            >
+                <ListItemIcon>
+                    <Checkbox
+                        checked={checked.indexOf(player) !== -1}
+                        tabIndex={-1}
+                        disableRipple
+                    />
+                </ListItemIcon>
+                <ListItemText primary={player} />
+            </ListItem>
+        );
+    }, [filteredPlayers, checked, handleToggle]);
+
+    // Move selected players to a team
+    const handleCheckedRight = useCallback((teamNumber) => {
+        const teamToUpdate = teamNumber === 1 ? customTeam1 : customTeam2;
+        const setTeam = teamNumber === 1 ? setCustomTeam1 : setCustomTeam2;
+        
+        // Filter to only include players that aren't already in either team
+        const playersToAdd = checked.filter(player => 
+            !customTeam1.includes(player) && !customTeam2.includes(player)
+        );
+        
+        setTeam([...teamToUpdate, ...playersToAdd]);
+        setChecked([]);
+        setError(null);
+    }, [checked, customTeam1, customTeam2, setChecked, setError]);
+
+    // Remove players from a team
+    const handleCheckedLeft = useCallback((teamNumber) => {
+        const teamToUpdate = teamNumber === 1 ? customTeam1 : customTeam2;
+        const setTeam = teamNumber === 1 ? setCustomTeam1 : setCustomTeam2;
+        
+        const filteredTeam = teamToUpdate.filter(player => !checked.includes(player));
+        setTeam(filteredTeam);
+        setChecked([]);
+    }, [checked, customTeam1, customTeam2, setChecked]);
+    
+    // Row renderer for Team 1 list
+    const Team1Row = useCallback(({ index, style }) => {
+        const player = customTeam1[index];
+        return (
+            <ListItem
+                style={style}
+                role="listitem"
+                button
+                onClick={handleToggle(player)}
+            >
+                <ListItemIcon>
+                    <Checkbox
+                        checked={checked.indexOf(player) !== -1}
+                        tabIndex={-1}
+                        disableRipple
+                    />
+                </ListItemIcon>
+                <ListItemText primary={player} />
+            </ListItem>
+        );
+    }, [customTeam1, checked, handleToggle]);
+
+    // Row renderer for Team 2 list
+    const Team2Row = useCallback(({ index, style }) => {
+        const player = customTeam2[index];
+        return (
+            <ListItem
+                style={style}
+                role="listitem"
+                button
+                onClick={handleToggle(player)}
+            >
+                <ListItemIcon>
+                    <Checkbox
+                        checked={checked.indexOf(player) !== -1}
+                        tabIndex={-1}
+                        disableRipple
+                    />
+                </ListItemIcon>
+                <ListItemText primary={player} />
+            </ListItem>
+        );
+    }, [customTeam2, checked, handleToggle]);
+
+    const handleGenerate = () => {
+        // Validate based on the current mode
+        if (mode === 0) { // Team vs Team
+            if (!selectedTeam1 || !selectedTeam2) {
+                setError("Please select both teams");
+                return;
+            }
+        } else { // Custom Teams
+            if (customTeam1.length === 0 || customTeam2.length === 0) {
+                setError("Please add at least one player to each team");
+                return;
+            }
+        }
+        
+        setShowMatchups(true);
+    };
+
+    const renderTeamVsTeam = () => (
+        <Box sx={{ mt: 3 }}>
+            <Typography variant="h6" gutterBottom>
+                Select Teams to Compare
+            </Typography>
+            
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <Autocomplete
+                    value={selectedTeam1}
+                    onChange={(event, newValue) => {
+                        setSelectedTeam1(newValue);
+                        setShowMatchups(false);
+                    }}
+                    options={teams}
+                    sx={{ width: 300 }}
+                    getOptionLabel={(option) => option?.abbreviated_name || ''}
+                    renderOption={(props, option) => (
+                        <li {...props}>
+                            <Typography>
+                                {option.abbreviated_name} - {option.full_name}
+                            </Typography>
+                        </li>
+                    )}
+                    renderInput={(params) => (
+                        <TextField {...params} label="Team 1" />
+                    )}
+                    isOptionEqualToValue={(option, value) => 
+                        option?.full_name === value?.full_name
+                    }
+                />
+                
+                <Autocomplete
+                    value={selectedTeam2}
+                    onChange={(event, newValue) => {
+                        setSelectedTeam2(newValue);
+                        setShowMatchups(false);
+                    }}
+                    options={teams.filter(team => team?.full_name !== selectedTeam1?.full_name)}
+                    sx={{ width: 300 }}
+                    getOptionLabel={(option) => option?.abbreviated_name || ''}
+                    renderOption={(props, option) => (
+                        <li {...props}>
+                            <Typography>
+                                {option.abbreviated_name} - {option.full_name}
+                            </Typography>
+                        </li>
+                    )}
+                    renderInput={(params) => (
+                        <TextField {...params} label="Team 2" />
+                    )}
+                    isOptionEqualToValue={(option, value) => 
+                        option?.full_name === value?.full_name
+                    }
+                />
+            </Box>
+        </Box>
+    );
+
+    const renderTeamBuilder = () => (
+        <Box sx={{ mt: 3 }}>
+            <Typography variant="h6" gutterBottom>
+                Build Custom Teams
+            </Typography>
+            
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <TextField
+                    label="Team 1 Name"
+                    value={customTeam1Name}
+                    onChange={(e) => setCustomTeam1Name(e.target.value)}
+                    sx={{ width: 200 }}
+                />
+                
+                <TextField
+                    label="Team 2 Name"
+                    value={customTeam2Name}
+                    onChange={(e) => setCustomTeam2Name(e.target.value)}
+                    sx={{ width: 200 }}
+                />
+            </Box>
+            
+            <Grid container spacing={2}>
+                {/* Available Players */}
+                <Grid item xs={4}>
+                    <Paper sx={{ width: '100%', height: 400, overflow: 'hidden' }}>
+                        <TextField
+                            fullWidth
+                            placeholder="Search players..."
+                            value={searchTerm}
+                            onChange={handleSearchChange}
+                            sx={{ p: 1 }}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                        <Divider />
+                        {filteredPlayers.length > 0 ? (
+                            <FixedSizeList
+                                height={335}
+                                width="100%"
+                                itemSize={46} // Height of each row
+                                itemCount={filteredPlayers.length}
+                                overscanCount={5} // Number of items to render beyond visible area
+                            >
+                                {PlayerRow}
+                            </FixedSizeList>
+                        ) : (
+                            <Box sx={{ p: 2, textAlign: 'center' }}>
+                                <Typography variant="body2" color="textSecondary">
+                                    No players found
+                                </Typography>
+                            </Box>
+                        )}
+                    </Paper>
+                </Grid>
+                
+                {/* Transfer Controls */}
+                <Grid item xs={1} sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handleCheckedRight(1)}
+                        disabled={checked.length === 0}
+                        sx={{ my: 0.5 }}
+                    >
+                        <KeyboardArrowRightIcon /> Team 1
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handleCheckedRight(2)}
+                        disabled={checked.length === 0}
+                        sx={{ my: 0.5 }}
+                    >
+                        <KeyboardArrowRightIcon /> Team 2
+                    </Button>
+                </Grid>
+                
+                {/* Team 1 */}
+                <Grid item xs={3.5}>
+                    <Paper sx={{ width: '100%', height: 400, overflow: 'hidden' }}>
+                        <Typography variant="h6" sx={{ p: 1 }}>
+                            {customTeam1Name} ({customTeam1.length} players)
+                        </Typography>
+                        <Divider />
+                        {customTeam1.length === 0 ? (
+                            <ListItem>
+                                <ListItemText primary="No players added" />
+                            </ListItem>
+                        ) : (
+                            <FixedSizeList
+                                height={300}
+                                width="100%"
+                                itemSize={46}
+                                itemCount={customTeam1.length}
+                                overscanCount={5}
+                            >
+                                {Team1Row}
+                            </FixedSizeList>
+                        )}
+                        <Divider />
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => handleCheckedLeft(1)}
+                            disabled={checked.length === 0 || !checked.some(item => customTeam1.includes(item))}
+                            sx={{ m: 1 }}
+                        >
+                            <KeyboardArrowLeftIcon /> Remove
+                        </Button>
+                    </Paper>
+                </Grid>
+                
+                {/* Team 2 */}
+                <Grid item xs={3.5}>
+                    <Paper sx={{ width: '100%', height: 400, overflow: 'hidden' }}>
+                        <Typography variant="h6" sx={{ p: 1 }}>
+                            {customTeam2Name} ({customTeam2.length} players)
+                        </Typography>
+                        <Divider />
+                        {customTeam2.length === 0 ? (
+                            <ListItem>
+                                <ListItemText primary="No players added" />
+                            </ListItem>
+                        ) : (
+                            <FixedSizeList
+                                height={300}
+                                width="100%"
+                                itemSize={46}
+                                itemCount={customTeam2.length}
+                                overscanCount={5}
+                            >
+                                {Team2Row}
+                            </FixedSizeList>
+                        )}
+                        <Divider />
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => handleCheckedLeft(2)}
+                            disabled={checked.length === 0 || !checked.some(item => customTeam2.includes(item))}
+                            sx={{ m: 1 }}
+                        >
+                            <KeyboardArrowLeftIcon /> Remove
+                        </Button>
+                    </Paper>
+                </Grid>
+            </Grid>
+        </Box>
+    );
+
+    const [matchupTabValue, setMatchupTabValue] = useState(0);
+const [team1Players, setTeam1Players] = useState([]);
+const [team2Players, setTeam2Players] = useState([]);
+
+    const handleMatchupTabChange = (event, newValue) => {
+        setMatchupTabValue(newValue);
+    };
+
+    const renderMatchups = () => {
+        if (!showMatchups) return null;
+        
+        if (mode === 0) { // Team vs Team
+            // Check if team1 and team2 are selected
+            if (!selectedTeam1 || !selectedTeam2) {
+                return (
+                    <Alert severity="warning" sx={{ mt: 3 }}>
+                        Please select both teams to view matchups.
+                    </Alert>
+                );
+            }
+            
+            // Team players are fetched in a useEffect outside this function
+            return (
+                <Box sx={{ width: '100%' }}>
+                    <Matchups
+                        team1={selectedTeam1.full_name}
+                        team2={selectedTeam2.full_name}
+                        startDate={startDate}
+                        endDate={endDate}
+                    />
+                    
+                    <Box sx={{ mt: 4 }}>
+                        <TeamBowlingTypeMatchups 
+                            players={[...team1Players, ...team2Players]}
+                            team1_players={team1Players}
+                            team2_players={team2Players}
+                            team1Name={selectedTeam1.abbreviated_name || selectedTeam1.full_name}
+                            team2Name={selectedTeam2.abbreviated_name || selectedTeam2.full_name}
+                            startDate={startDate}
+                            endDate={endDate}
+                        />
+                    </Box>
+                </Box>
+            );
+        } else { // Custom Teams
+            // Check if at least one player is added to each team
+            if (customTeam1.length === 0 || customTeam2.length === 0) {
+                return (
+                    <Alert severity="warning" sx={{ mt: 3 }}>
+                        Please add at least one player to each team to view matchups.
+                    </Alert>
+                );
+            }
+            
+            // Combine players for bowling type analysis
+            const allPlayers = [...customTeam1, ...customTeam2];
+            
+            return (
+                <Box sx={{ width: '100%' }}>
+                    <Matchups
+                        team1={formatTeamNameForUrl(customTeam1Name)}
+                        team2={formatTeamNameForUrl(customTeam2Name)}
+                        startDate={startDate}
+                        endDate={endDate}
+                        team1_players={customTeam1}
+                        team2_players={customTeam2}
+                    />
+                    
+                    <Box sx={{ mt: 4 }}>
+                        <TeamBowlingTypeMatchups
+                            players={allPlayers}
+                            team1_players={customTeam1}
+                            team2_players={customTeam2}
+                            team1Name={customTeam1Name}
+                            team2Name={customTeam2Name}
+                            startDate={startDate}
+                            endDate={endDate}
+                        />
+                    </Box>
+                </Box>
+            );
+        }
+    };
+
+    return (
+        <Box sx={{ p: 2 }}>
+            <Typography variant="h4" gutterBottom>
+                Player Matchups Analysis
+            </Typography>
+            
+            {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                </Alert>
+            )}
+            
+            <Paper sx={{ width: '100%', mb: 3 }}>
+                <Tabs 
+                    value={mode} 
+                    onChange={(e, newValue) => {
+                        setMode(newValue);
+                        setShowMatchups(false);
+                    }}
+                >
+                    <Tab label="Team vs Team" />
+                    <Tab label="Custom Teams" />
+                </Tabs>
+                
+                <Box sx={{ p: 2 }}>
+                    <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                        <TextField
+                            label="Start Date"
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => handleDateChange(e.target.value, true)}
+                            InputLabelProps={{ shrink: true }}
+                            inputProps={{ max: endDate }}
+                        />
+                        
+                        <TextField
+                            label="End Date"
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => handleDateChange(e.target.value, false)}
+                            InputLabelProps={{ shrink: true }}
+                            inputProps={{ max: TODAY }}
+                        />
+                    </Box>
+                    
+                    {/* Render appropriate form based on selected mode */}
+                    {mode === 0 ? renderTeamVsTeam() : renderTeamBuilder()}
+                    
+                    <Button 
+                        variant="contained"
+                        color="primary"
+                        onClick={handleGenerate}
+                        sx={{ mt: 2 }}
+                        disabled={loading}
+                    >
+                        Generate Matchups
+                    </Button>
+                </Box>
+            </Paper>
+            
+            {loading && <CircularProgress />}
+            
+            {renderMatchups()}
+        </Box>
+    );
+};
+
+export default MatchupsTab;

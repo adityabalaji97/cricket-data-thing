@@ -19,7 +19,6 @@ import MatchupsTab from './components/MatchupsTab';
 import CompetitionFilter from './components/CompetitionFilter';
 import PlayerProfile from './components/PlayerProfile';
 import axios from 'axios';
-import config from './config';
 
 const DEFAULT_START_DATE = "2024-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
@@ -54,8 +53,8 @@ const App = () => {
         setLoading(true);
         setError(null);
         const [venuesResponse, teamsResponse] = await Promise.all([
-          axios.get(`${config.API_URL}/venues/`),
-          axios.get(`${config.API_URL}/teams/`)
+          axios.get('http://localhost:8000/venues/'),
+          axios.get('http://localhost:8000/teams/')
         ]);
         
         if (Array.isArray(venuesResponse.data)) {
@@ -128,8 +127,8 @@ const App = () => {
         try {
           // Use allSettled to avoid failing the entire Promise.all if one request fails
           const [venueResponseResult, statsResponseResult] = await Promise.allSettled([
-            axios.get(`${config.API_URL}/venue_notes/${encodeURIComponent(selectedVenue)}?${params.toString()}`),
-            axios.get(`${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/stats?${params.toString()}`)
+            axios.get(`http://localhost:8000/venue_notes/${encodeURIComponent(selectedVenue)}?${params.toString()}`),
+            axios.get(`http://localhost:8000/venues/${encodeURIComponent(selectedVenue)}/stats?${params.toString()}`)
           ]);
       
           // Handle results individually
