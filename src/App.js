@@ -23,14 +23,14 @@ import MatchHistory from './components/MatchHistory';
 import Matchups from './components/Matchups';
 import MatchupsTab from './components/MatchupsTab';
 import CompetitionFilter from './components/CompetitionFilter';
+import LandingPage from './components/LandingPage';
 import PlayerProfile from './components/PlayerProfile';
 import axios from 'axios';
-import config from './config';
 
+import config from './config';
 const DEFAULT_START_DATE = "2024-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
 
-// Wrap the main content with this to access navigation
 const AppContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -73,13 +73,21 @@ const AppContent = () => {
   const handleNavigate = (path) => {
     handleMenuClose();
     navigate(path);
-    setCurrentTab(path === '/' ? 0 : path === '/player' ? 1 : 2);
+    if (path === '/') {
+      setCurrentTab(-1); // -1 for home/landing page
+    } else {
+      setCurrentTab(path === '/venue' ? 0 : path === '/player' ? 1 : 2);
+    }
   };
 
   useEffect(() => {
     // Set current tab based on location
     const path = location.pathname;
-    setCurrentTab(path === '/' ? 0 : path === '/player' ? 1 : 2);
+    if (path === '/') {
+      setCurrentTab(-1); // Landing page
+    } else {
+      setCurrentTab(path === '/venue' ? 0 : path === '/player' ? 1 : 2);
+    }
   }, [location]);
 
   useEffect(() => {
@@ -293,6 +301,7 @@ const AppContent = () => {
 
   // Create page title based on current tab
   const getPageTitle = () => {
+    if (currentTab === -1) return 'Home';
     return currentTab === 0 ? 'Venue Analysis' : 
            currentTab === 1 ? 'Batter Profile' : 'Matchups';
   };
@@ -303,7 +312,7 @@ const AppContent = () => {
         borderBottom: 1, 
         borderColor: 'divider', 
         mb: 3, 
-        display: 'flex', 
+        display: currentTab === -1 ? 'none' : 'flex', // Hide when on landing page
         alignItems: 'center',
         flexDirection: 'row',
         flexWrap: 'nowrap'
@@ -326,6 +335,9 @@ const AppContent = () => {
               onClose={handleMenuClose}
             >
               <MenuItem onClick={() => handleNavigate('/')}>
+                Home
+              </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/venue')}>
                 Venue Analysis
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/player')}>
@@ -348,7 +360,7 @@ const AppContent = () => {
             allowScrollButtonsMobile
             sx={{ width: '100%' }}
           >
-            <Tab label="Venue Analysis" component={Link} to="/" />
+            <Tab label="Venue Analysis" component={Link} to="/venue" />
             <Tab label="Batter Profile" component={Link} to="/player" />
             <Tab label="Matchups" component={Link} to="/matchups" />
           </Tabs>
@@ -356,9 +368,10 @@ const AppContent = () => {
       </Box>
 
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/player" element={<PlayerProfile isMobile={isMobile} />} />
         <Route path="/matchups" element={<MatchupsTab isMobile={isMobile} />} />
-        <Route path="/" element={
+        <Route path="/venue" element={
           <Box sx={{ my: 3 }}>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
