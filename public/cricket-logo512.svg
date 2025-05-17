@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Cricket bat -->
+  <rect 
+    x="102.4" 
+    y="51.2" 
+    width="51.2" 
+    height="153.6" 
+    fill="#8B4513" 
+    rx="10.24" 
+  />
+  <rect 
+    x="76.8" 
+    y="204.8" 
+    width="102.4" 
+    height="358.4" 
+    fill="#8B4513" 
+    rx="20.48" 
+  />
+  
+  <!-- Cricket ball -->
+  <circle 
+    cx="358.4" 
+    cy="153.6" 
+    r="179.2" 
+    fill="#c70d3a" 
+  />
+  
+  <!-- Ball stitches -->
+  <path 
+    d="M 268.8 153.6 
+       A 89.6 89.6 0 0 1 448 153.6"
+    stroke="#333333" 
+    stroke-width="10.24" 
+    fill="none" 
+  />
+  
+  <path 
+    d="M 358.4 64 
+       A 89.6 89.6 0 0 1 358.4 243.2"
+    stroke="#333333" 
+    stroke-width="10.24" 
+    fill="none" 
+    transform="rotate(90, 358.4, 153.6)" 
+  />
+</svg>

@@ -294,7 +294,7 @@ const AppContent = () => {
   // Create page title based on current tab
   const getPageTitle = () => {
     return currentTab === 0 ? 'Venue Analysis' : 
-           currentTab === 1 ? 'Player Profile' : 'Matchups';
+           currentTab === 1 ? 'Batter Profile' : 'Matchups';
   };
 
   return (
@@ -329,7 +329,7 @@ const AppContent = () => {
                 Venue Analysis
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/player')}>
-                Player Profile
+                Batter Profile
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/matchups')}>
                 Matchups
@@ -349,7 +349,7 @@ const AppContent = () => {
             sx={{ width: '100%' }}
           >
             <Tab label="Venue Analysis" component={Link} to="/" />
-            <Tab label="Player Profile" component={Link} to="/player" />
+            <Tab label="Batter Profile" component={Link} to="/player" />
             <Tab label="Matchups" component={Link} to="/matchups" />
           </Tabs>
         )}
