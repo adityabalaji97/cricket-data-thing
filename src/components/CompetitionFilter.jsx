@@ -15,7 +15,7 @@ import config from '../config';
 const CompetitionFilter = ({ onFilterChange, isMobile }) => {
     const [includeInternational, setIncludeInternational] = useState(false);
     const [topTeams, setTopTeams] = useState(10);
-    const [selectedLeagues, setSelectedLeagues] = useState([]);
+    const [selectedLeagues, setSelectedLeagues] = useState([{ label: 'All Leagues', value: 'all' }]);
     const [leagues, setLeagues] = useState([]); 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -26,9 +26,9 @@ const CompetitionFilter = ({ onFilterChange, isMobile }) => {
                 setLoading(true);
                 const response = await axios.get(`${config.API_URL}/competitions`);
                 setLeagues(response.data.leagues);
-                // Set initial state with empty leagues
+                // Set initial state with all leagues
                 onFilterChange({
-                    leagues: [],
+                    leagues: response.data.leagues.map(league => league.value),
                     international: false,
                     topTeams: 10
                 });

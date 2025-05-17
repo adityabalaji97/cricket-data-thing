@@ -143,7 +143,14 @@ const BattingScatter = ({ data, isMobile }) => {
         .map(d => ({
             ...d,
             fill: getTeamColor(d.batting_team)
-        }));
+        }))
+        // Sort players by total runs (descending) to show the most prolific batters
+        .sort((a, b) => {
+            const phasePrefix = phase === 'overall' ? '' : `${phase}_`;
+            const aRuns = phase === 'overall' ? a.total_runs : a[`${phasePrefix}runs`] || 0;
+            const bRuns = phase === 'overall' ? b.total_runs : b[`${phasePrefix}runs`] || 0;
+            return bRuns - aRuns; // Descending order
+        });
 
     const metrics = getAxesData();
     const axisData = filteredData.map(d => ({
@@ -207,7 +214,7 @@ const BattingScatter = ({ data, isMobile }) => {
                 </FormControl>
             </Stack>
 
-            <Box sx={{ height: isMobile ? 350 : 450, width: '100%' }}>
+            <Box sx={{ height: isMobile ? 400 : 500, width: '100%' }}>
                 <ResponsiveContainer>
                     <ScatterChart 
                         margin={{ 
@@ -314,19 +321,63 @@ const BattingScatter = ({ data, isMobile }) => {
 
                         <Scatter
                             name="Players"
-                            data={filteredData.slice(0, 15)} // Limit to top 15 players to prevent overcrowding
+                            data={filteredData.slice(0, 12)} // Limit to top 12 players to prevent overcrowding
                             fill="#8884d8"
-                        >
-                            {filteredData.slice(0, 15).map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill || '#8884d8'} />
-                            ))}
-                        </Scatter>
+                            shape={(props) => {
+                                const { cx, cy, fill, payload } = props;
+                                return (
+                                    <>
+                                        <circle
+                                            cx={cx}
+                                            cy={cy}
+                                            r={6}
+                                            fill={fill || '#8884d8'}
+                                            stroke="#fff"
+                                            strokeWidth={1}
+                                        />
+                                        <text
+                                            x={cx}
+                                            y={cy + 16}
+                                            textAnchor="middle"
+                                            fontSize={11}
+                                            fontWeight="normal"
+                                            fill="#333"
+                                        >
+                                            {payload.name.length > 10 ? payload.name.substring(0, 10) + '...' : payload.name}
+                                        </text>
+                                    </>
+                                );
+                            }}
+                        />
                         
                         <Scatter
                             name="Average Batter"
                             data={[avgBatter]}
                             fill="#000"
-                            shape="star"
+                            shape={(props) => {
+                                const { cx, cy } = props;
+                                return (
+                                    <>
+                                        {/* Diamond shape for Average Batter */}
+                                        <polygon
+                                            points={`${cx},${cy-8} ${cx+8},${cy} ${cx},${cy+8} ${cx-8},${cy}`}
+                                            fill="#000"
+                                            stroke="#fff"
+                                            strokeWidth={1}
+                                        />
+                                        <text
+                                            x={cx}
+                                            y={cy + 16}
+                                            textAnchor="middle"
+                                            fontSize={11}
+                                            fontWeight="bold"
+                                            fill="#333"
+                                        >
+                                            Avg. Batter
+                                        </text>
+                                    </>
+                                );
+                            }}
                         />
                     </ScatterChart>
                 </ResponsiveContainer>
