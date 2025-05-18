@@ -69,7 +69,9 @@ Cricket Data Thing addresses these needs by providing an intuitive interface wit
 
 Cricket Data Thing follows a modern web application architecture with clear separation of concerns:
 
-![Architecture Diagram](placeholder-for-architecture-diagram.png)
+<img width="1178" alt="Screenshot 2025-05-18 at 18 19 22" src="https://github.com/user-attachments/assets/b98fca61-bf6f-4b35-beb3-55005f548569" />
+<img width="1178" alt="Screenshot 2025-05-18 at 18 19 33" src="https://github.com/user-attachments/assets/3b73fa7e-b38e-49f2-b771-ccd4bc8a8995" />
+
 
 ### Frontend (React.js)
 - **Framework**: React.js with React Router for navigation
