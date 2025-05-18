@@ -47,6 +47,7 @@ import FantasyPointsTable from './FantasyPointsTable';
 import FantasyPointsBarChart from './FantasyPointsBarChart';
 import MatchHistory from './MatchHistory';
 import Matchups from './Matchups';
+import BattingScatterChart from './BattingScatterChart';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -132,6 +133,7 @@ const BattingScatter = ({ data, isMobile }) => {
     const avgBatter = data.find(d => d.name === 'Average Batter');
     if (!avgBatter) return null;
 
+    // Filter data based on minimum innings and phase
     const filteredData = data
         .filter(d => {
             const phasePrefix = phase === 'overall' ? '' : `${phase}_`;
@@ -152,43 +154,70 @@ const BattingScatter = ({ data, isMobile }) => {
             return bRuns - aRuns; // Descending order
         });
 
+    // Calculate domain boundaries from the filtered data
     const metrics = getAxesData();
-    const axisData = filteredData.map(d => ({
-        x: d[metrics.xKey],
-        y: d[metrics.yKey]
-    }));
-
-    const padding = 0.05;
-    const minX = Math.floor(Math.min(...axisData.map(d => d.x)) * (1 - padding));
-    const maxX = Math.ceil(Math.max(...axisData.map(d => d.x)) * (1 + padding));
-    const minY = Math.floor(Math.min(...axisData.map(d => d.y)) * (1 - padding));
-    const maxY = Math.ceil(Math.max(...axisData.map(d => d.y)) * (1 + padding));
+    
+    // Check if filteredData has any elements before mapping
+    const axisData = filteredData.length > 0 
+        ? filteredData.map(d => ({
+            x: d[metrics.xKey],
+            y: d[metrics.yKey]
+          }))
+        : [{x: 0, y: 0}]; // Default if no data
+    
+    // Add Average Batter data point to ensure it's included in the domain
+    if (avgBatter) {
+        axisData.push({
+            x: avgBatter[metrics.xKey],
+            y: avgBatter[metrics.yKey]
+        });
+    }
+    
+    const padding = 0.1; // Increase padding to create more space
+    
+    // Calculate min/max values safely with fallbacks
+    const allXValues = axisData.map(d => d.x).filter(val => !isNaN(val) && val !== undefined);
+    const allYValues = axisData.map(d => d.y).filter(val => !isNaN(val) && val !== undefined);
+    
+    const minX = allXValues.length > 0 ? Math.floor(Math.min(...allXValues) * (1 - padding)) : 0;
+    const maxX = allXValues.length > 0 ? Math.ceil(Math.max(...allXValues) * (1 + padding)) : 50;
+    const minY = allYValues.length > 0 ? Math.floor(Math.min(...allYValues) * (1 - padding)) : 0;
+    const maxY = allYValues.length > 0 ? Math.ceil(Math.max(...allYValues) * (1 + padding)) : 150;
 
     return (
-        <Box sx={{ width: '100%', height: isMobile ? 450 : 550, pt: 2 }}>
-            <Typography variant="h6" sx={{ px: 2, mb: 2 }}>
+        <Box sx={{ width: '100%', height: isMobile ? '100%' : 650, display: 'flex', flexDirection: 'column', flex: 1, pt: 0 }}>
+            <Typography variant="h6" sx={{ px: 2, mb: 1 }}>
                 Batting Performance Analysis
             </Typography>
             
+            {filteredData.length > 30 && (
+                <Typography variant="caption" sx={{ px: 2, display: 'block', color: 'text.secondary', mb: 2 }}>
+                    Showing top 30 players by runs scored (from {filteredData.length} total matching your criteria)
+                </Typography>
+            )}
+            
             <Stack 
-                direction={isMobile ? "column" : "row"} 
+                direction={isMobile ? "column" : "row"}
                 spacing={2} 
                 alignItems={isMobile ? "stretch" : "center"} 
                 sx={{ px: 2, mb: 2 }}
             >
-                <Box sx={{ width: isMobile ? "100%" : 200 }}>
+                <Box sx={{ width: isMobile ? '100%' : 200 }}>
                     <Typography variant="body2" gutterBottom>
-                        Minimum Innings: {minInnings}
+                        Minimum Innings: {minInnings} ({filteredData.length} players)
                     </Typography>
                     <Slider
                         value={minInnings}
                         onChange={(_, value) => setMinInnings(value)}
                         min={1}
-                        max={20}
+                        max={15}
                         step={1}
+                        marks
+                        aria-label="Minimum Innings"
+                        valueLabelDisplay="auto"
                     />
                 </Box>
-                <FormControl sx={{ width: isMobile ? "100%" : 150 }}>
+                <FormControl sx={{ width: isMobile ? '100%' : 150 }}>
                     <InputLabel>Phase</InputLabel>
                     <Select
                         value={phase}
@@ -200,7 +229,7 @@ const BattingScatter = ({ data, isMobile }) => {
                         ))}
                     </Select>
                 </FormControl>
-                <FormControl sx={{ width: isMobile ? "100%" : 200 }}>
+                <FormControl sx={{ width: isMobile ? '100%' : 200 }}>
                     <InputLabel>Plot Type</InputLabel>
                     <Select
                         value={plotType}
@@ -214,14 +243,14 @@ const BattingScatter = ({ data, isMobile }) => {
                 </FormControl>
             </Stack>
 
-            <Box sx={{ height: isMobile ? 400 : 500, width: '100%' }}>
-                <ResponsiveContainer>
-                    <ScatterChart 
+            <Box sx={{ flex: 1, width: '100%', height: '90%', minHeight: 600, mt: 1 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                        <ScatterChart 
                         margin={{ 
-                            top: 20, 
-                            right: isMobile ? 20 : 30, 
-                            bottom: isMobile ? 30 : 50, 
-                            left: isMobile ? 40 : 60 
+                            top: 10, 
+                            right: 20, 
+                            bottom: 20, 
+                            left: 20 
                         }}
                     >
                         {plotType === 'avgsr' ? (
@@ -299,29 +328,24 @@ const BattingScatter = ({ data, isMobile }) => {
                         <XAxis 
                             type="number" 
                             dataKey={metrics.xKey}
-                            name={metrics.xLabel}
-                            label={isMobile ? null : { value: metrics.xLabel, position: 'bottom' }}
                             domain={[minX, maxX]}
-                            tick={{ fontSize: isMobile ? 10 : 12 }}
+                            tick={{ fontSize: 12 }}
                         />
                         <YAxis 
                             type="number" 
                             dataKey={metrics.yKey}
-                            name={metrics.yLabel}
-                            label={isMobile ? null : { value: metrics.yLabel, angle: -90, position: 'left' }}
                             domain={[minY, maxY]}
-                            tick={{ fontSize: isMobile ? 10 : 12 }}
+                            tick={{ fontSize: 12 }}
                         />
                         
                         <ReferenceLine x={avgBatter[metrics.xKey]} stroke="#666" strokeDasharray="3 3" />
                         <ReferenceLine y={avgBatter[metrics.yKey]} stroke="#666" strokeDasharray="3 3" />
 
                         <Tooltip content={<CustomTooltip />} />
-                        <Legend />
 
                         <Scatter
                             name="Players"
-                            data={filteredData.slice(0, 12)} // Limit to top 12 players to prevent overcrowding
+                            data={filteredData.length > 30 ? filteredData.slice(0, 30) : filteredData} // Limit to 30 max players, but show all if fewer
                             fill="#8884d8"
                             shape={(props) => {
                                 const { cx, cy, fill, payload } = props;
@@ -330,20 +354,20 @@ const BattingScatter = ({ data, isMobile }) => {
                                         <circle
                                             cx={cx}
                                             cy={cy}
-                                            r={6}
+                                            r={isMobile ? 6 : 8}
                                             fill={fill || '#8884d8'}
                                             stroke="#fff"
                                             strokeWidth={1}
                                         />
                                         <text
                                             x={cx}
-                                            y={cy + 16}
+                                            y={cy + (isMobile ? 12 : 16)}
                                             textAnchor="middle"
-                                            fontSize={11}
+                                            fontSize={isMobile ? 8 : 10}
                                             fontWeight="normal"
                                             fill="#333"
                                         >
-                                            {payload.name.length > 10 ? payload.name.substring(0, 10) + '...' : payload.name}
+                                            {payload.name.length > (isMobile ? 6 : 8) ? payload.name.substring(0, isMobile ? 6 : 8) + '...' : payload.name}
                                         </text>
                                     </>
                                 );
@@ -360,16 +384,16 @@ const BattingScatter = ({ data, isMobile }) => {
                                     <>
                                         {/* Diamond shape for Average Batter */}
                                         <polygon
-                                            points={`${cx},${cy-8} ${cx+8},${cy} ${cx},${cy+8} ${cx-8},${cy}`}
+                                            points={`${cx},${cy-10} ${cx+10},${cy} ${cx},${cy+10} ${cx-10},${cy}`}
                                             fill="#000"
                                             stroke="#fff"
                                             strokeWidth={1}
                                         />
                                         <text
                                             x={cx}
-                                            y={cy + 16}
+                                            y={cy + (isMobile ? 12 : 16)}
                                             textAnchor="middle"
-                                            fontSize={11}
+                                            fontSize={isMobile ? 9 : 11}
                                             fontWeight="bold"
                                             fill="#333"
                                         >
@@ -541,7 +565,7 @@ const WinPercentagesPie = ({ data }) => {
 
     const COLORS = ['#003f5c', '#bc5090'];
 
-    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, count }) => {
+    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
       const RADIAN = Math.PI / 180;
       const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
       const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -556,13 +580,13 @@ const WinPercentagesPie = ({ data }) => {
           dominantBaseline="central"
           fontSize={isMobile ? 12 : 14}
         >
-          {`${pieData[index].count} (${(percent * 100).toFixed(1)}%)`}
+          {`${(percent * 100).toFixed(1)}%`}
         </text>
       );
     };
 
     return (
-        <Box sx={{ width: '100%', height: isMobile ? 250 : 350 }}>
+        <Box sx={{ width: '100%', height: 350 }}>
             <Typography variant="subtitle1" align="center" gutterBottom>
                 Match Results Distribution
             </Typography>
@@ -571,7 +595,7 @@ const WinPercentagesPie = ({ data }) => {
                     <Pie
                         data={pieData}
                         cx="50%"
-                        cy="50%"
+                        cy="40%"
                         innerRadius={isMobile ? 40 : 60}
                         outerRadius={isMobile ? 80 : 110}
                         paddingAngle={2}
@@ -584,7 +608,12 @@ const WinPercentagesPie = ({ data }) => {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                     </Pie>
-                    <Legend />
+                    <text x="50%" y="85%" textAnchor="middle" dominantBaseline="middle">
+                        <tspan x="28%" fill={COLORS[0]}>●</tspan>
+                        <tspan dx="5" fill="#333">Won Batting First</tspan>
+                        <tspan x="72%" fill={COLORS[1]}>●</tspan>
+                        <tspan dx="5" fill="#333">Won Fielding First</tspan>
+                    </text>
                     <Tooltip 
                         formatter={(value, name, props) => [`${props.payload.count} (${value.toFixed(1)}%)`, name]}
                     />
@@ -645,7 +674,7 @@ const ScoresBarChart = ({ data }) => {
                 x={x + width + 5} 
                 y={y + height / 2} 
                 fill="#666"
-                fontSize={isMobile ? 10 : 12}
+                fontSize={12}
                 textAnchor="start"
                 dominantBaseline="middle"
             >
@@ -655,7 +684,7 @@ const ScoresBarChart = ({ data }) => {
     };
 
     return (
-        <Box sx={{ width: '100%', height: isMobile ? 250 : 350 }}>
+        <Box sx={{ width: '100%', height: 350 }}>
             <Typography variant="subtitle1" align="center" gutterBottom>
                 Innings Scores Analysis
             </Typography>
@@ -665,8 +694,8 @@ const ScoresBarChart = ({ data }) => {
                     layout="vertical"
                     margin={{ 
                         top: 20, 
-                        right: isMobile ? 50 : 70, // Increased right margin to accommodate labels
-                        left: isMobile ? 10 : 20, 
+                        right: 50, 
+                        left: 10, 
                         bottom: 20 
                     }}
                 >
@@ -675,15 +704,16 @@ const ScoresBarChart = ({ data }) => {
                         domain={[0, 'dataMax + 20']}
                         axisLine={true}
                         grid={false}
-                        tick={{ fontSize: isMobile ? 10 : 12 }}
+                        tick={{ fontSize: 12 }}
+                        label={{ value: 'Runs', position: 'bottom', offset: 0 }}
                     />
                     <YAxis 
                         type="category" 
                         dataKey="name" 
-                        width={isMobile ? 90 : 120}
+                        width={120}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: isMobile ? 9 : 12 }}
+                        tick={{ fontSize: 12 }}
                     />
                     <Tooltip formatter={formatTooltip} />
                     <Bar 
@@ -948,9 +978,7 @@ return (
             
             {statsData?.batting_scatter && statsData.batting_scatter.length > 0 && (
                 <Grid item xs={12} md={12}>
-                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
-                        <BattingScatter data={statsData.batting_scatter} isMobile={isMobile} />
-                    </Card>
+                    <BattingScatterChart data={statsData.batting_scatter} isMobile={isMobile} />
                 </Grid>
             )}
             {statsData?.batting_scatter && statsData.batting_scatter.length > 0 && (
@@ -972,6 +1000,71 @@ return (
                 </Grid>
             )}
         </Grid>
+        
+        {/* Credits Section */}
+        <Box sx={{ mt: 6, mb: 3, pt: 4, borderTop: '1px solid #eee' }}>
+            <Typography variant="h6" gutterBottom align="center">
+                Credits & Acknowledgements
+            </Typography>
+            <Grid container spacing={3} sx={{ mt: 1 }}>
+                <Grid item xs={12} md={4}>
+                    <Typography variant="subtitle2" gutterBottom color="primary">
+                        Data Sources
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                        Ball-by-ball data from <a href="https://cricsheet.org/" target="_blank" rel="noopener noreferrer">Cricsheet.org</a>
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                        Player information from <a href="https://cricmetric.com/" target="_blank" rel="noopener noreferrer">Cricmetric</a>
+                    </Typography>
+                </Grid>
+                
+                <Grid item xs={12} md={4}>
+                    <Typography variant="subtitle2" gutterBottom color="primary">
+                        Metrics & Visualization Inspiration
+                    </Typography>
+                    <Typography variant="body2" component="div">
+                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                            <a href="https://twitter.com/prasannalara" target="_blank" rel="noopener noreferrer">@prasannalara</a>
+                        </Box>
+                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                            <a href="https://twitter.com/cricketingview" target="_blank" rel="noopener noreferrer">@cricketingview</a>
+                        </Box>
+                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                            <a href="https://twitter.com/IndianMourinho" target="_blank" rel="noopener noreferrer">@IndianMourinho</a>
+                        </Box>
+                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                            <a href="https://twitter.com/hganjoo_153" target="_blank" rel="noopener noreferrer">@hganjoo_153</a>
+                        </Box>
+                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                            <a href="https://twitter.com/randomcricstat" target="_blank" rel="noopener noreferrer">@randomcricstat</a>
+                        </Box>
+                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                            <a href="https://twitter.com/kaustats" target="_blank" rel="noopener noreferrer">@kaustats</a>
+                        </Box>
+                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                            <a href="https://twitter.com/cricviz" target="_blank" rel="noopener noreferrer">@cricviz</a>
+                        </Box>
+                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                            <a href="https://twitter.com/ajarrodkimber" target="_blank" rel="noopener noreferrer">@ajarrodkimber</a>
+                        </Box>
+                    </Typography>
+                </Grid>
+                
+                <Grid item xs={12} md={4}>
+                    <Typography variant="subtitle2" gutterBottom color="primary">
+                        Development Assistance
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                        Claude and ChatGPT for Vibe Coding my way through this project
+                    </Typography>
+                </Grid>
+            </Grid>
+            
+            <Typography variant="body2" color="textSecondary" align="center" sx={{ mt: 3, pb: 2 }}>
+                Cricket Data Thing © {new Date().getFullYear()} - Advanced cricket analytics and visualization
+            </Typography>
+        </Box>
     </Box>
 );
 };

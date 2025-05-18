@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Container, 
   Box, 
@@ -12,15 +12,168 @@ import {
   Divider,
   useTheme,
   useMediaQuery,
-  Chip
+  Chip,
+  Stack,
+  CircularProgress
 } from '@mui/material';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import StadiumIcon from '@mui/icons-material/Stadium';
 import GroupsIcon from '@mui/icons-material/Groups';
 import PersonIcon from '@mui/icons-material/Person';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import EventNoteIcon from '@mui/icons-material/EventNote';
+import PeopleIcon from '@mui/icons-material/People';
+import { getUpcomingMatches, formatDate } from '../data/iplSchedule';
+
+// Component to display upcoming match links in the CTA section
+const UpcomingMatchLinks = () => {
+  const [upcomingMatches, setUpcomingMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  // Utility function to create URLs for match analysis
+  const createAnalysisUrl = (match, type) => {
+    if (type === 'venue') {
+      return `/venue?venue=${encodeURIComponent(match.venue)}&team1=${match.team1Abbr}&team2=${match.team2Abbr}`;
+    } else if (type === 'matchups') {
+      return `/matchups?team1=${match.team1Abbr}&team2=${match.team2Abbr}`;
+    }
+    return '';
+  };
+  
+  useEffect(() => {
+    const fetchUpcomingMatches = async () => {
+      try {
+        setLoading(true);
+        
+        // Get tomorrow's date
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowString = tomorrow.toISOString().split('T')[0];
+        
+        // Get upcoming matches from tomorrow
+        const nextMatches = getUpcomingMatches(3, tomorrowString);
+        setUpcomingMatches(nextMatches);
+      } catch (error) {
+        console.error('Error fetching upcoming matches:', error);
+        // If there's an error, set an empty array
+        setUpcomingMatches([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUpcomingMatches();
+  }, []);
+
+  if (loading) {
+    return (
+      <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Typography variant="subtitle1" sx={{ mb: 2 }}>
+          Loading match schedule...
+        </Typography>
+        <CircularProgress size={24} />
+      </Box>
+    );
+  }
+
+  if (upcomingMatches.length === 0 && !loading) {
+    return (
+      <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Typography variant="subtitle1" color="text.secondary">
+          No upcoming matches found in the schedule. We're showing you some sample matches instead.
+        </Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ mt: 4 }}>
+      <Typography variant="subtitle1" sx={{ mb: 2 }}>
+        Upcoming Matches Analysis
+      </Typography>
+      
+      <Grid container spacing={3} sx={{ mt: 1 }}>
+        {upcomingMatches.map((match) => (
+          <Grid item xs={12} md={4} key={match.matchNumber}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
+                  <CalendarTodayIcon color="primary" fontSize="small" />
+                  <Typography variant="subtitle1">
+                    {formatDate(match.date)}
+                  </Typography>
+                </Box>
+                
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  {match.team1Abbr} vs {match.team2Abbr}
+                </Typography>
+                
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {match.venue}
+                </Typography>
+                
+                <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="primary"
+                    component={Link}
+                    startIcon={<StadiumIcon />}
+                    fullWidth
+                    to={createAnalysisUrl(match, 'venue')}
+                  >
+                    Venue Analysis
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="secondary"
+                    component={Link}
+                    startIcon={<GroupsIcon />}
+                    fullWidth
+                    to={createAnalysisUrl(match, 'matchups')}
+                  >
+                    Team Matchups
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
+        <Button
+          variant="outlined"
+          size="medium"
+          startIcon={<EventNoteIcon />}
+          component={Link}
+          to="/venue"
+          sx={{ px: 2 }}
+        >
+          Venue Analysis
+        </Button>
+        
+        <Button
+          variant="outlined"
+          size="medium"
+          startIcon={<PeopleIcon />}
+          component={Link}
+          to="/matchups"
+          sx={{ px: 2 }}
+        >
+          Team Matchups
+        </Button>
+      </Box>
+    </Box>
+  );
+};
 
 // This will be a new component that serves as a landing page
 const LandingPage = () => {
@@ -450,6 +603,10 @@ const LandingPage = () => {
             </Box>
           </Grid>
         </Grid>
+        
+        <Typography variant="body2" color="textSecondary" align="center" sx={{ mt: 3, pb: 2 }}>
+          Cricket Data Thing © {new Date().getFullYear()} - Advanced cricket analytics and visualization
+        </Typography>
       </Box>
 
       {/* Sample Insights Section (Optional) */}
@@ -559,13 +716,72 @@ const LandingPage = () => {
         >
           Get Started Now
         </Button>
+        
+        <UpcomingMatchLinks />
       </Box>
       
-      {/* Footer */}
+      {/* Footer with Credits */}
       <Divider sx={{ mb: 3 }} />
-      <Typography variant="body2" color="textSecondary" align="center" sx={{ pb: 2 }}>
-        Cricket Data Thing © {new Date().getFullYear()} - Advanced cricket analytics and visualization
-      </Typography>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h6" align="center" gutterBottom>
+          Credits & Acknowledgements
+        </Typography>
+        
+        <Grid container spacing={3} sx={{ mt: 2 }}>
+          <Grid item xs={12} md={4}>
+            <Typography variant="subtitle2" gutterBottom color="primary">
+              Data Sources
+            </Typography>
+            <Typography variant="body2" paragraph>
+              Ball-by-ball data from <a href="https://cricsheet.org/" target="_blank" rel="noopener noreferrer">Cricsheet.org</a>
+            </Typography>
+            <Typography variant="body2" paragraph>
+              Player information from <a href="https://cricmetric.com/" target="_blank" rel="noopener noreferrer">Cricmetric</a>
+            </Typography>
+          </Grid>
+          
+          <Grid item xs={12} md={4}>
+            <Typography variant="subtitle2" gutterBottom color="primary">
+              Metrics & Visualization Inspiration
+            </Typography>
+            <Typography variant="body2" component="div">
+              <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                <a href="https://twitter.com/prasannalara" target="_blank" rel="noopener noreferrer">@prasannalara</a>
+              </Box>
+              <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                <a href="https://twitter.com/cricketingview" target="_blank" rel="noopener noreferrer">@cricketingview</a>
+              </Box>
+              <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                <a href="https://twitter.com/IndianMourinho" target="_blank" rel="noopener noreferrer">@IndianMourinho</a>
+              </Box>
+              <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                <a href="https://twitter.com/hganjoo_153" target="_blank" rel="noopener noreferrer">@hganjoo_153</a>
+              </Box>
+              <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                <a href="https://twitter.com/randomcricstat" target="_blank" rel="noopener noreferrer">@randomcricstat</a>
+              </Box>
+              <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                <a href="https://twitter.com/kaustats" target="_blank" rel="noopener noreferrer">@kaustats</a>
+              </Box>
+              <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                <a href="https://twitter.com/cricviz" target="_blank" rel="noopener noreferrer">@cricviz</a>
+              </Box>
+              <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                <a href="https://twitter.com/ajarrodkimber" target="_blank" rel="noopener noreferrer">@ajarrodkimber</a>
+              </Box>
+            </Typography>
+          </Grid>
+          
+          <Grid item xs={12} md={4}>
+            <Typography variant="subtitle2" gutterBottom color="primary">
+              Development Assistance
+            </Typography>
+            <Typography variant="body2" paragraph>
+              Claude and ChatGPT for Vibe Coding my way through this project
+            </Typography>
+          </Grid>
+        </Grid>
+      </Box>
     </Container>
   );
 };

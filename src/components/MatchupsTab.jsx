@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import config from '../config';
+import { useLocation } from 'react-router-dom';
 import { 
     Box, 
     TextField, 
@@ -40,7 +41,13 @@ import TeamBowlingTypeMatchups from './TeamBowlingTypeMatchups';
 const DEFAULT_START_DATE = "2024-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
 
-const MatchupsTab = () => {
+const MatchupsTab = ({ isMobile }) => {
+    // Get query parameters from URL
+    const location = useLocation();
+    const getQueryParam = (param) => {
+        const searchParams = new URLSearchParams(location.search);
+        return searchParams.get(param);
+    };
     // Helper function to format team name for URL
     const formatTeamNameForUrl = (teamName) => {
         // Replace special characters and spaces that might cause URL issues
@@ -95,7 +102,36 @@ const MatchupsTab = () => {
                 ]);
                 
                 if (Array.isArray(teamsResponse.data)) {
-                    setTeams(teamsResponse.data.sort((a, b) => a.full_name.localeCompare(b.full_name)));
+                    const sortedTeams = teamsResponse.data.sort((a, b) => a.full_name.localeCompare(b.full_name));
+                    setTeams(sortedTeams);
+                    
+                    // Check for team1 and team2 URL parameters
+                    const team1Param = getQueryParam('team1');
+                    const team2Param = getQueryParam('team2');
+                    
+                    let team1Found = false;
+                    let team2Found = false;
+                    
+                    if (team1Param) {
+                        const team1 = sortedTeams.find(team => team.abbreviated_name === team1Param);
+                        if (team1) {
+                            setSelectedTeam1(team1);
+                            team1Found = true;
+                        }
+                    }
+                    
+                    if (team2Param) {
+                        const team2 = sortedTeams.find(team => team.abbreviated_name === team2Param);
+                        if (team2) {
+                            setSelectedTeam2(team2);
+                            team2Found = true;
+                        }
+                    }
+                    
+                    // If both teams are found, auto-trigger analysis
+                    if (team1Found && team2Found) {
+                        setShowMatchups(true);
+                    }
                 }
                 
                 if (Array.isArray(playersResponse.data)) {
@@ -110,7 +146,7 @@ const MatchupsTab = () => {
         };
 
         fetchInitialData();
-    }, []);
+    }, [location.search]);
     
     // Effect for fetching team players for bowling type matchups
     useEffect(() => {

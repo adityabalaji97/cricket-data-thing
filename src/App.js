@@ -37,6 +37,12 @@ const AppContent = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
+  // Helper function to get query parameters from URL
+  const getQueryParam = (param) => {
+    const searchParams = new URLSearchParams(location.search);
+    return searchParams.get(param);
+  };
+  
   const [venues, setVenues] = useState([]);
   const [teams, setTeams] = useState([]);
   const [selectedVenue, setSelectedVenue] = useState("All Venues");
@@ -100,13 +106,47 @@ const AppContent = () => {
           axios.get(`${config.API_URL}/teams/`)
         ]);
         
+        // Process venues response
         if (Array.isArray(venuesResponse.data)) {
           const venuesList = ["All Venues", ...venuesResponse.data.filter(v => v).sort()];
           setVenues(venuesList);
         }
         
+        // Process teams response
         if (Array.isArray(teamsResponse.data)) {
-          setTeams(teamsResponse.data.sort((a, b) => a.full_name.localeCompare(b.full_name)));
+          const sortedTeams = teamsResponse.data.sort((a, b) => a.full_name.localeCompare(b.full_name));
+          setTeams(sortedTeams);
+          
+          // Get all URL parameters we'll need
+          const venueParam = getQueryParam('venue');
+          const team1Param = getQueryParam('team1');
+          const team2Param = getQueryParam('team2');
+          
+          // Set venue if it's in the URL parameters
+          if (venueParam) {
+            setSelectedVenue(venueParam);
+          }
+          
+          // Set team1 if found
+          if (team1Param) {
+            const team1 = sortedTeams.find(team => team.abbreviated_name === team1Param);
+            if (team1) {
+              setSelectedTeam1(team1);
+            }
+          }
+          
+          // Set team2 if found
+          if (team2Param) {
+            const team2 = sortedTeams.find(team => team.abbreviated_name === team2Param);
+            if (team2) {
+              setSelectedTeam2(team2);
+            }
+          }
+          
+          // If all required params are present, trigger the analysis
+          if (venueParam && team1Param && team2Param) {
+            setShowVisualizations(true);
+          }
         }
       } catch (error) {
         console.error('Error fetching initial data:', error);
@@ -117,7 +157,7 @@ const AppContent = () => {
     };
 
     fetchInitialData();
-  }, []);
+  }, [location.search]); // Re-run this effect when location.search changes
 
   const handleDateChange = (value, isStartDate) => {
     const newDate = value;
