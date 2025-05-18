@@ -137,16 +137,27 @@ export const iplSchedule = [
 export const getUpcomingMatches = (count = 3, fromDate = null) => {
   // If fromDate is null, use today's date
   const referenceDate = fromDate ? new Date(fromDate) : new Date();
-  referenceDate.setHours(0, 0, 0, 0); // Set to beginning of day for proper comparison
+  
+  // Log the reference date to debug
+  console.log('Reference date for upcoming matches:', referenceDate.toISOString());
+  
+  // Extract just the date part for comparison (YYYY-MM-DD)
+  const referenceDateStr = referenceDate.toISOString().split('T')[0];
+  console.log('Reference date string:', referenceDateStr);
   
   // We're going to use a more reliable approach for filtering upcoming matches
+  // Including matches that are on the same day
   let upcoming = iplSchedule
     .filter(match => {
-      const matchDate = new Date(match.date);
-      return matchDate >= referenceDate;
+      // Match date is already in YYYY-MM-DD format, so direct string comparison works
+      // This includes matches on the same day
+      return match.date >= referenceDateStr;
     })
     .sort((a, b) => new Date(a.date) - new Date(b.date))
     .slice(0, count);
+  
+  // Log the filtered matches
+  console.log('Filtered upcoming matches:', upcoming);
   
   // If no upcoming matches found (might be because all the dates have passed),
   // just return the next 3 matches in the schedule regardless of date
@@ -165,6 +176,13 @@ export const formatDate = (dateString) => {
   const date = new Date(dateString);
   const options = { weekday: 'short', month: 'short', day: 'numeric' };
   return date.toLocaleDateString('en-US', options);
+};
+
+// Format venue name with proper capitalization
+export const formatVenue = (venue) => {
+  // The venue names are already correctly capitalized in the data
+  // Just return them directly
+  return venue;
 };
 
 export default iplSchedule;

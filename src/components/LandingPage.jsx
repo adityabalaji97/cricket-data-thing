@@ -26,37 +26,30 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import PeopleIcon from '@mui/icons-material/People';
-import { getUpcomingMatches, formatDate } from '../data/iplSchedule';
+import { getUpcomingMatches, formatDate, formatVenue } from '../data/iplSchedule';
 
-// Component to display upcoming match links in the CTA section
-const UpcomingMatchLinks = () => {
+// This will be a new component that serves as a landing page
+const LandingPage = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMedium = useMediaQuery(theme.breakpoints.down('md'));
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
-  // Utility function to create URLs for match analysis
-  const createAnalysisUrl = (match, type) => {
-    if (type === 'venue') {
-      return `/venue?venue=${encodeURIComponent(match.venue)}&team1=${match.team1Abbr}&team2=${match.team2Abbr}`;
-    } else if (type === 'matchups') {
-      return `/matchups?team1=${match.team1Abbr}&team2=${match.team2Abbr}`;
-    }
-    return '';
-  };
-  
+
+  // URLs for analysis pages are now created inline with template literals
+  // This avoids the need for a separate createAnalysisUrl function
+
   useEffect(() => {
     const fetchUpcomingMatches = async () => {
       try {
         setLoading(true);
         
-        // Get tomorrow's date
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowString = tomorrow.toISOString().split('T')[0];
+        // Get today's date
+        const today = new Date();
+        const todayString = today.toISOString().split('T')[0];
         
-        // Get upcoming matches from tomorrow
-        const nextMatches = getUpcomingMatches(3, tomorrowString);
+        // Get upcoming matches starting from today
+        const nextMatches = getUpcomingMatches(3, todayString);
         setUpcomingMatches(nextMatches);
       } catch (error) {
         console.error('Error fetching upcoming matches:', error);
@@ -70,116 +63,112 @@ const UpcomingMatchLinks = () => {
     fetchUpcomingMatches();
   }, []);
 
-  if (loading) {
+  // Component to display upcoming match links
+  const UpcomingMatchLinks = () => {
+    if (loading) {
+      return (
+        <Box sx={{ mt: 4, textAlign: 'center' }}>
+          <Typography variant="subtitle1" sx={{ mb: 2 }}>
+            Loading match schedule...
+          </Typography>
+          <CircularProgress size={24} />
+        </Box>
+      );
+    }
+
+    if (upcomingMatches.length === 0 && !loading) {
+      return (
+        <Box sx={{ mt: 4, textAlign: 'center' }}>
+          <Typography variant="subtitle1" color="text.secondary">
+            No upcoming matches found in the schedule. We're showing you some sample matches instead.
+          </Typography>
+        </Box>
+      );
+    }
+
     return (
-      <Box sx={{ mt: 4, textAlign: 'center' }}>
+      <Box sx={{ mt: 4 }}>
         <Typography variant="subtitle1" sx={{ mb: 2 }}>
-          Loading match schedule...
+          Upcoming Matches Analysis
         </Typography>
-        <CircularProgress size={24} />
-      </Box>
-    );
-  }
-
-  if (upcomingMatches.length === 0 && !loading) {
-    return (
-      <Box sx={{ mt: 4, textAlign: 'center' }}>
-        <Typography variant="subtitle1" color="text.secondary">
-          No upcoming matches found in the schedule. We're showing you some sample matches instead.
-        </Typography>
-      </Box>
-    );
-  }
-
-  return (
-    <Box sx={{ mt: 4 }}>
-      <Typography variant="subtitle1" sx={{ mb: 2 }}>
-        Upcoming Matches Analysis
-      </Typography>
-      
-      <Grid container spacing={3} sx={{ mt: 1 }}>
-        {upcomingMatches.map((match) => (
-          <Grid item xs={12} md={4} key={match.matchNumber}>
-            <Card sx={{ height: '100%' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
-                  <CalendarTodayIcon color="primary" fontSize="small" />
-                  <Typography variant="subtitle1">
-                    {formatDate(match.date)}
-                  </Typography>
-                </Box>
-                
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                  {match.team1Abbr} vs {match.team2Abbr}
-                </Typography>
-                
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {match.venue}
-                </Typography>
-                
-                <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    color="primary"
-                    component={Link}
-                    startIcon={<StadiumIcon />}
-                    fullWidth
-                    to={createAnalysisUrl(match, 'venue')}
-                  >
-                    Venue Analysis
-                  </Button>
-                  
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    color="secondary"
-                    component={Link}
-                    startIcon={<GroupsIcon />}
-                    fullWidth
-                    to={createAnalysisUrl(match, 'matchups')}
-                  >
-                    Team Matchups
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-      
-      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
-        <Button
-          variant="outlined"
-          size="medium"
-          startIcon={<EventNoteIcon />}
-          component={Link}
-          to="/venue"
-          sx={{ px: 2 }}
-        >
-          Venue Analysis
-        </Button>
         
-        <Button
-          variant="outlined"
-          size="medium"
-          startIcon={<PeopleIcon />}
-          component={Link}
-          to="/matchups"
-          sx={{ px: 2 }}
-        >
-          Team Matchups
-        </Button>
+        <Grid container spacing={3} sx={{ mt: 1 }}>
+          {upcomingMatches.map((match) => (
+            <Grid item xs={12} md={4} key={match.matchNumber}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
+                    <CalendarTodayIcon color="primary" fontSize="small" />
+                    <Typography variant="subtitle1">
+                      {formatDate(match.date)}
+                    </Typography>
+                  </Box>
+                  
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    {match.team1Abbr} vs {match.team2Abbr}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    {formatVenue(match.venue)}
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="primary"
+                      component={Link}
+                      startIcon={<StadiumIcon />}
+                      fullWidth
+                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
+                    >
+                      Venue Analysis
+                    </Button>
+                    
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="secondary"
+                      component={Link}
+                      startIcon={<GroupsIcon />}
+                      fullWidth
+                      to={`/matchups?team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
+                    >
+                      Team Matchups
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
+          <Button
+            variant="outlined"
+            size="medium"
+            startIcon={<EventNoteIcon />}
+            component={Link}
+            to="/venue"
+            sx={{ px: 2 }}
+          >
+            Venue Analysis
+          </Button>
+          
+          <Button
+            variant="outlined"
+            size="medium"
+            startIcon={<PeopleIcon />}
+            component={Link}
+            to="/matchups"
+            sx={{ px: 2 }}
+          >
+            Team Matchups
+          </Button>
+        </Box>
       </Box>
-    </Box>
-  );
-};
-
-// This will be a new component that serves as a landing page
-const LandingPage = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isMedium = useMediaQuery(theme.breakpoints.down('md'));
+    );
+  };
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -331,9 +320,40 @@ const LandingPage = () => {
                 borderRadius: 2,
                 mb: 2
               }}>
-                <Typography variant="subtitle2" color="textSecondary">
-                  Perfect for pre-match preparation and understanding venue characteristics
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                  Upcoming Matches:
                 </Typography>
+                {loading ? (
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    Loading matches...
+                  </Typography>
+                ) : upcomingMatches.length > 0 ? (
+                  upcomingMatches.map((match) => (
+                    <Button
+                      key={match.matchNumber}
+                      fullWidth
+                      variant="text"
+                      color="primary"
+                      component={Link}
+                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
+                      sx={{ 
+                        justifyContent: 'flex-start', 
+                        mb: 1, 
+                        textAlign: 'left',
+                        fontSize: '0.8rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
+                      {formatDate(match.date)} {match.team1Abbr} vs {match.team2Abbr} ({formatVenue(match.venue)})
+                    </Button>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    No upcoming matches found.
+                  </Typography>
+                )}
               </Box>
             </CardContent>
             
@@ -395,9 +415,42 @@ const LandingPage = () => {
                 borderRadius: 2,
                 mb: 2
               }}>
-                <Typography variant="subtitle2" color="textSecondary">
-                  Ideal for player evaluation and identifying strengths and weaknesses
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                  Featured Batters:
                 </Typography>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="error"
+                  component={Link}
+                  to="/player?name=MS%20Dhoni&autoload=true"
+                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                  onClick={() => {console.log('Clicked MS Dhoni link');}}
+                >
+                  MS Dhoni
+                </Button>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="error"
+                  component={Link}
+                  to="/player?name=V%20Kohli&autoload=true"
+                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                  onClick={() => {console.log('Clicked V Kohli link');}}
+                >
+                  V Kohli
+                </Button>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="error"
+                  component={Link}
+                  to="/player?name=RG%20Sharma&autoload=true"
+                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                  onClick={() => {console.log('Clicked RG Sharma link');}}
+                >
+                  RG Sharma
+                </Button>
               </Box>
             </CardContent>
             
@@ -460,9 +513,40 @@ const LandingPage = () => {
                 borderRadius: 2,
                 mb: 2
               }}>
-                <Typography variant="subtitle2" color="textSecondary">
-                  Essential for pre-match strategy and betting insights
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                  Upcoming Matchups:
                 </Typography>
+                {loading ? (
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    Loading matches...
+                  </Typography>
+                ) : upcomingMatches.length > 0 ? (
+                  upcomingMatches.map((match) => (
+                    <Button
+                      key={match.matchNumber}
+                      fullWidth
+                      variant="text"
+                      color="success"
+                      component={Link}
+                      to={`/matchups?team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
+                      sx={{ 
+                        justifyContent: 'flex-start', 
+                        mb: 1, 
+                        textAlign: 'left',
+                        fontSize: '0.8rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
+                      {formatDate(match.date)} {match.team1Abbr} vs {match.team2Abbr}
+                    </Button>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    No upcoming matches found.
+                  </Typography>
+                )}
               </Box>
             </CardContent>
             
@@ -688,37 +772,8 @@ const LandingPage = () => {
         </Grid>
       </Box>
       
-      {/* Final CTA */}
-      <Box 
-        sx={{ 
-          textAlign: 'center', 
-          p: 4, 
-          borderRadius: 4,
-          bgcolor: 'grey.100',
-          mb: 4
-        }}
-      >
-        <Typography variant="h5" gutterBottom>
-          Ready to dive into cricket analytics?
-        </Typography>
-        
-        <Button 
-          variant="contained" 
-          color="primary" 
-          size="large" 
-          component={Link}
-          to="/venue"
-          sx={{ 
-            mt: 2,
-            px: 4,
-            py: 1.5
-          }}
-        >
-          Get Started Now
-        </Button>
-        
-        <UpcomingMatchLinks />
-      </Box>
+      {/* Upcoming Matches Section */}
+      <UpcomingMatchLinks />
       
       {/* Footer with Credits */}
       <Divider sx={{ mb: 3 }} />
