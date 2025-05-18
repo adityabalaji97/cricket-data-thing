@@ -2,7 +2,7 @@
 
 A comprehensive cricket analytics platform for visualizing and analyzing T20 cricket data, with a focus on venue analysis, player performance metrics, and team matchups.
 
-![Dashboard Overview](placeholder-for-dashboard-screenshot.png)
+<img width="1680" alt="Dashboard" src="https://github.com/user-attachments/assets/c91c40d6-9095-428b-9059-a993f31c640c" />
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -130,27 +130,27 @@ The application's data pipeline transforms raw cricket data into actionable insi
 ### Venue Analysis Dashboard
 The venue analysis dashboard provides comprehensive statistics for each cricket venue, including win percentages, scoring patterns, and phase-wise strategies.
 
-![Venue Analysis](placeholder-for-venue-analysis-screenshot.png)
+<img width="1680" alt="Venue Analysis" src="https://github.com/user-attachments/assets/2c54ce1f-05f7-4913-b91c-ac04516b3601" />
 
 ### Batting Performance Scatter Plot
 The batting scatter plot visualizes player performance based on average and strike rate, helping identify player roles (anchors, finishers, etc.).
 
-![Batting Scatter](placeholder-for-batting-scatter-screenshot.png)
+<img width="1504" alt="Batter Scatter" src="https://github.com/user-attachments/assets/aee00bf1-7be1-45cc-86e4-4e02e6e2b572" />
 
 ### Matchup Matrix
 The matchup matrix displays head-to-head statistics between batters and bowlers, highlighting strengths and weaknesses.
 
-![Matchup Matrix](placeholder-for-matchup-matrix-screenshot.png)
+<img width="1680" alt="Matchup Matrix" src="https://github.com/user-attachments/assets/1555080c-6679-4099-adc8-1af34ca77c57" />
 
 ### Fantasy Points Analysis
 The fantasy points visualization breaks down fantasy performance by batting, bowling, and fielding contributions.
 
-![Fantasy Points](placeholder-for-fantasy-points-screenshot.png)
+<img width="1680" alt="Fantasy Points Analysis" src="https://github.com/user-attachments/assets/0716006f-f2b9-4cd8-83dc-80e19c679b6c" />
 
 ### Phase-wise Performance Analysis
 The phase analysis charts show how teams and players perform during different phases of a T20 innings.
 
-![Phase Analysis](placeholder-for-phase-analysis-screenshot.png)
+<img width="1497" alt="Phase-wise Strategy" src="https://github.com/user-attachments/assets/1841130b-9a4f-4505-a28b-0f17b3254680" />
 
 ## Installation and Setup
 
