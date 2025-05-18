@@ -85,11 +85,33 @@ const PlayerProfile = () => {
         setVenues(['All Venues', ...await venuesRes.json()]);
         
         console.log('Players loaded:', playersList);
-        console.log('URL parameters:', { name: getQueryParam('name'), autoload: getQueryParam('autoload') });
+        console.log('URL parameters:', { 
+          name: getQueryParam('name'), 
+          autoload: getQueryParam('autoload'),
+          start_date: getQueryParam('start_date')
+        });
         
-        // Get player name from URL if present
+        // Get player name and other parameters from URL if present
         const playerNameFromURL = getQueryParam('name');
         const autoload = getQueryParam('autoload') === 'true';
+        const startDateFromURL = getQueryParam('start_date');
+        const endDateFromURL = getQueryParam('end_date');
+        const venueFromURL = getQueryParam('venue');
+        
+        // Update date range from URL parameters if present
+        if (startDateFromURL || endDateFromURL) {
+          console.log('Setting date range from URL:', { start: startDateFromURL || DEFAULT_START_DATE, end: endDateFromURL || TODAY });
+          setDateRange({
+            start: startDateFromURL || DEFAULT_START_DATE,
+            end: endDateFromURL || TODAY
+          });
+        }
+        
+        // Set venue from URL if present
+        if (venueFromURL) {
+          console.log('Setting venue from URL:', venueFromURL);
+          setSelectedVenue(venueFromURL);
+        }
         
         if (playerNameFromURL && playersList.includes(playerNameFromURL)) {
           console.log('Setting player from URL:', playerNameFromURL);
