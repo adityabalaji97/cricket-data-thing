@@ -22,6 +22,7 @@ import {
   TableRow,
   TableCell
 } from '@mui/material';
+import { useLocation, useNavigate } from 'react-router-dom';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
@@ -35,6 +36,9 @@ const DEFAULT_START_DATE = "2020-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
 
 const BatterComparison = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
   // State for handling player selection and data
   const [players, setPlayers] = useState([]);
   const [venues, setVenues] = useState(['All Venues']);
@@ -56,10 +60,71 @@ const BatterComparison = () => {
   const [error, setError] = useState(null);
   const [compareData, setCompareData] = useState(null);
   
+  // Handler for comparing batters loaded from URL
+  const handleCompareUrlBatters = async (battersToCompare) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch data for each batter in parallel
+      const promises = battersToCompare.map(async batter => {
+        try {
+          const params = new URLSearchParams();
+          
+          if (batter.dateRange.start) params.append('start_date', batter.dateRange.start);
+          if (batter.dateRange.end) params.append('end_date', batter.dateRange.end);
+          if (batter.venue !== "All Venues") params.append('venue', batter.venue);
+          
+          batter.competitionFilters.leagues.forEach(league => {
+            params.append('leagues', league);
+          });
+          
+          params.append('include_international', batter.competitionFilters.international);
+          if (batter.competitionFilters.international && batter.competitionFilters.topTeams) {
+            params.append('top_teams', batter.competitionFilters.topTeams);
+          }
+          
+          // Fetch player stats
+          const statsResponse = await fetch(`${config.API_URL}/player/${encodeURIComponent(batter.name)}/stats?${params}`);
+          const statsData = await statsResponse.json();
+          
+          return {
+            ...batter,
+            stats: statsData,
+            loading: false,
+            error: null
+          };
+        } catch (error) {
+          console.error(`Error fetching data for ${batter.name}:`, error);
+          return {
+            ...batter,
+            stats: null,
+            loading: false,
+            error: `Failed to load data for ${batter.name}`
+          };
+        }
+      });
+      
+      // Wait for all promises to resolve
+      const results = await Promise.all(promises);
+      setSelectedBatters(results);
+      
+      // Set the data for the comparison view
+      setCompareData(results.filter(batter => batter.stats));
+      
+    } catch (error) {
+      console.error('Error during comparison:', error);
+      setError('An unexpected error occurred during comparison');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   // Fetch players and venues on component mount
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
+        setLoading(true);
         const [playersRes, venuesRes] = await Promise.all([
           fetch(`${config.API_URL}/players`),
           fetch(`${config.API_URL}/venues`)
@@ -70,14 +135,61 @@ const BatterComparison = () => {
         
         const venuesList = await venuesRes.json();
         setVenues(['All Venues', ...venuesList]);
+        
+        // Check if there are batters and leagues in the URL to auto-load
+        const searchParams = new URLSearchParams(location.search);
+        const batterParam = searchParams.get('batters');
+        const leaguesParam = searchParams.get('leagues');
+        
+        // Create competition filters with leagues from URL
+        let updatedFilters = { ...competitionFilters };
+        if (leaguesParam) {
+          const leagues = leaguesParam.split(',');
+          updatedFilters = {
+            ...updatedFilters,
+            leagues: leagues
+          };
+          setCompetitionFilters(updatedFilters);
+        }
+        
+        if (batterParam) {
+          const batterNames = batterParam.split(',');
+          
+          // Add each batter from the URL with the updated filters
+          const urlBatters = batterNames
+            .filter(name => playersList.includes(name)) // Make sure the player exists in our list
+            .map(name => ({
+              id: `${name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              name,
+              label: name,
+              dateRange: { ...dateRange },
+              venue: selectedVenue,
+              competitionFilters: updatedFilters, // Use the updated filters here
+              stats: null,
+              loading: false,
+              error: null
+            }));
+          
+          if (urlBatters.length > 0) {
+            setSelectedBatters(urlBatters);
+            // Auto-trigger comparison
+            setTimeout(() => {
+              setSelectedBatters(urlBatters.map(batter => ({ ...batter, loading: true })));
+              handleCompareUrlBatters(urlBatters);
+            }, 500);
+          }
+        }
+        
       } catch (error) {
         console.error('Error fetching initial data:', error);
         setError('Failed to load initial data');
+      } finally {
+        setLoading(false);
       }
     };
     
     fetchInitialData();
-  }, []);
+  }, [location.search]); // Re-run when URL changes
   
   // Handler for adding a batter to the comparison
   const handleAddBatter = () => {

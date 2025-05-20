@@ -81,12 +81,12 @@ const AppContent = () => {
     handleMenuClose();
     navigate(path);
     if (path === '/') {
-      setCurrentTab(-1); // -1 for home/landing page
+      setCurrentTab(0); // 0 for home/landing page
     } else {
       setCurrentTab(
-        path === '/venue' ? 0 : 
-        path === '/player' ? 1 : 
-        path === '/comparison' ? 2 : 3 // Added comparison tab
+        path === '/venue' ? 1 : 
+        path === '/player' ? 2 : 
+        path === '/comparison' ? 3 : 4 // Adjusted tab indices
       );
     }
   };
@@ -95,12 +95,12 @@ const AppContent = () => {
     // Set current tab based on location
     const path = location.pathname;
     if (path === '/') {
-      setCurrentTab(-1); // Landing page
+      setCurrentTab(0); // Home tab
     } else {
       setCurrentTab(
-        path === '/venue' ? 0 : 
-        path === '/player' ? 1 : 
-        path === '/comparison' ? 2 : 3 // Added comparison tab
+        path === '/venue' ? 1 : 
+        path === '/player' ? 2 : 
+        path === '/comparison' ? 3 : 4 // Adjusted tab indices
       );
     }
   }, [location]);
@@ -350,10 +350,10 @@ const AppContent = () => {
 
   // Create page title based on current tab
   const getPageTitle = () => {
-    if (currentTab === -1) return 'Home';
-    return currentTab === 0 ? 'Venue Analysis' : 
-           currentTab === 1 ? 'Batter Profile' : 
-           currentTab === 2 ? 'Batter Comparison' : 'Matchups';
+    return currentTab === 0 ? 'Home' :
+           currentTab === 1 ? 'Venue Analysis' : 
+           currentTab === 2 ? 'Batter Profile' : 
+           currentTab === 3 ? 'Batter Comparison' : 'Matchups';
   };
 
   return (
@@ -362,7 +362,7 @@ const AppContent = () => {
         borderBottom: 1, 
         borderColor: 'divider', 
         mb: 3, 
-        display: currentTab === -1 ? 'none' : 'flex', // Hide when on landing page
+        display: 'flex', // Always show the tabs
         alignItems: 'center',
         flexDirection: 'row',
         flexWrap: 'nowrap'
@@ -413,6 +413,7 @@ const AppContent = () => {
             allowScrollButtonsMobile
             sx={{ width: '100%' }}
           >
+            <Tab label="Home" component={Link} to="/" />
             <Tab label="Venue Analysis" component={Link} to="/venue" />
             <Tab label="Batter Profile" component={Link} to="/player" />
             <Tab label="Batter Comparison" component={Link} to="/comparison" />

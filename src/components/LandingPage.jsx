@@ -26,6 +26,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import PeopleIcon from '@mui/icons-material/People';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import { getUpcomingMatches, formatDate, formatVenue } from '../data/iplSchedule';
 
 // This will be a new component that serves as a landing page
@@ -234,25 +235,61 @@ const LandingPage = () => {
           </Button>
           
           <Button 
-            variant="outlined" 
+            variant="contained" 
             component={Link} 
             to="/player" 
-            color="inherit"
+            color="secondary"
             size="large"
             startIcon={<PersonIcon />}
-            sx={{ px: 3, py: 1.5 }}
+            sx={{ 
+              px: 3, 
+              py: 1.5,
+              backgroundColor: '#ffffff',
+              color: '#c70d3a',
+              '&:hover': {
+                backgroundColor: '#f5f5f5',
+              } 
+            }}
           >
             Analyze Batters
           </Button>
+
+          <Button 
+            variant="contained" 
+            component={Link} 
+            to="/comparison" 
+            color="secondary"
+            size="large"
+            startIcon={<CompareArrowsIcon />}
+            sx={{ 
+              px: 3, 
+              py: 1.5,
+              backgroundColor: '#ffffff',
+              color: '#9c27b0',
+              '&:hover': {
+                backgroundColor: '#f5f5f5',
+              } 
+            }}
+          >
+            Compare Batters
+          </Button>
           
           <Button 
-            variant="outlined" 
+            variant="contained" 
             component={Link} 
             to="/matchups" 
-            color="inherit"
+            color="secondary"
             size="large"
             startIcon={<GroupsIcon />}
-            sx={{ px: 3, py: 1.5 }}
+            sx={{ 
+              px: 3, 
+              py: 1.5,
+              backgroundColor: '#ffffff',
+              color: '#007e33',
+              '&:hover': {
+                backgroundColor: '#f5f5f5',
+              } 
+            }}
           >
             Compare Matchups
           </Button>
@@ -278,7 +315,7 @@ const LandingPage = () => {
       
       <Grid container spacing={4} sx={{ mb: 8 }}>
         {/* Venue Analysis Card */}
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={3}>
           <Card sx={{ 
             height: '100%', 
             display: 'flex', 
@@ -373,7 +410,7 @@ const LandingPage = () => {
         </Grid>
         
         {/* Batter Profile Card */}
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={3}>
           <Card sx={{ 
             height: '100%', 
             display: 'flex', 
@@ -469,9 +506,104 @@ const LandingPage = () => {
             </CardActions>
           </Card>
         </Grid>
+
+        {/* Batter Comparison Card */}
+        <Grid item xs={12} md={3}>
+          <Card sx={{ 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column',
+            transition: 'transform 0.3s, box-shadow 0.3s',
+            '&:hover': {
+              transform: 'translateY(-5px)',
+              boxShadow: 8
+            }
+          }}>
+            <CardContent sx={{ flexGrow: 1, p: 3 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center',
+                mb: 2
+              }}>
+                <CompareArrowsIcon 
+                  sx={{ 
+                    fontSize: 60, 
+                    color: '#9c27b0',
+                    p: 1,
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(156, 39, 176, 0.1)'
+                  }} 
+                />
+              </Box>
+              
+              <Typography variant="h5" component="h2" gutterBottom align="center" fontWeight="bold">
+                Batter Comparison
+              </Typography>
+              
+              <Typography color="textSecondary" paragraph align="center">
+                Compare multiple batters across various metrics, including phase-wise performance, strike rates, and matchups.
+              </Typography>
+              
+              <Box sx={{ 
+                bgcolor: 'grey.100', 
+                p: 2, 
+                borderRadius: 2,
+                mb: 2
+              }}>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                  Example Comparisons:
+                </Typography>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="secondary"
+                  component={Link}
+                  to="/comparison?batters=V%20Kohli,RG%20Sharma,KL%20Rahul&leagues=Indian%20Premier%20League"
+                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                >
+                  Rohit vs Kohli vs Rahul
+                </Button>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="secondary"
+                  component={Link}
+                  to="/comparison?batters=DA%20Warner,JC%20Buttler,Q%20de%20Kock&leagues=Indian%20Premier%20League"
+                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                >
+                  Warner vs Buttler vs de Kock
+                </Button>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="secondary"
+                  component={Link}
+                  to="/comparison?batters=Shubman%20Gill,Abhishek%20Sharma,SV%20Samson&leagues=Indian%20Premier%20League"
+                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                >
+                  Gill vs Abhishek vs Samson
+                </Button>
+              </Box>
+            </CardContent>
+            
+            <CardActions sx={{ p: 2, pt: 0 }}>
+              <Button 
+                component={Link}
+                to="/comparison"
+                fullWidth 
+                variant="outlined" 
+                endIcon={<ArrowForwardIcon />} 
+                color="secondary"
+                size="large"
+              >
+                Compare Batters
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
         
         {/* Matchups Card */}
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={3}>
           <Card sx={{ 
             height: '100%', 
             display: 'flex', 
@@ -693,84 +825,7 @@ const LandingPage = () => {
         </Typography>
       </Box>
 
-      {/* Sample Insights Section (Optional) */}
-      <Box sx={{ mb: 6 }}>
-        <Typography variant="h4" align="center" gutterBottom sx={{ mb: 3 }}>
-          Data-Driven Cricket Insights
-        </Typography>
-        
-        <Typography variant="subtitle1" color="textSecondary" align="center" sx={{ mb: 4, maxWidth: 800, mx: 'auto' }}>
-          Our advanced analytics help you understand cricket performance in detail through clear visualizations and comprehensive statistics
-        </Typography>
-        
-        <Grid container spacing={3} justifyContent="center">
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" gutterBottom color="primary">
-                <TrendingUpIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Player Analysis
-              </Typography>
-              <Typography variant="body2" paragraph>
-                Uncover batting strengths and weaknesses with detailed performance breakdowns by bowling type, match phase, and opposition.
-              </Typography>
-              <Box sx={{ 
-                p: 1, 
-                bgcolor: 'primary.light', 
-                color: 'white', 
-                borderRadius: 1,
-                fontSize: '0.875rem',
-                mt: 'auto'
-              }}>
-                Popular for fantasy cricket and team selection
-              </Box>
-            </Paper>
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" gutterBottom color="error">
-                <TrendingUpIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Venue Insights
-              </Typography>
-              <Typography variant="body2" paragraph>
-                Analyze pitch behavior, historical scoring patterns, and batting/bowling success rates at different venues.
-              </Typography>
-              <Box sx={{ 
-                p: 1, 
-                bgcolor: 'error.light', 
-                color: 'white', 
-                borderRadius: 1,
-                fontSize: '0.875rem',
-                mt: 'auto'
-              }}>
-                Essential for pre-match preparation
-              </Box>
-            </Paper>
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" gutterBottom color="success.dark">
-                <TrendingUpIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Matchup Analytics
-              </Typography>
-              <Typography variant="body2" paragraph>
-                Review head-to-head records, player vs player statistics, and historical encounter data to predict match outcomes.
-              </Typography>
-              <Box sx={{ 
-                p: 1, 
-                bgcolor: 'success.light', 
-                color: 'white', 
-                borderRadius: 1,
-                fontSize: '0.875rem',
-                mt: 'auto'
-              }}>
-                Game-changing for strategic planning
-              </Box>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Box>
+
       
       {/* Upcoming Matches Section */}
       <UpcomingMatchLinks />
