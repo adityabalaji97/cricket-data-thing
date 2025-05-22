@@ -273,6 +273,26 @@ const LandingPage = () => {
           >
             Compare Batters
           </Button>
+
+          <Button 
+            variant="contained" 
+            component={Link} 
+            to="/bowler" 
+            color="secondary"
+            size="large"
+            startIcon={<SportsCricketIcon />}
+            sx={{ 
+              px: 3, 
+              py: 1.5,
+              backgroundColor: '#ffffff',
+              color: '#ff6f00',
+              '&:hover': {
+                backgroundColor: '#f5f5f5',
+              } 
+            }}
+          >
+            Analyze Bowlers
+          </Button>
           
           <Button 
             variant="contained" 
@@ -315,7 +335,7 @@ const LandingPage = () => {
       
       <Grid container spacing={4} sx={{ mb: 8 }}>
         {/* Venue Analysis Card */}
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Card sx={{ 
             height: '100%', 
             display: 'flex', 
@@ -410,7 +430,7 @@ const LandingPage = () => {
         </Grid>
         
         {/* Batter Profile Card */}
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Card sx={{ 
             height: '100%', 
             display: 'flex', 
@@ -508,7 +528,7 @@ const LandingPage = () => {
         </Grid>
 
         {/* Batter Comparison Card */}
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Card sx={{ 
             height: '100%', 
             display: 'flex', 
@@ -602,8 +622,103 @@ const LandingPage = () => {
           </Card>
         </Grid>
         
+        {/* Bowler Profiles Card */}
+        <Grid item xs={12} md={2.4}>
+          <Card sx={{ 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column',
+            transition: 'transform 0.3s, box-shadow 0.3s',
+            '&:hover': {
+              transform: 'translateY(-5px)',
+              boxShadow: 8
+            }
+          }}>
+            <CardContent sx={{ flexGrow: 1, p: 3 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center',
+                mb: 2
+              }}>
+                <SportsCricketIcon 
+                  sx={{ 
+                    fontSize: 60, 
+                    color: '#ff6f00',
+                    p: 1,
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(255, 111, 0, 0.1)'
+                  }} 
+                />
+              </Box>
+              
+              <Typography variant="h5" component="h2" gutterBottom align="center" fontWeight="bold">
+                Bowler Profiles
+              </Typography>
+              
+              <Typography color="textSecondary" paragraph align="center">
+                Comprehensive bowling analysis with wicket patterns, economy rates, and phase-wise performance metrics.
+              </Typography>
+              
+              <Box sx={{ 
+                bgcolor: 'grey.100', 
+                p: 2, 
+                borderRadius: 2,
+                mb: 2
+              }}>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                  Featured Bowlers:
+                </Typography>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="warning"
+                  component={Link}
+                  to="/bowler?name=JJ%20Bumrah&autoload=true"
+                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                >
+                  JJ Bumrah
+                </Button>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="warning"
+                  component={Link}
+                  to="/bowler?name=DL%20Chahar&autoload=true"
+                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                >
+                  DL Chahar
+                </Button>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="warning"
+                  component={Link}
+                  to="/bowler?name=Rashid%20Khan&autoload=true"
+                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                >
+                  Rashid Khan
+                </Button>
+              </Box>
+            </CardContent>
+            
+            <CardActions sx={{ p: 2, pt: 0 }}>
+              <Button 
+                component={Link}
+                to="/bowler"
+                fullWidth 
+                variant="outlined" 
+                endIcon={<ArrowForwardIcon />} 
+                color="warning"
+                size="large"
+              >
+                Analyze Bowlers
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+        
         {/* Matchups Card */}
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Card sx={{ 
             height: '100%', 
             display: 'flex', 

@@ -25,6 +25,7 @@ import MatchupsTab from './components/MatchupsTab';
 import CompetitionFilter from './components/CompetitionFilter';
 import LandingPage from './components/LandingPage';
 import PlayerProfile from './components/PlayerProfile';
+import BowlerProfile from './components/BowlerProfile'; // Import the new BowlerProfile component
 import BatterComparison from './components/BatterComparison';
 import axios from 'axios';
 
@@ -86,7 +87,8 @@ const AppContent = () => {
       setCurrentTab(
         path === '/venue' ? 1 : 
         path === '/player' ? 2 : 
-        path === '/comparison' ? 3 : 4 // Adjusted tab indices
+        path === '/bowler' ? 3 : // New tab for Bowler Profile
+        path === '/comparison' ? 4 : 5 // Adjusted tab indices
       );
     }
   };
@@ -100,7 +102,8 @@ const AppContent = () => {
       setCurrentTab(
         path === '/venue' ? 1 : 
         path === '/player' ? 2 : 
-        path === '/comparison' ? 3 : 4 // Adjusted tab indices
+        path === '/bowler' ? 3 : // New tab for Bowler Profile
+        path === '/comparison' ? 4 : 5 // Adjusted tab indices
       );
     }
   }, [location]);
@@ -353,7 +356,8 @@ const AppContent = () => {
     return currentTab === 0 ? 'Home' :
            currentTab === 1 ? 'Venue Analysis' : 
            currentTab === 2 ? 'Batter Profile' : 
-           currentTab === 3 ? 'Batter Comparison' : 'Matchups';
+           currentTab === 3 ? 'Bowler Profile' :  
+           currentTab === 4 ? 'Batter Comparison' : 'Matchups';
   };
 
   return (
@@ -393,6 +397,9 @@ const AppContent = () => {
               <MenuItem onClick={() => handleNavigate('/player')}>
                 Batter Profile
               </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/bowler')}>
+                Bowler Profile
+              </MenuItem>
               <MenuItem onClick={() => handleNavigate('/comparison')}>
                 Batter Comparison
               </MenuItem>
@@ -416,6 +423,7 @@ const AppContent = () => {
             <Tab label="Home" component={Link} to="/" />
             <Tab label="Venue Analysis" component={Link} to="/venue" />
             <Tab label="Batter Profile" component={Link} to="/player" />
+            <Tab label="Bowler Profile" component={Link} to="/bowler" />
             <Tab label="Batter Comparison" component={Link} to="/comparison" />
             <Tab label="Matchups" component={Link} to="/matchups" />
           </Tabs>
@@ -425,6 +433,7 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/player" element={<PlayerProfile isMobile={isMobile} />} />
+        <Route path="/bowler" element={<BowlerProfile isMobile={isMobile} />} />
         <Route path="/comparison" element={<BatterComparison />} />
         <Route path="/matchups" element={<MatchupsTab isMobile={isMobile} />} />
         <Route path="/venue" element={
