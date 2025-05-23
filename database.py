@@ -10,7 +10,7 @@ load_dotenv()  # This loads the variables from .env
 
 #DATABASE_URL = "postgresql://aditya:aditya123@localhost:5432/cricket_db"
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://aditya:aditya123@localhost:5432/cricket_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://username:password@localhost:5432/cricket_db")
 
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
