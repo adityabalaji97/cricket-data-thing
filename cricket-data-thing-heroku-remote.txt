@@ -1,0 +1,1 @@
+Heroku remote: https://git.heroku.com/cricket-data-thing.git
