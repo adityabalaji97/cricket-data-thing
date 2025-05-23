@@ -21,4 +21,25 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-cricket-data-thing/
+# cricket-data-thing/ - removed to include backend code
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database files
+*.db
+*.sqlite3
+
+# Large data files
+*.xlsx
+*.csv
+
+# Log files
+*.log
