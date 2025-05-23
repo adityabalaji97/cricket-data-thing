@@ -1,0 +1,38 @@
+# Environment variables and secrets
+.env
+.env.*
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+venue_stats.log
+
+# Excel and CSV files (large data)
+*.xlsx
+*.csv
+
+# Database files
+*.db
+*.sqlite3
+
+# Temporary files
+*~
+.*.swp
+.*.swo
+
+# Analysis output files
+*.json
