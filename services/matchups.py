@@ -161,6 +161,76 @@ def get_team_matchups_service(
                     team2_batting[row[0]] = {}
                 team2_batting[row[0]][row[1]] = matchup_data
 
+        # Add "Overall" entry for each batter in team1_batting
+        for batter, bowler_stats in team1_batting.items():
+            bowlers = list(bowler_stats.keys())
+            if not bowlers:
+                continue
+
+            overall_query = text("""
+                SELECT
+                    COUNT(*) AS total_balls,
+                    SUM(runs_off_bat) AS total_runs,
+                    COUNT(CASE WHEN player_dismissed = :batter THEN 1 END) AS dismissals,
+                    COUNT(CASE WHEN runs_off_bat = 4 THEN 1 END) + COUNT(CASE WHEN runs_off_bat = 6 THEN 1 END) AS boundaries,
+                    COUNT(CASE WHEN runs_off_bat = 0 THEN 1 END) AS dots,
+                    SUM(runs_off_bat)::float / NULLIF(COUNT(DISTINCT match_id), 0) AS average,
+                    (SUM(runs_off_bat)::float / NULLIF(COUNT(DISTINCT match_id), 0)) * 100 / NULLIF(COUNT(*)::float / NULLIF(COUNT(DISTINCT match_id), 0), 0) AS strike_rate,
+                    COUNT(CASE WHEN runs_off_bat = 0 THEN 1 END)::float * 100 / NULLIF(COUNT(*), 0) AS dot_percentage,
+                    (COUNT(CASE WHEN runs_off_bat = 4 THEN 1 END) + COUNT(CASE WHEN runs_off_bat = 6 THEN 1 END))::float * 100 / NULLIF(COUNT(*), 0) AS boundary_percentage
+                FROM deliveries
+                WHERE batter = :batter
+                  AND bowler IN :bowlers
+                  AND wides = 0
+            """)
+            result = db.execute(overall_query, {"batter": batter, "bowlers": tuple(bowlers)}).fetchone()
+            team1_batting[batter]["Overall"] = {
+                "balls": result.total_balls,
+                "runs": result.total_runs,
+                "wickets": result.dismissals,
+                "boundaries": result.boundaries,
+                "dots": result.dots,
+                "average": result.average,
+                "strike_rate": result.strike_rate,
+                "dot_percentage": result.dot_percentage,
+                "boundary_percentage": result.boundary_percentage
+            }
+
+        # Add "Overall" entry for each batter in team2_batting
+        for batter, bowler_stats in team2_batting.items():
+            bowlers = list(bowler_stats.keys())
+            if not bowlers:
+                continue
+
+            overall_query = text("""
+                SELECT
+                    COUNT(*) AS total_balls,
+                    SUM(runs_off_bat) AS total_runs,
+                    COUNT(CASE WHEN player_dismissed = :batter THEN 1 END) AS dismissals,
+                    COUNT(CASE WHEN runs_off_bat = 4 THEN 1 END) + COUNT(CASE WHEN runs_off_bat = 6 THEN 1 END) AS boundaries,
+                    COUNT(CASE WHEN runs_off_bat = 0 THEN 1 END) AS dots,
+                    SUM(runs_off_bat)::float / NULLIF(COUNT(DISTINCT match_id), 0) AS average,
+                    (SUM(runs_off_bat)::float / NULLIF(COUNT(DISTINCT match_id), 0)) * 100 / NULLIF(COUNT(*)::float / NULLIF(COUNT(DISTINCT match_id), 0), 0) AS strike_rate,
+                    COUNT(CASE WHEN runs_off_bat = 0 THEN 1 END)::float * 100 / NULLIF(COUNT(*), 0) AS dot_percentage,
+                    (COUNT(CASE WHEN runs_off_bat = 4 THEN 1 END) + COUNT(CASE WHEN runs_off_bat = 6 THEN 1 END))::float * 100 / NULLIF(COUNT(*), 0) AS boundary_percentage
+                FROM deliveries
+                WHERE batter = :batter
+                  AND bowler IN :bowlers
+                  AND wides = 0
+            """)
+            result = db.execute(overall_query, {"batter": batter, "bowlers": tuple(bowlers)}).fetchone()
+            team2_batting[batter]["Overall"] = {
+                "balls": result.total_balls,
+                "runs": result.total_runs,
+                "wickets": result.dismissals,
+                "boundaries": result.boundaries,
+                "dots": result.dots,
+                "average": result.average,
+                "strike_rate": result.strike_rate,
+                "dot_percentage": result.dot_percentage,
+                "boundary_percentage": result.boundary_percentage
+            }
+
         return {
             "team1": {
                 "name": team1,
