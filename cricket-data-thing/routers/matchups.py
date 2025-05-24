@@ -4,6 +4,7 @@ from typing import List, Optional
 from datetime import date
 from database import get_session
 from services.matchups import get_team_matchups_service
+import json
 
 router = APIRouter(prefix="/teams", tags=["matchups"])
 
@@ -17,7 +18,7 @@ def get_team_matchups(
     team2_players: List[str] = Query(default=[]),
     db: Session = Depends(get_session)
 ):
-    return get_team_matchups_service(
+    result = get_team_matchups_service(
         team1=team1,
         team2=team2,
         start_date=start_date,
@@ -26,3 +27,4 @@ def get_team_matchups(
         team2_players=team2_players,
         db=db
     )
+    return result
