@@ -164,7 +164,7 @@ The phase analysis charts show how teams and players perform during different ph
 ### Frontend Setup
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/cricket-data-thing.git
+git clone https://github.com/adityabalaji97/cricket-data-thing.git
 cd cricket-data-thing/cricket-viz
 
 # Install dependencies
@@ -180,15 +180,19 @@ npm start
 cd api
 
 # Create virtual environment
+#try python3 if python command not found
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
+cd ../cricket-data-thing
+#try pip3 is pip command not found
 pip install -r requirements.txt
 
 # Set up environment variables
 cp .env.example .env
 # Edit .env with your database credentials
+#for quickly getting things done locally, change the DATABASE_URL in database.py file
 
 # Start the API server
 uvicorn main:app --reload
