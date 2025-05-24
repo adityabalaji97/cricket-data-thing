@@ -29,21 +29,14 @@ const MetricCell = ({ data, isMobile, bowler }) => {
     };
 
     let displayValue;
-    let innings = null;
 
-    if (bowler === "Expected") {
-        // Calculate number of innings using: average = total runs / innings
-        innings = data.average && data.runs ? Math.round(data.runs / data.average) : null;
-        
-        // If innings are less than 5, show "-" in the cell
-        if (innings && innings < 5) {
-            displayValue = "-";
-        } else {
-            // Otherwise, show average @ strike rate
-            displayValue = data.average
-                ? `${data.average.toFixed(1)} @ ${data.strike_rate.toFixed(1)}`
-                : "-";
-        }
+    if (bowler === "Overall") {
+        // Calculate effective wickets to avoid division by zero
+        const effectiveWickets = data.wickets && data.wickets > 0 ? data.wickets : 1;
+        // Display average (balls per wicket) @ strike rate.
+        displayValue = data.average 
+            ? `${data.average.toFixed(1)} (${(data.balls / effectiveWickets).toFixed(1)}) @ ${data.strike_rate.toFixed(1)}`
+            : "-";
     } else {
         displayValue = isMobile
             ? `${data.runs}-${data.wickets} (${data.balls})`
@@ -66,7 +59,8 @@ const MetricCell = ({ data, isMobile, bowler }) => {
                             Runs: {data.runs}<br />
                             Wickets: {data.wickets}<br />
                             Balls: {data.balls}<br />
-                            Strike Rate: {data.strike_rate ? data.strike_rate.toFixed(1) : '-'}<br />
+                            Average: {data.average ? data.average.toFixed(1) : '-'}<br />
+                            Strike Rate: {data.strike_rate.toFixed(1)}<br />
                             Boundary %: {data.boundary_percentage?.toFixed(1)}%<br />
                             Dot %: {data.dot_percentage?.toFixed(1)}%
                         </Typography>
@@ -82,20 +76,20 @@ const MetricCell = ({ data, isMobile, bowler }) => {
 const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
     const batters = Object.keys(matchups);
     const bowlers = React.useMemo(() => {
-        const allBowlers = Array.from(
+        const cols = Array.from(
             new Set(
                 batters.flatMap(batter =>
                     Object.keys(matchups[batter] || {})
                 )
             )
         );
-        // Ensure "Overall" is at the end
-        const overallIdx = allBowlers.indexOf("Overall");
-        if (overallIdx !== -1) {
-            allBowlers.splice(overallIdx, 1);
-            allBowlers.push("Overall");
+        // Remove "Overall" if present, then append it at the end
+        const overallIndex = cols.indexOf("Overall");
+        if (overallIndex !== -1) {
+            cols.splice(overallIndex, 1);
         }
-        return allBowlers;
+        cols.push("Overall");
+        return cols;
     }, [batters, matchups]);
 
     return (
@@ -134,7 +128,7 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
                                         minWidth: isMobile ? '80px' : '120px'
                                     }}
                                 >
-                                    {bowler === "Overall" ? "Expected" : bowler}
+                                    {bowler === "Overall" ? "Consolidated" : bowler}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -161,8 +155,7 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
                                         key={`${batter}-${bowler}`}
                                         data={matchups[batter]?.[bowler]}
                                         isMobile={isMobile}
-                                        // Rename "Overall" to "Expected" when passing
-                                        bowler={bowler === "Overall" ? "Expected" : bowler}
+                                        bowler={bowler} // pass the bowler to MetricCell
                                     />
                                 ))}
                             </TableRow>
