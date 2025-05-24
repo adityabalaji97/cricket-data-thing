@@ -25,7 +25,9 @@ from datetime import date, datetime
 from models import teams_mapping
 from models import get_league_abbreviation, get_full_league_name, leagues_mapping, league_aliases
 from sqlalchemy.sql import text
+from routers.matchups import router as matchups_router
 import math
+
 
 # Helper function to expand league abbreviations
 def expand_league_abbreviations(abbrevs: List[str]) -> List[str]:
@@ -64,6 +66,7 @@ logging.basicConfig(filename='venue_stats.log', level=logging.INFO)
 from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Cricket Stats API")
+app.include_router(matchups_router)
 
 # Add CORS middleware
 app.add_middleware(
@@ -1570,7 +1573,7 @@ def get_team_recent_matches(
         return matches
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
+'''
 @app.get("/teams/{team1}/{team2}/matchups")
 def get_team_matchups(
     team1: str,
@@ -1747,7 +1750,7 @@ def get_team_matchups(
         logging.error(f"Error getting matchups: {str(e)}")
         logging.error("Traceback:", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
+'''
 @app.get("/venue-bowling-stats")
 async def get_venue_bowling_stats(
     venue: str,
