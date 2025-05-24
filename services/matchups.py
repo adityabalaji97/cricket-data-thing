@@ -163,72 +163,75 @@ def get_team_matchups_service(
 
         # Add "Overall" entry for each batter in team1_batting
         for batter, bowler_stats in team1_batting.items():
-            bowlers = list(bowler_stats.keys())
-            if not bowlers:
+            if not bowler_stats:
                 continue
+            agg_balls = 0
+            agg_runs = 0
+            agg_wickets = 0
+            agg_boundaries = 0
+            agg_dots = 0
 
-            overall_query = text("""
-                SELECT
-                    COUNT(*) AS total_balls,
-                    SUM(runs_off_bat) AS total_runs,
-                    COUNT(CASE WHEN player_dismissed = :batter THEN 1 END) AS dismissals,
-                    COUNT(CASE WHEN runs_off_bat = 4 THEN 1 END) + COUNT(CASE WHEN runs_off_bat = 6 THEN 1 END) AS boundaries,
-                    COUNT(CASE WHEN runs_off_bat = 0 THEN 1 END) AS dots,
-                    SUM(runs_off_bat)::float / NULLIF(COUNT(DISTINCT match_id), 0) AS average,
-                    (SUM(runs_off_bat)::float / NULLIF(COUNT(DISTINCT match_id), 0)) * 100 / NULLIF(COUNT(*)::float / NULLIF(COUNT(DISTINCT match_id), 0), 0) AS strike_rate,
-                    COUNT(CASE WHEN runs_off_bat = 0 THEN 1 END)::float * 100 / NULLIF(COUNT(*), 0) AS dot_percentage,
-                    (COUNT(CASE WHEN runs_off_bat = 4 THEN 1 END) + COUNT(CASE WHEN runs_off_bat = 6 THEN 1 END))::float * 100 / NULLIF(COUNT(*), 0) AS boundary_percentage
-                FROM deliveries
-                WHERE batter = :batter
-                  AND bowler IN :bowlers
-                  AND wides = 0
-            """)
-            result = db.execute(overall_query, {"batter": batter, "bowlers": tuple(bowlers)}).fetchone()
+            for stats in bowler_stats.values():
+                agg_balls += stats["balls"]
+                agg_runs += stats["runs"]
+                agg_wickets += stats["wickets"]
+                agg_boundaries += stats["boundaries"]
+                agg_dots += stats["dots"]
+
+            # If wickets are 0, treat it as 1 for average calculation
+            effective_wickets = agg_wickets if agg_wickets != 0 else 1
+
+            overall_average = agg_runs / effective_wickets  if agg_runs is not None else None
+            overall_strike_rate = (agg_runs * 100 / agg_balls) if agg_balls != 0 else 0.0
+            overall_dot_percentage = (agg_dots * 100 / agg_balls) if agg_balls != 0 else 0.0
+            overall_boundary_percentage = (agg_boundaries * 100 / agg_balls) if agg_balls != 0 else 0.0
+
             team1_batting[batter]["Overall"] = {
-                "balls": result.total_balls,
-                "runs": result.total_runs,
-                "wickets": result.dismissals,
-                "boundaries": result.boundaries,
-                "dots": result.dots,
-                "average": result.average,
-                "strike_rate": result.strike_rate,
-                "dot_percentage": result.dot_percentage,
-                "boundary_percentage": result.boundary_percentage
+                "balls": agg_balls,
+                "runs": agg_runs,
+                "wickets": agg_wickets,
+                "boundaries": agg_boundaries,
+                "dots": agg_dots,
+                "average": overall_average,
+                "strike_rate": overall_strike_rate,
+                "dot_percentage": overall_dot_percentage,
+                "boundary_percentage": overall_boundary_percentage
             }
 
         # Add "Overall" entry for each batter in team2_batting
         for batter, bowler_stats in team2_batting.items():
-            bowlers = list(bowler_stats.keys())
-            if not bowlers:
+            if not bowler_stats:
                 continue
+            agg_balls = 0
+            agg_runs = 0
+            agg_wickets = 0
+            agg_boundaries = 0
+            agg_dots = 0
 
-            overall_query = text("""
-                SELECT
-                    COUNT(*) AS total_balls,
-                    SUM(runs_off_bat) AS total_runs,
-                    COUNT(CASE WHEN player_dismissed = :batter THEN 1 END) AS dismissals,
-                    COUNT(CASE WHEN runs_off_bat = 4 THEN 1 END) + COUNT(CASE WHEN runs_off_bat = 6 THEN 1 END) AS boundaries,
-                    COUNT(CASE WHEN runs_off_bat = 0 THEN 1 END) AS dots,
-                    SUM(runs_off_bat)::float / NULLIF(COUNT(DISTINCT match_id), 0) AS average,
-                    (SUM(runs_off_bat)::float / NULLIF(COUNT(DISTINCT match_id), 0)) * 100 / NULLIF(COUNT(*)::float / NULLIF(COUNT(DISTINCT match_id), 0), 0) AS strike_rate,
-                    COUNT(CASE WHEN runs_off_bat = 0 THEN 1 END)::float * 100 / NULLIF(COUNT(*), 0) AS dot_percentage,
-                    (COUNT(CASE WHEN runs_off_bat = 4 THEN 1 END) + COUNT(CASE WHEN runs_off_bat = 6 THEN 1 END))::float * 100 / NULLIF(COUNT(*), 0) AS boundary_percentage
-                FROM deliveries
-                WHERE batter = :batter
-                  AND bowler IN :bowlers
-                  AND wides = 0
-            """)
-            result = db.execute(overall_query, {"batter": batter, "bowlers": tuple(bowlers)}).fetchone()
+            for stats in bowler_stats.values():
+                agg_balls += stats["balls"]
+                agg_runs += stats["runs"]
+                agg_wickets += stats["wickets"]
+                agg_boundaries += stats["boundaries"]
+                agg_dots += stats["dots"]
+
+            effective_wickets = agg_wickets if agg_wickets != 0 else 1
+
+            overall_average = agg_runs / effective_wickets  if agg_runs is not None else None
+            overall_strike_rate = (agg_runs * 100 / agg_balls) if agg_balls != 0 else 0.0
+            overall_dot_percentage = (agg_dots * 100 / agg_balls) if agg_balls != 0 else 0.0
+            overall_boundary_percentage = (agg_boundaries * 100 / agg_balls) if agg_balls != 0 else 0.0
+
             team2_batting[batter]["Overall"] = {
-                "balls": result.total_balls,
-                "runs": result.total_runs,
-                "wickets": result.dismissals,
-                "boundaries": result.boundaries,
-                "dots": result.dots,
-                "average": result.average,
-                "strike_rate": result.strike_rate,
-                "dot_percentage": result.dot_percentage,
-                "boundary_percentage": result.boundary_percentage
+                "balls": agg_balls,
+                "runs": agg_runs,
+                "wickets": agg_wickets,
+                "boundaries": agg_boundaries,
+                "dots": agg_dots,
+                "average": overall_average,
+                "strike_rate": overall_strike_rate,
+                "dot_percentage": overall_dot_percentage,
+                "boundary_percentage": overall_boundary_percentage
             }
 
         return {
