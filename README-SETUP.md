@@ -9,37 +9,49 @@
 
 ### Backend Setup (cricket-data-thing)
 
-1. **Clone the repository**
+### For Project Maintainers
+
+1. **Standard setup:**
    ```bash
-   git clone <your-repo-url>
    cd cricket-viz/cricket-data-thing
-   ```
-
-2. **Create virtual environment**
-   ```bash
    python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
+   source venv/bin/activate
    pip install -r requirements.txt
    ```
 
-4. **Environment Configuration**
+2. **Export data for collaborators:**
    ```bash
-   cp .env.example .env
-   # Edit .env with your local database credentials
+   ./db_sync.sh export
+   # Share the generated .sql.gz file with collaborators
    ```
 
-5. **Database Setup**
+### For Collaborators
+
+1. **Clone and setup:**
    ```bash
-   # Create local PostgreSQL database
-   createdb cricket_db
-   # The app will automatically create tables on first run
+   git clone <repo-url>
+   cd cricket-viz/cricket-data-thing
+   chmod +x db_sync.sh
+   ./db_sync.sh setup
    ```
 
-6. **Run the backend**
+2. **Install dependencies:**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+3. **Get database export:**
+   - Request latest database export file from project maintainer
+   - Place it in the `data_exports/` directory
+
+4. **Import data:**
+   ```bash
+   ./db_sync.sh import
+   ```
+
+5. **Start developing:**
    ```bash
    uvicorn main:app --reload
    ```

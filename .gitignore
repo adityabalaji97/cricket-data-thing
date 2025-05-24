@@ -37,6 +37,12 @@ __pycache__/
 *.db
 *.sqlite3
 
+# Database exports and backups
+data_exports/
+*.sql
+*.sql.gz
+*.dump
+
 # Large data files
 *.xlsx
 *.csv
