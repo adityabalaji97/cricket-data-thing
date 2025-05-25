@@ -18,7 +18,7 @@ import {
 
 import { Info as InfoIcon } from 'lucide-react';
 
-const MetricCell = ({ data, isMobile }) => {
+const MetricCell = ({ data, isMobile, bowler }) => {
     if (!data) return <TableCell align="center">-</TableCell>;
 
     const getColor = (sr, balls) => {
@@ -28,9 +28,20 @@ const MetricCell = ({ data, isMobile }) => {
         return 'warning.main';
     };
 
-    const displayValue = isMobile
-        ? `${data.runs}-${data.wickets} (${data.balls})`
-        : `${data.runs}-${data.wickets} (${data.balls}) @ ${data.strike_rate.toFixed(1)}`;
+    let displayValue;
+
+    if (bowler === "Overall") {
+        // Calculate effective wickets to avoid division by zero
+        const effectiveWickets = data.wickets && data.wickets > 0 ? data.wickets : 1;
+        // Display average (balls per wicket) @ strike rate.
+        displayValue = data.average 
+            ? `${data.average.toFixed(1)} (${(data.balls / effectiveWickets).toFixed(1)}) @ ${data.strike_rate.toFixed(1)}`
+            : "-";
+    } else {
+        displayValue = isMobile
+            ? `${data.runs}-${data.wickets} (${data.balls})`
+            : `${data.runs}-${data.wickets} (${data.balls}) @ ${data.strike_rate.toFixed(1)}`;
+    }
 
     return (
         <TableCell 
@@ -45,11 +56,13 @@ const MetricCell = ({ data, isMobile }) => {
                 title={
                     <Box>
                         <Typography variant="body2">
-                            Average: {data.average ? data.average.toFixed(1) : '-'}
-                            <br />
-                            Boundary %: {data.boundary_percentage.toFixed(1)}%
-                            <br />
-                            Dot %: {data.dot_percentage.toFixed(1)}%
+                            Runs: {data.runs}<br />
+                            Wickets: {data.wickets}<br />
+                            Balls: {data.balls}<br />
+                            Average: {data.average ? data.average.toFixed(1) : '-'}<br />
+                            Strike Rate: {data.strike_rate.toFixed(1)}<br />
+                            Boundary %: {data.boundary_percentage?.toFixed(1)}%<br />
+                            Dot %: {data.dot_percentage?.toFixed(1)}%
                         </Typography>
                     </Box>
                 }
@@ -62,13 +75,22 @@ const MetricCell = ({ data, isMobile }) => {
 
 const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
     const batters = Object.keys(matchups);
-    const bowlers = Array.from(
-        new Set(
-            batters.flatMap(batter => 
-                Object.keys(matchups[batter] || {})
+    const bowlers = React.useMemo(() => {
+        const cols = Array.from(
+            new Set(
+                batters.flatMap(batter =>
+                    Object.keys(matchups[batter] || {})
+                )
             )
-        )
-    );
+        );
+        // Remove "Overall" if present, then append it at the end
+        const overallIndex = cols.indexOf("Overall");
+        if (overallIndex !== -1) {
+            cols.splice(overallIndex, 1);
+        }
+        cols.push("Overall");
+        return cols;
+    }, [batters, matchups]);
 
     return (
         <Card sx={{ p: 2, mb: 3 }}>
@@ -106,7 +128,7 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
                                         minWidth: isMobile ? '80px' : '120px'
                                     }}
                                 >
-                                    {bowler}
+                                    {bowler === "Overall" ? "Consolidated" : bowler}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -129,10 +151,11 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
                                     {batter}
                                 </TableCell>
                                 {bowlers.map(bowler => (
-                    <MetricCell 
+                                    <MetricCell 
                                         key={`${batter}-${bowler}`}
                                         data={matchups[batter]?.[bowler]}
                                         isMobile={isMobile}
+                                        bowler={bowler} // pass the bowler to MetricCell
                                     />
                                 ))}
                             </TableRow>
