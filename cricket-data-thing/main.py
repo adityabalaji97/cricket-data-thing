@@ -71,7 +71,11 @@ app.include_router(matchups_router)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://cricket-data-thing.vercel.app",],
+    allow_origins=[
+        "http://localhost:3000", 
+        "https://cricket-data-thing.vercel.app",
+        "https://hindsight2020.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
