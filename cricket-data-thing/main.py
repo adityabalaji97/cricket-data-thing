@@ -1,3 +1,4 @@
+import os
 from email.mime import base
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -68,14 +69,21 @@ from fastapi.responses import JSONResponse
 app = FastAPI(title="Cricket Stats API")
 app.include_router(matchups_router)
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Get CORS origins from environment variable or use defaults
+cors_origins_env = os.getenv('CORS_ORIGINS', '')
+if cors_origins_env:
+    cors_origins = [origin.strip() for origin in cors_origins_env.split(',')]
+else:
+    cors_origins = [
         "http://localhost:3000", 
         "https://cricket-data-thing.vercel.app",
         "https://hindsight2020.vercel.app"
-    ],
+    ]
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -114,14 +122,22 @@ def startup():
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the Cricket Data Thing API", 
-            "documentation": "/docs",
-            "version": "1.0",
-            "cors_origins": [
-                "http://localhost:3000", 
-                "https://cricket-data-thing.vercel.app",
-                "https://hindsight2020.vercel.app"
-            ]}
+    debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
+    response = {
+        "message": "Welcome to the Cricket Data Thing API", 
+        "documentation": "/docs",
+        "version": "1.0"
+    }
+    
+    if debug_mode:
+        cors_origins_env = os.getenv('CORS_ORIGINS', '')
+        response["debug"] = {
+            "cors_origins_env": cors_origins_env,
+            "cors_origins_parsed": [origin.strip() for origin in cors_origins_env.split(',')] if cors_origins_env else [],
+            "environment": "heroku" if os.getenv('DYNO') else "local"
+        }
+    
+    return response
 
 # Modified simple competitions endpoint using direct SQLAlchemy
 @app.get("/competitions")
