@@ -116,7 +116,12 @@ def startup():
 def read_root():
     return {"message": "Welcome to the Cricket Data Thing API", 
             "documentation": "/docs",
-            "version": "1.0"}
+            "version": "1.0",
+            "cors_origins": [
+                "http://localhost:3000", 
+                "https://cricket-data-thing.vercel.app",
+                "https://hindsight2020.vercel.app"
+            ]}
 
 # Modified simple competitions endpoint using direct SQLAlchemy
 @app.get("/competitions")
