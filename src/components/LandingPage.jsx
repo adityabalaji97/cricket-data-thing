@@ -201,11 +201,11 @@ const LandingPage = () => {
         </Box>
         
         <Typography variant={isMobile ? "h4" : "h2"} fontWeight="bold" gutterBottom>
-          Cricket Analytics Made Simple
+          Hindsight - Cricket Analytics
         </Typography>
         
         <Typography variant={isMobile ? "body1" : "h6"} sx={{ mb: 4, maxWidth: 800, mx: 'auto' }}>
-          Visualize match data, analyze player performance, and explore team matchups all in one place
+          Because hindsight is 20/20, and this is all about 20-20 cricket data
         </Typography>
         
         <Box sx={{ 
@@ -847,9 +847,9 @@ const LandingPage = () => {
             >
               <SportsCricketIcon sx={{ fontSize: 100, opacity: 0.2, position: 'absolute', right: 20, bottom: 20 }} />
               <Typography variant="h5" component="div" sx={{ fontWeight: 'bold', textAlign: 'center', p: 2 }}>
-                Cricket Data Thing
+                Hindsight
                 <Typography component="div" variant="body1" sx={{ mt: 1 }}>
-                  Advanced Analytics & Visualization
+                  Cricket Analytics with Perfect Hindsight
                 </Typography>
               </Typography>
             </Box>
@@ -936,7 +936,7 @@ const LandingPage = () => {
         </Grid>
         
         <Typography variant="body2" color="textSecondary" align="center" sx={{ mt: 3, pb: 2 }}>
-          Cricket Data Thing © {new Date().getFullYear()} - Advanced cricket analytics and visualization
+          Hindsight © {new Date().getFullYear()} - Cricket analytics with perfect hindsight
         </Typography>
       </Box>
 
