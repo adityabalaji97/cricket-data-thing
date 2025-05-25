@@ -23,6 +23,7 @@ const TeamBowlingTypeMatchups = ({
   players, 
   startDate, 
   endDate, 
+  venue, // add venue here
   team1_players = [], 
   team2_players = [], 
   team1Name = "Team 1", 
@@ -135,8 +136,31 @@ const TeamBowlingTypeMatchups = ({
         <TableBody>
           {playersData.map((player) => (
             <TableRow key={player.name} sx={{ height: '52px' }}>
-              <TableCell component="th" scope="row">
-                {player.name}
+              <TableCell 
+                component="th" 
+                scope="row" 
+                sx={{ cursor: 'pointer', width: '200px' }}
+              >
+                <a 
+                  href={`${window.location.origin}/player?${new URLSearchParams({
+                    name: player.name,
+                    ...(venue && venue !== "All Venues" ? { venue } : {}),
+                    ...(startDate ? { start_date: startDate } : {}),
+                    ...(endDate ? { end_date: endDate } : {}),
+                    autoload: 'true'
+                  }).toString()}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ 
+                    textDecoration: 'none', 
+                    color: 'inherit', 
+                    display: 'block', 
+                    width: '100%', 
+                    height: '100%' 
+                  }}
+                >
+                  {player.name}
+                </a>
               </TableCell>
               {filteredBowlingTypes.map(type => {
                 const matchup = player.bowling_types[type];

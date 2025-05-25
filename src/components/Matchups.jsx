@@ -73,7 +73,7 @@ const MetricCell = ({ data, isMobile, bowler }) => {
     );
 };
 
-const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
+const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile, venue, startDate, endDate }) => {
     const batters = Object.keys(matchups);
     const bowlers = React.useMemo(() => {
         const cols = Array.from(
@@ -91,6 +91,22 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
         cols.push("Overall");
         return cols;
     }, [batters, matchups]);
+
+    const handleBatterClick = (batter) => {
+        const params = new URLSearchParams();
+        params.append('name', batter);
+        if (venue && venue !== "All Venues") {
+            params.append('venue', venue);
+        }
+        if (startDate) {
+            params.append('start_date', startDate);
+        }
+        if (endDate) {
+            params.append('end_date', endDate);
+        }
+        params.append('autoload', 'true');
+        window.open(`${window.location.origin}/player?${params.toString()}`, '_blank');
+    };
 
     return (
         <Card sx={{ p: 2, mb: 3 }}>
@@ -125,17 +141,49 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
                                     sx={{ 
                                         fontWeight: 'bold',
                                         whiteSpace: 'nowrap',
-                                        minWidth: isMobile ? '80px' : '120px'
+                                        minWidth: isMobile ? '80px' : '120px',
+                                        cursor: bowler === "Overall" ? 'default' : 'pointer'
                                     }}
                                 >
-                                    {bowler === "Overall" ? "Consolidated" : bowler}
+                                    {bowler === "Overall" ? (
+                                        <span style={{ 
+                                            textDecoration: 'none', 
+                                            color: 'inherit', 
+                                            display: 'block', 
+                                            width: '100%', 
+                                            height: '100%' 
+                                        }}>
+                                            Consolidated
+                                        </span>
+                                    ) : (
+                                        <a 
+                                            href={`${window.location.origin}/bowler?${new URLSearchParams({
+                                                name: bowler,
+                                                ...(venue && venue !== "All Venues" ? { venue } : {}),
+                                                ...(startDate ? { start_date: startDate } : {}),
+                                                ...(endDate ? { end_date: endDate } : {}),
+                                                autoload: 'true'
+                                            }).toString()}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{ 
+                                                textDecoration: 'none', 
+                                                color: 'inherit', 
+                                                display: 'block', 
+                                                width: '100%', 
+                                                height: '100%' 
+                                            }}
+                                        >
+                                            {bowler}
+                                        </a>
+                                    )}
                                 </TableCell>
                             ))}
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {batters.map(batter => (
-                            <TableRow key={batter}>
+                            <TableRow key={batter} onClick={() => handleBatterClick(batter)} style={{ cursor: 'pointer' }}>
                                 <TableCell 
                                     component="th" 
                                     scope="row"
@@ -145,10 +193,31 @@ const MatchupMatrix = ({ batting_team, bowling_team, matchups, isMobile }) => {
                                         position: 'sticky',
                                         left: 0,
                                         backgroundColor: 'background.paper',
-                                        zIndex: 1
+                                        zIndex: 1,
+                                        cursor: 'pointer'
                                     }}
+                                    onClick={() => handleBatterClick(batter)}
                                 >
-                                    {batter}
+                                    <a 
+                                        href={`${window.location.origin}/player?${new URLSearchParams({
+                                            name: batter,
+                                            ...(venue && venue !== "All Venues" ? { venue } : {}),
+                                            ...(startDate ? { start_date: startDate } : {}),
+                                            ...(endDate ? { end_date: endDate } : {}),
+                                            autoload: 'true'
+                                        }).toString()}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ 
+                                            textDecoration: 'none', 
+                                            color: 'inherit', 
+                                            display: 'block', 
+                                            width: '100%', 
+                                            height: '100%' 
+                                        }}
+                                    >
+                                        {batter}
+                                    </a>
                                 </TableCell>
                                 {bowlers.map(bowler => (
                                     <MetricCell 
@@ -254,12 +323,18 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
                 bowling_team={matchupData.team2.name}
                 matchups={matchupData.team1.batting_matchups}
                 isMobile={isMobile}
+                venue={matchupData.venue}
+                startDate={startDate}
+                endDate={endDate}
             />
             <MatchupMatrix 
                 batting_team={matchupData.team2.name}
                 bowling_team={matchupData.team1.name}
                 matchups={matchupData.team2.batting_matchups}
                 isMobile={isMobile}
+                venue={matchupData.venue}
+                startDate={startDate}
+                endDate={endDate}
             />
         </Box>
     );
