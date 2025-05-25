@@ -1,7 +1,9 @@
 {
-  "version": 2,
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/proxy.js" },
-    { "src": "/(.*)", "dest": "/$1" }
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://hindsight2020.vercel.app/$1",
+      "permanent": true
+    }
   ]
 }
