@@ -49,3 +49,4 @@ data_exports/
 
 # Log files
 *.log
+.vercel

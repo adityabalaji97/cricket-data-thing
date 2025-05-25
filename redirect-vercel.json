@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://hindsight.vercel.app/$1",
+      "permanent": true
+    }
+  ]
+}
