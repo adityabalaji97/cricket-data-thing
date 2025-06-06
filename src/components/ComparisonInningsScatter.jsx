@@ -225,13 +225,13 @@ const ComparisonInningsScatter = ({ batters }) => {
 
         <div style={{ height: 500, width: '100%' }}>
           <ResponsiveContainer>
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 40 }}>
+            <ScatterChart margin={{ top: 20, right: 20, bottom: 80, left: 40 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
                 {...getAxisProps(xMetric)}
                 dataKey={xAxisMetrics[xMetric].key}
                 name={xAxisMetrics[xMetric].label}
-                label={{ value: xAxisMetrics[xMetric].label, position: 'bottom' }}
+                label={{ value: xAxisMetrics[xMetric].label, position: 'bottom', offset: -5 }}
               />
               <YAxis 
                 type="number"
@@ -263,7 +263,11 @@ const ComparisonInningsScatter = ({ batters }) => {
                 );
               })}
               
-              <Legend />
+              <Legend 
+                verticalAlign="bottom" 
+                height={36}
+                wrapperStyle={{ paddingTop: '20px' }}
+              />
             </ScatterChart>
           </ResponsiveContainer>
         </div>
