@@ -108,6 +108,16 @@ const ComparisonInningsScatter = ({ batters }) => {
       const inning = payload[0].payload;
       const phaseNames = ['0-6', '6-10', '10-15', '15-20'];
       
+      // Calculate team entry score: wickets = batting_position - 1
+      const entryWickets = inning.position - 1;
+      const entryRuns = inning.entry_point.runs;
+      const entryOvers = inning.entry_point.overs.toFixed(1);
+      
+      // Calculate total team performance (including this batter)
+      const totalTeamRuns = inning.runs + inning.team_comparison.team_runs_excl_batter;
+      const totalTeamBalls = inning.balls + inning.team_comparison.team_balls_excl_batter;
+      const totalTeamSR = totalTeamBalls > 0 ? (totalTeamRuns * 100 / totalTeamBalls) : 0;
+      
       return (
         <Card sx={{ p: 1, bgcolor: 'background.paper' }}>
           <Typography variant="subtitle2" sx={{ color: inning.color, fontWeight: 'bold' }}>
@@ -115,6 +125,17 @@ const ComparisonInningsScatter = ({ batters }) => {
           </Typography>
           <Typography variant="body2">{`${inning.runs} (${inning.balls})`}</Typography>
           <Typography variant="body2" color="text.secondary">{`SR: ${inning.strike_rate.toFixed(1)}`}</Typography>
+          
+          {/* Entry Context */}
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Entry Score: {entryRuns}/{entryWickets} ({entryOvers})
+          </Typography>
+          
+          {/* Team Performance Context */}
+          <Typography variant="body2" color="text.secondary">
+            Team Total: {totalTeamRuns} ({totalTeamSR.toFixed(1)} SR)
+          </Typography>
+          
           <Typography variant="body2" color="text.secondary">
             {`Team SR: ${inning.team_sr.toFixed(1)} (Diff: ${inning.sr_diff.toFixed(1)})`}
           </Typography>
