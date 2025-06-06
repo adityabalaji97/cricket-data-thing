@@ -30,6 +30,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import CompetitionFilter from './CompetitionFilter';
 import ComparisonStrikeRateProgression from './ComparisonStrikeRateProgression';
 import PhaseComparisonChart from './PhaseComparisonChart';
+import ComparisonInningsScatter from './ComparisonInningsScatter';
 import config from '../config';
 
 const DEFAULT_START_DATE = "2020-01-01";
@@ -449,6 +450,9 @@ const BatterComparison = () => {
         </Grid>
         <Grid item xs={12}>
           <PhaseComparisonChart batters={compareData} />
+        </Grid>
+        <Grid item xs={12}>
+          <ComparisonInningsScatter batters={compareData} />
         </Grid>
       </Grid>
     );
