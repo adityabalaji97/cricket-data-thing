@@ -31,7 +31,18 @@ const ComparisonInningsScatter = ({ batters }) => {
 
   // Color assignment for players
   const playerColors = useMemo(() => {
-    const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7'];
+    const colors = [
+      '#ff6b6b', // Red
+      '#4ecdc4', // Teal
+      '#feca57', // Yellow/Gold  
+      '#ff9ff3', // Pink
+      '#54a0ff', // Blue
+      '#5f27cd', // Purple
+      '#00d2d3', // Cyan
+      '#ff9f43', // Orange
+      '#1dd1a1', // Green
+      '#c44569'  // Dark Pink
+    ];
     return batters.reduce((acc, batter, index) => {
       acc[batter.id] = colors[index % colors.length];
       return acc;
@@ -225,13 +236,13 @@ const ComparisonInningsScatter = ({ batters }) => {
 
         <div style={{ height: 500, width: '100%' }}>
           <ResponsiveContainer>
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 40 }}>
+            <ScatterChart margin={{ top: 20, right: 20, bottom: 80, left: 40 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
                 {...getAxisProps(xMetric)}
                 dataKey={xAxisMetrics[xMetric].key}
                 name={xAxisMetrics[xMetric].label}
-                label={{ value: xAxisMetrics[xMetric].label, position: 'bottom' }}
+                label={{ value: xAxisMetrics[xMetric].label, position: 'bottom', offset: -5 }}
               />
               <YAxis 
                 type="number"
@@ -263,7 +274,11 @@ const ComparisonInningsScatter = ({ batters }) => {
                 );
               })}
               
-              <Legend />
+              <Legend 
+                verticalAlign="bottom" 
+                height={36}
+                wrapperStyle={{ paddingTop: '20px' }}
+              />
             </ScatterChart>
           </ResponsiveContainer>
         </div>
