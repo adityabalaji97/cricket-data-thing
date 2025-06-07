@@ -31,6 +31,7 @@ import CompetitionFilter from './CompetitionFilter';
 import ComparisonStrikeRateProgression from './ComparisonStrikeRateProgression';
 import PhaseComparisonChart from './PhaseComparisonChart';
 import ComparisonInningsScatter from './ComparisonInningsScatter';
+import ComparisonAggregatedTable from './ComparisonAggregatedTable';
 import config from '../config';
 
 const DEFAULT_START_DATE = "2020-01-01";
@@ -453,6 +454,9 @@ const BatterComparison = () => {
         </Grid>
         <Grid item xs={12}>
           <ComparisonInningsScatter batters={compareData} />
+        </Grid>
+        <Grid item xs={12}>
+          <ComparisonAggregatedTable batters={compareData} />
         </Grid>
       </Grid>
     );
