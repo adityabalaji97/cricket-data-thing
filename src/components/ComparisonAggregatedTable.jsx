@@ -47,6 +47,18 @@ const ComparisonAggregatedTable = ({ batters }) => {
     return 'Death';
   };
 
+  const formatOvers = (overs) => {
+    // Convert decimal overs to proper cricket format
+    // e.g., 9.9 becomes 10.0, 10.7 becomes 11.1
+    const wholeOvers = Math.floor(overs);
+    const balls = Math.round((overs - wholeOvers) * 6);
+    
+    if (balls >= 6) {
+      return wholeOvers + 1;
+    }
+    return wholeOvers + (balls / 10); // Convert balls to decimal (e.g., 3 balls = 0.3)
+  };
+
   const getPositionGroup = (position) => {
     if (position <= 3) return 'Top Order (1-3)';
     if (position <= 6) return 'Middle Order (4-6)';
@@ -111,6 +123,10 @@ const ComparisonAggregatedTable = ({ batters }) => {
             totalDots: 0,
             wins: 0,
             losses: 0,
+            // Entry point totals
+            totalEntryRuns: 0,
+            totalEntryWickets: 0,
+            totalEntryOvers: 0,
             // Phase-wise totals
             ppRuns: 0,
             ppBalls: 0,
@@ -129,6 +145,11 @@ const ComparisonAggregatedTable = ({ batters }) => {
         group.totalWickets += (inning.wickets || 0);
         group.totalBoundaries += (inning.fours || 0) + (inning.sixes || 0);
         group.totalDots += inning.dots || 0;
+        
+        // Entry point aggregation
+        group.totalEntryRuns += inning.entry_point?.runs || 0;
+        group.totalEntryWickets += Math.max(0, (inning.batting_position || 1) - 2);
+        group.totalEntryOvers += inning.entry_point?.overs || 0;
         
         // Match results (derive from winner vs batting_team)
         const isWin = inning.winner === inning.batting_team;
@@ -155,6 +176,11 @@ const ComparisonAggregatedTable = ({ batters }) => {
       group.runsPerInnings = group.matches > 0 ? group.totalRuns / group.matches : 0;
       group.ballsPerInnings = group.matches > 0 ? group.totalBalls / group.matches : 0;
       
+      // Entry point averages
+      group.avgEntryRuns = group.matches > 0 ? group.totalEntryRuns / group.matches : 0;
+      group.avgEntryWickets = group.matches > 0 ? group.totalEntryWickets / group.matches : 0;
+      group.avgEntryOvers = group.matches > 0 ? group.totalEntryOvers / group.matches : 0;
+      
       // Phase-wise rates
       group.ppStrikeRate = group.ppBalls > 0 ? (group.ppRuns * 100) / group.ppBalls : 0;
       group.middleStrikeRate = group.middleBalls > 0 ? (group.middleRuns * 100) / group.middleBalls : 0;
@@ -170,26 +196,44 @@ const ComparisonAggregatedTable = ({ batters }) => {
     return values.sort();
   }, [aggregatedData]);
 
-  // Sort data
+  // Sort data with player order preservation
   const sortedData = useMemo(() => {
     return [...aggregatedData].sort((a, b) => {
-      // First sort by group value, then by metric
+      // First sort by group value
       if (a.groupValue !== b.groupValue) {
         return a.groupValue.localeCompare(b.groupValue);
       }
       
+      // Within the same group, sort by the selected metric, but preserve player order for ties
       let aVal = a[sortBy];
       let bVal = b[sortBy];
       
       if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        const sortResult = sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        // If values are equal, preserve original player order
+        if (sortResult === 0) {
+          const aIndex = batters.findIndex(batter => batter.id === a.playerId);
+          const bIndex = batters.findIndex(batter => batter.id === b.playerId);
+          return aIndex - bIndex;
+        }
+        return sortResult;
       }
       
-      return sortOrder === 'asc' ? 
+      // For string sorting
+      const stringSort = sortOrder === 'asc' ? 
         (aVal > bVal ? 1 : -1) : 
         (aVal < bVal ? 1 : -1);
+      
+      // If strings are equal, preserve original player order
+      if (aVal === bVal) {
+        const aIndex = batters.findIndex(batter => batter.id === a.playerId);
+        const bIndex = batters.findIndex(batter => batter.id === b.playerId);
+        return aIndex - bIndex;
+      }
+      
+      return stringSort;
     });
-  }, [aggregatedData, sortBy, sortOrder]);
+  }, [aggregatedData, sortBy, sortOrder, batters]);
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -305,7 +349,7 @@ const ComparisonAggregatedTable = ({ batters }) => {
                     direction={sortBy === 'totalRuns' ? sortOrder : 'asc'}
                     onClick={() => handleSort('totalRuns')}
                   >
-                    Runs
+                    Runs (Balls)
                   </TableSortLabel>
                 </TableCell>
                 <TableCell align="center">
@@ -314,35 +358,30 @@ const ComparisonAggregatedTable = ({ batters }) => {
                     direction={sortBy === 'average' ? sortOrder : 'asc'}
                     onClick={() => handleSort('average')}
                   >
-                    Avg
+                    Avg @ SR
                   </TableSortLabel>
                 </TableCell>
                 <TableCell align="center">
-                  <TableSortLabel
-                    active={sortBy === 'strikeRate'}
-                    direction={sortBy === 'strikeRate' ? sortOrder : 'asc'}
-                    onClick={() => handleSort('strikeRate')}
-                  >
-                    SR
-                  </TableSortLabel>
+                  <Tooltip title="Average team score when entering">
+                    <TableSortLabel
+                      active={sortBy === 'avgEntryRuns'}
+                      direction={sortBy === 'avgEntryRuns' ? sortOrder : 'asc'}
+                      onClick={() => handleSort('avgEntryRuns')}
+                    >
+                      Entry
+                    </TableSortLabel>
+                  </Tooltip>
                 </TableCell>
                 <TableCell align="center">
-                  <TableSortLabel
-                    active={sortBy === 'runsPerInnings'}
-                    direction={sortBy === 'runsPerInnings' ? sortOrder : 'asc'}
-                    onClick={() => handleSort('runsPerInnings')}
-                  >
-                    Runs/Inn
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell align="center">
-                  <TableSortLabel
-                    active={sortBy === 'ballsPerInnings'}
-                    direction={sortBy === 'ballsPerInnings' ? sortOrder : 'asc'}
-                    onClick={() => handleSort('ballsPerInnings')}
-                  >
-                    Balls/Inn
-                  </TableSortLabel>
+                  <Tooltip title="Average batting performance">
+                    <TableSortLabel
+                      active={sortBy === 'runsPerInnings'}
+                      direction={sortBy === 'runsPerInnings' ? sortOrder : 'asc'}
+                      onClick={() => handleSort('runsPerInnings')}
+                    >
+                      Score
+                    </TableSortLabel>
+                  </Tooltip>
                 </TableCell>
                 <TableCell align="center">
                   <TableSortLabel
@@ -359,7 +398,7 @@ const ComparisonAggregatedTable = ({ batters }) => {
                     direction={sortBy === 'boundaryPercentage' ? sortOrder : 'asc'}
                     onClick={() => handleSort('boundaryPercentage')}
                   >
-                    Boundary %
+                    4s/6s %
                   </TableSortLabel>
                 </TableCell>
                 <TableCell align="center">
@@ -369,7 +408,7 @@ const ComparisonAggregatedTable = ({ batters }) => {
                       direction={sortBy === 'ppStrikeRate' ? sortOrder : 'asc'}
                       onClick={() => handleSort('ppStrikeRate')}
                     >
-                      PP SR
+                      PP
                     </TableSortLabel>
                   </Tooltip>
                 </TableCell>
@@ -380,7 +419,7 @@ const ComparisonAggregatedTable = ({ batters }) => {
                       direction={sortBy === 'middleStrikeRate' ? sortOrder : 'asc'}
                       onClick={() => handleSort('middleStrikeRate')}
                     >
-                      Mid SR
+                      Mid
                     </TableSortLabel>
                   </Tooltip>
                 </TableCell>
@@ -391,7 +430,7 @@ const ComparisonAggregatedTable = ({ batters }) => {
                       direction={sortBy === 'deathStrikeRate' ? sortOrder : 'asc'}
                       onClick={() => handleSort('deathStrikeRate')}
                     >
-                      Death SR
+                      Death
                     </TableSortLabel>
                   </Tooltip>
                 </TableCell>
@@ -459,27 +498,22 @@ const ComparisonAggregatedTable = ({ batters }) => {
                         </TableCell>
                         <TableCell align="center">
                           <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                            {item.totalRuns}
+                            {item.totalRuns} ({item.totalBalls})
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
                           <Typography variant="body2">
-                            {item.average.toFixed(1)}
+                            {item.average.toFixed(1)} @ {item.strikeRate.toFixed(1)}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
                           <Typography variant="body2">
-                            {item.strikeRate.toFixed(1)}
+                            {item.avgEntryRuns.toFixed(0)}-{item.avgEntryWickets.toFixed(0)} ({formatOvers(item.avgEntryOvers).toFixed(1)})
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
                           <Typography variant="body2">
-                            {item.runsPerInnings.toFixed(1)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Typography variant="body2">
-                            {item.ballsPerInnings.toFixed(1)}
+                            {item.runsPerInnings.toFixed(0)} ({item.ballsPerInnings.toFixed(0)})
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
