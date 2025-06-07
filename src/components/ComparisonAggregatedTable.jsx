@@ -90,11 +90,85 @@ const ComparisonAggregatedTable = ({ batters }) => {
     'match_result': { 
       label: 'Match Result', 
       getValue: (inning) => inning.winner === inning.batting_team ? 'win' : 'loss'
+    },
+    'bowling_type': {
+      label: 'vs Bowling Type',
+      getValue: () => 'special' // This will be handled differently
     }
   };
 
   // Process and aggregate data
   const aggregatedData = useMemo(() => {
+    if (groupBy === 'bowling_type') {
+      // Special handling for bowling type grouping
+      const grouped = {};
+      
+      batters.forEach(batter => {
+        if (!visiblePlayers.includes(batter.id)) return;
+        
+        // Create entries for pace and spin performance
+        ['pace', 'spin'].forEach(bowlingType => {
+          const key = `vs ${bowlingType.charAt(0).toUpperCase() + bowlingType.slice(1)}|${batter.id}`;
+          const stats = batter.stats.phase_stats?.[bowlingType];
+          
+          if (stats?.overall && stats.overall.balls > 0) { // Only include if there's actual data
+            grouped[key] = {
+              groupValue: `vs ${bowlingType.charAt(0).toUpperCase() + bowlingType.slice(1)}`,
+              playerId: batter.id,
+              playerLabel: batter.label,
+              color: playerColors[batter.id],
+              innings: [], // Not applicable for this grouping
+              
+              // Use the aggregated stats from phase_stats
+              matches: 1, // Represents one aggregated performance type
+              totalRuns: stats.overall.runs || 0,
+              totalBalls: stats.overall.balls || 0,
+              totalWickets: 0, // Not available in phase_stats
+              totalBoundaries: Math.round((stats.overall.boundary_percentage || 0) * stats.overall.balls / 100),
+              totalDots: Math.round((stats.overall.dot_percentage || 0) * stats.overall.balls / 100),
+              wins: 0, // Not applicable for this aggregation
+              losses: 0,
+              
+              // Entry point data - not applicable for bowling type grouping
+              totalEntryRuns: 0,
+              totalEntryWickets: 0,
+              totalEntryOvers: 0,
+              
+              // Phase-wise totals - extract from pace/spin phase data
+              ppRuns: stats.powerplay?.runs || 0,
+              ppBalls: stats.powerplay?.balls || 0,
+              middleRuns: stats.middle?.runs || 0,
+              middleBalls: stats.middle?.balls || 0,
+              deathRuns: stats.death?.runs || 0,
+              deathBalls: stats.death?.balls || 0,
+              
+              // Pre-calculated metrics from API
+              average: stats.overall.average || 0,
+              strikeRate: stats.overall.strike_rate || 0,
+              dotPercentage: stats.overall.dot_percentage || 0,
+              boundaryPercentage: stats.overall.boundary_percentage || 0,
+              winPercentage: 0, // Not applicable
+              runsPerInnings: stats.overall.runs || 0, // Total runs against this bowling type
+              ballsPerInnings: stats.overall.balls || 0, // Total balls against this bowling type
+              
+              // Entry point averages - not applicable
+              avgEntryRuns: 0,
+              avgEntryWickets: 0,
+              avgEntryOvers: 0,
+              
+              // Phase-wise rates - calculate from phase data
+              ppStrikeRate: stats.powerplay?.strike_rate || 0,
+              middleStrikeRate: stats.middle?.strike_rate || 0,
+              deathStrikeRate: stats.death?.strike_rate || 0
+            };
+          }
+        });
+      });
+      
+      return Object.values(grouped);
+    }
+    
+    // Original logic for other groupings
     const getGroupValue = groupByOptions[groupBy].getValue;
     
     // Group data by groupBy field and player
@@ -493,7 +567,7 @@ const ComparisonAggregatedTable = ({ batters }) => {
                         </TableCell>
                         <TableCell align="center">
                           <Typography variant="body2">
-                            {item.matches}
+                            {groupBy === 'bowling_type' ? 'All' : item.matches}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
@@ -508,12 +582,12 @@ const ComparisonAggregatedTable = ({ batters }) => {
                         </TableCell>
                         <TableCell align="center">
                           <Typography variant="body2">
-                            {item.avgEntryRuns.toFixed(0)}-{item.avgEntryWickets.toFixed(0)} ({formatOvers(item.avgEntryOvers).toFixed(1)})
+                            {groupBy === 'bowling_type' ? 'N/A' : `${item.avgEntryRuns.toFixed(0)}-${item.avgEntryWickets.toFixed(0)} (${formatOvers(item.avgEntryOvers).toFixed(1)})`}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
                           <Typography variant="body2">
-                            {item.runsPerInnings.toFixed(0)} ({item.ballsPerInnings.toFixed(0)})
+                            {groupBy === 'bowling_type' ? `${item.totalRuns} (${item.totalBalls})` : `${item.runsPerInnings.toFixed(0)} (${item.ballsPerInnings.toFixed(0)})`}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
@@ -527,27 +601,31 @@ const ComparisonAggregatedTable = ({ batters }) => {
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
-                          <Typography variant="body2" color={item.ppBalls > 0 ? 'inherit' : 'text.secondary'}>
-                            {item.ppBalls > 0 ? item.ppStrikeRate.toFixed(1) : 'N/A'}
+                          <Typography variant="body2" color={(groupBy === 'bowling_type' ? item.ppBalls : item.ppBalls) > 0 ? 'inherit' : 'text.secondary'}>
+                            {(groupBy === 'bowling_type' ? item.ppBalls : item.ppBalls) > 0 ? item.ppStrikeRate.toFixed(1) : 'N/A'}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
-                          <Typography variant="body2" color={item.middleBalls > 0 ? 'inherit' : 'text.secondary'}>
-                            {item.middleBalls > 0 ? item.middleStrikeRate.toFixed(1) : 'N/A'}
+                          <Typography variant="body2" color={(groupBy === 'bowling_type' ? item.middleBalls : item.middleBalls) > 0 ? 'inherit' : 'text.secondary'}>
+                            {(groupBy === 'bowling_type' ? item.middleBalls : item.middleBalls) > 0 ? item.middleStrikeRate.toFixed(1) : 'N/A'}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
-                          <Typography variant="body2" color={item.deathBalls > 0 ? 'inherit' : 'text.secondary'}>
-                            {item.deathBalls > 0 ? item.deathStrikeRate.toFixed(1) : 'N/A'}
+                          <Typography variant="body2" color={(groupBy === 'bowling_type' ? item.deathBalls : item.deathBalls) > 0 ? 'inherit' : 'text.secondary'}>
+                            {(groupBy === 'bowling_type' ? item.deathBalls : item.deathBalls) > 0 ? item.deathStrikeRate.toFixed(1) : 'N/A'}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
-                          <Chip 
-                            label={`${item.winPercentage.toFixed(0)}%`}
-                            color={item.winPercentage >= 50 ? 'success' : 'error'}
-                            size="small"
-                            variant="outlined"
-                          />
+                          {groupBy === 'bowling_type' ? (
+                            <Typography variant="body2" color="text.secondary">N/A</Typography>
+                          ) : (
+                            <Chip 
+                              label={`${item.winPercentage.toFixed(0)}%`}
+                              color={item.winPercentage >= 50 ? 'success' : 'error'}
+                              size="small"
+                              variant="outlined"
+                            />
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
