@@ -17,8 +17,76 @@ import {
   MenuItem,
   InputLabel,
   Paper,
-  Tooltip
+  Tooltip,
+  IconButton
 } from '@mui/material';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Sortable Row Component
+const SortableRow = ({ id, children, ...props }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow
+      ref={setNodeRef}
+      style={style}
+      {...props}
+      sx={{ 
+        ...props.sx,
+        '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' },
+        cursor: isDragging ? 'grabbing' : 'default'
+      }}
+    >
+      {/* Drag Handle Cell */}
+      <TableCell sx={{ width: 40, padding: '4px' }}>
+        <IconButton
+          size="small"
+          {...attributes}
+          {...listeners}
+          sx={{ 
+            cursor: 'grab',
+            '&:active': { cursor: 'grabbing' },
+            color: 'text.secondary'
+          }}
+        >
+          <DragIndicatorIcon fontSize="small" />
+        </IconButton>
+      </TableCell>
+      {children}
+    </TableRow>
+  );
+};
 
 const ComparisonAggregatedTable = ({ batters }) => {
   const [groupBy, setGroupBy] = useState('batting_position');
@@ -27,6 +95,65 @@ const ComparisonAggregatedTable = ({ batters }) => {
   const [visiblePlayers, setVisiblePlayers] = useState(
     batters.map(b => b.id)
   );
+  
+  // Custom player ordering state (session-only)
+  const [customPlayerOrder, setCustomPlayerOrder] = useState(
+    batters.map(b => b.id) // Initialize with original selection order
+  );
+  
+  // Update custom player order when batters change
+  React.useEffect(() => {
+    setCustomPlayerOrder(batters.map(b => b.id));
+  }, [batters.map(b => b.id).join(',')]);
+  
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Drag end handler
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      // Extract group and player ID from the drag ID
+      const [groupValue, activePlayerId] = active.id.split('|');
+      const [, overPlayerId] = over.id.split('|');
+      
+      // Get current group data
+      const groupData = sortedData.filter(item => item.groupValue === groupValue);
+      const groupPlayerIds = groupData.map(item => item.playerId);
+      
+      // Find old and new indices within this group
+      const oldIndex = groupPlayerIds.indexOf(activePlayerId);
+      const newIndex = groupPlayerIds.indexOf(overPlayerId);
+      
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // Reorder the players within this group
+        const newGroupOrder = arrayMove(groupPlayerIds, oldIndex, newIndex);
+        
+        // Update the global custom player order
+        setCustomPlayerOrder(prevOrder => {
+          const newOrder = [...prevOrder];
+          
+          // Remove the affected players from their current positions
+          const filteredOrder = newOrder.filter(id => !groupPlayerIds.includes(id));
+          
+          // Find the position to insert the reordered group
+          // We'll insert them in the position of the first player from this group
+          const firstGroupPlayerIndex = newOrder.findIndex(id => groupPlayerIds.includes(id));
+          
+          // Insert the reordered group players
+          filteredOrder.splice(firstGroupPlayerIndex, 0, ...newGroupOrder);
+          
+          return filteredOrder;
+        });
+      }
+    }
+  };
 
   // Color assignment for players (same as other components)
   const playerColors = useMemo(() => {
@@ -270,7 +397,7 @@ const ComparisonAggregatedTable = ({ batters }) => {
     return values.sort();
   }, [aggregatedData]);
 
-  // Sort data with player order preservation
+  // Sort data with custom player order and column sorting
   const sortedData = useMemo(() => {
     return [...aggregatedData].sort((a, b) => {
       // First sort by group value
@@ -278,36 +405,44 @@ const ComparisonAggregatedTable = ({ batters }) => {
         return a.groupValue.localeCompare(b.groupValue);
       }
       
-      // Within the same group, sort by the selected metric, but preserve player order for ties
-      let aVal = a[sortBy];
-      let bVal = b[sortBy];
-      
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        const sortResult = sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-        // If values are equal, preserve original player order
-        if (sortResult === 0) {
-          const aIndex = batters.findIndex(batter => batter.id === a.playerId);
-          const bIndex = batters.findIndex(batter => batter.id === b.playerId);
+      // Within the same group, apply column sorting if active, otherwise use custom order
+      if (sortBy && (sortBy !== 'matches' || sortOrder !== 'desc')) {
+        // Column sorting is active (not default state)
+        let aVal = a[sortBy];
+        let bVal = b[sortBy];
+        
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          const sortResult = sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+          // If values are equal, use custom player order
+          if (sortResult === 0) {
+            const aIndex = customPlayerOrder.indexOf(a.playerId);
+            const bIndex = customPlayerOrder.indexOf(b.playerId);
+            return aIndex - bIndex;
+          }
+          return sortResult;
+        }
+        
+        // For string sorting
+        const stringSort = sortOrder === 'asc' ? 
+          (aVal > bVal ? 1 : -1) : 
+          (aVal < bVal ? 1 : -1);
+        
+        // If strings are equal, use custom player order
+        if (aVal === bVal) {
+          const aIndex = customPlayerOrder.indexOf(a.playerId);
+          const bIndex = customPlayerOrder.indexOf(b.playerId);
           return aIndex - bIndex;
         }
-        return sortResult;
-      }
-      
-      // For string sorting
-      const stringSort = sortOrder === 'asc' ? 
-        (aVal > bVal ? 1 : -1) : 
-        (aVal < bVal ? 1 : -1);
-      
-      // If strings are equal, preserve original player order
-      if (aVal === bVal) {
-        const aIndex = batters.findIndex(batter => batter.id === a.playerId);
-        const bIndex = batters.findIndex(batter => batter.id === b.playerId);
+        
+        return stringSort;
+      } else {
+        // No column sorting active, use custom player order
+        const aIndex = customPlayerOrder.indexOf(a.playerId);
+        const bIndex = customPlayerOrder.indexOf(b.playerId);
         return aIndex - bIndex;
       }
-      
-      return stringSort;
     });
-  }, [aggregatedData, sortBy, sortOrder, batters]);
+  }, [aggregatedData, sortBy, sortOrder, customPlayerOrder]);
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -404,10 +539,21 @@ const ComparisonAggregatedTable = ({ batters }) => {
           <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
+                <TableCell sx={{ width: 40 }}>
+                  {/* Drag handle column header */}
+                </TableCell>
                 <TableCell sx={{ minWidth: 120 }}>
                   {groupByOptions[groupBy].label}
                 </TableCell>
-                <TableCell>Player</TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortBy === 'playerLabel'}
+                    direction={sortBy === 'playerLabel' ? sortOrder : 'asc'}
+                    onClick={() => handleSort('playerLabel')}
+                  >
+                    Player
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell align="center">
                   <TableSortLabel
                     active={sortBy === 'matches'}
@@ -519,6 +665,11 @@ const ComparisonAggregatedTable = ({ batters }) => {
                 </TableCell>
               </TableRow>
             </TableHead>
+            <DndContext 
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
             <TableBody>
               {groupValues.map(groupValue => {
                 const groupData = sortedData.filter(item => item.groupValue === groupValue);
@@ -528,7 +679,7 @@ const ComparisonAggregatedTable = ({ batters }) => {
                     {/* Group Header */}
                     <TableRow sx={{ backgroundColor: 'rgba(0, 0, 0, 0.04)' }}>
                       <TableCell 
-                        colSpan={13} 
+                        colSpan={14} 
                         sx={{ 
                           fontWeight: 'bold', 
                           fontSize: '0.9rem',
@@ -539,17 +690,19 @@ const ComparisonAggregatedTable = ({ batters }) => {
                       </TableCell>
                     </TableRow>
                     
-                    {/* Player Data */}
-                    {groupData.map((item, index) => (
-                      <TableRow 
-                        key={`${item.groupValue}-${item.playerId}`}
-                        sx={{ 
-                          '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' }
-                        }}
-                      >
-                        <TableCell sx={{ pl: 3 }}>
-                          {/* Empty cell under group header */}
-                        </TableCell>
+                    {/* Player Data with Drag and Drop */}
+                    <SortableContext 
+                      items={groupData.map(item => `${item.groupValue}|${item.playerId}`)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {groupData.map((item, index) => (
+                        <SortableRow 
+                          key={`${item.groupValue}-${item.playerId}`}
+                          id={`${item.groupValue}|${item.playerId}`}
+                        >
+                          <TableCell sx={{ pl: 3 }}>
+                            {/* Empty cell under group header */}
+                          </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <Box 
@@ -627,12 +780,14 @@ const ComparisonAggregatedTable = ({ batters }) => {
                             />
                           )}
                         </TableCell>
-                      </TableRow>
-                    ))}
+                        </SortableRow>
+                      ))}
+                    </SortableContext>
                   </React.Fragment>
                 );
               })}
             </TableBody>
+            </DndContext>
           </Table>
         </TableContainer>
 
