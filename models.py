@@ -1,6 +1,7 @@
 # models.py
-from sqlalchemy import create_engine, Column, Integer, String, Date, JSON, ForeignKey, Float, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Date, JSON, ForeignKey, Float, Boolean, DECIMAL, TIMESTAMP
 from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -136,6 +137,50 @@ class Delivery(Base):
     fielder = Column(String)
     batting_team = Column(String)
     bowling_team = Column(String)
+    
+    # WPA (Win Probability Added) columns for per-delivery impact analysis
+    wpa_batter = Column(DECIMAL(6,3), nullable=True)  # WPA for batter (-2.0 to +2.0)
+    wpa_bowler = Column(DECIMAL(6,3), nullable=True)  # WPA for bowler (inverse of batter)
+    wpa_computed_date = Column(TIMESTAMP, nullable=True)  # When WPA was calculated
+    
+    # Phase 1: Left-Right Analysis Columns
+    striker_batter_type = Column(String(10), nullable=True)  # LHB/RHB for striker
+    non_striker_batter_type = Column(String(10), nullable=True)  # LHB/RHB for non-striker  
+    bowler_type = Column(String(10), nullable=True)  # LO/LM/RL/RM/RO/etc for bowler
+    
+    # Phase 2: Derived Analysis Columns
+    crease_combo = Column(String(20), nullable=True)  # rhb_rhb/lhb_lhb/lhb_rhb/unknown
+    ball_direction = Column(String(20), nullable=True)  # intoBatter/awayFromBatter/unknown
+    
+    def to_dict(self):
+        """Convert delivery to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'match_id': self.match_id,
+            'innings': self.innings,
+            'over': self.over,
+            'ball': self.ball,
+            'batter': self.batter,
+            'bowler': self.bowler,
+            'runs_off_bat': self.runs_off_bat,
+            'extras': self.extras,
+            'wicket_type': self.wicket_type,
+            'player_dismissed': self.player_dismissed,
+            'batting_team': self.batting_team,
+            'bowling_team': self.bowling_team,
+            'wpa_batter': float(self.wpa_batter) if self.wpa_batter else None,
+            'wpa_bowler': float(self.wpa_bowler) if self.wpa_bowler else None,
+            'wpa_computed_date': self.wpa_computed_date.isoformat() if self.wpa_computed_date else None,
+            'striker_batter_type': self.striker_batter_type,
+            'non_striker_batter_type': self.non_striker_batter_type,
+            'bowler_type': self.bowler_type,
+            'crease_combo': self.crease_combo,
+            'ball_direction': self.ball_direction
+        }
+    
+    def has_wpa_calculated(self) -> bool:
+        """Check if WPA has been calculated for this delivery"""
+        return self.wpa_batter is not None and self.wpa_bowler is not None
 
 class Player(Base):
     __tablename__ = 'players'
