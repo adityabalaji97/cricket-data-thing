@@ -288,7 +288,8 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
             d.wicket_type,
             m.venue,
             m.date,
-            m.competition
+            m.competition,
+            EXTRACT(YEAR FROM m.date) as year
         FROM deliveries d
         JOIN matches m ON d.match_id = m.id
         {where_clause}
@@ -321,7 +322,8 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
             "wicket_type": row[15],
             "venue": row[16],
             "date": row[17].isoformat() if row[17] else None,
-            "competition": row[18]
+            "competition": row[18],
+            "year": int(row[19]) if row[19] is not None else None
         })
     
     # Count total matching rows (for pagination info)
@@ -491,5 +493,6 @@ def get_grouping_columns_map():
         "batter": "d.batter",
         "bowler": "d.bowler",
         "competition": "m.competition",
+        "year": "EXTRACT(YEAR FROM m.date)",
         "phase": "CASE WHEN d.over < 6 THEN 'powerplay' WHEN d.over < 15 THEN 'middle' ELSE 'death' END"
     }

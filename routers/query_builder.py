@@ -109,7 +109,8 @@ def get_available_columns():
             "group_by_columns": [
                 "venue", "crease_combo", "ball_direction", "bowler_type", 
                 "striker_batter_type", "non_striker_batter_type", "innings",
-                "batting_team", "bowling_team", "batter", "bowler",
+                "batting_team", "bowling_team", "batter", "bowler", "competition",
+                "year",  # Extract year from match date
                 "phase"  # Special computed column for powerplay/middle/death
             ],
             "crease_combo_options": ["rhb_rhb", "lhb_lhb", "lhb_rhb", "unknown"],

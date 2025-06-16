@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -19,17 +19,54 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  IconButton,
-  Tooltip
+  TableSortLabel
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GetAppIcon from '@mui/icons-material/GetApp';
-import InfoIcon from '@mui/icons-material/Info';
 
 const QueryResults = ({ results, groupBy, isMobile }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
   
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: 'asc'
+  });
+  
+  // Extract data early to avoid hooks rule violation
+  const data = results?.data || [];
+  const metadata = results?.metadata || {};
+  const isGrouped = groupBy && groupBy.length > 0;
+  
+  // Memoized sorted data - moved before early return
+  const sortedData = useMemo(() => {
+    if (!sortConfig.key || data.length === 0) return data;
+    
+    return [...data].sort((a, b) => {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      
+      // Handle null/undefined values
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+      
+      // Handle different data types
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+      
+      // Handle strings and dates
+      const aStr = String(aValue).toLowerCase();
+      const bStr = String(bValue).toLowerCase();
+      
+      if (aStr < bStr) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [data, sortConfig]);
+  
+  // Early return after all hooks
   if (!results || !results.data) {
     return (
       <Alert severity="info">
@@ -38,8 +75,15 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
     );
   }
   
-  const { data, metadata } = results;
-  const isGrouped = groupBy && groupBy.length > 0;
+  // Sorting logic
+  const handleSort = (columnKey) => {
+    let direction = 'asc';
+    if (sortConfig.key === columnKey && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key: columnKey, direction });
+    setPage(0); // Reset to first page when sorting
+  };
   
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -51,15 +95,15 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
   };
   
   const exportToCSV = () => {
-    if (!data || data.length === 0) return;
+    if (!sortedData || sortedData.length === 0) return;
     
     // Get all unique keys from the data
-    const headers = Object.keys(data[0]);
+    const headers = Object.keys(sortedData[0]);
     
     // Create CSV content
     const csvContent = [
       headers.join(','),
-      ...data.map(row => 
+      ...sortedData.map(row => 
         headers.map(header => {
           const value = row[header];
           // Handle null/undefined values and escape commas
@@ -118,7 +162,8 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
       'strike_rate': 'Strike Rate',
       'dot_percentage': 'Dot %',
       'boundary_percentage': 'Boundary %',
-      'balls_per_dismissal': 'Balls/Wicket'
+      'balls_per_dismissal': 'Balls/Wicket',
+      'year': 'Year'
     };
     
     return displayNames[key] || key.split('_').map(word => 
@@ -160,7 +205,8 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
     return allColumns;
   };
   
-  const paginatedData = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  // Use sorted data for pagination
+  const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const visibleColumns = getVisibleColumns();
   const cricketMetrics = getCricketMetrics();
   
@@ -202,6 +248,16 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
                     />
                   </>
                 )}
+                
+                {/* Sort indicator */}
+                {sortConfig.key && (
+                  <Chip 
+                    label={`Sorted by: ${getColumnDisplayName(sortConfig.key)} (${sortConfig.direction})`} 
+                    variant="outlined" 
+                    size="small"
+                    color="secondary"
+                  />
+                )}
               </Box>
               
               {metadata.filters_applied && (
@@ -234,7 +290,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
           </AccordionSummary>
           <AccordionDetails>
             <Grid container spacing={2}>
-              {data.slice(0, 3).map((row, index) => (
+              {sortedData.slice(0, 3).map((row, index) => (
                 <Grid item xs={12} sm={6} md={4} key={index}>
                   <Card variant="outlined">
                     <CardContent sx={{ py: 2 }}>
@@ -256,7 +312,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
         </Accordion>
       )}
       
-      {/* Data Table */}
+      {/* Data Table with Sorting */}
       <Paper>
         <TableContainer sx={{ maxHeight: isMobile ? 400 : 600 }}>
           <Table stickyHeader size={isMobile ? "small" : "medium"}>
@@ -264,7 +320,18 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
               <TableRow>
                 {visibleColumns.map((column) => (
                   <TableCell key={column} sx={{ fontWeight: 'bold' }}>
-                    {getColumnDisplayName(column)}
+                    <TableSortLabel
+                      active={sortConfig.key === column}
+                      direction={sortConfig.key === column ? sortConfig.direction : 'asc'}
+                      onClick={() => handleSort(column)}
+                      sx={{ 
+                        '& .MuiTableSortLabel-icon': {
+                          opacity: sortConfig.key === column ? 1 : 0.5
+                        }
+                      }}
+                    >
+                      {getColumnDisplayName(column)}
+                    </TableSortLabel>
                   </TableCell>
                 ))}
               </TableRow>
@@ -286,7 +353,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
         <TablePagination
           rowsPerPageOptions={isMobile ? [5, 10, 25] : [5, 10, 25, 50]}
           component="div"
-          count={data.length}
+          count={sortedData.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
