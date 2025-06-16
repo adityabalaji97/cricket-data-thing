@@ -95,13 +95,26 @@ def query_deliveries(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/deliveries/columns")
-def get_available_columns():
+def get_available_columns(db: Session = Depends(get_session)):
     """
     Get list of available columns for filtering and grouping.
     
     This endpoint returns metadata about available columns to help build the UI.
     """
     try:
+        # Dynamically get bowler types from the database
+        from sqlalchemy.sql import text
+        bowler_types_query = text("""
+            SELECT DISTINCT bowler_type
+            FROM deliveries 
+            WHERE bowler_type IS NOT NULL 
+            AND bowler_type != ''
+            ORDER BY bowler_type
+        """)
+        
+        bowler_types_result = db.execute(bowler_types_query).fetchall()
+        available_bowler_types = [row[0] for row in bowler_types_result]
+        
         return {
             "filter_columns": {
                 "basic": ["venue", "start_date", "end_date", "leagues", "teams", "players", "batters", "bowlers"],
@@ -120,7 +133,7 @@ def get_available_columns():
             "crease_combo_options": ["rhb_rhb", "lhb_lhb", "lhb_rhb", "unknown"],
             "ball_direction_options": ["intoBatter", "awayFromBatter", "unknown"],
             "batter_type_options": ["LHB", "RHB"],
-            "common_bowler_types": ["RF", "RM", "RO", "LF", "LM", "LO"],
+            "common_bowler_types": available_bowler_types,  # Now dynamically fetched
             "innings_options": [1, 2],
             "wicket_type_options": ["caught", "bowled", "lbw", "run out", "stumped", "hit wicket"]
         }
