@@ -21,7 +21,7 @@ def query_deliveries_service(
     # Column-specific filters
     crease_combo: Optional[str],
     ball_direction: Optional[str],
-    bowler_type: Optional[str],
+    bowler_type: List[str],
     striker_batter_type: Optional[str],
     non_striker_batter_type: Optional[str],
     innings: Optional[int],
@@ -196,7 +196,7 @@ def build_where_clause(
         params["ball_direction"] = ball_direction
     
     if bowler_type:
-        conditions.append("d.bowler_type = :bowler_type")
+        conditions.append("d.bowler_type = ANY(:bowler_type)")
         params["bowler_type"] = bowler_type
     
     if striker_batter_type:

@@ -22,7 +22,7 @@ def query_deliveries(
     # Column-specific filters
     crease_combo: Optional[str] = Query(default=None, description="Filter by crease combination (rhb_rhb, lhb_lhb, lhb_rhb, unknown)"),
     ball_direction: Optional[str] = Query(default=None, description="Filter by ball direction (intoBatter, awayFromBatter, unknown)"),
-    bowler_type: Optional[str] = Query(default=None, description="Filter by bowler type (RF, RM, RO, LF, LM, LO, etc.)"),
+    bowler_type: List[str] = Query(default=[], description="Filter by bowler type (RF, RM, RO, LF, LM, LO, etc.)"),
     striker_batter_type: Optional[str] = Query(default=None, description="Filter by striker batter type (LHB, RHB)"),
     non_striker_batter_type: Optional[str] = Query(default=None, description="Filter by non-striker batter type (LHB, RHB)"),
     innings: Optional[int] = Query(default=None, description="Filter by innings (1 or 2)"),
