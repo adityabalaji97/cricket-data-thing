@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -23,6 +23,10 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GetAppIcon from '@mui/icons-material/GetApp';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import ScatterPlotIcon from '@mui/icons-material/ScatterPlot';
+import AddIcon from '@mui/icons-material/Add';
+import ChartPanel from './ChartPanel';
 
 const QueryResults = ({ results, groupBy, isMobile }) => {
   const [page, setPage] = useState(0);
@@ -34,12 +38,16 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
     direction: 'asc'
   });
   
+  // Chart panel ref to trigger chart additions
+  const chartPanelRef = useRef(null);
+  const [showCharts, setShowCharts] = useState(false);
+  
   // Extract data early to avoid hooks rule violation
   const data = results?.data || [];
   const metadata = results?.metadata || {};
   const isGrouped = groupBy && groupBy.length > 0;
   
-  // Memoized sorted data - moved before early return
+  // Memoized sorted data
   const sortedData = useMemo(() => {
     if (!sortConfig.key || data.length === 0) return data;
     
@@ -75,6 +83,28 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
     );
   }
   
+
+  // Chart management functions
+  const handleAddBarChart = () => {
+    setShowCharts(true);
+    // Small delay to ensure ChartPanel is rendered before calling addBarChart
+    setTimeout(() => {
+      if (chartPanelRef.current && chartPanelRef.current.addBarChart) {
+        chartPanelRef.current.addBarChart();
+      }
+    }, 100);
+  };
+
+  const handleAddScatterChart = () => {
+    setShowCharts(true);
+    // Small delay to ensure ChartPanel is rendered before calling addScatterChart
+    setTimeout(() => {
+      if (chartPanelRef.current && chartPanelRef.current.addScatterChart) {
+        chartPanelRef.current.addScatterChart();
+      }
+    }, 100);
+  };
+
   // Sorting logic
   const handleSort = (columnKey) => {
     let direction = 'asc';
@@ -212,7 +242,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
   const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const visibleColumns = getVisibleColumns();
   const cricketMetrics = getCricketMetrics();
-  
+
   return (
     <Box>
       {/* Results Summary */}
@@ -245,7 +275,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
                       size="small" 
                     />
                     <Chip 
-                      label={`Showing ${metadata.returned_rows || 0}`} 
+                      label={`Showing ${sortedData.length}`} 
                       variant="outlined" 
                       size="small" 
                     />
@@ -271,19 +301,44 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
             </Grid>
             
             <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-              <Button
-                variant="outlined"
-                startIcon={<GetAppIcon />}
-                onClick={exportToCSV}
-                disabled={!data || data.length === 0}
-                size="small"
-              >
-                Export CSV
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                {/* Chart buttons only for grouped data */}
+                {isGrouped && data.length > 0 && (
+                  <>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={handleAddBarChart}
+                      size="small"
+                      sx={{ mr: 1 }}
+                    >
+                      Add Bar Chart
+                    </Button>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={handleAddScatterChart}
+                      size="small"
+                    >
+                      Add Scatter Plot
+                    </Button>
+                  </>
+                )}
+                <Button
+                  variant="outlined"
+                  startIcon={<GetAppIcon />}
+                  onClick={exportToCSV}
+                  disabled={!data || data.length === 0}
+                  size="small"
+                >
+                  Export CSV
+                </Button>
+              </Box>
             </Grid>
           </Grid>
         </CardContent>
       </Card>
+
       
       {/* Cricket Metrics Summary (for grouped results) */}
       {isGrouped && cricketMetrics && (
@@ -370,6 +425,16 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </Paper>
+      
+      {/* Chart Panel */}
+      <ChartPanel 
+        ref={chartPanelRef}
+        data={sortedData}
+        groupBy={groupBy}
+        isVisible={showCharts && isGrouped}
+        onToggle={() => setShowCharts(!showCharts)}
+        isMobile={isMobile}
+      />
       
       {/* Applied Filters Info */}
       {metadata.filters_applied && (
