@@ -31,32 +31,32 @@ import ScatterPlotIcon from '@mui/icons-material/ScatterPlot';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 
-// Generate pastel colors for data points
-const generatePastelColor = (index) => {
-  const pastelColors = [
-    '#FFB3BA', // Light Pink
-    '#BAFFC9', // Light Green
-    '#BAE1FF', // Light Blue
-    '#FFFFBA', // Light Yellow
-    '#FFD3BA', // Light Orange
-    '#E1BAFF', // Light Purple
-    '#FFBAE1', // Light Magenta
-    '#BAFFFF', // Light Cyan
-    '#D4EDDA', // Light Mint
-    '#F8D7DA', // Light Rose
-    '#D1ECF1', // Light Sky
-    '#FFF3CD', // Light Cream
-    '#E2E3E5', // Light Gray
-    '#F5C6CB', // Light Coral
-    '#C3E6CB', // Light Sage
-    '#B3D9FF', // Light Periwinkle
-    '#FFE4B5', // Light Peach
-    '#E6E6FA', // Light Lavender
-    '#F0FFF0', // Light Honeydew
-    '#FFF8DC'  // Light Cornsilk
+// Generate vibrant, contrasty colors for better visibility
+const generateContrastColor = (index) => {
+  const contrastColors = [
+    '#E91E63', // Pink
+    '#4CAF50', // Green
+    '#2196F3', // Blue
+    '#FF9800', // Orange
+    '#9C27B0', // Purple
+    '#F44336', // Red
+    '#00BCD4', // Cyan
+    '#8BC34A', // Light Green
+    '#3F51B5', // Indigo
+    '#FF5722', // Deep Orange
+    '#607D8B', // Blue Grey
+    '#795548', // Brown
+    '#009688', // Teal
+    '#CDDC39', // Lime
+    '#FFC107', // Amber
+    '#673AB7', // Deep Purple
+    '#FF1744', // Pink Accent
+    '#00E676', // Green Accent
+    '#2979FF', // Blue Accent
+    '#FF6D00'  // Orange Accent
   ];
   
-  return pastelColors[index % pastelColors.length];
+  return contrastColors[index % contrastColors.length];
 };
 
 // Team colors for scatter plots (extracted from VenueNotes.jsx)
@@ -164,26 +164,44 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
     if (!data || data.length === 0 || !groupBy || groupBy.length === 0) return [];
 
     return data.map((row, index) => {
-      // Create a display name from grouping columns
+      // Create a display name from grouping columns with better formatting
       const groupingName = groupBy
         .map(col => {
           const value = row[col];
           if (col === 'year') return value;
-          if (typeof value === 'string' && value.length > 12) {
-            return value.substring(0, 12) + '...';
+          // Don't truncate team names - they're important for identification
+          if (col === 'batting_team' || col === 'bowling_team' || col === 'team') {
+            return value;
+          }
+          // Only truncate very long strings (>20 chars)
+          if (typeof value === 'string' && value.length > 20) {
+            return value.substring(0, 18) + '...';
           }
           return value;
         })
         .join(' • ');
 
-      // Add pastel color for scatter plots
-      const pastelColor = generatePastelColor(index);
+      // Create a shorter name for chart labels
+      const shortName = groupBy
+        .map(col => {
+          const value = row[col];
+          if (col === 'year') return value;
+          if (typeof value === 'string' && value.length > 10) {
+            return value.substring(0, 8) + '..';
+          }
+          return value;
+        })
+        .join(' • ');
+
+      // Add vibrant color for scatter plots
+      const contrastColor = generateContrastColor(index);
 
       return {
         ...row,
         name: groupingName,
+        shortName: shortName,
         displayIndex: index,
-        teamColor: pastelColor // Use pastel colors instead of team colors
+        teamColor: contrastColor // Use vibrant colors for better visibility
       };
     });
   }, [data, groupBy]);
@@ -431,20 +449,21 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={6}
+                          r={7}
                           fill={payload.teamColor || '#8884d8'}
                           stroke="#fff"
-                          strokeWidth={1}
+                          strokeWidth={2}
                         />
                         {!isMobile && (
                           <text
                             x={cx}
-                            y={cy + 15}
+                            y={cy + 18}
                             textAnchor="middle"
-                            fontSize={9}
-                            fill="#666"
+                            fontSize={10}
+                            fontWeight="500"
+                            fill="#333"
                           >
-                            {payload.name?.length > 8 ? payload.name.substring(0, 8) + '...' : payload.name}
+                            {payload.shortName || payload.name}
                           </text>
                         )}
                       </>

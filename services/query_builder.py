@@ -15,6 +15,8 @@ def query_deliveries_service(
     leagues: List[str],
     teams: List[str],
     players: List[str],
+    batters: List[str],
+    bowlers: List[str],
     
     # Column-specific filters
     crease_combo: Optional[str],
@@ -64,6 +66,8 @@ def query_deliveries_service(
             leagues=leagues,
             teams=teams,
             players=players,
+            batters=batters,
+            bowlers=bowlers,
             crease_combo=crease_combo,
             ball_direction=ball_direction,
             bowler_type=bowler_type,
@@ -86,6 +90,8 @@ def query_deliveries_service(
             "leagues": leagues,
             "teams": teams,
             "players": players,
+            "batters": batters,
+            "bowlers": bowlers,
             "crease_combo": crease_combo,
             "ball_direction": ball_direction,
             "bowler_type": bowler_type,
@@ -112,7 +118,7 @@ def query_deliveries_service(
         raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
 
 def build_where_clause(
-    venue, start_date, end_date, leagues, teams, players,
+    venue, start_date, end_date, leagues, teams, players, batters, bowlers,
     crease_combo, ball_direction, bowler_type, striker_batter_type,
     non_striker_batter_type, innings, over_min, over_max, wicket_type,
     include_international, top_teams, base_params
@@ -165,10 +171,20 @@ def build_where_clause(
         conditions.append("(d.batting_team = ANY(:teams) OR d.bowling_team = ANY(:teams))")
         params["teams"] = team_variations
     
-    # Player filters
+    # Player filters - handle both generic and specific
     if players:
         conditions.append("(d.batter = ANY(:players) OR d.bowler = ANY(:players))")
         params["players"] = players
+    
+    # Specific batter filters
+    if batters:
+        conditions.append("d.batter = ANY(:batters)")
+        params["batters"] = batters
+    
+    # Specific bowler filters  
+    if bowlers:
+        conditions.append("d.bowler = ANY(:bowlers)")
+        params["bowlers"] = bowlers
     
     # Column-specific filters
     if crease_combo:

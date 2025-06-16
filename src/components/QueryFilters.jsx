@@ -26,15 +26,19 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
   const [venues, setVenues] = useState([]);
   const [teams, setTeams] = useState([]);
   const [players, setPlayers] = useState([]);
+  const [batters, setBatters] = useState([]);
+  const [bowlers, setBowlers] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   
   // Fetch dropdown data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [venuesResponse, teamsResponse] = await Promise.all([
+        const [venuesResponse, teamsResponse, batterResponse, bowlerResponse] = await Promise.all([
           axios.get(`${config.API_URL}/venues/`),
-          axios.get(`${config.API_URL}/teams/`)
+          axios.get(`${config.API_URL}/teams/`),
+          axios.get(`${config.API_URL}/players/batters`),
+          axios.get(`${config.API_URL}/players/bowlers`)
         ]);
         
         if (Array.isArray(venuesResponse.data)) {
@@ -43,6 +47,17 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         
         if (Array.isArray(teamsResponse.data)) {
           setTeams(teamsResponse.data.sort((a, b) => a.full_name.localeCompare(b.full_name)));
+        }
+        
+        // Set players data for batters and bowlers from separate endpoints
+        if (Array.isArray(batterResponse.data)) {
+          const batterNames = batterResponse.data.map(p => p.value || p.label || p).sort();
+          setBatters(batterNames);
+        }
+        
+        if (Array.isArray(bowlerResponse.data)) {
+          const bowlerNames = bowlerResponse.data.map(p => p.value || p.label || p).sort();
+          setBowlers(bowlerNames);
         }
         
       } catch (error) {
@@ -174,6 +189,104 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         </AccordionDetails>
       </Accordion>
       
+      {/* Player Analysis Filters */}
+      <Accordion>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="h6">👤 Player Analysis</Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Grid container spacing={2}>
+            {/* Batters */}
+            <Grid item xs={12} sm={6}>
+              <Autocomplete
+                multiple
+                value={filters.batters || []}
+                onChange={(e, value) => handleFilterChange('batters', value)}
+                options={batters}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField {...params} label="Batters" size="small" />
+                )}
+              />
+            </Grid>
+            
+            {/* Bowlers */}
+            <Grid item xs={12} sm={6}>
+              <Autocomplete
+                multiple
+                value={filters.bowlers || []}
+                onChange={(e, value) => handleFilterChange('bowlers', value)}
+                options={bowlers}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField {...params} label="Bowlers" size="small" />
+                )}
+              />
+            </Grid>
+            
+            {/* Min Balls */}
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                label="Min Balls"
+                type="number"
+                value={filters.min_balls || ''}
+                onChange={(e) => handleFilterChange('min_balls', e.target.value ? parseInt(e.target.value) : null)}
+                inputProps={{ min: 0 }}
+                size="small"
+                fullWidth
+              />
+            </Grid>
+            
+            {/* Max Balls */}
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                label="Max Balls"
+                type="number"
+                value={filters.max_balls || ''}
+                onChange={(e) => handleFilterChange('max_balls', e.target.value ? parseInt(e.target.value) : null)}
+                inputProps={{ min: 0 }}
+                size="small"
+                fullWidth
+              />
+            </Grid>
+            
+            {/* Min Runs */}
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                label="Min Runs"
+                type="number"
+                value={filters.min_runs || ''}
+                onChange={(e) => handleFilterChange('min_runs', e.target.value ? parseInt(e.target.value) : null)}
+                inputProps={{ min: 0 }}
+                size="small"
+                fullWidth
+              />
+            </Grid>
+            
+            {/* Max Runs */}
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                label="Max Runs"
+                type="number"
+                value={filters.max_runs || ''}
+                onChange={(e) => handleFilterChange('max_runs', e.target.value ? parseInt(e.target.value) : null)}
+                inputProps={{ min: 0 }}
+                size="small"
+                fullWidth
+              />
+            </Grid>
+          </Grid>
+        </AccordionDetails>
+      </Accordion>
+      
       {/* Left-Right Analysis Filters */}
       <Accordion>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -182,35 +295,37 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         <AccordionDetails>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={3}>
-              <FormControl size="small" fullWidth>
-                <InputLabel>Crease Combo</InputLabel>
-                <Select
-                  value={filters.crease_combo || ''}
-                  onChange={(e) => handleFilterChange('crease_combo', e.target.value || null)}
-                  label="Crease Combo"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  {availableColumns.crease_combo_options?.map(option => (
-                    <MenuItem key={option} value={option}>{option}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                multiple
+                value={filters.crease_combo || []}
+                onChange={(e, value) => handleFilterChange('crease_combo', value)}
+                options={availableColumns.crease_combo_options || []}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField {...params} label="Crease Combo" size="small" />
+                )}
+              />
             </Grid>
             
             <Grid item xs={12} sm={6} md={3}>
-              <FormControl size="small" fullWidth>
-                <InputLabel>Ball Direction</InputLabel>
-                <Select
-                  value={filters.ball_direction || ''}
-                  onChange={(e) => handleFilterChange('ball_direction', e.target.value || null)}
-                  label="Ball Direction"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  {availableColumns.ball_direction_options?.map(option => (
-                    <MenuItem key={option} value={option}>{option}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                multiple
+                value={filters.ball_direction || []}
+                onChange={(e, value) => handleFilterChange('ball_direction', value)}
+                options={availableColumns.ball_direction_options || []}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField {...params} label="Ball Direction" size="small" />
+                )}
+              />
             </Grid>
             
             <Grid item xs={12} sm={6} md={3}>
@@ -256,19 +371,20 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         <AccordionDetails>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={3}>
-              <FormControl size="small" fullWidth>
-                <InputLabel>Bowler Type</InputLabel>
-                <Select
-                  value={filters.bowler_type || ''}
-                  onChange={(e) => handleFilterChange('bowler_type', e.target.value || null)}
-                  label="Bowler Type"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  {availableColumns.common_bowler_types?.map(option => (
-                    <MenuItem key={option} value={option}>{option}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                multiple
+                value={filters.bowler_type || []}
+                onChange={(e, value) => handleFilterChange('bowler_type', value)}
+                options={availableColumns.common_bowler_types || []}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField {...params} label="Bowler Type" size="small" />
+                )}
+              />
             </Grid>
             
             <Grid item xs={12} sm={6} md={3}>
@@ -311,19 +427,20 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
             </Grid>
             
             <Grid item xs={12} sm={6} md={4}>
-              <FormControl size="small" fullWidth>
-                <InputLabel>Wicket Type</InputLabel>
-                <Select
-                  value={filters.wicket_type || ''}
-                  onChange={(e) => handleFilterChange('wicket_type', e.target.value || null)}
-                  label="Wicket Type"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  {availableColumns.wicket_type_options?.map(option => (
-                    <MenuItem key={option} value={option}>{option}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                multiple
+                value={filters.wicket_type || []}
+                onChange={(e, value) => handleFilterChange('wicket_type', value)}
+                options={availableColumns.wicket_type_options || []}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField {...params} label="Wicket Type" size="small" />
+                )}
+              />
             </Grid>
           </Grid>
         </AccordionDetails>

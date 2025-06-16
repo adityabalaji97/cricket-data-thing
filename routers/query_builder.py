@@ -16,6 +16,8 @@ def query_deliveries(
     leagues: List[str] = Query(default=[], description="Filter by leagues"),
     teams: List[str] = Query(default=[], description="Filter by teams"),
     players: List[str] = Query(default=[], description="Filter by players (batter or bowler)"),
+    batters: List[str] = Query(default=[], description="Filter by specific batters"),
+    bowlers: List[str] = Query(default=[], description="Filter by specific bowlers"),
     
     # Column-specific filters
     crease_combo: Optional[str] = Query(default=None, description="Filter by crease combination (rhb_rhb, lhb_lhb, lhb_rhb, unknown)"),
@@ -61,6 +63,8 @@ def query_deliveries(
             leagues=leagues,
             teams=teams,
             players=players,
+            batters=batters,
+            bowlers=bowlers,
             
             # Column-specific filters
             crease_combo=crease_combo,
@@ -100,7 +104,7 @@ def get_available_columns():
     try:
         return {
             "filter_columns": {
-                "basic": ["venue", "start_date", "end_date", "leagues", "teams", "players"],
+                "basic": ["venue", "start_date", "end_date", "leagues", "teams", "players", "batters", "bowlers"],
                 "match": ["innings", "over_min", "over_max"],
                 "players": ["striker_batter_type", "non_striker_batter_type", "bowler_type"],
                 "left_right": ["crease_combo", "ball_direction"],
