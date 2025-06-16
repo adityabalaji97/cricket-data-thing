@@ -141,6 +141,9 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
     if (key === 'average' || key === 'balls_per_dismissal') {
       return Number(value).toFixed(2);
     }
+    if (key === 'year') {
+      return value; // Display year without comma formatting
+    }
     if (typeof value === 'number' && value > 1000) {
       return value.toLocaleString();
     }
@@ -324,9 +327,16 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
                       active={sortConfig.key === column}
                       direction={sortConfig.key === column ? sortConfig.direction : 'asc'}
                       onClick={() => handleSort(column)}
+                      hideSortIcon={sortConfig.key !== column}
                       sx={{ 
                         '& .MuiTableSortLabel-icon': {
-                          opacity: sortConfig.key === column ? 1 : 0.5
+                          opacity: sortConfig.key === column ? 1 : 0
+                        },
+                        '&:hover .MuiTableSortLabel-icon': {
+                          opacity: 0.5
+                        },
+                        '&:hover': {
+                          color: 'primary.main'
                         }
                       }}
                     >
