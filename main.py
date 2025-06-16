@@ -27,6 +27,7 @@ from models import get_league_abbreviation, get_full_league_name, leagues_mappin
 from sqlalchemy.sql import text
 from routers.matchups import router as matchups_router
 from routers.query_builder import router as query_builder_router
+from routers.players import router as players_router
 import math
 
 
@@ -69,6 +70,7 @@ from fastapi.responses import JSONResponse
 app = FastAPI(title="Cricket Stats API")
 app.include_router(matchups_router)
 app.include_router(query_builder_router)
+app.include_router(players_router)
 
 # Add CORS middleware
 app.add_middleware(
