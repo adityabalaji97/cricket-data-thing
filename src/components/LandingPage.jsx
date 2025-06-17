@@ -14,7 +14,9 @@ import {
   useMediaQuery,
   Chip,
   Stack,
-  CircularProgress
+  CircularProgress,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import SportsCricketIcon from '@mui/icons-material/SportsCricket';
@@ -27,6 +29,8 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import PeopleIcon from '@mui/icons-material/People';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import SearchIcon from '@mui/icons-material/Search';
+import InfoIcon from '@mui/icons-material/Info';
 import { getUpcomingMatches, formatDate, formatVenue } from '../data/iplSchedule';
 
 // This will be a new component that serves as a landing page
@@ -177,8 +181,8 @@ const LandingPage = () => {
       <Paper 
         elevation={0}
         sx={{
-          p: { xs: 4, md: 8 },
-          mb: 6,
+          p: { xs: 1.5, md: 2 },
+          mb: 3,
           background: 'linear-gradient(to right, #0057b7, #1976d2)',
           borderRadius: 4,
           position: 'relative',
@@ -200,279 +204,64 @@ const LandingPage = () => {
           <SportsCricketIcon fontSize="inherit" />
         </Box>
         
-        <Typography variant={isMobile ? "h4" : "h2"} fontWeight="bold" gutterBottom>
+        <Typography variant={isMobile ? "h6" : "h4"} fontWeight="bold" gutterBottom>
           Hindsight - Cricket Analytics
         </Typography>
         
-        <Typography variant={isMobile ? "body1" : "h6"} sx={{ mb: 4, maxWidth: 800, mx: 'auto' }}>
+        <Typography variant={isMobile ? "body2" : "body1"} sx={{ maxWidth: 800, mx: 'auto' }}>
           Because hindsight is 20/20, and this is all about 20-20 cricket data
         </Typography>
-        
-        <Box sx={{ 
-          display: 'flex', 
-          gap: 2, 
-          justifyContent: 'center',
-          flexWrap: 'wrap'
-        }}>
-          <Button 
-            variant="contained" 
-            component={Link} 
-            to="/venue" 
-            color="secondary"
-            size="large"
-            startIcon={<StadiumIcon />}
-            sx={{ 
-              px: 3, 
-              py: 1.5,
-              backgroundColor: '#ffffff',
-              color: '#0057b7',
-              '&:hover': {
-                backgroundColor: '#f5f5f5',
-              } 
-            }}
-          >
-            Explore Venue Data
-          </Button>
-          
-          <Button 
-            variant="contained" 
-            component={Link} 
-            to="/player" 
-            color="secondary"
-            size="large"
-            startIcon={<PersonIcon />}
-            sx={{ 
-              px: 3, 
-              py: 1.5,
-              backgroundColor: '#ffffff',
-              color: '#c70d3a',
-              '&:hover': {
-                backgroundColor: '#f5f5f5',
-              } 
-            }}
-          >
-            Analyze Batters
-          </Button>
-
-          <Button 
-            variant="contained" 
-            component={Link} 
-            to="/comparison" 
-            color="secondary"
-            size="large"
-            startIcon={<CompareArrowsIcon />}
-            sx={{ 
-              px: 3, 
-              py: 1.5,
-              backgroundColor: '#ffffff',
-              color: '#9c27b0',
-              '&:hover': {
-                backgroundColor: '#f5f5f5',
-              } 
-            }}
-          >
-            Compare Batters
-          </Button>
-
-          <Button 
-            variant="contained" 
-            component={Link} 
-            to="/bowler" 
-            color="secondary"
-            size="large"
-            startIcon={<SportsCricketIcon />}
-            sx={{ 
-              px: 3, 
-              py: 1.5,
-              backgroundColor: '#ffffff',
-              color: '#ff6f00',
-              '&:hover': {
-                backgroundColor: '#f5f5f5',
-              } 
-            }}
-          >
-            Analyze Bowlers
-          </Button>
-          
-          <Button 
-            variant="contained" 
-            component={Link} 
-            to="/matchups" 
-            color="secondary"
-            size="large"
-            startIcon={<GroupsIcon />}
-            sx={{ 
-              px: 3, 
-              py: 1.5,
-              backgroundColor: '#ffffff',
-              color: '#007e33',
-              '&:hover': {
-                backgroundColor: '#f5f5f5',
-              } 
-            }}
-          >
-            Compare Matchups
-          </Button>
-        </Box>
-        
-        <Chip 
-          label="NEW" 
-          color="error" 
-          size="small" 
-          sx={{ 
-            position: 'absolute', 
-            top: 20, 
-            right: 20,
-            fontWeight: 'bold'
-          }} 
-        />
       </Paper>
 
       {/* Features Section */}
-      <Typography variant="h4" align="center" gutterBottom sx={{ mb: 4 }}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ mb: 2 }}>
         What would you like to do?
       </Typography>
       
-      <Grid container spacing={4} sx={{ mb: 8 }}>
-        {/* Venue Analysis Card */}
-        <Grid item xs={12} md={2.4}>
-          <Card sx={{ 
-            height: '100%', 
-            display: 'flex', 
-            flexDirection: 'column',
-            transition: 'transform 0.3s, box-shadow 0.3s',
-            '&:hover': {
-              transform: 'translateY(-5px)',
-              boxShadow: 8
-            }
-          }}>
-            <CardContent sx={{ flexGrow: 1, p: 3 }}>
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'center',
-                mb: 2
-              }}>
-                <StadiumIcon 
-                  sx={{ 
-                    fontSize: 60, 
-                    color: '#0057b7',
-                    p: 1,
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(0, 87, 183, 0.1)'
-                  }} 
-                />
-              </Box>
-              
-              <Typography variant="h5" component="h2" gutterBottom align="center" fontWeight="bold">
-                Venue Analysis
-              </Typography>
-              
-              <Typography color="textSecondary" paragraph align="center">
-                Explore match statistics by venue, including win percentages, scoring patterns, and historical performance data.
-              </Typography>
-              
-              <Box sx={{ 
-                bgcolor: 'grey.100', 
-                p: 2, 
-                borderRadius: 2,
-                mb: 2
-              }}>
-                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                  Upcoming Matches:
-                </Typography>
-                {loading ? (
-                  <Typography variant="body2" color="text.secondary" align="center">
-                    Loading matches...
-                  </Typography>
-                ) : upcomingMatches.length > 0 ? (
-                  upcomingMatches.map((match) => (
-                    <Button
-                      key={match.matchNumber}
-                      fullWidth
-                      variant="text"
-                      color="primary"
-                      component={Link}
-                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
-                      sx={{ 
-                        justifyContent: 'flex-start', 
-                        mb: 1, 
-                        textAlign: 'left',
-                        fontSize: '0.8rem',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}
-                    >
-                      {formatDate(match.date)} {match.team1Abbr} vs {match.team2Abbr} ({formatVenue(match.venue)})
-                    </Button>
-                  ))
-                ) : (
-                  <Typography variant="body2" color="text.secondary" align="center">
-                    No upcoming matches found.
-                  </Typography>
-                )}
-              </Box>
-            </CardContent>
-            
-            <CardActions sx={{ p: 2, pt: 0 }}>
-              <Button 
-                component={Link}
-                to="/venue"
-                fullWidth 
-                variant="outlined" 
-                endIcon={<ArrowForwardIcon />}
-                size="large"
-              >
-                Analyze Venues
-              </Button>
-            </CardActions>
-          </Card>
-        </Grid>
-        
+      <Grid container spacing={2} sx={{ mb: 4 }}>
         {/* Batter Profile Card */}
-        <Grid item xs={12} md={2.4}>
+        <Grid item xs={6} md={4}>
           <Card sx={{ 
             height: '100%', 
             display: 'flex', 
             flexDirection: 'column',
             transition: 'transform 0.3s, box-shadow 0.3s',
             '&:hover': {
-              transform: 'translateY(-5px)',
-              boxShadow: 8
+              transform: 'translateY(-3px)',
+              boxShadow: 6
             }
           }}>
-            <CardContent sx={{ flexGrow: 1, p: 3 }}>
+            <CardContent sx={{ flexGrow: 1, p: 2 }}>
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
-                mb: 2
+                alignItems: 'center',
+                mb: 1.5,
+                gap: 0.5
               }}>
                 <PersonIcon 
                   sx={{ 
-                    fontSize: 60, 
-                    color: '#c70d3a',
-                    p: 1,
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(199, 13, 58, 0.1)'
+                    fontSize: '1.25rem', 
+                    color: '#c70d3a'
                   }} 
                 />
+                <Typography variant="h6" component="h2" fontWeight="bold" sx={{ fontSize: '1.25rem' }}>
+                  Batter Profiles
+                </Typography>
+                <Tooltip title="Deep dive into batting performance with comprehensive stats, scoring patterns, and matchup analysis.">
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <InfoIcon sx={{ fontSize: '1.25rem' }} color="action" />
+                  </IconButton>
+                </Tooltip>
               </Box>
-              
-              <Typography variant="h5" component="h2" gutterBottom align="center" fontWeight="bold">
-                Batter Profiles
-              </Typography>
-              
-              <Typography color="textSecondary" paragraph align="center">
-                Deep dive into batting performance with comprehensive stats, scoring patterns, and matchup analysis.
-              </Typography>
               
               <Box sx={{ 
                 bgcolor: 'grey.100', 
-                p: 2, 
+                p: 1.5, 
                 borderRadius: 2,
-                mb: 2
+                mb: 1.5
               }}>
-                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom sx={{ fontSize: '0.75rem' }}>
                   Featured Batters:
                 </Typography>
                 <Button
@@ -481,8 +270,7 @@ const LandingPage = () => {
                   color="error"
                   component={Link}
                   to="/player?name=MS%20Dhoni&autoload=true"
-                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
-                  onClick={() => {console.log('Clicked MS Dhoni link');}}
+                  sx={{ justifyContent: 'flex-start', mb: 0.5, textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
                 >
                   MS Dhoni
                 </Button>
@@ -492,8 +280,7 @@ const LandingPage = () => {
                   color="error"
                   component={Link}
                   to="/player?name=V%20Kohli&autoload=true"
-                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
-                  onClick={() => {console.log('Clicked V Kohli link');}}
+                  sx={{ justifyContent: 'flex-start', mb: 0.5, textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
                 >
                   V Kohli
                 </Button>
@@ -503,15 +290,14 @@ const LandingPage = () => {
                   color="error"
                   component={Link}
                   to="/player?name=RG%20Sharma&autoload=true"
-                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
-                  onClick={() => {console.log('Clicked RG Sharma link');}}
+                  sx={{ justifyContent: 'flex-start', textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
                 >
                   RG Sharma
                 </Button>
               </Box>
             </CardContent>
             
-            <CardActions sx={{ p: 2, pt: 0 }}>
+            <CardActions sx={{ p: 1.5, pt: 0 }}>
               <Button 
                 component={Link}
                 to="/player"
@@ -519,268 +305,172 @@ const LandingPage = () => {
                 variant="outlined" 
                 endIcon={<ArrowForwardIcon />} 
                 color="error"
-                size="large"
+                size="small"
               >
                 Explore Batters
               </Button>
             </CardActions>
           </Card>
         </Grid>
-
-        {/* Batter Comparison Card */}
-        <Grid item xs={12} md={2.4}>
+        
+        {/* Query Builder Card */}
+        <Grid item xs={6} md={4}>
           <Card sx={{ 
             height: '100%', 
             display: 'flex', 
             flexDirection: 'column',
             transition: 'transform 0.3s, box-shadow 0.3s',
             '&:hover': {
-              transform: 'translateY(-5px)',
-              boxShadow: 8
+              transform: 'translateY(-3px)',
+              boxShadow: 6
             }
           }}>
-            <CardContent sx={{ flexGrow: 1, p: 3 }}>
+            <CardContent sx={{ flexGrow: 1, p: 2 }}>
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
-                mb: 2
+                alignItems: 'center',
+                mb: 1.5,
+                gap: 0.5
               }}>
-                <CompareArrowsIcon 
+                <SearchIcon 
                   sx={{ 
-                    fontSize: 60, 
-                    color: '#9c27b0',
-                    p: 1,
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(156, 39, 176, 0.1)'
+                    fontSize: '1.25rem', 
+                    color: '#1976d2'
                   }} 
                 />
+                <Typography variant="h6" component="h2" fontWeight="bold" sx={{ fontSize: '1.25rem' }}>
+                  Query Builder
+                </Typography>
+                <Tooltip title="Build custom queries to analyze specific scenarios, player combinations, and match conditions.">
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <InfoIcon sx={{ fontSize: '1.25rem' }} color="action" />
+                  </IconButton>
+                </Tooltip>
               </Box>
-              
-              <Typography variant="h5" component="h2" gutterBottom align="center" fontWeight="bold">
-                Batter Comparison
-              </Typography>
-              
-              <Typography color="textSecondary" paragraph align="center">
-                Compare multiple batters across various metrics, including phase-wise performance, strike rates, and matchups.
-              </Typography>
               
               <Box sx={{ 
                 bgcolor: 'grey.100', 
-                p: 2, 
+                p: 1.5, 
                 borderRadius: 2,
-                mb: 2
+                mb: 1.5
               }}>
-                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                  Example Comparisons:
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom sx={{ fontSize: '0.75rem' }}>
+                  Quick Start Queries:
                 </Typography>
                 <Button
                   fullWidth
                   variant="text"
-                  color="secondary"
+                  color="primary"
                   component={Link}
-                  to="/comparison?batters=V%20Kohli,RG%20Sharma,KL%20Rahul&leagues=Indian%20Premier%20League"
-                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                  to="/query?start_date=2025-01-01&leagues=IPL&batting_teams=Chennai+Super+Kings&min_balls=30&limit=1000&offset=0&include_international=false&top_teams=10&group_by=batter&group_by=phase"
+                  sx={{ justifyContent: 'flex-start', mb: 0.5, textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
                 >
-                  Rohit vs Kohli vs Rahul
+                  CSK batters by phase in 2025
                 </Button>
                 <Button
                   fullWidth
                   variant="text"
-                  color="secondary"
+                  color="primary"
                   component={Link}
-                  to="/comparison?batters=DA%20Warner,JC%20Buttler,Q%20de%20Kock&leagues=Indian%20Premier%20League"
-                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                  to="/query?batters=V%20Kohli&leagues=IPL&min_balls=20"
+                  sx={{ justifyContent: 'flex-start', mb: 0.5, textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
                 >
-                  Warner vs Buttler vs de Kock
+                  Virat Kohli in IPL
                 </Button>
                 <Button
                   fullWidth
                   variant="text"
-                  color="secondary"
+                  color="primary"
                   component={Link}
-                  to="/comparison?batters=Shubman%20Gill,Abhishek%20Sharma,SV%20Samson&leagues=Indian%20Premier%20League"
-                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
+                  to="/query?start_date=2023-01-01&min_balls=100"
+                  sx={{ justifyContent: 'flex-start', textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
                 >
-                  Gill vs Abhishek vs Samson
+                  All T20s since 2023
                 </Button>
               </Box>
             </CardContent>
             
-            <CardActions sx={{ p: 2, pt: 0 }}>
+            <CardActions sx={{ p: 1.5, pt: 0 }}>
               <Button 
                 component={Link}
-                to="/comparison"
+                to="/query"
                 fullWidth 
                 variant="outlined" 
                 endIcon={<ArrowForwardIcon />} 
-                color="secondary"
-                size="large"
+                color="primary"
+                size="small"
               >
-                Compare Batters
+                Build Query
               </Button>
             </CardActions>
           </Card>
         </Grid>
         
-        {/* Bowler Profiles Card */}
-        <Grid item xs={12} md={2.4}>
+        {/* Venue Analysis Card */}
+        <Grid item xs={6} md={4}>
           <Card sx={{ 
             height: '100%', 
             display: 'flex', 
             flexDirection: 'column',
             transition: 'transform 0.3s, box-shadow 0.3s',
             '&:hover': {
-              transform: 'translateY(-5px)',
-              boxShadow: 8
+              transform: 'translateY(-3px)',
+              boxShadow: 6
             }
           }}>
-            <CardContent sx={{ flexGrow: 1, p: 3 }}>
+            <CardContent sx={{ flexGrow: 1, p: 2 }}>
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
-                mb: 2
+                alignItems: 'center',
+                mb: 1.5,
+                gap: 0.5
               }}>
-                <SportsCricketIcon 
+                <StadiumIcon 
                   sx={{ 
-                    fontSize: 60, 
-                    color: '#ff6f00',
-                    p: 1,
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(255, 111, 0, 0.1)'
+                    fontSize: '1.25rem', 
+                    color: '#0057b7'
                   }} 
                 />
-              </Box>
-              
-              <Typography variant="h5" component="h2" gutterBottom align="center" fontWeight="bold">
-                Bowler Profiles
-              </Typography>
-              
-              <Typography color="textSecondary" paragraph align="center">
-                Comprehensive bowling analysis with wicket patterns, economy rates, and phase-wise performance metrics.
-              </Typography>
-              
-              <Box sx={{ 
-                bgcolor: 'grey.100', 
-                p: 2, 
-                borderRadius: 2,
-                mb: 2
-              }}>
-                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                  Featured Bowlers:
+                <Typography variant="h6" component="h2" fontWeight="bold" sx={{ fontSize: '1.25rem' }}>
+                  Venue Analysis
                 </Typography>
-                <Button
-                  fullWidth
-                  variant="text"
-                  color="warning"
-                  component={Link}
-                  to="/bowler?name=JJ%20Bumrah&autoload=true"
-                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
-                >
-                  JJ Bumrah
-                </Button>
-                <Button
-                  fullWidth
-                  variant="text"
-                  color="warning"
-                  component={Link}
-                  to="/bowler?name=DL%20Chahar&autoload=true"
-                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
-                >
-                  DL Chahar
-                </Button>
-                <Button
-                  fullWidth
-                  variant="text"
-                  color="warning"
-                  component={Link}
-                  to="/bowler?name=Rashid%20Khan&autoload=true"
-                  sx={{ justifyContent: 'flex-start', mb: 1, textAlign: 'left' }}
-                >
-                  Rashid Khan
-                </Button>
+                <Tooltip title="Explore match statistics by venue, including win percentages, scoring patterns, and historical performance data.">
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <InfoIcon sx={{ fontSize: '1.25rem' }} color="action" />
+                  </IconButton>
+                </Tooltip>
               </Box>
-            </CardContent>
-            
-            <CardActions sx={{ p: 2, pt: 0 }}>
-              <Button 
-                component={Link}
-                to="/bowler"
-                fullWidth 
-                variant="outlined" 
-                endIcon={<ArrowForwardIcon />} 
-                color="warning"
-                size="large"
-              >
-                Analyze Bowlers
-              </Button>
-            </CardActions>
-          </Card>
-        </Grid>
-        
-        {/* Matchups Card */}
-        <Grid item xs={12} md={2.4}>
-          <Card sx={{ 
-            height: '100%', 
-            display: 'flex', 
-            flexDirection: 'column',
-            transition: 'transform 0.3s, box-shadow 0.3s',
-            '&:hover': {
-              transform: 'translateY(-5px)',
-              boxShadow: 8
-            }
-          }}>
-            <CardContent sx={{ flexGrow: 1, p: 3 }}>
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'center',
-                mb: 2
-              }}>
-                <GroupsIcon 
-                  sx={{ 
-                    fontSize: 60, 
-                    color: '#007e33',
-                    p: 1,
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(0, 126, 51, 0.1)'
-                  }} 
-                />
-              </Box>
-              
-              <Typography variant="h5" component="h2" gutterBottom align="center" fontWeight="bold">
-                Team Matchups
-              </Typography>
-              
-              <Typography color="textSecondary" paragraph align="center">
-                Compare head-to-head team statistics, player matchups, and historical encounters.
-              </Typography>
               
               <Box sx={{ 
                 bgcolor: 'grey.100', 
-                p: 2, 
+                p: 1.5, 
                 borderRadius: 2,
-                mb: 2
+                mb: 1.5
               }}>
-                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                  Upcoming Matchups:
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom sx={{ fontSize: '0.75rem' }}>
+                  Upcoming Matches:
                 </Typography>
                 {loading ? (
-                  <Typography variant="body2" color="text.secondary" align="center">
+                  <Typography variant="body2" color="text.secondary" align="center" sx={{ fontSize: '0.75rem' }}>
                     Loading matches...
                   </Typography>
                 ) : upcomingMatches.length > 0 ? (
-                  upcomingMatches.map((match) => (
+                  upcomingMatches.slice(0, 3).map((match) => (
                     <Button
                       key={match.matchNumber}
                       fullWidth
                       variant="text"
-                      color="success"
+                      color="primary"
                       component={Link}
-                      to={`/matchups?team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
+                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
                       sx={{ 
                         justifyContent: 'flex-start', 
-                        mb: 1, 
+                        mb: 0.5, 
                         textAlign: 'left',
-                        fontSize: '0.8rem',
+                        fontSize: '0.7rem',
+                        py: 0.3,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis'
@@ -790,14 +480,109 @@ const LandingPage = () => {
                     </Button>
                   ))
                 ) : (
-                  <Typography variant="body2" color="text.secondary" align="center">
+                  <Typography variant="body2" color="text.secondary" align="center" sx={{ fontSize: '0.75rem' }}>
                     No upcoming matches found.
                   </Typography>
                 )}
               </Box>
             </CardContent>
             
-            <CardActions sx={{ p: 2, pt: 0 }}>
+            <CardActions sx={{ p: 1.5, pt: 0 }}>
+              <Button 
+                component={Link}
+                to="/venue"
+                fullWidth 
+                variant="outlined" 
+                endIcon={<ArrowForwardIcon />}
+                size="small"
+              >
+                Analyze Venues
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+        
+        {/* Team Matchups Card */}
+        <Grid item xs={6} md={4}>
+          <Card sx={{ 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column',
+            transition: 'transform 0.3s, box-shadow 0.3s',
+            '&:hover': {
+              transform: 'translateY(-3px)',
+              boxShadow: 6
+            }
+          }}>
+            <CardContent sx={{ flexGrow: 1, p: 2 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center',
+                alignItems: 'center',
+                mb: 1.5,
+                gap: 0.5
+              }}>
+                <GroupsIcon 
+                  sx={{ 
+                    fontSize: '1.25rem', 
+                    color: '#007e33'
+                  }} 
+                />
+                <Typography variant="h6" component="h2" fontWeight="bold" sx={{ fontSize: '1.25rem' }}>
+                  Team Matchups
+                </Typography>
+                <Tooltip title="Compare head-to-head team statistics, player matchups, and historical encounters.">
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <InfoIcon sx={{ fontSize: '1.25rem' }} color="action" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              
+              <Box sx={{ 
+                bgcolor: 'grey.100', 
+                p: 1.5, 
+                borderRadius: 2,
+                mb: 1.5
+              }}>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom sx={{ fontSize: '0.75rem' }}>
+                  Upcoming Matchups:
+                </Typography>
+                {loading ? (
+                  <Typography variant="body2" color="text.secondary" align="center" sx={{ fontSize: '0.75rem' }}>
+                    Loading matches...
+                  </Typography>
+                ) : upcomingMatches.length > 0 ? (
+                  upcomingMatches.slice(0, 3).map((match) => (
+                    <Button
+                      key={match.matchNumber}
+                      fullWidth
+                      variant="text"
+                      color="success"
+                      component={Link}
+                      to={`/matchups?team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
+                      sx={{ 
+                        justifyContent: 'flex-start', 
+                        mb: 0.5, 
+                        textAlign: 'left',
+                        fontSize: '0.7rem',
+                        py: 0.3,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
+                      {formatDate(match.date)} {match.team1Abbr} vs {match.team2Abbr}
+                    </Button>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary" align="center" sx={{ fontSize: '0.75rem' }}>
+                    No upcoming matches found.
+                  </Typography>
+                )}
+              </Box>
+            </CardContent>
+            
+            <CardActions sx={{ p: 1.5, pt: 0 }}>
               <Button 
                 component={Link}
                 to="/matchups"
@@ -805,9 +590,197 @@ const LandingPage = () => {
                 variant="outlined" 
                 endIcon={<ArrowForwardIcon />}
                 color="success"
-                size="large"
+                size="small"
               >
                 View Matchups
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+        
+        {/* Bowler Profiles Card */}
+        <Grid item xs={6} md={4}>
+          <Card sx={{ 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column',
+            transition: 'transform 0.3s, box-shadow 0.3s',
+            '&:hover': {
+              transform: 'translateY(-3px)',
+              boxShadow: 6
+            }
+          }}>
+            <CardContent sx={{ flexGrow: 1, p: 2 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center',
+                alignItems: 'center',
+                mb: 1.5,
+                gap: 0.5
+              }}>
+                <SportsCricketIcon 
+                  sx={{ 
+                    fontSize: '1.25rem', 
+                    color: '#ff6f00'
+                  }} 
+                />
+                <Typography variant="h6" component="h2" fontWeight="bold" sx={{ fontSize: '1.25rem' }}>
+                  Bowler Profiles
+                </Typography>
+                <Tooltip title="Comprehensive bowling analysis with wicket patterns, economy rates, and phase-wise performance metrics.">
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <InfoIcon sx={{ fontSize: '1.25rem' }} color="action" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              
+              <Box sx={{ 
+                bgcolor: 'grey.100', 
+                p: 1.5, 
+                borderRadius: 2,
+                mb: 1.5
+              }}>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom sx={{ fontSize: '0.75rem' }}>
+                  Featured Bowlers:
+                </Typography>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="warning"
+                  component={Link}
+                  to="/bowler?name=JJ%20Bumrah&autoload=true"
+                  sx={{ justifyContent: 'flex-start', mb: 0.5, textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
+                >
+                  JJ Bumrah
+                </Button>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="warning"
+                  component={Link}
+                  to="/bowler?name=DL%20Chahar&autoload=true"
+                  sx={{ justifyContent: 'flex-start', mb: 0.5, textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
+                >
+                  DL Chahar
+                </Button>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="warning"
+                  component={Link}
+                  to="/bowler?name=Rashid%20Khan&autoload=true"
+                  sx={{ justifyContent: 'flex-start', textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
+                >
+                  Rashid Khan
+                </Button>
+              </Box>
+            </CardContent>
+            
+            <CardActions sx={{ p: 1.5, pt: 0 }}>
+              <Button 
+                component={Link}
+                to="/bowler"
+                fullWidth 
+                variant="outlined" 
+                endIcon={<ArrowForwardIcon />} 
+                color="warning"
+                size="small"
+              >
+                Analyze Bowlers
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+
+        {/* Batter Comparison Card */}
+        <Grid item xs={6} md={4}>
+          <Card sx={{ 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column',
+            transition: 'transform 0.3s, box-shadow 0.3s',
+            '&:hover': {
+              transform: 'translateY(-3px)',
+              boxShadow: 6
+            }
+          }}>
+            <CardContent sx={{ flexGrow: 1, p: 2 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center',
+                alignItems: 'center',
+                mb: 1.5,
+                gap: 0.5
+              }}>
+                <CompareArrowsIcon 
+                  sx={{ 
+                    fontSize: '1.25rem', 
+                    color: '#9c27b0'
+                  }} 
+                />
+                <Typography variant="h6" component="h2" fontWeight="bold" sx={{ fontSize: '1.25rem' }}>
+                  Batter Comparison
+                </Typography>
+                <Tooltip title="Compare multiple batters across various metrics, including phase-wise performance, strike rates, and matchups.">
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <InfoIcon sx={{ fontSize: '1.25rem' }} color="action" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              
+              <Box sx={{ 
+                bgcolor: 'grey.100', 
+                p: 1.5, 
+                borderRadius: 2,
+                mb: 1.5
+              }}>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom sx={{ fontSize: '0.75rem' }}>
+                  Example Comparisons:
+                </Typography>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="secondary"
+                  component={Link}
+                  to="/comparison?batters=V%20Kohli,RG%20Sharma,KL%20Rahul&leagues=Indian%20Premier%20League"
+                  sx={{ justifyContent: 'flex-start', mb: 0.5, textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
+                >
+                  Rohit vs Kohli vs Rahul
+                </Button>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="secondary"
+                  component={Link}
+                  to="/comparison?batters=DA%20Warner,JC%20Buttler,Q%20de%20Kock&leagues=Indian%20Premier%20League"
+                  sx={{ justifyContent: 'flex-start', mb: 0.5, textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
+                >
+                  Warner vs Buttler vs de Kock
+                </Button>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="secondary"
+                  component={Link}
+                  to="/comparison?batters=Shubman%20Gill,Abhishek%20Sharma,SV%20Samson&leagues=Indian%20Premier%20League"
+                  sx={{ justifyContent: 'flex-start', textAlign: 'left', fontSize: '0.8rem', py: 0.5 }}
+                >
+                  Gill vs Abhishek vs Samson
+                </Button>
+              </Box>
+            </CardContent>
+            
+            <CardActions sx={{ p: 1.5, pt: 0 }}>
+              <Button 
+                component={Link}
+                to="/comparison"
+                fullWidth 
+                variant="outlined" 
+                endIcon={<ArrowForwardIcon />} 
+                color="secondary"
+                size="small"
+              >
+                Compare Batters
               </Button>
             </CardActions>
           </Card>

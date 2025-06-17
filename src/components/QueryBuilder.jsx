@@ -88,10 +88,10 @@ const PREFILLED_QUERIES = [
     tags: ["Death Overs", "IPL", "Venues", "2025"]
   },
   {
-    title: "Mumbai Indians vs pace bowling at Wankhede",
-    description: "Analyze MI's performance against pace at home venue",
+    title: "Mumbai Indians' pace bowling at Wankhede",
+    description: "Analyze MI's pace bowling performance at their home venue",
     filters: {
-      batting_teams: ["Mumbai Indians"],
+      bowling_teams: ["Mumbai Indians"],
       venue: "Wankhede Stadium, Mumbai",
       bowler_type: ["RF", "RM", "LF", "LM"],
       min_balls: 20
