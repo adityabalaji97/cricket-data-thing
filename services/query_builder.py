@@ -14,6 +14,8 @@ def query_deliveries_service(
     end_date: Optional[date],
     leagues: List[str],
     teams: List[str],
+    batting_teams: List[str],
+    bowling_teams: List[str],
     players: List[str],
     batters: List[str],
     bowlers: List[str],
@@ -31,6 +33,12 @@ def query_deliveries_service(
     
     # Grouping and aggregation
     group_by: List[str],
+    
+    # Filters for grouped results
+    min_balls: Optional[int],
+    max_balls: Optional[int],
+    min_runs: Optional[int],
+    max_runs: Optional[int],
     
     # Pagination and limits
     limit: int,
@@ -65,6 +73,8 @@ def query_deliveries_service(
             end_date=end_date,
             leagues=leagues,
             teams=teams,
+            batting_teams=batting_teams,
+            bowling_teams=bowling_teams,
             players=players,
             batters=batters,
             bowlers=bowlers,
@@ -89,6 +99,8 @@ def query_deliveries_service(
             "end_date": end_date.isoformat() if end_date else None,
             "leagues": leagues,
             "teams": teams,
+            "batting_teams": batting_teams,
+            "bowling_teams": bowling_teams,
             "players": players,
             "batters": batters,
             "bowlers": bowlers,
@@ -111,14 +123,14 @@ def query_deliveries_service(
         else:
             # Grouping requested - return aggregated cricket statistics
             logger.info(f"Handling grouped query with grouping: {group_by}")
-            return handle_grouped_query(where_clause, params, group_by, limit, offset, db, filters_applied)
+            return handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, min_runs, max_runs, limit, offset, db, filters_applied)
         
     except Exception as e:
         logger.error(f"Error in query_deliveries_service: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
 
 def build_where_clause(
-    venue, start_date, end_date, leagues, teams, players, batters, bowlers,
+    venue, start_date, end_date, leagues, teams, batting_teams, bowling_teams, players, batters, bowlers,
     crease_combo, ball_direction, bowler_type, striker_batter_type,
     non_striker_batter_type, innings, over_min, over_max, wicket_type,
     include_international, top_teams, base_params
@@ -163,13 +175,32 @@ def build_where_clause(
         else:
             conditions.append("(m.match_type = 'international')")
     
-    # Team filters
+    # Team filters - handle general teams, batting teams, and bowling teams
+    team_conditions = []
+    
     if teams:
         team_variations = []
         for team in teams:
             team_variations.extend(get_all_team_name_variations(team))
-        conditions.append("(d.batting_team = ANY(:teams) OR d.bowling_team = ANY(:teams))")
+        team_conditions.append("(d.batting_team = ANY(:teams) OR d.bowling_team = ANY(:teams))")
         params["teams"] = team_variations
+    
+    if batting_teams:
+        batting_variations = []
+        for team in batting_teams:
+            batting_variations.extend(get_all_team_name_variations(team))
+        team_conditions.append("d.batting_team = ANY(:batting_teams)")
+        params["batting_teams"] = batting_variations
+    
+    if bowling_teams:
+        bowling_variations = []
+        for team in bowling_teams:
+            bowling_variations.extend(get_all_team_name_variations(team))
+        team_conditions.append("d.bowling_team = ANY(:bowling_teams)")
+        params["bowling_teams"] = bowling_variations
+    
+    if team_conditions:
+        conditions.append("(" + " AND ".join(team_conditions) + ")")
     
     # Player filters - handle both generic and specific
     if players:
@@ -350,7 +381,7 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
         {where_clause}
     """
     
-    # Remove LIMIT and OFFSET params for count query
+    # Remove LIMIT and OFFSET params for count query (but keep min/max filters for HAVING clause)
     count_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
     total_count = db.execute(text(count_query), count_params).scalar()
     
@@ -367,7 +398,7 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
         }
     }
 
-def handle_grouped_query(where_clause, params, group_by, limit, offset, db, filters_applied=None):
+def handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, min_runs, max_runs, limit, offset, db, filters_applied=None):
     """
     Handle queries with grouping - return aggregated cricket statistics.
     """
@@ -391,12 +422,33 @@ def handle_grouped_query(where_clause, params, group_by, limit, offset, db, filt
     group_by_clause = ", ".join(group_columns)
     select_group_clause = ", ".join(select_columns)
     
+    # Determine if we should use runs_off_bat only (for batter grouping) or include extras
+    batter_grouping = "batter" in group_by
+    runs_calculation = "SUM(d.runs_off_bat)" if batter_grouping else "SUM(d.runs_off_bat + d.extras)"
+    
+    # Build HAVING clause for grouped result filters
+    having_conditions = []
+    if min_balls is not None:
+        having_conditions.append("COUNT(*) >= :min_balls")
+        params["min_balls"] = min_balls
+    if max_balls is not None:
+        having_conditions.append("COUNT(*) <= :max_balls")
+        params["max_balls"] = max_balls
+    if min_runs is not None:
+        having_conditions.append(f"{runs_calculation} >= :min_runs")
+        params["min_runs"] = min_runs
+    if max_runs is not None:
+        having_conditions.append(f"{runs_calculation} <= :max_runs")
+        params["max_runs"] = max_runs
+    
+    having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
+    
     # Build aggregation query with cricket metrics
     aggregation_query = f"""
         SELECT 
             {select_group_clause},
             COUNT(*) as balls,
-            SUM(d.runs_off_bat + d.extras) as runs,
+            {runs_calculation} as runs,
             SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) as wickets,
             SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
             SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
@@ -405,11 +457,11 @@ def handle_grouped_query(where_clause, params, group_by, limit, offset, db, filt
             
             -- Calculated cricket metrics (PostgreSQL compatible)
             CASE WHEN SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) > 0 
-                THEN CAST(SUM(d.runs_off_bat + d.extras) AS DECIMAL) / SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END)
+                THEN CAST({runs_calculation} AS DECIMAL) / SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END)
                 ELSE NULL END as average,
             
             CASE WHEN COUNT(*) > 0 
-                THEN (CAST(SUM(d.runs_off_bat + d.extras) AS DECIMAL) * 100.0) / COUNT(*)
+                THEN (CAST({runs_calculation} AS DECIMAL) * 100.0) / COUNT(*)
                 ELSE 0 END as strike_rate,
             
             CASE WHEN SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) > 0 
@@ -428,6 +480,7 @@ def handle_grouped_query(where_clause, params, group_by, limit, offset, db, filt
         JOIN matches m ON d.match_id = m.id
         {where_clause}
         GROUP BY {group_by_clause}
+        {having_clause}
         ORDER BY runs DESC
         LIMIT :limit
         OFFSET :offset
@@ -471,6 +524,7 @@ def handle_grouped_query(where_clause, params, group_by, limit, offset, db, filt
             JOIN matches m ON d.match_id = m.id
             {where_clause}
             GROUP BY {group_by_clause}
+            {having_clause}
         ) as grouped_count
     """
     

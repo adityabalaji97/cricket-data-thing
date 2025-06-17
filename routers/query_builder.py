@@ -14,7 +14,9 @@ def query_deliveries(
     start_date: Optional[date] = Query(default=None, description="Start date filter"),
     end_date: Optional[date] = Query(default=None, description="End date filter"),
     leagues: List[str] = Query(default=[], description="Filter by leagues"),
-    teams: List[str] = Query(default=[], description="Filter by teams"),
+    teams: List[str] = Query(default=[], description="Filter by teams (batting or bowling)"),
+    batting_teams: List[str] = Query(default=[], description="Filter by specific batting teams"),
+    bowling_teams: List[str] = Query(default=[], description="Filter by specific bowling teams"),
     players: List[str] = Query(default=[], description="Filter by players (batter or bowler)"),
     batters: List[str] = Query(default=[], description="Filter by specific batters"),
     bowlers: List[str] = Query(default=[], description="Filter by specific bowlers"),
@@ -32,6 +34,12 @@ def query_deliveries(
     
     # Grouping and aggregation
     group_by: List[str] = Query(default=[], description="Group results by columns"),
+    
+    # Filters for grouped results (applied via HAVING clause)
+    min_balls: Optional[int] = Query(default=None, ge=1, description="Minimum balls for grouped results"),
+    max_balls: Optional[int] = Query(default=None, ge=1, description="Maximum balls for grouped results"),
+    min_runs: Optional[int] = Query(default=None, ge=0, description="Minimum runs for grouped results"),
+    max_runs: Optional[int] = Query(default=None, ge=0, description="Maximum runs for grouped results"),
     
     # Pagination and limits
     limit: int = Query(default=1000, le=10000, description="Maximum number of results (max 10,000)"),
@@ -53,6 +61,8 @@ def query_deliveries(
     - Left-arm spin vs mixed partnerships: `?bowler_type=LO&crease_combo=lhb_rhb`
     - Powerplay analysis: `?over_min=0&over_max=5&group_by=crease_combo,ball_direction`
     - Venue-specific patterns: `?venue=Wankhede Stadium&group_by=bowler_type,ball_direction`
+    - KKR batting performance: `?batting_teams=KKR&group_by=batter&min_balls=50`
+    - Multiple bowler types: `?bowler_type=LC&bowler_type=LO&bowler_type=RL&bowler_type=RO`
     """
     try:
         result = query_deliveries_service(
@@ -62,6 +72,8 @@ def query_deliveries(
             end_date=end_date,
             leagues=leagues,
             teams=teams,
+            batting_teams=batting_teams,
+            bowling_teams=bowling_teams,
             players=players,
             batters=batters,
             bowlers=bowlers,
@@ -79,6 +91,12 @@ def query_deliveries(
             
             # Grouping and aggregation
             group_by=group_by,
+            
+            # Filters for grouped results
+            min_balls=min_balls,
+            max_balls=max_balls,
+            min_runs=min_runs,
+            max_runs=max_runs,
             
             # Pagination and limits
             limit=limit,
@@ -117,11 +135,12 @@ def get_available_columns(db: Session = Depends(get_session)):
         
         return {
             "filter_columns": {
-                "basic": ["venue", "start_date", "end_date", "leagues", "teams", "players", "batters", "bowlers"],
+                "basic": ["venue", "start_date", "end_date", "leagues", "teams", "batting_teams", "bowling_teams", "players", "batters", "bowlers"],
                 "match": ["innings", "over_min", "over_max"],
                 "players": ["striker_batter_type", "non_striker_batter_type", "bowler_type"],
                 "left_right": ["crease_combo", "ball_direction"],
-                "cricket": ["wicket_type"]
+                "cricket": ["wicket_type"],
+                "grouped_filters": ["min_balls", "max_balls", "min_runs", "max_runs"]
             },
             "group_by_columns": [
                 "venue", "crease_combo", "ball_direction", "bowler_type", 
