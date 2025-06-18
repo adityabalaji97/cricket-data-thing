@@ -37,8 +37,8 @@ const PREFILLED_QUERIES = [
     tags: ["IPL", "CSK", "Batting", "Phase Analysis"]
   },
   {
-    title: "V Kohli facing spinners (LC, LO, RL, RO) grouped by ball direction in IPL since 2023",
-    description: "Study how Kohli performs against spin bowling by ball direction",
+    title: "V Kohli facing spinners (LC, LO, RL, RO) grouped by phase and ball direction in IPL since 2023",
+    description: "Study how Kohli performs against spin bowling by phase and ball direction",
     filters: {
       batters: ["V Kohli"],
       bowler_type: ["LC", "LO", "RL", "RO"],
@@ -46,8 +46,8 @@ const PREFILLED_QUERIES = [
       start_date: "2023-01-01",
       min_balls: 10
     },
-    groupBy: ["ball_direction"],
-    tags: ["Kohli", "Spinners", "IPL", "Ball Direction"]
+    groupBy: ["phase", "ball_direction"],
+    tags: ["Kohli", "Spinners", "IPL", "Phase", "Ball Direction"]
   },
   {
     title: "T20 batting since 2020 grouped by crease_combo",
@@ -186,27 +186,36 @@ const QueryBuilder = ({ isMobile }) => {
   const [availableColumns, setAvailableColumns] = useState(null);
   const [queryTab, setQueryTab] = useState(0); // 0: Filters, 1: Results
   const [showPrefilledQueries, setShowPrefilledQueries] = useState(true);
+  const [isAutoExecuting, setIsAutoExecuting] = useState(false); // Track if we're auto-executing from URL
+  const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false); // Track if we've loaded from URL
   
   // Load filters from URL on component mount
   useEffect(() => {
     const urlFilters = getFiltersFromUrl();
     const urlGroupBy = getGroupByFromUrl();
     
-    // Only update if there are actual URL parameters
-    if (currentParams && currentParams.length > 1) {
+    // Only update if there are actual URL parameters and we haven't loaded from URL yet
+    if (currentParams && currentParams.length > 1 && !hasLoadedFromUrl) {
+      console.log('Loading filters from URL:', urlFilters, 'GroupBy:', urlGroupBy);
+      
       setFilters(prevFilters => ({
         ...prevFilters,
         ...urlFilters
       }));
       setGroupBy(urlGroupBy);
       setShowPrefilledQueries(false);
+      setHasLoadedFromUrl(true);
+      
+      // Set flag that we're about to auto-execute
+      setIsAutoExecuting(true);
       
       // If URL has filters, auto-execute the query after a short delay
+      // Give time for the state to update before executing
       setTimeout(() => {
-        executeQuery();
-      }, 1000);
+        executeQueryFromUrl(urlFilters, urlGroupBy);
+      }, 500);
     }
-  }, [currentParams]);
+  }, [currentParams, hasLoadedFromUrl]);
   
   // Fetch available columns for dropdowns
   useEffect(() => {
@@ -223,6 +232,49 @@ const QueryBuilder = ({ isMobile }) => {
     fetchAvailableColumns();
   }, []);
   
+  // Function to execute query from URL parameters (doesn't update URL)
+  const executeQueryFromUrl = async (urlFilters, urlGroupBy) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Build query parameters using URL filters directly
+      const params = new URLSearchParams();
+      
+      // Add filters
+      Object.entries(urlFilters).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== '') {
+          if (Array.isArray(value)) {
+            value.forEach(item => params.append(key, item));
+          } else {
+            params.append(key, value);
+          }
+        }
+      });
+      
+      // Add grouping
+      urlGroupBy.forEach(col => params.append('group_by', col));
+      
+      // Debug: Log the final query parameters
+      console.log('Auto-executing query with URL parameters:', Object.fromEntries(params.entries()));
+      
+      const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
+      setResults(response.data);
+      
+      // Switch to results tab
+      setQueryTab(1);
+      setShowPrefilledQueries(false);
+      
+    } catch (error) {
+      console.error('Error executing query from URL:', error);
+      setError(error.response?.data?.detail || 'Failed to execute query');
+    } finally {
+      setLoading(false);
+      setIsAutoExecuting(false);
+    }
+  };
+  
+  // Function for manual query execution (updates URL)
   const executeQuery = async () => {
     try {
       setLoading(true);
@@ -245,13 +297,15 @@ const QueryBuilder = ({ isMobile }) => {
       // Add grouping
       groupBy.forEach(col => params.append('group_by', col));
       
-      // Update URL without triggering navigation
-      const newParams = filtersToUrlParams(filters, groupBy);
-      const newUrl = `${window.location.pathname}?${newParams}`;
-      window.history.replaceState({}, '', newUrl);
+      // Only update URL if this is a manual execution (not auto-executing from URL)
+      if (!isAutoExecuting) {
+        const newParams = filtersToUrlParams(filters, groupBy);
+        const newUrl = `${window.location.pathname}?${newParams}`;
+        window.history.replaceState({}, '', newUrl);
+      }
       
       // Debug: Log the final query parameters
-      console.log('Query Parameters being sent:', Object.fromEntries(params.entries()));
+      console.log('Manual query execution. Parameters being sent:', Object.fromEntries(params.entries()));
       console.log('Date filters:', {
         start_date: filters.start_date,
         end_date: filters.end_date
@@ -307,6 +361,10 @@ const QueryBuilder = ({ isMobile }) => {
     setQueryTab(0);
     setShowPrefilledQueries(true);
     
+    // Reset URL loading state
+    setHasLoadedFromUrl(false);
+    setIsAutoExecuting(false);
+    
     // Clear URL parameters
     window.history.replaceState({}, '', window.location.pathname);
   };
@@ -319,6 +377,10 @@ const QueryBuilder = ({ isMobile }) => {
     setGroupBy(query.groupBy);
     setShowPrefilledQueries(false);
     setQueryTab(0); // Show filters tab so user can see what was selected
+    
+    // Reset URL loading state so user can execute manually
+    setHasLoadedFromUrl(false);
+    setIsAutoExecuting(false);
   };
   
   const hasValidFilters = () => {
