@@ -123,7 +123,9 @@ def query_deliveries_service(
         else:
             # Grouping requested - return aggregated cricket statistics
             logger.info(f"Handling grouped query with grouping: {group_by}")
-            return handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, min_runs, max_runs, limit, offset, db, filters_applied)
+            # Check if batter filters are applied
+            has_batter_filters = bool(batters) or bool(players)
+            return handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, min_runs, max_runs, limit, offset, db, filters_applied, has_batter_filters)
         
     except Exception as e:
         logger.error(f"Error in query_deliveries_service: {str(e)}")
@@ -398,7 +400,7 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
         }
     }
 
-def handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, min_runs, max_runs, limit, offset, db, filters_applied=None):
+def handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, min_runs, max_runs, limit, offset, db, filters_applied=None, has_batter_filters=False):
     """
     Handle queries with grouping - return aggregated cricket statistics.
     """
@@ -422,9 +424,10 @@ def handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, m
     group_by_clause = ", ".join(group_columns)
     select_group_clause = ", ".join(select_columns)
     
-    # Determine if we should use runs_off_bat only (for batter grouping) or include extras
+    # Determine if we should use runs_off_bat only (for batter grouping or batter filters) or include extras
     batter_grouping = "batter" in group_by
-    runs_calculation = "SUM(d.runs_off_bat)" if batter_grouping else "SUM(d.runs_off_bat + d.extras)"
+    use_runs_off_bat_only = batter_grouping or has_batter_filters
+    runs_calculation = "SUM(d.runs_off_bat)" if use_runs_off_bat_only else "SUM(d.runs_off_bat + d.extras)"
     
     # Build HAVING clause for grouped result filters
     having_conditions = []

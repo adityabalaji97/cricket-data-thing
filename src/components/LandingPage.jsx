@@ -174,12 +174,12 @@ const LandingPage = () => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 0.5 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 0.5, md: 2 } }}>
       {/* Hero Section */}
       <Paper 
         elevation={0}
         sx={{
-          p: { xs: 0.5, md: 1 },
+          p: { xs: 0.5, md: 3 },
           mb: 1,
           background: 'linear-gradient(to right, #0057b7, #1976d2)',
           borderRadius: 4,
@@ -215,7 +215,7 @@ const LandingPage = () => {
       </Paper>
 
       {/* Features Section */}
-      <Grid container spacing={1} sx={{ mb: 4 }}>
+      <Grid container spacing={{ xs: 1, md: 3 }} sx={{ mb: 4 }}>
         {/* Batter Profile Card */}
         <Grid item xs={6} md={4}>
           <Card sx={{ 
@@ -228,7 +228,7 @@ const LandingPage = () => {
               boxShadow: 6
             }
           }}>
-            <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
+            <CardContent sx={{ flexGrow: 1, p: { xs: 1.5, md: 2.5 } }}>
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
@@ -321,7 +321,7 @@ const LandingPage = () => {
               boxShadow: 6
             }
           }}>
-            <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
+            <CardContent sx={{ flexGrow: 1, p: { xs: 1.5, md: 2.5 } }}>
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
@@ -414,7 +414,7 @@ const LandingPage = () => {
               boxShadow: 6
             }
           }}>
-            <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
+            <CardContent sx={{ flexGrow: 1, p: { xs: 1.5, md: 2.5 } }}>
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
@@ -507,7 +507,7 @@ const LandingPage = () => {
               boxShadow: 6
             }
           }}>
-            <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
+            <CardContent sx={{ flexGrow: 1, p: { xs: 1.5, md: 2.5 } }}>
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
@@ -600,7 +600,7 @@ const LandingPage = () => {
               boxShadow: 6
             }
           }}>
-            <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
+            <CardContent sx={{ flexGrow: 1, p: { xs: 1.5, md: 2.5 } }}>
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
@@ -695,7 +695,7 @@ const LandingPage = () => {
               boxShadow: 6
             }
           }}>
-            <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
+            <CardContent sx={{ flexGrow: 1, p: { xs: 1.5, md: 2.5 } }}>
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
