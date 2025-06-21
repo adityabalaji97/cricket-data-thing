@@ -33,6 +33,7 @@ def query_deliveries_service(
     
     # Grouping and aggregation
     group_by: List[str],
+    show_summary_rows: bool,
     
     # Filters for grouped results
     min_balls: Optional[int],
@@ -125,7 +126,7 @@ def query_deliveries_service(
             logger.info(f"Handling grouped query with grouping: {group_by}")
             # Check if batter filters are applied
             has_batter_filters = bool(batters) or bool(players)
-            return handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, min_runs, max_runs, limit, offset, db, filters_applied, has_batter_filters)
+            return handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, min_runs, max_runs, limit, offset, db, filters_applied, has_batter_filters, show_summary_rows)
         
     except Exception as e:
         logger.error(f"Error in query_deliveries_service: {str(e)}")
@@ -400,7 +401,7 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
         }
     }
 
-def handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, min_runs, max_runs, limit, offset, db, filters_applied=None, has_batter_filters=False):
+def handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, min_runs, max_runs, limit, offset, db, filters_applied=None, has_batter_filters=False, show_summary_rows=False):
     """
     Handle queries with grouping - return aggregated cricket statistics.
     """
@@ -535,8 +536,14 @@ def handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, m
     count_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
     total_groups = db.execute(text(count_query), count_params).scalar()
     
+    # Generate summary data if requested
+    summary_data = None
+    if show_summary_rows and len(group_by) > 1:
+        summary_data = generate_summary_data(where_clause, params, group_by, runs_calculation, db)
+    
     return {
         "data": formatted_results,
+        "summary_data": summary_data,
         "metadata": {
             "total_groups": total_groups,
             "returned_groups": len(formatted_results),
@@ -545,6 +552,7 @@ def handle_grouped_query(where_clause, params, group_by, min_balls, max_balls, m
             "has_more": total_groups > (offset + len(formatted_results)),
             "grouped_by": group_by,
             "filters_applied": filters_applied,
+            "has_summaries": summary_data is not None,
             "note": "Step 3: Grouped data with cricket aggregations"
         }
     }
@@ -569,3 +577,179 @@ def get_grouping_columns_map():
         "year": "EXTRACT(YEAR FROM m.date)",
         "phase": "CASE WHEN d.over < 6 THEN 'powerplay' WHEN d.over < 15 THEN 'middle' ELSE 'death' END"
     }
+
+def generate_summary_data(where_clause, params, group_by, runs_calculation, db):
+    """
+    Generate hierarchical summary data and percentage calculations for grouped queries.
+    
+    For example, if grouping by [year, crease_combo]:
+    - Generate summaries for each year (first group level)
+    - Calculate what % each crease_combo represents within its year
+    """
+    try:
+        grouping_columns = get_grouping_columns_map()
+        
+        # Generate summary data for each group level (except the last one)
+        summaries = {}
+        percentages = []
+        
+        # For each level from 1 to len(group_by)-1, create summary groups
+        for level in range(1, len(group_by)):
+            summary_group_by = group_by[:level]
+            summary_key = f"{summary_group_by[0]}_summaries" if level == 1 else f"level_{level}_summaries"
+            
+            # Build summary query for this level
+            summary_columns = []
+            summary_group_clause = []
+            
+            for col in summary_group_by:
+                db_column = grouping_columns[col]
+                summary_group_clause.append(db_column)
+                summary_columns.append(f"{db_column} as {col}")
+            
+            summary_group_by_clause = ", ".join(summary_group_clause)
+            summary_select_clause = ", ".join(summary_columns)
+            
+            summary_query = f"""
+                SELECT 
+                    {summary_select_clause},
+                    COUNT(*) as total_balls,
+                    {runs_calculation} as total_runs,
+                    SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) as total_wickets,
+                    SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as total_dots,
+                    SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as total_boundaries,
+                    SUM(CASE WHEN d.runs_off_bat = 4 THEN 1 ELSE 0 END) as total_fours,
+                    SUM(CASE WHEN d.runs_off_bat = 6 THEN 1 ELSE 0 END) as total_sixes
+                FROM deliveries d
+                JOIN matches m ON d.match_id = m.id
+                {where_clause}
+                GROUP BY {summary_group_by_clause}
+                ORDER BY total_runs DESC
+            """
+            
+            # Remove pagination params for summary queries
+            summary_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
+            summary_result = db.execute(text(summary_query), summary_params).fetchall()
+            
+            # Format summary results
+            formatted_summaries = []
+            for row in summary_result:
+                summary_dict = {}
+                # Add grouping columns
+                for i, col in enumerate(summary_group_by):
+                    summary_dict[col] = row[i]
+                
+                # Add aggregated stats
+                stats_start = len(summary_group_by)
+                summary_dict.update({
+                    "total_balls": row[stats_start],
+                    "total_runs": row[stats_start + 1],
+                    "total_wickets": row[stats_start + 2],
+                    "total_dots": row[stats_start + 3],
+                    "total_boundaries": row[stats_start + 4],
+                    "total_fours": row[stats_start + 5],
+                    "total_sixes": row[stats_start + 6]
+                })
+                
+                formatted_summaries.append(summary_dict)
+            
+            summaries[summary_key] = formatted_summaries
+        
+        # Generate percentage calculations for the main data
+        # For each row in the main results, calculate what % it represents within its parent group
+        if len(group_by) >= 2:
+            parent_group_by = group_by[:-1]  # All but the last grouping column
+            
+            # Build percentage calculation query
+            parent_columns = []
+            parent_group_clause = []
+            
+            for col in parent_group_by:
+                db_column = grouping_columns[col]
+                parent_group_clause.append(db_column)
+                parent_columns.append(f"{db_column} as {col}")
+            
+            parent_group_by_clause = ", ".join(parent_group_clause)
+            parent_select_clause = ", ".join(parent_columns)
+            
+            # Query to get totals for each parent group
+            parent_totals_query = f"""
+                SELECT 
+                    {parent_select_clause},
+                    COUNT(*) as parent_total_balls
+                FROM deliveries d
+                JOIN matches m ON d.match_id = m.id
+                {where_clause}
+                GROUP BY {parent_group_by_clause}
+            """
+            
+            parent_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
+            parent_totals_result = db.execute(text(parent_totals_query), parent_params).fetchall()
+            
+            # Create lookup for parent totals
+            parent_totals_lookup = {}
+            for row in parent_totals_result:
+                key_parts = []
+                for i, col in enumerate(parent_group_by):
+                    key_parts.append(str(row[i]))
+                parent_key = "|".join(key_parts)
+                parent_totals_lookup[parent_key] = row[len(parent_group_by)]  # parent_total_balls
+            
+            # Now get full detailed data with parent keys to calculate percentages
+            full_group_columns = []
+            full_group_clause = []
+            
+            for col in group_by:
+                db_column = grouping_columns[col]
+                full_group_clause.append(db_column)
+                full_group_columns.append(f"{db_column} as {col}")
+            
+            full_group_by_clause = ", ".join(full_group_clause)
+            full_select_clause = ", ".join(full_group_columns)
+            
+            percentage_query = f"""
+                SELECT 
+                    {full_select_clause},
+                    COUNT(*) as balls
+                FROM deliveries d
+                JOIN matches m ON d.match_id = m.id
+                {where_clause}
+                GROUP BY {full_group_by_clause}
+            """
+            
+            percentage_result = db.execute(text(percentage_query), parent_params).fetchall()
+            
+            # Calculate percentages
+            for row in percentage_result:
+                percentage_dict = {}
+                
+                # Add all grouping columns
+                for i, col in enumerate(group_by):
+                    percentage_dict[col] = row[i]
+                
+                # Build parent key for lookup
+                parent_key_parts = []
+                for i, col in enumerate(parent_group_by):
+                    parent_key_parts.append(str(row[i]))
+                parent_key = "|".join(parent_key_parts)
+                
+                # Calculate percentage
+                balls_for_this_row = row[len(group_by)]  # balls count
+                parent_total = parent_totals_lookup.get(parent_key, 0)
+                
+                if parent_total > 0:
+                    percent_balls = (balls_for_this_row / parent_total) * 100.0
+                else:
+                    percent_balls = 0.0
+                
+                percentage_dict["percent_balls"] = round(percent_balls, 1)
+                percentages.append(percentage_dict)
+        
+        return {
+            **summaries,
+            "percentages": percentages
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating summary data: {str(e)}")
+        return None

@@ -123,7 +123,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
   const formatMetricValue = (value, metric) => {
     if (value === null || value === undefined) return 'N/A';
     
-    if (metric.includes('percentage')) {
+    if (metric.includes('percentage') || metric === 'percent_balls') {
       return `${Number(value).toFixed(1)}%`;
     }
     if (metric === 'strike_rate' || metric === 'average' || metric === 'balls_per_dismissal') {
@@ -141,7 +141,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
     if (!data || data.length === 0) return [];
     
     const sampleRow = data[0];
-    const numericMetrics = [
+    const predefinedMetrics = [
       { key: 'runs', label: 'Runs', color: '#8884d8' },
       { key: 'balls', label: 'Balls', color: '#82ca9d' },
       { key: 'wickets', label: 'Wickets', color: '#ffc658' },
@@ -153,11 +153,34 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
       { key: 'average', label: 'Average', color: '#ff9999' },
       { key: 'dot_percentage', label: 'Dot %', color: '#ffcc99' },
       { key: 'boundary_percentage', label: 'Boundary %', color: '#99ccff' },
-      { key: 'balls_per_dismissal', label: 'Balls/Wicket', color: '#cc99ff' }
+      { key: 'balls_per_dismissal', label: 'Balls/Wicket', color: '#cc99ff' },
+      { key: 'percent_balls', label: '% Balls', color: '#ff6b6b' } // Add the new column
     ];
 
-    return numericMetrics.filter(metric => metric.key in sampleRow);
-  }, [data]);
+    // Filter to only include metrics that exist in the data
+    const availableFromPredefined = predefinedMetrics.filter(metric => metric.key in sampleRow);
+    
+    // Dynamically add any other numeric columns that aren't in our predefined list
+    const dynamicMetrics = [];
+    Object.keys(sampleRow).forEach(key => {
+      // Check if it's a numeric value and not already in our predefined list
+      const value = sampleRow[key];
+      const isNumeric = typeof value === 'number' && !isNaN(value);
+      const isNotGrouping = !groupBy || !groupBy.includes(key);
+      const isNotPredefined = !predefinedMetrics.some(m => m.key === key);
+      const isNotInternal = !['is_summary', 'summary_level', 'displayIndex'].includes(key);
+      
+      if (isNumeric && isNotGrouping && isNotPredefined && isNotInternal) {
+        dynamicMetrics.push({
+          key,
+          label: key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+          color: generateContrastColor(availableFromPredefined.length + dynamicMetrics.length)
+        });
+      }
+    });
+
+    return [...availableFromPredefined, ...dynamicMetrics];
+  }, [data, groupBy]);
 
   // Prepare chart data
   const chartData = useMemo(() => {

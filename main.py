@@ -31,29 +31,36 @@ from routers.players import router as players_router
 import math
 
 
-# Helper function to expand league abbreviations
+# Enhanced helper function to expand league abbreviations with partial matching
 def expand_league_abbreviations(abbrevs: List[str]) -> List[str]:
-    """Expand league abbreviations to include both the abbreviation and the full name."""
+    """Enhanced version that handles partial matches and common variations"""
     expanded = []
+    
     for abbrev in abbrevs:
-        # First check if this is a full name with an abbreviation
-        if abbrev in leagues_mapping:
-            expanded.append(abbrev)  # Add the full name
-            expanded.append(leagues_mapping[abbrev])  # Add the abbreviation
-        # Then check if it's an abbreviation with a full name
-        else:
-            full_name = get_full_league_name(abbrev)
-            if full_name != abbrev:  # If we found a mapping
-                expanded.append(full_name)
-                expanded.append(abbrev)
-            else:
-                expanded.append(abbrev)  # Include the original if no mapping found
+        # Add the original term
+        expanded.append(abbrev)
         
-        # Also check aliases (for renamed leagues)
-        for alias, std_name in league_aliases.items():
-            if abbrev == std_name or abbrev == alias:
-                expanded.append(alias)
-                expanded.append(std_name)
+        # Check exact matches in leagues_mapping
+        if abbrev in leagues_mapping:
+            expanded.append(leagues_mapping[abbrev])
+        
+        # Check reverse mapping (abbrev -> full name)
+        reverse_mapping = {v: k for k, v in leagues_mapping.items()}
+        if abbrev in reverse_mapping:
+            expanded.append(reverse_mapping[abbrev])
+        
+        # Check aliases
+        if abbrev in league_aliases:
+            expanded.append(league_aliases[abbrev])
+        
+        # Check reverse aliases
+        reverse_aliases = {v: k for k, v in league_aliases.items()}
+        if abbrev in reverse_aliases:
+            expanded.append(reverse_aliases[abbrev])
+        
+        # Handle common variations for specific leagues
+        variations = get_league_variations(abbrev)
+        expanded.extend(variations)
     
     # Remove duplicates while preserving order
     result = []
@@ -62,6 +69,74 @@ def expand_league_abbreviations(abbrevs: List[str]) -> List[str]:
             result.append(item)
     
     return result
+
+def get_league_variations(league_name: str) -> List[str]:
+    """Get common variations for specific league names"""
+    variations = []
+    league_lower = league_name.lower()
+    
+    # Major League Cricket variations
+    if 'major league cricket' in league_lower or league_name == 'MLC':
+        variations.extend([
+            'Major League Cricket',
+            'MLC',
+            'Major League Cricket USA',
+            'MLC USA'
+        ])
+    
+    # Vitality Blast variations  
+    elif 'vitality blast' in league_lower or 'blast' in league_lower:
+        variations.extend([
+            'Vitality Blast',
+            'Vitality Blast Men',
+            'T20 Blast',
+            'NatWest T20 Blast',
+            'Vitality T20 Blast'
+        ])
+    
+    # IPL variations
+    elif 'ipl' in league_lower or 'indian premier league' in league_lower:
+        variations.extend([
+            'Indian Premier League',
+            'IPL',
+            'TATA IPL',
+            'Vivo IPL'
+        ])
+    
+    # BBL variations
+    elif 'bbl' in league_lower or 'big bash' in league_lower:
+        variations.extend([
+            'Big Bash League',
+            'BBL',
+            'KFC Big Bash League',
+            'Weber WBBL'  # Women's version
+        ])
+    
+    # PSL variations
+    elif 'psl' in league_lower or 'pakistan super league' in league_lower:
+        variations.extend([
+            'Pakistan Super League',
+            'PSL',
+            'HBL PSL'
+        ])
+    
+    # CPL variations
+    elif 'cpl' in league_lower or 'caribbean premier league' in league_lower:
+        variations.extend([
+            'Caribbean Premier League',
+            'CPL',
+            'Hero CPL'
+        ])
+    
+    # The Hundred variations
+    elif 'hundred' in league_lower:
+        variations.extend([
+            'The Hundred',
+            'The Hundred Men',
+            'The Hundred Women'
+        ])
+    
+    return variations
 
 logging.basicConfig(filename='venue_stats.log', level=logging.INFO)
 
@@ -289,14 +364,26 @@ def get_venue_notes(
             "leagues": leagues
         }
         
-        # Handle league matches
+        # Handle league matches with enhanced matching
         if leagues and len(leagues) > 0:
-            # Expand league abbreviations to include full names
+            # Expand league abbreviations to include full names and variations
             expanded_leagues = expand_league_abbreviations(leagues)
             params["leagues"] = expanded_leagues
             logging.info(f"Expanded leagues: {leagues} -> {expanded_leagues}")
-            competition_conditions.append("""
-                (m.match_type = 'league' AND m.competition = ANY(:leagues))
+            
+            # Create flexible ILIKE conditions for partial matching
+            league_conditions = []
+            for i, league in enumerate(expanded_leagues):
+                param_name = f"league_{i}"
+                params[param_name] = f"%{league}%"
+                league_conditions.append(f"m.competition ILIKE :{param_name}")
+            
+            # Also add exact matches
+            exact_conditions = "m.competition = ANY(:leagues)"
+            all_league_conditions = " OR ".join(league_conditions + [exact_conditions])
+            
+            competition_conditions.append(f"""
+                (m.match_type = 'league' AND ({all_league_conditions}))
             """)
         
         # Handle international matches with top teams

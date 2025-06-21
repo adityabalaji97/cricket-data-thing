@@ -176,7 +176,10 @@ const QueryBuilder = ({ isMobile }) => {
     
     // International matches
     include_international: false,
-    top_teams: 10
+    top_teams: 10,
+    
+    // Summary rows
+    show_summary_rows: false
   });
   
   const [groupBy, setGroupBy] = useState([]);
@@ -354,7 +357,8 @@ const QueryBuilder = ({ isMobile }) => {
       limit: 1000,
       offset: 0,
       include_international: false,
-      top_teams: 10
+      top_teams: 10,
+      show_summary_rows: false
     });
     setGroupBy([]);
     setResults(null);

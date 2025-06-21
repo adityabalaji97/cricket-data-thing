@@ -34,6 +34,7 @@ def query_deliveries(
     
     # Grouping and aggregation
     group_by: List[str] = Query(default=[], description="Group results by columns"),
+    show_summary_rows: bool = Query(default=False, description="Include summary rows for each group level with percentage calculations"),
     
     # Filters for grouped results (applied via HAVING clause)
     min_balls: Optional[int] = Query(default=None, ge=1, description="Minimum balls for grouped results"),
@@ -91,6 +92,7 @@ def query_deliveries(
             
             # Grouping and aggregation
             group_by=group_by,
+            show_summary_rows=show_summary_rows,
             
             # Filters for grouped results
             min_balls=min_balls,

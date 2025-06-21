@@ -19,14 +19,76 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  TableSortLabel
+  TableSortLabel,
+  Autocomplete,
+  TextField,
+  IconButton,
+  Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  OutlinedInput
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GetAppIcon from '@mui/icons-material/GetApp';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ScatterPlotIcon from '@mui/icons-material/ScatterPlot';
 import AddIcon from '@mui/icons-material/Add';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import ClearIcon from '@mui/icons-material/Clear';
+import FilterListOffIcon from '@mui/icons-material/FilterListOff';
 import ChartPanel from './ChartPanel';
+
+// Column Filter Component
+const ColumnFilter = ({ column, displayName, uniqueValues, selectedValues, onChange, onClear, isMobile }) => {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 200 }}>
+      <FormControl size="small" sx={{ minWidth: 150, maxWidth: 200 }}>
+        <InputLabel>{`Filter ${displayName}`}</InputLabel>
+        <Select
+          multiple
+          value={selectedValues || []}
+          onChange={(e) => onChange(column, e.target.value)}
+          input={<OutlinedInput label={`Filter ${displayName}`} />}
+          renderValue={(selected) => (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {selected.slice(0, isMobile ? 1 : 2).map((value) => (
+                <Chip key={value} label={value} size="small" />
+              ))}
+              {selected.length > (isMobile ? 1 : 2) && (
+                <Chip 
+                  label={`+${selected.length - (isMobile ? 1 : 2)} more`} 
+                  size="small" 
+                  variant="outlined" 
+                />
+              )}
+            </Box>
+          )}
+          sx={{ fontSize: '0.875rem' }}
+        >
+          {uniqueValues.map((value) => (
+            <MenuItem key={value} value={value}>
+              {value}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      
+      {selectedValues && selectedValues.length > 0 && (
+        <Tooltip title="Clear filter">
+          <IconButton 
+            size="small" 
+            onClick={() => onClear(column)}
+            sx={{ p: 0.5 }}
+          >
+            <ClearIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+    </Box>
+  );
+};
 
 const QueryResults = ({ results, groupBy, isMobile }) => {
   const [page, setPage] = useState(0);
@@ -38,20 +100,140 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
     direction: 'asc'
   });
   
+  // Column filtering state
+  const [columnFilters, setColumnFilters] = useState({});
+  const [showFilters, setShowFilters] = useState(false);
+  
   // Chart panel ref to trigger chart additions
   const chartPanelRef = useRef(null);
   const [showCharts, setShowCharts] = useState(false);
   
   // Extract data early to avoid hooks rule violation
   const data = results?.data || [];
+  const summaryData = results?.summary_data || null;
   const metadata = results?.metadata || {};
   const isGrouped = groupBy && groupBy.length > 0;
+  const hasSummaries = metadata.has_summaries || false;
+  
+  // Merge regular data with summary data and percentages for display
+  const displayData = useMemo(() => {
+    // Always add is_summary: false to regular data first
+    const dataWithFlags = data.map(row => ({
+      ...row,
+      is_summary: false
+    }));
+    
+    // If no summaries requested, just return data with flags
+    if (!hasSummaries || !summaryData || !isGrouped) {
+      return dataWithFlags;
+    }
+    
+    // Create a lookup for percentages
+    const percentageLookup = {};
+    if (summaryData.percentages) {
+      summaryData.percentages.forEach(item => {
+        const key = groupBy.map(col => String(item[col] || 'null')).join('|');
+        percentageLookup[key] = item.percent_balls;
+      });
+    }
+    
+    // Add percent_balls to regular data
+    const dataWithPercentages = dataWithFlags.map(row => {
+      const key = groupBy.map(col => String(row[col] || 'null')).join('|');
+      const percent_balls = percentageLookup[key] || 0;
+      return {
+        ...row,
+        percent_balls
+      };
+    });
+    
+    // If we have multi-level grouping, insert summary rows
+    if (groupBy.length > 1 && summaryData[`${groupBy[0]}_summaries`]) {
+      const summaries = summaryData[`${groupBy[0]}_summaries`];
+      const mergedData = [];
+      
+      // Group data by first grouping column to insert summaries
+      const groupedByFirst = {};
+      dataWithPercentages.forEach(row => {
+        const firstGroupValue = String(row[groupBy[0]] || 'null');
+        if (!groupedByFirst[firstGroupValue]) {
+          groupedByFirst[firstGroupValue] = [];
+        }
+        groupedByFirst[firstGroupValue].push(row);
+      });
+      
+      // Sort by the first group column to match order
+      const sortedGroups = Object.keys(groupedByFirst).sort((a, b) => {
+        // Handle numeric sorting for years
+        if (!isNaN(a) && !isNaN(b)) {
+          return Number(b) - Number(a); // Descending order for years
+        }
+        return a.localeCompare(b);
+      });
+      
+      sortedGroups.forEach(groupValue => {
+        // Add the regular rows for this group
+        mergedData.push(...groupedByFirst[groupValue]);
+        
+        // Add summary row for this group
+        const summary = summaries.find(s => String(s[groupBy[0]]) === groupValue);
+        if (summary) {
+          const summaryRow = {
+            ...summary,
+            // Set other grouping columns to null to indicate this is a summary
+            ...groupBy.slice(1).reduce((acc, col) => ({ ...acc, [col]: null }), {}),
+            // Rename total_ fields to regular field names for display
+            balls: summary.total_balls,
+            runs: summary.total_runs,
+            wickets: summary.total_wickets,
+            dots: summary.total_dots,
+            boundaries: summary.total_boundaries,
+            fours: summary.total_fours,
+            sixes: summary.total_sixes,
+            // Add calculated fields for summaries
+            average: summary.total_wickets > 0 ? summary.total_runs / summary.total_wickets : null,
+            strike_rate: summary.total_balls > 0 ? (summary.total_runs * 100) / summary.total_balls : 0,
+            balls_per_dismissal: summary.total_wickets > 0 ? summary.total_balls / summary.total_wickets : null,
+            dot_percentage: summary.total_balls > 0 ? (summary.total_dots * 100) / summary.total_balls : 0,
+            boundary_percentage: summary.total_balls > 0 ? (summary.total_boundaries * 100) / summary.total_balls : 0,
+            percent_balls: 100.0, // Summary rows represent 100% of their group
+            is_summary: true,
+            summary_level: 1
+          };
+          mergedData.push(summaryRow);
+        }
+      });
+      
+      return mergedData;
+    }
+    
+    return dataWithPercentages;
+  }, [data, summaryData, hasSummaries, isGrouped, groupBy]);
+  
+  // Apply column filters to displayData
+  const filteredData = useMemo(() => {
+    if (!columnFilters || Object.keys(columnFilters).length === 0) {
+      return displayData;
+    }
+    
+    return displayData.filter(row => {
+      return Object.entries(columnFilters).every(([column, selectedValues]) => {
+        if (!selectedValues || selectedValues.length === 0) return true;
+        
+        const cellValue = row[column];
+        // Handle null values and convert to string for comparison
+        const valueStr = cellValue === null || cellValue === undefined ? 'N/A' : String(cellValue);
+        
+        return selectedValues.includes(valueStr);
+      });
+    });
+  }, [displayData, columnFilters]);
   
   // Memoized sorted data
   const sortedData = useMemo(() => {
-    if (!sortConfig.key || data.length === 0) return data;
+    if (!sortConfig.key || filteredData.length === 0) return filteredData;
     
-    return [...data].sort((a, b) => {
+    return [...filteredData].sort((a, b) => {
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
       
@@ -72,7 +254,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
       if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [data, sortConfig]);
+  }, [filteredData, sortConfig]);
   
   // Early return after all hooks
   if (!results || !results.data) {
@@ -115,6 +297,39 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
     setPage(0); // Reset to first page when sorting
   };
   
+  // Column filtering logic
+  const getUniqueValuesForColumn = (column) => {
+    const values = new Set();
+    displayData.forEach(row => {
+      const value = row[column];
+      const valueStr = value === null || value === undefined ? 'N/A' : String(value);
+      values.add(valueStr);
+    });
+    return Array.from(values).sort();
+  };
+  
+  const handleColumnFilter = (column, selectedValues) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [column]: selectedValues
+    }));
+    setPage(0); // Reset to first page when filtering
+  };
+  
+  const clearColumnFilter = (column) => {
+    setColumnFilters(prev => {
+      const updated = { ...prev };
+      delete updated[column];
+      return updated;
+    });
+    setPage(0);
+  };
+  
+  const clearAllFilters = () => {
+    setColumnFilters({});
+    setPage(0);
+  };
+  
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
   };
@@ -127,19 +342,22 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
   const exportToCSV = () => {
     if (!sortedData || sortedData.length === 0) return;
     
+    // Use filtered and sorted data for export
+    const exportData = sortedData;
+    
     // Get all unique keys from the data
-    const headers = Object.keys(sortedData[0]);
+    const headers = Object.keys(exportData[0]);
     
     // Create CSV content
     const csvContent = [
       headers.join(','),
-      ...sortedData.map(row => 
+      ...exportData.map(row => 
         headers.map(header => {
           const value = row[header];
           // Handle null/undefined values and escape commas
           if (value === null || value === undefined) return '';
           if (typeof value === 'string' && value.includes(',')) {
-            return `"${value.replace(/"/g, '""')}"`;
+            return `"${value.replace(/"/g, '""')}"`;  
           }
           return value;
         }).join(',')
@@ -151,7 +369,12 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `cricket-query-${new Date().toISOString().split('T')[0]}.csv`);
+    
+    // Include filter info in filename if filters are active
+    const filterSuffix = Object.keys(columnFilters).length > 0 ? '-filtered' : '';
+    const filename = `cricket-query${filterSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.setAttribute('download', filename);
+    
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -162,7 +385,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
     if (value === null || value === undefined) return 'N/A';
     
     // Format different types of values
-    if (key.includes('percentage')) {
+    if (key.includes('percentage') || key === 'percent_balls') {
       return `${Number(value).toFixed(1)}%`;
     }
     if (key === 'strike_rate') {
@@ -195,6 +418,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
       'strike_rate': 'Strike Rate',
       'dot_percentage': 'Dot %',
       'boundary_percentage': 'Boundary %',
+      'percent_balls': '% Balls',
       'balls_per_dismissal': 'Balls/Wicket',
       'year': 'Year'
     };
@@ -205,9 +429,9 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
   };
   
   const getCricketMetrics = () => {
-    if (!isGrouped || data.length === 0) return null;
+    if (!isGrouped || displayData.length === 0) return null;
     
-    const sampleRow = data[0];
+    const sampleRow = displayData[0];
     const cricketKeys = ['balls', 'runs', 'wickets', 'dots', 'boundaries', 'fours', 'sixes', 
                          'average', 'strike_rate', 'balls_per_dismissal', 'dot_percentage', 'boundary_percentage'];
     
@@ -215,27 +439,33 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
   };
   
   const getGroupingColumns = () => {
-    if (!isGrouped || data.length === 0) return [];
+    if (!isGrouped || displayData.length === 0) return [];
     
-    const sampleRow = data[0];
+    const sampleRow = displayData[0];
     return Object.keys(sampleRow).filter(key => groupBy.includes(key));
   };
   
   const getVisibleColumns = () => {
-    if (data.length === 0) return [];
+    if (displayData.length === 0) return [];
     
-    const allColumns = Object.keys(data[0]);
+    const allColumns = Object.keys(displayData[0]);
     
     // For mobile, show fewer columns
     if (isMobile) {
       if (isGrouped) {
-        return [...getGroupingColumns(), 'balls', 'runs', 'strike_rate'].filter(col => allColumns.includes(col));
+        const baseColumns = [...getGroupingColumns(), 'balls', 'runs', 'strike_rate'];
+        // Add percent_balls if available
+        if (hasSummaries && allColumns.includes('percent_balls')) {
+          baseColumns.push('percent_balls');
+        }
+        return baseColumns.filter(col => allColumns.includes(col));
       } else {
         return ['batter', 'bowler', 'runs_off_bat', 'crease_combo'].filter(col => allColumns.includes(col));
       }
     }
     
-    return allColumns;
+    // For desktop, show all columns except internal ones
+    return allColumns.filter(col => !['is_summary', 'summary_level'].includes(col));
   };
   
   // Use sorted data for pagination
@@ -266,6 +496,13 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
                       variant="outlined" 
                       size="small" 
                     />
+                    {hasSummaries && (
+                      <Chip 
+                        label="With Summary Rows" 
+                        color="secondary" 
+                        size="small" 
+                      />
+                    )}
                   </>
                 ) : (
                   <>
@@ -291,6 +528,16 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
                     color="secondary"
                   />
                 )}
+                
+                {/* Filter indicator */}
+                {Object.keys(columnFilters).length > 0 && (
+                  <Chip 
+                    label={`${Object.keys(columnFilters).length} column filter${Object.keys(columnFilters).length > 1 ? 's' : ''} active`} 
+                    color="warning" 
+                    size="small"
+                    icon={<FilterListIcon />}
+                  />
+                )}
               </Box>
               
               {metadata.filters_applied && (
@@ -302,6 +549,33 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
             
             <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                {/* Filter toggle button - only show for grouped data */}
+                {isGrouped && data.length > 0 && (
+                  <>
+                    <Button
+                      variant={showFilters ? "contained" : "outlined"}
+                      startIcon={showFilters ? <FilterListOffIcon /> : <FilterListIcon />}
+                      onClick={() => setShowFilters(!showFilters)}
+                      size="small"
+                      color={Object.keys(columnFilters).length > 0 ? "warning" : "primary"}
+                    >
+                      {showFilters ? 'Hide Filters' : 'Show Filters'}
+                    </Button>
+                    
+                    {Object.keys(columnFilters).length > 0 && (
+                      <Button
+                        variant="outlined"
+                        startIcon={<ClearIcon />}
+                        onClick={clearAllFilters}
+                        size="small"
+                        color="warning"
+                      >
+                        Clear Filters
+                      </Button>
+                    )}
+                  </>
+                )}
+                
                 {/* Chart buttons only for grouped data */}
                 {isGrouped && data.length > 0 && (
                   <>
@@ -400,13 +674,57 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
                   </TableCell>
                 ))}
               </TableRow>
+              
+              {/* Filter Row */}
+              {showFilters && isGrouped && (
+                <TableRow sx={{ backgroundColor: 'grey.50' }}>
+                  {visibleColumns.map((column) => {
+                    // Only show filters for grouping columns and string/categorical columns
+                    const isFilterableColumn = groupBy.includes(column) || 
+                      ['crease_combo', 'ball_direction', 'bowler_type', 'striker_batter_type', 'non_striker_batter_type', 'venue', 'batting_team', 'bowling_team', 'batter', 'bowler', 'competition'].includes(column);
+                    
+                    return (
+                      <TableCell key={column} sx={{ py: 1 }}>
+                        {isFilterableColumn ? (
+                          <ColumnFilter
+                            column={column}
+                            displayName={getColumnDisplayName(column)}
+                            uniqueValues={getUniqueValuesForColumn(column)}
+                            selectedValues={columnFilters[column]}
+                            onChange={handleColumnFilter}
+                            onClear={clearColumnFilter}
+                            isMobile={isMobile}
+                          />
+                        ) : (
+                          <Box sx={{ height: 40 }} /> // Empty space for non-filterable columns
+                        )}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              )}
             </TableHead>
             <TableBody>
               {paginatedData.map((row, index) => (
-                <TableRow key={index} hover>
+                <TableRow 
+                  key={index} 
+                  hover={!row.is_summary}
+                  sx={{
+                    backgroundColor: row.is_summary ? 'grey.100' : 'inherit',
+                    fontWeight: row.is_summary ? 'bold' : 'normal',
+                    '& .MuiTableCell-root': {
+                      fontWeight: row.is_summary ? 'bold' : 'normal',
+                      borderTop: row.is_summary ? '2px solid' : 'none',
+                      borderTopColor: row.is_summary ? 'grey.400' : 'transparent'
+                    }
+                  }}
+                >
                   {visibleColumns.map((column) => (
                     <TableCell key={column}>
-                      {formatValue(row[column], column)}
+                      {row.is_summary && column !== groupBy[0] && groupBy.includes(column) ? 
+                        '— Total —' : 
+                        formatValue(row[column], column)
+                      }
                     </TableCell>
                   ))}
                 </TableRow>
@@ -429,7 +747,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
       {/* Chart Panel */}
       <ChartPanel 
         ref={chartPanelRef}
-        data={sortedData}
+        data={sortedData.filter(row => !row.is_summary)} // Filter out summary rows for charts
         groupBy={groupBy}
         isVisible={showCharts && isGrouped}
         onToggle={() => setShowCharts(!showCharts)}

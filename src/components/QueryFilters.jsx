@@ -447,6 +447,27 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
+        {/* Summary Rows Toggle - only show when multiple grouping levels */}
+        {groupBy && groupBy.length > 1 && (
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pl: 2 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={filters.show_summary_rows || false}
+                    onChange={(e) => handleFilterChange('show_summary_rows', e.target.checked)}
+                    size="small"
+                    color="primary"
+                  />
+                }
+                label="Show Summary Rows"
+                sx={{ flexGrow: 1 }}
+              />
+              <InfoTooltip tooltip="Add summary rows for each group level with % calculations. For example, year totals when grouping by year + crease_combo." />
+            </Box>
+          </Grid>
+        )}
+        
         {/* Row 7: Result Filtering */}
         <Grid item xs={12} sm={6} md={3}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

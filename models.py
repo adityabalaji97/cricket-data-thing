@@ -50,14 +50,16 @@ leagues_mapping = {
     "International League T20": "ILT20",
     "Bangladesh Premier League": "BPL",
     "Lanka Premier League": "LPL",
-    "Major League Cricket": "MLC"
+    "Major League Cricket": "MLC",
+    "Vitality Blast": "VB"
 }
 
 # Additional mapping for leagues with name changes over time
 league_aliases = {
     "HRV Cup": "Super Smash",
     "HRV Twenty20": "Super Smash",
-    "NatWest T20 Blast": "Vitality Blast"
+    "NatWest T20 Blast": "Vitality Blast",
+    "Vitality Blast Men": "Vitality Blast"
 }
 
 INTERNATIONAL_TEAMS_RANKED = [
