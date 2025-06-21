@@ -49,7 +49,8 @@ leagues_mapping = {
     "SA20": "SA20",
     "International League T20": "ILT20",
     "Bangladesh Premier League": "BPL",
-    "Lanka Premier League": "LPL"
+    "Lanka Premier League": "LPL",
+    "Major League Cricket": "MLC"
 }
 
 # Additional mapping for leagues with name changes over time
