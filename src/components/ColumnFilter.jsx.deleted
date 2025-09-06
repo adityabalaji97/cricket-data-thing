@@ -1,0 +1,209 @@
+import React from 'react';
+import {
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Chip,
+  Box,
+  IconButton,
+  Autocomplete
+} from '@mui/material';
+import ClearIcon from '@mui/icons-material/Clear';
+
+const ColumnFilter = ({ 
+  column, 
+  columnType, 
+  value, 
+  onChange, 
+  onClear, 
+  data = [],
+  placeholder 
+}) => {
+  
+  // Determine filter type based on column and data
+  const getFilterType = () => {
+    // Specific column type mappings
+    if (column === 'year') return 'select';
+    if (column.includes('percentage') || column === 'strike_rate' || column === 'average') {
+      return 'range';
+    }
+    if (['runs', 'balls', 'wickets', 'dots', 'boundaries', 'fours', 'sixes', 'balls_per_dismissal'].includes(column)) {
+      return 'range';
+    }
+    
+    // Check if column has limited unique values (good for dropdown)
+    if (data.length > 0) {
+      const uniqueValues = [...new Set(data.map(row => row[column]).filter(val => val !== null && val !== undefined))];
+      if (uniqueValues.length <= 20 && uniqueValues.length > 1) {
+        return 'select';
+      }
+    }
+    
+    // Default to text search
+    return 'text';
+  };
+
+  const filterType = getFilterType();
+
+  // Get unique values for select/autocomplete filters
+  const getUniqueValues = () => {
+    if (data.length === 0) return [];
+    const uniqueValues = [...new Set(data.map(row => row[column]).filter(val => val !== null && val !== undefined))];
+    return uniqueValues.sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') return a - b;
+      return String(a).localeCompare(String(b));
+    });
+  };
+
+  const uniqueValues = getUniqueValues();
+
+  // Format display value
+  const formatDisplayValue = (val) => {
+    if (column === 'year') return val;
+    if (column.includes('percentage')) return `${Number(val).toFixed(1)}%`;
+    if (column === 'strike_rate' || column === 'average') return Number(val).toFixed(1);
+    if (typeof val === 'number' && val > 1000) return val.toLocaleString();
+    return val;
+  };
+
+  const renderTextFilter = () => (
+    <TextField
+      size="small"
+      placeholder={placeholder || `Filter ${column}...`}
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      sx={{ minWidth: 120 }}
+      InputProps={{
+        endAdornment: value && (
+          <IconButton size="small" onClick={onClear}>
+            <ClearIcon fontSize="small" />
+          </IconButton>
+        )
+      }}
+    />
+  );
+
+  const renderRangeFilter = () => {
+    const rangeValue = value || { min: '', max: '' };
+    
+    return (
+      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', minWidth: 140 }}>
+        <TextField
+          size="small"
+          placeholder="Min"
+          type="number"
+          value={rangeValue.min}
+          onChange={(e) => onChange({ ...rangeValue, min: e.target.value })}
+          sx={{ width: 60 }}
+        />
+        <span>-</span>
+        <TextField
+          size="small"
+          placeholder="Max"
+          type="number"
+          value={rangeValue.max}
+          onChange={(e) => onChange({ ...rangeValue, max: e.target.value })}
+          sx={{ width: 60 }}
+        />
+        {(rangeValue.min || rangeValue.max) && (
+          <IconButton size="small" onClick={onClear}>
+            <ClearIcon fontSize="small" />
+          </IconButton>
+        )}
+      </Box>
+    );
+  };
+
+  const renderSelectFilter = () => {
+    const selectedValues = Array.isArray(value) ? value : (value ? [value] : []);
+    
+    if (uniqueValues.length <= 10) {
+      // Use Select for small lists
+      return (
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <Select
+            multiple
+            value={selectedValues}
+            onChange={(e) => onChange(e.target.value)}
+            displayEmpty
+            renderValue={(selected) => {
+              if (selected.length === 0) {
+                return <span style={{ color: '#999' }}>All</span>;
+              }
+              if (selected.length === 1) {
+                return formatDisplayValue(selected[0]);
+              }
+              return `${selected.length} selected`;
+            }}
+          >
+            {uniqueValues.map((val) => (
+              <MenuItem key={val} value={val}>
+                {formatDisplayValue(val)}
+              </MenuItem>
+            ))}
+          </Select>
+          {selectedValues.length > 0 && (
+            <IconButton 
+              size="small" 
+              onClick={onClear}
+              sx={{ position: 'absolute', right: 24, top: '50%', transform: 'translateY(-50%)' }}
+            >
+              <ClearIcon fontSize="small" />
+            </IconButton>
+          )}
+        </FormControl>
+      );
+    } else {
+      // Use Autocomplete for larger lists
+      return (
+        <Autocomplete
+          multiple
+          size="small"
+          options={uniqueValues}
+          value={selectedValues}
+          onChange={(_, newValue) => onChange(newValue)}
+          getOptionLabel={(option) => String(formatDisplayValue(option))}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              placeholder={selectedValues.length === 0 ? "All" : undefined}
+              sx={{ minWidth: 140 }}
+            />
+          )}
+          renderTags={(tagValue, getTagProps) =>
+            tagValue.length <= 2 ? (
+              tagValue.map((option, index) => (
+                <Chip
+                  variant="outlined"
+                  label={formatDisplayValue(option)}
+                  size="small"
+                  {...getTagProps({ index })}
+                  key={option}
+                />
+              ))
+            ) : (
+              <Chip
+                variant="outlined"
+                label={`${tagValue.length} selected`}
+                size="small"
+              />
+            )
+          }
+          sx={{ minWidth: 140 }}
+        />
+      );
+    }
+  };
+
+  return (
+    <Box sx={{ p: 1, borderBottom: '1px solid #e0e0e0' }}>
+      {filterType === 'text' && renderTextFilter()}
+      {filterType === 'range' && renderRangeFilter()}
+      {filterType === 'select' && renderSelectFilter()}
+    </Box>
+  );
+};
+
+export default ColumnFilter;

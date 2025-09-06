@@ -28,6 +28,7 @@ import PlayerProfile from './components/PlayerProfile';
 import BowlerProfile from './components/BowlerProfile'; // Import the new BowlerProfile component
 import BatterComparison from './components/BatterComparison';
 import QueryBuilder from './components/QueryBuilder'; // Import the new QueryBuilder component
+import TeamProfile from './components/TeamProfile';
 import axios from 'axios';
 
 import config from './config';
@@ -83,17 +84,18 @@ const AppContent = () => {
     handleMenuClose();
     navigate(path);
     if (path === '/') {
-      setCurrentTab(0); // 0 for home/landing page
+    setCurrentTab(0); // 0 for home/landing page
     } else {
-      setCurrentTab(
-        path === '/venue' ? 1 : 
-        path === '/player' ? 2 : 
-        path === '/bowler' ? 3 : 
-        path === '/comparison' ? 4 : 
-        path === '/matchups' ? 5 : 
-        path === '/query' ? 6 : 0 // Added query builder tab
+    setCurrentTab(
+    path === '/venue' ? 1 : 
+    path === '/player' ? 2 : 
+    path === '/bowler' ? 3 : 
+    path === '/comparison' ? 4 : 
+    path === '/matchups' ? 5 : 
+    path === '/query' ? 6 : 
+      path === '/team' ? 7 : 0 // Added team profile tab
       );
-    }
+            }
   };
 
   useEffect(() => {
@@ -108,7 +110,8 @@ const AppContent = () => {
         path === '/bowler' ? 3 : 
         path === '/comparison' ? 4 : 
         path === '/matchups' ? 5 : 
-        path === '/query' ? 6 : 0 // Added query builder tab
+        path === '/query' ? 6 : 
+        path === '/team' ? 7 : 0 // Added team profile tab
       );
     }
   }, [location]);
@@ -364,7 +367,8 @@ const AppContent = () => {
            currentTab === 3 ? 'Bowler Profile' :  
            currentTab === 4 ? 'Batter Comparison' : 
            currentTab === 5 ? 'Matchups' : 
-           currentTab === 6 ? 'Query Builder' : 'Home';
+           currentTab === 6 ? 'Query Builder' : 
+           currentTab === 7 ? 'Team Profile' : 'Home';
   };
 
   return (
@@ -416,6 +420,9 @@ const AppContent = () => {
               <MenuItem onClick={() => handleNavigate('/query')}>
                 Query Builder
               </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/team')}>
+                Team Profile
+              </MenuItem>
             </Menu>
             <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap' }}>
               {getPageTitle()}
@@ -437,6 +444,7 @@ const AppContent = () => {
             <Tab label="Batter Comparison" component={Link} to="/comparison" />
             <Tab label="Matchups" component={Link} to="/matchups" />
             <Tab label="Query Builder" component={Link} to="/query" />
+            <Tab label="Team Profile" component={Link} to="/team" />
           </Tabs>
         )}
       </Box>
@@ -448,6 +456,7 @@ const AppContent = () => {
         <Route path="/comparison" element={<BatterComparison />} />
         <Route path="/matchups" element={<MatchupsTab isMobile={isMobile} />} />
         <Route path="/query" element={<QueryBuilder isMobile={isMobile} />} />
+        <Route path="/team" element={<TeamProfile isMobile={isMobile} />} />
         <Route path="/venue" element={
           <Box sx={{ my: 3 }}>
             {error && (

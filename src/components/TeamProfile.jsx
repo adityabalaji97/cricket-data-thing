@@ -1,0 +1,402 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Container, 
+  Box, 
+  Button, 
+  Typography, 
+  TextField, 
+  CircularProgress, 
+  Alert, 
+  Autocomplete,
+  Card,
+  CardContent,
+  Grid
+} from '@mui/material';
+import { useLocation, useNavigate } from 'react-router-dom';
+import CompetitionFilter from './CompetitionFilter';
+import TeamStatsCards from './TeamStatsCards';
+import TeamPhasePerformanceRadar from './TeamPhasePerformanceRadar';
+import config from '../config';
+
+const DEFAULT_START_DATE = "2025-01-01";
+const TODAY = new Date().toISOString().split('T')[0];
+
+const TeamProfile = ({ isMobile }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Helper function to get URL parameters
+  const getQueryParam = (param) => {
+    const searchParams = new URLSearchParams(location.search);
+    return searchParams.get(param);
+  };
+  
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [dateRange, setDateRange] = useState({ start: DEFAULT_START_DATE, end: TODAY });
+  const [teams, setTeams] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [teamData, setTeamData] = useState(null);
+  const [phaseStats, setPhaseStats] = useState(null);
+  const [shouldFetch, setShouldFetch] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const teamsRes = await fetch(`${config.API_URL}/teams`);
+        const teamsList = await teamsRes.json();
+        setTeams(teamsList);
+        
+        // Get team name from URL if present
+        const teamNameFromURL = getQueryParam('team');
+        const autoload = getQueryParam('autoload') === 'true';
+        const startDateFromURL = getQueryParam('start_date');
+        const endDateFromURL = getQueryParam('end_date');
+        
+        // Update date range from URL parameters if present
+        if (startDateFromURL || endDateFromURL) {
+          setDateRange({
+            start: startDateFromURL || DEFAULT_START_DATE,
+            end: endDateFromURL || TODAY
+          });
+        }
+        
+        if (teamNameFromURL) {
+          // Find team by either full name or abbreviated name
+          const team = teamsList.find(t => 
+            t.full_name === teamNameFromURL || t.abbreviated_name === teamNameFromURL
+          );
+          if (team) {
+            setSelectedTeam(team);
+            
+            // Auto-trigger data fetch if autoload parameter is true
+            if (autoload) {
+              setTimeout(() => {
+                setShouldFetch(true);
+              }, 500);
+            }
+          }
+        }
+        
+        setInitialLoadComplete(true);
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+        setError('Failed to load initial data');
+        setInitialLoadComplete(true);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  // Update URL when user changes filters
+  useEffect(() => {
+    if (!initialLoadComplete) return;
+    
+    const searchParams = new URLSearchParams();
+    
+    if (selectedTeam) {
+      searchParams.set('team', selectedTeam.abbreviated_name);
+    }
+    
+    if (dateRange.start !== DEFAULT_START_DATE) {
+      searchParams.set('start_date', dateRange.start);
+    }
+    
+    if (dateRange.end !== TODAY) {
+      searchParams.set('end_date', dateRange.end);
+    }
+    
+    if (teamData) {
+      searchParams.set('autoload', 'true');
+    }
+    
+    // Update URL without reloading the page
+    const newUrl = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    navigate(newUrl, { replace: true });
+  }, [selectedTeam, dateRange, teamData, initialLoadComplete, navigate]);
+
+  const handleFetch = () => {
+    if (!selectedTeam) return;
+    setShouldFetch(true);
+  };
+
+  useEffect(() => {
+    const fetchTeamData = async () => {
+      if (!shouldFetch || !selectedTeam) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const params = new URLSearchParams();
+        if (dateRange.start) params.append('start_date', dateRange.start);
+        if (dateRange.end) params.append('end_date', dateRange.end);
+        
+        // Fetch both matches and phase stats in parallel
+        const [matchesResponse, phaseStatsResponse] = await Promise.all([
+          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/matches?${params}`),
+          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/phase-stats?${params}`)
+        ]);
+        
+        if (!matchesResponse.ok || !phaseStatsResponse.ok) {
+          throw new Error(`HTTP error! matches: ${matchesResponse.status}, phase: ${phaseStatsResponse.status}`);
+        }
+        
+        const [matchesData, phaseStatsData] = await Promise.all([
+          matchesResponse.json(),
+          phaseStatsResponse.json()
+        ]);
+        
+        setTeamData(matchesData);
+        setPhaseStats(phaseStatsData.phase_stats);
+      } catch (error) {
+        console.error('Error loading team data:', error);
+        setError('Failed to load team data');
+      } finally {
+        setLoading(false);
+        setShouldFetch(false);
+      }
+    };
+
+    fetchTeamData();
+  }, [shouldFetch, selectedTeam, dateRange]);
+
+  // Calculate key metrics from matches
+  const calculateMetrics = (matches) => {
+    if (!matches || matches.length === 0) {
+      return {
+        totalMatches: 0,
+        wins: 0,
+        losses: 0,
+        noResults: 0,
+        winLossRatio: '0:0',
+        wonBattingFirst: 0,
+        wonFieldingFirst: 0,
+        battedFirstMatches: 0,
+        fieldedFirstMatches: 0,
+        tossWins: 0,
+        tossBatFirst: 0,
+        tossBowlFirst: 0
+      };
+    }
+
+    const wins = matches.filter(m => m.result === 'W').length;
+    const losses = matches.filter(m => m.result === 'L').length;
+    const noResults = matches.filter(m => m.result === 'NR').length;
+    const wonBattingFirst = matches.filter(m => m.result === 'W' && m.batted_first).length;
+    const wonFieldingFirst = matches.filter(m => m.result === 'W' && !m.batted_first).length;
+    const battedFirstMatches = matches.filter(m => m.batted_first).length;
+    const fieldedFirstMatches = matches.filter(m => !m.batted_first).length;
+    
+    // Calculate toss statistics
+    const tossWins = matches.filter(m => m.toss_winner === selectedTeam?.abbreviated_name || m.toss_winner === selectedTeam?.full_name).length;
+    const tossBatFirst = matches.filter(m => 
+      (m.toss_winner === selectedTeam?.abbreviated_name || m.toss_winner === selectedTeam?.full_name) && 
+      m.toss_decision === 'bat'
+    ).length;
+    const tossBowlFirst = matches.filter(m => 
+      (m.toss_winner === selectedTeam?.abbreviated_name || m.toss_winner === selectedTeam?.full_name) && 
+      m.toss_decision === 'field'
+    ).length;
+
+    return {
+      totalMatches: matches.length,
+      wins,
+      losses,
+      noResults,
+      winLossRatio: `${wins}:${losses}`,
+      wonBattingFirst,
+      wonFieldingFirst,
+      battedFirstMatches,
+      fieldedFirstMatches,
+      tossWins,
+      tossBatFirst,
+      tossBowlFirst
+    };
+  };
+
+  const metrics = teamData ? calculateMetrics(teamData.matches) : null;
+
+  return (
+    <Container maxWidth="xl">
+      <Box sx={{ py: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Team Profile
+        </Typography>
+        
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', md: 'row' }, 
+          gap: 2, 
+          mb: 4,
+          alignItems: { xs: 'stretch', md: 'flex-end' }
+        }}>
+          <Autocomplete
+            value={selectedTeam}
+            onChange={(_, newValue) => setSelectedTeam(newValue)}
+            options={teams}
+            sx={{ width: { xs: '100%', md: 300 } }}
+            getOptionLabel={(option) => option?.abbreviated_name || ''}
+            renderOption={(props, option) => (
+              <li {...props}>
+                <Typography>
+                  {option.abbreviated_name} - {option.full_name}
+                </Typography>
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField {...params} label="Select Team" variant="outlined" required />
+            )}
+            isOptionEqualToValue={(option, value) => 
+              option?.full_name === value?.full_name
+            }
+          />
+
+          <TextField
+            label="Start Date"
+            type="date"
+            value={dateRange.start}
+            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: { xs: '100%', md: 'auto' } }}
+          />
+          
+          <TextField
+            label="End Date"
+            type="date"
+            value={dateRange.end}
+            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+            InputLabelProps={{ shrink: true }}
+            inputProps={{ max: TODAY }}
+            sx={{ width: { xs: '100%', md: 'auto' } }}
+          />
+          
+          <Button 
+            variant="contained"
+            onClick={handleFetch}
+            disabled={!selectedTeam || loading}
+            id="go-button"
+            sx={{ 
+              height: '56px',
+              width: { xs: '100%', md: 'auto' },
+              minWidth: '80px'
+            }}
+          >
+            GO
+          </Button>
+        </Box>
+
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        )}
+
+        {teamData && metrics && !loading && (
+          <Box sx={{ mt: 4 }}>
+            {/* Team Stats Cards */}
+            <TeamStatsCards 
+              metrics={metrics}
+              teamName={`${selectedTeam.full_name} (${selectedTeam.abbreviated_name})`}
+              dateRange={dateRange}
+            />
+
+            {/* Phase Performance Radar Chart */}
+            {phaseStats && (
+              <Box sx={{ mt: 4 }}>
+                <TeamPhasePerformanceRadar 
+                  phaseStats={phaseStats}
+                  teamName={selectedTeam.abbreviated_name}
+                />
+              </Box>
+            )}
+
+            {/* Matches List */}
+            <Card>
+              <CardContent>
+                <Typography variant="h5" gutterBottom>
+                  Recent Matches
+                </Typography>
+                
+                {teamData.matches.length === 0 ? (
+                  <Typography variant="body1" color="text.secondary">
+                    No matches found for the selected date range.
+                  </Typography>
+                ) : (
+                  <Box sx={{ mt: 2 }}>
+                    {teamData.matches.map((match, index) => (
+                      <Card 
+                        key={match.match_id} 
+                        variant="outlined" 
+                        sx={{ 
+                          mb: 2,
+                          border: match.result === 'W' ? '2px solid #4caf50' : 
+                                 match.result === 'L' ? '2px solid #f44336' : '1px solid #e0e0e0'
+                        }}
+                      >
+                        <CardContent sx={{ py: 2 }}>
+                          <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} sm={2}>
+                              <Typography variant="body2" color="text.secondary">
+                                {match.date}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {match.venue}
+                              </Typography>
+                            </Grid>
+                            
+                            <Grid item xs={12} sm={6}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Typography variant="h6">
+                                  {match.team} vs {match.opponent}
+                                </Typography>
+                                <Box sx={{
+                                  backgroundColor: match.result === 'W' ? '#4caf50' : 
+                                                 match.result === 'L' ? '#f44336' : '#ff9800',
+                                  color: 'white',
+                                  px: 1,
+                                  py: 0.5,
+                                  borderRadius: 1,
+                                  fontWeight: 'bold',
+                                  fontSize: '0.875rem'
+                                }}>
+                                  {match.result}
+                                </Box>
+                              </Box>
+                              <Typography variant="body2" color="text.secondary">
+                                {match.competition} • {match.event_name}
+                              </Typography>
+                            </Grid>
+                            
+                            <Grid item xs={12} sm={4}>
+                              <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                                <Typography variant="h6">
+                                  {match.batted_first ? match.team_score : match.opponent_score} vs {match.batted_first ? match.opponent_score : match.team_score}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {match.toss_winner} won toss, chose to {match.toss_decision}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {match.batted_first ? 'Batted First' : 'Fielded First'}
+                                </Typography>
+                              </Box>
+                            </Grid>
+                          </Grid>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+      </Box>
+    </Container>
+  );
+};
+
+export default TeamProfile;
