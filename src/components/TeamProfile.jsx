@@ -17,6 +17,7 @@ import CompetitionFilter from './CompetitionFilter';
 import TeamStatsCards from './TeamStatsCards';
 import TeamPhasePerformanceRadar from './TeamPhasePerformanceRadar';
 import TeamBowlingPhasePerformanceRadar from './TeamBowlingPhasePerformanceRadar';
+import TeamBattingOrderCard from './TeamBattingOrderCard';
 import EloStatsCard from './EloStatsCard';
 import config from '../config';
 
@@ -42,6 +43,7 @@ const TeamProfile = ({ isMobile }) => {
   const [phaseStats, setPhaseStats] = useState(null);
   const [bowlingPhaseStats, setBowlingPhaseStats] = useState(null);
   const [eloStats, setEloStats] = useState(null);
+  const [battingOrderData, setBattingOrderData] = useState(null);
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -137,29 +139,32 @@ const TeamProfile = ({ isMobile }) => {
         if (dateRange.start) params.append('start_date', dateRange.start);
         if (dateRange.end) params.append('end_date', dateRange.end);
         
-        // Fetch matches, batting phase stats, bowling phase stats, and ELO stats in parallel
-        const [matchesResponse, phaseStatsResponse, bowlingPhaseStatsResponse, eloStatsResponse] = await Promise.all([
+        // Fetch matches, batting phase stats, bowling phase stats, ELO stats, and batting order in parallel
+        const [matchesResponse, phaseStatsResponse, bowlingPhaseStatsResponse, eloStatsResponse, battingOrderResponse] = await Promise.all([
           fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/matches?${params}&include_elo=true`),
           fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/phase-stats?${params}`),
           fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/bowling-phase-stats?${params}`),
-          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/elo-stats?${params}`)
+          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/elo-stats?${params}`),
+          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/batting-order?${params}`)
         ]);
         
-        if (!matchesResponse.ok || !phaseStatsResponse.ok || !bowlingPhaseStatsResponse.ok || !eloStatsResponse.ok) {
-          throw new Error(`HTTP error! matches: ${matchesResponse.status}, phase: ${phaseStatsResponse.status}, bowling: ${bowlingPhaseStatsResponse.status}, elo: ${eloStatsResponse.status}`);
+        if (!matchesResponse.ok || !phaseStatsResponse.ok || !bowlingPhaseStatsResponse.ok || !eloStatsResponse.ok || !battingOrderResponse.ok) {
+          throw new Error(`HTTP error! matches: ${matchesResponse.status}, phase: ${phaseStatsResponse.status}, bowling: ${bowlingPhaseStatsResponse.status}, elo: ${eloStatsResponse.status}, batting-order: ${battingOrderResponse.status}`);
         }
         
-        const [matchesData, phaseStatsData, bowlingPhaseStatsData, eloStatsData] = await Promise.all([
+        const [matchesData, phaseStatsData, bowlingPhaseStatsData, eloStatsData, battingOrderData] = await Promise.all([
           matchesResponse.json(),
           phaseStatsResponse.json(),
           bowlingPhaseStatsResponse.json(),
-          eloStatsResponse.json()
+          eloStatsResponse.json(),
+          battingOrderResponse.json()
         ]);
         
         setTeamData(matchesData);
         setPhaseStats(phaseStatsData.phase_stats);
         setBowlingPhaseStats(bowlingPhaseStatsData.bowling_phase_stats);
         setEloStats(eloStatsData);
+        setBattingOrderData(battingOrderData);
       } catch (error) {
         console.error('Error loading team data:', error);
         setError('Failed to load team data');
@@ -325,6 +330,16 @@ const TeamProfile = ({ isMobile }) => {
               </Box>
             )}
 
+            {/* Batting Order */}
+            {battingOrderData && (
+              <Box sx={{ mt: 4 }}>
+                <TeamBattingOrderCard 
+                  battingOrderData={battingOrderData}
+                  teamName={selectedTeam.abbreviated_name}
+                />
+              </Box>
+            )}
+
             {/* Phase Performance Radar Charts */}
             <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {/* Batting Phase Stats */}
@@ -356,7 +371,7 @@ const TeamProfile = ({ isMobile }) => {
                     No matches found for the selected date range.
                   </Typography>
                 ) : (
-                  <Box sx={{ mt: 2 }}>
+                  <Box sx={{ mt: 2, maxHeight: '700px', overflowY: 'auto' }}>
                     {teamData.matches.map((match, index) => (
                       <Card 
                         key={match.match_id} 
