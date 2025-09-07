@@ -100,6 +100,10 @@ class Match(Base):
     won_fielding_first = Column(Boolean, nullable=True)
     match_type = Column(String, nullable=False)  # 'league' or 'international'
     competition = Column(String, nullable=False)  # e.g. 'IPL', 'T20I', 'BBL', etc.
+    
+    # ELO rating columns - store pre-match ratings
+    team1_elo = Column(Integer, nullable=True)  # Team1's ELO rating before this match
+    team2_elo = Column(Integer, nullable=True)  # Team2's ELO rating before this match
 
     def to_dict(self) -> dict:
         """Convert match to dictionary with formatted scores"""

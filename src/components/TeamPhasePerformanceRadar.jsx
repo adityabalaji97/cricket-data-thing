@@ -130,12 +130,12 @@ const TeamPhasePerformanceRadar = ({ phaseStats, teamName }) => {
     <Card>
       <CardContent>
         <Typography variant="h6" gutterBottom>
-          {teamName} - Phase-wise Performance (Normalized)
+          {teamName} - Phase-wise Batting Performance
         </Typography>
         
         {/* Context Information */}
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Benchmarked against: {phaseStats?.context || 'Unknown'} 
+          Normalized against: {phaseStats?.context || 'Unknown'} 
           {phaseStats?.benchmark_teams ? `(${phaseStats.benchmark_teams} teams)` : ''}
           • Values shown as percentiles (0-100 scale)
         </Typography>

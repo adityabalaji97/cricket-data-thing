@@ -4,7 +4,8 @@ from typing import List, Optional
 from datetime import date
 from database import get_session
 from services.teams import get_team_matches_service, get_team_batting_stats_service, get_team_phase_stats_service
-from services.teams_fixed import get_team_phase_stats_service_fixed
+from services.teams_fixed import get_team_phase_stats_service_fixed, get_team_bowling_phase_stats_service_fixed
+from services.elo import get_team_elo_stats_service, get_team_matches_with_elo_service
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -13,6 +14,7 @@ def get_team_matches(
     team_name: str,
     start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
+    include_elo: bool = Query(False, description="Include ELO ratings in match data"),
     db: Session = Depends(get_session)
 ):
     """
@@ -22,17 +24,26 @@ def get_team_matches(
         team_name: Name of the team (can be full name or abbreviation from /teams endpoint)
         start_date: Optional start date filter
         end_date: Optional end date filter
+        include_elo: Whether to include ELO ratings in the response
     
     Returns:
         List of matches with team scores, opponents, results, and match details
     """
     try:
-        matches = get_team_matches_service(
-            team_name=team_name,
-            start_date=start_date,
-            end_date=end_date,
-            db=db
-        )
+        if include_elo:
+            matches = get_team_matches_with_elo_service(
+                team_name=team_name,
+                start_date=start_date,
+                end_date=end_date,
+                db=db
+            )
+        else:
+            matches = get_team_matches_service(
+                team_name=team_name,
+                start_date=start_date,
+                end_date=end_date,
+                db=db
+            )
         
         return {
             "team": team_name,
@@ -41,7 +52,77 @@ def get_team_matches(
                 "start": start_date.isoformat() if start_date else None,
                 "end": end_date.isoformat() if end_date else None
             },
+            "includes_elo": include_elo,
             "matches": matches
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{team_name}/elo-stats")
+def get_team_elo_stats(
+    team_name: str,
+    start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
+    db: Session = Depends(get_session)
+):
+    """
+    Get ELO statistics for a team within a date range
+    
+    Args:
+        team_name: Name of the team (can be full name or abbreviation)
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+    
+    Returns:
+        ELO statistics including starting ELO, ending ELO, peak ELO, lowest ELO, and history
+    """
+    try:
+        elo_stats = get_team_elo_stats_service(
+            team_name=team_name,
+            start_date=start_date,
+            end_date=end_date,
+            db=db
+        )
+        
+        return elo_stats
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{team_name}/bowling-phase-stats")
+def get_team_bowling_phase_stats(
+    team_name: str,
+    start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
+    db: Session = Depends(get_session)
+):
+    """
+    Get aggregated phase-wise bowling statistics for a team (for radar chart)
+    
+    Args:
+        team_name: Name of the team (can be full name or abbreviation)
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+    
+    Returns:
+        Aggregated phase-wise bowling stats including averages, strike rates and economy rates by phase
+    """
+    try:
+        bowling_phase_stats = get_team_bowling_phase_stats_service_fixed(
+            team_name=team_name,
+            start_date=start_date,
+            end_date=end_date,
+            db=db
+        )
+        
+        return {
+            "team": team_name,
+            "date_range": {
+                "start": start_date.isoformat() if start_date else None,
+                "end": end_date.isoformat() if end_date else None
+            },
+            "bowling_phase_stats": bowling_phase_stats
         }
         
     except Exception as e:

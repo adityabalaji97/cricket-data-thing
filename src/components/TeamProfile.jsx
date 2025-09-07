@@ -16,6 +16,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import CompetitionFilter from './CompetitionFilter';
 import TeamStatsCards from './TeamStatsCards';
 import TeamPhasePerformanceRadar from './TeamPhasePerformanceRadar';
+import TeamBowlingPhasePerformanceRadar from './TeamBowlingPhasePerformanceRadar';
+import EloStatsCard from './EloStatsCard';
 import config from '../config';
 
 const DEFAULT_START_DATE = "2025-01-01";
@@ -38,6 +40,8 @@ const TeamProfile = ({ isMobile }) => {
   const [error, setError] = useState(null);
   const [teamData, setTeamData] = useState(null);
   const [phaseStats, setPhaseStats] = useState(null);
+  const [bowlingPhaseStats, setBowlingPhaseStats] = useState(null);
+  const [eloStats, setEloStats] = useState(null);
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -133,23 +137,29 @@ const TeamProfile = ({ isMobile }) => {
         if (dateRange.start) params.append('start_date', dateRange.start);
         if (dateRange.end) params.append('end_date', dateRange.end);
         
-        // Fetch both matches and phase stats in parallel
-        const [matchesResponse, phaseStatsResponse] = await Promise.all([
-          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/matches?${params}`),
-          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/phase-stats?${params}`)
+        // Fetch matches, batting phase stats, bowling phase stats, and ELO stats in parallel
+        const [matchesResponse, phaseStatsResponse, bowlingPhaseStatsResponse, eloStatsResponse] = await Promise.all([
+          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/matches?${params}&include_elo=true`),
+          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/phase-stats?${params}`),
+          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/bowling-phase-stats?${params}`),
+          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/elo-stats?${params}`)
         ]);
         
-        if (!matchesResponse.ok || !phaseStatsResponse.ok) {
-          throw new Error(`HTTP error! matches: ${matchesResponse.status}, phase: ${phaseStatsResponse.status}`);
+        if (!matchesResponse.ok || !phaseStatsResponse.ok || !bowlingPhaseStatsResponse.ok || !eloStatsResponse.ok) {
+          throw new Error(`HTTP error! matches: ${matchesResponse.status}, phase: ${phaseStatsResponse.status}, bowling: ${bowlingPhaseStatsResponse.status}, elo: ${eloStatsResponse.status}`);
         }
         
-        const [matchesData, phaseStatsData] = await Promise.all([
+        const [matchesData, phaseStatsData, bowlingPhaseStatsData, eloStatsData] = await Promise.all([
           matchesResponse.json(),
-          phaseStatsResponse.json()
+          phaseStatsResponse.json(),
+          bowlingPhaseStatsResponse.json(),
+          eloStatsResponse.json()
         ]);
         
         setTeamData(matchesData);
         setPhaseStats(phaseStatsData.phase_stats);
+        setBowlingPhaseStats(bowlingPhaseStatsData.bowling_phase_stats);
+        setEloStats(eloStatsData);
       } catch (error) {
         console.error('Error loading team data:', error);
         setError('Failed to load team data');
@@ -304,15 +314,35 @@ const TeamProfile = ({ isMobile }) => {
               dateRange={dateRange}
             />
 
-            {/* Phase Performance Radar Chart */}
-            {phaseStats && (
+            {/* ELO Statistics */}
+            {eloStats && (
               <Box sx={{ mt: 4 }}>
+                <EloStatsCard 
+                  eloStats={eloStats}
+                  teamName={`${selectedTeam.full_name} (${selectedTeam.abbreviated_name})`}
+                  dateRange={dateRange}
+                />
+              </Box>
+            )}
+
+            {/* Phase Performance Radar Charts */}
+            <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {/* Batting Phase Stats */}
+              {phaseStats && (
                 <TeamPhasePerformanceRadar 
                   phaseStats={phaseStats}
                   teamName={selectedTeam.abbreviated_name}
                 />
-              </Box>
-            )}
+              )}
+              
+              {/* Bowling Phase Stats */}
+              {bowlingPhaseStats && (
+                <TeamBowlingPhasePerformanceRadar 
+                  bowlingPhaseStats={bowlingPhaseStats}
+                  teamName={selectedTeam.abbreviated_name}
+                />
+              )}
+            </Box>
 
             {/* Matches List */}
             <Card>
@@ -369,6 +399,21 @@ const TeamProfile = ({ isMobile }) => {
                               <Typography variant="body2" color="text.secondary">
                                 {match.competition} • {match.event_name}
                               </Typography>
+                              {/* ELO Information */}
+                              {match.elo && (
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                  ELO: {match.team} ({match.elo.team_elo}) vs {match.opponent} ({match.elo.opponent_elo})
+                                  {match.elo.elo_difference && (
+                                    <span style={{ 
+                                      color: match.elo.elo_difference > 0 ? '#4caf50' : '#f44336',
+                                      fontWeight: 'bold',
+                                      marginLeft: '8px'
+                                    }}>
+                                      ({match.elo.elo_difference > 0 ? '+' : ''}{match.elo.elo_difference})
+                                    </span>
+                                  )}
+                                </Typography>
+                              )}
                             </Grid>
                             
                             <Grid item xs={12} sm={4}>
