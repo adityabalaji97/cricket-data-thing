@@ -18,6 +18,7 @@ import TeamStatsCards from './TeamStatsCards';
 import TeamPhasePerformanceRadar from './TeamPhasePerformanceRadar';
 import TeamBowlingPhasePerformanceRadar from './TeamBowlingPhasePerformanceRadar';
 import TeamBattingOrderCard from './TeamBattingOrderCard';
+import TeamBowlingOrderCard from './TeamBowlingOrderCard';
 import EloStatsCard from './EloStatsCard';
 import config from '../config';
 
@@ -44,6 +45,7 @@ const TeamProfile = ({ isMobile }) => {
   const [bowlingPhaseStats, setBowlingPhaseStats] = useState(null);
   const [eloStats, setEloStats] = useState(null);
   const [battingOrderData, setBattingOrderData] = useState(null);
+  const [bowlingOrderData, setBowlingOrderData] = useState(null);
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -139,25 +141,27 @@ const TeamProfile = ({ isMobile }) => {
         if (dateRange.start) params.append('start_date', dateRange.start);
         if (dateRange.end) params.append('end_date', dateRange.end);
         
-        // Fetch matches, batting phase stats, bowling phase stats, ELO stats, and batting order in parallel
-        const [matchesResponse, phaseStatsResponse, bowlingPhaseStatsResponse, eloStatsResponse, battingOrderResponse] = await Promise.all([
+        // Fetch matches, batting phase stats, bowling phase stats, ELO stats, batting order, and bowling order in parallel
+        const [matchesResponse, phaseStatsResponse, bowlingPhaseStatsResponse, eloStatsResponse, battingOrderResponse, bowlingOrderResponse] = await Promise.all([
           fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/matches?${params}&include_elo=true`),
           fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/phase-stats?${params}`),
           fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/bowling-phase-stats?${params}`),
           fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/elo-stats?${params}`),
-          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/batting-order?${params}`)
+          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/batting-order?${params}`),
+          fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/bowling-order?${params}`)
         ]);
         
-        if (!matchesResponse.ok || !phaseStatsResponse.ok || !bowlingPhaseStatsResponse.ok || !eloStatsResponse.ok || !battingOrderResponse.ok) {
-          throw new Error(`HTTP error! matches: ${matchesResponse.status}, phase: ${phaseStatsResponse.status}, bowling: ${bowlingPhaseStatsResponse.status}, elo: ${eloStatsResponse.status}, batting-order: ${battingOrderResponse.status}`);
+        if (!matchesResponse.ok || !phaseStatsResponse.ok || !bowlingPhaseStatsResponse.ok || !eloStatsResponse.ok || !battingOrderResponse.ok || !bowlingOrderResponse.ok) {
+          throw new Error(`HTTP error! matches: ${matchesResponse.status}, phase: ${phaseStatsResponse.status}, bowling: ${bowlingPhaseStatsResponse.status}, elo: ${eloStatsResponse.status}, batting-order: ${battingOrderResponse.status}, bowling-order: ${bowlingOrderResponse.status}`);
         }
         
-        const [matchesData, phaseStatsData, bowlingPhaseStatsData, eloStatsData, battingOrderData] = await Promise.all([
+        const [matchesData, phaseStatsData, bowlingPhaseStatsData, eloStatsData, battingOrderData, bowlingOrderData] = await Promise.all([
           matchesResponse.json(),
           phaseStatsResponse.json(),
           bowlingPhaseStatsResponse.json(),
           eloStatsResponse.json(),
-          battingOrderResponse.json()
+          battingOrderResponse.json(),
+          bowlingOrderResponse.json()
         ]);
         
         setTeamData(matchesData);
@@ -165,6 +169,7 @@ const TeamProfile = ({ isMobile }) => {
         setBowlingPhaseStats(bowlingPhaseStatsData.bowling_phase_stats);
         setEloStats(eloStatsData);
         setBattingOrderData(battingOrderData);
+        setBowlingOrderData(bowlingOrderData);
       } catch (error) {
         console.error('Error loading team data:', error);
         setError('Failed to load team data');
@@ -335,6 +340,16 @@ const TeamProfile = ({ isMobile }) => {
               <Box sx={{ mt: 4 }}>
                 <TeamBattingOrderCard 
                   battingOrderData={battingOrderData}
+                  teamName={selectedTeam.abbreviated_name}
+                />
+              </Box>
+            )}
+
+            {/* Bowling Order */}
+            {bowlingOrderData && (
+              <Box sx={{ mt: 4 }}>
+                <TeamBowlingOrderCard 
+                  bowlingOrderData={bowlingOrderData}
                   teamName={selectedTeam.abbreviated_name}
                 />
               </Box>

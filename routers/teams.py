@@ -6,6 +6,7 @@ from database import get_session
 from services.teams import get_team_matches_service, get_team_batting_stats_service, get_team_phase_stats_service
 from services.teams_fixed import get_team_phase_stats_service_fixed, get_team_bowling_phase_stats_service_fixed
 from services.teams_batting_order import get_team_batting_order_service
+from services.teams_bowling_order import get_team_bowling_order_service
 from services.elo import get_team_elo_stats_service, get_team_matches_with_elo_service
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -236,6 +237,40 @@ def get_team_batting_order(
         )
         
         return batting_order_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{team_name}/bowling-order")
+def get_team_bowling_order(
+    team_name: str,
+    start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
+    players: Optional[List[str]] = Query(None, description="Optional custom player list"),
+    db: Session = Depends(get_session)
+):
+    """
+    Get bowling order with aggregated overall and phase-wise statistics
+    
+    Args:
+        team_name: Name of the team (can be full name or abbreviation)
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+        players: Optional custom player list (overrides team-based filtering)
+    
+    Returns:
+        Bowling order with overall and phase-wise stats for each player, including most frequent over combinations
+    """
+    try:
+        bowling_order_data = get_team_bowling_order_service(
+            team_name=team_name,
+            start_date=start_date,
+            end_date=end_date,
+            players=players,
+            db=db
+        )
+        
+        return bowling_order_data
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
