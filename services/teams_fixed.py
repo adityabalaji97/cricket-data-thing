@@ -46,63 +46,118 @@ def get_team_phase_stats_service_fixed(
     team_name: str,
     start_date: Optional[date],
     end_date: Optional[date],
+    players: Optional[List[str]],
     db
 ) -> dict:
     """
-    Get aggregated phase-wise batting statistics for a team with FIXED SQL queries
+    Get aggregated phase-wise batting statistics for a team or custom players with FIXED SQL queries
     """
     logger.info(f"=== STARTING PHASE STATS SERVICE (FIXED VERSION) ===")
-    logger.info(f"Team: {team_name}, Start: {start_date}, End: {end_date}")
+    logger.info(f"Team: {team_name}, Players: {players}, Start: {start_date}, End: {end_date}")
     
     try:
-        # Step 1: Get team variations
-        logger.info("Step 1: Getting team variations")
-        team_variations = get_all_team_name_variations(team_name)
-        logger.info(f"Team variations: {team_variations}")
+        # Step 1: Determine if we're using team-based or custom player analysis
+        use_custom_players = players is not None and len(players) > 0
+        logger.info(f"Using custom players: {use_custom_players}")
         
-        # Step 2: Determine team type (FIXED - check database for international matches)
-        logger.info("Step 2: Determining team type")
-        from models import INTERNATIONAL_TEAMS_RANKED
+        if use_custom_players:
+            # Custom player mode
+            player_filter = "bs.striker = ANY(:players)"
+            filter_params = {"players": players}
+            context_prefix = "Custom Players"
+            logger.info(f"Custom players: {players}")
+        else:
+            # Team-based mode
+            team_variations = get_all_team_name_variations(team_name)
+            player_filter = "bs.batting_team = ANY(:team_variations)"
+            filter_params = {"team_variations": team_variations}
+            context_prefix = team_name
+            logger.info(f"Team variations: {team_variations}")
         
-        # Prepare parameters for queries
-        team_params = {
-            "team_variations": team_variations,
+        # Add date parameters
+        filter_params.update({
             "start_date": start_date,
             "end_date": end_date
-        }
+        })
         
-        # Check if team has played international matches in the specified date range
-        international_check_query = text("""
-            SELECT COUNT(*) as international_matches
-            FROM matches m
-            INNER JOIN batting_stats bs ON m.id = bs.match_id
-            WHERE bs.batting_team = ANY(:team_variations)
-            AND m.match_type = 'international'
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-        """)
+        # Step 2: Determine team type and benchmark context
+        logger.info("Step 2: Determining team type and benchmark context")
+        from models import INTERNATIONAL_TEAMS_RANKED
         
-        try:
-            international_result = db.execute(international_check_query, team_params).fetchone()
-            has_international_matches = international_result.international_matches > 0
-            logger.info(f"International matches found: {international_result.international_matches}")
-        except Exception as e:
-            logger.error(f"Error checking international matches: {str(e)}")
-            has_international_matches = False
-        
-        # Fallback to ranked list check (for teams that might not have recent matches in date range)
-        is_top_ranked = any(variation in INTERNATIONAL_TEAMS_RANKED for variation in team_variations)
-        
-        # Team is international if it has played international matches OR is in top ranked list
-        is_international_team = has_international_matches or is_top_ranked
-        
-        logger.info(f"Has international matches: {has_international_matches}")
-        logger.info(f"Is top ranked: {is_top_ranked}")
-        logger.info(f"Final is_international_team decision: {is_international_team}")
-        
-        # Step 3: Get team's phase stats
-        logger.info("Step 3: Executing team phase stats query")
-        team_phase_stats_query = text("""
+        if use_custom_players:
+            # For custom players, always use global benchmarks
+            context = "All Teams (Global Benchmark)"
+            benchmark_filter = "1=1"  # No additional filter - use all teams
+            league_param = None
+            logger.info("Using global benchmarking for custom players")
+        else:
+            # Team-based mode - existing logic
+            international_check_query = text(f"""
+                SELECT COUNT(*) as international_matches
+                FROM matches m
+                INNER JOIN batting_stats bs ON m.id = bs.match_id
+                WHERE {player_filter}
+                AND m.match_type = 'international'
+                AND (:start_date IS NULL OR m.date >= :start_date)
+                AND (:end_date IS NULL OR m.date <= :end_date)
+            """)
+            
+            try:
+                international_result = db.execute(international_check_query, filter_params).fetchone()
+                has_international_matches = international_result.international_matches > 0
+                logger.info(f"International matches found: {international_result.international_matches}")
+            except Exception as e:
+                logger.error(f"Error checking international matches: {str(e)}")
+                has_international_matches = False
+            
+            # Fallback to ranked list check (for teams that might not have recent matches in date range)
+            if not use_custom_players:
+                team_variations = filter_params.get("team_variations", [])
+                is_top_ranked = any(variation in INTERNATIONAL_TEAMS_RANKED for variation in team_variations)
+            else:
+                is_top_ranked = False
+            
+            # Team is international if it has played international matches OR is in top ranked list
+            is_international_team = has_international_matches or is_top_ranked
+            
+            logger.info(f"Has international matches: {has_international_matches}")
+            logger.info(f"Is top ranked: {is_top_ranked}")
+            logger.info(f"Final is_international_team decision: {is_international_team}")
+            
+            if is_international_team:
+                context = "International Teams"
+                benchmark_filter = "m.match_type = 'international'"
+                league_param = None
+                logger.info("Using international team benchmarking")
+            else:
+                # Get the league from recent matches
+                logger.info("Getting league for benchmarking")
+                league_query = text(f"""
+                    SELECT m.competition, m.date
+                    FROM matches m
+                    INNER JOIN batting_stats bs ON m.id = bs.match_id
+                    WHERE {player_filter}
+                    AND m.match_type = 'league'
+                    AND (:start_date IS NULL OR m.date >= :start_date)
+                    AND (:end_date IS NULL OR m.date <= :end_date)
+                    ORDER BY m.date DESC 
+                    LIMIT 1
+                """)
+                
+                try:
+                    league_result = db.execute(league_query, filter_params).fetchone()
+                    league_param = league_result.competition if league_result else None
+                    context = f"{league_param} Teams" if league_param else "League Teams"
+                    benchmark_filter = "m.match_type = 'league' AND (:league_param IS NULL OR m.competition = :league_param)"
+                    logger.info(f"League query successful: league_param={league_param}, context={context}")
+                    
+                except Exception as e:
+                    logger.error(f"LEAGUE QUERY FAILED: {str(e)}")
+                    logger.error(f"League query traceback: {traceback.format_exc()}")
+                    raise HTTPException(status_code=500, detail=f"League query failed: {str(e)}")
+        # Step 3: Get team/player phase stats
+        logger.info("Step 3: Executing phase stats query")
+        team_phase_stats_query = text(f"""
             WITH team_phase_aggregates AS (
                 SELECT 
                     COALESCE(SUM(bs.pp_runs), 0) as total_pp_runs,
@@ -117,7 +172,7 @@ def get_team_phase_stats_service_fixed(
                     COUNT(DISTINCT bs.match_id) as total_matches
                 FROM batting_stats bs
                 INNER JOIN matches m ON bs.match_id = m.id
-                WHERE bs.batting_team = ANY(:team_variations)
+                WHERE {player_filter}
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
             )
@@ -134,25 +189,25 @@ def get_team_phase_stats_service_fixed(
                 CASE WHEN total_death_balls > 0 THEN ROUND(total_death_runs::numeric * 100 / total_death_balls, 2) ELSE 0 END as death_strike_rate
             FROM team_phase_aggregates
         """)
-        logger.info(f"Team query parameters: {team_params}")
+        logger.info(f"Query parameters: {filter_params}")
         
         try:
-            team_result = db.execute(team_phase_stats_query, team_params).fetchone()
-            logger.info(f"Team query executed successfully")
+            team_result = db.execute(team_phase_stats_query, filter_params).fetchone()
+            logger.info(f"Phase stats query executed successfully")
             
             if team_result:
-                logger.info(f"Team stats: matches={team_result.total_matches}, pp_runs={team_result.total_pp_runs}")
+                logger.info(f"Stats: matches={team_result.total_matches}, pp_runs={team_result.total_pp_runs}")
             else:
-                logger.warning("Team query returned no results")
+                logger.warning("Phase stats query returned no results")
                 
         except Exception as e:
-            logger.error(f"TEAM QUERY FAILED: {str(e)}")
-            logger.error(f"Team query traceback: {traceback.format_exc()}")
-            raise HTTPException(status_code=500, detail=f"Team query failed: {str(e)}")
+            logger.error(f"PHASE STATS QUERY FAILED: {str(e)}")
+            logger.error(f"Query traceback: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=f"Phase stats query failed: {str(e)}")
         
         # Step 4: Handle no data case
         if not team_result or team_result.total_matches == 0:
-            logger.info("No team data found, returning default values")
+            logger.info("No phase stats data found, returning default values")
             return {
                 "powerplay": {"runs": 0, "balls": 0, "wickets": 0, "average": 0, "strike_rate": 0, "normalized_average": 50, "normalized_strike_rate": 50},
                 "middle_overs": {"runs": 0, "balls": 0, "wickets": 0, "average": 0, "strike_rate": 0, "normalized_average": 50, "normalized_strike_rate": 50},
@@ -160,47 +215,27 @@ def get_team_phase_stats_service_fixed(
                 "total_matches": 0, "context": "No data", "benchmark_teams": 0
             }
         
-        # Step 5: Determine benchmark context
-        logger.info("Step 5: Determining benchmark context")
-        if is_international_team:
-            context = "International Teams"
-            benchmark_filter = "m.match_type = 'international'"
-            league_param = None
-            logger.info("Using international team benchmarking")
-        else:
-            # FIXED: Get the league from recent matches - fix the SQL query
-            logger.info("Getting league for benchmarking")
-            league_query = text("""
-                SELECT m.competition, m.date
-                FROM matches m
-                INNER JOIN batting_stats bs ON m.id = bs.match_id
-                WHERE bs.batting_team = ANY(:team_variations)
-                AND m.match_type = 'league'
-                AND (:start_date IS NULL OR m.date >= :start_date)
-                AND (:end_date IS NULL OR m.date <= :end_date)
-                ORDER BY m.date DESC 
-                LIMIT 1
-            """)
-            
-            try:
-                league_result = db.execute(league_query, {
-                    "team_variations": team_variations,
-                    "start_date": start_date,
-                    "end_date": end_date
-                }).fetchone()
-                
-                league_param = league_result.competition if league_result else None
-                context = f"{league_param} Teams" if league_param else "League Teams"
-                benchmark_filter = "m.match_type = 'league' AND (:league_param IS NULL OR m.competition = :league_param)"
-                logger.info(f"League query successful: league_param={league_param}, context={context}")
-                
-            except Exception as e:
-                logger.error(f"LEAGUE QUERY FAILED: {str(e)}")
-                logger.error(f"League query traceback: {traceback.format_exc()}")
-                raise HTTPException(status_code=500, detail=f"League query failed: {str(e)}")
+        # Step 5: Execute SIMPLIFIED benchmark query (remove complex percentiles for now)
+        logger.info("Step 5: Executing simplified benchmark query")
         
-        # Step 6: Execute SIMPLIFIED benchmark query (remove complex percentiles for now)
-        logger.info("Step 6: Executing simplified benchmark query")
+        # For custom players, exclude them from benchmarks. For teams, exclude the team.
+        if use_custom_players:
+            exclude_filter = "bs.batting_team != ANY(:players)"  # Exclude individual players
+            benchmark_params = {
+                "players": players,
+                "start_date": start_date,
+                "end_date": end_date
+            }
+        else:
+            exclude_filter = "bs.batting_team != ANY(:team_variations)"  # Exclude team
+            benchmark_params = {
+                "team_variations": filter_params["team_variations"],
+                "start_date": start_date,
+                "end_date": end_date
+            }
+            if not use_custom_players and league_param:  # Only add league_param for team-based queries
+                benchmark_params["league_param"] = league_param
+        
         benchmark_query = text(f"""
             WITH team_stats AS (
                 SELECT 
@@ -214,7 +249,7 @@ def get_team_phase_stats_service_fixed(
                 FROM batting_stats bs
                 INNER JOIN matches m ON bs.match_id = m.id
                 WHERE {benchmark_filter}
-                AND bs.batting_team != ANY(:team_variations)
+                AND {exclude_filter}
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 GROUP BY bs.batting_team
@@ -237,15 +272,6 @@ def get_team_phase_stats_service_fixed(
             FROM team_stats
         """)
         
-        # Execute benchmark query with proper parameters
-        benchmark_params = {
-            "team_variations": team_variations,
-            "start_date": start_date,
-            "end_date": end_date
-        }
-        if not is_international_team:
-            benchmark_params["league_param"] = league_param
-            
         logger.info(f"Benchmark query parameters: {benchmark_params}")
         
         try:
@@ -262,8 +288,8 @@ def get_team_phase_stats_service_fixed(
             logger.error(f"Benchmark query traceback: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Benchmark query failed: {str(e)}")
         
-        # Step 7: Use SIMPLE normalization (remove complex percentile calculations)
-        logger.info("Step 7: Using simplified normalization")
+        # Step 6: Use SIMPLE normalization (remove complex percentile calculations)
+        logger.info("Step 6: Using simplified normalization")
         
         # Extract team stats
         team_pp_avg = float(team_result.pp_average) if team_result.pp_average else None
@@ -273,7 +299,7 @@ def get_team_phase_stats_service_fixed(
         team_death_avg = float(team_result.death_average) if team_result.death_average else None
         team_death_sr = float(team_result.death_strike_rate) if team_result.death_strike_rate else 0
         
-        logger.info(f"Team stats extracted - PP: avg={team_pp_avg}, sr={team_pp_sr}")
+        logger.info(f"Stats extracted - PP: avg={team_pp_avg}, sr={team_pp_sr}")
         
         # Use simple normalization based on typical cricket values
         def simple_normalize_avg(avg):
@@ -299,8 +325,8 @@ def get_team_phase_stats_service_fixed(
         context += " (Simplified normalization)"
         logger.info("Simplified normalization completed successfully")
         
-        # Step 8: Format response
-        logger.info("Step 8: Formatting response")
+        # Step 7: Format response
+        logger.info("Step 7: Formatting response")
         
         try:
             phase_stats = {
@@ -345,7 +371,6 @@ def get_team_phase_stats_service_fixed(
             logger.error(f"Error formatting response: {e}")
             logger.error(f"Response formatting traceback: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Response formatting failed: {str(e)}")
-        
     except HTTPException:
         # Re-raise HTTP exceptions as-is
         raise
@@ -358,63 +383,119 @@ def get_team_bowling_phase_stats_service_fixed(
     team_name: str,
     start_date: Optional[date],
     end_date: Optional[date],
+    players: Optional[List[str]],
     db
 ) -> dict:
     """
-    Get aggregated phase-wise bowling statistics for a team with FIXED SQL queries
+    Get aggregated phase-wise bowling statistics for a team or custom players with FIXED SQL queries
     """
     logger.info(f"=== STARTING BOWLING PHASE STATS SERVICE (FIXED VERSION) ===")
-    logger.info(f"Team: {team_name}, Start: {start_date}, End: {end_date}")
+    logger.info(f"Team: {team_name}, Players: {players}, Start: {start_date}, End: {end_date}")
     
     try:
-        # Step 1: Get team variations
-        logger.info("Step 1: Getting team variations")
-        team_variations = get_all_team_name_variations(team_name)
-        logger.info(f"Team variations: {team_variations}")
+        # Step 1: Determine if we're using team-based or custom player analysis
+        use_custom_players = players is not None and len(players) > 0
+        logger.info(f"Using custom players: {use_custom_players}")
         
-        # Step 2: Determine team type (FIXED - check database for international matches)
-        logger.info("Step 2: Determining team type")
-        from models import INTERNATIONAL_TEAMS_RANKED
+        if use_custom_players:
+            # Custom player mode
+            player_filter = "bs.bowler = ANY(:players)"
+            filter_params = {"players": players}
+            context_prefix = "Custom Players"
+            logger.info(f"Custom players: {players}")
+        else:
+            # Team-based mode
+            team_variations = get_all_team_name_variations(team_name)
+            player_filter = "bs.bowling_team = ANY(:team_variations)"
+            filter_params = {"team_variations": team_variations}
+            context_prefix = team_name
+            logger.info(f"Team variations: {team_variations}")
         
-        # Prepare parameters for queries
-        team_params = {
-            "team_variations": team_variations,
+        # Add date parameters
+        filter_params.update({
             "start_date": start_date,
             "end_date": end_date
-        }
+        })
         
-        # Check if team has played international matches in the specified date range
-        international_check_query = text("""
-            SELECT COUNT(*) as international_matches
-            FROM matches m
-            INNER JOIN bowling_stats bs ON m.id = bs.match_id
-            WHERE bs.bowling_team = ANY(:team_variations)
-            AND m.match_type = 'international'
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-        """)
+        # Step 2: Determine team type and benchmark context
+        logger.info("Step 2: Determining team type and benchmark context")
+        from models import INTERNATIONAL_TEAMS_RANKED
         
-        try:
-            international_result = db.execute(international_check_query, team_params).fetchone()
-            has_international_matches = international_result.international_matches > 0
-            logger.info(f"International bowling matches found: {international_result.international_matches}")
-        except Exception as e:
-            logger.error(f"Error checking international bowling matches: {str(e)}")
-            has_international_matches = False
+        if use_custom_players:
+            # For custom players, always use global benchmarks
+            context = "All Teams (Global Benchmark)"
+            benchmark_filter = "1=1"  # No additional filter - use all teams
+            league_param = None
+            logger.info("Using global benchmarking for custom players")
+        else:
+            # Team-based mode - existing logic
+            international_check_query = text(f"""
+                SELECT COUNT(*) as international_matches
+                FROM matches m
+                INNER JOIN bowling_stats bs ON m.id = bs.match_id
+                WHERE {player_filter}
+                AND m.match_type = 'international'
+                AND (:start_date IS NULL OR m.date >= :start_date)
+                AND (:end_date IS NULL OR m.date <= :end_date)
+            """)
+            
+            try:
+                international_result = db.execute(international_check_query, filter_params).fetchone()
+                has_international_matches = international_result.international_matches > 0
+                logger.info(f"International bowling matches found: {international_result.international_matches}")
+            except Exception as e:
+                logger.error(f"Error checking international bowling matches: {str(e)}")
+                has_international_matches = False
+            
+            # Fallback to ranked list check
+            if not use_custom_players:
+                team_variations = filter_params.get("team_variations", [])
+                is_top_ranked = any(variation in INTERNATIONAL_TEAMS_RANKED for variation in team_variations)
+            else:
+                is_top_ranked = False
+            
+            # Team is international if it has played international matches OR is in top ranked list
+            is_international_team = has_international_matches or is_top_ranked
+            
+            logger.info(f"Has international bowling matches: {has_international_matches}")
+            logger.info(f"Is top ranked: {is_top_ranked}")
+            logger.info(f"Final is_international_team decision: {is_international_team}")
+            
+            if is_international_team:
+                context = "International Teams"
+                benchmark_filter = "m.match_type = 'international'"
+                league_param = None
+                logger.info("Using international team bowling benchmarking")
+            else:
+                # Get the league from recent matches
+                logger.info("Getting league for bowling benchmarking")
+                league_query = text(f"""
+                    SELECT m.competition, m.date
+                    FROM matches m
+                    INNER JOIN bowling_stats bs ON m.id = bs.match_id
+                    WHERE {player_filter}
+                    AND m.match_type = 'league'
+                    AND (:start_date IS NULL OR m.date >= :start_date)
+                    AND (:end_date IS NULL OR m.date <= :end_date)
+                    ORDER BY m.date DESC 
+                    LIMIT 1
+                """)
+                
+                try:
+                    league_result = db.execute(league_query, filter_params).fetchone()
+                    league_param = league_result.competition if league_result else None
+                    context = f"{league_param} Teams" if league_param else "League Teams"
+                    benchmark_filter = "m.match_type = 'league' AND (:league_param IS NULL OR m.competition = :league_param)"
+                    logger.info(f"League bowling query successful: league_param={league_param}, context={context}")
+                    
+                except Exception as e:
+                    logger.error(f"LEAGUE BOWLING QUERY FAILED: {str(e)}")
+                    logger.error(f"League bowling query traceback: {traceback.format_exc()}")
+                    raise HTTPException(status_code=500, detail=f"League bowling query failed: {str(e)}")
         
-        # Fallback to ranked list check (for teams that might not have recent matches in date range)
-        is_top_ranked = any(variation in INTERNATIONAL_TEAMS_RANKED for variation in team_variations)
-        
-        # Team is international if it has played international matches OR is in top ranked list
-        is_international_team = has_international_matches or is_top_ranked
-        
-        logger.info(f"Has international bowling matches: {has_international_matches}")
-        logger.info(f"Is top ranked: {is_top_ranked}")
-        logger.info(f"Final is_international_team decision: {is_international_team}")
-        
-        # Step 3: Get team's bowling phase stats
-        logger.info("Step 3: Executing team bowling phase stats query")
-        team_bowling_phase_stats_query = text("""
+        # Step 3: Get team/player bowling phase stats
+        logger.info("Step 3: Executing bowling phase stats query")
+        team_bowling_phase_stats_query = text(f"""
             WITH team_bowling_phase_aggregates AS (
                 SELECT 
                     COALESCE(SUM(bs.pp_runs), 0) as total_pp_runs,
@@ -429,7 +510,7 @@ def get_team_bowling_phase_stats_service_fixed(
                     COUNT(DISTINCT bs.match_id) as total_matches
                 FROM bowling_stats bs
                 INNER JOIN matches m ON bs.match_id = m.id
-                WHERE bs.bowling_team = ANY(:team_variations)
+                WHERE {player_filter}
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
             )
@@ -454,25 +535,25 @@ def get_team_bowling_phase_stats_service_fixed(
                 CASE WHEN total_death_balls > 0 THEN ROUND((total_death_runs::numeric * 6 / total_death_balls::numeric), 2) ELSE 0 END as death_economy_rate
             FROM team_bowling_phase_aggregates
         """)
-        logger.info(f"Team bowling query parameters: {team_params}")
+        logger.info(f"Bowling query parameters: {filter_params}")
         
         try:
-            team_result = db.execute(team_bowling_phase_stats_query, team_params).fetchone()
-            logger.info(f"Team bowling query executed successfully")
+            team_result = db.execute(team_bowling_phase_stats_query, filter_params).fetchone()
+            logger.info(f"Bowling phase stats query executed successfully")
             
             if team_result:
-                logger.info(f"Team bowling stats: matches={team_result.total_matches}, pp_runs={team_result.total_pp_runs}")
+                logger.info(f"Bowling stats: matches={team_result.total_matches}, pp_runs={team_result.total_pp_runs}")
             else:
-                logger.warning("Team bowling query returned no results")
+                logger.warning("Bowling phase stats query returned no results")
                 
         except Exception as e:
-            logger.error(f"TEAM BOWLING QUERY FAILED: {str(e)}")
-            logger.error(f"Team bowling query traceback: {traceback.format_exc()}")
-            raise HTTPException(status_code=500, detail=f"Team bowling query failed: {str(e)}")
+            logger.error(f"BOWLING PHASE STATS QUERY FAILED: {str(e)}")
+            logger.error(f"Bowling query traceback: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=f"Bowling phase stats query failed: {str(e)}")
         
         # Step 4: Handle no data case
         if not team_result or team_result.total_matches == 0:
-            logger.info("No team bowling data found, returning default values")
+            logger.info("No bowling phase stats data found, returning default values")
             return {
                 "powerplay": {"runs": 0, "balls": 0, "wickets": 0, "bowling_average": 0, "bowling_strike_rate": 0, "economy_rate": 0, "normalized_average": 50, "normalized_strike_rate": 50, "normalized_economy": 50},
                 "middle_overs": {"runs": 0, "balls": 0, "wickets": 0, "bowling_average": 0, "bowling_strike_rate": 0, "economy_rate": 0, "normalized_average": 50, "normalized_strike_rate": 50, "normalized_economy": 50},
@@ -480,47 +561,27 @@ def get_team_bowling_phase_stats_service_fixed(
                 "total_matches": 0, "context": "No data", "benchmark_teams": 0
             }
         
-        # Step 5: Determine benchmark context
-        logger.info("Step 5: Determining bowling benchmark context")
-        if is_international_team:
-            context = "International Teams"
-            benchmark_filter = "m.match_type = 'international'"
-            league_param = None
-            logger.info("Using international team bowling benchmarking")
-        else:
-            # Get the league from recent matches
-            logger.info("Getting league for bowling benchmarking")
-            league_query = text("""
-                SELECT m.competition, m.date
-                FROM matches m
-                INNER JOIN bowling_stats bs ON m.id = bs.match_id
-                WHERE bs.bowling_team = ANY(:team_variations)
-                AND m.match_type = 'league'
-                AND (:start_date IS NULL OR m.date >= :start_date)
-                AND (:end_date IS NULL OR m.date <= :end_date)
-                ORDER BY m.date DESC 
-                LIMIT 1
-            """)
-            
-            try:
-                league_result = db.execute(league_query, {
-                    "team_variations": team_variations,
-                    "start_date": start_date,
-                    "end_date": end_date
-                }).fetchone()
-                
-                league_param = league_result.competition if league_result else None
-                context = f"{league_param} Teams" if league_param else "League Teams"
-                benchmark_filter = "m.match_type = 'league' AND (:league_param IS NULL OR m.competition = :league_param)"
-                logger.info(f"League bowling query successful: league_param={league_param}, context={context}")
-                
-            except Exception as e:
-                logger.error(f"LEAGUE BOWLING QUERY FAILED: {str(e)}")
-                logger.error(f"League bowling query traceback: {traceback.format_exc()}")
-                raise HTTPException(status_code=500, detail=f"League bowling query failed: {str(e)}")
+        # Step 5: Execute SIMPLIFIED bowling benchmark query
+        logger.info("Step 5: Executing simplified bowling benchmark query")
         
-        # Step 6: Execute SIMPLIFIED bowling benchmark query
-        logger.info("Step 6: Executing simplified bowling benchmark query")
+        # For custom players, exclude them from benchmarks. For teams, exclude the team.
+        if use_custom_players:
+            exclude_filter = "bs.bowling_team != ANY(:players)"  # Exclude individual players
+            benchmark_params = {
+                "players": players,
+                "start_date": start_date,
+                "end_date": end_date
+            }
+        else:
+            exclude_filter = "bs.bowling_team != ANY(:team_variations)"  # Exclude team
+            benchmark_params = {
+                "team_variations": filter_params["team_variations"],
+                "start_date": start_date,
+                "end_date": end_date
+            }
+            if not use_custom_players and league_param:  # Only add league_param for team-based queries
+                benchmark_params["league_param"] = league_param
+        
         bowling_benchmark_query = text(f"""
             WITH team_bowling_stats AS (
                 SELECT 
@@ -537,7 +598,7 @@ def get_team_bowling_phase_stats_service_fixed(
                 FROM bowling_stats bs
                 INNER JOIN matches m ON bs.match_id = m.id
                 WHERE {benchmark_filter}
-                AND bs.bowling_team != ANY(:team_variations)
+                AND {exclude_filter}
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 GROUP BY bs.bowling_team
@@ -548,15 +609,6 @@ def get_team_bowling_phase_stats_service_fixed(
             FROM team_bowling_stats
         """)
         
-        # Execute bowling benchmark query with proper parameters
-        benchmark_params = {
-            "team_variations": team_variations,
-            "start_date": start_date,
-            "end_date": end_date
-        }
-        if not is_international_team:
-            benchmark_params["league_param"] = league_param
-            
         logger.info(f"Bowling benchmark query parameters: {benchmark_params}")
         
         try:
@@ -573,8 +625,8 @@ def get_team_bowling_phase_stats_service_fixed(
             logger.error(f"Bowling benchmark query traceback: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Bowling benchmark query failed: {str(e)}")
         
-        # Step 7: Use SIMPLE normalization for bowling stats (inverted for bowling - lower is better)
-        logger.info("Step 7: Using simplified bowling normalization")
+        # Step 6: Use SIMPLE normalization for bowling stats (inverted for bowling - lower is better)
+        logger.info("Step 6: Using simplified bowling normalization")
         
         # Extract team bowling stats
         team_pp_bowling_avg = float(team_result.pp_bowling_average) if team_result.pp_bowling_average else None
@@ -587,7 +639,7 @@ def get_team_bowling_phase_stats_service_fixed(
         team_death_bowling_sr = float(team_result.death_bowling_strike_rate) if team_result.death_bowling_strike_rate else None
         team_death_economy = float(team_result.death_economy_rate) if team_result.death_economy_rate else 0
         
-        logger.info(f"Team bowling stats extracted - PP: avg={team_pp_bowling_avg}, sr={team_pp_bowling_sr}, econ={team_pp_economy}")
+        logger.info(f"Bowling stats extracted - PP: avg={team_pp_bowling_avg}, sr={team_pp_bowling_sr}, econ={team_pp_economy}")
         
         # Use simple normalization based on typical bowling values (INVERTED - lower values = higher percentiles)
         def simple_normalize_bowling_avg(avg):
@@ -626,8 +678,8 @@ def get_team_bowling_phase_stats_service_fixed(
         context += " (Simplified normalization)"
         logger.info("Simplified bowling normalization completed successfully")
         
-        # Step 8: Format bowling response
-        logger.info("Step 8: Formatting bowling response")
+        # Step 7: Format bowling response
+        logger.info("Step 7: Formatting bowling response")
         
         try:
             bowling_phase_stats = {

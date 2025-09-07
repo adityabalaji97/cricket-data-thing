@@ -92,34 +92,56 @@ def get_team_elo_stats(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{team_name}/bowling-phase-stats")
+@router.get("/bowling-phase-stats")
 def get_team_bowling_phase_stats(
-    team_name: str,
+    team_name: Optional[str] = Query(None, description="Name of the team (can be full name or abbreviation)"),
     start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
+    players: Optional[List[str]] = Query(None, description="Custom player list (alternative to team_name)"),
     db: Session = Depends(get_session)
 ):
     """
-    Get aggregated phase-wise bowling statistics for a team (for radar chart)
+    Get aggregated phase-wise bowling statistics for a team or custom players (for radar chart)
     
     Args:
-        team_name: Name of the team (can be full name or abbreviation)
+        team_name: Optional name of the team (can be full name or abbreviation)
         start_date: Optional start date filter
         end_date: Optional end date filter
+        players: Optional custom player list (alternative to team_name)
     
     Returns:
         Aggregated phase-wise bowling stats including averages, strike rates and economy rates by phase
+        
+    Note:
+        Either team_name OR players must be provided, but not both.
     """
     try:
+        # Validation: ensure either team_name OR players is provided, but not both
+        if not team_name and not players:
+            raise HTTPException(
+                status_code=400, 
+                detail="Either 'team_name' or 'players' parameter must be provided"
+            )
+        
+        if team_name and players:
+            raise HTTPException(
+                status_code=400, 
+                detail="Provide either 'team_name' or 'players', not both"
+            )
+        
+        # Use team_name or 'Custom Players' as fallback
+        display_name = team_name if team_name else "Custom Players"
+        
         bowling_phase_stats = get_team_bowling_phase_stats_service_fixed(
-            team_name=team_name,
+            team_name=display_name,
             start_date=start_date,
             end_date=end_date,
+            players=players,
             db=db
         )
         
         return {
-            "team": team_name,
+            "team": display_name,
             "date_range": {
                 "start": start_date.isoformat() if start_date else None,
                 "end": end_date.isoformat() if end_date else None
@@ -169,34 +191,56 @@ def get_team_batting_stats(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{team_name}/phase-stats")
+@router.get("/phase-stats")
 def get_team_phase_stats(
-    team_name: str,
+    team_name: Optional[str] = Query(None, description="Name of the team (can be full name or abbreviation)"),
     start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
+    players: Optional[List[str]] = Query(None, description="Custom player list (alternative to team_name)"),
     db: Session = Depends(get_session)
 ):
     """
-    Get aggregated phase-wise batting statistics for a team (for radar chart)
+    Get aggregated phase-wise batting statistics for a team or custom players (for radar chart)
     
     Args:
-        team_name: Name of the team (can be full name or abbreviation)
+        team_name: Optional name of the team (can be full name or abbreviation)
         start_date: Optional start date filter
         end_date: Optional end date filter
+        players: Optional custom player list (alternative to team_name)
     
     Returns:
         Aggregated phase-wise stats including averages and strike rates by phase
+        
+    Note:
+        Either team_name OR players must be provided, but not both.
     """
     try:
+        # Validation: ensure either team_name OR players is provided, but not both
+        if not team_name and not players:
+            raise HTTPException(
+                status_code=400, 
+                detail="Either 'team_name' or 'players' parameter must be provided"
+            )
+        
+        if team_name and players:
+            raise HTTPException(
+                status_code=400, 
+                detail="Provide either 'team_name' or 'players', not both"
+            )
+        
+        # Use team_name or 'Custom Players' as fallback
+        display_name = team_name if team_name else "Custom Players"
+        
         phase_stats = get_team_phase_stats_service_fixed(
-            team_name=team_name,
+            team_name=display_name,
             start_date=start_date,
             end_date=end_date,
+            players=players,
             db=db
         )
         
         return {
-            "team": team_name,
+            "team": display_name,
             "date_range": {
                 "start": start_date.isoformat() if start_date else None,
                 "end": end_date.isoformat() if end_date else None
@@ -207,29 +251,48 @@ def get_team_phase_stats(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{team_name}/batting-order")
+@router.get("/batting-order")
 def get_team_batting_order(
-    team_name: str,
+    team_name: Optional[str] = Query(None, description="Name of the team (can be full name or abbreviation)"),
     start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
-    players: Optional[List[str]] = Query(None, description="Optional custom player list"),
+    players: Optional[List[str]] = Query(None, description="Custom player list (alternative to team_name)"),
     db: Session = Depends(get_session)
 ):
     """
     Get batting order with aggregated overall and phase-wise statistics
     
     Args:
-        team_name: Name of the team (can be full name or abbreviation)
+        team_name: Optional name of the team (can be full name or abbreviation)
         start_date: Optional start date filter
         end_date: Optional end date filter
-        players: Optional custom player list (overrides team-based filtering)
+        players: Optional custom player list (alternative to team_name)
     
     Returns:
         Batting order with overall and phase-wise stats for each player
+        
+    Note:
+        Either team_name OR players must be provided, but not both.
     """
     try:
+        # Validation: ensure either team_name OR players is provided, but not both
+        if not team_name and not players:
+            raise HTTPException(
+                status_code=400, 
+                detail="Either 'team_name' or 'players' parameter must be provided"
+            )
+        
+        if team_name and players:
+            raise HTTPException(
+                status_code=400, 
+                detail="Provide either 'team_name' or 'players', not both"
+            )
+        
+        # Use team_name or 'Custom Players' as fallback
+        display_name = team_name if team_name else "Custom Players"
+        
         batting_order_data = get_team_batting_order_service(
-            team_name=team_name,
+            team_name=display_name,
             start_date=start_date,
             end_date=end_date,
             players=players,
@@ -241,29 +304,48 @@ def get_team_batting_order(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{team_name}/bowling-order")
+@router.get("/bowling-order")
 def get_team_bowling_order(
-    team_name: str,
+    team_name: Optional[str] = Query(None, description="Name of the team (can be full name or abbreviation)"),
     start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
-    players: Optional[List[str]] = Query(None, description="Optional custom player list"),
+    players: Optional[List[str]] = Query(None, description="Custom player list (alternative to team_name)"),
     db: Session = Depends(get_session)
 ):
     """
     Get bowling order with aggregated overall and phase-wise statistics
     
     Args:
-        team_name: Name of the team (can be full name or abbreviation)
+        team_name: Optional name of the team (can be full name or abbreviation)
         start_date: Optional start date filter
         end_date: Optional end date filter
-        players: Optional custom player list (overrides team-based filtering)
+        players: Optional custom player list (alternative to team_name)
     
     Returns:
         Bowling order with overall and phase-wise stats for each player, including most frequent over combinations
+        
+    Note:
+        Either team_name OR players must be provided, but not both.
     """
     try:
+        # Validation: ensure either team_name OR players is provided, but not both
+        if not team_name and not players:
+            raise HTTPException(
+                status_code=400, 
+                detail="Either 'team_name' or 'players' parameter must be provided"
+            )
+        
+        if team_name and players:
+            raise HTTPException(
+                status_code=400, 
+                detail="Provide either 'team_name' or 'players', not both"
+            )
+        
+        # Use team_name or 'Custom Players' as fallback
+        display_name = team_name if team_name else "Custom Players"
+        
         bowling_order_data = get_team_bowling_order_service(
-            team_name=team_name,
+            team_name=display_name,
             start_date=start_date,
             end_date=end_date,
             players=players,
