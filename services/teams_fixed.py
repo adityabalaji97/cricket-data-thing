@@ -9,7 +9,9 @@ import traceback
 # Import the new true percentiles functions
 from .teams_percentiles import (
     calculate_true_batting_percentiles,
-    apply_true_batting_percentiles
+    apply_true_batting_percentiles,
+    calculate_true_bowling_percentiles,
+    apply_true_bowling_percentiles
 )
 
 # Set up detailed logging
@@ -551,74 +553,40 @@ def get_team_bowling_phase_stats_service_fixed(
                 "total_matches": 0, "context": "No data", "benchmark_teams": 0
             }
         
-        # Step 5: Execute SIMPLIFIED bowling benchmark query
-        logger.info("Step 5: Executing simplified bowling benchmark query")
+        # Step 5: Calculate TRUE SQL percentiles from benchmark data
+        logger.info("Step 5: Calculating true bowling SQL percentiles")
         
-        # For custom players, exclude them from benchmarks. For teams, exclude the team.
+        # Set up benchmark parameters for true percentiles calculation
         if use_custom_players:
-            exclude_filter = "bs.bowling_team != ANY(:players)"  # Exclude individual players
             benchmark_params = {
                 "players": players,
                 "start_date": start_date,
                 "end_date": end_date
             }
         else:
-            exclude_filter = "bs.bowling_team != ANY(:team_variations)"  # Exclude team
             benchmark_params = {
                 "team_variations": filter_params["team_variations"],
                 "start_date": start_date,
                 "end_date": end_date
             }
-            if not use_custom_players and league_param:  # Only add league_param for team-based queries
+            if league_param:  # Add league parameter if applicable
                 benchmark_params["league_param"] = league_param
         
-        bowling_benchmark_query = text(f"""
-            WITH team_bowling_stats AS (
-                SELECT 
-                    bs.bowling_team,
-                    SUM(bs.pp_runs)::float / NULLIF(SUM(bs.pp_wickets), 0) as team_pp_bowling_avg,
-                    SUM(bs.pp_overs * 6)::float / NULLIF(SUM(bs.pp_wickets), 0) as team_pp_bowling_sr,
-                    SUM(bs.pp_runs)::float * 6 / NULLIF(SUM(bs.pp_overs * 6), 0) as team_pp_economy,
-                    SUM(bs.middle_runs)::float / NULLIF(SUM(bs.middle_wickets), 0) as team_middle_bowling_avg,
-                    SUM(bs.middle_overs * 6)::float / NULLIF(SUM(bs.middle_wickets), 0) as team_middle_bowling_sr,
-                    SUM(bs.middle_runs)::float * 6 / NULLIF(SUM(bs.middle_overs * 6), 0) as team_middle_economy,
-                    SUM(bs.death_runs)::float / NULLIF(SUM(bs.death_wickets), 0) as team_death_bowling_avg,
-                    SUM(bs.death_overs * 6)::float / NULLIF(SUM(bs.death_wickets), 0) as team_death_bowling_sr,
-                    SUM(bs.death_runs)::float * 6 / NULLIF(SUM(bs.death_overs * 6), 0) as team_death_economy
-                FROM bowling_stats bs
-                INNER JOIN matches m ON bs.match_id = m.id
-                WHERE {benchmark_filter}
-                AND {exclude_filter}
-                AND (:start_date IS NULL OR m.date >= :start_date)
-                AND (:end_date IS NULL OR m.date <= :end_date)
-                GROUP BY bs.bowling_team
-                HAVING SUM(bs.pp_overs * 6) > 0 AND SUM(bs.middle_overs * 6) > 0 AND SUM(bs.death_overs * 6) > 0
-            )
-            SELECT 
-                COUNT(*) as benchmark_teams
-            FROM team_bowling_stats
-        """)
+        # Calculate true bowling percentiles using the new function
+        bowling_percentile_data = calculate_true_bowling_percentiles(
+            team_name=context_prefix,
+            start_date=start_date,
+            end_date=end_date,
+            players=players,
+            benchmark_filter=benchmark_filter,
+            benchmark_params=benchmark_params,
+            db=db
+        )
         
-        logger.info(f"Bowling benchmark query parameters: {benchmark_params}")
+        # Step 6: Apply percentile normalization (with fallback to simplified)
+        logger.info("Step 6: Applying bowling percentile normalization")
         
-        try:
-            benchmark_result = db.execute(bowling_benchmark_query, benchmark_params).fetchone()
-            logger.info(f"Simplified bowling benchmark query executed successfully")
-            
-            if benchmark_result:
-                logger.info(f"Bowling benchmark stats: teams={benchmark_result.benchmark_teams}")
-            else:
-                logger.warning("Bowling benchmark query returned no results")
-                
-        except Exception as e:
-            logger.error(f"BOWLING BENCHMARK QUERY FAILED: {str(e)}")
-            logger.error(f"Bowling benchmark query traceback: {traceback.format_exc()}")
-            raise HTTPException(status_code=500, detail=f"Bowling benchmark query failed: {str(e)}")
-        
-        # Step 6: Use SIMPLE normalization for bowling stats (inverted for bowling - lower is better)
-        logger.info("Step 6: Using simplified bowling normalization")
-        
-        # Extract team bowling stats
+        # Extract team bowling stats for normalization
         team_pp_bowling_avg = float(team_result.pp_bowling_average) if team_result.pp_bowling_average else None
         team_pp_bowling_sr = float(team_result.pp_bowling_strike_rate) if team_result.pp_bowling_strike_rate else None
         team_pp_economy = float(team_result.pp_economy_rate) if team_result.pp_economy_rate else 0
@@ -631,42 +599,75 @@ def get_team_bowling_phase_stats_service_fixed(
         
         logger.info(f"Bowling stats extracted - PP: avg={team_pp_bowling_avg}, sr={team_pp_bowling_sr}, econ={team_pp_economy}")
         
-        # Use simple normalization based on typical bowling values (INVERTED - lower values = higher percentiles)
-        def simple_normalize_bowling_avg(avg):
-            if avg is None: return 50
-            # For bowling average, lower is better: 15-35 range, inverted scale
-            if avg >= 35: return 25
-            elif avg >= 25: return 25 + (35 - avg) * 25 / 10
-            elif avg >= 15: return 50 + (25 - avg) * 25 / 10
-            else: return 75 + min(25, (15 - avg) * 25 / 5)
+        if bowling_percentile_data:  # Use true percentiles if available
+            team_bowling_stats = {
+                "pp_bowling_average": team_pp_bowling_avg,
+                "pp_bowling_strike_rate": team_pp_bowling_sr,
+                "pp_economy_rate": team_pp_economy,
+                "middle_bowling_average": team_middle_bowling_avg,
+                "middle_bowling_strike_rate": team_middle_bowling_sr,
+                "middle_economy_rate": team_middle_economy,
+                "death_bowling_average": team_death_bowling_avg,
+                "death_bowling_strike_rate": team_death_bowling_sr,
+                "death_economy_rate": team_death_economy
+            }
             
-        def simple_normalize_bowling_sr(sr):
-            if sr is None: return 50
-            # For bowling strike rate, lower is better: 12-24 balls per wicket, inverted scale
-            if sr >= 24: return 25
-            elif sr >= 18: return 25 + (24 - sr) * 25 / 6
-            elif sr >= 12: return 50 + (18 - sr) * 25 / 6
-            else: return 75 + min(25, (12 - sr) * 25 / 6)
-        
-        def simple_normalize_economy(econ):
-            # For economy rate, lower is better: 6-12 runs per over, inverted scale
-            if econ >= 12: return 25
-            elif econ >= 9: return 25 + (12 - econ) * 25 / 3
-            elif econ >= 6: return 50 + (9 - econ) * 25 / 3
-            else: return 75 + min(25, (6 - econ) * 25 / 3)
-        
-        pp_bowling_avg_norm = simple_normalize_bowling_avg(team_pp_bowling_avg)
-        pp_bowling_sr_norm = simple_normalize_bowling_sr(team_pp_bowling_sr)
-        pp_economy_norm = simple_normalize_economy(team_pp_economy)
-        middle_bowling_avg_norm = simple_normalize_bowling_avg(team_middle_bowling_avg)
-        middle_bowling_sr_norm = simple_normalize_bowling_sr(team_middle_bowling_sr)
-        middle_economy_norm = simple_normalize_economy(team_middle_economy)
-        death_bowling_avg_norm = simple_normalize_bowling_avg(team_death_bowling_avg)
-        death_bowling_sr_norm = simple_normalize_bowling_sr(team_death_bowling_sr)
-        death_economy_norm = simple_normalize_economy(team_death_economy)
-        
-        context += " (Simplified normalization)"
-        logger.info("Simplified bowling normalization completed successfully")
+            percentile_scores = apply_true_bowling_percentiles(team_bowling_stats, bowling_percentile_data)
+            
+            pp_bowling_avg_norm = percentile_scores["pp_avg_percentile"]
+            pp_bowling_sr_norm = percentile_scores["pp_sr_percentile"]
+            pp_economy_norm = percentile_scores["pp_economy_percentile"]
+            middle_bowling_avg_norm = percentile_scores["middle_avg_percentile"]
+            middle_bowling_sr_norm = percentile_scores["middle_sr_percentile"]
+            middle_economy_norm = percentile_scores["middle_economy_percentile"]
+            death_bowling_avg_norm = percentile_scores["death_avg_percentile"]
+            death_bowling_sr_norm = percentile_scores["death_sr_percentile"]
+            death_economy_norm = percentile_scores["death_economy_percentile"]
+            benchmark_teams_count = percentile_scores["benchmark_teams_count"]
+            
+            context += " (True SQL Percentiles)"
+            logger.info(f"True bowling percentiles applied successfully with {benchmark_teams_count} benchmark teams")
+            
+        else:  # Fallback to simplified normalization
+            logger.warning("Falling back to simplified bowling normalization due to insufficient benchmark data")
+            
+            # Use simple normalization based on typical bowling values (INVERTED - lower values = higher percentiles)
+            def simple_normalize_bowling_avg(avg):
+                if avg is None: return 50
+                # For bowling average, lower is better: 15-35 range, inverted scale
+                if avg >= 35: return 25
+                elif avg >= 25: return 25 + (35 - avg) * 25 / 10
+                elif avg >= 15: return 50 + (25 - avg) * 25 / 10
+                else: return 75 + min(25, (15 - avg) * 25 / 5)
+                
+            def simple_normalize_bowling_sr(sr):
+                if sr is None: return 50
+                # For bowling strike rate, lower is better: 12-24 balls per wicket, inverted scale
+                if sr >= 24: return 25
+                elif sr >= 18: return 25 + (24 - sr) * 25 / 6
+                elif sr >= 12: return 50 + (18 - sr) * 25 / 6
+                else: return 75 + min(25, (12 - sr) * 25 / 6)
+            
+            def simple_normalize_economy(econ):
+                # For economy rate, lower is better: 6-12 runs per over, inverted scale
+                if econ >= 12: return 25
+                elif econ >= 9: return 25 + (12 - econ) * 25 / 3
+                elif econ >= 6: return 50 + (9 - econ) * 25 / 3
+                else: return 75 + min(25, (6 - econ) * 25 / 3)
+            
+            pp_bowling_avg_norm = simple_normalize_bowling_avg(team_pp_bowling_avg)
+            pp_bowling_sr_norm = simple_normalize_bowling_sr(team_pp_bowling_sr)
+            pp_economy_norm = simple_normalize_economy(team_pp_economy)
+            middle_bowling_avg_norm = simple_normalize_bowling_avg(team_middle_bowling_avg)
+            middle_bowling_sr_norm = simple_normalize_bowling_sr(team_middle_bowling_sr)
+            middle_economy_norm = simple_normalize_economy(team_middle_economy)
+            death_bowling_avg_norm = simple_normalize_bowling_avg(team_death_bowling_avg)
+            death_bowling_sr_norm = simple_normalize_bowling_sr(team_death_bowling_sr)
+            death_economy_norm = simple_normalize_economy(team_death_economy)
+            benchmark_teams_count = 0
+            
+            context += " (Simplified Fallback)"
+            logger.info("Simplified bowling normalization completed as fallback")
         
         # Step 7: Format bowling response
         logger.info("Step 7: Formatting bowling response")
@@ -708,7 +709,7 @@ def get_team_bowling_phase_stats_service_fixed(
                 },
                 "total_matches": team_result.total_matches or 0,
                 "context": context,
-                "benchmark_teams": benchmark_result.benchmark_teams if benchmark_result else 0
+                "benchmark_teams": benchmark_teams_count
             }
             
             logger.info("Bowling response formatted successfully")
