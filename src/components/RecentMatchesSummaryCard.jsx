@@ -99,8 +99,7 @@ const RecentMatchesSummaryCard = () => {
         return a.priority - b.priority;
       }
       return b.match_count - a.match_count;
-    })
-    .slice(0, 8);
+    });
 
   return (
     <Card sx={{ 
