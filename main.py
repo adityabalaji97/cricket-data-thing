@@ -29,6 +29,7 @@ from routers.matchups import router as matchups_router
 from routers.query_builder import router as query_builder_router
 from routers.players import router as players_router
 from routers.teams import router as teams_router
+from routers.recent_matches import router as recent_matches_router
 import math
 
 
@@ -148,6 +149,7 @@ app.include_router(matchups_router)
 app.include_router(query_builder_router)
 app.include_router(players_router)
 app.include_router(teams_router)
+app.include_router(recent_matches_router)
 
 # Add CORS middleware
 app.add_middleware(

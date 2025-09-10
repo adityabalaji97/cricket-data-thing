@@ -30,6 +30,7 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import SearchIcon from '@mui/icons-material/Search';
 import InfoIcon from '@mui/icons-material/Info';
 import { getUpcomingMatches, formatDate, formatVenue } from '../data/iplSchedule';
+import RecentMatchesSummaryCard from './RecentMatchesSummaryCard';
 
 // This will be a new component that serves as a landing page
 const LandingPage = () => {
@@ -909,6 +910,9 @@ const LandingPage = () => {
       
       {/* Upcoming Matches Section */}
       <UpcomingMatchLinks />
+      
+      {/* Recent Matches Summary */}
+      <RecentMatchesSummaryCard />
       
       {/* Footer with Credits */}
       <Divider sx={{ mb: 3 }} />

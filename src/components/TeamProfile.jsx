@@ -496,6 +496,25 @@ const TeamProfile = ({ isMobile }) => {
               </Box>
             )}
 
+            {/* Phase Performance Radar Charts */}
+            <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {/* Batting Phase Stats */}
+              {phaseStats && (
+                <TeamPhasePerformanceRadar 
+                  phaseStats={phaseStats}
+                  teamName={isCustomMode ? 'Custom Players' : selectedTeam.abbreviated_name}
+                />
+              )}
+              
+              {/* Bowling Phase Stats */}
+              {bowlingPhaseStats && (
+                <TeamBowlingPhasePerformanceRadar 
+                  bowlingPhaseStats={bowlingPhaseStats}
+                  teamName={isCustomMode ? 'Custom Players' : selectedTeam.abbreviated_name}
+                />
+              )}
+            </Box>
+
             {/* Batting Order */}
             {battingOrderData && (
               <Box sx={{ mt: 4 }}>
@@ -515,25 +534,6 @@ const TeamProfile = ({ isMobile }) => {
                 />
               </Box>
             )}
-
-            {/* Phase Performance Radar Charts */}
-            <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {/* Batting Phase Stats */}
-              {phaseStats && (
-                <TeamPhasePerformanceRadar 
-                  phaseStats={phaseStats}
-                  teamName={isCustomMode ? 'Custom Players' : selectedTeam.abbreviated_name}
-                />
-              )}
-              
-              {/* Bowling Phase Stats */}
-              {bowlingPhaseStats && (
-                <TeamBowlingPhasePerformanceRadar 
-                  bowlingPhaseStats={bowlingPhaseStats}
-                  teamName={isCustomMode ? 'Custom Players' : selectedTeam.abbreviated_name}
-                />
-              )}
-            </Box>
 
             {/* Matches List - Only show in team mode */}
             {!isCustomMode && teamData && (
