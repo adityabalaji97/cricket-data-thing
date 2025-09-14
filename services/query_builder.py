@@ -563,6 +563,7 @@ def get_grouping_columns_map():
     """
     return {
         "venue": "m.venue",
+        "match_id": "d.match_id",
         "crease_combo": "d.crease_combo",
         "ball_direction": "d.ball_direction",
         "bowler_type": "d.bowler_type",

@@ -145,7 +145,7 @@ def get_available_columns(db: Session = Depends(get_session)):
                 "grouped_filters": ["min_balls", "max_balls", "min_runs", "max_runs"]
             },
             "group_by_columns": [
-                "venue", "crease_combo", "ball_direction", "bowler_type", 
+                "venue", "match_id", "crease_combo", "ball_direction", "bowler_type", 
                 "striker_batter_type", "non_striker_batter_type", "innings",
                 "batting_team", "bowling_team", "batter", "bowler", "competition",
                 "year",  # Extract year from match date

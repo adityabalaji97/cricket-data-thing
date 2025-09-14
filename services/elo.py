@@ -4,8 +4,30 @@ from typing import List, Optional, Dict
 from datetime import date
 from models import teams_mapping
 
+def get_delhi_team_name_variations(team_name: str) -> List[str]:
+    """Special handler for Delhi teams to manage the DD->DC transition properly"""
+    delhi_names = ['Delhi Capitals', 'Delhi Daredevils']
+    
+    # If requesting Delhi Capitals, return both names to get complete history
+    if team_name == 'Delhi Capitals':
+        return delhi_names
+    # If requesting Delhi Daredevils, return both names to get complete history  
+    elif team_name == 'Delhi Daredevils':
+        return delhi_names
+    # If requesting DC abbreviation, return both names
+    elif team_name == 'DC':
+        return delhi_names
+    else:
+        return [team_name]
+
 def get_all_team_name_variations(team_name: str) -> List[str]:
     """Get all possible name variations for a given team based on teams_mapping"""
+    
+    # Special handling for Delhi teams
+    if team_name in ['Delhi Capitals', 'Delhi Daredevils', 'DC']:
+        return get_delhi_team_name_variations(team_name)
+    
+    # Regular handling for other teams
     # Create a reverse mapping from abbreviation to all team names
     reverse_mapping = {}
     for full_name, abbrev in teams_mapping.items():

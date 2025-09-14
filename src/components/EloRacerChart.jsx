@@ -27,7 +27,7 @@ import config from '../config';
 const EloRacerChart = () => {
   const [competitions, setCompetitions] = useState([]);
   const [selectedCompetition, setSelectedCompetition] = useState('international');
-  const [startDate, setStartDate] = useState('2023-01-01');
+  const [startDate, setStartDate] = useState('2008-01-01'); // Start from IPL beginning
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [customTitle, setCustomTitle] = useState('ELO Rankings Race');
   const [eloData, setEloData] = useState({});
