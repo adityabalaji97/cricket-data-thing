@@ -430,10 +430,9 @@ def get_teams_elo_history_service(
         for team in teams:
             variations = get_all_team_name_variations(team)
             all_team_variations.extend(variations)
-            # Map all variations to the abbreviated name for consistency
-            std_name = teams_mapping.get(team, team)
+            # Map all variations to the original requested team name (preserve full names)
             for var in variations:
-                team_mapping[var] = std_name
+                team_mapping[var] = team
         
         params = {
             "team_variations": all_team_variations,
