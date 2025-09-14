@@ -140,6 +140,13 @@ class Delivery(Base):
     fielder = Column(String)
     batting_team = Column(String)
     bowling_team = Column(String)
+    
+    # Enhancement columns for left-right analysis
+    striker_batter_type = Column(String(10), nullable=True)
+    non_striker_batter_type = Column(String(10), nullable=True)
+    bowler_type = Column(String(10), nullable=True)
+    crease_combo = Column(String(20), nullable=True)
+    ball_direction = Column(String(20), nullable=True)
 
 class Player(Base):
     __tablename__ = 'players'

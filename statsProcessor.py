@@ -241,7 +241,7 @@ class StatsProcessor:
         
         # Calculate fantasy points
         fantasy_calculator = FantasyPointsCalculator()
-        stats.fantasy_points = fantasy_calculator.calculate_batting_points(stats, innings_deliveries)
+        stats.fantasy_points = fantasy_calculator.calculate_batting_points(stats)
         self.logger.info(f"Fantasy points for {batter} in match {match_id}, innings {innings}: {stats.fantasy_points}")
         
         return stats
@@ -420,7 +420,7 @@ class StatsProcessor:
         
         # Calculate fantasy points
         fantasy_calculator = FantasyPointsCalculator()
-        stats.fantasy_points = fantasy_calculator.calculate_bowling_points(stats, innings_deliveries)
+        stats.fantasy_points = fantasy_calculator.calculate_bowling_points(stats)
         self.logger.info(f"Fantasy points for bowler {bowler} in match {match_id}, innings {innings}: {stats.fantasy_points}")
         
         return stats

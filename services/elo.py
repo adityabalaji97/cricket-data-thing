@@ -238,3 +238,286 @@ def get_team_matches_with_elo_service(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching team matches with ELO: {str(e)}")
+
+def get_teams_elo_rankings_service(
+    league: Optional[str] = None,
+    include_international: bool = True,
+    top_teams: Optional[int] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db = None
+) -> List[dict]:
+    """
+    Get current ELO rankings for teams based on their most recent ratings
+    
+    Args:
+        league: Specific league to filter by (e.g., 'Indian Premier League')
+        include_international: Whether to include international teams
+        top_teams: Limit to top N international teams (only applies to international matches)
+        start_date: Optional start date for filtering matches used to calculate latest ELO
+        end_date: Optional end date for filtering matches used to calculate latest ELO
+        db: Database session
+    
+    Returns:
+        List of team ELO rankings with current ratings
+    """
+    try:
+        # Build the base query to get the latest ELO rating for each team
+        params = {
+            "league": league,
+            "include_international": include_international,
+            "start_date": start_date,
+            "end_date": end_date
+        }
+        
+        # Determine competition filter
+        competition_conditions = []
+        
+        if league:
+            competition_conditions.append("(m.match_type = 'league' AND m.competition = :league)")
+        
+        if include_international:
+            if top_teams:
+                # Use the predefined ranked international teams list
+                from models import INTERNATIONAL_TEAMS_RANKED
+                top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+                params["top_team_list"] = top_team_list
+                competition_conditions.append(
+                    "(m.match_type = 'international' AND m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))"
+                )
+            else:
+                competition_conditions.append("(m.match_type = 'international')")
+        
+        # Build competition filter
+        if competition_conditions:
+            competition_filter = "AND (" + " OR ".join(competition_conditions) + ")"
+        else:
+            competition_filter = "AND false"  # No teams if no conditions
+        
+        # Query to get latest ELO for each team
+        elo_rankings_query = text(f"""
+            WITH latest_team_elos AS (
+                -- Get the most recent ELO rating for each team from either team1 or team2 position
+                SELECT DISTINCT ON (team_name)
+                    team_name,
+                    latest_elo,
+                    latest_date,
+                    total_matches,
+                    wins,
+                    losses,
+                    win_percentage,
+                    match_type,
+                    latest_competition
+                FROM (
+                    -- Team1 ELOs
+                    SELECT 
+                        m.team1 as team_name,
+                        m.team1_elo as latest_elo,
+                        m.date as latest_date,
+                        COUNT(*) OVER (PARTITION BY m.team1) as total_matches,
+                        SUM(CASE WHEN m.winner = m.team1 THEN 1 ELSE 0 END) OVER (PARTITION BY m.team1) as wins,
+                        SUM(CASE WHEN m.winner IS NOT NULL AND m.winner != m.team1 THEN 1 ELSE 0 END) OVER (PARTITION BY m.team1) as losses,
+                        ROUND(
+                            (SUM(CASE WHEN m.winner = m.team1 THEN 1 ELSE 0 END) OVER (PARTITION BY m.team1) * 100.0) / 
+                            NULLIF(COUNT(CASE WHEN m.winner IS NOT NULL THEN 1 END) OVER (PARTITION BY m.team1), 0), 
+                            2
+                        ) as win_percentage,
+                        m.match_type,
+                        m.competition as latest_competition,
+                        ROW_NUMBER() OVER (PARTITION BY m.team1 ORDER BY m.date DESC, m.id DESC) as rn
+                    FROM matches m
+                    WHERE m.team1_elo IS NOT NULL
+                    AND (:start_date IS NULL OR m.date >= :start_date)
+                    AND (:end_date IS NULL OR m.date <= :end_date)
+                    {competition_filter}
+                    
+                    UNION ALL
+                    
+                    -- Team2 ELOs  
+                    SELECT 
+                        m.team2 as team_name,
+                        m.team2_elo as latest_elo,
+                        m.date as latest_date,
+                        COUNT(*) OVER (PARTITION BY m.team2) as total_matches,
+                        SUM(CASE WHEN m.winner = m.team2 THEN 1 ELSE 0 END) OVER (PARTITION BY m.team2) as wins,
+                        SUM(CASE WHEN m.winner IS NOT NULL AND m.winner != m.team2 THEN 1 ELSE 0 END) OVER (PARTITION BY m.team2) as losses,
+                        ROUND(
+                            (SUM(CASE WHEN m.winner = m.team2 THEN 1 ELSE 0 END) OVER (PARTITION BY m.team2) * 100.0) / 
+                            NULLIF(COUNT(CASE WHEN m.winner IS NOT NULL THEN 1 END) OVER (PARTITION BY m.team2), 0), 
+                            2
+                        ) as win_percentage,
+                        m.match_type,
+                        m.competition as latest_competition,
+                        ROW_NUMBER() OVER (PARTITION BY m.team2 ORDER BY m.date DESC, m.id DESC) as rn
+                    FROM matches m
+                    WHERE m.team2_elo IS NOT NULL
+                    AND (:start_date IS NULL OR m.date >= :start_date)
+                    AND (:end_date IS NULL OR m.date <= :end_date)
+                    {competition_filter}
+                ) combined_elos
+                WHERE rn = 1
+                ORDER BY team_name, latest_date DESC
+            )
+            SELECT 
+                team_name,
+                latest_elo as current_elo,
+                latest_date,
+                total_matches,
+                wins,
+                losses,
+                COALESCE(win_percentage, 0) as win_percentage,
+                match_type,
+                latest_competition
+            FROM latest_team_elos
+            WHERE latest_elo IS NOT NULL
+            ORDER BY latest_elo DESC, team_name ASC
+        """)
+        
+        results = db.execute(elo_rankings_query, params).fetchall()
+        
+        if not results:
+            return []
+        
+        # Format results
+        rankings = []
+        for i, row in enumerate(results, 1):
+            team_data = {
+                "rank": i,
+                "team_name": row.team_name,
+                "team_abbreviation": teams_mapping.get(row.team_name, row.team_name),
+                "current_elo": row.current_elo,
+                "last_match_date": row.latest_date.isoformat() if row.latest_date else None,
+                "total_matches": row.total_matches or 0,
+                "wins": row.wins or 0,
+                "losses": row.losses or 0,
+                "win_percentage": float(row.win_percentage or 0),
+                "match_type": row.match_type,
+                "latest_competition": row.latest_competition
+            }
+            rankings.append(team_data)
+        
+        return rankings
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching ELO rankings: {str(e)}")
+
+def get_teams_elo_history_service(
+    teams: List[str],
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db = None
+) -> Dict[str, List[dict]]:
+    """
+    Get ELO history for multiple teams over a specified time period for racer chart visualization
+    
+    Args:
+        teams: List of team names (full names or abbreviations)
+        start_date: Start date for the ELO history
+        end_date: End date for the ELO history
+        db: Database session
+    
+    Returns:
+        Dictionary with team names as keys and ELO history arrays as values
+    """
+    try:
+        if not teams:
+            return {}
+        
+        # Get all team name variations for the requested teams
+        all_team_variations = []
+        team_mapping = {}  # Maps any variation to the standardized name
+        
+        for team in teams:
+            variations = get_all_team_name_variations(team)
+            all_team_variations.extend(variations)
+            # Map all variations to the abbreviated name for consistency
+            std_name = teams_mapping.get(team, team)
+            for var in variations:
+                team_mapping[var] = std_name
+        
+        params = {
+            "team_variations": all_team_variations,
+            "start_date": start_date,
+            "end_date": end_date
+        }
+        
+        # Query to get ELO evolution for all requested teams
+        elo_history_query = text("""
+            WITH team_elo_evolution AS (
+                -- Get ELO ratings from team1 position
+                SELECT 
+                    m.team1 as team_name,
+                    m.team1_elo as elo_rating,
+                    m.date,
+                    m.id as match_id,
+                    m.team2 as opponent,
+                    m.winner,
+                    1 as team_position
+                FROM matches m
+                WHERE m.team1 = ANY(:team_variations)
+                AND m.team1_elo IS NOT NULL
+                AND (:start_date IS NULL OR m.date >= :start_date)
+                AND (:end_date IS NULL OR m.date <= :end_date)
+                
+                UNION ALL
+                
+                -- Get ELO ratings from team2 position
+                SELECT 
+                    m.team2 as team_name,
+                    m.team2_elo as elo_rating,
+                    m.date,
+                    m.id as match_id,
+                    m.team1 as opponent,
+                    m.winner,
+                    2 as team_position
+                FROM matches m
+                WHERE m.team2 = ANY(:team_variations)
+                AND m.team2_elo IS NOT NULL
+                AND (:start_date IS NULL OR m.date >= :start_date)
+                AND (:end_date IS NULL OR m.date <= :end_date)
+            )
+            SELECT 
+                team_name,
+                elo_rating,
+                date,
+                match_id,
+                opponent,
+                winner,
+                team_position
+            FROM team_elo_evolution
+            ORDER BY team_name, date ASC, match_id ASC
+        """)
+        
+        results = db.execute(elo_history_query, params).fetchall()
+        
+        # Group results by team
+        team_histories = {}
+        
+        for row in results:
+            # Use the standardized team name
+            std_team_name = team_mapping.get(row.team_name, row.team_name)
+            
+            if std_team_name not in team_histories:
+                team_histories[std_team_name] = []
+            
+            # Determine match result for this team
+            match_result = "NR"  # No result
+            if row.winner:
+                # Check if this team won
+                winner_variations = get_all_team_name_variations(row.winner)
+                match_result = "W" if row.team_name in winner_variations else "L"
+            
+            elo_point = {
+                "date": row.date.isoformat(),
+                "elo": row.elo_rating,
+                "match_id": row.match_id,
+                "opponent": teams_mapping.get(row.opponent, row.opponent),
+                "result": match_result
+            }
+            
+            team_histories[std_team_name].append(elo_point)
+        
+        return team_histories
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching ELO history: {str(e)}")

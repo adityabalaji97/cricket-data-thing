@@ -7,7 +7,7 @@ from services.teams import get_team_matches_service, get_team_batting_stats_serv
 from services.teams_fixed import get_team_phase_stats_service_fixed, get_team_bowling_phase_stats_service_fixed
 from services.teams_batting_order import get_team_batting_order_service
 from services.teams_bowling_order import get_team_bowling_order_service
-from services.elo import get_team_elo_stats_service, get_team_matches_with_elo_service
+from services.elo import get_team_elo_stats_service, get_team_matches_with_elo_service, get_teams_elo_rankings_service, get_teams_elo_history_service
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -353,6 +353,94 @@ def get_team_bowling_order(
         )
         
         return bowling_order_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/elo-rankings")
+def get_teams_elo_rankings(
+    league: Optional[str] = Query(None, description="Specific league to filter by (e.g., 'Indian Premier League')"),
+    include_international: bool = Query(True, description="Whether to include international teams"),
+    top_teams: Optional[int] = Query(None, description="Limit to top N international teams"),
+    start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
+    db: Session = Depends(get_session)
+):
+    """
+    Get current ELO rankings for teams based on their most recent ratings
+    
+    Args:
+        league: Specific league to filter by (e.g., 'Indian Premier League')
+        include_international: Whether to include international teams
+        top_teams: Limit to top N international teams (only applies to international matches)
+        start_date: Optional start date for filtering matches used to calculate latest ELO
+        end_date: Optional end date for filtering matches used to calculate latest ELO
+    
+    Returns:
+        List of team ELO rankings with current ratings
+    """
+    try:
+        rankings = get_teams_elo_rankings_service(
+            league=league,
+            include_international=include_international,
+            top_teams=top_teams,
+            start_date=start_date,
+            end_date=end_date,
+            db=db
+        )
+        
+        return {
+            "total_teams": len(rankings),
+            "filter_criteria": {
+                "league": league,
+                "include_international": include_international,
+                "top_teams": top_teams,
+                "date_range": {
+                    "start": start_date.isoformat() if start_date else None,
+                    "end": end_date.isoformat() if end_date else None
+                }
+            },
+            "rankings": rankings
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/elo-history")
+def get_teams_elo_history(
+    teams: List[str] = Query(..., description="List of team names (full names or abbreviations)"),
+    start_date: Optional[date] = Query(None, description="Start date for ELO history (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End date for ELO history (YYYY-MM-DD)"),
+    db: Session = Depends(get_session)
+):
+    """
+    Get ELO history for multiple teams over a specified time period for racer chart visualization
+    
+    Args:
+        teams: List of team names (full names or abbreviations)
+        start_date: Start date for the ELO history
+        end_date: End date for the ELO history
+    
+    Returns:
+        Dictionary with team names as keys and ELO history arrays as values
+    """
+    try:
+        team_histories = get_teams_elo_history_service(
+            teams=teams,
+            start_date=start_date,
+            end_date=end_date,
+            db=db
+        )
+        
+        return {
+            "teams_requested": teams,
+            "teams_found": list(team_histories.keys()),
+            "date_range": {
+                "start": start_date.isoformat() if start_date else None,
+                "end": end_date.isoformat() if end_date else None
+            },
+            "elo_histories": team_histories
+        }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

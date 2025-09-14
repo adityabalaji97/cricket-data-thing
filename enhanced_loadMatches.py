@@ -8,14 +8,18 @@ and populates all enhancement columns during initial data loading.
 Features:
 - Automatic player discovery and creation
 - Population of all delivery enhancement columns during load
+- Optional ELO rating calculation for newly loaded matches
 - Bulk optimization for large datasets
 - Handles both new matches and backfill scenarios
 - Integration with unified pipeline
+- Efficient chronological ELO updates
 
 Usage:
     python enhanced_loadMatches.py /path/to/json/files/
     python enhanced_loadMatches.py /path/to/single/match.json --single-file
-    python enhanced_loadMatches.py /path/to/json/files/ --batch-size 50 --auto-create-players
+    python enhanced_loadMatches.py /path/to/json/files/ --batch-size 50 --calculate-elo
+    python enhanced_loadMatches.py /path/to/json/files/ --bulk-insert --calculate-elo
+    python enhanced_loadMatches.py /path/to/json/files/ --calculate-elo --no-elo-optimization
 """
 
 import json
@@ -29,6 +33,7 @@ from sqlalchemy import text
 from models import Match, Delivery, Player, Base
 from database import get_database_connection
 from player_discovery import PlayerDiscoveryService, PlayerInfo
+from elo_update_service import ELOUpdateService
 import logging
 
 # Set up logging
@@ -39,24 +44,35 @@ logger = logging.getLogger(__name__)
 class EnhancedMatchLoader:
     """Enhanced match loader with player discovery and column population"""
     
-    def __init__(self, auto_create_players: bool = True, batch_size: int = 100):
+    def __init__(self, auto_create_players: bool = True, batch_size: int = 100, 
+                 calculate_elo: bool = False, elo_batch_optimization: bool = True):
         """
         Initialize the enhanced loader
         
         Args:
             auto_create_players: Whether to automatically create missing players
             batch_size: Number of matches to process in each batch
+            calculate_elo: Whether to calculate ELO ratings for new matches
+            elo_batch_optimization: Whether to optimize ELO calculation for batches
         """
         self.auto_create_players = auto_create_players
         self.batch_size = batch_size
+        self.calculate_elo = calculate_elo
+        self.elo_batch_optimization = elo_batch_optimization
         self.engine, self.SessionLocal = get_database_connection()
         
         # Initialize player discovery service
         self.player_discovery = PlayerDiscoveryService()
         
+        # Initialize ELO service if needed
+        self.elo_service = ELOUpdateService() if calculate_elo else None
+        
         # Cache for player data to avoid repeated queries
         self.player_cache: Dict[str, Dict[str, str]] = {}
         self.cache_loaded = False
+        
+        # Track newly loaded matches for ELO calculation
+        self.newly_loaded_matches: List[str] = []
     
     def _load_player_cache(self, session: Session) -> None:
         """Load all player data into memory cache for fast lookups"""
@@ -304,6 +320,10 @@ class EnhancedMatchLoader:
             session.bulk_save_objects(deliveries)
             session.commit()
             
+            # Track newly loaded match for ELO calculation
+            if self.calculate_elo:
+                self.newly_loaded_matches.append(match_id)
+            
             logger.info(f"✅ Successfully processed match {match_id} with {len(deliveries)} deliveries")
             return True
             
@@ -341,6 +361,41 @@ class EnhancedMatchLoader:
                 continue
         
         return errors
+    
+    def calculate_elo_for_loaded_matches(self) -> Dict[str, int]:
+        """
+        Calculate ELO ratings for newly loaded matches
+        
+        Returns:
+            Dictionary with ELO calculation statistics
+        """
+        if not self.calculate_elo or not self.elo_service or not self.newly_loaded_matches:
+            return {'processed': 0, 'updated': 0, 'errors': 0}
+        
+        logger.info(f"🎯 Calculating ELO for {len(self.newly_loaded_matches)} newly loaded matches...")
+        
+        try:
+            if self.elo_batch_optimization:
+                # Use optimized batch calculation
+                stats = self.elo_service.calculate_elo_for_match_batch(
+                    self.newly_loaded_matches, optimize_for_recent=True
+                )
+            else:
+                # Use standard new match calculation
+                stats = self.elo_service.calculate_elo_for_new_matches(
+                    self.newly_loaded_matches
+                )
+            
+            logger.info(f"✅ ELO calculation complete - Processed: {stats['processed']}, Updated: {stats['updated']}, Errors: {stats['errors']}")
+            
+            # Clear the list after calculation
+            self.newly_loaded_matches.clear()
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"❌ Error calculating ELO for loaded matches: {e}")
+            return {'processed': 0, 'updated': 0, 'errors': len(self.newly_loaded_matches)}
     
     def process_matches(self, input_path: str) -> Dict[str, int]:
         """
@@ -443,6 +498,15 @@ class EnhancedMatchLoader:
             else:
                 raise ValueError(f"Invalid input path: {input_path}")
             
+            # Calculate ELO for newly loaded matches
+            elo_stats = {'processed': 0, 'updated': 0, 'errors': 0}
+            if self.calculate_elo and stats['processed'] > 0:
+                logger.info(f"\n🎯 Starting ELO calculation for {len(self.newly_loaded_matches)} new matches...")
+                elo_stats = self.calculate_elo_for_loaded_matches()
+                stats['elo_processed'] = elo_stats['processed']
+                stats['elo_updated'] = elo_stats['updated']
+                stats['elo_errors'] = elo_stats['errors']
+            
             # Final statistics
             logger.info(f"\n📊 Processing Summary:")
             logger.info(f"  Total files: {stats['total_files']}")
@@ -450,8 +514,16 @@ class EnhancedMatchLoader:
             logger.info(f"  Skipped (existing): {stats['skipped']}")
             logger.info(f"  Errors: {stats['errors']}")
             
+            if self.calculate_elo and 'elo_processed' in stats:
+                logger.info(f"  ELO processed: {stats['elo_processed']}")
+                logger.info(f"  ELO updated: {stats['elo_updated']}")
+                logger.info(f"  ELO errors: {stats['elo_errors']}")
+            
             if stats['errors'] == 0:
-                logger.info("🎉 All files processed successfully!")
+                success_msg = "🎉 All files processed successfully!"
+                if self.calculate_elo and elo_stats['errors'] == 0:
+                    success_msg += " ELO ratings calculated!"
+                logger.info(success_msg)
             
             return stats
             
@@ -639,6 +711,19 @@ class EnhancedMatchLoader:
                 
                 stats['processed'] = len(matches_to_insert)
                 logger.info(f"✅ Successfully bulk inserted {len(matches_to_insert)} matches!")
+                
+                # Add match IDs to newly loaded list for ELO calculation
+                if self.calculate_elo:
+                    self.newly_loaded_matches.extend([m['id'] for m in matches_to_insert])
+            
+            # Calculate ELO for bulk inserted matches
+            elo_stats = {'processed': 0, 'updated': 0, 'errors': 0}
+            if self.calculate_elo and stats['processed'] > 0:
+                logger.info(f"\n🎯 Starting ELO calculation for {len(self.newly_loaded_matches)} bulk inserted matches...")
+                elo_stats = self.calculate_elo_for_loaded_matches()
+                stats['elo_processed'] = elo_stats['processed']
+                stats['elo_updated'] = elo_stats['updated']
+                stats['elo_errors'] = elo_stats['errors']
             
             return stats
             
@@ -664,13 +749,19 @@ def main():
                        help='Disable automatic player creation')
     parser.add_argument('--bulk-insert', action='store_true',
                        help='Use ultra-fast bulk insert method')
+    parser.add_argument('--calculate-elo', action='store_true',
+                       help='Calculate ELO ratings for newly loaded matches')
+    parser.add_argument('--no-elo-optimization', action='store_true',
+                       help='Disable ELO batch optimization (slower but more accurate)')
     
     args = parser.parse_args()
     
     # Initialize loader
     loader = EnhancedMatchLoader(
         auto_create_players=not args.no_auto_create_players,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        calculate_elo=args.calculate_elo,
+        elo_batch_optimization=not args.no_elo_optimization
     )
     
     try:
@@ -684,6 +775,14 @@ def main():
         print(f"  Files processed: {stats['processed']}")
         print(f"  Files skipped: {stats['skipped']}")
         print(f"  Errors: {stats['errors']}")
+        
+        # Print ELO statistics if calculated
+        if args.calculate_elo and 'elo_processed' in stats:
+            print(f"  ELO ratings processed: {stats['elo_processed']}")
+            print(f"  ELO database updates: {stats['elo_updated']}")
+            print(f"  ELO errors: {stats['elo_errors']}")
+            if stats['elo_errors'] == 0 and stats['elo_processed'] > 0:
+                print(f"  ✅ ELO calculation successful!")
         
     except Exception as e:
         print(f"❌ Error: {e}")

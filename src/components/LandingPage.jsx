@@ -30,6 +30,8 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import SearchIcon from '@mui/icons-material/Search';
 import InfoIcon from '@mui/icons-material/Info';
 import { getUpcomingMatches, formatDate, formatVenue } from '../data/iplSchedule';
+import EloLeaderboard from './EloLeaderboard';
+import EloRacerChart from './EloRacerChart';
 import RecentMatchesSummaryCard from './RecentMatchesSummaryCard';
 
 // This will be a new component that serves as a landing page
@@ -780,131 +782,11 @@ const LandingPage = () => {
         </Grid>
       </Grid>
 
-      {/* How It Works Section */}
-      <Box sx={{ 
-        mb: 8,
-        p: { xs: 3, md: 5 },
-        backgroundColor: 'grey.50',
-        borderRadius: 4
-      }}>
-        <Typography variant="h4" align="center" gutterBottom sx={{ mb: 4 }}>
-          How It Works
-        </Typography>
-        
-        <Grid container spacing={4} alignItems="center">
-          <Grid item xs={12} md={6}>
-            {/* Use a direct SVG or component instead of trying to load an image */}
-            <Box
-              sx={{
-                width: '100%',
-                maxWidth: '500px',
-                height: '300px',
-                margin: '0 auto',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#0057b7',
-                borderRadius: '8px',
-                color: 'white',
-                position: 'relative',
-                overflow: 'hidden',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-              }}
-            >
-              <SportsCricketIcon sx={{ fontSize: 100, opacity: 0.2, position: 'absolute', right: 20, bottom: 20 }} />
-              <Typography variant="h5" component="div" sx={{ fontWeight: 'bold', textAlign: 'center', p: 2 }}>
-                Hindsight
-                <Typography component="div" variant="body1" sx={{ mt: 1 }}>
-                  Cricket Analytics with Perfect Hindsight
-                </Typography>
-              </Typography>
-            </Box>
-          </Grid>
-          
-          <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                <Box sx={{ 
-                  width: 36, 
-                  height: 36, 
-                  borderRadius: '50%', 
-                  bgcolor: '#0057b7', 
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold',
-                  flexShrink: 0
-                }}>
-                  1
-                </Box>
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Select Data Parameters
-                  </Typography>
-                  <Typography color="textSecondary">
-                    Choose venues, dates, and teams to analyze from our comprehensive database of cricket matches.
-                  </Typography>
-                </Box>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                <Box sx={{ 
-                  width: 36, 
-                  height: 36, 
-                  borderRadius: '50%', 
-                  bgcolor: '#c70d3a', 
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold',
-                  flexShrink: 0
-                }}>
-                  2
-                </Box>
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Visualize Insights
-                  </Typography>
-                  <Typography color="textSecondary">
-                    Explore interactive charts, statistical breakdowns, and player performance data through our intuitive visualization tools.
-                  </Typography>
-                </Box>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                <Box sx={{ 
-                  width: 36, 
-                  height: 36, 
-                  borderRadius: '50%', 
-                  bgcolor: '#007e33', 
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold',
-                  flexShrink: 0
-                }}>
-                  3
-                </Box>
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Make Informed Decisions
-                  </Typography>
-                  <Typography color="textSecondary">
-                    Use analytics for team selection, fantasy teams, betting or match predictions based on data-driven insights.
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-          </Grid>
-        </Grid>
-        
-        <Typography variant="body2" color="textSecondary" align="center" sx={{ mt: 3, pb: 2 }}>
-          Hindsight © {new Date().getFullYear()} - Cricket analytics with perfect hindsight
-        </Typography>
-      </Box>
+      {/* ELO Leaderboard Section */}
+      <EloLeaderboard />
+      
+      {/* ELO Evolution Chart */}
+      <EloRacerChart />
 
 
       
