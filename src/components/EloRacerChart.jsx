@@ -174,20 +174,22 @@ const EloRacerChart = () => {
       }
       
       const rankingsData = await rankingsResponse.json();
-      const teams = rankingsData.rankings.map(team => team.team_abbreviation);
+      // Use full team names instead of abbreviations to avoid mapping issues
+      const teams = rankingsData.rankings.map(team => team.team_name);
       
       if (teams.length === 0) {
         setError('No teams found for the selected competition');
         return;
       }
       
-      // Now get ELO history for these teams
+      // Now get ELO history for these teams using full names
       const historyParams = new URLSearchParams();
       teams.forEach(team => {
         historyParams.append('teams', team);
       });
-      historyParams.append('start_date', startDate);
-      historyParams.append('end_date', endDate);
+      // Don't pass date filters to get complete history for accurate ELO values
+      // historyParams.append('start_date', startDate);
+      // historyParams.append('end_date', endDate);
       
       const historyResponse = await fetch(`${config.API_URL}/teams/elo-history?${historyParams}`);
       if (!historyResponse.ok) {
@@ -211,9 +213,15 @@ const EloRacerChart = () => {
   const processChartData = (histories) => {
     const allDates = new Set();
     
-    // Collect all unique dates
+    // Collect all unique dates within the selected date range
     Object.values(histories).forEach(history => {
-      history.forEach(point => allDates.add(point.date));
+      history.forEach(point => {
+        const pointDate = point.date;
+        // Only include dates within the selected range
+        if (pointDate >= startDate && pointDate <= endDate) {
+          allDates.add(pointDate);
+        }
+      });
     });
     
     // Sort dates chronologically
@@ -230,7 +238,7 @@ const EloRacerChart = () => {
         if (relevantPoints.length > 0) {
           const latestPoint = relevantPoints[relevantPoints.length - 1];
           teams.push({
-            team: teamName,
+            team: teamName, // Use full team name
             elo: latestPoint.elo,
             result: latestPoint.result
           });
@@ -443,12 +451,13 @@ const EloRacerChart = () => {
     const minElo = Math.min(...teams.map(team => team.elo), 1000);
     const eloRange = maxElo - minElo;
     
-    // Draw teams with scaling
+    // Updated layout for full team names
     const startY = Math.round(130 * scale);
     const barHeight = Math.round(35 * scale);
     const rowHeight = Math.round(45 * scale);
-    const maxBarWidth = Math.round(600 * scale);
-    const barStartX = Math.round(150 * scale);
+    const maxBarWidth = Math.round(500 * scale); // Reduced to make space for team names
+    const barStartX = Math.round(280 * scale); // Increased left margin for team names
+    const teamNameWidth = Math.round(260 * scale); // Space allocated for team names
     
     teams.forEach((team, index) => {
       const y = startY + (index * rowHeight);
@@ -467,11 +476,49 @@ const EloRacerChart = () => {
       ctx.textAlign = 'center';
       ctx.fillText((team.position + 1).toString(), Math.round(40 * scale), y + Math.round(22 * scale));
       
-      // Draw team name
+      // Draw team name with proper handling for long names
       ctx.fillStyle = '#000000';
-      ctx.font = `${Math.round(16 * scale)}px Arial`;
+      ctx.font = `${Math.round(14 * scale)}px Arial`;
       ctx.textAlign = 'right';
-      ctx.fillText(team.team, barStartX - Math.round(10 * scale), y + Math.round(22 * scale));
+      
+      // Handle team name display (use full name but truncate if too long)
+      let displayName = team.team;
+      const maxNameWidth = teamNameWidth - Math.round(20 * scale);
+      let nameWidth = ctx.measureText(displayName).width;
+      
+      // If name is too long, use common abbreviations first
+      if (nameWidth > maxNameWidth) {
+        const abbreviations = {
+          'Royal Challengers Bangalore': 'RCB',
+          'Royal Challengers Bengaluru': 'RCB',
+          'Kolkata Knight Riders': 'KKR',
+          'Chennai Super Kings': 'CSK',
+          'Mumbai Indians': 'MI',
+          'Sunrisers Hyderabad': 'SRH',
+          'Rajasthan Royals': 'RR',
+          'Punjab Kings': 'PBKS',
+          'Delhi Capitals': 'DC',
+          'Delhi Daredevils': 'DD',
+          'Lucknow Super Giants': 'LSG',
+          'Gujarat Titans': 'GT'
+        };
+        
+        if (abbreviations[displayName]) {
+          displayName = abbreviations[displayName];
+          nameWidth = ctx.measureText(displayName).width;
+        }
+        
+        // If still too long, truncate with ellipsis
+        if (nameWidth > maxNameWidth) {
+          while (nameWidth > maxNameWidth - ctx.measureText('...').width && displayName.length > 3) {
+            displayName = displayName.slice(0, -1);
+            nameWidth = ctx.measureText(displayName + '...').width;
+          }
+          displayName += '...';
+        }
+      }
+      
+      ctx.fillText(displayName, barStartX - Math.round(10 * scale), y + Math.round(22 * scale));
       
       // Draw bar with shadow for depth
       ctx.shadowColor = 'rgba(0,0,0,0.2)';
@@ -854,11 +901,14 @@ const EloRacerChart = () => {
                     
                     {/* Team Name */}
                     <Box sx={{
-                      width: 60,
+                      width: 200, // Increased width for full team names
                       textAlign: 'right',
                       pr: 2,
                       fontWeight: 'medium',
-                      fontSize: '0.9rem'
+                      fontSize: '0.85rem', // Slightly smaller font
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
                     }}>
                       {team.team}
                     </Box>
@@ -869,11 +919,12 @@ const EloRacerChart = () => {
                       position: 'relative',
                       height: 32,
                       display: 'flex',
-                      alignItems: 'center'
+                      alignItems: 'center',
+                      ml: 1 // Add margin to separate from team name
                     }}>
                       <Box
                         sx={{
-                          width: `${barWidth}%`,
+                          width: `${Math.max(barWidth, 20)}%`, // Ensure minimum width
                           height: '100%',
                           backgroundColor: color,
                           borderRadius: 1,
@@ -883,7 +934,7 @@ const EloRacerChart = () => {
                           alignItems: 'center',
                           justifyContent: 'flex-end',
                           pr: 1,
-                          minWidth: 60,
+                          minWidth: 80, // Increased minimum width
                           boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                         }}
                       >
@@ -937,7 +988,7 @@ const EloRacerChart = () => {
               display: 'flex',
               justifyContent: 'space-between',
               mt: 2,
-              px: 13,
+              px: 25, // Adjusted padding to match new layout
               borderTop: 1,
               borderColor: 'divider',
               pt: 1
