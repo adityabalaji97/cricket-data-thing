@@ -29,6 +29,7 @@ const EloRacerChart = () => {
   const [selectedCompetition, setSelectedCompetition] = useState('international');
   const [startDate, setStartDate] = useState('2023-01-01');
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customTitle, setCustomTitle] = useState('ELO Rankings Race');
   const [eloData, setEloData] = useState({});
   const [chartData, setChartData] = useState([]);
   const [currentData, setCurrentData] = useState([]);
@@ -418,7 +419,7 @@ const EloRacerChart = () => {
     ctx.fillStyle = '#000000';
     ctx.font = `bold ${Math.round(32 * scale)}px Arial`;
     ctx.textAlign = 'center';
-    ctx.fillText('ELO Rankings Racer Chart', 960, Math.round(50 * scale));
+    ctx.fillText(customTitle, 960, Math.round(50 * scale));
     
     // Draw date
     ctx.font = `${Math.round(24 * scale)}px Arial`;
@@ -601,6 +602,19 @@ const EloRacerChart = () => {
         <Typography variant="h5" gutterBottom>
           ELO Rankings Racer Chart
         </Typography>
+        
+        {/* Title Input for Video */}
+        <Box sx={{ mb: 3 }}>
+          <TextField
+            label="Video Title"
+            value={customTitle}
+            onChange={(e) => setCustomTitle(e.target.value)}
+            fullWidth
+            size="small"
+            helperText="This title will appear in the downloaded video"
+            sx={{ maxWidth: 400 }}
+          />
+        </Box>
         
         {/* Controls */}
         <Box sx={{ 
