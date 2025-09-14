@@ -21,7 +21,8 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  Divider
+  Divider,
+  TextField
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 import TrophyIcon from '@mui/icons-material/EmojiEvents';
@@ -35,6 +36,8 @@ const EloLeaderboard = () => {
   const [selectedFilter, setSelectedFilter] = useState('international');
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [leagues, setLeagues] = useState([]);
+  const [startDate, setStartDate] = useState(''); // empty string = all time
+  const [endDate, setEndDate] = useState(''); // empty string = all time
 
   // Team-specific colors based on your color scheme
   const getTeamColor = (teamName) => {
@@ -133,7 +136,7 @@ const EloLeaderboard = () => {
     fetchLeagues();
   }, []);
 
-  // Fetch ELO rankings based on selected filter
+  // Fetch ELO rankings based on selected filter and date range
   useEffect(() => {
     const fetchRankings = async () => {
       setLoading(true);
@@ -152,6 +155,14 @@ const EloLeaderboard = () => {
           params.append('include_international', 'false');
         }
         
+        // Add date filters if they are set
+        if (startDate) {
+          params.append('start_date', startDate);
+        }
+        if (endDate) {
+          params.append('end_date', endDate);
+        }
+        
         const response = await fetch(`${url}?${params}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -168,10 +179,23 @@ const EloLeaderboard = () => {
     };
 
     fetchRankings();
-  }, [selectedFilter]);
+  }, [selectedFilter, startDate, endDate]);
 
   const handleFilterChange = (event) => {
     setSelectedFilter(event.target.value);
+  };
+
+  const handleStartDateChange = (event) => {
+    setStartDate(event.target.value);
+  };
+
+  const handleEndDateChange = (event) => {
+    setEndDate(event.target.value);
+  };
+
+  const handleClearDates = () => {
+    setStartDate('');
+    setEndDate('');
   };
 
   const getRankColor = (rank) => {
@@ -246,12 +270,12 @@ const EloLeaderboard = () => {
   );
 
   return (
-    <Card sx={{ mt: 4, maxHeight: '600px', overflow: 'hidden' }}>
+    <Card sx={{ mt: 4, maxHeight: '700px', overflow: 'hidden' }}>
       <CardContent>
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
-          alignItems: 'center', 
+          alignItems: 'flex-start', 
           mb: 3 
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -262,23 +286,6 @@ const EloLeaderboard = () => {
           </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <InputLabel>Competition</InputLabel>
-              <Select
-                value={selectedFilter}
-                onChange={handleFilterChange}
-                label="Competition"
-              >
-                <MenuItem value="international">International Teams</MenuItem>
-                <Divider />
-                {leagues.map((league) => (
-                  <MenuItem key={league.value} value={league.value}>
-                    {league.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            
             <Tooltip title="Learn about our ELO rating system">
               <IconButton 
                 onClick={() => setShowInfoDialog(true)}
@@ -289,6 +296,63 @@ const EloLeaderboard = () => {
               </IconButton>
             </Tooltip>
           </Box>
+        </Box>
+
+        {/* Filters Section */}
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', md: 'row' },
+          gap: 2, 
+          mb: 3,
+          alignItems: { xs: 'stretch', md: 'flex-end' }
+        }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Competition</InputLabel>
+            <Select
+              value={selectedFilter}
+              onChange={handleFilterChange}
+              label="Competition"
+            >
+              <MenuItem value="international">International Teams</MenuItem>
+              <Divider />
+              {leagues.map((league) => (
+                <MenuItem key={league.value} value={league.value}>
+                  {league.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          <TextField
+            label="Start Date"
+            type="date"
+            value={startDate}
+            onChange={handleStartDateChange}
+            InputLabelProps={{ shrink: true }}
+            size="small"
+            sx={{ minWidth: 140 }}
+          />
+          
+          <TextField
+            label="End Date"
+            type="date"
+            value={endDate}
+            onChange={handleEndDateChange}
+            InputLabelProps={{ shrink: true }}
+            size="small"
+            sx={{ minWidth: 140 }}
+          />
+          
+          {(startDate || endDate) && (
+            <Button 
+              variant="outlined" 
+              size="small" 
+              onClick={handleClearDates}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
+              Clear Dates
+            </Button>
+          )}
         </Box>
 
         {error && (
@@ -417,7 +481,7 @@ const EloLeaderboard = () => {
           </Box>
         )}
       </CardContent>
-
+      
       <EloInfoDialog />
     </Card>
   );

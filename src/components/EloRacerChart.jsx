@@ -312,17 +312,17 @@ const EloRacerChart = () => {
     setIsRecording(true);
     
     try {
-      // Simple WebM video generation using canvas capture
+      // High resolution canvas for better video quality
       const canvas = document.createElement('canvas');
-      canvas.width = 1200;
-      canvas.height = 800;
+      canvas.width = 1920; // Increased resolution
+      canvas.height = 1080; // Increased resolution  
       const ctx = canvas.getContext('2d');
       
-      // Set up canvas stream
-      const stream = canvas.captureStream(30); // 30 FPS
+      // Set up canvas stream with higher frame rate
+      const stream = canvas.captureStream(60); // 60 FPS for smoother video
       const recorder = new MediaRecorder(stream, {
         mimeType: 'video/webm;codecs=vp9',
-        videoBitsPerSecond: 2500000
+        videoBitsPerSecond: 8000000 // Higher bitrate for better quality
       });
       
       const chunks = [];
@@ -342,24 +342,34 @@ const EloRacerChart = () => {
       // Start recording
       recorder.start();
       
-      // Render each frame of the animation
+      // Calculate timing for smoother animation
       const frameDuration = getAnimationDelay(animationSpeed);
+      const frameInterval = 16; // 60 FPS = ~16ms per frame
+      const framesPerDataPoint = Math.max(1, Math.floor(frameDuration / frameInterval));
       
+      // Render each frame of the animation with interpolation
       for (let i = 0; i < chartData.length; i++) {
-        // Update chart data
-        setCurrentIndex(i);
-        setCurrentData(chartData[i].teams);
-        setCurrentDate(chartData[i].date);
+        const currentFrame = chartData[i];
+        const nextFrame = chartData[i + 1];
         
-        // Wait for React to render
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Draw the current chart state to canvas
-        await drawChartToCanvas(ctx, chartData[i]);
-        
-        // Hold this frame for the specified duration
-        await new Promise(resolve => setTimeout(resolve, frameDuration));
+        // If we have a next frame, interpolate between current and next
+        if (nextFrame && framesPerDataPoint > 1) {
+          for (let f = 0; f < framesPerDataPoint; f++) {
+            const progress = f / framesPerDataPoint;
+            const interpolatedFrame = interpolateFrames(currentFrame, nextFrame, progress);
+            
+            await drawChartToCanvas(ctx, interpolatedFrame);
+            await new Promise(resolve => setTimeout(resolve, frameInterval));
+          }
+        } else {
+          // Just draw the current frame
+          await drawChartToCanvas(ctx, currentFrame);
+          await new Promise(resolve => setTimeout(resolve, frameDuration));
+        }
       }
+      
+      // Hold the last frame for a moment
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Stop recording
       recorder.stop();
@@ -371,37 +381,62 @@ const EloRacerChart = () => {
     }
   };
   
+  // Interpolate between two frames for smoother animation
+  const interpolateFrames = (current, next, progress) => {
+    const interpolatedTeams = current.teams.map(currentTeam => {
+      const nextTeam = next.teams.find(t => t.team === currentTeam.team);
+      if (!nextTeam) return currentTeam;
+      
+      return {
+        ...currentTeam,
+        elo: Math.round(currentTeam.elo + (nextTeam.elo - currentTeam.elo) * progress),
+        position: Math.round(currentTeam.position + (nextTeam.position - currentTeam.position) * progress)
+      };
+    });
+    
+    // Sort by interpolated position
+    interpolatedTeams.sort((a, b) => a.position - b.position);
+    
+    return {
+      date: current.date,
+      teams: interpolatedTeams
+    };
+  };
+  
   // Draw the chart to canvas
   const drawChartToCanvas = async (ctx, dataPoint) => {
     const { teams, date } = dataPoint;
     
+    // Scale factor for higher resolution
+    const scale = 1920 / 1200; // 1.6x scaling
+    
     // Clear canvas
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, 1200, 800);
+    ctx.fillRect(0, 0, 1920, 1080);
     
     // Draw title
     ctx.fillStyle = '#000000';
-    ctx.font = 'bold 32px Arial';
+    ctx.font = `bold ${Math.round(32 * scale)}px Arial`;
     ctx.textAlign = 'center';
-    ctx.fillText('ELO Rankings Racer Chart', 600, 50);
+    ctx.fillText('ELO Rankings Racer Chart', 960, Math.round(50 * scale));
     
     // Draw date
-    ctx.font = '24px Arial';
+    ctx.font = `${Math.round(24 * scale)}px Arial`;
     ctx.fillStyle = '#1976d2';
     const formattedDate = formatDate(date);
-    ctx.fillText(formattedDate, 600, 90);
+    ctx.fillText(formattedDate, 960, Math.round(90 * scale));
     
     // Calculate ELO range for bar scaling
     const maxElo = Math.max(...teams.map(team => team.elo), 1000);
     const minElo = Math.min(...teams.map(team => team.elo), 1000);
     const eloRange = maxElo - minElo;
     
-    // Draw teams
-    const startY = 130;
-    const barHeight = 35;
-    const rowHeight = 45;
-    const maxBarWidth = 600;
-    const barStartX = 150;
+    // Draw teams with scaling
+    const startY = Math.round(130 * scale);
+    const barHeight = Math.round(35 * scale);
+    const rowHeight = Math.round(45 * scale);
+    const maxBarWidth = Math.round(600 * scale);
+    const barStartX = Math.round(150 * scale);
     
     teams.forEach((team, index) => {
       const y = startY + (index * rowHeight);
@@ -416,25 +451,35 @@ const EloRacerChart = () => {
       
       // Draw rank
       ctx.fillStyle = team.position < 3 ? '#1976d2' : '#666666';
-      ctx.font = 'bold 20px Arial';
+      ctx.font = `bold ${Math.round(20 * scale)}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText((team.position + 1).toString(), 40, y + 22);
+      ctx.fillText((team.position + 1).toString(), Math.round(40 * scale), y + Math.round(22 * scale));
       
       // Draw team name
       ctx.fillStyle = '#000000';
-      ctx.font = '16px Arial';
+      ctx.font = `${Math.round(16 * scale)}px Arial`;
       ctx.textAlign = 'right';
-      ctx.fillText(team.team, barStartX - 10, y + 22);
+      ctx.fillText(team.team, barStartX - Math.round(10 * scale), y + Math.round(22 * scale));
       
-      // Draw bar
+      // Draw bar with shadow for depth
+      ctx.shadowColor = 'rgba(0,0,0,0.2)';
+      ctx.shadowBlur = Math.round(4 * scale);
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = Math.round(2 * scale);
       ctx.fillStyle = teamColor;
       ctx.fillRect(barStartX, y, barWidth, barHeight);
       
+      // Reset shadow
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      
       // Draw ELO value
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 14px Arial';
+      ctx.font = `bold ${Math.round(14 * scale)}px Arial`;
       ctx.textAlign = 'right';
-      ctx.fillText(team.elo.toString(), barStartX + barWidth - 10, y + 22);
+      ctx.fillText(team.elo.toString(), barStartX + barWidth - Math.round(10 * scale), y + Math.round(22 * scale));
       
       // Draw result indicator if available
       if (team.result) {
@@ -444,25 +489,57 @@ const EloRacerChart = () => {
         
         ctx.fillStyle = resultColor;
         ctx.beginPath();
-        ctx.arc(barStartX + barWidth + 25, y + 17, 8, 0, 2 * Math.PI);
+        ctx.arc(
+          barStartX + barWidth + Math.round(25 * scale), 
+          y + Math.round(17 * scale), 
+          Math.round(8 * scale), 
+          0, 
+          2 * Math.PI
+        );
         ctx.fill();
         
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px Arial';
+        ctx.font = `bold ${Math.round(10 * scale)}px Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText(team.result, barStartX + barWidth + 25, y + 21);
+        ctx.fillText(
+          team.result, 
+          barStartX + barWidth + Math.round(25 * scale), 
+          y + Math.round(21 * scale)
+        );
       }
     });
     
     // Draw ELO scale
     ctx.fillStyle = '#666666';
-    ctx.font = '12px Arial';
+    ctx.font = `${Math.round(12 * scale)}px Arial`;
+    const scaleY = startY + teams.length * rowHeight + Math.round(30 * scale);
+    
     ctx.textAlign = 'left';
-    ctx.fillText(Math.round(minElo).toString(), barStartX, startY + teams.length * rowHeight + 30);
+    ctx.fillText(Math.round(minElo).toString(), barStartX, scaleY);
     ctx.textAlign = 'center';
-    ctx.fillText('ELO Rating', barStartX + maxBarWidth / 2, startY + teams.length * rowHeight + 30);
+    ctx.fillText('ELO Rating', barStartX + maxBarWidth / 2, scaleY);
     ctx.textAlign = 'right';
-    ctx.fillText(Math.round(maxElo).toString(), barStartX + maxBarWidth, startY + teams.length * rowHeight + 30);
+    ctx.fillText(Math.round(maxElo).toString(), barStartX + maxBarWidth, scaleY);
+    
+    // Add watermark
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.font = `${Math.round(14 * scale)}px Arial`;
+    ctx.textAlign = 'right';
+    ctx.fillText(
+      'Created using hindsight2020.vercel.app', 
+      1920 - Math.round(20 * scale), 
+      1080 - Math.round(20 * scale)
+    );
+    
+    // Add subtle logo/branding
+    ctx.fillStyle = 'rgba(25, 118, 210, 0.8)';
+    ctx.font = `bold ${Math.round(12 * scale)}px Arial`;
+    ctx.textAlign = 'right';
+    ctx.fillText(
+      'Cricket Analytics Dashboard', 
+      1920 - Math.round(20 * scale), 
+      1080 - Math.round(40 * scale)
+    );
   };
   
   // Download helper
@@ -658,12 +735,13 @@ const EloRacerChart = () => {
                   value={animationSpeed}
                   onChange={(_, newValue) => setAnimationSpeed(newValue)}
                   min={0.25}
-                  max={2}
+                  max={5}
                   step={0.25}
                   marks={[
                     { value: 0.25, label: '0.25x' },
                     { value: 1, label: '1x' },
-                    { value: 2, label: '2x' }
+                    { value: 2.5, label: '2.5x' },
+                    { value: 5, label: '5x' }
                   ]}
                   valueLabelDisplay="auto"
                   valueLabelFormat={(value) => `${value}x`}
