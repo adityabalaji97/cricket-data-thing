@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -20,6 +20,8 @@ import {
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import DownloadIcon from '@mui/icons-material/Download';
+import VideocamIcon from '@mui/icons-material/Videocam';
 import config from '../config';
 
 const EloRacerChart = () => {
@@ -36,6 +38,9 @@ const EloRacerChart = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [animationSpeed, setAnimationSpeed] = useState(1); // Speed multiplier (0.25x to 2x)
   const [currentDate, setCurrentDate] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const chartRef = useRef(null);
 
   // Convert speed multiplier to milliseconds (base speed: 400ms)
   const getAnimationDelay = (speedMultiplier) => {
@@ -297,6 +302,209 @@ const EloRacerChart = () => {
     }
   };
 
+  // Video recording functions
+  const generateVideo = async () => {
+    if (chartData.length === 0) {
+      alert('Please load data first');
+      return;
+    }
+    
+    setIsRecording(true);
+    
+    try {
+      // Simple WebM video generation using canvas capture
+      const canvas = document.createElement('canvas');
+      canvas.width = 1200;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d');
+      
+      // Set up canvas stream
+      const stream = canvas.captureStream(30); // 30 FPS
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=vp9',
+        videoBitsPerSecond: 2500000
+      });
+      
+      const chunks = [];
+      
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+      
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        downloadBlob(blob, 'webm');
+        setIsRecording(false);
+      };
+      
+      // Start recording
+      recorder.start();
+      
+      // Render each frame of the animation
+      const frameDuration = getAnimationDelay(animationSpeed);
+      
+      for (let i = 0; i < chartData.length; i++) {
+        // Update chart data
+        setCurrentIndex(i);
+        setCurrentData(chartData[i].teams);
+        setCurrentDate(chartData[i].date);
+        
+        // Wait for React to render
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Draw the current chart state to canvas
+        await drawChartToCanvas(ctx, chartData[i]);
+        
+        // Hold this frame for the specified duration
+        await new Promise(resolve => setTimeout(resolve, frameDuration));
+      }
+      
+      // Stop recording
+      recorder.stop();
+      
+    } catch (error) {
+      console.error('Error generating video:', error);
+      alert('Video generation failed. This feature requires a modern browser with MediaRecorder support.');
+      setIsRecording(false);
+    }
+  };
+  
+  // Draw the chart to canvas
+  const drawChartToCanvas = async (ctx, dataPoint) => {
+    const { teams, date } = dataPoint;
+    
+    // Clear canvas
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 1200, 800);
+    
+    // Draw title
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 32px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('ELO Rankings Racer Chart', 600, 50);
+    
+    // Draw date
+    ctx.font = '24px Arial';
+    ctx.fillStyle = '#1976d2';
+    const formattedDate = formatDate(date);
+    ctx.fillText(formattedDate, 600, 90);
+    
+    // Calculate ELO range for bar scaling
+    const maxElo = Math.max(...teams.map(team => team.elo), 1000);
+    const minElo = Math.min(...teams.map(team => team.elo), 1000);
+    const eloRange = maxElo - minElo;
+    
+    // Draw teams
+    const startY = 130;
+    const barHeight = 35;
+    const rowHeight = 45;
+    const maxBarWidth = 600;
+    const barStartX = 150;
+    
+    teams.forEach((team, index) => {
+      const y = startY + (index * rowHeight);
+      
+      // Calculate bar width
+      const barWidth = eloRange > 0 ? 
+        ((team.elo - minElo) / eloRange) * maxBarWidth * 0.8 + maxBarWidth * 0.15 : 
+        maxBarWidth * 0.5;
+      
+      // Get team color
+      const teamColor = getTeamColor(team.team);
+      
+      // Draw rank
+      ctx.fillStyle = team.position < 3 ? '#1976d2' : '#666666';
+      ctx.font = 'bold 20px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText((team.position + 1).toString(), 40, y + 22);
+      
+      // Draw team name
+      ctx.fillStyle = '#000000';
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText(team.team, barStartX - 10, y + 22);
+      
+      // Draw bar
+      ctx.fillStyle = teamColor;
+      ctx.fillRect(barStartX, y, barWidth, barHeight);
+      
+      // Draw ELO value
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText(team.elo.toString(), barStartX + barWidth - 10, y + 22);
+      
+      // Draw result indicator if available
+      if (team.result) {
+        const resultColor = 
+          team.result === 'W' ? '#4caf50' : 
+          team.result === 'L' ? '#f44336' : '#ff9800';
+        
+        ctx.fillStyle = resultColor;
+        ctx.beginPath();
+        ctx.arc(barStartX + barWidth + 25, y + 17, 8, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(team.result, barStartX + barWidth + 25, y + 21);
+      }
+    });
+    
+    // Draw ELO scale
+    ctx.fillStyle = '#666666';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(Math.round(minElo).toString(), barStartX, startY + teams.length * rowHeight + 30);
+    ctx.textAlign = 'center';
+    ctx.fillText('ELO Rating', barStartX + maxBarWidth / 2, startY + teams.length * rowHeight + 30);
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(maxElo).toString(), barStartX + maxBarWidth, startY + teams.length * rowHeight + 30);
+  };
+  
+  // Download helper
+  const downloadBlob = (blob, extension) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `elo-racer-${selectedCompetition}-${new Date().toISOString().split('T')[0]}.${extension}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  
+  const stopRecording = () => {
+    // For programmatic generation, we can't really "stop" mid-process
+    // This is just for UI consistency
+    setIsRecording(false);
+  };
+  
+  // Simplified download function with instructions
+  const downloadAsVideo = async () => {
+    if (chartData.length === 0) {
+      alert('Please load data first');
+      return;
+    }
+    
+    const confirmed = window.confirm(
+      'Generate video of the ELO racer animation?\n\n' +
+      'This will:\n' +
+      '• Create a high-quality video file\n' +
+      '• Include the full animation sequence\n' +
+      '• Take a few moments to process\n' +
+      '• Download automatically when complete\n\n' +
+      'Continue?'
+    );
+    
+    if (confirmed) {
+      await generateVideo();
+    }
+  };
+
   const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -405,15 +613,37 @@ const EloRacerChart = () => {
                 </Tooltip>
                 
                 <Tooltip title="Reset Animation">
-                  <IconButton 
-                    onClick={handleResetAnimation}
-                    color="primary"
-                    size="large"
-                  >
-                    <RestartAltIcon />
-                  </IconButton>
+                <IconButton 
+                onClick={handleResetAnimation}
+                color="primary"
+                size="large"
+                >
+                <RestartAltIcon />
+                </IconButton>
                 </Tooltip>
-              </Box>
+                </Box>
+                
+                {/* Video Recording Controls */}
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Tooltip title={isRecording ? "Generating Video..." : "Generate Video"}>
+                    <IconButton 
+                      onClick={downloadAsVideo}
+                      color="error"
+                      size="large"
+                      disabled={chartData.length === 0 || isRecording}
+                      sx={isRecording ? { 
+                        animation: 'pulse 1.5s infinite',
+                        '@keyframes pulse': {
+                          '0%': { opacity: 1 },
+                          '50%': { opacity: 0.5 },
+                          '100%': { opacity: 1 }
+                        }
+                      } : {}}
+                    >
+                      <VideocamIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
               
               <Box sx={{ 
                 display: 'flex', 
@@ -473,12 +703,14 @@ const EloRacerChart = () => {
             <CircularProgress />
           </Box>
         ) : currentData.length > 0 ? (
-          <Box sx={{ 
-            height: Math.max(400, currentData.length * 50), 
-            width: '100%',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
+          <Box 
+            ref={chartRef}
+            sx={{ 
+              height: Math.max(400, currentData.length * 50), 
+              width: '100%',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
             {/* Chart Container */}
             <Box sx={{ 
               position: 'relative',
