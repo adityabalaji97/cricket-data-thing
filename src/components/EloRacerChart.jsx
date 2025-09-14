@@ -313,10 +313,17 @@ const EloRacerChart = () => {
     setIsRecording(true);
     
     try {
-      // High resolution canvas for better video quality
+      // Calculate dynamic height based on number of teams
+      const maxTeams = Math.max(...chartData.map(frame => frame.teams.length));
+      const baseHeight = 200; // Space for title, date, and padding
+      const teamRowHeight = 45;
+      const scaleHeight = 60; // Space for ELO scale and watermarks
+      const dynamicHeight = Math.max(1080, baseHeight + (maxTeams * teamRowHeight) + scaleHeight);
+      
+      // High resolution canvas with dynamic height
       const canvas = document.createElement('canvas');
-      canvas.width = 1920; // Increased resolution
-      canvas.height = 1080; // Increased resolution  
+      canvas.width = 1920;
+      canvas.height = dynamicHeight;
       const ctx = canvas.getContext('2d');
       
       // Set up canvas stream with higher frame rate
@@ -411,9 +418,13 @@ const EloRacerChart = () => {
     // Scale factor for higher resolution
     const scale = 1920 / 1200; // 1.6x scaling
     
+    // Get canvas dimensions
+    const canvasWidth = ctx.canvas.width;
+    const canvasHeight = ctx.canvas.height;
+    
     // Clear canvas
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, 1920, 1080);
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
     
     // Draw title
     ctx.fillStyle = '#000000';
@@ -528,8 +539,8 @@ const EloRacerChart = () => {
     ctx.textAlign = 'right';
     ctx.fillText(
       'Created using hindsight2020.vercel.app', 
-      1920 - Math.round(20 * scale), 
-      1080 - Math.round(20 * scale)
+      canvasWidth - Math.round(20 * scale), 
+      canvasHeight - Math.round(20 * scale)
     );
     
     // Add subtle logo/branding
@@ -538,8 +549,8 @@ const EloRacerChart = () => {
     ctx.textAlign = 'right';
     ctx.fillText(
       'Cricket Analytics Dashboard', 
-      1920 - Math.round(20 * scale), 
-      1080 - Math.round(40 * scale)
+      canvasWidth - Math.round(20 * scale), 
+      canvasHeight - Math.round(40 * scale)
     );
   };
   
