@@ -136,6 +136,107 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
     return value;
   };
 
+  // Generate nice, evenly spaced tick values for axes
+  const generateNiceTicks = (min, max, targetCount = 5) => {
+    if (min === max) return [min];
+    
+    const range = max - min;
+    const roughStep = range / (targetCount - 1);
+    
+    // Find a "nice" step size
+    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const normalizedStep = roughStep / magnitude;
+    
+    let niceStep;
+    if (normalizedStep < 1.5) {
+      niceStep = 1 * magnitude;
+    } else if (normalizedStep < 3) {
+      niceStep = 2 * magnitude;
+    } else if (normalizedStep < 7) {
+      niceStep = 5 * magnitude;
+    } else {
+      niceStep = 10 * magnitude;
+    }
+    
+    // Generate ticks
+    const ticks = [];
+    const startTick = Math.ceil(min / niceStep) * niceStep;
+    
+    for (let tick = startTick; tick <= max + niceStep * 0.01; tick += niceStep) {
+      ticks.push(Math.round(tick * 1000) / 1000); // Round to avoid floating point issues
+    }
+    
+    return ticks.length > 0 ? ticks : [min, max];
+  };
+
+  // Format axis tick values with rounding and nice spacing
+  const formatAxisTick = (value, metric) => {
+    if (value === null || value === undefined) return '';
+    
+    const numValue = Number(value);
+    
+    if (metric.includes('percentage') || metric === 'percent_balls') {
+      return `${numValue.toFixed(0)}%`;
+    }
+    if (metric === 'strike_rate' || metric === 'average' || metric === 'economy_rate') {
+      return numValue.toFixed(1);
+    }
+    if (numValue >= 1000) {
+      return `${(numValue / 1000).toFixed(1)}k`;
+    }
+    if (numValue % 1 === 0) {
+      return numValue.toString();
+    }
+    
+    return numValue.toFixed(1);
+  };
+
+  // Calculate dynamic domain boundaries with nice tick spacing
+  const getDataDomain = (dataKey) => {
+    const values = chartData
+      .map(d => d[dataKey])
+      .filter(val => !isNaN(val) && val !== undefined && val !== null);
+    
+    if (values.length === 0) return [0, 100];
+    
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    
+    // For scatter plots, use dynamic ranges that fit the data better
+    // Only start from 0 for metrics that meaningfully start from 0
+    let paddedMin, paddedMax;
+    
+    if (dataKey.includes('percentage') || dataKey === 'percent_balls') {
+      // Percentages should start from 0
+      paddedMin = 0;
+      paddedMax = Math.min(100, max + range * 0.1);
+    } else if (dataKey === 'wickets' || dataKey === 'runs' || dataKey === 'balls') {
+      // Count-based metrics should start from 0
+      paddedMin = 0;
+      paddedMax = max + range * 0.1;
+    } else {
+      // For averages, strike rates, economy rates - use dynamic range
+      paddedMin = Math.max(0, min - range * 0.15); // 15% padding below
+      paddedMax = max + range * 0.15; // 15% padding above
+      
+      // Ensure minimum range for readability
+      if (range < 5) {
+        const center = (min + max) / 2;
+        paddedMin = Math.max(0, center - 3);
+        paddedMax = center + 3;
+      }
+    }
+    
+    return [paddedMin, paddedMax];
+  };
+  
+  // Generate nice tick arrays for both axes
+  const getAxisTicks = (dataKey) => {
+    const [min, max] = getDataDomain(dataKey);
+    return generateNiceTicks(min, max, 5);
+  };
+
   // Get available metrics from the data
   const availableMetrics = useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -336,8 +437,10 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
                   fontSize={isMobile ? 10 : 12}
                 />
                 <YAxis 
-                  tickFormatter={(value) => formatMetricValue(value, chart.selectedMetric)}
+                  tickFormatter={(value) => formatAxisTick(value, chart.selectedMetric)}
                   fontSize={12}
+                  domain={getDataDomain(chart.selectedMetric)}
+                  ticks={generateNiceTicks(...getDataDomain(chart.selectedMetric), 6)}
                 />
                 <Tooltip content={(props) => <CustomTooltip {...props} chartConfig={chart} />} />
                 <Legend />
@@ -359,25 +462,6 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
   const renderScatterChart = (chart) => {
     const xMetricData = availableMetrics.find(m => m.key === chart.xMetric);
     const yMetricData = availableMetrics.find(m => m.key === chart.yMetric);
-    
-    // Calculate dynamic domain boundaries from actual data
-    const getDataDomain = (dataKey) => {
-      const values = chartData
-        .map(d => d[dataKey])
-        .filter(val => !isNaN(val) && val !== undefined && val !== null);
-      
-      if (values.length === 0) return [0, 100];
-      
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      const range = max - min;
-      const padding = range * 0.1; // 10% padding
-      
-      return [
-        Math.max(0, min - padding), // Don't go below 0 for percentages/rates
-        max + padding
-      ];
-    };
     
     const xDomain = getDataDomain(chart.xMetric);
     const yDomain = getDataDomain(chart.yMetric);
@@ -451,7 +535,8 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
                   dataKey={chart.xMetric}
                   name={xMetricData?.label}
                   domain={xDomain}
-                  tickFormatter={(value) => formatMetricValue(value, chart.xMetric)}
+                  ticks={getAxisTicks(chart.xMetric)}
+                  tickFormatter={(value) => formatAxisTick(value, chart.xMetric)}
                   fontSize={12}
                 />
                 <YAxis 
@@ -459,7 +544,8 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
                   dataKey={chart.yMetric}
                   name={yMetricData?.label}
                   domain={yDomain}
-                  tickFormatter={(value) => formatMetricValue(value, chart.yMetric)}
+                  ticks={getAxisTicks(chart.yMetric)}
+                  tickFormatter={(value) => formatAxisTick(value, chart.yMetric)}
                   fontSize={12}
                 />
                 <Tooltip content={(props) => <CustomTooltip {...props} chartConfig={chart} />} />

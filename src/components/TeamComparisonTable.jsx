@@ -15,11 +15,23 @@ import {
   Tab,
   useTheme,
   useMediaQuery,
-  Chip
+  Chip,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  List,
+  ListItem,
+  ListItemText
 } from '@mui/material';
+import InfoIcon from '@mui/icons-material/Info';
 
 const TeamComparisonTable = ({ teams, showPercentiles }) => {
   const [currentTab, setCurrentTab] = useState(0);
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [infoDialogContent, setInfoDialogContent] = useState(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -31,6 +43,16 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
     setCurrentTab(newValue);
   };
 
+  const handleInfoClick = (content) => {
+    setInfoDialogContent(content);
+    setInfoDialogOpen(true);
+  };
+
+  const handleInfoClose = () => {
+    setInfoDialogOpen(false);
+    setInfoDialogContent(null);
+  };
+
   // Helper function to format values
   const formatValue = (value, decimals = 2) => {
     if (value === null || value === undefined || value === '') return '-';
@@ -38,6 +60,17 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
       return decimals === 0 ? value.toString() : value.toFixed(decimals);
     }
     return value.toString();
+  };
+
+  // Helper function to get the correct value based on percentiles toggle
+  const getValue = (data, baseKey, percentileKey = null) => {
+    if (!data) return 0;
+    
+    if (showPercentiles && percentileKey && data[percentileKey] !== undefined) {
+      return data[percentileKey];
+    }
+    
+    return data[baseKey] || 0;
   };
 
   // Helper function to get cell color based on values
@@ -72,16 +105,44 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
   // Phase-wise batting performance comparison
   const renderBattingPhaseComparison = () => {
     const metrics = [
-      { key: 'runs', label: 'Runs', higherBetter: true, decimals: 0 },
-      { key: 'balls', label: 'Balls', higherBetter: true, decimals: 0 },
-      { key: 'wickets', label: 'Wickets', higherBetter: false, decimals: 0 },
-      { key: 'average', label: 'Average', higherBetter: true, decimals: 2 },
-      { key: 'strike_rate', label: 'Strike Rate', higherBetter: true, decimals: 2 },
-      { key: 'boundary_percentage', label: 'Boundary %', higherBetter: true, decimals: 1 },
-      { key: 'dot_percentage', label: 'Dot %', higherBetter: false, decimals: 1 }
+      { 
+        key: 'runs', 
+        label: 'Runs', 
+        higherBetter: true, 
+        decimals: 0,
+        percentileKey: null
+      },
+      { 
+        key: 'balls', 
+        label: 'Balls', 
+        higherBetter: true, 
+        decimals: 0,
+        percentileKey: null
+      },
+      { 
+        key: 'wickets', 
+        label: 'Wickets', 
+        higherBetter: false, 
+        decimals: 0,
+        percentileKey: null
+      },
+      { 
+        key: 'average', 
+        label: 'Average', 
+        higherBetter: true, 
+        decimals: 2,
+        percentileKey: 'normalized_average'
+      },
+      { 
+        key: 'strike_rate', 
+        label: 'Strike Rate', 
+        higherBetter: true, 
+        decimals: 2,
+        percentileKey: 'normalized_strike_rate'
+      }
     ];
 
-    const phases = ['powerplay', 'middle_overs', 'death_overs', 'overall'];
+    const phases = ['powerplay', 'middle_overs', 'death_overs'];
     
     return (
       <TableContainer component={Paper} sx={{ mt: 2 }}>
@@ -99,7 +160,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
             {phases.map(phase => 
               metrics.map((metric, metricIndex) => {
                 const values = teams.map(team => 
-                  team.phaseStats?.[phase]?.[metric.key] || 0
+                  getValue(team.phaseStats?.[phase], metric.key, metric.percentileKey)
                 );
                 
                 return (
@@ -115,7 +176,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
                     )}
                     <TableCell>{metric.label}</TableCell>
                     {teams.map((team, teamIndex) => {
-                      const value = team.phaseStats?.[phase]?.[metric.key] || 0;
+                      const value = getValue(team.phaseStats?.[phase], metric.key, metric.percentileKey);
                       return (
                         <TableCell 
                           key={team.id} 
@@ -123,7 +184,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
                           sx={getCellColorStyle(value, metric.higherBetter, values)}
                         >
                           {formatValue(value, metric.decimals)}
-                          {metric.key.includes('percentage') && value > 0 ? '%' : ''}
+                          {showPercentiles && metric.percentileKey && value > 0 ? '%' : ''}
                         </TableCell>
                       );
                     })}
@@ -140,17 +201,51 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
   // Phase-wise bowling performance comparison
   const renderBowlingPhaseComparison = () => {
     const metrics = [
-      { key: 'runs', label: 'Runs', higherBetter: false, decimals: 0 },
-      { key: 'balls', label: 'Balls', higherBetter: true, decimals: 0 },
-      { key: 'wickets', label: 'Wickets', higherBetter: true, decimals: 0 },
-      { key: 'average', label: 'Average', higherBetter: false, decimals: 2 },
-      { key: 'strike_rate', label: 'Strike Rate', higherBetter: false, decimals: 2 },
-      { key: 'economy', label: 'Economy', higherBetter: false, decimals: 2 },
-      { key: 'boundary_percentage', label: 'Boundary %', higherBetter: false, decimals: 1 },
-      { key: 'dot_percentage', label: 'Dot %', higherBetter: true, decimals: 1 }
+      { 
+        key: 'runs', 
+        label: 'Runs', 
+        higherBetter: false, 
+        decimals: 0,
+        percentileKey: null
+      },
+      { 
+        key: 'balls', 
+        label: 'Balls', 
+        higherBetter: true, 
+        decimals: 0,
+        percentileKey: null
+      },
+      { 
+        key: 'wickets', 
+        label: 'Wickets', 
+        higherBetter: true, 
+        decimals: 0,
+        percentileKey: null
+      },
+      { 
+        key: 'bowling_average', 
+        label: 'Average', 
+        higherBetter: false, 
+        decimals: 2,
+        percentileKey: 'normalized_average'
+      },
+      { 
+        key: 'bowling_strike_rate', 
+        label: 'Strike Rate', 
+        higherBetter: false, 
+        decimals: 2,
+        percentileKey: 'normalized_strike_rate'
+      },
+      { 
+        key: 'economy_rate', 
+        label: 'Economy', 
+        higherBetter: false, 
+        decimals: 2,
+        percentileKey: 'normalized_economy'
+      }
     ];
 
-    const phases = ['powerplay', 'middle_overs', 'death_overs', 'overall'];
+    const phases = ['powerplay', 'middle_overs', 'death_overs'];
     
     return (
       <TableContainer component={Paper} sx={{ mt: 2 }}>
@@ -168,7 +263,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
             {phases.map(phase => 
               metrics.map((metric, metricIndex) => {
                 const values = teams.map(team => 
-                  team.bowlingPhaseStats?.[phase]?.[metric.key] || 0
+                  getValue(team.bowlingPhaseStats?.[phase], metric.key, metric.percentileKey)
                 );
                 
                 return (
@@ -184,7 +279,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
                     )}
                     <TableCell>{metric.label}</TableCell>
                     {teams.map((team, teamIndex) => {
-                      const value = team.bowlingPhaseStats?.[phase]?.[metric.key] || 0;
+                      const value = getValue(team.bowlingPhaseStats?.[phase], metric.key, metric.percentileKey);
                       return (
                         <TableCell 
                           key={team.id} 
@@ -192,7 +287,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
                           sx={getCellColorStyle(value, metric.higherBetter, values)}
                         >
                           {formatValue(value, metric.decimals)}
-                          {metric.key.includes('percentage') && value > 0 ? '%' : ''}
+                          {showPercentiles && metric.percentileKey && value > 0 ? '%' : ''}
                         </TableCell>
                       );
                     })}
@@ -367,6 +462,37 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
     );
   };
 
+  // Info content for different tabs
+  const getInfoContent = (tab) => {
+    switch(tab) {
+      case 2: // Batting Order
+        return {
+          title: "Batting Order Structure Comparison",
+          content: [
+            "This table shows how each team structures their batting lineup by comparing players at each batting position.",
+            "Each row represents a batting position (1, 2, 3, etc.) and shows which player typically bats at that position for each team.",
+            "The statistics shown are the player's overall average and strike rate in that position during the selected time period.",
+            "Use this to compare team strategies - some teams prefer aggressive openers, others prefer stability at the top.",
+            "You can analyze middle-order depth, finishing capabilities, and overall batting balance across teams."
+          ]
+        };
+      case 3: // Bowling Order
+        return {
+          title: "Bowling Order Structure Comparison",
+          content: [
+            "This table shows how each team structures their bowling attack across different phases of the innings.",
+            "Players are ranked by the number of balls they bowl in each phase, with 1 being the primary bowler for that phase.",
+            "The 'Overs' field shows the most frequent over combinations when this bowler typically operates.",
+            "Economy rate and balls bowled help you understand each bowler's role and effectiveness in that phase.",
+            "Use this to analyze team bowling strategies - who they trust in the powerplay, middle overs, and death overs.",
+            "Compare how different teams utilize their bowling resources and identify tactical patterns."
+          ]
+        };
+      default:
+        return null;
+    }
+  };
+
   return (
     <Box sx={{ mt: 4 }}>
       <Tabs value={currentTab} onChange={handleTabChange} variant="scrollable" scrollButtons="auto">
@@ -383,7 +509,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
               Phase-wise Batting Performance Comparison
             </Typography>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              {showPercentiles ? 'Showing SQL percentiles' : 'Showing absolute values'}
+              {showPercentiles ? 'Showing SQL percentiles (0-100 scale)' : 'Showing absolute values'}
             </Typography>
             {renderBattingPhaseComparison()}
           </CardContent>
@@ -397,7 +523,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
               Phase-wise Bowling Performance Comparison
             </Typography>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              {showPercentiles ? 'Showing SQL percentiles' : 'Showing absolute values'}
+              {showPercentiles ? 'Showing SQL percentiles (0-100 scale)' : 'Showing absolute values'}
             </Typography>
             {renderBowlingPhaseComparison()}
           </CardContent>
@@ -407,9 +533,18 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
       {currentTab === 2 && (
         <Card sx={{ mt: 2 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Batting Order Structure Comparison
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Typography variant="h6">
+                Batting Order Structure Comparison
+              </Typography>
+              <IconButton 
+                size="small" 
+                onClick={() => handleInfoClick(getInfoContent(2))}
+                color="primary"
+              >
+                <InfoIcon fontSize="small" />
+              </IconButton>
+            </Box>
             <Typography variant="body2" color="text.secondary" gutterBottom>
               Comparing how each team structures their batting order by position
             </Typography>
@@ -421,9 +556,18 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
       {currentTab === 3 && (
         <Card sx={{ mt: 2 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Bowling Order Structure Comparison
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Typography variant="h6">
+                Bowling Order Structure Comparison
+              </Typography>
+              <IconButton 
+                size="small" 
+                onClick={() => handleInfoClick(getInfoContent(3))}
+                color="primary"
+              >
+                <InfoIcon fontSize="small" />
+              </IconButton>
+            </Box>
             <Typography variant="body2" color="text.secondary" gutterBottom>
               Comparing how each team structures their bowling across different phases
             </Typography>
@@ -431,6 +575,37 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
           </CardContent>
         </Card>
       )}
+
+      {/* Info Dialog */}
+      <Dialog 
+        open={infoDialogOpen} 
+        onClose={handleInfoClose}
+        maxWidth="md"
+        fullWidth
+      >
+        {infoDialogContent && (
+          <>
+            <DialogTitle>{infoDialogContent.title}</DialogTitle>
+            <DialogContent>
+              <List>
+                {infoDialogContent.content.map((item, index) => (
+                  <ListItem key={index} sx={{ pl: 0 }}>
+                    <ListItemText 
+                      primary={`• ${item}`}
+                      primaryTypographyProps={{ variant: 'body2' }}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleInfoClose} color="primary">
+                Close
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </Box>
   );
 };
