@@ -29,6 +29,7 @@ import BowlerProfile from './components/BowlerProfile'; // Import the new Bowler
 import BatterComparison from './components/BatterComparison';
 import QueryBuilder from './components/QueryBuilder'; // Import the new QueryBuilder component
 import TeamProfile from './components/TeamProfile';
+import TeamComparison from './components/TeamComparison';
 import axios from 'axios';
 
 import config from './config';
@@ -93,7 +94,8 @@ const AppContent = () => {
     path === '/comparison' ? 4 : 
     path === '/matchups' ? 5 : 
     path === '/query' ? 6 : 
-      path === '/team' ? 7 : 0 // Added team profile tab
+    path === '/team' ? 7 : 
+    path === '/team-comparison' ? 8 : 0 // Added team comparison tab
       );
             }
   };
@@ -111,7 +113,8 @@ const AppContent = () => {
         path === '/comparison' ? 4 : 
         path === '/matchups' ? 5 : 
         path === '/query' ? 6 : 
-        path === '/team' ? 7 : 0 // Added team profile tab
+        path === '/team' ? 7 : 
+        path === '/team-comparison' ? 8 : 0 // Added team comparison tab
       );
     }
   }, [location]);
@@ -368,7 +371,8 @@ const AppContent = () => {
            currentTab === 4 ? 'Batter Comparison' : 
            currentTab === 5 ? 'Matchups' : 
            currentTab === 6 ? 'Query Builder' : 
-           currentTab === 7 ? 'Team Profile' : 'Home';
+           currentTab === 7 ? 'Team Profile' : 
+           currentTab === 8 ? 'Team Comparison' : 'Home';
   };
 
   return (
@@ -423,6 +427,8 @@ const AppContent = () => {
               <MenuItem onClick={() => handleNavigate('/team')}>
                 Team Profile
               </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/team-comparison')}>                Team Comparison
+              </MenuItem>
             </Menu>
             <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap' }}>
               {getPageTitle()}
@@ -445,6 +451,7 @@ const AppContent = () => {
             <Tab label="Matchups" component={Link} to="/matchups" />
             <Tab label="Query Builder" component={Link} to="/query" />
             <Tab label="Team Profile" component={Link} to="/team" />
+            <Tab label="Team Comparison" component={Link} to="/team-comparison" />
           </Tabs>
         )}
       </Box>
@@ -457,6 +464,7 @@ const AppContent = () => {
         <Route path="/matchups" element={<MatchupsTab isMobile={isMobile} />} />
         <Route path="/query" element={<QueryBuilder isMobile={isMobile} />} />
         <Route path="/team" element={<TeamProfile isMobile={isMobile} />} />
+        <Route path="/team-comparison" element={<TeamComparison />} />
         <Route path="/venue" element={
           <Box sx={{ my: 3 }}>
             {error && (
