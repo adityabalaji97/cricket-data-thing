@@ -2433,7 +2433,10 @@ def get_player_stats(
                     "team_balls_excl_batter": inning.team_balls_excl_batter,
                     "team_sr_excl_batter": float(inning.team_sr_excl_batter) if inning.team_sr_excl_batter else 0,
                     "sr_diff": float(inning.sr_diff) if inning.sr_diff else 0
-                }
+                },
+
+                # Fantasy points
+                "fantasy_points": float(inning.fantasy_points) if inning.fantasy_points else 0
             })
 
         def calculate_phase_metrics(data):

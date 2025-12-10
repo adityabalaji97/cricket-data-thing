@@ -11,6 +11,7 @@ import CompetitionFilter from './CompetitionFilter';
 import TopInnings from './TopInnings'
 import BallRunDistribution from './BallRunDistribution'
 import StrikeRateIntervals from './StrikeRateIntervals'
+import ContributionGraph from './ContributionGraph'
 import config from '../config';
 
 const DEFAULT_START_DATE = "2020-01-01";
@@ -311,6 +312,13 @@ const PlayerProfile = () => {
         {stats && !loading && (
           <Box sx={{ mt: 4 }}>
             <CareerStatsCards stats={stats} />
+            <Box sx={{ mt: 3 }}>
+              <ContributionGraph 
+                innings={stats.innings || []} 
+                mode="batter" 
+                dateRange={dateRange} 
+              />
+            </Box>
             <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
               <PhasePerformanceRadar stats={stats} />
               <PaceSpinBreakdown stats={stats} />
