@@ -118,7 +118,7 @@ const ContributionGraph = ({ innings, playerName }) => {
           {stats.total} innings
         </span>
         <span style={{ color: '#666', fontSize: '12px', marginLeft: '12px' }}>
-          Avg Fantasy: {stats.avgFantasy.toFixed(1)}
+          Avg Fantasy: {stats.avgFantasy.toFixed(1)} pts
         </span>
         <span style={{ color: '#666', fontSize: '12px', marginLeft: '12px' }}>
           🦆 {stats.ducks} ducks
@@ -184,7 +184,7 @@ const ContributionGraph = ({ innings, playerName }) => {
                 // Create tooltip text
                 const tooltipText = hasInnings 
                   ? `${day.date}: ${day.innings.map(inn => 
-                      `${inn.runs}(${inn.balls_faced}) vs ${inn.opposition} - ${inn.fantasy_points?.toFixed(1) || 0} pts`
+                      `${inn.runs}(${inn.balls_faced}) vs ${inn.bowling_team} - ${inn.fantasy_points?.toFixed(1) || 0} pts`
                     ).join(', ')}`
                   : '';
                 
