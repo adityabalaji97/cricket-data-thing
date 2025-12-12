@@ -12,6 +12,8 @@ import TopInnings from './TopInnings'
 import BallRunDistribution from './BallRunDistribution'
 import StrikeRateIntervals from './StrikeRateIntervals'
 import ContributionGraph from './ContributionGraph'
+import ContextualQueryPrompts from './ContextualQueryPrompts'
+import { getBatterContextualQueries } from '../utils/queryBuilderLinks'
 import config from '../config';
 
 const DEFAULT_START_DATE = "2020-01-01";
@@ -312,6 +314,18 @@ const PlayerProfile = () => {
         {stats && !loading && (
           <Box sx={{ mt: 4 }}>
             <CareerStatsCards stats={stats} />
+            
+            {/* Contextual Query Prompts */}
+            <ContextualQueryPrompts 
+              queries={getBatterContextualQueries(selectedPlayer, {
+                startDate: dateRange.start,
+                endDate: dateRange.end,
+                leagues: competitionFilters.leagues,
+                venue: selectedVenue !== 'All Venues' ? selectedVenue : null,
+              })}
+              title={`🔍 Explore ${selectedPlayer.split(' ').pop()}'s Data`}
+            />
+            
             <Box sx={{ mt: 3 }}>
               <ContributionGraph 
                 innings={stats.innings || []} 

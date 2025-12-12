@@ -8,6 +8,8 @@ import OverEconomyChart from './OverEconomyChart';
 import OverCombinationsChart from './OverCombinationsChart';
 import FrequentOversChart from './FrequentOversChart';
 import BowlingInningsTable from './BowlingInningsTable';
+import ContextualQueryPrompts from './ContextualQueryPrompts';
+import { getBowlerContextualQueries } from '../utils/queryBuilderLinks';
 import config from '../config';
 
 const DEFAULT_START_DATE = "2020-01-01";
@@ -311,6 +313,17 @@ const BowlerProfile = ({ isMobile }) => {
           <Box sx={{ mt: 4 }}>
             {/* Career Stats Cards */}
             <BowlingCareerStatsCards stats={stats} />
+            
+            {/* Contextual Query Prompts */}
+            <ContextualQueryPrompts 
+              queries={getBowlerContextualQueries(selectedPlayer, {
+                startDate: dateRange.start,
+                endDate: dateRange.end,
+                leagues: competitionFilters.leagues,
+                venue: selectedVenue !== 'All Venues' ? selectedVenue : null,
+              })}
+              title={`🔍 Explore ${selectedPlayer.split(' ').pop()}'s Bowling Data`}
+            />
             
             {/* Main 2x2 Grid Layout */}
             <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>

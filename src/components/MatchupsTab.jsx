@@ -37,6 +37,8 @@ import { FixedSizeList } from 'react-window';
 import debounce from 'lodash/debounce';
 import Matchups from './Matchups';
 import TeamBowlingTypeMatchups from './TeamBowlingTypeMatchups';
+import ContextualQueryPrompts from './ContextualQueryPrompts';
+import { getMatchupContextualQueries } from '../utils/queryBuilderLinks';
 
 const DEFAULT_START_DATE = "2024-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
@@ -579,6 +581,16 @@ const [team2Players, setTeam2Players] = useState([]);
                         endDate={endDate}
                     />
                     
+                    {/* Contextual Query Prompts */}
+                    <ContextualQueryPrompts 
+                        queries={getMatchupContextualQueries(selectedTeam1, selectedTeam2, {
+                            startDate,
+                            endDate,
+                            leagues: [],
+                        })}
+                        title={`🔍 Deep Dive into ${selectedTeam1.abbreviated_name} vs ${selectedTeam2.abbreviated_name}`}
+                    />
+                    
                     <Box sx={{ mt: 4 }}>
                         <TeamBowlingTypeMatchups 
                             players={[...team1Players, ...team2Players]}
@@ -614,6 +626,20 @@ const [team2Players, setTeam2Players] = useState([]);
                         endDate={endDate}
                         team1_players={customTeam1}
                         team2_players={customTeam2}
+                    />
+                    
+                    {/* Contextual Query Prompts for Custom Teams */}
+                    <ContextualQueryPrompts 
+                        queries={getMatchupContextualQueries(
+                            { full_name: customTeam1Name, abbreviated_name: customTeam1Name },
+                            { full_name: customTeam2Name, abbreviated_name: customTeam2Name },
+                            {
+                                startDate,
+                                endDate,
+                                leagues: [],
+                            }
+                        )}
+                        title={`🔍 Explore ${customTeam1Name} vs ${customTeam2Name} Matchup`}
                     />
                     
                     <Box sx={{ mt: 4 }}>

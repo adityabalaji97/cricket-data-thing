@@ -48,6 +48,8 @@ import FantasyPointsBarChart from './FantasyPointsBarChart';
 import MatchHistory from './MatchHistory';
 import Matchups from './Matchups';
 import BattingScatterChart from './BattingScatterChart';
+import ContextualQueryPrompts from './ContextualQueryPrompts';
+import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -854,6 +856,21 @@ return (
                     <PhaseWiseStrategy data={venueStats} isMobile={isMobile} />
                 </Card>
             </Grid>
+            
+            {/* Contextual Query Prompts */}
+            <Grid item xs={12}>
+                <ContextualQueryPrompts 
+                    queries={getVenueContextualQueries(venue, {
+                        startDate,
+                        endDate,
+                        leagues: [],
+                        team1: selectedTeam1,
+                        team2: selectedTeam2,
+                    })}
+                    title={`🔍 Explore ${venue.split(',')[0]} Data`}
+                />
+            </Grid>
+            
             {selectedTeam1 && selectedTeam2 && matchHistory && (
                 <>
                     <Grid item xs={12}>
