@@ -183,7 +183,7 @@ const PlayerProfile = () => {
     // Update URL without reloading the page
     const newUrl = searchParams.toString() ? `?${searchParams.toString()}` : '';
     navigate(newUrl, { replace: true });
-  }, [selectedPlayer, selectedVenue, dateRange, stats, initialLoadComplete, navigate]);
+  }, [selectedPlayer, selectedVenue, dateRange, stats, initialLoadComplete]);
 
   const handleFetch = () => {
     if (!selectedPlayer) return;
