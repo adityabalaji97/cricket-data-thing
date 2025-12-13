@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Loader2, AlertCircle } from 'lucide-react';
 import axios from 'axios';
+import config from '../config';
 
 const PlayerDNASummary = ({ 
   playerName, 
@@ -39,7 +40,7 @@ const PlayerDNASummary = ({
       }
       
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/player-summary/batter/${encodeURIComponent(playerName)}?${params.toString()}`
+        `${config.API_URL}/player-summary/batter/${encodeURIComponent(playerName)}?${params.toString()}`
       );
       
       if (response.data.success) {
