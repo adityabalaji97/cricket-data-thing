@@ -70,3 +70,4 @@ data_exports/
 *.json
 
 .vercel
+.env
