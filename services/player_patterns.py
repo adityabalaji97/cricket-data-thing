@@ -8,6 +8,7 @@ This is a simplified MVP version focusing on batters only with streamlined patte
 
 from typing import Dict, List, Any, Optional
 import logging
+from sqlalchemy.sql import text
 
 logger = logging.getLogger(__name__)
 
@@ -425,12 +426,14 @@ def _analyze_pace_spin_preference(pace_stats: Dict, spin_stats: Dict) -> Dict:
 # BOWLER PATTERN DETECTION
 # =============================================================================
 
-def detect_bowler_patterns(stats: Dict[str, Any]) -> Dict[str, Any]:
+def detect_bowler_patterns(stats: Dict[str, Any], db=None, filters: dict = None) -> Dict[str, Any]:
     """
     Extract patterns from bowler statistics.
     
     Args:
         stats: Raw stats from /player/{name}/bowling_stats endpoint
+        db: Database session (optional, for crease_combo queries)
+        filters: Filter dict with start_date, end_date, leagues etc.
         
     Returns:
         Structured pattern data for LLM synthesis
@@ -471,6 +474,22 @@ def detect_bowler_patterns(stats: Dict[str, Any]) -> Dict[str, Any]:
         # Consistency analysis
         patterns.update(_analyze_bowling_consistency(innings))
         
+        # Crease combo analysis (if db available)
+        if db and filters:
+            player_name = patterns.get("player_name", "")
+            crease_combo_stats = get_bowler_crease_combo_stats(player_name, filters, db)
+            ball_direction_stats = get_bowler_ball_direction_stats(player_name, filters, db)
+            
+            patterns["crease_combo_stats"] = crease_combo_stats
+            patterns["ball_direction_stats"] = ball_direction_stats
+            patterns["best_crease_combo"] = _find_best_crease_combo(crease_combo_stats)
+            patterns["worst_crease_combo"] = _find_worst_crease_combo(crease_combo_stats)
+        else:
+            patterns["crease_combo_stats"] = {}
+            patterns["ball_direction_stats"] = {}
+            patterns["best_crease_combo"] = None
+            patterns["worst_crease_combo"] = None
+        
         logger.info(f"Successfully detected bowler patterns for {patterns['player_name']}")
         return patterns
         
@@ -479,27 +498,76 @@ def detect_bowler_patterns(stats: Dict[str, Any]) -> Dict[str, Any]:
         raise
 
 
-def _calculate_bowling_phase_distribution(phase_stats: Dict) -> Dict[str, float]:
-    """Calculate percentage of overs bowled in each phase."""
-    pp_overs = phase_stats.get("powerplay", {}).get("overs", 0)
-    mid_overs = phase_stats.get("middle", {}).get("overs", 0)
-    death_overs = phase_stats.get("death", {}).get("overs", 0)
+def _calculate_bowling_phase_distribution(phase_stats: Dict) -> Dict[str, Dict]:
+    """
+    Calculate comprehensive phase distribution including:
+    - % of overs in each phase
+    - % of wickets in each phase
+    - Economy per phase
+    - Strike rate per phase
+    - Dot percentage per phase
     
-    total = pp_overs + mid_overs + death_overs
-    if total == 0:
-        return {"powerplay": 33.3, "middle": 33.3, "death": 33.3}
+    Args:
+        phase_stats: Dict with powerplay/middle/death phase data
+        
+    Returns:
+        Dict with detailed stats for each phase
+    """
+    # Calculate totals first
+    total_overs = sum(
+        phase_stats.get(p, {}).get("overs", 0) 
+        for p in ["powerplay", "middle", "death"]
+    )
+    total_wickets = sum(
+        phase_stats.get(p, {}).get("wickets", 0) 
+        for p in ["powerplay", "middle", "death"]
+    )
     
-    return {
-        "powerplay": round((pp_overs / total) * 100, 1),
-        "middle": round((mid_overs / total) * 100, 1),
-        "death": round((death_overs / total) * 100, 1)
-    }
+    if total_overs == 0:
+        return {
+            "powerplay": {"overs_percentage": 33.3, "wickets_percentage": 33.3, "economy": 0, "strike_rate": 999, "overs": 0, "wickets": 0, "dot_percentage": 0},
+            "middle": {"overs_percentage": 33.3, "wickets_percentage": 33.3, "economy": 0, "strike_rate": 999, "overs": 0, "wickets": 0, "dot_percentage": 0},
+            "death": {"overs_percentage": 33.3, "wickets_percentage": 33.3, "economy": 0, "strike_rate": 999, "overs": 0, "wickets": 0, "dot_percentage": 0}
+        }
+    
+    result = {}
+    for phase_name in ["powerplay", "middle", "death"]:
+        phase_data = phase_stats.get(phase_name, {})
+        overs = phase_data.get("overs", 0)
+        wickets = phase_data.get("wickets", 0)
+        runs = phase_data.get("runs", 0)
+        balls = phase_data.get("balls", int(overs * 6)) if overs > 0 else 0
+        dots = phase_data.get("dots", 0)
+        
+        result[phase_name] = {
+            "overs_percentage": round((overs / total_overs * 100), 1) if total_overs > 0 else 0,
+            "wickets_percentage": round((wickets / total_wickets * 100), 1) if total_wickets > 0 else 0,
+            "economy": round((runs * 6 / balls), 2) if balls > 0 else 0,
+            "strike_rate": round(balls / wickets, 1) if wickets > 0 else 999,
+            "dot_percentage": round((dots * 100 / balls), 1) if balls > 0 else 0,
+            "wickets": wickets,
+            "overs": overs
+        }
+    
+    return result
 
 
-def _detect_bowling_primary_phase(distribution: Dict[str, float]) -> str:
-    """Determine bowler's primary phase."""
-    max_phase = max(distribution, key=distribution.get)
-    max_pct = distribution[max_phase]
+def _detect_bowling_primary_phase(distribution: Dict[str, Dict]) -> str:
+    """Determine bowler's primary phase based on overs percentage."""
+    # Extract overs_percentage from each phase
+    phase_pcts = {}
+    for phase, data in distribution.items():
+        if isinstance(data, dict):
+            phase_pcts[phase] = data.get("overs_percentage", 0)
+        else:
+            # Fallback for old format
+            phase_pcts[phase] = data
+    
+    if not phase_pcts:
+        return "workhorse"
+    
+    max_phase = max(phase_pcts, key=phase_pcts.get)
+    max_pct = phase_pcts[max_phase]
     
     if max_pct > 50:
         return f"{max_phase}_specialist"
@@ -599,40 +667,80 @@ def _detect_bowler_weaknesses(phase_stats: Dict) -> List[Dict]:
 
 
 def _analyze_over_usage(over_stats: List[Dict], overall: Dict) -> Dict:
-    """Analyze which overs the bowler typically bowls."""
+    """
+    Analyze which overs the bowler typically bowls.
+    
+    Args:
+        over_stats: List of dicts from bowling_stats endpoint
+            Each dict has: over_number, instances_bowled/times_bowled, matches_percentage, etc.
+        overall: Overall stats dict with matches count
+        
+    Returns:
+        Dict with typical_overs, overs_per_match, usage_pattern, primary_over info
+    """
     if not over_stats:
         return {
             "typical_overs": [],
             "overs_per_match": 0,
-            "usage_pattern": "unknown"
+            "usage_pattern": "unknown",
+            "primary_over": None,
+            "primary_over_percentage": 0
         }
     
     matches = overall.get("matches", 1)
     total_overs = overall.get("overs", 0)
     overs_per_match = round(total_overs / matches, 1) if matches > 0 else 0
     
-    # Find most frequent overs (sorted by frequency)
-    sorted_overs = sorted(over_stats, key=lambda x: x.get("times_bowled", 0), reverse=True)
-    typical_overs = [o.get("over_number", 0) + 1 for o in sorted_overs[:4]]  # +1 for 1-indexed display
+    # Sort by frequency (handle both field names: instances_bowled or times_bowled)
+    sorted_overs = sorted(
+        over_stats, 
+        key=lambda x: x.get("instances_bowled", x.get("times_bowled", 0)), 
+        reverse=True
+    )
     
-    # Determine usage pattern
+    # Get top 4 most frequently bowled overs with details
+    typical_overs = []
+    for over_data in sorted_overs[:4]:
+        over_num = over_data.get("over_number", 0)
+        display_over = over_num + 1  # Convert to 1-indexed for display
+        frequency = over_data.get("instances_bowled", over_data.get("times_bowled", 0))
+        
+        # Calculate percentage if not provided
+        percentage = over_data.get("matches_percentage", 0)
+        if percentage == 0 and matches > 0 and frequency > 0:
+            percentage = round((frequency / matches) * 100, 1)
+        
+        typical_overs.append({
+            "over": display_over,
+            "frequency": frequency,
+            "percentage": round(percentage, 1)
+        })
+    
+    # Determine primary over (most frequently bowled)
+    primary_over = typical_overs[0] if typical_overs else None
+    
+    # Determine usage pattern based on typical overs
     if typical_overs:
-        avg_over = sum(typical_overs) / len(typical_overs)
+        over_numbers = [o["over"] for o in typical_overs]
+        avg_over = sum(over_numbers) / len(over_numbers)
+        
         if avg_over <= 6:
             usage_pattern = "powerplay_specialist"
-        elif avg_over >= 16:
+        elif avg_over >= 17:
             usage_pattern = "death_specialist"
-        elif 7 <= avg_over <= 15:
+        elif all(6 < o <= 15 for o in over_numbers):
             usage_pattern = "middle_overs"
         else:
             usage_pattern = "flexible"
     else:
-        usage_pattern = "flexible"
+        usage_pattern = "unknown"
     
     return {
         "typical_overs": typical_overs,
         "overs_per_match": overs_per_match,
-        "usage_pattern": usage_pattern
+        "usage_pattern": usage_pattern,
+        "primary_over": primary_over["over"] if primary_over else None,
+        "primary_over_percentage": primary_over["percentage"] if primary_over else 0
     }
 
 
@@ -673,3 +781,247 @@ def _analyze_bowling_consistency(innings: List[Dict]) -> Dict:
         "consistency_rating": consistency,
         "wicket_hauls_percentage": two_plus_pct
     }
+
+
+# =============================================================================
+# BOWLER MATCHUP ANALYSIS (Crease Combo & Ball Direction)
+# =============================================================================
+
+def get_bowler_crease_combo_stats(player_name: str, filters: dict, db) -> Dict[str, Any]:
+    """
+    Query deliveries table to get bowler performance vs different crease combinations.
+    
+    Args:
+        player_name: The bowler's name
+        filters: Dict containing start_date, end_date, leagues, venue, etc.
+        db: Database session
+        
+    Returns:
+        Dict with stats for each crease combo (Right-Right, Right-Left, Left-Right, Left-Left)
+    """
+    if not db:
+        return {}
+    
+    try:
+        # Build filter conditions
+        conditions = ["d.bowler = :player_name", "d.crease_combo IS NOT NULL"]
+        params = {"player_name": player_name}
+        
+        if filters.get("start_date"):
+            conditions.append("m.date >= :start_date")
+            params["start_date"] = filters["start_date"]
+        
+        if filters.get("end_date"):
+            conditions.append("m.date <= :end_date")
+            params["end_date"] = filters["end_date"]
+        
+        if filters.get("venue"):
+            conditions.append("m.venue = :venue")
+            params["venue"] = filters["venue"]
+        
+        if filters.get("leagues") and len(filters["leagues"]) > 0:
+            conditions.append("m.league IN :leagues")
+            params["leagues"] = tuple(filters["leagues"])
+        
+        where_clause = " AND ".join(conditions)
+        
+        query = text(f"""
+            SELECT 
+                d.crease_combo,
+                COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
+                SUM(d.runs_off_bat + d.extras) as runs,
+                SUM(CASE WHEN d.wicket_type IS NOT NULL 
+                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out') 
+                THEN 1 ELSE 0 END) as wickets,
+                SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots
+            FROM deliveries d
+            JOIN matches m ON d.match_id = m.id
+            WHERE {where_clause}
+            GROUP BY d.crease_combo
+            HAVING COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) >= 30
+        """)
+        
+        result = db.execute(query, params)
+        rows = result.fetchall()
+        
+        crease_stats = {}
+        for row in rows:
+            balls = row.legal_balls or 0
+            runs = row.runs or 0
+            wickets = row.wickets or 0
+            dots = row.dots or 0
+            
+            if balls > 0:
+                crease_stats[row.crease_combo] = {
+                    "balls": balls,
+                    "runs": runs,
+                    "wickets": wickets,
+                    "dots": dots,
+                    "economy": round((runs * 6 / balls), 2),
+                    "strike_rate": round(balls / wickets, 1) if wickets > 0 else 999,
+                    "dot_percentage": round((dots * 100 / balls), 1)
+                }
+        
+        logger.info(f"Got crease combo stats for {player_name}: {list(crease_stats.keys())}")
+        return crease_stats
+        
+    except Exception as e:
+        logger.error(f"Error getting crease combo stats for {player_name}: {str(e)}")
+        return {}
+
+
+def get_bowler_ball_direction_stats(player_name: str, filters: dict, db) -> Dict[str, Any]:
+    """
+    Query deliveries table to get bowler performance by ball direction.
+    
+    Ball direction is calculated based on bowler type + striker handedness:
+    - intoBatter: Ball moving towards the striker (e.g., off-spinner to RHB)
+    - awayFromBatter: Ball moving away from the striker (e.g., off-spinner to LHB)
+    
+    Args:
+        player_name: The bowler's name
+        filters: Dict containing start_date, end_date, leagues, venue, etc.
+        db: Database session
+        
+    Returns:
+        Dict with stats for each ball direction
+    """
+    if not db:
+        return {}
+    
+    try:
+        # Build filter conditions
+        conditions = ["d.bowler = :player_name", "d.ball_direction IS NOT NULL"]
+        params = {"player_name": player_name}
+        
+        if filters.get("start_date"):
+            conditions.append("m.date >= :start_date")
+            params["start_date"] = filters["start_date"]
+        
+        if filters.get("end_date"):
+            conditions.append("m.date <= :end_date")
+            params["end_date"] = filters["end_date"]
+        
+        if filters.get("venue"):
+            conditions.append("m.venue = :venue")
+            params["venue"] = filters["venue"]
+        
+        if filters.get("leagues") and len(filters["leagues"]) > 0:
+            conditions.append("m.league IN :leagues")
+            params["leagues"] = tuple(filters["leagues"])
+        
+        where_clause = " AND ".join(conditions)
+        
+        query = text(f"""
+            SELECT 
+                d.ball_direction,
+                COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
+                SUM(d.runs_off_bat + d.extras) as runs,
+                SUM(CASE WHEN d.wicket_type IS NOT NULL 
+                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out') 
+                THEN 1 ELSE 0 END) as wickets,
+                SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots
+            FROM deliveries d
+            JOIN matches m ON d.match_id = m.id
+            WHERE {where_clause}
+            GROUP BY d.ball_direction
+            HAVING COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) >= 50
+        """)
+        
+        result = db.execute(query, params)
+        rows = result.fetchall()
+        
+        direction_stats = {}
+        for row in rows:
+            balls = row.legal_balls or 0
+            runs = row.runs or 0
+            wickets = row.wickets or 0
+            dots = row.dots or 0
+            
+            if balls > 0:
+                direction_stats[row.ball_direction] = {
+                    "balls": balls,
+                    "runs": runs,
+                    "wickets": wickets,
+                    "dots": dots,
+                    "economy": round((runs * 6 / balls), 2),
+                    "strike_rate": round(balls / wickets, 1) if wickets > 0 else 999,
+                    "dot_percentage": round((dots * 100 / balls), 1)
+                }
+        
+        logger.info(f"Got ball direction stats for {player_name}: {list(direction_stats.keys())}")
+        return direction_stats
+        
+    except Exception as e:
+        logger.error(f"Error getting ball direction stats for {player_name}: {str(e)}")
+        return {}
+
+
+def _find_best_crease_combo(crease_stats: Dict) -> Optional[Dict]:
+    """
+    Find the crease combination where the bowler performs best.
+    
+    "Best" = lowest economy rate with minimum 30 balls sample
+    
+    Args:
+        crease_stats: Dict from get_bowler_crease_combo_stats()
+        
+    Returns:
+        Dict with combo name and stats, or None if no data
+    """
+    if not crease_stats:
+        return None
+    
+    best = None
+    best_economy = float('inf')
+    
+    for combo, stats in crease_stats.items():
+        if stats.get("balls", 0) >= 30:
+            economy = stats.get("economy", float('inf'))
+            if economy < best_economy:
+                best_economy = economy
+                best = {
+                    "combo": combo,
+                    "economy": economy,
+                    "strike_rate": stats.get("strike_rate", 0),
+                    "dot_percentage": stats.get("dot_percentage", 0),
+                    "balls": stats.get("balls", 0),
+                    "wickets": stats.get("wickets", 0)
+                }
+    
+    return best
+
+
+def _find_worst_crease_combo(crease_stats: Dict) -> Optional[Dict]:
+    """
+    Find the crease combination where the bowler struggles.
+    
+    "Worst" = highest economy rate with minimum 30 balls sample
+    
+    Args:
+        crease_stats: Dict from get_bowler_crease_combo_stats()
+        
+    Returns:
+        Dict with combo name and stats, or None if no data
+    """
+    if not crease_stats:
+        return None
+    
+    worst = None
+    worst_economy = 0
+    
+    for combo, stats in crease_stats.items():
+        if stats.get("balls", 0) >= 30:
+            economy = stats.get("economy", 0)
+            if economy > worst_economy:
+                worst_economy = economy
+                worst = {
+                    "combo": combo,
+                    "economy": economy,
+                    "strike_rate": stats.get("strike_rate", 0),
+                    "dot_percentage": stats.get("dot_percentage", 0),
+                    "balls": stats.get("balls", 0),
+                    "wickets": stats.get("wickets", 0)
+                }
+    
+    return worst

@@ -94,18 +94,31 @@ BOWLER_SUMMARY_PROMPT = """You are a cricket analyst writing a concise "Player D
 ## Output Format
 Write exactly 5 bullet points, each on a new line starting with an emoji and label:
 
-🎯 Primary Phase: [1 sentence about when they bowl based on phase_distribution]
-⚡ Bowling Profile: [1 sentence about their style using profile_classification]
-💪 Dominance: [Best matchup from strengths list with key stats]
-⚠️ Vulnerability: [Main weakness from weaknesses list, or "No significant weaknesses"]
-📊 Usage Pattern: [Which overs they typically bowl based on typical_overs]
+🎯 Primary Phase: [Which phase they bowl most AND their effectiveness there - include overs%, wickets%, economy]
+⚡ Bowling Profile: [Their style classification with key numbers - economy, SR, dot%, wickets per match]
+💪 Dominance: [Best matchup from crease_combo_stats or best_crease_combo or phase strengths - be specific with numbers]
+⚠️ Vulnerability: [Weakness from worst_crease_combo or phase weakness - include specific numbers]
+📊 Usage Pattern: [Which overs they typically bowl with percentages from typical_overs]
 
 ## Rules
-1. Be specific - use actual numbers from the data
+1. Be SPECIFIC - every bullet must include at least 2 numbers
 2. Keep each bullet to ONE sentence
 3. Format economy as "Econ 7.2" and strike rate as "SR 18"
-4. If weaknesses list is empty, write "No clear vulnerabilities identified"
-5. For typical_overs, mention the actual over numbers (they are already 1-indexed)
+4. For crease combos, translate to readable format:
+   - "rhb_rhb" = "vs two right-handers"
+   - "rhb_lhb" = "vs right-hander with left-hander at non-striker"
+   - "lhb_rhb" = "vs left-hander with right-hander at non-striker"
+   - "lhb_lhb" = "vs two left-handers"
+5. Use typical_overs data to state actual over numbers (they are 1-indexed in the data)
+6. If crease_combo_stats is empty, focus on phase-based strengths/weaknesses
+7. Calculate wickets per match from total_wickets / matches
+
+## Example Output
+🎯 Primary Phase: Powerplay specialist (76.9% of overs) taking 65% of wickets in this phase with Econ 6.31 and SR 18.2.
+⚡ Bowling Profile: Wicket-taking seamer (SR 22.3, Econ 8.49) who builds pressure with 39.9% dots - averages 0.9 wickets per match.
+💪 Dominance: Excels vs two right-handers (Econ 6.8, SR 16.2, 45% dots) in the powerplay.
+⚠️ Vulnerability: Struggles in death overs (Econ 10.59) and vs right-left combinations (Econ 9.2).
+📊 Usage Pattern: Bowls 1st over in 86.9% of matches, typically overs 1, 3, 5 - averages 3.2 overs per match.
 
 Now generate the summary:"""
 
@@ -202,50 +215,127 @@ def generate_fallback_summary(patterns: dict) -> str:
     return "\n".join(lines)
 
 
+def _format_crease_combo(combo: str) -> str:
+    """Convert crease combo code to readable format."""
+    mapping = {
+        # Database format: lhb_lhb, lhb_rhb, rhb_lhb, rhb_rhb
+        "rhb_rhb": "vs two right-handers",
+        "rhb_lhb": "vs right-hander (left at non-striker)",
+        "lhb_rhb": "vs left-hander (right at non-striker)",
+        "lhb_lhb": "vs two left-handers",
+        # Also support alternate formats just in case
+        "Right-Right": "vs two right-handers",
+        "Right-Left": "vs right-hander (left at non-striker)",
+        "Left-Right": "vs left-hander (right at non-striker)",
+        "Left-Left": "vs two left-handers"
+    }
+    return mapping.get(combo, f"vs {combo}")
+
+
 def generate_bowler_fallback_summary(patterns: dict) -> str:
     """Generate a basic bowler summary without LLM (fallback)."""
     lines = []
     
-    # Primary Phase
-    phase = patterns.get("primary_phase", "balanced")
+    # Primary Phase - Now with wicket stats
     phase_dist = patterns.get("phase_distribution", {})
-    max_phase = max(phase_dist, key=phase_dist.get) if phase_dist else "middle"
-    max_pct = phase_dist.get(max_phase, 33)
-    lines.append(f"🎯 Primary Phase: {phase.replace('_', ' ').title()} who bowls {max_pct:.0f}% of overs in {max_phase}")
     
-    # Bowling Profile
-    profile = patterns.get("profile_classification", "balanced")
+    # Find the dominant phase
+    max_phase = None
+    max_overs_pct = 0
+    max_phase_data = {}
+    for phase_name, phase_data in phase_dist.items():
+        if isinstance(phase_data, dict):
+            overs_pct = phase_data.get("overs_percentage", 0)
+            if overs_pct > max_overs_pct:
+                max_overs_pct = overs_pct
+                max_phase = phase_name
+                max_phase_data = phase_data
+    
+    if max_phase and max_overs_pct > 40:
+        wickets_pct = max_phase_data.get("wickets_percentage", 0)
+        economy = max_phase_data.get("economy", 0)
+        sr = max_phase_data.get("strike_rate", 0)
+        lines.append(
+            f"🎯 Primary Phase: {max_phase.title()} specialist ({max_overs_pct:.0f}% of overs) "
+            f"taking {wickets_pct:.0f}% of wickets with Econ {economy:.2f} and SR {sr:.1f}"
+        )
+    else:
+        lines.append("🎯 Primary Phase: Workhorse who bowls across all phases")
+    
+    # Bowling Profile - With actual numbers
     economy = patterns.get("overall_economy", 0)
+    sr = patterns.get("overall_strike_rate", 0)
     dot_pct = patterns.get("overall_dot_percentage", 0)
-    lines.append(f"⚡ Bowling Profile: {profile.replace('_', ' ').title()} with economy of {economy:.2f} and {dot_pct:.1f}% dots")
+    matches = patterns.get("matches", 1)
+    wickets = patterns.get("total_wickets", 0)
+    wpg = round(wickets / matches, 1) if matches > 0 else 0
     
-    # Dominance
-    strengths = patterns.get("strengths", [])
-    if strengths:
-        s = strengths[0]
-        ctx = s.get("context", "")
-        econ = s.get("economy", 0)
-        sr = s.get("strike_rate", 0)
-        lines.append(f"💪 Dominance: Excellent {ctx} (Econ {econ:.2f}, SR {sr:.1f})")
+    profile = patterns.get("profile_classification", "balanced")
+    lines.append(
+        f"⚡ Bowling Profile: {profile.replace('_', ' ').title()} "
+        f"(SR {sr:.1f}, Econ {economy:.2f}, {dot_pct:.1f}% dots) - {wpg} wickets per match"
+    )
+    
+    # Dominance - Best crease combo or phase
+    best_combo = patterns.get("best_crease_combo")
+    if best_combo:
+        combo_name = _format_crease_combo(best_combo["combo"])
+        lines.append(
+            f"💪 Dominance: Excels {combo_name} "
+            f"(Econ {best_combo['economy']:.2f}, SR {best_combo['strike_rate']:.1f}, {best_combo['dot_percentage']:.0f}% dots)"
+        )
     else:
-        lines.append("💪 Dominance: Consistent across all phases")
+        # Fall back to phase strengths
+        strengths = patterns.get("strengths", [])
+        if strengths:
+            s = strengths[0]
+            ctx = s.get("context", "")
+            econ = s.get("economy", 0)
+            sr_val = s.get("strike_rate", 0)
+            lines.append(
+                f"💪 Dominance: Strong {ctx} (Econ {econ:.2f}, SR {sr_val:.1f})"
+            )
+        else:
+            lines.append("💪 Dominance: Consistent across all matchups")
     
-    # Vulnerability
-    weaknesses = patterns.get("weaknesses", [])
-    if weaknesses:
-        w = weaknesses[0]
-        ctx = w.get("context", "")
-        econ = w.get("economy", 0)
-        lines.append(f"⚠️ Vulnerability: Can be expensive {ctx} (Econ {econ:.2f})")
+    # Vulnerability - Worst crease combo or phase
+    worst_combo = patterns.get("worst_crease_combo")
+    if worst_combo and worst_combo.get("economy", 0) >= 8.5:
+        combo_name = _format_crease_combo(worst_combo["combo"])
+        lines.append(
+            f"⚠️ Vulnerability: Struggles {combo_name} (Econ {worst_combo['economy']:.2f}, SR {worst_combo['strike_rate']:.1f})"
+        )
     else:
-        lines.append("⚠️ Vulnerability: No clear vulnerabilities identified")
+        weaknesses = patterns.get("weaknesses", [])
+        if weaknesses:
+            w = weaknesses[0]
+            ctx = w.get("context", "")
+            econ = w.get("economy", 0)
+            lines.append(
+                f"⚠️ Vulnerability: Can be expensive {ctx} (Econ {econ:.2f})"
+            )
+        else:
+            lines.append("⚠️ Vulnerability: No clear vulnerabilities identified")
     
-    # Usage Pattern
+    # Usage Pattern - With actual over numbers and percentages
     typical_overs = patterns.get("typical_overs", [])
     overs_per_match = patterns.get("overs_per_match", 0)
-    if typical_overs:
-        overs_str = ", ".join(str(o) for o in typical_overs[:3])
-        lines.append(f"📊 Usage Pattern: Typically bowls overs {overs_str}, averaging {overs_per_match:.1f} overs per match")
+    primary_over = patterns.get("primary_over")
+    primary_over_pct = patterns.get("primary_over_percentage", 0)
+    
+    if typical_overs and len(typical_overs) > 0:
+        # Get over numbers for display
+        over_nums = [str(o["over"]) for o in typical_overs[:3]]
+        if primary_over and primary_over_pct > 0:
+            lines.append(
+                f"📊 Usage Pattern: Bowls over {primary_over} in {primary_over_pct:.0f}% of matches, "
+                f"typically overs {', '.join(over_nums)} - {overs_per_match:.1f} overs per match"
+            )
+        else:
+            lines.append(
+                f"📊 Usage Pattern: Typically bowls overs {', '.join(over_nums)}, "
+                f"averaging {overs_per_match:.1f} overs per match"
+            )
     else:
         lines.append(f"📊 Usage Pattern: Flexible usage, averaging {overs_per_match:.1f} overs per match")
     
@@ -410,9 +500,9 @@ async def get_bowler_summary(
         
         stats["player_name"] = player_name
         
-        # Detect patterns
+        # Detect patterns (pass db and filters for advanced queries)
         logger.info(f"Detecting bowler patterns for {player_name}")
-        patterns = detect_bowler_patterns(stats)
+        patterns = detect_bowler_patterns(stats, db=db, filters=filters)
         
         # Generate summary
         logger.info(f"Generating bowler summary for {player_name}")
