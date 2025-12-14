@@ -45,6 +45,7 @@ const PlayerProfile = () => {
   const [stats, setStats] = useState(null);
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [dnaFetchTrigger, setDnaFetchTrigger] = useState(0);
 
   // Add a direct event listener to trigger analysis on page load if needed
   useEffect(() => {
@@ -227,8 +228,9 @@ const PlayerProfile = () => {
       
           setStats({
             ...statsData,
-            ball_by_ball_stats: ballStatsData.ball_by_ball_stats || []  // Ensure we have a default value
+            ball_by_ball_stats: ballStatsData.ball_by_ball_stats || []
           });
+          setDnaFetchTrigger(prev => prev + 1);
           console.log('Stats loaded successfully');
         } catch (error) {
           console.error('Error loading stats:', error);
@@ -323,6 +325,8 @@ const PlayerProfile = () => {
               leagues={competitionFilters.leagues}
               includeInternational={competitionFilters.international}
               topTeams={competitionFilters.topTeams}
+              venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+              fetchTrigger={dnaFetchTrigger}
             />
             
             {/* Contextual Query Prompts */}
