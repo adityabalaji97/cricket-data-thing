@@ -441,7 +441,7 @@ def detect_bowler_patterns(stats: Dict[str, Any], db=None, filters: dict = None)
     try:
         overall = stats.get("overall", {})
         phase_stats = stats.get("phase_stats", {})
-        over_stats = stats.get("over_stats", [])
+        over_stats = stats.get("over_distribution", [])  # Key is "over_distribution" from bowling_stats endpoint
         innings = stats.get("innings", [])
         
         patterns = {
@@ -820,8 +820,8 @@ def get_bowler_crease_combo_stats(player_name: str, filters: dict, db) -> Dict[s
             params["venue"] = filters["venue"]
         
         if filters.get("leagues") and len(filters["leagues"]) > 0:
-            conditions.append("m.league IN :leagues")
-            params["leagues"] = tuple(filters["leagues"])
+            conditions.append("m.competition = ANY(:leagues)")
+            params["leagues"] = filters["leagues"]
         
         where_clause = " AND ".join(conditions)
         
@@ -907,8 +907,8 @@ def get_bowler_ball_direction_stats(player_name: str, filters: dict, db) -> Dict
             params["venue"] = filters["venue"]
         
         if filters.get("leagues") and len(filters["leagues"]) > 0:
-            conditions.append("m.league IN :leagues")
-            params["leagues"] = tuple(filters["leagues"])
+            conditions.append("m.competition = ANY(:leagues)")
+            params["leagues"] = filters["leagues"]
         
         where_clause = " AND ".join(conditions)
         
