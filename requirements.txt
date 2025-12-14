@@ -9,3 +9,4 @@ pydantic>=1.10.7
 aiohttp>=3.8.4
 typing-extensions>=4.5.0
 python-multipart>=0.0.6
+openai>=1.0.0
