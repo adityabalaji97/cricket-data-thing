@@ -6,6 +6,7 @@ import config from '../config';
 
 const PlayerDNASummary = ({ 
   playerName, 
+  playerType = 'batter', // 'batter' or 'bowler'
   startDate, 
   endDate, 
   leagues, 
@@ -38,8 +39,9 @@ const PlayerDNASummary = ({
           leagues.forEach(league => params.append('leagues', league));
         }
         
+        const endpoint = playerType === 'bowler' ? 'bowler' : 'batter';
         const response = await axios.get(
-          `${config.API_URL}/player-summary/batter/${encodeURIComponent(playerName)}?${params.toString()}`
+          `${config.API_URL}/player-summary/${endpoint}/${encodeURIComponent(playerName)}?${params.toString()}`
         );
         
         if (response.data.success) {
@@ -93,7 +95,7 @@ const PlayerDNASummary = ({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 2 }}>
               <CircularProgress size={18} />
               <Typography variant="body2" color="text.secondary">
-                Analyzing player patterns...
+                Analyzing {playerType === 'bowler' ? 'bowling' : 'batting'} patterns...
               </Typography>
             </Box>
           )}

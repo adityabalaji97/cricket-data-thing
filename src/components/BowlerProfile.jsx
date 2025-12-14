@@ -11,6 +11,7 @@ import BowlingInningsTable from './BowlingInningsTable';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
 import { getBowlerContextualQueries } from '../utils/queryBuilderLinks';
 import config from '../config';
+import PlayerDNASummary from './PlayerDNASummary';
 
 const DEFAULT_START_DATE = "2020-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
@@ -40,6 +41,7 @@ const BowlerProfile = ({ isMobile }) => {
   const [stats, setStats] = useState(null);
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [dnaFetchTrigger, setDnaFetchTrigger] = useState(0);
 
   // Add a direct event listener to trigger analysis on page load if needed
   useEffect(() => {
@@ -222,9 +224,9 @@ const BowlerProfile = ({ isMobile }) => {
     
         setStats({
           ...statsData,
-          bowling_ball_stats: ballStatsData.bowling_ball_stats || []  // Ensure we have a default value
+          bowling_ball_stats: ballStatsData.bowling_ball_stats || []
         });
-        
+        setDnaFetchTrigger(prev => prev + 1);
         console.log('Bowling stats loaded successfully:', statsData);
         console.log('Bowling ball stats loaded successfully:', ballStatsData);
       } catch (error) {
@@ -313,6 +315,19 @@ const BowlerProfile = ({ isMobile }) => {
           <Box sx={{ mt: 4 }}>
             {/* Career Stats Cards */}
             <BowlingCareerStatsCards stats={stats} />
+            
+            {/* Player DNA Summary */}
+            <PlayerDNASummary
+              playerName={selectedPlayer}
+              playerType="bowler"
+              startDate={dateRange.start}
+              endDate={dateRange.end}
+              leagues={competitionFilters.leagues}
+              includeInternational={competitionFilters.international}
+              topTeams={competitionFilters.topTeams}
+              venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+              fetchTrigger={dnaFetchTrigger}
+            />
             
             {/* Contextual Query Prompts */}
             <ContextualQueryPrompts 

@@ -419,3 +419,257 @@ def _analyze_pace_spin_preference(pace_stats: Dict, spin_stats: Dict) -> Dict:
         "spin_avg": spin_avg,
         "preferred_bowling_type": preference
     }
+
+
+# =============================================================================
+# BOWLER PATTERN DETECTION
+# =============================================================================
+
+def detect_bowler_patterns(stats: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract patterns from bowler statistics.
+    
+    Args:
+        stats: Raw stats from /player/{name}/bowling_stats endpoint
+        
+    Returns:
+        Structured pattern data for LLM synthesis
+    """
+    try:
+        overall = stats.get("overall", {})
+        phase_stats = stats.get("phase_stats", {})
+        over_stats = stats.get("over_stats", [])
+        innings = stats.get("innings", [])
+        
+        patterns = {
+            "player_name": stats.get("player_name", "Unknown"),
+            "matches": overall.get("matches", 0),
+            "total_wickets": overall.get("wickets", 0),
+            "total_overs": overall.get("overs", 0),
+            "overall_economy": overall.get("economy", 0),
+            "overall_average": overall.get("average", 0),
+            "overall_strike_rate": overall.get("strike_rate", 0),
+            "overall_dot_percentage": overall.get("dot_percentage", 0),
+        }
+        
+        # Detect primary phase
+        patterns["phase_distribution"] = _calculate_bowling_phase_distribution(phase_stats)
+        patterns["primary_phase"] = _detect_bowling_primary_phase(patterns["phase_distribution"])
+        
+        # Detect bowling profile
+        patterns["profile_classification"], patterns["profile_evidence"] = _classify_bowling_profile(overall)
+        
+        # Detect strengths
+        patterns["strengths"] = _detect_bowler_strengths(phase_stats)
+        
+        # Detect weaknesses  
+        patterns["weaknesses"] = _detect_bowler_weaknesses(phase_stats)
+        
+        # Analyze over usage pattern
+        patterns.update(_analyze_over_usage(over_stats, overall))
+        
+        # Consistency analysis
+        patterns.update(_analyze_bowling_consistency(innings))
+        
+        logger.info(f"Successfully detected bowler patterns for {patterns['player_name']}")
+        return patterns
+        
+    except Exception as e:
+        logger.error(f"Error detecting bowler patterns: {str(e)}", exc_info=True)
+        raise
+
+
+def _calculate_bowling_phase_distribution(phase_stats: Dict) -> Dict[str, float]:
+    """Calculate percentage of overs bowled in each phase."""
+    pp_overs = phase_stats.get("powerplay", {}).get("overs", 0)
+    mid_overs = phase_stats.get("middle", {}).get("overs", 0)
+    death_overs = phase_stats.get("death", {}).get("overs", 0)
+    
+    total = pp_overs + mid_overs + death_overs
+    if total == 0:
+        return {"powerplay": 33.3, "middle": 33.3, "death": 33.3}
+    
+    return {
+        "powerplay": round((pp_overs / total) * 100, 1),
+        "middle": round((mid_overs / total) * 100, 1),
+        "death": round((death_overs / total) * 100, 1)
+    }
+
+
+def _detect_bowling_primary_phase(distribution: Dict[str, float]) -> str:
+    """Determine bowler's primary phase."""
+    max_phase = max(distribution, key=distribution.get)
+    max_pct = distribution[max_phase]
+    
+    if max_pct > 50:
+        return f"{max_phase}_specialist"
+    elif max_pct > 40:
+        return max_phase
+    else:
+        return "workhorse"
+
+
+def _classify_bowling_profile(overall: Dict) -> tuple:
+    """Classify bowling profile based on key metrics."""
+    economy = overall.get("economy", 0)
+    sr = overall.get("strike_rate", 0)
+    dot_pct = overall.get("dot_percentage", 0)
+    
+    evidence = []
+    
+    # Wicket taker: Low SR (<18)
+    if sr > 0 and sr <= 18:
+        evidence.append(f"Excellent strike rate ({sr:.1f})")
+        return "wicket_taker", evidence
+    
+    # Economical: Low economy (<7.5), high dots
+    if economy > 0 and economy <= 7.5 and dot_pct >= 40:
+        evidence.append(f"Miserly economy ({economy:.2f})")
+        evidence.append(f"High dot percentage ({dot_pct:.1f}%)")
+        return "economical", evidence
+    
+    # Restrictive: High dots
+    if dot_pct >= 45:
+        evidence.append(f"Builds pressure ({dot_pct:.1f}% dots)")
+        return "restrictive", evidence
+    
+    # Balanced
+    if economy > 0 and economy <= 8.5 and sr > 0 and sr <= 24:
+        evidence.append(f"Balanced profile (Econ: {economy:.2f}, SR: {sr:.1f})")
+        return "balanced", evidence
+    
+    return "impact", ["Capable of match-winning spells"]
+
+
+def _detect_bowler_strengths(phase_stats: Dict) -> List[Dict]:
+    """Detect bowler strengths by phase."""
+    strengths = []
+    
+    for phase_name in ["powerplay", "middle", "death"]:
+        phase_data = phase_stats.get(phase_name, {})
+        overs = phase_data.get("overs", 0)
+        
+        if overs >= 8:
+            economy = phase_data.get("economy", 0)
+            sr = phase_data.get("strike_rate", 0)
+            wickets = phase_data.get("wickets", 0)
+            
+            # Strong in phase: Low economy or good SR
+            if (economy > 0 and economy <= 7.5) or (sr > 0 and sr <= 16):
+                strength_score = 0
+                if economy > 0:
+                    strength_score += max(0, (8.5 - economy) / 2)
+                if sr > 0:
+                    strength_score += max(0, (20 - sr) / 5)
+                
+                strengths.append({
+                    "context": f"in {phase_name}",
+                    "economy": economy,
+                    "strike_rate": sr,
+                    "wickets": wickets,
+                    "overs": overs,
+                    "strength_score": strength_score
+                })
+    
+    strengths.sort(key=lambda x: x.get("strength_score", 0), reverse=True)
+    return strengths[:2]
+
+
+def _detect_bowler_weaknesses(phase_stats: Dict) -> List[Dict]:
+    """Detect bowler weaknesses by phase."""
+    weaknesses = []
+    
+    for phase_name in ["powerplay", "middle", "death"]:
+        phase_data = phase_stats.get(phase_name, {})
+        overs = phase_data.get("overs", 0)
+        
+        if overs >= 5:
+            economy = phase_data.get("economy", 0)
+            
+            if economy >= 9.5:
+                weaknesses.append({
+                    "context": f"in {phase_name}",
+                    "economy": economy,
+                    "overs": overs,
+                    "weakness_score": economy
+                })
+    
+    weaknesses.sort(key=lambda x: x.get("weakness_score", 0), reverse=True)
+    return weaknesses[:1]
+
+
+def _analyze_over_usage(over_stats: List[Dict], overall: Dict) -> Dict:
+    """Analyze which overs the bowler typically bowls."""
+    if not over_stats:
+        return {
+            "typical_overs": [],
+            "overs_per_match": 0,
+            "usage_pattern": "unknown"
+        }
+    
+    matches = overall.get("matches", 1)
+    total_overs = overall.get("overs", 0)
+    overs_per_match = round(total_overs / matches, 1) if matches > 0 else 0
+    
+    # Find most frequent overs (sorted by frequency)
+    sorted_overs = sorted(over_stats, key=lambda x: x.get("times_bowled", 0), reverse=True)
+    typical_overs = [o.get("over_number", 0) + 1 for o in sorted_overs[:4]]  # +1 for 1-indexed display
+    
+    # Determine usage pattern
+    if typical_overs:
+        avg_over = sum(typical_overs) / len(typical_overs)
+        if avg_over <= 6:
+            usage_pattern = "powerplay_specialist"
+        elif avg_over >= 16:
+            usage_pattern = "death_specialist"
+        elif 7 <= avg_over <= 15:
+            usage_pattern = "middle_overs"
+        else:
+            usage_pattern = "flexible"
+    else:
+        usage_pattern = "flexible"
+    
+    return {
+        "typical_overs": typical_overs,
+        "overs_per_match": overs_per_match,
+        "usage_pattern": usage_pattern
+    }
+
+
+def _analyze_bowling_consistency(innings: List[Dict]) -> Dict:
+    """Analyze bowling consistency."""
+    if not innings:
+        return {
+            "consistency_rating": "unknown",
+            "wicket_hauls_percentage": 0
+        }
+    
+    wicket_list = [i.get("wickets", 0) for i in innings]
+    total_innings = len(wicket_list)
+    
+    # 2+ wicket hauls percentage
+    two_plus = sum(1 for w in wicket_list if w >= 2)
+    two_plus_pct = round((two_plus / total_innings * 100), 1) if total_innings > 0 else 0
+    
+    # Consistency based on variance
+    if total_innings > 1:
+        avg_wickets = sum(wicket_list) / total_innings
+        if avg_wickets > 0:
+            variance = sum((w - avg_wickets) ** 2 for w in wicket_list) / total_innings
+            cv = (variance ** 0.5) / avg_wickets
+            
+            if cv < 0.8:
+                consistency = "high"
+            elif cv < 1.2:
+                consistency = "medium"
+            else:
+                consistency = "low"
+        else:
+            consistency = "low"
+    else:
+        consistency = "unknown"
+    
+    return {
+        "consistency_rating": consistency,
+        "wicket_hauls_percentage": two_plus_pct
+    }

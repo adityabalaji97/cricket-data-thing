@@ -20,7 +20,7 @@ import os
 import logging
 
 from database import get_session
-from services.player_patterns import detect_batter_patterns
+from services.player_patterns import detect_batter_patterns, detect_bowler_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,30 @@ Write exactly 5 bullet points, each on a new line starting with an emoji and lab
 Now generate the summary:"""
 
 
+BOWLER_SUMMARY_PROMPT = """You are a cricket analyst writing a concise "Player DNA" summary. Based on the pattern data below, write a brief, insightful summary of this bowler's style.
+
+## Pattern Data
+{pattern_json}
+
+## Output Format
+Write exactly 5 bullet points, each on a new line starting with an emoji and label:
+
+🎯 Primary Phase: [1 sentence about when they bowl based on phase_distribution]
+⚡ Bowling Profile: [1 sentence about their style using profile_classification]
+💪 Dominance: [Best matchup from strengths list with key stats]
+⚠️ Vulnerability: [Main weakness from weaknesses list, or "No significant weaknesses"]
+📊 Usage Pattern: [Which overs they typically bowl based on typical_overs]
+
+## Rules
+1. Be specific - use actual numbers from the data
+2. Keep each bullet to ONE sentence
+3. Format economy as "Econ 7.2" and strike rate as "SR 18"
+4. If weaknesses list is empty, write "No clear vulnerabilities identified"
+5. For typical_overs, mention the actual over numbers (they are already 1-indexed)
+
+Now generate the summary:"""
+
+
 # =============================================================================
 # Helper Functions
 # =============================================================================
@@ -101,13 +125,18 @@ def generate_summary_with_llm(patterns: dict, player_type: str) -> str:
     """Call OpenAI to generate summary from patterns."""
     if not OPENAI_API_KEY:
         logger.warning("OPENAI_API_KEY not configured - returning pattern-based summary")
+        if player_type == "bowler":
+            return generate_bowler_fallback_summary(patterns)
         return generate_fallback_summary(patterns)
     
     try:
         import openai
         client = openai.OpenAI(api_key=OPENAI_API_KEY)
         
-        prompt = BATTER_SUMMARY_PROMPT.format(pattern_json=json.dumps(patterns, indent=2))
+        if player_type == "bowler":
+            prompt = BOWLER_SUMMARY_PROMPT.format(pattern_json=json.dumps(patterns, indent=2))
+        else:
+            prompt = BATTER_SUMMARY_PROMPT.format(pattern_json=json.dumps(patterns, indent=2))
         
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -122,6 +151,8 @@ def generate_summary_with_llm(patterns: dict, player_type: str) -> str:
     
     except Exception as e:
         logger.error(f"Error calling OpenAI API: {str(e)}")
+        if player_type == "bowler":
+            return generate_bowler_fallback_summary(patterns)
         return generate_fallback_summary(patterns)
 
 
@@ -167,6 +198,56 @@ def generate_fallback_summary(patterns: dict) -> str:
         lines.append(f"📊 Entry Pattern: Typically bats at #{pos}, {entry} entry")
     else:
         lines.append(f"📊 Entry Pattern: {entry.title()} entry pattern")
+    
+    return "\n".join(lines)
+
+
+def generate_bowler_fallback_summary(patterns: dict) -> str:
+    """Generate a basic bowler summary without LLM (fallback)."""
+    lines = []
+    
+    # Primary Phase
+    phase = patterns.get("primary_phase", "balanced")
+    phase_dist = patterns.get("phase_distribution", {})
+    max_phase = max(phase_dist, key=phase_dist.get) if phase_dist else "middle"
+    max_pct = phase_dist.get(max_phase, 33)
+    lines.append(f"🎯 Primary Phase: {phase.replace('_', ' ').title()} who bowls {max_pct:.0f}% of overs in {max_phase}")
+    
+    # Bowling Profile
+    profile = patterns.get("profile_classification", "balanced")
+    economy = patterns.get("overall_economy", 0)
+    dot_pct = patterns.get("overall_dot_percentage", 0)
+    lines.append(f"⚡ Bowling Profile: {profile.replace('_', ' ').title()} with economy of {economy:.2f} and {dot_pct:.1f}% dots")
+    
+    # Dominance
+    strengths = patterns.get("strengths", [])
+    if strengths:
+        s = strengths[0]
+        ctx = s.get("context", "")
+        econ = s.get("economy", 0)
+        sr = s.get("strike_rate", 0)
+        lines.append(f"💪 Dominance: Excellent {ctx} (Econ {econ:.2f}, SR {sr:.1f})")
+    else:
+        lines.append("💪 Dominance: Consistent across all phases")
+    
+    # Vulnerability
+    weaknesses = patterns.get("weaknesses", [])
+    if weaknesses:
+        w = weaknesses[0]
+        ctx = w.get("context", "")
+        econ = w.get("economy", 0)
+        lines.append(f"⚠️ Vulnerability: Can be expensive {ctx} (Econ {econ:.2f})")
+    else:
+        lines.append("⚠️ Vulnerability: No clear vulnerabilities identified")
+    
+    # Usage Pattern
+    typical_overs = patterns.get("typical_overs", [])
+    overs_per_match = patterns.get("overs_per_match", 0)
+    if typical_overs:
+        overs_str = ", ".join(str(o) for o in typical_overs[:3])
+        lines.append(f"📊 Usage Pattern: Typically bowls overs {overs_str}, averaging {overs_per_match:.1f} overs per match")
+    else:
+        lines.append(f"📊 Usage Pattern: Flexible usage, averaging {overs_per_match:.1f} overs per match")
     
     return "\n".join(lines)
 
@@ -269,6 +350,96 @@ async def get_batter_summary(
             success=False,
             player_name=player_name,
             player_type="batter",
+            error=str(e)
+        )
+
+
+@router.get("/bowler/{player_name}", response_model=SummaryResponse)
+async def get_bowler_summary(
+    player_name: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    leagues: List[str] = Query(default=[]),
+    include_international: bool = Query(default=False),
+    top_teams: Optional[int] = Query(default=None),
+    venue: Optional[str] = None,
+    include_patterns: bool = Query(default=False),
+    db: Session = Depends(get_session)
+):
+    """
+    Generate AI-powered bowling summary for a player.
+    """
+    try:
+        filters = {
+            "start_date": str(start_date) if start_date else None,
+            "end_date": str(end_date) if end_date else None,
+            "leagues": leagues,
+            "include_international": include_international,
+            "top_teams": top_teams,
+            "venue": venue
+        }
+        
+        # Check cache
+        cache_key = get_cache_key(player_name, "bowler", filters)
+        if cache_key in summary_cache:
+            logger.info(f"Cache hit for bowler {player_name}")
+            cached_result = summary_cache[cache_key]
+            return SummaryResponse(
+                success=True,
+                player_name=player_name,
+                player_type="bowler",
+                summary=cached_result["summary"],
+                patterns=cached_result["patterns"] if include_patterns else None,
+                cached=True
+            )
+        
+        # Fetch bowling stats
+        logger.info(f"Fetching bowling stats for {player_name}")
+        from main import get_player_bowling_stats
+        
+        stats = get_player_bowling_stats(
+            player_name=player_name,
+            start_date=start_date,
+            end_date=end_date,
+            leagues=leagues,
+            include_international=include_international,
+            top_teams=top_teams,
+            venue=venue,
+            db=db
+        )
+        
+        stats["player_name"] = player_name
+        
+        # Detect patterns
+        logger.info(f"Detecting bowler patterns for {player_name}")
+        patterns = detect_bowler_patterns(stats)
+        
+        # Generate summary
+        logger.info(f"Generating bowler summary for {player_name}")
+        summary = generate_summary_with_llm(patterns, "bowler")
+        
+        # Cache result
+        summary_cache[cache_key] = {
+            "summary": summary,
+            "patterns": patterns
+        }
+        
+        logger.info(f"Successfully generated bowler summary for {player_name}")
+        return SummaryResponse(
+            success=True,
+            player_name=player_name,
+            player_type="bowler",
+            summary=summary,
+            patterns=patterns if include_patterns else None,
+            cached=False
+        )
+        
+    except Exception as e:
+        logger.error(f"Error generating bowler summary for {player_name}: {str(e)}", exc_info=True)
+        return SummaryResponse(
+            success=False,
+            player_name=player_name,
+            player_type="bowler",
             error=str(e)
         )
 
