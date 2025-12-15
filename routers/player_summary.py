@@ -96,8 +96,8 @@ Write exactly 5 bullet points, each on a new line starting with an emoji and lab
 
 🎯 Primary Phase: [Which phase they bowl most AND their effectiveness there - include overs%, wickets%, economy]
 ⚡ Bowling Profile: [Their style classification with key numbers - economy, SR, dot%, wickets per match]
-💪 Dominance: [Best matchup from crease_combo_stats or best_crease_combo or phase strengths - be specific with numbers]
-⚠️ Vulnerability: [Weakness from worst_crease_combo or phase weakness - include specific numbers]
+💪 Best Matchup: [Best crease combo from best_crease_combo - these are OVERALL stats, not phase-specific]
+⚠️ Weakness: [Worst crease combo from worst_crease_combo OR phase weakness - be specific with numbers]
 📊 Usage Pattern: [Which overs they typically bowl with percentages from typical_overs]
 
 ## Rules
@@ -109,16 +109,17 @@ Write exactly 5 bullet points, each on a new line starting with an emoji and lab
    - "rhb_lhb" = "vs right-hander with left-hander at non-striker"
    - "lhb_rhb" = "vs left-hander with right-hander at non-striker"
    - "lhb_lhb" = "vs two left-handers"
-5. Use typical_overs data to state actual over numbers (they are 1-indexed in the data)
-6. If crease_combo_stats is empty, focus on phase-based strengths/weaknesses
-7. Calculate wickets per match from total_wickets / matches
+5. IMPORTANT: crease_combo_stats are OVERALL career stats for the selected filters - do NOT mention any phase when discussing them
+6. Use typical_overs data to state actual over numbers (they are 1-indexed in the data)
+7. If crease_combo_stats is empty, focus on phase-based strengths/weaknesses for Best Matchup/Weakness
+8. Calculate wickets per match from total_wickets / matches
 
 ## Example Output
-🎯 Primary Phase: Powerplay specialist (76.9% of overs) taking 65% of wickets in this phase with Econ 6.31 and SR 18.2.
-⚡ Bowling Profile: Wicket-taking seamer (SR 22.3, Econ 8.49) who builds pressure with 39.9% dots - averages 0.9 wickets per match.
-💪 Dominance: Excels vs two right-handers (Econ 6.8, SR 16.2, 45% dots) in the powerplay.
-⚠️ Vulnerability: Struggles in death overs (Econ 10.59) and vs right-left combinations (Econ 9.2).
-📊 Usage Pattern: Bowls 1st over in 86.9% of matches, typically overs 1, 3, 5 - averages 3.2 overs per match.
+🎯 Primary Phase: Death specialist (50.7% of wickets) with Econ 7.38 and SR 11.5 in overs 16-20.
+⚡ Bowling Profile: Restrictive bowler (SR 15.9, Econ 7.1) who builds pressure with 45.5% dots - averages 1.45 wickets per match.
+💪 Best Matchup: Excels vs two left-handers (Econ 5.42, SR 10.3, 44% dots).
+⚠️ Weakness: Less effective vs two right-handers (Econ 7.41, SR 16.6).
+📊 Usage Pattern: Bowls 19th over in 45.5% of matches, typically overs 19, 4, 2 - averages 3.8 overs per match.
 
 Now generate the summary:"""
 
@@ -276,12 +277,12 @@ def generate_bowler_fallback_summary(patterns: dict) -> str:
         f"(SR {sr:.1f}, Econ {economy:.2f}, {dot_pct:.1f}% dots) - {wpg} wickets per match"
     )
     
-    # Dominance - Best crease combo or phase
+    # Best Matchup - Best crease combo (overall, not phase-specific)
     best_combo = patterns.get("best_crease_combo")
     if best_combo:
         combo_name = _format_crease_combo(best_combo["combo"])
         lines.append(
-            f"💪 Dominance: Excels {combo_name} "
+            f"💪 Best Matchup: Excels {combo_name} "
             f"(Econ {best_combo['economy']:.2f}, SR {best_combo['strike_rate']:.1f}, {best_combo['dot_percentage']:.0f}% dots)"
         )
     else:
@@ -293,17 +294,17 @@ def generate_bowler_fallback_summary(patterns: dict) -> str:
             econ = s.get("economy", 0)
             sr_val = s.get("strike_rate", 0)
             lines.append(
-                f"💪 Dominance: Strong {ctx} (Econ {econ:.2f}, SR {sr_val:.1f})"
+                f"💪 Best Matchup: Strong {ctx} (Econ {econ:.2f}, SR {sr_val:.1f})"
             )
         else:
-            lines.append("💪 Dominance: Consistent across all matchups")
+            lines.append("💪 Best Matchup: Consistent across all matchups")
     
-    # Vulnerability - Worst crease combo or phase
+    # Weakness - Worst crease combo (overall) or phase weakness
     worst_combo = patterns.get("worst_crease_combo")
     if worst_combo and worst_combo.get("economy", 0) >= 8.5:
         combo_name = _format_crease_combo(worst_combo["combo"])
         lines.append(
-            f"⚠️ Vulnerability: Struggles {combo_name} (Econ {worst_combo['economy']:.2f}, SR {worst_combo['strike_rate']:.1f})"
+            f"⚠️ Weakness: Less effective {combo_name} (Econ {worst_combo['economy']:.2f}, SR {worst_combo['strike_rate']:.1f})"
         )
     else:
         weaknesses = patterns.get("weaknesses", [])
@@ -312,10 +313,10 @@ def generate_bowler_fallback_summary(patterns: dict) -> str:
             ctx = w.get("context", "")
             econ = w.get("economy", 0)
             lines.append(
-                f"⚠️ Vulnerability: Can be expensive {ctx} (Econ {econ:.2f})"
+                f"⚠️ Weakness: Can be expensive {ctx} (Econ {econ:.2f})"
             )
         else:
-            lines.append("⚠️ Vulnerability: No clear vulnerabilities identified")
+            lines.append("⚠️ Weakness: No clear weaknesses identified")
     
     # Usage Pattern - With actual over numbers and percentages
     typical_overs = patterns.get("typical_overs", [])
