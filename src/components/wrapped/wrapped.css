@@ -1,0 +1,685 @@
+/* ============================================
+   WRAPPED 2025 - Mobile-First Styles
+   ============================================ */
+
+/* CSS Variables for Wrapped Theme */
+:root {
+  --wrapped-bg: #121212;
+  --wrapped-card-bg: #1a1a1a;
+  --wrapped-primary: #1DB954;
+  --wrapped-secondary: #b3b3b3;
+  --wrapped-text: #ffffff;
+  --wrapped-text-muted: #a0a0a0;
+  --wrapped-border: #333333;
+  --wrapped-success: #4CAF50;
+  --wrapped-warning: #ff9800;
+  --wrapped-error: #f44336;
+}
+
+/* ============================================
+   Container & Layout
+   ============================================ */
+
+.wrapped-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: var(--wrapped-bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+  z-index: 1000;
+}
+
+.wrapped-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--wrapped-bg);
+  color: var(--wrapped-text);
+}
+
+.wrapped-loading p {
+  margin-top: 16px;
+  color: var(--wrapped-secondary);
+}
+
+.wrapped-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--wrapped-bg);
+  padding: 24px;
+}
+
+/* ============================================
+   Progress Bar
+   ============================================ */
+
+.wrapped-progress-bar {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+
+.progress-segment {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.progress-segment.completed {
+  background: var(--wrapped-primary);
+}
+
+.progress-segment.active {
+  background: var(--wrapped-text);
+}
+
+.progress-segment:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   Close Button
+   ============================================ */
+
+.wrapped-close-btn {
+  position: absolute;
+  top: 24px;
+  right: 16px;
+  z-index: 10;
+  color: var(--wrapped-text) !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+}
+
+.wrapped-close-btn:hover {
+  background: rgba(0, 0, 0, 0.5) !important;
+}
+
+/* ============================================
+   Card Base Styles
+   ============================================ */
+
+.wrapped-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 60px 20px 20px;
+  overflow-y: auto;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.wrapped-card-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--wrapped-text-muted);
+}
+
+.wrapped-card-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.wrapped-card-index {
+  color: var(--wrapped-primary);
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+
+.wrapped-card-title {
+  color: var(--wrapped-text);
+  font-weight: 700;
+  font-size: 24px;
+  margin: 8px 0;
+  line-height: 1.2;
+}
+
+.wrapped-card-subtitle {
+  color: var(--wrapped-secondary);
+  font-size: 14px;
+}
+
+.wrapped-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ============================================
+   Card Actions
+   ============================================ */
+
+.wrapped-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 16px 0;
+  margin-top: auto;
+}
+
+.wrapped-action-btn {
+  font-size: 12px !important;
+  padding: 6px 12px !important;
+  border-radius: 20px !important;
+  text-transform: none !important;
+  background: var(--wrapped-primary) !important;
+  color: var(--wrapped-bg) !important;
+}
+
+.wrapped-action-btn-secondary {
+  background: transparent !important;
+  border: 1px solid var(--wrapped-primary) !important;
+  color: var(--wrapped-primary) !important;
+}
+
+.wrapped-action-btn-share {
+  background: transparent !important;
+  color: var(--wrapped-secondary) !important;
+}
+
+/* ============================================
+   Navigation Hints
+   ============================================ */
+
+.wrapped-nav-hints {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.wrapped-container:hover .wrapped-nav-hints {
+  opacity: 0.3;
+}
+
+.nav-hint {
+  font-size: 48px;
+  color: var(--wrapped-text);
+}
+
+/* ============================================
+   Intro Card Specific
+   ============================================ */
+
+.intro-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.intro-stat-hero {
+  text-align: center;
+}
+
+.hero-number {
+  font-size: 64px;
+  font-weight: 800;
+  color: var(--wrapped-primary);
+  line-height: 1;
+}
+
+.hero-label {
+  color: var(--wrapped-secondary);
+  margin-top: 8px;
+}
+
+.intro-chart {
+  width: 100%;
+  max-width: 400px;
+}
+
+.intro-quick-stats {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+}
+
+.quick-stat {
+  text-align: center;
+}
+
+.quick-stat h6 {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.quick-stat span {
+  color: var(--wrapped-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* ============================================
+   Scatter Card Specific
+   ============================================ */
+
+.scatter-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.top-players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.top-player-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--wrapped-card-bg);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.top-player-item:hover {
+  background: #252525;
+}
+
+.top-player-item .rank {
+  color: var(--wrapped-primary);
+  font-weight: 700;
+  min-width: 40px;
+}
+
+.player-info {
+  flex: 1;
+}
+
+.player-info h6 {
+  color: var(--wrapped-text);
+  font-size: 14px;
+}
+
+.player-info p {
+  color: var(--wrapped-secondary);
+  font-size: 12px;
+}
+
+.scatter-chart {
+  background: var(--wrapped-card-bg);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.filter-slider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+
+.filter-slider span {
+  color: var(--wrapped-secondary);
+  font-size: 12px;
+}
+
+/* ============================================
+   Table Card Specific (Death Hitters, etc.)
+   ============================================ */
+
+.table-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.podium-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  background: var(--wrapped-card-bg);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  min-width: 80px;
+}
+
+.podium-item:hover {
+  transform: translateY(-4px);
+}
+
+.podium-item.first {
+  order: 2;
+  padding: 16px;
+  background: linear-gradient(135deg, #1DB954 0%, #169c46 100%);
+  min-width: 100px;
+}
+
+.podium-item.second {
+  order: 1;
+}
+
+.podium-item.third {
+  order: 3;
+}
+
+.podium-rank {
+  font-weight: 700;
+  color: var(--wrapped-primary);
+}
+
+.podium-item.first .podium-rank {
+  color: var(--wrapped-text);
+}
+
+.podium-name {
+  color: var(--wrapped-text);
+  margin: 8px 0;
+  text-align: center;
+  font-size: 12px;
+}
+
+.podium-stat {
+  color: var(--wrapped-text);
+  font-weight: 700;
+}
+
+.podium-item span {
+  color: var(--wrapped-secondary);
+  font-size: 10px;
+}
+
+.podium-item.first span {
+  color: rgba(255,255,255,0.8);
+}
+
+.remaining-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--wrapped-card-bg);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.list-item:hover {
+  background: #252525;
+}
+
+.list-rank {
+  color: var(--wrapped-secondary);
+  min-width: 30px;
+}
+
+.list-name {
+  flex: 1;
+  color: var(--wrapped-text);
+}
+
+.list-stat {
+  color: var(--wrapped-primary);
+  font-weight: 600;
+}
+
+/* ============================================
+   Diverging Bar Card (Pace vs Spin)
+   ============================================ */
+
+.diverging-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.diverging-chart {
+  background: var(--wrapped-card-bg);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.chart-legend {
+  text-align: center;
+}
+
+.chart-legend span {
+  color: var(--wrapped-secondary);
+  font-size: 11px;
+}
+
+/* ============================================
+   ELO Movers Card
+   ============================================ */
+
+.elo-movers-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.movers-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.mover-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--wrapped-card-bg);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.mover-item:hover {
+  background: #252525;
+}
+
+.team-name {
+  color: var(--wrapped-text);
+}
+
+.elo-change {
+  text-align: right;
+}
+
+.elo-change.positive h6 {
+  color: var(--wrapped-success);
+}
+
+.elo-change.negative h6 {
+  color: var(--wrapped-error);
+}
+
+.elo-change span {
+  color: var(--wrapped-secondary);
+  font-size: 11px;
+}
+
+/* ============================================
+   Venue Card
+   ============================================ */
+
+.venue-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.venue-quick-stats {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+}
+
+.venue-stat {
+  text-align: center;
+}
+
+.venue-stat h5 {
+  color: var(--wrapped-primary);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.venue-stat span {
+  color: var(--wrapped-secondary);
+  font-size: 11px;
+}
+
+.venue-scatter {
+  background: var(--wrapped-card-bg);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.top-venues {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.venue-item {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  background: var(--wrapped-card-bg);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.venue-item:hover {
+  background: #252525;
+}
+
+.venue-name {
+  color: var(--wrapped-text);
+  font-weight: 500;
+}
+
+.venue-item span {
+  color: var(--wrapped-secondary);
+  font-size: 11px;
+}
+
+/* ============================================
+   Tooltip Styles
+   ============================================ */
+
+.wrapped-tooltip {
+  background: rgba(0, 0, 0, 0.9);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--wrapped-border);
+}
+
+.wrapped-tooltip h6 {
+  color: var(--wrapped-text);
+  margin-bottom: 8px;
+}
+
+.wrapped-tooltip p {
+  color: var(--wrapped-secondary);
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+
+@media (min-width: 768px) {
+  .wrapped-card {
+    padding: 80px 40px 40px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .wrapped-card-title {
+    font-size: 32px;
+  }
+  
+  .hero-number {
+    font-size: 80px;
+  }
+}
+
+@media (max-width: 360px) {
+  .wrapped-card-title {
+    font-size: 20px;
+  }
+  
+  .hero-number {
+    font-size: 48px;
+  }
+  
+  .podium {
+    gap: 4px;
+  }
+  
+  .podium-item {
+    padding: 8px;
+    min-width: 70px;
+  }
+  
+  .podium-item.first {
+    min-width: 85px;
+  }
+}

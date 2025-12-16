@@ -30,6 +30,7 @@ import BatterComparison from './components/BatterComparison';
 import QueryBuilder from './components/QueryBuilder'; // Import the new QueryBuilder component
 import TeamProfile from './components/TeamProfile';
 import TeamComparison from './components/TeamComparison';
+import WrappedPage from './components/wrapped/WrappedPage';
 import axios from 'axios';
 
 import config from './config';
@@ -465,6 +466,7 @@ const AppContent = () => {
         <Route path="/query" element={<QueryBuilder isMobile={isMobile} />} />
         <Route path="/team" element={<TeamProfile isMobile={isMobile} />} />
         <Route path="/team-comparison" element={<TeamComparison />} />
+        <Route path="/wrapped/2025" element={<WrappedPage />} />
         <Route path="/venue" element={
           <Box sx={{ my: 3 }}>
             {error && (
