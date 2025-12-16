@@ -53,15 +53,14 @@ const WrappedCard = ({ cardData, cardIndex, totalCards }) => {
     <Box className="wrapped-card">
       {/* Card Header */}
       <Box className="wrapped-card-header">
-        <Typography variant="overline" className="wrapped-card-index">
-          {cardIndex + 1} / {totalCards}
-        </Typography>
         <Typography variant="h4" className="wrapped-card-title">
           {cardData.card_title}
         </Typography>
-        <Typography variant="subtitle1" className="wrapped-card-subtitle">
-          {cardData.card_subtitle}
-        </Typography>
+        {cardData.card_subtitle && (
+          <Typography variant="subtitle1" className="wrapped-card-subtitle">
+            {cardData.card_subtitle}
+          </Typography>
+        )}
       </Box>
 
       {/* Card Content - Specific visualization */}

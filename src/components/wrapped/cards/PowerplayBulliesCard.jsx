@@ -1,11 +1,9 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
-import { useNavigate } from 'react-router-dom';
+import TeamBadge from '../TeamBadge';
 
 const PowerplayBulliesCard = ({ data }) => {
-  const navigate = useNavigate();
-
   if (!data.players || data.players.length === 0) {
     return <Typography>No powerplay data available</Typography>;
   }
@@ -15,7 +13,8 @@ const PowerplayBulliesCard = ({ data }) => {
   const avgDot = data.players.reduce((sum, p) => sum + p.dot_percentage, 0) / data.players.length;
 
   const handlePlayerClick = (player) => {
-    navigate(`/player?name=${encodeURIComponent(player.name)}&start_date=2025-01-01&end_date=2025-12-31&autoload=true`);
+    const url = `/player?name=${encodeURIComponent(player.name)}&start_date=2025-01-01&end_date=2025-12-31&autoload=true`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Custom tooltip
@@ -24,13 +23,12 @@ const PowerplayBulliesCard = ({ data }) => {
       const player = payload[0].payload;
       return (
         <Box className="wrapped-tooltip">
-          <Typography variant="subtitle2">{player.name}</Typography>
+          <Typography variant="subtitle2">
+            {player.name} {player.team && <TeamBadge team={player.team} />}
+          </Typography>
           <Typography variant="body2">SR: {player.strike_rate}</Typography>
           <Typography variant="body2">Dot%: {player.dot_percentage}%</Typography>
           <Typography variant="body2">Balls: {player.balls}</Typography>
-          <Typography variant="caption" sx={{ color: '#1DB954' }}>
-            Tap to view profile →
-          </Typography>
         </Box>
       );
     }
@@ -52,7 +50,10 @@ const PowerplayBulliesCard = ({ data }) => {
           >
             <Typography variant="h5" className="rank">#{index + 1}</Typography>
             <Box className="player-info">
-              <Typography variant="subtitle1">{player.name}</Typography>
+              <Typography variant="subtitle1" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {player.name}
+                <TeamBadge team={player.team} />
+              </Typography>
               <Typography variant="body2">
                 SR: {player.strike_rate} | {player.balls} balls
               </Typography>

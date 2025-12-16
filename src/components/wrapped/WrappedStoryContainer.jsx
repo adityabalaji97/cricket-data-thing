@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, IconButton } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
+import { Box } from '@mui/material';
 import WrappedProgressBar from './WrappedProgressBar';
+import WrappedHeader from './WrappedHeader';
 import WrappedCard from './WrappedCard';
 import './wrapped.css';
 
@@ -22,6 +22,7 @@ const WrappedStoryContainer = ({ cards, initialCardId, year }) => {
   const [currentIndex, setCurrentIndex] = useState(getInitialIndex());
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   // Minimum swipe distance (in px)
   const minSwipeDistance = 50;
@@ -132,24 +133,21 @@ const WrappedStoryContainer = ({ cards, initialCardId, year }) => {
       onTouchEnd={onTouchEnd}
       onClick={handleTap}
     >
-      {/* Progress Bar */}
-      <WrappedProgressBar 
-        totalCards={cards.length} 
-        currentIndex={currentIndex}
-        onProgressClick={goToCard}
-      />
+      {/* Top Section: Progress + Header */}
+      <div className="wrapped-top-section">
+        {/* Progress Bar */}
+        <WrappedProgressBar 
+          totalCards={cards.length} 
+          currentIndex={currentIndex}
+          onProgressClick={goToCard}
+        />
 
-      {/* Close Button */}
-      <IconButton 
-        className="wrapped-close-btn"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleClose();
-        }}
-        aria-label="Close"
-      >
-        <CloseIcon />
-      </IconButton>
+        {/* Header Row */}
+        <WrappedHeader 
+          onMenuClick={() => setShowFilterMenu(true)}
+          onClose={handleClose}
+        />
+      </div>
 
       {/* Current Card */}
       <WrappedCard 

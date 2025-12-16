@@ -1,16 +1,46 @@
 import React from 'react';
 import { Box, Button } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import BuildIcon from '@mui/icons-material/Build';
 import ShareIcon from '@mui/icons-material/Share';
 import './wrapped.css';
 
-const WrappedCardActions = ({ deepLinks }) => {
-  const navigate = useNavigate();
+// External link icon component
+const ExternalLinkIcon = () => (
+  <svg 
+    width="14" 
+    height="14" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2"
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
+  </svg>
+);
 
-  const handleOpenInApp = (url) => {
-    navigate(url);
+// Query/Build icon component
+const QueryIcon = () => (
+  <svg 
+    width="14" 
+    height="14" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2"
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <circle cx="11" cy="11" r="8" />
+    <path d="M21 21l-4.35-4.35" />
+  </svg>
+);
+
+const WrappedCardActions = ({ deepLinks }) => {
+  const handleOpenInNewTab = (url) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleShare = async () => {
@@ -36,13 +66,13 @@ const WrappedCardActions = ({ deepLinks }) => {
 
   return (
     <Box className="wrapped-card-actions" onClick={(e) => e.stopPropagation()}>
-      {/* Open in App Buttons */}
+      {/* Open in App Buttons - Now open in new tab */}
       {deepLinks.comparison && (
         <Button
           variant="contained"
           size="small"
-          startIcon={<OpenInNewIcon />}
-          onClick={() => handleOpenInApp(deepLinks.comparison)}
+          endIcon={<ExternalLinkIcon />}
+          onClick={() => handleOpenInNewTab(deepLinks.comparison)}
           className="wrapped-action-btn"
         >
           Compare Players
@@ -53,8 +83,8 @@ const WrappedCardActions = ({ deepLinks }) => {
         <Button
           variant="contained"
           size="small"
-          startIcon={<OpenInNewIcon />}
-          onClick={() => handleOpenInApp(deepLinks.team_profile)}
+          endIcon={<ExternalLinkIcon />}
+          onClick={() => handleOpenInNewTab(deepLinks.team_profile)}
           className="wrapped-action-btn"
         >
           Team Profile
@@ -65,8 +95,8 @@ const WrappedCardActions = ({ deepLinks }) => {
         <Button
           variant="contained"
           size="small"
-          startIcon={<OpenInNewIcon />}
-          onClick={() => handleOpenInApp(deepLinks.venue_analysis)}
+          endIcon={<ExternalLinkIcon />}
+          onClick={() => handleOpenInNewTab(deepLinks.venue_analysis)}
           className="wrapped-action-btn"
         >
           Venue Analysis
@@ -78,8 +108,9 @@ const WrappedCardActions = ({ deepLinks }) => {
         <Button
           variant="outlined"
           size="small"
-          startIcon={<BuildIcon />}
-          onClick={() => handleOpenInApp(deepLinks.query_builder)}
+          startIcon={<QueryIcon />}
+          endIcon={<ExternalLinkIcon />}
+          onClick={() => handleOpenInNewTab(deepLinks.query_builder)}
           className="wrapped-action-btn wrapped-action-btn-secondary"
         >
           Recreate Query

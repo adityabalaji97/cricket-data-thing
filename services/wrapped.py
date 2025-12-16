@@ -298,11 +298,44 @@ class WrappedService:
         
         matches_result = db.execute(matches_query, params).fetchone()
         
+        # Get batting first vs chase win statistics
+        toss_query = text(f"""
+            SELECT 
+                SUM(CASE WHEN 
+                    (m.toss_decision = 'bat' AND m.winner = m.toss_winner) OR
+                    (m.toss_decision = 'field' AND m.winner != m.toss_winner AND m.winner IS NOT NULL)
+                    THEN 1 ELSE 0 END) as bat_first_wins,
+                SUM(CASE WHEN 
+                    (m.toss_decision = 'field' AND m.winner = m.toss_winner) OR
+                    (m.toss_decision = 'bat' AND m.winner != m.toss_winner AND m.winner IS NOT NULL)
+                    THEN 1 ELSE 0 END) as chase_wins,
+                COUNT(*) FILTER (WHERE m.winner IS NOT NULL) as total_decided
+            FROM matches m
+            WHERE m.date >= :start_date
+            AND m.date <= :end_date
+            AND m.winner IS NOT NULL
+            {competition_filter}
+        """)
+        
+        toss_result = db.execute(toss_query, params).fetchone()
+        
+        # Calculate percentages
+        bat_first_wins = toss_result.bat_first_wins if toss_result and toss_result.bat_first_wins else 0
+        chase_wins = toss_result.chase_wins if toss_result and toss_result.chase_wins else 0
+        total_decided = bat_first_wins + chase_wins
+        bat_first_pct = round((bat_first_wins * 100.0 / total_decided), 1) if total_decided > 0 else 50.0
+        
         return {
             "card_id": "intro",
             "card_title": "2025 in One Breath",
             "card_subtitle": "The rhythm of T20 cricket",
             "total_matches": matches_result.total_matches if matches_result else 0,
+            "toss_stats": {
+                "bat_first_wins": bat_first_wins,
+                "chase_wins": chase_wins,
+                "total_decided": total_decided,
+                "bat_first_pct": bat_first_pct
+            },
             "phases": [
                 {
                     "phase": row.phase,
@@ -344,6 +377,7 @@ class WrappedService:
             WITH powerplay_stats AS (
                 SELECT 
                     bs.striker as player,
+                    bs.batting_team as team,
                     SUM(bs.pp_balls) as balls,
                     SUM(bs.pp_runs) as runs,
                     SUM(bs.pp_wickets) as wickets,
@@ -356,16 +390,34 @@ class WrappedService:
                 AND m.date <= :end_date
                 AND bs.pp_balls > 0
                 {competition_filter}
-                GROUP BY bs.striker
-                HAVING SUM(bs.pp_balls) >= :min_balls
+                GROUP BY bs.striker, bs.batting_team
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM powerplay_stats
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(wickets) as wickets,
+                    SUM(dots) as dots,
+                    SUM(boundaries) as boundaries,
+                    SUM(innings) as innings
+                FROM powerplay_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
             )
             SELECT 
-                player, balls, runs, wickets, dots, boundaries, innings,
-                ROUND(CAST(runs * 100.0 / NULLIF(balls, 0) AS numeric), 2) as strike_rate,
-                ROUND(CAST(runs AS numeric) / NULLIF(wickets, 0), 2) as average,
-                ROUND(CAST(dots * 100.0 / NULLIF(balls, 0) AS numeric), 1) as dot_percentage,
-                ROUND(CAST(boundaries * 100.0 / NULLIF(balls, 0) AS numeric), 1) as boundary_percentage
-            FROM powerplay_stats
+                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, pt.boundaries, pt.innings,
+                ROUND(CAST(pt.runs * 100.0 / NULLIF(pt.balls, 0) AS numeric), 2) as strike_rate,
+                ROUND(CAST(pt.runs AS numeric) / NULLIF(pt.wickets, 0), 2) as average,
+                ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage,
+                ROUND(CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as boundary_percentage
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
             ORDER BY strike_rate DESC
             LIMIT 20
         """)
@@ -374,14 +426,15 @@ class WrappedService:
         
         return {
             "card_id": "powerplay_bullies",
-            "card_title": "Powerplay Bullies of 2025",
-            "card_subtitle": f"Min {min_balls} balls in powerplay",
+            "card_title": "Powerplay Bullies",
+            "card_subtitle": f"Who dominated the first 6 overs (min {min_balls} balls)",
             "visualization_type": "scatter",
             "x_axis": "dot_percentage",
             "y_axis": "strike_rate",
             "players": [
                 {
                     "name": row.player,
+                    "team": row.team,
                     "balls": row.balls,
                     "runs": row.runs,
                     "innings": row.innings,
@@ -421,6 +474,7 @@ class WrappedService:
             WITH middle_stats AS (
                 SELECT 
                     bs.striker as player,
+                    bs.batting_team as team,
                     SUM(bs.middle_balls) as balls,
                     SUM(bs.middle_runs) as runs,
                     SUM(bs.middle_wickets) as wickets,
@@ -433,19 +487,37 @@ class WrappedService:
                 AND m.date <= :end_date
                 AND bs.middle_balls > 0
                 {competition_filter}
-                GROUP BY bs.striker
-                HAVING SUM(bs.middle_balls) >= :min_balls
+                GROUP BY bs.striker, bs.batting_team
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM middle_stats
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(wickets) as wickets,
+                    SUM(dots) as dots,
+                    SUM(boundaries) as boundaries,
+                    SUM(innings) as innings
+                FROM middle_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
             )
             SELECT 
-                player, balls, runs, wickets, dots, boundaries, innings,
-                ROUND(CAST(runs * 100.0 / NULLIF(balls, 0) AS numeric), 2) as strike_rate,
-                ROUND(CAST(runs AS numeric) / NULLIF(wickets, 0), 2) as average,
-                ROUND(CAST(dots * 100.0 / NULLIF(balls, 0) AS numeric), 1) as dot_percentage,
-                ROUND(CAST(boundaries * 100.0 / NULLIF(balls, 0) AS numeric), 1) as boundary_percentage
-            FROM middle_stats
-            WHERE wickets > 0
-            ORDER BY (CAST(runs * 100.0 / NULLIF(balls, 0) AS numeric) * 
-                     CAST(runs AS numeric) / NULLIF(wickets, 0)) / 100 DESC
+                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, pt.boundaries, pt.innings,
+                ROUND(CAST(pt.runs * 100.0 / NULLIF(pt.balls, 0) AS numeric), 2) as strike_rate,
+                ROUND(CAST(pt.runs AS numeric) / NULLIF(pt.wickets, 0), 2) as average,
+                ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage,
+                ROUND(CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as boundary_percentage
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            WHERE pt.wickets > 0
+            ORDER BY (CAST(pt.runs * 100.0 / NULLIF(pt.balls, 0) AS numeric) * 
+                     CAST(pt.runs AS numeric) / NULLIF(pt.wickets, 0)) / 100 DESC
             LIMIT 20
         """)
         
@@ -453,7 +525,7 @@ class WrappedService:
         
         return {
             "card_id": "middle_merchants",
-            "card_title": "Middle-Overs Merchants",
+            "card_title": "Middle Merchants",
             "card_subtitle": f"Masters of overs 7-15 (min {min_balls} balls)",
             "visualization_type": "scatter",
             "x_axis": "average",
@@ -461,6 +533,7 @@ class WrappedService:
             "players": [
                 {
                     "name": row.player,
+                    "team": row.team,
                     "balls": row.balls,
                     "runs": row.runs,
                     "innings": row.innings,
@@ -499,6 +572,7 @@ class WrappedService:
             WITH death_stats AS (
                 SELECT 
                     bs.striker as player,
+                    bs.batting_team as team,
                     SUM(bs.death_balls) as balls,
                     SUM(bs.death_runs) as runs,
                     SUM(bs.death_wickets) as wickets,
@@ -511,16 +585,34 @@ class WrappedService:
                 AND m.date <= :end_date
                 AND bs.death_balls > 0
                 {competition_filter}
-                GROUP BY bs.striker
-                HAVING SUM(bs.death_balls) >= :min_balls
+                GROUP BY bs.striker, bs.batting_team
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM death_stats
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(wickets) as wickets,
+                    SUM(dots) as dots,
+                    SUM(boundaries) as boundaries,
+                    SUM(innings) as innings
+                FROM death_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
             )
             SELECT 
-                player, balls, runs, wickets, dots, boundaries, innings,
-                ROUND(CAST(runs * 100.0 / NULLIF(balls, 0) AS numeric), 2) as strike_rate,
-                ROUND(CAST(runs AS numeric) / NULLIF(wickets, 0), 2) as average,
-                ROUND(CAST(dots * 100.0 / NULLIF(balls, 0) AS numeric), 1) as dot_percentage,
-                ROUND(CAST(boundaries * 100.0 / NULLIF(balls, 0) AS numeric), 1) as boundary_percentage
-            FROM death_stats
+                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, pt.boundaries, pt.innings,
+                ROUND(CAST(pt.runs * 100.0 / NULLIF(pt.balls, 0) AS numeric), 2) as strike_rate,
+                ROUND(CAST(pt.runs AS numeric) / NULLIF(pt.wickets, 0), 2) as average,
+                ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage,
+                ROUND(CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as boundary_percentage
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
             ORDER BY strike_rate DESC
             LIMIT 15
         """)
@@ -529,12 +621,13 @@ class WrappedService:
         
         return {
             "card_id": "death_hitters",
-            "card_title": "Death is a Personality Trait",
-            "card_subtitle": f"Finishers in overs 16-20 (min {min_balls} balls)",
+            "card_title": "Death Hitters",
+            "card_subtitle": f"The finishers who lived dangerously (min {min_balls} balls)",
             "visualization_type": "table_with_highlight",
             "players": [
                 {
                     "name": row.player,
+                    "team": row.team,
                     "balls": row.balls,
                     "runs": row.runs,
                     "innings": row.innings,
@@ -582,6 +675,7 @@ class WrappedService:
             batter_vs_pace AS (
                 SELECT 
                     d.batter,
+                    d.batting_team as team,
                     COUNT(*) as balls,
                     SUM(d.runs_off_bat + d.extras) as runs
                 FROM deliveries d
@@ -589,12 +683,12 @@ class WrappedService:
                 WHERE d.bowler IN (SELECT name FROM pace_types)
                 AND m.date >= :start_date AND m.date <= :end_date
                 {competition_filter}
-                GROUP BY d.batter
-                HAVING COUNT(*) >= :min_balls
+                GROUP BY d.batter, d.batting_team
             ),
             batter_vs_spin AS (
                 SELECT 
                     d.batter,
+                    d.batting_team as team,
                     COUNT(*) as balls,
                     SUM(d.runs_off_bat + d.extras) as runs
                 FROM deliveries d
@@ -602,19 +696,41 @@ class WrappedService:
                 WHERE d.bowler IN (SELECT name FROM spin_types)
                 AND m.date >= :start_date AND m.date <= :end_date
                 {competition_filter}
-                GROUP BY d.batter
-                HAVING COUNT(*) >= :min_balls
+                GROUP BY d.batter, d.batting_team
+            ),
+            pace_totals AS (
+                SELECT batter, SUM(balls) as balls, SUM(runs) as runs
+                FROM batter_vs_pace
+                GROUP BY batter
+                HAVING SUM(balls) >= :min_balls
+            ),
+            spin_totals AS (
+                SELECT batter, SUM(balls) as balls, SUM(runs) as runs
+                FROM batter_vs_spin
+                GROUP BY batter
+                HAVING SUM(balls) >= :min_balls
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (batter) batter, team
+                FROM (
+                    SELECT batter, team, balls FROM batter_vs_pace
+                    UNION ALL
+                    SELECT batter, team, balls FROM batter_vs_spin
+                ) combined
+                ORDER BY batter, balls DESC
             )
             SELECT 
                 COALESCE(p.batter, s.batter) as player,
+                ppt.team,
                 p.balls as pace_balls, p.runs as pace_runs,
                 ROUND(CAST(p.runs * 100.0 / NULLIF(p.balls, 0) AS numeric), 2) as sr_vs_pace,
                 s.balls as spin_balls, s.runs as spin_runs,
                 ROUND(CAST(s.runs * 100.0 / NULLIF(s.balls, 0) AS numeric), 2) as sr_vs_spin,
                 ROUND(CAST(p.runs * 100.0 / NULLIF(p.balls, 0) AS numeric) - 
                       CAST(s.runs * 100.0 / NULLIF(s.balls, 0) AS numeric), 2) as sr_delta
-            FROM batter_vs_pace p
-            FULL OUTER JOIN batter_vs_spin s ON p.batter = s.batter
+            FROM pace_totals p
+            FULL OUTER JOIN spin_totals s ON p.batter = s.batter
+            LEFT JOIN player_primary_team ppt ON COALESCE(p.batter, s.batter) = ppt.batter
             WHERE p.balls IS NOT NULL AND s.balls IS NOT NULL
             ORDER BY ABS(CAST(p.runs * 100.0 / NULLIF(p.balls, 0) AS numeric) - 
                         CAST(s.runs * 100.0 / NULLIF(s.balls, 0) AS numeric)) DESC
@@ -628,12 +744,13 @@ class WrappedService:
         
         return {
             "card_id": "pace_vs_spin",
-            "card_title": "Pace vs Spin: 2025's Split Brain",
-            "card_subtitle": f"Who dominated which bowling type (min {min_balls} balls each)",
+            "card_title": "Pace vs Spin",
+            "card_subtitle": f"2025's split personality batters (min {min_balls} balls each)",
             "visualization_type": "diverging_bar",
             "pace_crushers": [
                 {
                     "name": row.player,
+                    "team": row.team,
                     "sr_vs_pace": float(row.sr_vs_pace) if row.sr_vs_pace else 0,
                     "sr_vs_spin": float(row.sr_vs_spin) if row.sr_vs_spin else 0,
                     "sr_delta": float(row.sr_delta) if row.sr_delta else 0,
@@ -645,6 +762,7 @@ class WrappedService:
             "spin_crushers": [
                 {
                     "name": row.player,
+                    "team": row.team,
                     "sr_vs_pace": float(row.sr_vs_pace) if row.sr_vs_pace else 0,
                     "sr_vs_spin": float(row.sr_vs_spin) if row.sr_vs_spin else 0,
                     "sr_delta": float(row.sr_delta) if row.sr_delta else 0,
@@ -681,6 +799,7 @@ class WrappedService:
             WITH pp_bowling AS (
                 SELECT 
                     bw.bowler as player,
+                    bw.bowling_team as team,
                     SUM(bw.pp_overs) * 6 as balls,
                     SUM(bw.pp_runs) as runs,
                     SUM(bw.pp_wickets) as wickets,
@@ -691,15 +810,32 @@ class WrappedService:
                 WHERE m.date >= :start_date AND m.date <= :end_date
                 AND bw.pp_overs > 0
                 {competition_filter}
-                GROUP BY bw.bowler
-                HAVING SUM(bw.pp_wickets) >= :min_wickets
+                GROUP BY bw.bowler, bw.bowling_team
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM pp_bowling
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(wickets) as wickets,
+                    SUM(dots) as dots,
+                    SUM(innings) as innings
+                FROM pp_bowling
+                GROUP BY player
+                HAVING SUM(wickets) >= :min_wickets
             )
             SELECT 
-                player, balls, runs, wickets, dots, innings,
-                ROUND(CAST(balls AS numeric) / NULLIF(wickets, 0), 2) as strike_rate,
-                ROUND(CAST(runs * 6.0 / NULLIF(balls, 0) AS numeric), 2) as economy,
-                ROUND(CAST(dots * 100.0 / NULLIF(balls, 0) AS numeric), 1) as dot_percentage
-            FROM pp_bowling
+                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, pt.innings,
+                ROUND(CAST(pt.balls AS numeric) / NULLIF(pt.wickets, 0), 2) as strike_rate,
+                ROUND(CAST(pt.runs * 6.0 / NULLIF(pt.balls, 0) AS numeric), 2) as economy,
+                ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
             ORDER BY strike_rate ASC
             LIMIT 15
         """)
@@ -708,12 +844,13 @@ class WrappedService:
         
         return {
             "card_id": "powerplay_thieves",
-            "card_title": "Powerplay Wicket Thieves",
+            "card_title": "PP Wicket Thieves",
             "card_subtitle": f"Early breakthrough specialists (min {min_wickets} wickets)",
             "visualization_type": "table",
             "bowlers": [
                 {
                     "name": row.player,
+                    "team": row.team,
                     "balls": row.balls,
                     "runs": row.runs,
                     "wickets": row.wickets,
@@ -752,6 +889,7 @@ class WrappedService:
             WITH death_bowling AS (
                 SELECT 
                     bw.bowler as player,
+                    bw.bowling_team as team,
                     SUM(bw.death_overs) * 6 as balls,
                     SUM(bw.death_runs) as runs,
                     SUM(bw.death_wickets) as wickets,
@@ -762,15 +900,32 @@ class WrappedService:
                 WHERE m.date >= :start_date AND m.date <= :end_date
                 AND bw.death_overs > 0
                 {competition_filter}
-                GROUP BY bw.bowler
-                HAVING SUM(bw.death_overs) >= :min_overs
+                GROUP BY bw.bowler, bw.bowling_team
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM death_bowling
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(wickets) as wickets,
+                    SUM(dots) as dots,
+                    SUM(innings) as innings
+                FROM death_bowling
+                GROUP BY player
+                HAVING SUM(balls) / 6 >= :min_overs
             )
             SELECT 
-                player, balls, runs, wickets, dots, innings,
-                ROUND(CAST(runs * 6.0 / NULLIF(balls, 0) AS numeric), 2) as economy,
-                ROUND(CAST(balls AS numeric) / NULLIF(wickets, 0), 2) as strike_rate,
-                ROUND(CAST(dots * 100.0 / NULLIF(balls, 0) AS numeric), 1) as dot_percentage
-            FROM death_bowling
+                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, pt.innings,
+                ROUND(CAST(pt.runs * 6.0 / NULLIF(pt.balls, 0) AS numeric), 2) as economy,
+                ROUND(CAST(pt.balls AS numeric) / NULLIF(pt.wickets, 0), 2) as strike_rate,
+                ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
             ORDER BY economy ASC
             LIMIT 15
         """)
@@ -779,12 +934,13 @@ class WrappedService:
         
         return {
             "card_id": "nineteenth_over_gods",
-            "card_title": "The 19th Over Gods",
-            "card_subtitle": f"Death overs excellence (min {min_overs} overs)",
+            "card_title": "Death Over Gods",
+            "card_subtitle": f"Overs 16-20 bowling excellence (min {min_overs} overs)",
             "visualization_type": "table",
             "bowlers": [
                 {
                     "name": row.player,
+                    "team": row.team,
                     "balls": row.balls,
                     "runs": row.runs,
                     "wickets": row.wickets,
@@ -863,8 +1019,8 @@ class WrappedService:
             
             return {
                 "card_id": "elo_movers",
-                "card_title": "Teams That Became Different People",
-                "card_subtitle": "Biggest ELO movements in 2025",
+                "card_title": "ELO Movers",
+                "card_subtitle": "Teams that transformed in 2025",
                 "visualization_type": "diverging_bar",
                 "risers": [
                     {
@@ -894,7 +1050,7 @@ class WrappedService:
             logger.error(f"Error fetching ELO data: {e}")
             return {
                 "card_id": "elo_movers",
-                "card_title": "Teams That Became Different People",
+                "card_title": "ELO Movers",
                 "error": "ELO data not available for selected filters"
             }
 
@@ -955,7 +1111,7 @@ class WrappedService:
         
         return {
             "card_id": "venue_vibes",
-            "card_title": "Venues Had Vibes",
+            "card_title": "Venue Vibes",
             "card_subtitle": f"Par scores and chase bias (min {min_matches} matches)",
             "visualization_type": "scatter",
             "x_axis": "par_score",

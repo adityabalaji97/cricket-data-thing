@@ -108,7 +108,7 @@ def get_wrapped_metadata():
             {
                 "id": "intro",
                 "title": "2025 in One Breath",
-                "subtitle": "Global run rate by phase",
+                "subtitle": "The rhythm of T20 cricket",
                 "order": 1
             },
             {
@@ -119,43 +119,43 @@ def get_wrapped_metadata():
             },
             {
                 "id": "middle_merchants",
-                "title": "Middle-Overs Merchants",
+                "title": "Middle Merchants",
                 "subtitle": "Masters of overs 7-15",
                 "order": 3
             },
             {
                 "id": "death_hitters",
-                "title": "Death is a Personality Trait",
+                "title": "Death Hitters",
                 "subtitle": "The finishers who lived dangerously",
                 "order": 4
             },
             {
                 "id": "pace_vs_spin",
-                "title": "Pace vs Spin: 2025's Split Brain",
-                "subtitle": "Who crushed what type of bowling",
+                "title": "Pace vs Spin",
+                "subtitle": "2025's split personality batters",
                 "order": 5
             },
             {
                 "id": "powerplay_thieves",
-                "title": "Powerplay Wicket Thieves",
-                "subtitle": "Early breakthroughs specialists",
+                "title": "PP Wicket Thieves",
+                "subtitle": "Early breakthrough specialists",
                 "order": 6
             },
             {
                 "id": "nineteenth_over_gods",
-                "title": "The 19th Over Gods",
-                "subtitle": "Death overs bowling excellence",
+                "title": "Death Over Gods",
+                "subtitle": "Overs 16-20 bowling excellence",
                 "order": 7
             },
             {
                 "id": "elo_movers",
-                "title": "Teams That Became Different People",
-                "subtitle": "Biggest ELO risers and fallers",
+                "title": "ELO Movers",
+                "subtitle": "Teams that transformed in 2025",
                 "order": 8
             },
             {
                 "id": "venue_vibes",
-                "title": "Venues Had Vibes",
+                "title": "Venue Vibes",
                 "subtitle": "Par scores and chase bias",
                 "order": 9
             }

@@ -1,16 +1,15 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import TeamBadge from '../TeamBadge';
 
 const NineteenthOverGodsCard = ({ data }) => {
-  const navigate = useNavigate();
-
   if (!data.bowlers || data.bowlers.length === 0) {
     return <Typography>No death bowling data available</Typography>;
   }
 
   const handleBowlerClick = (bowler) => {
-    navigate(`/bowler?name=${encodeURIComponent(bowler.name)}&start_date=2025-01-01&end_date=2025-12-31&autoload=true`);
+    const url = `/bowler?name=${encodeURIComponent(bowler.name)}&start_date=2025-01-01&end_date=2025-12-31&autoload=true`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const topBowlers = data.bowlers.slice(0, 5);
@@ -30,6 +29,7 @@ const NineteenthOverGodsCard = ({ data }) => {
           >
             <Typography variant="h6" className="podium-rank">2</Typography>
             <Typography variant="body2" className="podium-name">{topBowlers[1]?.name}</Typography>
+            <TeamBadge team={topBowlers[1]?.team} />
             <Typography variant="h5" className="podium-stat">{topBowlers[1]?.economy}</Typography>
             <Typography variant="caption">Economy</Typography>
           </Box>
@@ -46,6 +46,7 @@ const NineteenthOverGodsCard = ({ data }) => {
           >
             <Typography variant="h5" className="podium-rank">👑</Typography>
             <Typography variant="subtitle1" className="podium-name">{topBowlers[0]?.name}</Typography>
+            <TeamBadge team={topBowlers[0]?.team} size="medium" />
             <Typography variant="h4" className="podium-stat">{topBowlers[0]?.economy}</Typography>
             <Typography variant="caption">Economy</Typography>
           </Box>
@@ -62,6 +63,7 @@ const NineteenthOverGodsCard = ({ data }) => {
           >
             <Typography variant="h6" className="podium-rank">3</Typography>
             <Typography variant="body2" className="podium-name">{topBowlers[2]?.name}</Typography>
+            <TeamBadge team={topBowlers[2]?.team} />
             <Typography variant="h5" className="podium-stat">{topBowlers[2]?.economy}</Typography>
             <Typography variant="caption">Economy</Typography>
           </Box>
@@ -80,7 +82,10 @@ const NineteenthOverGodsCard = ({ data }) => {
             }}
           >
             <Typography variant="body2" className="list-rank">#{index + 4}</Typography>
-            <Typography variant="body2" className="list-name">{bowler.name}</Typography>
+            <Typography variant="body2" className="list-name" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              {bowler.name}
+              <TeamBadge team={bowler.team} />
+            </Typography>
             <Typography variant="body2" className="list-stat">
               Econ: {bowler.economy} | {bowler.wickets} wkts
             </Typography>
