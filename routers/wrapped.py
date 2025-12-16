@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_START_DATE = "2025-01-01"
 DEFAULT_END_DATE = "2025-12-31"
 
+# Default settings
+DEFAULT_TOP_TEAMS = 20
+
 # Initialize service
 wrapped_service = WrappedService()
 
@@ -28,11 +31,16 @@ wrapped_service = WrappedService()
 def get_wrapped_cards(
     leagues: List[str] = Query(default=[]),
     include_international: bool = Query(default=True),
+    top_teams: int = Query(default=DEFAULT_TOP_TEAMS),
     db: Session = Depends(get_session)
 ):
     """
     Get all card data for the 2025 Wrapped experience.
     Returns an array of card objects with their data and metadata.
+    
+    - leagues: List of leagues to filter. If empty, includes ALL leagues from database.
+    - include_international: Include international matches (default True)
+    - top_teams: Number of top international teams to include (default 20)
     """
     try:
         return wrapped_service.get_all_cards(
@@ -40,7 +48,8 @@ def get_wrapped_cards(
             end_date=DEFAULT_END_DATE,
             leagues=leagues,
             include_international=include_international,
-            db=db
+            db=db,
+            top_teams=top_teams
         )
     except Exception as e:
         logger.error(f"Error fetching wrapped cards: {str(e)}")
@@ -52,11 +61,17 @@ def get_wrapped_card(
     card_id: str,
     leagues: List[str] = Query(default=[]),
     include_international: bool = Query(default=True),
+    top_teams: int = Query(default=DEFAULT_TOP_TEAMS),
     db: Session = Depends(get_session)
 ):
     """
     Get data for a single wrapped card.
     Useful for deep linking to specific cards.
+    
+    - card_id: The card identifier (e.g., 'intro', 'powerplay_bullies')
+    - leagues: List of leagues to filter. If empty, includes ALL leagues from database.
+    - include_international: Include international matches (default True)
+    - top_teams: Number of top international teams to include (default 20)
     """
     try:
         return wrapped_service.get_single_card(
@@ -65,7 +80,8 @@ def get_wrapped_card(
             end_date=DEFAULT_END_DATE,
             leagues=leagues,
             include_international=include_international,
-            db=db
+            db=db,
+            top_teams=top_teams
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

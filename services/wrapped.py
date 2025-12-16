@@ -7,17 +7,47 @@ Each function corresponds to a specific card in the wrapped experience.
 
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Import team rankings for top_teams filter
+try:
+    from config.teams import INTERNATIONAL_TEAMS_RANKED
+except ImportError:
+    INTERNATIONAL_TEAMS_RANKED = [
+        'India', 'Australia', 'England', 'South Africa', 'New Zealand',
+        'Pakistan', 'West Indies', 'Sri Lanka', 'Bangladesh', 'Afghanistan',
+        'Ireland', 'Zimbabwe', 'Scotland', 'Netherlands', 'Namibia',
+        'UAE', 'Nepal', 'USA', 'Oman', 'Papua New Guinea'
+    ]
+
+# Default settings
+DEFAULT_TOP_TEAMS = 20
 
 
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
-def build_competition_filter(leagues: List[str], include_international: bool) -> str:
+def get_all_leagues_from_db(db: Session) -> List[str]:
+    """Fetch all available leagues from the database."""
+    query = text("""
+        SELECT DISTINCT competition
+        FROM matches 
+        WHERE competition IS NOT NULL 
+        AND match_type = 'league'
+    """)
+    result = db.execute(query).fetchall()
+    return [row[0] for row in result if row[0]]
+
+
+def build_competition_filter(
+    leagues: List[str], 
+    include_international: bool,
+    top_teams: Optional[int] = None
+) -> str:
     """Build the competition filter clause used across all queries."""
     conditions = []
     
@@ -25,7 +55,14 @@ def build_competition_filter(leagues: List[str], include_international: bool) ->
         conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
     
     if include_international:
-        conditions.append("(m.match_type = 'international')")
+        if top_teams:
+            conditions.append(
+                "(m.match_type = 'international' "
+                "AND m.team1 = ANY(:top_team_list) "
+                "AND m.team2 = ANY(:top_team_list))"
+            )
+        else:
+            conditions.append("(m.match_type = 'international')")
     
     if conditions:
         return " AND (" + " OR ".join(conditions) + ")"
@@ -33,13 +70,23 @@ def build_competition_filter(leagues: List[str], include_international: bool) ->
         return " AND FALSE"
 
 
-def get_base_params(start_date: str, end_date: str, leagues: List[str]) -> Dict:
+def get_base_params(
+    start_date: str, 
+    end_date: str, 
+    leagues: List[str],
+    top_teams: Optional[int] = None
+) -> Dict:
     """Returns base parameters used in most queries."""
-    return {
+    params = {
         "start_date": start_date,
         "end_date": end_date,
         "leagues": leagues if leagues else []
     }
+    
+    if top_teams:
+        params["top_team_list"] = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+    
+    return params
 
 
 # ============================================================================
@@ -54,71 +101,86 @@ class WrappedService:
         start_date: str,
         end_date: str,
         leagues: List[str],
-        include_international: bool,
-        db: Session
+        include_international: bool = True,
+        db: Session = None,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Fetch data for all wrapped cards."""
+        """Fetch data for all wrapped cards.
+        
+        Args:
+            start_date: Start date for filtering
+            end_date: End date for filtering
+            leagues: List of leagues to include. If empty, fetches all leagues from DB.
+            include_international: Include international matches (default True)
+            db: Database session
+            top_teams: Number of top teams for international filtering (default 20)
+        """
+        # If no leagues specified, get all available leagues from DB
+        if not leagues:
+            leagues = get_all_leagues_from_db(db)
+            logger.info(f"Using all available leagues: {len(leagues)} leagues found")
+        
         cards = []
         
         # Card 1: Intro
         try:
-            cards.append(self.get_intro_card_data(start_date, end_date, leagues, include_international, db))
+            cards.append(self.get_intro_card_data(start_date, end_date, leagues, include_international, db, top_teams))
         except Exception as e:
             logger.error(f"Error fetching intro card: {e}")
             cards.append({"card_id": "intro", "error": str(e)})
         
         # Card 2: Powerplay Bullies
         try:
-            cards.append(self.get_powerplay_bullies_data(start_date, end_date, leagues, include_international, db))
+            cards.append(self.get_powerplay_bullies_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
         except Exception as e:
             logger.error(f"Error fetching powerplay bullies: {e}")
             cards.append({"card_id": "powerplay_bullies", "error": str(e)})
         
         # Card 3: Middle Merchants
         try:
-            cards.append(self.get_middle_merchants_data(start_date, end_date, leagues, include_international, db))
+            cards.append(self.get_middle_merchants_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
         except Exception as e:
             logger.error(f"Error fetching middle merchants: {e}")
             cards.append({"card_id": "middle_merchants", "error": str(e)})
         
         # Card 4: Death Hitters
         try:
-            cards.append(self.get_death_hitters_data(start_date, end_date, leagues, include_international, db))
+            cards.append(self.get_death_hitters_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
         except Exception as e:
             logger.error(f"Error fetching death hitters: {e}")
             cards.append({"card_id": "death_hitters", "error": str(e)})
         
         # Card 5: Pace vs Spin
         try:
-            cards.append(self.get_pace_vs_spin_data(start_date, end_date, leagues, include_international, db))
+            cards.append(self.get_pace_vs_spin_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
         except Exception as e:
             logger.error(f"Error fetching pace vs spin: {e}")
             cards.append({"card_id": "pace_vs_spin", "error": str(e)})
         
         # Card 6: Powerplay Wicket Thieves
         try:
-            cards.append(self.get_powerplay_wicket_thieves_data(start_date, end_date, leagues, include_international, db))
+            cards.append(self.get_powerplay_wicket_thieves_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
         except Exception as e:
             logger.error(f"Error fetching powerplay thieves: {e}")
             cards.append({"card_id": "powerplay_thieves", "error": str(e)})
         
         # Card 7: 19th Over Gods
         try:
-            cards.append(self.get_nineteenth_over_gods_data(start_date, end_date, leagues, include_international, db))
+            cards.append(self.get_nineteenth_over_gods_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
         except Exception as e:
             logger.error(f"Error fetching 19th over gods: {e}")
             cards.append({"card_id": "nineteenth_over_gods", "error": str(e)})
         
         # Card 8: ELO Movers
         try:
-            cards.append(self.get_elo_movers_data(start_date, end_date, leagues, include_international, db))
+            cards.append(self.get_elo_movers_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
         except Exception as e:
             logger.error(f"Error fetching elo movers: {e}")
             cards.append({"card_id": "elo_movers", "error": str(e)})
         
         # Card 9: Venue Vibes
         try:
-            cards.append(self.get_venue_vibes_data(start_date, end_date, leagues, include_international, db))
+            cards.append(self.get_venue_vibes_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
         except Exception as e:
             logger.error(f"Error fetching venue vibes: {e}")
             cards.append({"card_id": "venue_vibes", "error": str(e)})
@@ -136,10 +198,16 @@ class WrappedService:
         start_date: str,
         end_date: str,
         leagues: List[str],
-        include_international: bool,
-        db: Session
+        include_international: bool = True,
+        db: Session = None,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
         """Fetch data for a single card by ID."""
+        # If no leagues specified, get all available leagues from DB
+        if not leagues:
+            leagues = get_all_leagues_from_db(db)
+            logger.info(f"Using all available leagues: {len(leagues)} leagues found")
+        
         card_methods = {
             "intro": self.get_intro_card_data,
             "powerplay_bullies": self.get_powerplay_bullies_data,
@@ -155,7 +223,7 @@ class WrappedService:
         if card_id not in card_methods:
             raise ValueError(f"Unknown card ID: {card_id}")
         
-        return card_methods[card_id](start_date, end_date, leagues, include_international, db)
+        return card_methods[card_id](start_date, end_date, leagues, include_international, db, top_teams=top_teams)
 
     # ========================================================================
     # CARD 1: INTRO - "2025 in One Breath"
@@ -167,12 +235,13 @@ class WrappedService:
         end_date: str,
         leagues: List[str],
         include_international: bool,
-        db: Session
+        db: Session,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
         """Card 1: Global run rate and wicket cost by phase."""
         
-        competition_filter = build_competition_filter(leagues, include_international)
-        params = get_base_params(start_date, end_date, leagues)
+        competition_filter = build_competition_filter(leagues, include_international, top_teams)
+        params = get_base_params(start_date, end_date, leagues, top_teams)
         
         query = text(f"""
             WITH phase_data AS (
@@ -263,12 +332,13 @@ class WrappedService:
         leagues: List[str],
         include_international: bool,
         db: Session,
-        min_balls: int = 100
+        min_balls: int = 100,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
         """Card 2: Top batters in powerplay by strike rate."""
         
-        competition_filter = build_competition_filter(leagues, include_international)
-        params = {**get_base_params(start_date, end_date, leagues), "min_balls": min_balls}
+        competition_filter = build_competition_filter(leagues, include_international, top_teams)
+        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
         
         query = text(f"""
             WITH powerplay_stats AS (
@@ -339,12 +409,13 @@ class WrappedService:
         leagues: List[str],
         include_international: bool,
         db: Session,
-        min_balls: int = 150
+        min_balls: int = 150,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
         """Card 3: Best middle-overs batters by average AND strike rate."""
         
-        competition_filter = build_competition_filter(leagues, include_international)
-        params = {**get_base_params(start_date, end_date, leagues), "min_balls": min_balls}
+        competition_filter = build_competition_filter(leagues, include_international, top_teams)
+        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
         
         query = text(f"""
             WITH middle_stats AS (
@@ -416,12 +487,13 @@ class WrappedService:
         leagues: List[str],
         include_international: bool,
         db: Session,
-        min_balls: int = 75
+        min_balls: int = 75,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
         """Card 4: Best death-overs hitters."""
         
-        competition_filter = build_competition_filter(leagues, include_international)
-        params = {**get_base_params(start_date, end_date, leagues), "min_balls": min_balls}
+        competition_filter = build_competition_filter(leagues, include_international, top_teams)
+        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
         
         query = text(f"""
             WITH death_stats AS (
@@ -490,12 +562,13 @@ class WrappedService:
         leagues: List[str],
         include_international: bool,
         db: Session,
-        min_balls: int = 100
+        min_balls: int = 100,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
         """Card 5: Batters who were pace-only vs spin-only monsters."""
         
-        competition_filter = build_competition_filter(leagues, include_international)
-        params = {**get_base_params(start_date, end_date, leagues), "min_balls": min_balls}
+        competition_filter = build_competition_filter(leagues, include_international, top_teams)
+        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
         
         query = text(f"""
             WITH pace_types AS (
@@ -596,12 +669,13 @@ class WrappedService:
         leagues: List[str],
         include_international: bool,
         db: Session,
-        min_wickets: int = 10
+        min_wickets: int = 10,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
         """Card 6: Best powerplay wicket-takers."""
         
-        competition_filter = build_competition_filter(leagues, include_international)
-        params = {**get_base_params(start_date, end_date, leagues), "min_wickets": min_wickets}
+        competition_filter = build_competition_filter(leagues, include_international, top_teams)
+        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_wickets": min_wickets}
         
         query = text(f"""
             WITH pp_bowling AS (
@@ -666,12 +740,13 @@ class WrappedService:
         leagues: List[str],
         include_international: bool,
         db: Session,
-        min_overs: int = 10
+        min_overs: int = 10,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
         """Card 7: Bowlers who dominated death overs."""
         
-        competition_filter = build_competition_filter(leagues, include_international)
-        params = {**get_base_params(start_date, end_date, leagues), "min_overs": min_overs}
+        competition_filter = build_competition_filter(leagues, include_international, top_teams)
+        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_overs": min_overs}
         
         query = text(f"""
             WITH death_bowling AS (
@@ -735,12 +810,13 @@ class WrappedService:
         end_date: str,
         leagues: List[str],
         include_international: bool,
-        db: Session
+        db: Session,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
         """Card 8: Biggest ELO risers/fallers."""
         
-        competition_filter = build_competition_filter(leagues, include_international)
-        params = get_base_params(start_date, end_date, leagues)
+        competition_filter = build_competition_filter(leagues, include_international, top_teams)
+        params = get_base_params(start_date, end_date, leagues, top_teams)
         
         query = text(f"""
             WITH team_matches AS (
@@ -833,12 +909,13 @@ class WrappedService:
         leagues: List[str],
         include_international: bool,
         db: Session,
-        min_matches: int = 5
+        min_matches: int = 5,
+        top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
         """Card 9: Venue leaderboard - par score + chase bias."""
         
-        competition_filter = build_competition_filter(leagues, include_international)
-        params = {**get_base_params(start_date, end_date, leagues), "min_matches": min_matches}
+        competition_filter = build_competition_filter(leagues, include_international, top_teams)
+        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_matches": min_matches}
         
         query = text(f"""
             WITH innings_totals AS (
