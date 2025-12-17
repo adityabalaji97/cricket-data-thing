@@ -32,6 +32,7 @@ from routers.teams import router as teams_router
 from routers.recent_matches import router as recent_matches_router
 from routers.player_summary import router as player_summary_router
 from routers.wrapped import router as wrapped_router
+from routers.search import router as search_router
 import math
 
 from dotenv import load_dotenv
@@ -160,6 +161,7 @@ app.include_router(teams_router)
 app.include_router(recent_matches_router)
 app.include_router(player_summary_router)
 app.include_router(wrapped_router)
+app.include_router(search_router)
 
 # Add CORS middleware
 app.add_middleware(
