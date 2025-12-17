@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import WrappedCardActions from './WrappedCardActions';
 
@@ -27,7 +27,7 @@ const cardComponents = {
   'venue_vibes': VenueVibesCard,
 };
 
-const WrappedCard = ({ cardData, cardIndex, totalCards }) => {
+const WrappedCard = forwardRef(({ cardData, cardIndex, totalCards, onShareImage, isSharing }, ref) => {
   if (!cardData) {
     return (
       <Box className="wrapped-card wrapped-card-error">
@@ -50,32 +50,41 @@ const WrappedCard = ({ cardData, cardIndex, totalCards }) => {
   const CardComponent = cardComponents[cardData.card_id];
 
   return (
-    <Box className="wrapped-card">
-      {/* Card Header */}
-      <Box className="wrapped-card-header">
-        <Typography variant="h4" className="wrapped-card-title">
-          {cardData.card_title}
-        </Typography>
-        {cardData.card_subtitle && (
-          <Typography variant="subtitle1" className="wrapped-card-subtitle">
-            {cardData.card_subtitle}
+    <Box className="wrapped-card" ref={ref}>
+      {/* Card Body - Vertically centered */}
+      <Box className="wrapped-card-body">
+        {/* Card Header */}
+        <Box className="wrapped-card-header">
+          <Typography variant="h4" className="wrapped-card-title">
+            {cardData.card_title}
           </Typography>
-        )}
+          {cardData.card_subtitle && (
+            <Typography variant="subtitle1" className="wrapped-card-subtitle">
+              {cardData.card_subtitle}
+            </Typography>
+          )}
+        </Box>
+
+        {/* Card Content - Specific visualization */}
+        <Box className="wrapped-card-content">
+          {CardComponent ? (
+            <CardComponent data={cardData} />
+          ) : (
+            <Typography>Visualization not available for this card type</Typography>
+          )}
+        </Box>
       </Box>
 
-      {/* Card Content - Specific visualization */}
-      <Box className="wrapped-card-content">
-        {CardComponent ? (
-          <CardComponent data={cardData} />
-        ) : (
-          <Typography>Visualization not available for this card type</Typography>
-        )}
-      </Box>
-
-      {/* Card Actions */}
-      <WrappedCardActions deepLinks={cardData.deep_links} />
+      {/* Card Actions - Stays at bottom */}
+      <WrappedCardActions 
+        deepLinks={cardData.deep_links} 
+        onShareImage={onShareImage}
+        isSharing={isSharing}
+      />
     </Box>
   );
-};
+});
+
+WrappedCard.displayName = 'WrappedCard';
 
 export default WrappedCard;

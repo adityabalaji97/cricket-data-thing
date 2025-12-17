@@ -4,11 +4,13 @@ import { Box } from '@mui/material';
 import WrappedProgressBar from './WrappedProgressBar';
 import WrappedHeader from './WrappedHeader';
 import WrappedCard from './WrappedCard';
+import { captureAndShare } from '../../utils/shareUtils';
 import './wrapped.css';
 
 const WrappedStoryContainer = ({ cards, initialCardId, year }) => {
   const navigate = useNavigate();
   const containerRef = useRef(null);
+  const cardRef = useRef(null);
   
   // Find initial card index
   const getInitialIndex = () => {
@@ -23,6 +25,7 @@ const WrappedStoryContainer = ({ cards, initialCardId, year }) => {
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   // Minimum swipe distance (in px)
   const minSwipeDistance = 50;
@@ -48,6 +51,21 @@ const WrappedStoryContainer = ({ cards, initialCardId, year }) => {
   const handleClose = () => {
     navigate('/');
   };
+
+  // Share card as image
+  const handleShareImage = useCallback(async () => {
+    if (!cardRef.current || isSharing) return;
+    
+    setIsSharing(true);
+    try {
+      const cardTitle = cards[currentIndex]?.card_title || 'Wrapped';
+      await captureAndShare(cardRef.current, cardTitle);
+    } catch (error) {
+      console.error('Share failed:', error);
+    } finally {
+      setIsSharing(false);
+    }
+  }, [cards, currentIndex, isSharing]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -151,9 +169,12 @@ const WrappedStoryContainer = ({ cards, initialCardId, year }) => {
 
       {/* Current Card */}
       <WrappedCard 
+        ref={cardRef}
         cardData={currentCard}
         cardIndex={currentIndex}
         totalCards={cards.length}
+        onShareImage={handleShareImage}
+        isSharing={isSharing}
       />
 
       {/* Navigation hints */}
