@@ -171,6 +171,28 @@ def get_available_columns(db: Session = Depends(get_session)):
         bowl_kind_data = get_options_with_coverage("bowl_kind")
         bat_hand_data = get_options_with_coverage("bat_hand")
         
+        # Get dropdown options for basic filters (from delivery_details)
+        venues_query = text("SELECT DISTINCT ground FROM delivery_details WHERE ground IS NOT NULL ORDER BY ground")
+        venues = [row[0] for row in db.execute(venues_query).fetchall()]
+        
+        batters_query = text("SELECT DISTINCT bat FROM delivery_details WHERE bat IS NOT NULL ORDER BY bat")
+        batters = [row[0] for row in db.execute(batters_query).fetchall()]
+        
+        bowlers_query = text("SELECT DISTINCT bowl FROM delivery_details WHERE bowl IS NOT NULL ORDER BY bowl")
+        bowlers = [row[0] for row in db.execute(bowlers_query).fetchall()]
+        
+        batting_teams_query = text("SELECT DISTINCT team_bat FROM delivery_details WHERE team_bat IS NOT NULL ORDER BY team_bat")
+        batting_teams = [row[0] for row in db.execute(batting_teams_query).fetchall()]
+        
+        bowling_teams_query = text("SELECT DISTINCT team_bowl FROM delivery_details WHERE team_bowl IS NOT NULL ORDER BY team_bowl")
+        bowling_teams = [row[0] for row in db.execute(bowling_teams_query).fetchall()]
+        
+        # Combine teams (union of batting and bowling teams)
+        all_teams = sorted(list(set(batting_teams + bowling_teams)))
+        
+        competitions_query = text("SELECT DISTINCT competition FROM delivery_details WHERE competition IS NOT NULL ORDER BY competition")
+        competitions = [row[0] for row in db.execute(competitions_query).fetchall()]
+        
         return {
             "total_deliveries": total_count,
             
@@ -217,6 +239,15 @@ def get_available_columns(db: Session = Depends(get_session)):
             "bat_hand_coverage": bat_hand_data["coverage_percent"],
             
             "innings_options": [1, 2],
+            
+            # Basic filter options (from delivery_details)
+            "venues": venues,
+            "batters": batters,
+            "bowlers": bowlers,
+            "teams": all_teams,
+            "batting_teams": batting_teams,
+            "bowling_teams": bowling_teams,
+            "competitions": competitions,
             
             # Coverage summary for UI warnings
             "coverage_summary": {

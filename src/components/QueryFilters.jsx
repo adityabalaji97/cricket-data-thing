@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Box,
   Grid,
@@ -23,8 +23,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoIcon from '@mui/icons-material/Info';
 import WarningIcon from '@mui/icons-material/Warning';
-import axios from 'axios';
-import config from '../config';
+
 
 // Info tooltip component
 const InfoTooltip = ({ tooltip }) => (
@@ -52,50 +51,7 @@ const CoverageWarning = ({ coverage, columnName }) => {
 };
 
 const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColumns, isMobile }) => {
-  const [venues, setVenues] = useState([]);
-  const [teams, setTeams] = useState([]);
-  const [batters, setBatters] = useState([]);
-  const [bowlers, setBowlers] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
-  
-  // Fetch dropdown data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [venuesResponse, teamsResponse, batterResponse, bowlerResponse] = await Promise.all([
-          axios.get(`${config.API_URL}/venues/`),
-          axios.get(`${config.API_URL}/teams/`),
-          axios.get(`${config.API_URL}/players/batters`),
-          axios.get(`${config.API_URL}/players/bowlers`)
-        ]);
-        
-        if (Array.isArray(venuesResponse.data)) {
-          setVenues(venuesResponse.data.filter(v => v).sort());
-        }
-        
-        if (Array.isArray(teamsResponse.data)) {
-          setTeams(teamsResponse.data.sort((a, b) => a.full_name.localeCompare(b.full_name)));
-        }
-        
-        if (Array.isArray(batterResponse.data)) {
-          const batterNames = batterResponse.data.map(p => p.value || p.label || p).sort();
-          setBatters(batterNames);
-        }
-        
-        if (Array.isArray(bowlerResponse.data)) {
-          const bowlerNames = bowlerResponse.data.map(p => p.value || p.label || p).sort();
-          setBowlers(bowlerNames);
-        }
-        
-      } catch (error) {
-        console.error('Error fetching dropdown data:', error);
-      } finally {
-        setLoadingData(false);
-      }
-    };
-    
-    fetchData();
-  }, []);
+  // All dropdown data now comes from availableColumns (fetched from delivery_details)
   
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
@@ -108,7 +64,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
     setGroupBy(newValue || []);
   };
   
-  if (!availableColumns || loadingData) {
+  if (!availableColumns) {
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
         <Typography>Loading filter options...</Typography>
@@ -148,7 +104,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           <Autocomplete
             value={filters.venue}
             onChange={(e, value) => handleFilterChange('venue', value)}
-            options={venues}
+            options={availableColumns?.venues || []}
             renderInput={(params) => (
               <TextField {...params} label="Venue" size="small" />
             )}
@@ -160,7 +116,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
             multiple
             value={filters.leagues}
             onChange={(e, value) => handleFilterChange('leagues', value)}
-            options={['IPL', 'BBL', 'PSL', 'CPL', 'MSL', 'LPL', 'BPL', 'T20I']}
+            options={availableColumns?.competitions || []}
             renderTags={(value, getTagProps) =>
               value.map((option, index) => (
                 <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
@@ -179,7 +135,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               multiple
               value={filters.batting_teams || []}
               onChange={(e, value) => handleFilterChange('batting_teams', value)}
-              options={teams.map(t => t.full_name)}
+              options={availableColumns?.batting_teams || []}
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip variant="outlined" label={option} size="small" color="primary" {...getTagProps({ index })} />
@@ -200,7 +156,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               multiple
               value={filters.bowling_teams || []}
               onChange={(e, value) => handleFilterChange('bowling_teams', value)}
-              options={teams.map(t => t.full_name)}
+              options={availableColumns?.bowling_teams || []}
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip variant="outlined" label={option} size="small" color="secondary" {...getTagProps({ index })} />
@@ -234,7 +190,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
             multiple
             value={filters.batters || []}
             onChange={(e, value) => handleFilterChange('batters', value)}
-            options={batters}
+            options={availableColumns?.batters || []}
             renderTags={(value, getTagProps) =>
               value.map((option, index) => (
                 <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
@@ -251,7 +207,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
             multiple
             value={filters.bowlers || []}
             onChange={(e, value) => handleFilterChange('bowlers', value)}
-            options={bowlers}
+            options={availableColumns?.bowlers || []}
             renderTags={(value, getTagProps) =>
               value.map((option, index) => (
                 <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
