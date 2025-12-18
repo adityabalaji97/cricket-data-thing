@@ -156,8 +156,8 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Cricket Stats API")
 app.include_router(matchups_router)
-app.include_router(query_builder_router)
-#app.include_router(query_builder_router_v2)
+#app.include_router(query_builder_router)
+app.include_router(query_builder_router_v2)
 app.include_router(players_router)
 app.include_router(teams_router)
 app.include_router(recent_matches_router)
