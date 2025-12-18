@@ -124,74 +124,49 @@ def query_deliveries(
 @router.get("/deliveries/columns")
 def get_available_columns(db: Session = Depends(get_session)):
     """
-    Get available columns for filtering and grouping, with dynamic coverage statistics.
+    Get available columns for filtering and grouping.
     
-    Returns column options fetched from the database along with data coverage
-    percentages to help users understand data availability.
+    Reads from precomputed query_builder_metadata table for fast response.
+    Run scripts/refresh_query_builder_metadata.py to update after data loads.
     """
     try:
         from sqlalchemy.sql import text
+        import json
         
-        # Get total row count
-        total_count = db.execute(text("SELECT COUNT(*) FROM delivery_details")).scalar()
+        # Read all metadata in one query
+        result = db.execute(text("""
+            SELECT key, values, coverage_percent
+            FROM query_builder_metadata
+        """)).fetchall()
         
-        # Fetch distinct values and coverage for key columns
-        def get_options_with_coverage(column_name):
-            query = text(f"""
-                SELECT 
-                    COUNT(*) FILTER (WHERE {column_name} IS NOT NULL) as non_null_count,
-                    COUNT(DISTINCT {column_name}) as distinct_count
-                FROM delivery_details
-            """)
-            result = db.execute(query).fetchone()
-            coverage = (result[0] / total_count * 100) if total_count > 0 else 0
-            
-            # Get distinct values
-            values_query = text(f"""
-                SELECT DISTINCT {column_name} 
-                FROM delivery_details 
-                WHERE {column_name} IS NOT NULL 
-                ORDER BY {column_name}
-            """)
-            values = [row[0] for row in db.execute(values_query).fetchall()]
-            
-            return {
-                "options": values,
-                "coverage_percent": round(coverage, 1),
-                "distinct_count": result[1]
+        # Build lookup dict
+        metadata = {}
+        for row in result:
+            metadata[row[0]] = {
+                "values": json.loads(row[1]) if row[1] else [],
+                "coverage": row[2]
             }
         
-        # Get options for each column
-        line_data = get_options_with_coverage("line")
-        length_data = get_options_with_coverage("length")
-        shot_data = get_options_with_coverage("shot")
-        control_data = get_options_with_coverage("control")
-        wagon_zone_data = get_options_with_coverage("wagon_zone")
-        bowl_style_data = get_options_with_coverage("bowl_style")
-        bowl_kind_data = get_options_with_coverage("bowl_kind")
-        bat_hand_data = get_options_with_coverage("bat_hand")
+        # Helper to get values with fallback
+        def get_values(key):
+            return metadata.get(key, {}).get("values", [])
         
-        # Get dropdown options for basic filters (from delivery_details)
-        venues_query = text("SELECT DISTINCT ground FROM delivery_details WHERE ground IS NOT NULL ORDER BY ground")
-        venues = [row[0] for row in db.execute(venues_query).fetchall()]
+        def get_coverage(key):
+            return metadata.get(key, {}).get("coverage")
         
-        batters_query = text("SELECT DISTINCT bat FROM delivery_details WHERE bat IS NOT NULL ORDER BY bat")
-        batters = [row[0] for row in db.execute(batters_query).fetchall()]
+        # Get total deliveries
+        total_deliveries = get_values("total_deliveries")
+        if isinstance(total_deliveries, int):
+            total_count = total_deliveries
+        elif isinstance(total_deliveries, list) and len(total_deliveries) == 0:
+            total_count = metadata.get("total_deliveries", {}).get("values", 0)
+        else:
+            total_count = total_deliveries
         
-        bowlers_query = text("SELECT DISTINCT bowl FROM delivery_details WHERE bowl IS NOT NULL ORDER BY bowl")
-        bowlers = [row[0] for row in db.execute(bowlers_query).fetchall()]
-        
-        batting_teams_query = text("SELECT DISTINCT team_bat FROM delivery_details WHERE team_bat IS NOT NULL ORDER BY team_bat")
-        batting_teams = [row[0] for row in db.execute(batting_teams_query).fetchall()]
-        
-        bowling_teams_query = text("SELECT DISTINCT team_bowl FROM delivery_details WHERE team_bowl IS NOT NULL ORDER BY team_bowl")
-        bowling_teams = [row[0] for row in db.execute(bowling_teams_query).fetchall()]
-        
-        # Combine teams (union of batting and bowling teams)
+        # Combine batting and bowling teams for "teams" dropdown
+        batting_teams = get_values("batting_teams")
+        bowling_teams = get_values("bowling_teams")
         all_teams = sorted(list(set(batting_teams + bowling_teams)))
-        
-        competitions_query = text("SELECT DISTINCT competition FROM delivery_details WHERE competition IS NOT NULL ORDER BY competition")
-        competitions = [row[0] for row in db.execute(competitions_query).fetchall()]
         
         return {
             "total_deliveries": total_count,
@@ -214,46 +189,46 @@ def get_available_columns(db: Session = Depends(get_session)):
             ],
             
             # Options with coverage info
-            "line_options": line_data["options"],
-            "line_coverage": line_data["coverage_percent"],
+            "line_options": get_values("line"),
+            "line_coverage": get_coverage("line"),
             
-            "length_options": length_data["options"],
-            "length_coverage": length_data["coverage_percent"],
+            "length_options": get_values("length"),
+            "length_coverage": get_coverage("length"),
             
-            "shot_options": shot_data["options"],
-            "shot_coverage": shot_data["coverage_percent"],
+            "shot_options": get_values("shot"),
+            "shot_coverage": get_coverage("shot"),
             
             "control_options": [0, 1],
-            "control_coverage": control_data["coverage_percent"],
+            "control_coverage": get_coverage("control"),
             
-            "wagon_zone_options": wagon_zone_data["options"],
-            "wagon_zone_coverage": wagon_zone_data["coverage_percent"],
+            "wagon_zone_options": get_values("wagon_zone"),
+            "wagon_zone_coverage": get_coverage("wagon_zone"),
             
-            "bowl_style_options": bowl_style_data["options"],
-            "bowl_style_coverage": bowl_style_data["coverage_percent"],
+            "bowl_style_options": get_values("bowl_style"),
+            "bowl_style_coverage": get_coverage("bowl_style"),
             
-            "bowl_kind_options": bowl_kind_data["options"],
-            "bowl_kind_coverage": bowl_kind_data["coverage_percent"],
+            "bowl_kind_options": get_values("bowl_kind"),
+            "bowl_kind_coverage": get_coverage("bowl_kind"),
             
-            "bat_hand_options": bat_hand_data["options"],
-            "bat_hand_coverage": bat_hand_data["coverage_percent"],
+            "bat_hand_options": get_values("bat_hand"),
+            "bat_hand_coverage": get_coverage("bat_hand"),
             
             "innings_options": [1, 2],
             
-            # Basic filter options (from delivery_details)
-            "venues": venues,
-            "batters": batters,
-            "bowlers": bowlers,
+            # Basic filter options
+            "venues": get_values("venues"),
+            "batters": get_values("batters"),
+            "bowlers": get_values("bowlers"),
             "teams": all_teams,
             "batting_teams": batting_teams,
             "bowling_teams": bowling_teams,
-            "competitions": competitions,
+            "competitions": get_values("competitions"),
             
             # Coverage summary for UI warnings
             "coverage_summary": {
-                "high": ["wagon_zone", "bat_hand", "bowl_style", "bowl_kind"],  # >90%
-                "medium": ["shot", "control"],  # 50-90%
-                "low": ["line", "length"]  # <50%
+                "high": ["wagon_zone", "bat_hand", "bowl_style", "bowl_kind"],
+                "medium": ["shot", "control"],
+                "low": ["line", "length"]
             }
         }
     except Exception as e:
