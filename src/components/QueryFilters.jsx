@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoIcon from '@mui/icons-material/Info';
+import WarningIcon from '@mui/icons-material/Warning';
 import axios from 'axios';
 import config from '../config';
 
@@ -34,10 +35,25 @@ const InfoTooltip = ({ tooltip }) => (
   </Tooltip>
 );
 
+// Coverage warning component
+const CoverageWarning = ({ coverage, columnName }) => {
+  if (coverage >= 80) return null;
+  
+  const severity = coverage < 50 ? 'warning' : 'info';
+  const color = coverage < 50 ? 'warning.main' : 'info.main';
+  
+  return (
+    <Tooltip title={`${columnName} data is available for ${coverage}% of deliveries. Filtering may reduce results significantly.`}>
+      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', ml: 0.5 }}>
+        <WarningIcon sx={{ fontSize: 16, color }} />
+      </Box>
+    </Tooltip>
+  );
+};
+
 const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColumns, isMobile }) => {
   const [venues, setVenues] = useState([]);
   const [teams, setTeams] = useState([]);
-  const [players, setPlayers] = useState([]);
   const [batters, setBatters] = useState([]);
   const [bowlers, setBowlers] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -61,7 +77,6 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           setTeams(teamsResponse.data.sort((a, b) => a.full_name.localeCompare(b.full_name)));
         }
         
-        // Set players data for batters and bowlers from separate endpoints
         if (Array.isArray(batterResponse.data)) {
           const batterNames = batterResponse.data.map(p => p.value || p.label || p).sort();
           setBatters(batterNames);
@@ -103,7 +118,6 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
   
   return (
     <Box>
-      {/* Compact filters without section titles */}
       <Grid container spacing={2}>
         {/* Row 1: Date Range & Venue */}
         <Grid item xs={12} sm={4} md={3}>
@@ -146,7 +160,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
             multiple
             value={filters.leagues}
             onChange={(e, value) => handleFilterChange('leagues', value)}
-            options={['IPL', 'BBL', 'PSL', 'CPL', 'MSL', 'LPL', 'BPL']}
+            options={['IPL', 'BBL', 'PSL', 'CPL', 'MSL', 'LPL', 'BPL', 'T20I']}
             renderTags={(value, getTagProps) =>
               value.map((option, index) => (
                 <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
@@ -202,41 +216,16 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         </Grid>
         
         <Grid item xs={12} sm={4} md={3}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Autocomplete
-              multiple
-              value={filters.teams || []}
-              onChange={(e, value) => handleFilterChange('teams', value)}
-              options={teams.map(t => t.full_name)}
-              renderTags={(value, getTagProps) =>
-                value.map((option, index) => (
-                  <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
-                ))
-              }
-              renderInput={(params) => (
-                <TextField {...params} label="Teams (Any Role)" size="small" />
-              )}
-              sx={{ flexGrow: 1 }}
-            />
-            <InfoTooltip tooltip="Teams in either batting or bowling role" />
-          </Box>
-        </Grid>
-        
-        <Grid item xs={12} sm={4} md={3}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={filters.include_international}
-                  onChange={(e) => handleFilterChange('include_international', e.target.checked)}
-                  size="small"
-                />
-              }
-              label="International"
-              sx={{ flexGrow: 1 }}
-            />
-            <InfoTooltip tooltip="Include international matches in analysis" />
-          </Box>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={filters.include_international}
+                onChange={(e) => handleFilterChange('include_international', e.target.checked)}
+                size="small"
+              />
+            }
+            label="Include T20I"
+          />
         </Grid>
         
         {/* Row 3: Players */}
@@ -275,7 +264,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         </Grid>
         
         {/* Row 4: Match Context */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={4} md={3}>
           <FormControl size="small" fullWidth>
             <InputLabel>Innings</InputLabel>
             <Select
@@ -290,11 +279,11 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </FormControl>
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={4} md={3}>
           <TextField
             label="Over Min"
             type="number"
-            value={filters.over_min || ''}
+            value={filters.over_min ?? ''}
             onChange={(e) => handleFilterChange('over_min', e.target.value ? parseInt(e.target.value) : null)}
             inputProps={{ min: 0, max: 19 }}
             size="small"
@@ -302,11 +291,11 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           />
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={4} md={3}>
           <TextField
             label="Over Max"
             type="number"
-            value={filters.over_max || ''}
+            value={filters.over_max ?? ''}
             onChange={(e) => handleFilterChange('over_max', e.target.value ? parseInt(e.target.value) : null)}
             inputProps={{ min: 0, max: 19 }}
             size="small"
@@ -314,115 +303,191 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           />
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
-          <Autocomplete
-            multiple
-            value={filters.wicket_type || []}
-            onChange={(e, value) => handleFilterChange('wicket_type', value)}
-            options={availableColumns.wicket_type_options || []}
-            renderTags={(value, getTagProps) =>
-              value.map((option, index) => (
-                <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
-              ))
-            }
-            renderInput={(params) => (
-              <TextField {...params} label="Wicket Type" size="small" />
-            )}
-          />
+        {/* Row 5: Batter/Bowler Attributes */}
+        <Grid item xs={12} sm={4} md={3}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Bat Hand</InputLabel>
+              <Select
+                value={filters.bat_hand || ''}
+                onChange={(e) => handleFilterChange('bat_hand', e.target.value || null)}
+                label="Bat Hand"
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="RHB">Right Hand (RHB)</MenuItem>
+                <MenuItem value="LHB">Left Hand (LHB)</MenuItem>
+              </Select>
+            </FormControl>
+            <CoverageWarning coverage={availableColumns?.bat_hand_coverage} columnName="Bat hand" />
+          </Box>
         </Grid>
         
-        {/* Row 5: Cricket Specific */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={4} md={3}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Autocomplete
               multiple
-              value={filters.bowler_type || []}
-              onChange={(e, value) => handleFilterChange('bowler_type', value)}
-              options={availableColumns.common_bowler_types || []}
+              value={filters.bowl_style || []}
+              onChange={(e, value) => handleFilterChange('bowl_style', value)}
+              options={availableColumns?.bowl_style_options || []}
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
                 ))
               }
               renderInput={(params) => (
-                <TextField {...params} label="Bowler Type" size="small" />
+                <TextField {...params} label="Bowl Style" size="small" />
               )}
               sx={{ flexGrow: 1 }}
             />
-            <InfoTooltip tooltip="RF=Right Fast, RM=Right Medium, LO=Left Orthodox, etc." />
+            <InfoTooltip tooltip="RF=Right Fast, RM=Right Medium, SLA=Slow Left Arm, OB=Off Break, LB=Leg Break" />
           </Box>
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={4} md={3}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Autocomplete
-              value={filters.crease_combo}
-              onChange={(e, value) => handleFilterChange('crease_combo', value)}
-              options={availableColumns.crease_combo_options || []}
+              multiple
+              value={filters.bowl_kind || []}
+              onChange={(e, value) => handleFilterChange('bowl_kind', value)}
+              options={availableColumns?.bowl_kind_options || []}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                ))
+              }
               renderInput={(params) => (
-                <TextField {...params} label="Crease Combo" size="small" />
+                <TextField {...params} label="Bowl Kind" size="small" />
               )}
               sx={{ flexGrow: 1 }}
             />
-            <InfoTooltip tooltip="Left/Right hand batting combinations (striker_nonstriker)" />
+            <InfoTooltip tooltip="Pace bowler, Spin bowler, or Mixture/Unknown" />
           </Box>
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
+        {/* Row 6: Delivery Details - NEW */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, mt: 1 }}>
+            Delivery Analysis Filters
+          </Typography>
+        </Grid>
+        
+        <Grid item xs={12} sm={4} md={3}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Autocomplete
-              value={filters.ball_direction}
-              onChange={(e, value) => handleFilterChange('ball_direction', value)}
-              options={availableColumns.ball_direction_options || []}
+              multiple
+              value={filters.line || []}
+              onChange={(e, value) => handleFilterChange('line', value)}
+              options={availableColumns?.line_options || []}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                ))
+              }
               renderInput={(params) => (
-                <TextField {...params} label="Ball Direction" size="small" />
+                <TextField {...params} label="Line" size="small" />
               )}
               sx={{ flexGrow: 1 }}
             />
-            <InfoTooltip tooltip="Ball direction relative to batter's stance" />
+            <CoverageWarning coverage={availableColumns?.line_coverage} columnName="Line" />
           </Box>
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Striker Type</InputLabel>
-            <Select
-              value={filters.striker_batter_type || ''}
-              onChange={(e) => handleFilterChange('striker_batter_type', e.target.value || null)}
-              label="Striker Type"
-            >
-              <MenuItem value="">All</MenuItem>
-              {availableColumns.batter_type_options?.map(option => (
-                <MenuItem key={option} value={option}>{option}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        <Grid item xs={12} sm={4} md={3}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Autocomplete
+              multiple
+              value={filters.length || []}
+              onChange={(e, value) => handleFilterChange('length', value)}
+              options={availableColumns?.length_options || []}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                ))
+              }
+              renderInput={(params) => (
+                <TextField {...params} label="Length" size="small" />
+              )}
+              sx={{ flexGrow: 1 }}
+            />
+            <CoverageWarning coverage={availableColumns?.length_coverage} columnName="Length" />
+          </Box>
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Non-Striker Type</InputLabel>
-            <Select
-              value={filters.non_striker_batter_type || ''}
-              onChange={(e) => handleFilterChange('non_striker_batter_type', e.target.value || null)}
-              label="Non-Striker Type"
-            >
-              <MenuItem value="">All</MenuItem>
-              {availableColumns.batter_type_options?.map(option => (
-                <MenuItem key={option} value={option}>{option}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        <Grid item xs={12} sm={4} md={3}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Autocomplete
+              multiple
+              value={filters.shot || []}
+              onChange={(e, value) => handleFilterChange('shot', value)}
+              options={availableColumns?.shot_options || []}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                ))
+              }
+              renderInput={(params) => (
+                <TextField {...params} label="Shot Type" size="small" />
+              )}
+              sx={{ flexGrow: 1 }}
+            />
+            <CoverageWarning coverage={availableColumns?.shot_coverage} columnName="Shot" />
+          </Box>
         </Grid>
         
-        {/* Row 6: Grouping */}
+        <Grid item xs={12} sm={4} md={3}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Shot Control</InputLabel>
+              <Select
+                value={filters.control ?? ''}
+                onChange={(e) => handleFilterChange('control', e.target.value === '' ? null : parseInt(e.target.value))}
+                label="Shot Control"
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value={1}>Controlled</MenuItem>
+                <MenuItem value={0}>Uncontrolled</MenuItem>
+              </Select>
+            </FormControl>
+            <CoverageWarning coverage={availableColumns?.control_coverage} columnName="Control" />
+          </Box>
+        </Grid>
+        
+        <Grid item xs={12} sm={4} md={3}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Autocomplete
+              multiple
+              value={filters.wagon_zone || []}
+              onChange={(e, value) => handleFilterChange('wagon_zone', value)}
+              options={availableColumns?.wagon_zone_options || [0, 1, 2, 3, 4, 5, 6, 7, 8]}
+              getOptionLabel={(option) => `Zone ${option}`}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip variant="outlined" label={`Z${option}`} size="small" {...getTagProps({ index })} />
+                ))
+              }
+              renderInput={(params) => (
+                <TextField {...params} label="Wagon Zone" size="small" />
+              )}
+              sx={{ flexGrow: 1 }}
+            />
+            <InfoTooltip tooltip="Wagon wheel zones 0-8. Zone 0=No shot, 1-8=Direction of shot" />
+          </Box>
+        </Grid>
+        
+        {/* Row 7: Grouping */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, mt: 1 }}>
+            Grouping & Aggregation
+          </Typography>
+        </Grid>
+        
         <Grid item xs={12}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Autocomplete
               multiple
               value={groupBy}
               onChange={handleGroupByChange}
-              options={availableColumns.group_by_columns || []}
+              options={availableColumns?.group_by_columns || []}
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
                   <Chip 
@@ -447,7 +512,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        {/* Summary Rows Toggle - only show when multiple grouping levels */}
+        {/* Summary Rows Toggle */}
         {groupBy && groupBy.length > 1 && (
           <Grid item xs={12}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pl: 2 }}>
@@ -461,20 +526,19 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
                   />
                 }
                 label="Show Summary Rows"
-                sx={{ flexGrow: 1 }}
               />
-              <InfoTooltip tooltip="Add summary rows for each group level with % calculations. For example, year totals when grouping by year + crease_combo." />
+              <InfoTooltip tooltip="Add summary rows for each group level with % calculations" />
             </Box>
           </Grid>
         )}
         
-        {/* Row 7: Result Filtering */}
+        {/* Row 8: Result Filtering */}
         <Grid item xs={12} sm={6} md={3}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <TextField
               label="Min Balls"
               type="number"
-              value={filters.min_balls || ''}
+              value={filters.min_balls ?? ''}
               onChange={(e) => handleFilterChange('min_balls', e.target.value ? parseInt(e.target.value) : null)}
               inputProps={{ min: 0 }}
               size="small"
@@ -488,7 +552,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           <TextField
             label="Max Balls"
             type="number"
-            value={filters.max_balls || ''}
+            value={filters.max_balls ?? ''}
             onChange={(e) => handleFilterChange('max_balls', e.target.value ? parseInt(e.target.value) : null)}
             inputProps={{ min: 0 }}
             size="small"
@@ -497,25 +561,22 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         </Grid>
         
         <Grid item xs={12} sm={6} md={3}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TextField
-              label="Min Runs"
-              type="number"
-              value={filters.min_runs || ''}
-              onChange={(e) => handleFilterChange('min_runs', e.target.value ? parseInt(e.target.value) : null)}
-              inputProps={{ min: 0 }}
-              size="small"
-              fullWidth
-            />
-            <InfoTooltip tooltip="Minimum runs for grouped results" />
-          </Box>
+          <TextField
+            label="Min Runs"
+            type="number"
+            value={filters.min_runs ?? ''}
+            onChange={(e) => handleFilterChange('min_runs', e.target.value ? parseInt(e.target.value) : null)}
+            inputProps={{ min: 0 }}
+            size="small"
+            fullWidth
+          />
         </Grid>
         
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             label="Max Runs"
             type="number"
-            value={filters.max_runs || ''}
+            value={filters.max_runs ?? ''}
             onChange={(e) => handleFilterChange('max_runs', e.target.value ? parseInt(e.target.value) : null)}
             inputProps={{ min: 0 }}
             size="small"
@@ -523,7 +584,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           />
         </Grid>
         
-        {/* Row 8: Query Settings */}
+        {/* Row 9: Query Settings */}
         <Grid item xs={12} sm={6}>
           <Box>
             <Typography variant="body2" gutterBottom>Result Limit: {filters.limit}</Typography>
@@ -565,6 +626,15 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
                 size="small"
               />
             </Box>
+          </Grid>
+        )}
+        
+        {/* Data coverage info */}
+        {availableColumns?.total_deliveries && (
+          <Grid item xs={12}>
+            <Typography variant="caption" color="text.secondary">
+              Total deliveries in database: {availableColumns.total_deliveries.toLocaleString()}
+            </Typography>
           </Grid>
         )}
       </Grid>

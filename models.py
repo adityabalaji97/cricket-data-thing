@@ -272,3 +272,33 @@ class BowlingStats(Base):
     team_overs_excl_bowler = Column(Float)
     team_economy_excl_bowler = Column(Float)
     economy_diff = Column(Float)
+
+
+class DeliveryDetails(Base):
+    """Enhanced ball-by-ball data with wagon wheel, shot, and line/length info."""
+    __tablename__ = 'delivery_details'
+    
+    id = Column(Integer, primary_key=True)
+    match_id = Column(String, ForeignKey('matches.id'), nullable=False)
+    innings = Column(Integer, nullable=False)
+    over = Column(Integer, nullable=False)
+    ball = Column(Integer, nullable=False)
+    
+    # Player IDs from source data
+    p_bat = Column(Integer)  # Batter ID
+    p_bowl = Column(Integer)  # Bowler ID
+    
+    # Wagon wheel coordinates
+    wagon_x = Column(Integer)
+    wagon_y = Column(Integer)
+    wagon_zone = Column(Integer)  # 0-8
+    
+    # Delivery details
+    line = Column(String(30))  # ON_THE_STUMPS, OUTSIDE_OFFSTUMP, etc.
+    length = Column(String(30))  # GOOD_LENGTH, YORKER, FULL, etc.
+    shot = Column(String(30))  # COVER_DRIVE, FLICK, DEFENDED, etc.
+    control = Column(Integer)  # 0 or 1
+    
+    # Predictive metrics
+    pred_score = Column(Float)  # Expected score (-1 = no data)
+    win_prob = Column(Float)  # Win probability (-1 = no data)

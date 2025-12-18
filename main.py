@@ -27,6 +27,7 @@ from models import get_league_abbreviation, get_full_league_name, leagues_mappin
 from sqlalchemy.sql import text
 from routers.matchups import router as matchups_router
 from routers.query_builder import router as query_builder_router
+from routers.query_builder_v2 import router as query_builder_router_v2
 from routers.players import router as players_router
 from routers.teams import router as teams_router
 from routers.recent_matches import router as recent_matches_router
@@ -156,6 +157,7 @@ from fastapi.responses import JSONResponse
 app = FastAPI(title="Cricket Stats API")
 app.include_router(matchups_router)
 app.include_router(query_builder_router)
+app.include_router(query_builder_router_v2)
 app.include_router(players_router)
 app.include_router(teams_router)
 app.include_router(recent_matches_router)

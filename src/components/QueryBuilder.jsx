@@ -22,10 +22,10 @@ import { useUrlParams, filtersToUrlParams } from '../utils/urlParamParser';
 import axios from 'axios';
 import config from '../config';
 
-// Helpful prefilled query links
+// Prefilled query examples showcasing new delivery_details features
 const PREFILLED_QUERIES = [
   {
-    title: "Chennai Super Kings batters grouped by phase and batter in 2025",
+    title: "Chennai Super Kings batters by phase in 2025",
     description: "Analyze CSK batting performance across different match phases",
     filters: {
       batting_teams: ["Chennai Super Kings"],
@@ -34,70 +34,60 @@ const PREFILLED_QUERIES = [
       min_balls: 30
     },
     groupBy: ["batter", "phase"],
-    tags: ["IPL", "CSK", "Batting", "Phase Analysis"]
+    tags: ["IPL", "CSK", "Batting", "Phase"]
   },
   {
-    title: "V Kohli facing spinners (LC, LO, RL, RO) grouped by phase and ball direction in IPL since 2023",
-    description: "Study how Kohli performs against spin bowling by phase and ball direction",
+    title: "Short ball response - shot distribution",
+    description: "See what shots batters play to short length deliveries",
     filters: {
-      batters: ["V Kohli"],
-      bowler_type: ["LC", "LO", "RL", "RO"],
-      leagues: ["IPL"],
-      start_date: "2023-01-01",
-      min_balls: 10
-    },
-    groupBy: ["phase", "ball_direction"],
-    tags: ["Kohli", "Spinners", "IPL", "Phase", "Ball Direction"]
-  },
-  {
-    title: "T20 batting since 2020 grouped by crease_combo",
-    description: "Analyze left-right batting combinations against spinners across all T20s",
-    filters: {
-      start_date: "2020-01-01",
-      bowler_type: ["LO", "LC", "RO", "RL"],
+      length: ["SHORT"],
       min_balls: 100
     },
-    groupBy: ["crease_combo"],
-    tags: ["T20", "Crease Combo", "Spinners", "Left-Right"]
+    groupBy: ["shot"],
+    tags: ["Length", "Shot", "Short Ball"]
   },
   {
-    title: "Powerplay bowling by type in IPL 2025",
-    description: "Study bowling strategies in powerplay overs",
+    title: "Spin bowling by line and length",
+    description: "Analyze spin bowler strategies by line and length combinations",
     filters: {
-      leagues: ["IPL"],
-      start_date: "2025-01-01",
-      end_date: "2025-12-31",
-      over_min: 0,
-      over_max: 5,
+      bowl_kind: ["spin bowler"],
       min_balls: 50
     },
-    groupBy: ["bowler_type"],
-    tags: ["IPL", "Powerplay", "Bowling", "Strategy"]
+    groupBy: ["line", "length"],
+    tags: ["Spin", "Line", "Length"]
   },
   {
-    title: "Death overs performance by venue in IPL 2025",
-    description: "Compare how different IPL venues affect death overs scoring",
+    title: "Controlled vs uncontrolled shots by wagon zone",
+    description: "Where do batters hit with control vs without control?",
+    filters: {
+      min_balls: 100
+    },
+    groupBy: ["control", "wagon_zone"],
+    tags: ["Control", "Wagon Wheel", "Shot Quality"]
+  },
+  {
+    title: "Powerplay pace bowling analysis",
+    description: "Study pace bowling strategies in powerplay overs",
     filters: {
       leagues: ["IPL"],
-      start_date: "2025-01-01",
-      over_min: 16,
-      over_max: 19,
-      min_balls: 20
+      start_date: "2024-01-01",
+      over_min: 0,
+      over_max: 5,
+      bowl_kind: ["pace bowler"],
+      min_balls: 50
     },
-    groupBy: ["venue", "phase"],
-    tags: ["Death Overs", "IPL", "Venues", "2025"]
+    groupBy: ["bowl_style", "length"],
+    tags: ["Powerplay", "Pace", "IPL"]
   },
   {
-    title: "Mumbai Indians' pace bowling at Wankhede",
-    description: "Analyze MI's pace bowling performance at their home venue",
+    title: "LHB vs RHB performance against spin",
+    description: "Compare left and right hand batters against spin bowling",
     filters: {
-      bowling_teams: ["Mumbai Indians"],
-      venue: "Wankhede Stadium, Mumbai",
-      bowler_type: ["RF", "RM", "LF", "LM"],
-      min_balls: 20
+      bowl_kind: ["spin bowler"],
+      min_balls: 100
     },
-    groupBy: ["bowler_type", "phase"],
-    tags: ["MI", "Wankhede", "Pace Bowling", "Home Venue"]
+    groupBy: ["bat_hand", "bowl_style"],
+    tags: ["LHB", "RHB", "Spin", "Matchup"]
   }
 ];
 
@@ -153,16 +143,24 @@ const QueryBuilder = ({ isMobile }) => {
     batters: [],
     bowlers: [],
     
-    // Column-specific filters
-    crease_combo: null,
-    ball_direction: null,
-    bowler_type: [],
-    striker_batter_type: null,
-    non_striker_batter_type: null,
+    // Match context
     innings: null,
     over_min: null,
     over_max: null,
-    wicket_type: null,
+    
+    // Batter filters
+    bat_hand: null,
+    
+    // Bowler filters
+    bowl_style: [],
+    bowl_kind: [],
+    
+    // Delivery detail filters (NEW)
+    line: [],
+    length: [],
+    shot: [],
+    control: null,
+    wagon_zone: [],
     
     // Grouped result filters
     min_balls: null,
@@ -187,17 +185,16 @@ const QueryBuilder = ({ isMobile }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [availableColumns, setAvailableColumns] = useState(null);
-  const [queryTab, setQueryTab] = useState(0); // 0: Filters, 1: Results
+  const [queryTab, setQueryTab] = useState(0);
   const [showPrefilledQueries, setShowPrefilledQueries] = useState(true);
-  const [isAutoExecuting, setIsAutoExecuting] = useState(false); // Track if we're auto-executing from URL
-  const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false); // Track if we've loaded from URL
+  const [isAutoExecuting, setIsAutoExecuting] = useState(false);
+  const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false);
   
-  // Load filters from URL on component mount
+  // Load filters from URL on mount
   useEffect(() => {
     const urlFilters = getFiltersFromUrl();
     const urlGroupBy = getGroupByFromUrl();
     
-    // Only update if there are actual URL parameters and we haven't loaded from URL yet
     if (currentParams && currentParams.length > 1 && !hasLoadedFromUrl) {
       console.log('Loading filters from URL:', urlFilters, 'GroupBy:', urlGroupBy);
       
@@ -208,19 +205,15 @@ const QueryBuilder = ({ isMobile }) => {
       setGroupBy(urlGroupBy);
       setShowPrefilledQueries(false);
       setHasLoadedFromUrl(true);
-      
-      // Set flag that we're about to auto-execute
       setIsAutoExecuting(true);
       
-      // If URL has filters, auto-execute the query after a short delay
-      // Give time for the state to update before executing
       setTimeout(() => {
         executeQueryFromUrl(urlFilters, urlGroupBy);
       }, 500);
     }
   }, [currentParams, hasLoadedFromUrl]);
   
-  // Fetch available columns for dropdowns
+  // Fetch available columns
   useEffect(() => {
     const fetchAvailableColumns = async () => {
       try {
@@ -235,16 +228,13 @@ const QueryBuilder = ({ isMobile }) => {
     fetchAvailableColumns();
   }, []);
   
-  // Function to execute query from URL parameters (doesn't update URL)
   const executeQueryFromUrl = async (urlFilters, urlGroupBy) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Build query parameters using URL filters directly
       const params = new URLSearchParams();
       
-      // Add filters
       Object.entries(urlFilters).forEach(([key, value]) => {
         if (value !== null && value !== undefined && value !== '') {
           if (Array.isArray(value)) {
@@ -255,16 +245,12 @@ const QueryBuilder = ({ isMobile }) => {
         }
       });
       
-      // Add grouping
       urlGroupBy.forEach(col => params.append('group_by', col));
       
-      // Debug: Log the final query parameters
       console.log('Auto-executing query with URL parameters:', Object.fromEntries(params.entries()));
       
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
-      
-      // Switch to results tab
       setQueryTab(1);
       setShowPrefilledQueries(false);
       
@@ -277,16 +263,13 @@ const QueryBuilder = ({ isMobile }) => {
     }
   };
   
-  // Function for manual query execution (updates URL)
   const executeQuery = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Build query parameters
       const params = new URLSearchParams();
       
-      // Add filters
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== null && value !== undefined && value !== '') {
           if (Array.isArray(value)) {
@@ -297,27 +280,18 @@ const QueryBuilder = ({ isMobile }) => {
         }
       });
       
-      // Add grouping
       groupBy.forEach(col => params.append('group_by', col));
       
-      // Only update URL if this is a manual execution (not auto-executing from URL)
       if (!isAutoExecuting) {
         const newParams = filtersToUrlParams(filters, groupBy);
         const newUrl = `${window.location.pathname}?${newParams}`;
         window.history.replaceState({}, '', newUrl);
       }
       
-      // Debug: Log the final query parameters
-      console.log('Manual query execution. Parameters being sent:', Object.fromEntries(params.entries()));
-      console.log('Date filters:', {
-        start_date: filters.start_date,
-        end_date: filters.end_date
-      });
+      console.log('Manual query execution. Parameters:', Object.fromEntries(params.entries()));
       
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
-      
-      // Switch to results tab
       setQueryTab(1);
       setShowPrefilledQueries(false);
       
@@ -341,15 +315,17 @@ const QueryBuilder = ({ isMobile }) => {
       players: [],
       batters: [],
       bowlers: [],
-      crease_combo: null,
-      ball_direction: null,
-      bowler_type: [],
-      striker_batter_type: null,
-      non_striker_batter_type: null,
       innings: null,
       over_min: null,
       over_max: null,
-      wicket_type: null,
+      bat_hand: null,
+      bowl_style: [],
+      bowl_kind: [],
+      line: [],
+      length: [],
+      shot: [],
+      control: null,
+      wagon_zone: [],
       min_balls: null,
       max_balls: null,
       min_runs: null,
@@ -364,12 +340,8 @@ const QueryBuilder = ({ isMobile }) => {
     setResults(null);
     setQueryTab(0);
     setShowPrefilledQueries(true);
-    
-    // Reset URL loading state
     setHasLoadedFromUrl(false);
     setIsAutoExecuting(false);
-    
-    // Clear URL parameters
     window.history.replaceState({}, '', window.location.pathname);
   };
   
@@ -380,18 +352,18 @@ const QueryBuilder = ({ isMobile }) => {
     }));
     setGroupBy(query.groupBy);
     setShowPrefilledQueries(false);
-    setQueryTab(0); // Show filters tab so user can see what was selected
-    
-    // Reset URL loading state so user can execute manually
+    setQueryTab(0);
     setHasLoadedFromUrl(false);
     setIsAutoExecuting(false);
   };
   
   const hasValidFilters = () => {
-    // At least one filter must be applied (excluding pagination and international settings)
-    const filterKeys = ['venue', 'start_date', 'end_date', 'leagues', 'teams', 'batting_teams', 'bowling_teams',
-                       'players', 'batters', 'bowlers', 'crease_combo', 'ball_direction', 'bowler_type', 
-                       'striker_batter_type', 'non_striker_batter_type', 'innings', 'over_min', 'over_max', 'wicket_type'];
+    const filterKeys = [
+      'venue', 'start_date', 'end_date', 'leagues', 'teams', 'batting_teams', 'bowling_teams',
+      'players', 'batters', 'bowlers', 'bat_hand', 'bowl_style', 'bowl_kind',
+      'line', 'length', 'shot', 'control', 'wagon_zone',
+      'innings', 'over_min', 'over_max'
+    ];
     
     return filterKeys.some(key => {
       const value = filters[key];
@@ -409,8 +381,8 @@ const QueryBuilder = ({ isMobile }) => {
       </Typography>
       
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Build custom queries to analyze cricket deliveries with flexible filtering and grouping.
-        Perfect for studying left-right combinations, bowling matchups, venue patterns, and more.
+        Build custom queries to analyze ball-by-ball cricket data. 
+        Filter by line, length, shot type, wagon wheel zones, and more.
       </Typography>
       
       {/* Prefilled Query Cards */}
@@ -420,7 +392,7 @@ const QueryBuilder = ({ isMobile }) => {
             🚀 Quick Start Queries
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Click on any query below to get started instantly:
+            Click on any query below to get started:
           </Typography>
           <Grid container spacing={2}>
             {PREFILLED_QUERIES.map((query, index) => (

@@ -11,6 +11,12 @@ export const parseUrlParams = (search) => {
     return values.length > 0 ? values : [];
   };
   
+  // Helper function to parse integer array parameters
+  const getIntArrayParam = (key) => {
+    const values = params.getAll(key);
+    return values.length > 0 ? values.map(v => parseInt(v, 10)) : [];
+  };
+  
   // Helper function to parse single value parameters
   const getSingleParam = (key, defaultValue = null) => {
     const value = params.get(key);
@@ -41,16 +47,24 @@ export const parseUrlParams = (search) => {
   filters.batters = getArrayParam('batters');
   filters.bowlers = getArrayParam('bowlers');
   
-  // Column-specific filters
-  filters.crease_combo = getSingleParam('crease_combo');
-  filters.ball_direction = getSingleParam('ball_direction');
-  filters.bowler_type = getArrayParam('bowler_type');
-  filters.striker_batter_type = getSingleParam('striker_batter_type');
-  filters.non_striker_batter_type = getSingleParam('non_striker_batter_type');
+  // Match context filters
   filters.innings = getIntParam('innings');
   filters.over_min = getIntParam('over_min');
   filters.over_max = getIntParam('over_max');
-  filters.wicket_type = getSingleParam('wicket_type');
+  
+  // Batter filters
+  filters.bat_hand = getSingleParam('bat_hand');
+  
+  // Bowler filters
+  filters.bowl_style = getArrayParam('bowl_style');
+  filters.bowl_kind = getArrayParam('bowl_kind');
+  
+  // Delivery detail filters (NEW)
+  filters.line = getArrayParam('line');
+  filters.length = getArrayParam('length');
+  filters.shot = getArrayParam('shot');
+  filters.control = getIntParam('control');
+  filters.wagon_zone = getIntArrayParam('wagon_zone');
   
   // Grouped result filters
   filters.min_balls = getIntParam('min_balls');
@@ -65,6 +79,9 @@ export const parseUrlParams = (search) => {
   // International matches
   filters.include_international = getBoolParam('include_international', false);
   filters.top_teams = getIntParam('top_teams', 10);
+  
+  // Summary rows
+  filters.show_summary_rows = getBoolParam('show_summary_rows', false);
   
   return filters;
 };
