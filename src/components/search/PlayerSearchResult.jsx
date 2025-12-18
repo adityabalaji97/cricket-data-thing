@@ -8,10 +8,16 @@ import {
   CircularProgress,
   Alert,
   Divider,
-  Button
+  Button,
+  Card,
+  CardContent,
+  Collapse
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import SportsCricketIcon from '@mui/icons-material/SportsCricket';
+import BoltIcon from '@mui/icons-material/Bolt';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from './searchConfig';
@@ -31,6 +37,106 @@ const StatCard = ({ label, value, subtitle }) => (
     )}
   </Box>
 );
+
+// DNA Summary sub-component
+const DNASummary = ({ playerName, playerType, color }) => {
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [expanded, setExpanded] = useState(true);
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const endpoint = playerType === 'bowler' ? 'bowler' : 'batter';
+        const response = await axios.get(
+          `${API_BASE_URL}/player-summary/${endpoint}/${encodeURIComponent(playerName)}`
+        );
+        if (response.data.success) {
+          setSummary(response.data.summary);
+        } else {
+          setError(response.data.error || 'Failed to generate summary');
+        }
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to load DNA summary');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (playerName) {
+      fetchSummary();
+    }
+  }, [playerName, playerType]);
+
+  const parseSummary = (text) => {
+    if (!text) return [];
+    return text.split('\n').filter(line => line.trim()).map((line) => {
+      const match = line.match(/^([🎯⚡💪⚠️📊]+)\s*(.+?):\s*(.+)$/);
+      if (match) return { emoji: match[1], label: match[2], text: match[3] };
+      const simpleMatch = line.match(/^([^\s]+)\s+(.+)$/);
+      if (simpleMatch) return { emoji: simpleMatch[1], label: '', text: simpleMatch[2] };
+      return { emoji: '•', label: '', text: line };
+    });
+  };
+
+  return (
+    <Card variant="outlined" sx={{ mt: 2, borderColor: color }}>
+      <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1, 
+            cursor: 'pointer' 
+          }}
+          onClick={() => setExpanded(!expanded)}
+        >
+          <BoltIcon sx={{ color, fontSize: 18 }} />
+          <Typography variant="subtitle2" fontWeight="bold" sx={{ flexGrow: 1 }}>
+            {playerType === 'bowler' ? 'Bowler' : 'Batter'} DNA
+          </Typography>
+          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        </Box>
+
+        <Collapse in={expanded}>
+          {loading && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1.5 }}>
+              <CircularProgress size={16} />
+              <Typography variant="body2" color="text.secondary">
+                Analyzing patterns...
+              </Typography>
+            </Box>
+          )}
+
+          {error && !loading && (
+            <Alert severity="warning" sx={{ mt: 1, py: 0.5 }}>
+              <Typography variant="caption">{error}</Typography>
+            </Alert>
+          )}
+
+          {summary && !loading && (
+            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              {parseSummary(summary).map((bullet, index) => (
+                <Box key={index} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                  <Typography component="span" sx={{ flexShrink: 0, fontSize: '0.85rem' }}>
+                    {bullet.emoji}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+                    {bullet.label && <strong>{bullet.label}: </strong>}
+                    {bullet.text}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Collapse>
+      </CardContent>
+    </Card>
+  );
+};
 
 const PlayerSearchResult = ({ playerName }) => {
   const [profile, setProfile] = useState(null);
@@ -147,12 +253,16 @@ const PlayerSearchResult = ({ playerName }) => {
               4s: {batting.fours} | 6s: {batting.sixes} | Dot%: {batting.dot_percentage}%
             </Typography>
           </Box>
+          
+          {/* Batter DNA Summary */}
+          <DNASummary playerName={playerName} playerType="batter" color="#d32f2f" />
+          
           <Button
             component={Link}
             to={`/player?name=${encodeURIComponent(playerName)}&autoload=true`}
             variant="outlined"
             size="small"
-            sx={{ mt: 1 }}
+            sx={{ mt: 2 }}
           >
             View Full Batting Profile →
           </Button>
@@ -162,6 +272,7 @@ const PlayerSearchResult = ({ playerName }) => {
       {/* Bowling Stats */}
       {bowling.has_stats && (
         <Box>
+          {batting.has_stats && <Divider sx={{ my: 3 }} />}
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <SportsCricketIcon color="warning" />
             Bowling
@@ -191,12 +302,16 @@ const PlayerSearchResult = ({ playerName }) => {
               Overs: {bowling.overs} | 3W: {bowling.three_wickets} | 5W: {bowling.five_wickets} | Dot%: {bowling.dot_percentage}%
             </Typography>
           </Box>
+          
+          {/* Bowler DNA Summary */}
+          <DNASummary playerName={playerName} playerType="bowler" color="#ed6c02" />
+          
           <Button
             component={Link}
             to={`/bowler?name=${encodeURIComponent(playerName)}&autoload=true`}
             variant="outlined"
             size="small"
-            sx={{ mt: 1 }}
+            sx={{ mt: 2 }}
           >
             View Full Bowling Profile →
           </Button>
