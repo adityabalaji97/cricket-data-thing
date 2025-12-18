@@ -39,7 +39,7 @@ const StatCard = ({ label, value, subtitle }) => (
 );
 
 // DNA Summary sub-component
-const DNASummary = ({ playerName, playerType, color }) => {
+const DNASummary = ({ playerName, playerType, color, startDate, endDate }) => {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -51,16 +51,23 @@ const DNASummary = ({ playerName, playerType, color }) => {
       setError(null);
       try {
         const endpoint = playerType === 'bowler' ? 'bowler' : 'batter';
-        const response = await axios.get(
-          `${API_BASE_URL}/player-summary/${endpoint}/${encodeURIComponent(playerName)}`
-        );
+        
+        // Build query params with date range
+        const params = new URLSearchParams();
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        
+        const url = `${API_BASE_URL}/player-summary/${endpoint}/${encodeURIComponent(playerName)}?${params.toString()}`;
+        const response = await axios.get(url);
+        
         if (response.data.success) {
           setSummary(response.data.summary);
         } else {
           setError(response.data.error || 'Failed to generate summary');
         }
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to load DNA summary');
+        console.error('DNA fetch error:', err);
+        setError(err.response?.data?.detail || err.response?.data?.error || 'Failed to load DNA summary');
       } finally {
         setLoading(false);
       }
@@ -69,7 +76,7 @@ const DNASummary = ({ playerName, playerType, color }) => {
     if (playerName) {
       fetchSummary();
     }
-  }, [playerName, playerType]);
+  }, [playerName, playerType, startDate, endDate]);
 
   const parseSummary = (text) => {
     if (!text) return [];
@@ -254,8 +261,14 @@ const PlayerSearchResult = ({ playerName }) => {
             </Typography>
           </Box>
           
-          {/* Batter DNA Summary */}
-          <DNASummary playerName={playerName} playerType="batter" color="#d32f2f" />
+          {/* Batter DNA Summary - pass date range */}
+          <DNASummary 
+            playerName={playerName} 
+            playerType="batter" 
+            color="#d32f2f"
+            startDate={date_range.start_date}
+            endDate={date_range.end_date}
+          />
           
           <Button
             component={Link}
@@ -303,8 +316,14 @@ const PlayerSearchResult = ({ playerName }) => {
             </Typography>
           </Box>
           
-          {/* Bowler DNA Summary */}
-          <DNASummary playerName={playerName} playerType="bowler" color="#ed6c02" />
+          {/* Bowler DNA Summary - pass date range */}
+          <DNASummary 
+            playerName={playerName} 
+            playerType="bowler" 
+            color="#ed6c02"
+            startDate={date_range.start_date}
+            endDate={date_range.end_date}
+          />
           
           <Button
             component={Link}

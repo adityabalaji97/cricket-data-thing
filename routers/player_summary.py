@@ -408,6 +408,15 @@ async def get_batter_summary(
             db=db
         )
         
+        # Handle empty or None stats
+        if not stats or not stats.get("overall") or stats.get("overall", {}).get("matches", 0) == 0:
+            return SummaryResponse(
+                success=False,
+                player_name=player_name,
+                player_type="batter",
+                error="No batting statistics found for this player in the selected date range"
+            )
+        
         # Add player name to stats
         stats["player_name"] = player_name
         
@@ -498,6 +507,15 @@ async def get_bowler_summary(
             venue=venue,
             db=db
         )
+        
+        # Handle empty or None stats
+        if not stats or not stats.get("overall") or stats.get("overall", {}).get("matches", 0) == 0:
+            return SummaryResponse(
+                success=False,
+                player_name=player_name,
+                player_type="bowler",
+                error="No bowling statistics found for this player in the selected date range"
+            )
         
         stats["player_name"] = player_name
         
