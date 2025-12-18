@@ -179,7 +179,7 @@ def get_player_profile(
     try:
         # Get player info
         player_info_query = text("""
-            SELECT name, batting_hand, bowler_type
+            SELECT name, batter_type, bowler_type
             FROM players
             WHERE name = :player_name
         """)
@@ -304,8 +304,8 @@ def get_player_profile(
             "found": True,
             "player_name": player_name,
             "player_info": {
-                "batting_hand": player_info.batting_hand,
-                "bowling_style": player_info.bowler_type,
+                "batter_type": player_info.batter_type,
+                "bowler_type": player_info.bowler_type,
                 "role": role,
                 "recent_teams": [t.team for t in recent_teams]
             },

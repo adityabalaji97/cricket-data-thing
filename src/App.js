@@ -31,6 +31,7 @@ import QueryBuilder from './components/QueryBuilder'; // Import the new QueryBui
 import TeamProfile from './components/TeamProfile';
 import TeamComparison from './components/TeamComparison';
 import WrappedPage from './components/wrapped/WrappedPage';
+import { GoogleSearchLanding } from './components/search';
 import axios from 'axios';
 
 import config from './config';
@@ -89,14 +90,15 @@ const AppContent = () => {
     setCurrentTab(0); // 0 for home/landing page
     } else {
     setCurrentTab(
-    path === '/venue' ? 1 : 
-    path === '/player' ? 2 : 
-    path === '/bowler' ? 3 : 
-    path === '/comparison' ? 4 : 
-    path === '/matchups' ? 5 : 
-    path === '/query' ? 6 : 
-    path === '/team' ? 7 : 
-    path === '/team-comparison' ? 8 : 0 // Added team comparison tab
+    path === '/search' ? 1 :
+    path === '/venue' ? 2 : 
+    path === '/player' ? 3 : 
+    path === '/bowler' ? 4 : 
+    path === '/comparison' ? 5 : 
+    path === '/matchups' ? 6 : 
+    path === '/query' ? 7 : 
+    path === '/team' ? 8 : 
+    path === '/team-comparison' ? 9 : 0
       );
             }
   };
@@ -108,14 +110,15 @@ const AppContent = () => {
       setCurrentTab(0); // Home tab
     } else {
       setCurrentTab(
-        path === '/venue' ? 1 : 
-        path === '/player' ? 2 : 
-        path === '/bowler' ? 3 : 
-        path === '/comparison' ? 4 : 
-        path === '/matchups' ? 5 : 
-        path === '/query' ? 6 : 
-        path === '/team' ? 7 : 
-        path === '/team-comparison' ? 8 : 0 // Added team comparison tab
+        path === '/search' ? 1 :
+        path === '/venue' ? 2 : 
+        path === '/player' ? 3 : 
+        path === '/bowler' ? 4 : 
+        path === '/comparison' ? 5 : 
+        path === '/matchups' ? 6 : 
+        path === '/query' ? 7 : 
+        path === '/team' ? 8 : 
+        path === '/team-comparison' ? 9 : 0
       );
     }
   }, [location]);
@@ -366,14 +369,15 @@ const AppContent = () => {
   // Create page title based on current tab
   const getPageTitle = () => {
     return currentTab === 0 ? 'Home' :
-           currentTab === 1 ? 'Venue Analysis' : 
-           currentTab === 2 ? 'Batter Profile' : 
-           currentTab === 3 ? 'Bowler Profile' :  
-           currentTab === 4 ? 'Batter Comparison' : 
-           currentTab === 5 ? 'Matchups' : 
-           currentTab === 6 ? 'Query Builder' : 
-           currentTab === 7 ? 'Team Profile' : 
-           currentTab === 8 ? 'Team Comparison' : 'Home';
+           currentTab === 1 ? 'Search' :
+           currentTab === 2 ? 'Venue Analysis' : 
+           currentTab === 3 ? 'Batter Profile' : 
+           currentTab === 4 ? 'Bowler Profile' :  
+           currentTab === 5 ? 'Batter Comparison' : 
+           currentTab === 6 ? 'Matchups' : 
+           currentTab === 7 ? 'Query Builder' : 
+           currentTab === 8 ? 'Team Profile' : 
+           currentTab === 9 ? 'Team Comparison' : 'Home';
   };
 
   return (
@@ -406,6 +410,9 @@ const AppContent = () => {
             >
               <MenuItem onClick={() => handleNavigate('/')}>
                 Home
+              </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/search')}>
+                Search
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/venue')}>
                 Venue Analysis
@@ -445,6 +452,7 @@ const AppContent = () => {
             sx={{ width: '100%' }}
           >
             <Tab label="Home" component={Link} to="/" />
+            <Tab label="Search" component={Link} to="/search" />
             <Tab label="Venue Analysis" component={Link} to="/venue" />
             <Tab label="Batter Profile" component={Link} to="/player" />
             <Tab label="Bowler Profile" component={Link} to="/bowler" />
@@ -467,6 +475,7 @@ const AppContent = () => {
         <Route path="/team" element={<TeamProfile isMobile={isMobile} />} />
         <Route path="/team-comparison" element={<TeamComparison />} />
         <Route path="/wrapped/2025" element={<WrappedPage />} />
+        <Route path="/search" element={<GoogleSearchLanding />} />
         <Route path="/venue" element={
           <Box sx={{ my: 3 }}>
             {error && (
