@@ -131,7 +131,6 @@ def get_available_columns(db: Session = Depends(get_session)):
     """
     try:
         from sqlalchemy.sql import text
-        import json
         
         # Read all metadata in one query
         result = db.execute(text("""
@@ -142,8 +141,9 @@ def get_available_columns(db: Session = Depends(get_session)):
         # Build lookup dict
         metadata = {}
         for row in result:
+            # JSONB returns already-parsed Python objects, no need for json.loads
             metadata[row[0]] = {
-                "values": json.loads(row[1]) if row[1] else [],
+                "values": row[1] if row[1] else [],
                 "coverage": row[2]
             }
         
