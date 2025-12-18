@@ -11,6 +11,7 @@ This is a simplified MVP version with:
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import text
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date
@@ -367,8 +368,21 @@ async def get_batter_summary(
     2. Extracts patterns using rule-based detection
     3. Generates natural language summary using LLM
     4. Caches result for subsequent requests
+    
+    If no competition filters are provided, automatically includes ALL leagues + international (top 20 teams).
     """
     try:
+        # If no filters provided, use ALL leagues + international
+        if not leagues and not include_international:
+            logger.info(f"No competition filters provided for {player_name}, using all leagues + international")
+            leagues_result = db.execute(text(
+                "SELECT DISTINCT competition FROM matches WHERE competition IS NOT NULL AND match_type = 'league'"
+            )).fetchall()
+            leagues = [r[0] for r in leagues_result if r[0]]
+            include_international = True
+            top_teams = 20
+            logger.info(f"Auto-populated {len(leagues)} leagues + international top 20")
+        
         # Build filter dict for cache key
         filters = {
             "start_date": str(start_date) if start_date else None,
@@ -468,8 +482,21 @@ async def get_bowler_summary(
 ):
     """
     Generate AI-powered bowling summary for a player.
+    
+    If no competition filters are provided, automatically includes ALL leagues + international (top 20 teams).
     """
     try:
+        # If no filters provided, use ALL leagues + international
+        if not leagues and not include_international:
+            logger.info(f"No competition filters provided for bowler {player_name}, using all leagues + international")
+            leagues_result = db.execute(text(
+                "SELECT DISTINCT competition FROM matches WHERE competition IS NOT NULL AND match_type = 'league'"
+            )).fetchall()
+            leagues = [r[0] for r in leagues_result if r[0]]
+            include_international = True
+            top_teams = 20
+            logger.info(f"Auto-populated {len(leagues)} leagues + international top 20")
+        
         filters = {
             "start_date": str(start_date) if start_date else None,
             "end_date": str(end_date) if end_date else None,
