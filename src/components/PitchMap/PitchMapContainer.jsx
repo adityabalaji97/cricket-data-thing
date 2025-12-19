@@ -3,11 +3,13 @@
  * 
  * Wraps PitchMapVisualization with:
  * - Dimension selector (when grouping by line/length + other columns)
- * - Metric selector for color scale
+ * - Metric selector for color scale and display
  * - Min balls threshold control
+ * - PNG export
+ * - Auto-generated title from filters
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -18,15 +20,17 @@ import {
   MenuItem,
   Slider,
   Chip,
-  ToggleButton,
-  ToggleButtonGroup,
   IconButton,
   Collapse,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  FormGroup,
   Divider
 } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import DownloadIcon from '@mui/icons-material/Download';
+import html2canvas from 'html2canvas';
 import PitchMapVisualization from './PitchMapVisualization';
 import {
   getPitchMapMode,
@@ -38,6 +42,7 @@ import {
 import {
   METRICS,
   DEFAULT_CELL_METRICS,
+  DEFAULT_SECONDARY_METRICS,
   DEFAULT_COLOR_METRIC,
   DEFAULT_MIN_BALLS,
   MIN_BALLS_OPTIONS
@@ -46,12 +51,16 @@ import {
 const PitchMapContainer = ({
   data,
   groupBy,
-  title = 'Pitch Map Analysis',
+  filters = {},
   initialColorMetric = DEFAULT_COLOR_METRIC,
   initialDisplayMetrics = DEFAULT_CELL_METRICS,
-  initialMinBalls = DEFAULT_MIN_BALLS,
-  width = 400
+  initialSecondaryMetrics = DEFAULT_SECONDARY_METRICS,
+  initialMinBalls = DEFAULT_MIN_BALLS
 }) => {
+  // Refs for export
+  const containerRef = useRef(null);
+  const svgRef = useRef(null);
+  
   // Determine mode and non-pitch dimensions
   const mode = useMemo(() => getPitchMapMode(groupBy), [groupBy]);
   const nonPitchDimensions = useMemo(() => getNonPitchDimensions(groupBy), [groupBy]);
@@ -62,6 +71,7 @@ const PitchMapContainer = ({
   // State for visualization settings
   const [colorMetric, setColorMetric] = useState(initialColorMetric);
   const [displayMetrics, setDisplayMetrics] = useState(initialDisplayMetrics);
+  const [secondaryMetrics, setSecondaryMetrics] = useState(initialSecondaryMetrics);
   const [minBalls, setMinBalls] = useState(initialMinBalls);
   const [showSettings, setShowSettings] = useState(false);
   
@@ -102,6 +112,49 @@ const PitchMapContainer = ({
     return Math.max(5, Math.floor(median * 0.1));
   }, [cells]);
   
+  // Generate title from filters
+  const generatedTitle = useMemo(() => {
+    const parts = [];
+    
+    // Add dimension selections first
+    Object.entries(dimensionSelections).forEach(([dim, value]) => {
+      if (value) {
+        parts.push(value);
+      }
+    });
+    
+    // Add key filters
+    if (filters.batting_teams?.length > 0) {
+      parts.push(filters.batting_teams.join(', '));
+    }
+    if (filters.bowling_teams?.length > 0) {
+      parts.push(`vs ${filters.bowling_teams.join(', ')}`);
+    }
+    if (filters.leagues?.length > 0) {
+      parts.push(filters.leagues.join(', '));
+    }
+    if (filters.venue) {
+      parts.push(`@ ${filters.venue}`);
+    }
+    
+    // Add phase info if over filters are set
+    if (filters.over_min !== null && filters.over_min !== undefined) {
+      if (filters.over_min === 0 && filters.over_max === 5) {
+        parts.push('Powerplay');
+      } else if (filters.over_min === 6 && filters.over_max === 14) {
+        parts.push('Middle Overs');
+      } else if (filters.over_min === 15) {
+        parts.push('Death Overs');
+      }
+    }
+    
+    if (parts.length === 0) {
+      return 'Pitch Map Analysis';
+    }
+    
+    return parts.join(' • ');
+  }, [filters, dimensionSelections]);
+  
   // Handle dimension selection change
   const handleDimensionChange = (dimension, value) => {
     setDimensionSelections(prev => ({
@@ -110,10 +163,42 @@ const PitchMapContainer = ({
     }));
   };
   
-  // Handle display metrics toggle
-  const handleDisplayMetricsChange = (event, newMetrics) => {
-    if (newMetrics && newMetrics.length > 0) {
-      setDisplayMetrics(newMetrics);
+  // Handle metric checkbox change
+  const handleMetricToggle = (metricKey, isPrimary) => {
+    if (isPrimary) {
+      setDisplayMetrics(prev => {
+        if (prev.includes(metricKey)) {
+          return prev.filter(k => k !== metricKey);
+        }
+        return [...prev, metricKey];
+      });
+    } else {
+      setSecondaryMetrics(prev => {
+        if (prev.includes(metricKey)) {
+          return prev.filter(k => k !== metricKey);
+        }
+        return [...prev, metricKey];
+      });
+    }
+  };
+  
+  // Export as PNG
+  const handleExport = async () => {
+    if (!containerRef.current) return;
+    
+    try {
+      const canvas = await html2canvas(containerRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false
+      });
+      
+      const link = document.createElement('a');
+      link.download = `pitch-map-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('Export failed:', error);
     }
   };
   
@@ -121,36 +206,50 @@ const PitchMapContainer = ({
   const subtitle = useMemo(() => {
     const parts = [];
     Object.entries(dimensionSelections).forEach(([dim, value]) => {
-      if (value) {
+      if (value && !generatedTitle.includes(value)) {
         parts.push(`${dim}: ${value}`);
       }
     });
-    return parts.join(' • ');
-  }, [dimensionSelections]);
+    return parts.length > 0 ? parts.join(' • ') : null;
+  }, [dimensionSelections, generatedTitle]);
   
   if (!mode) {
-    return null; // No line or length in groupBy
+    return null;
   }
   
+  const totalBalls = cells.reduce((sum, c) => sum + (c.balls || 0), 0);
+  const cellsWithData = cells.filter(c => c.balls >= minBalls).length;
+  
   return (
-    <Paper elevation={2} sx={{ p: 2 }}>
+    <Paper elevation={2} sx={{ p: 2, width: '100%' }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">{title}</Typography>
-        <IconButton 
-          size="small" 
-          onClick={() => setShowSettings(!showSettings)}
-          color={showSettings ? 'primary' : 'default'}
-        >
-          <SettingsIcon />
-        </IconButton>
+        <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+          Pitch Map
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <IconButton 
+            size="small" 
+            onClick={handleExport}
+            title="Export as PNG"
+          >
+            <DownloadIcon />
+          </IconButton>
+          <IconButton 
+            size="small" 
+            onClick={() => setShowSettings(!showSettings)}
+            color={showSettings ? 'primary' : 'default'}
+          >
+            <SettingsIcon />
+          </IconButton>
+        </Box>
       </Box>
       
       {/* Dimension Selectors */}
       {nonPitchDimensions.length > 0 && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
           {nonPitchDimensions.map(dim => (
-            <FormControl key={dim} size="small" sx={{ minWidth: 150 }}>
+            <FormControl key={dim} size="small" sx={{ minWidth: 140, flex: '1 1 140px' }}>
               <InputLabel>{dim.charAt(0).toUpperCase() + dim.slice(1)}</InputLabel>
               <Select
                 value={dimensionSelections[dim] || ''}
@@ -171,11 +270,9 @@ const PitchMapContainer = ({
       {/* Settings Panel */}
       <Collapse in={showSettings}>
         <Box sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1, mb: 2 }}>
-          <Typography variant="subtitle2" gutterBottom>Visualization Settings</Typography>
-          
           {/* Color Metric Selector */}
           <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
+            <Typography variant="subtitle2" gutterBottom>
               Color Scale Metric
             </Typography>
             <FormControl size="small" fullWidth>
@@ -192,28 +289,59 @@ const PitchMapContainer = ({
             </FormControl>
           </Box>
           
-          {/* Display Metrics Toggle */}
+          <Divider sx={{ my: 2 }} />
+          
+          {/* Primary Metrics Checkboxes */}
           <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Metrics to Display
+            <Typography variant="subtitle2" gutterBottom>
+              Primary Metrics (top line)
             </Typography>
-            <ToggleButtonGroup
-              value={displayMetrics}
-              onChange={handleDisplayMetricsChange}
-              size="small"
-              sx={{ flexWrap: 'wrap' }}
-            >
+            <FormGroup row sx={{ flexWrap: 'wrap' }}>
               {Object.entries(METRICS).map(([key, config]) => (
-                <ToggleButton key={key} value={key} sx={{ textTransform: 'none', px: 1.5 }}>
-                  {config.shortLabel}
-                </ToggleButton>
+                <FormControlLabel
+                  key={key}
+                  control={
+                    <Checkbox
+                      checked={displayMetrics.includes(key)}
+                      onChange={() => handleMetricToggle(key, true)}
+                      size="small"
+                    />
+                  }
+                  label={config.shortLabel}
+                  sx={{ mr: 1, minWidth: 80 }}
+                />
               ))}
-            </ToggleButtonGroup>
+            </FormGroup>
           </Box>
+          
+          {/* Secondary Metrics Checkboxes */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Secondary Metrics (bottom line)
+            </Typography>
+            <FormGroup row sx={{ flexWrap: 'wrap' }}>
+              {Object.entries(METRICS).map(([key, config]) => (
+                <FormControlLabel
+                  key={key}
+                  control={
+                    <Checkbox
+                      checked={secondaryMetrics.includes(key)}
+                      onChange={() => handleMetricToggle(key, false)}
+                      size="small"
+                    />
+                  }
+                  label={config.shortLabel}
+                  sx={{ mr: 1, minWidth: 80 }}
+                />
+              ))}
+            </FormGroup>
+          </Box>
+          
+          <Divider sx={{ my: 2 }} />
           
           {/* Min Balls Slider */}
           <Box>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
+            <Typography variant="subtitle2" gutterBottom>
               Minimum Balls: {minBalls}
               {suggestedMinBalls > 0 && minBalls !== suggestedMinBalls && (
                 <Chip 
@@ -238,24 +366,29 @@ const PitchMapContainer = ({
         </Box>
       </Collapse>
       
-      {/* Pitch Map Visualization */}
-      <PitchMapVisualization
-        cells={cells}
-        mode={mode}
-        colorMetric={colorMetric}
-        displayMetrics={displayMetrics}
-        minBalls={minBalls}
-        subtitle={subtitle}
-        width={width}
-      />
+      {/* Pitch Map Visualization - wrapped in ref for export */}
+      <Box ref={containerRef} sx={{ bgcolor: '#fff', p: 1 }}>
+        <PitchMapVisualization
+          cells={cells}
+          mode={mode}
+          colorMetric={colorMetric}
+          displayMetrics={displayMetrics}
+          secondaryMetrics={secondaryMetrics}
+          minBalls={minBalls}
+          title={generatedTitle}
+          subtitle={subtitle}
+          width={null} // Will use container width
+          svgRef={svgRef}
+        />
+      </Box>
       
       {/* Data Summary */}
-      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
         <Typography variant="caption" color="text.secondary">
-          Total Balls: {cells.reduce((sum, c) => sum + (c.balls || 0), 0).toLocaleString()}
+          Total Balls: {totalBalls.toLocaleString()}
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          Cells with Data: {cells.filter(c => c.balls >= minBalls).length} / {cells.length}
+          Cells with Data: {cellsWithData} / {cells.length}
         </Typography>
       </Box>
     </Paper>

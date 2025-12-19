@@ -451,6 +451,7 @@ const QueryBuilder = ({ isMobile }) => {
             <QueryResults
               results={results}
               groupBy={groupBy}
+              filters={filters}
               isMobile={isMobile}
             />
           )}

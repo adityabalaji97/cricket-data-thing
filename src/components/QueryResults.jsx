@@ -92,7 +92,7 @@ const ColumnFilter = ({ column, displayName, uniqueValues, selectedValues, onCha
   );
 };
 
-const QueryResults = ({ results, groupBy, isMobile }) => {
+const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
   
@@ -636,8 +636,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
           <PitchMapContainer
             data={data}
             groupBy={groupBy}
-            title="Pitch Map Analysis"
-            width={Math.min(500, window.innerWidth - 48)}
+            filters={filters || metadata?.filters_applied || {}}
           />
         </Box>
       )}

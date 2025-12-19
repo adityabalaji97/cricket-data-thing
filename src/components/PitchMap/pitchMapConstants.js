@@ -2,7 +2,7 @@
  * Pitch Map Constants
  * 
  * Coordinates and mappings for pitch map visualization.
- * Bowler's view: bowling from top, batter at bottom.
+ * Mobile-first design with stumps at top.
  */
 
 // Line values from delivery_details (left to right from bowler's view for RHB)
@@ -58,19 +58,20 @@ export const LENGTH_SHORT_LABELS = {
   'FULL_TOSS': 'F.Toss'
 };
 
-// SVG dimensions and layout
+// SVG dimensions and layout - mobile-first, fills container
 export const PITCH_DIMENSIONS = {
-  width: 400,
-  height: 540,
-  padding: { top: 60, right: 60, bottom: 70, left: 60 },  // More top padding for stumps, bottom for bowler label
+  width: 360,  // Will be overridden by container width
+  height: 600,
+  padding: { top: 80, right: 55, bottom: 80, left: 20 },  // Room for stumps top, bowler bottom
   
   // Pitch area (the actual pitch rectangle)
   pitchWidth: 280,
-  pitchHeight: 400,
+  pitchHeight: 440,
   
-  // Stump position (at top of pitch - batter's end)
-  stumpY: 40,
-  stumpWidth: 20,
+  // Stump dimensions
+  stumpHeight: 35,
+  stumpWidth: 5,
+  stumpGap: 8,
 };
 
 // Available metrics for visualization
@@ -80,7 +81,7 @@ export const METRICS = {
     label: 'Strike Rate',
     shortLabel: 'SR',
     format: (v) => v?.toFixed(1) ?? '-',
-    colorScale: 'ascending', // higher is "hotter"
+    colorScale: 'ascending', // higher is "better" for batter
     range: [60, 200]
   },
   average: {
@@ -95,15 +96,15 @@ export const METRICS = {
     key: 'dot_percentage',
     label: 'Dot %',
     shortLabel: 'Dot%',
-    format: (v) => v?.toFixed(1) + '%' ?? '-',
-    colorScale: 'descending', // lower dots is "hotter" for batters
+    format: (v) => v != null ? v.toFixed(1) + '%' : '-',
+    colorScale: 'descending', // lower dots is "better" for batters
     range: [20, 60]
   },
   boundary_percentage: {
     key: 'boundary_percentage',
     label: 'Boundary %',
     shortLabel: 'Bnd%',
-    format: (v) => v?.toFixed(1) + '%' ?? '-',
+    format: (v) => v != null ? v.toFixed(1) + '%' : '-',
     colorScale: 'ascending',
     range: [5, 30]
   },
@@ -111,6 +112,14 @@ export const METRICS = {
     key: 'balls',
     label: 'Balls',
     shortLabel: 'Balls',
+    format: (v) => v?.toString() ?? '-',
+    colorScale: 'neutral',
+    range: [0, 500]
+  },
+  runs: {
+    key: 'runs',
+    label: 'Runs',
+    shortLabel: 'Runs',
     format: (v) => v?.toString() ?? '-',
     colorScale: 'ascending',
     range: [0, 500]
@@ -120,21 +129,24 @@ export const METRICS = {
     label: 'Wickets',
     shortLabel: 'Wkts',
     format: (v) => v?.toString() ?? '-',
-    colorScale: 'ascending',
+    colorScale: 'descending', // fewer wickets is better for batter
     range: [0, 20]
   },
   control_percentage: {
     key: 'control_percentage',
     label: 'Control %',
     shortLabel: 'Ctrl%',
-    format: (v) => v?.toFixed(1) + '%' ?? '-',
+    format: (v) => v != null ? v.toFixed(1) + '%' : '-',
     colorScale: 'ascending',
     range: [50, 95]
   }
 };
 
 // Default metrics to display in cells
-export const DEFAULT_CELL_METRICS = ['average', 'strike_rate', 'dot_percentage', 'boundary_percentage'];
+export const DEFAULT_CELL_METRICS = ['average', 'strike_rate'];
+
+// Secondary metrics (shown on second line)
+export const DEFAULT_SECONDARY_METRICS = ['dot_percentage', 'boundary_percentage'];
 
 // Default metric for color scale
 export const DEFAULT_COLOR_METRIC = 'strike_rate';
