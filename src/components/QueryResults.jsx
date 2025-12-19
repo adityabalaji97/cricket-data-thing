@@ -37,8 +37,10 @@ import ScatterPlotIcon from '@mui/icons-material/ScatterPlot';
 import AddIcon from '@mui/icons-material/Add';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
+import MapIcon from '@mui/icons-material/Map';
 import FilterListOffIcon from '@mui/icons-material/FilterListOff';
 import ChartPanel from './ChartPanel';
+import { PitchMapContainer, getPitchMapMode } from './PitchMap';
 
 // Column Filter Component
 const ColumnFilter = ({ column, displayName, uniqueValues, selectedValues, onChange, onClear, isMobile }) => {
@@ -107,6 +109,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
   // Chart panel ref to trigger chart additions
   const chartPanelRef = useRef(null);
   const [showCharts, setShowCharts] = useState(false);
+  const [showPitchMap, setShowPitchMap] = useState(false);
   
   // Extract data early to avoid hooks rule violation
   const data = results?.data || [];
@@ -114,6 +117,7 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
   const metadata = results?.metadata || {};
   const isGrouped = groupBy && groupBy.length > 0;
   const hasSummaries = metadata.has_summaries || false;
+  const pitchMapMode = useMemo(() => getPitchMapMode(groupBy || []), [groupBy]);
   
   // Merge regular data with summary data and percentages for display
   const displayData = useMemo(() => {
@@ -576,6 +580,19 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
                   </>
                 )}
                 
+                {/* Pitch Map button - show when line or length is in groupBy */}
+                {isGrouped && pitchMapMode && data.length > 0 && (
+                  <Button
+                    variant={showPitchMap ? "contained" : "outlined"}
+                    startIcon={<MapIcon />}
+                    onClick={() => setShowPitchMap(!showPitchMap)}
+                    size="small"
+                    color="success"
+                  >
+                    {showPitchMap ? 'Hide Pitch Map' : 'Show Pitch Map'}
+                  </Button>
+                )}
+                
                 {/* Chart buttons only for grouped data */}
                 {isGrouped && data.length > 0 && (
                   <>
@@ -612,6 +629,18 @@ const QueryResults = ({ results, groupBy, isMobile }) => {
           </Grid>
         </CardContent>
       </Card>
+      
+      {/* Pitch Map Visualization */}
+      {showPitchMap && pitchMapMode && isGrouped && (
+        <Box sx={{ mb: 3 }}>
+          <PitchMapContainer
+            data={data}
+            groupBy={groupBy}
+            title="Pitch Map Analysis"
+            width={Math.min(500, window.innerWidth - 48)}
+          />
+        </Box>
+      )}
 
       
       {/* Cricket Metrics Summary (for grouped results) */}
