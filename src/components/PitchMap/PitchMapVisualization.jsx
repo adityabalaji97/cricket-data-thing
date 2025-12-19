@@ -266,8 +266,8 @@ const CellContent = ({ x, y, width, height, content, mode }) => {
 const PitchMarkings = ({ dimensions, mode }) => {
   const { padding, pitchWidth, pitchHeight } = dimensions;
   
-  // Popping crease (where batter stands) - near bottom
-  const creaseY = padding.top + pitchHeight - 40;
+  // Popping crease (where batter stands) - near top
+  const creaseY = padding.top + 30;
   
   return (
     <g stroke="#86efac" strokeWidth={1} strokeDasharray="4,4">
@@ -289,9 +289,12 @@ const AxisLabels = ({ dimensions, mode, scale }) => {
   const { padding, pitchWidth, pitchHeight } = dimensions;
   const fontSize = 10 * scale;
   
+  // Reverse length order to match cell positions (yorker at top, short at bottom)
+  const reversedLengthOrder = [...LENGTH_ORDER].reverse();
+  
   return (
     <>
-      {/* Line labels (top) */}
+      {/* Line labels (bottom, below pitch) */}
       {(mode === 'grid' || mode === 'line-only') && (
         LINE_ORDER.map((line, index) => {
           const cellWidth = pitchWidth / LINE_ORDER.length;
@@ -300,7 +303,7 @@ const AxisLabels = ({ dimensions, mode, scale }) => {
             <text
               key={line}
               x={x}
-              y={padding.top - 8}
+              y={padding.top + pitchHeight + 16}
               textAnchor="middle"
               fontSize={fontSize}
               fill="#6b7280"
@@ -311,9 +314,9 @@ const AxisLabels = ({ dimensions, mode, scale }) => {
         })
       )}
       
-      {/* Length labels (right) */}
+      {/* Length labels (right, in reversed order) */}
       {(mode === 'grid' || mode === 'length-only') && (
-        LENGTH_ORDER.map((length, index) => {
+        reversedLengthOrder.map((length, index) => {
           const cellHeight = pitchHeight / LENGTH_ORDER.length;
           const y = padding.top + index * cellHeight + cellHeight / 2;
           return (
@@ -336,13 +339,12 @@ const AxisLabels = ({ dimensions, mode, scale }) => {
 };
 
 /**
- * Stumps indicator at batter's end
+ * Stumps indicator at batter's end (TOP of pitch)
  */
 const StumpsIndicator = ({ dimensions, scale }) => {
   const { padding, pitchWidth, pitchHeight } = dimensions;
   const stumpX = padding.left + pitchWidth / 2;
-  const stumpY = padding.top + pitchHeight + 5;
-  const stumpWidth = 20 * scale;
+  const stumpY = padding.top - 20 * scale; // Above the pitch
   
   return (
     <g>
@@ -361,7 +363,7 @@ const StumpsIndicator = ({ dimensions, scale }) => {
       {/* Bails */}
       <rect
         x={stumpX - 10 * scale}
-        y={stumpY - 2 * scale}
+        y={stumpY + 15 * scale - 2 * scale}
         width={20 * scale}
         height={3 * scale}
         fill="#b45309"
@@ -369,19 +371,30 @@ const StumpsIndicator = ({ dimensions, scale }) => {
       />
       <text
         x={stumpX}
-        y={stumpY + 25 * scale}
+        y={stumpY - 8 * scale}
         textAnchor="middle"
         fontSize={9 * scale}
         fill="#6b7280"
       >
         Batter
       </text>
+      
+      {/* Bowler label at bottom */}
+      <text
+        x={stumpX}
+        y={padding.top + pitchHeight + 32 * scale}
+        textAnchor="middle"
+        fontSize={9 * scale}
+        fill="#6b7280"
+      >
+        ↑ Bowler
+      </text>
     </g>
   );
 };
 
 /**
- * Color scale legend
+ * Color scale legend (red=bad for batter, green=good for batter)
  */
 const ColorLegend = ({ metric, dataRange, width }) => {
   const metricConfig = METRICS[metric];
@@ -390,17 +403,20 @@ const ColorLegend = ({ metric, dataRange, width }) => {
   const gradientId = `legend-gradient-${metric}`;
   const legendWidth = Math.min(width, 200);
   
+  // For descending metrics (like dot%), lower is better, so flip the gradient
+  const isDescending = metricConfig.colorScale === 'descending';
+  
   return (
     <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
-        Color: {metricConfig.label}
+        Color: {metricConfig.label} {isDescending ? '(lower = better)' : '(higher = better)'}
       </Typography>
       <svg width={legendWidth} height={24}>
         <defs>
           <linearGradient id={gradientId}>
-            <stop offset="0%" stopColor={HEAT_COLORS.cold} />
+            <stop offset="0%" stopColor={isDescending ? HEAT_COLORS.good : HEAT_COLORS.bad} />
             <stop offset="50%" stopColor={HEAT_COLORS.neutral} />
-            <stop offset="100%" stopColor={HEAT_COLORS.hot} />
+            <stop offset="100%" stopColor={isDescending ? HEAT_COLORS.bad : HEAT_COLORS.good} />
           </linearGradient>
         </defs>
         <rect

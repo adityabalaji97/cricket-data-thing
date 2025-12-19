@@ -61,15 +61,15 @@ export const LENGTH_SHORT_LABELS = {
 // SVG dimensions and layout
 export const PITCH_DIMENSIONS = {
   width: 400,
-  height: 500,
-  padding: { top: 40, right: 60, bottom: 40, left: 60 },
+  height: 540,
+  padding: { top: 60, right: 60, bottom: 70, left: 60 },  // More top padding for stumps, bottom for bowler label
   
   // Pitch area (the actual pitch rectangle)
   pitchWidth: 280,
-  pitchHeight: 420,
+  pitchHeight: 400,
   
-  // Stump position (at bottom of pitch from bowler's view)
-  stumpY: 400,
+  // Stump position (at top of pitch - batter's end)
+  stumpY: 40,
   stumpWidth: 20,
 };
 
@@ -139,11 +139,11 @@ export const DEFAULT_CELL_METRICS = ['average', 'strike_rate', 'dot_percentage',
 // Default metric for color scale
 export const DEFAULT_COLOR_METRIC = 'strike_rate';
 
-// Heat map color scale (blue=cold/low, red=hot/high)
+// Heat map color scale (red=bad for batter, green=good for batter)
 export const HEAT_COLORS = {
-  cold: '#3b82f6',    // Blue
+  bad: '#ef4444',     // Red - bad for batter
   neutral: '#fbbf24', // Yellow/Amber
-  hot: '#ef4444',     // Red
+  good: '#22c55e',    // Green - good for batter
   noData: '#e5e7eb'   // Gray
 };
 

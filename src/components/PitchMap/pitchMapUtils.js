@@ -159,28 +159,29 @@ export function getHeatColor(value, metricKey, dataRange) {
 }
 
 /**
- * Interpolate between cold (blue) -> neutral (yellow) -> hot (red).
+ * Interpolate between bad (red) -> neutral (yellow) -> good (green).
+ * For batter-friendly metrics: higher = greener
  */
 function interpolateHeatColor(t) {
-  // t: 0 = cold, 0.5 = neutral, 1 = hot
-  const cold = { r: 59, g: 130, b: 246 };   // #3b82f6
-  const neutral = { r: 251, g: 191, b: 36 }; // #fbbf24
-  const hot = { r: 239, g: 68, b: 68 };      // #ef4444
+  // t: 0 = bad (red), 0.5 = neutral (yellow), 1 = good (green)
+  const bad = { r: 239, g: 68, b: 68 };      // #ef4444 - red
+  const neutral = { r: 251, g: 191, b: 36 }; // #fbbf24 - yellow
+  const good = { r: 34, g: 197, b: 94 };     // #22c55e - green
   
   let r, g, b;
   
   if (t < 0.5) {
-    // Interpolate cold -> neutral
+    // Interpolate bad -> neutral
     const t2 = t * 2;
-    r = Math.round(cold.r + (neutral.r - cold.r) * t2);
-    g = Math.round(cold.g + (neutral.g - cold.g) * t2);
-    b = Math.round(cold.b + (neutral.b - cold.b) * t2);
+    r = Math.round(bad.r + (neutral.r - bad.r) * t2);
+    g = Math.round(bad.g + (neutral.g - bad.g) * t2);
+    b = Math.round(bad.b + (neutral.b - bad.b) * t2);
   } else {
-    // Interpolate neutral -> hot
+    // Interpolate neutral -> good
     const t2 = (t - 0.5) * 2;
-    r = Math.round(neutral.r + (hot.r - neutral.r) * t2);
-    g = Math.round(neutral.g + (hot.g - neutral.g) * t2);
-    b = Math.round(neutral.b + (hot.b - neutral.b) * t2);
+    r = Math.round(neutral.r + (good.r - neutral.r) * t2);
+    g = Math.round(neutral.g + (good.g - neutral.g) * t2);
+    b = Math.round(neutral.b + (good.b - neutral.b) * t2);
   }
   
   return `rgb(${r}, ${g}, ${b})`;
@@ -226,17 +227,21 @@ export function formatCellContent(cell, metrics) {
 
 /**
  * Get cell position in SVG coordinates.
+ * Orientation: Stumps at top, short balls at bottom.
  */
 export function getCellPosition(line, length, mode, dimensions) {
   const { padding, pitchWidth, pitchHeight } = dimensions;
   const contentWidth = pitchWidth;
   const contentHeight = pitchHeight;
   
+  // Reverse length order so yorker is at top (near stumps), short at bottom
+  const reversedLengthOrder = [...LENGTH_ORDER].reverse();
+  
   let x, y, width, height;
   
   if (mode === 'grid') {
     const lineIndex = LINE_ORDER.indexOf(line);
-    const lengthIndex = LENGTH_ORDER.indexOf(length);
+    const lengthIndex = reversedLengthOrder.indexOf(length);
     
     width = contentWidth / LINE_ORDER.length;
     height = contentHeight / LENGTH_ORDER.length;
@@ -250,7 +255,7 @@ export function getCellPosition(line, length, mode, dimensions) {
     x = padding.left + lineIndex * width;
     y = padding.top;
   } else if (mode === 'length-only') {
-    const lengthIndex = LENGTH_ORDER.indexOf(length);
+    const lengthIndex = reversedLengthOrder.indexOf(length);
     
     width = contentWidth;
     height = contentHeight / LENGTH_ORDER.length;
