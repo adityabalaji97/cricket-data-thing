@@ -227,14 +227,14 @@ export function formatCellContent(cell, metrics) {
 
 /**
  * Get cell position in SVG coordinates.
- * Orientation: Stumps at top, short balls at bottom.
+ * Orientation: Stumps at top, full toss at stump level, short balls at bottom.
  */
 export function getCellPosition(line, length, mode, dimensions) {
-  const { padding, pitchWidth, pitchHeight } = dimensions;
+  const { padding, pitchWidth, pitchHeight, stumpOverlap = 0 } = dimensions;
   const contentWidth = pitchWidth;
   const contentHeight = pitchHeight;
   
-  // Reverse length order so yorker is at top (near stumps), short at bottom
+  // Reverse length order so full toss is at top (near stumps), short at bottom
   const reversedLengthOrder = [...LENGTH_ORDER].reverse();
   
   let x, y, width, height;
@@ -246,21 +246,22 @@ export function getCellPosition(line, length, mode, dimensions) {
     width = contentWidth / LINE_ORDER.length;
     height = contentHeight / LENGTH_ORDER.length;
     x = padding.left + lineIndex * width;
-    y = padding.top + lengthIndex * height;
+    // Start from higher up (stumpOverlap) so full toss is at stump level
+    y = (padding.top - stumpOverlap) + lengthIndex * height;
   } else if (mode === 'line-only') {
     const lineIndex = LINE_ORDER.indexOf(line);
     
     width = contentWidth / LINE_ORDER.length;
     height = contentHeight;
     x = padding.left + lineIndex * width;
-    y = padding.top;
+    y = padding.top - stumpOverlap;
   } else if (mode === 'length-only') {
     const lengthIndex = reversedLengthOrder.indexOf(length);
     
     width = contentWidth;
     height = contentHeight / LENGTH_ORDER.length;
     x = padding.left;
-    y = padding.top + lengthIndex * height;
+    y = (padding.top - stumpOverlap) + lengthIndex * height;
   }
   
   return { x, y, width, height };

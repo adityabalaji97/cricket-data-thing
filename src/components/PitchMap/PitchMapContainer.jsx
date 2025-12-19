@@ -116,20 +116,39 @@ const PitchMapContainer = ({
   const generatedTitle = useMemo(() => {
     const parts = [];
     
-    // Add dimension selections first
+    // Add specific players from filters first
+    if (filters.batters?.length > 0) {
+      parts.push(filters.batters.join(', '));
+    }
+    if (filters.bowlers?.length > 0) {
+      parts.push(filters.bowlers.join(', '));
+    }
+    if (filters.players?.length > 0) {
+      parts.push(filters.players.join(', '));
+    }
+    
+    // Add dimension selections (but avoid duplicates)
     Object.entries(dimensionSelections).forEach(([dim, value]) => {
-      if (value) {
+      if (value && !parts.includes(value)) {
         parts.push(value);
       }
     });
     
-    // Add key filters
+    // Add teams from filters
     if (filters.batting_teams?.length > 0) {
-      parts.push(filters.batting_teams.join(', '));
+      const teamStr = filters.batting_teams.join(', ');
+      if (!parts.some(p => p.includes(teamStr))) {
+        parts.push(teamStr);
+      }
     }
     if (filters.bowling_teams?.length > 0) {
       parts.push(`vs ${filters.bowling_teams.join(', ')}`);
     }
+    if (filters.teams?.length > 0 && !filters.batting_teams?.length && !filters.bowling_teams?.length) {
+      parts.push(filters.teams.join(', '));
+    }
+    
+    // Add league/venue info
     if (filters.leagues?.length > 0) {
       parts.push(filters.leagues.join(', '));
     }
@@ -202,12 +221,14 @@ const PitchMapContainer = ({
     }
   };
   
-  // Build subtitle from selections
+  // Build subtitle from selections not in title
   const subtitle = useMemo(() => {
+    // If there are dimension selections that aren't already shown, show them
     const parts = [];
     Object.entries(dimensionSelections).forEach(([dim, value]) => {
-      if (value && !generatedTitle.includes(value)) {
-        parts.push(`${dim}: ${value}`);
+      if (value && !generatedTitle.toLowerCase().includes(String(value).toLowerCase())) {
+        const dimLabel = dim.charAt(0).toUpperCase() + dim.slice(1).replace(/_/g, ' ');
+        parts.push(`${dimLabel}: ${value}`);
       }
     });
     return parts.length > 0 ? parts.join(' • ') : null;

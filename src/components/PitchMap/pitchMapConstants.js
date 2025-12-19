@@ -61,17 +61,17 @@ export const LENGTH_SHORT_LABELS = {
 // SVG dimensions and layout - mobile-first, fills container
 export const PITCH_DIMENSIONS = {
   width: 360,  // Will be overridden by container width
-  height: 600,
-  padding: { top: 80, right: 55, bottom: 80, left: 20 },  // Room for stumps top, bowler bottom
+  height: 620,
+  padding: { top: 90, right: 55, bottom: 70, left: 20 },  // Extra top padding for stumps + full toss overlap
   
   // Pitch area (the actual pitch rectangle)
   pitchWidth: 280,
-  pitchHeight: 440,
+  pitchHeight: 450,
   
-  // Stump dimensions
-  stumpHeight: 35,
-  stumpWidth: 5,
-  stumpGap: 8,
+  // Stump dimensions - taller for visibility
+  stumpHeight: 40,
+  stumpWidth: 6,
+  stumpGap: 9,
 };
 
 // Available metrics for visualization
