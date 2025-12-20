@@ -230,7 +230,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
         dynamicMetrics.push({
           key,
           label: key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
-          color: generateContrastColor(availableFromPredefined.length + dynamicMetrics.length)
+          color: getFallbackColor(availableFromPredefined.length + dynamicMetrics.length)
         });
       }
     });
