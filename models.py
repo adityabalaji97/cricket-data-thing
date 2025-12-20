@@ -274,6 +274,16 @@ class BowlingStats(Base):
     economy_diff = Column(Float)
 
 
+class PlayerAlias(Base):
+    """Maps player names between deliveries (old) and delivery_details (new) tables."""
+    __tablename__ = 'player_aliases'
+    
+    id = Column(Integer, primary_key=True)
+    player_name = Column(String, nullable=False)  # Name in deliveries table (old)
+    alias_name = Column(String, nullable=False)   # Name in delivery_details table (new)
+    source = Column(String, default='bbb_dataset')
+
+
 class DeliveryDetails(Base):
     """Enhanced ball-by-ball data with wagon wheel, shot, and line/length info."""
     __tablename__ = 'delivery_details'
