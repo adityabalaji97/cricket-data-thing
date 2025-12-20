@@ -2,7 +2,7 @@
  * PitchMapVisualization
  * 
  * Pure SVG rendering component for pitch map.
- * Mobile-first design with stumps at top, full toss at stump level.
+ * Mobile-first design with stumps centered within full toss row.
  */
 
 import React from 'react';
@@ -54,28 +54,24 @@ const PitchMapVisualization = ({
   const width = propWidth || containerWidth;
   const scale = width / PITCH_DIMENSIONS.width;
   
-  // Calculate cell height first (for stump overlap calculation)
+  // Calculate cell height (for full toss row positioning)
   const cellHeight = (PITCH_DIMENSIONS.pitchHeight * scale) / LENGTH_ORDER.length;
-  
-  // Pitch starts higher up - full toss row should be at stump level
-  // stumpOverlap is the full height of one cell so full toss aligns with stumps
-  const stumpOverlap = cellHeight;
   
   const scaledDimensions = {
     width,
-    height: Math.max(550, PITCH_DIMENSIONS.height * scale + stumpOverlap),
+    height: Math.max(550, PITCH_DIMENSIONS.height * scale),
     pitchWidth: (width - (PITCH_DIMENSIONS.padding.left + PITCH_DIMENSIONS.padding.right) * scale),
     pitchHeight: PITCH_DIMENSIONS.pitchHeight * scale,
+    cellHeight,
     padding: {
-      top: PITCH_DIMENSIONS.padding.top * scale + stumpOverlap, // Add overlap to top padding
+      top: PITCH_DIMENSIONS.padding.top * scale,
       right: PITCH_DIMENSIONS.padding.right * scale,
       bottom: PITCH_DIMENSIONS.padding.bottom * scale,
       left: PITCH_DIMENSIONS.padding.left * scale
     },
-    stumpHeight: Math.max(40, PITCH_DIMENSIONS.stumpHeight * scale),
-    stumpWidth: Math.max(6, PITCH_DIMENSIONS.stumpWidth * scale),
-    stumpGap: Math.max(8, PITCH_DIMENSIONS.stumpGap * scale),
-    stumpOverlap
+    stumpHeight: Math.max(30, PITCH_DIMENSIONS.stumpHeight * scale * 0.8),
+    stumpWidth: Math.max(5, PITCH_DIMENSIONS.stumpWidth * scale),
+    stumpGap: Math.max(7, PITCH_DIMENSIONS.stumpGap * scale)
   };
   
   // Calculate color range from data
@@ -103,7 +99,6 @@ const PitchMapVisualization = ({
     const availableWidth = cellWidth * 0.92;
     
     // Estimate character widths more accurately
-    // Each metric value is roughly 4-6 chars, separator is 3 chars (" @ " or " | ")
     const primaryMetricCount = displayMetrics.length;
     const secondaryMetricCount = secondaryMetrics.length;
     
@@ -121,7 +116,6 @@ const PitchMapVisualization = ({
     // Calculate max font size based on height constraint
     let maxPrimaryByHeight, maxSecondaryByHeight;
     if (hasSecondary) {
-      // Two lines need to fit with some spacing
       const lineHeight = availableHeight / 2.5;
       maxPrimaryByHeight = lineHeight;
       maxSecondaryByHeight = lineHeight * 0.9;
@@ -164,23 +158,17 @@ const PitchMapVisualization = ({
         height={scaledDimensions.height}
         style={{ overflow: 'visible', maxWidth: '100%' }}
       >
-        {/* Stumps at top - positioned so full toss row is at stump level */}
-        <StumpsIndicator dimensions={scaledDimensions} scale={scale} />
-        
-        {/* Background pitch - starts slightly behind stumps */}
+        {/* Background pitch */}
         <rect
           x={scaledDimensions.padding.left}
-          y={scaledDimensions.padding.top - stumpOverlap}
+          y={scaledDimensions.padding.top}
           width={scaledDimensions.pitchWidth}
-          height={scaledDimensions.pitchHeight + stumpOverlap}
+          height={scaledDimensions.pitchHeight}
           fill="#f0fdf4"
           stroke="#86efac"
           strokeWidth={2}
           rx={4}
         />
-        
-        {/* Pitch markings - crease line at full toss level */}
-        <PitchMarkings dimensions={scaledDimensions} mode={mode} />
         
         {/* Cells */}
         {cells.map((cell, index) => (
@@ -198,6 +186,9 @@ const PitchMapVisualization = ({
             fontSizes={fontSizes}
           />
         ))}
+        
+        {/* Stumps centered within full toss row */}
+        <StumpsIndicator dimensions={scaledDimensions} scale={scale} mode={mode} />
         
         {/* Axis labels */}
         <AxisLabels dimensions={scaledDimensions} mode={mode} scale={scale} />
@@ -373,32 +364,10 @@ const CellContent = ({ x, y, width, height, cell, displayMetrics, secondaryMetri
 };
 
 /**
- * Pitch markings (crease lines, etc.)
- */
-const PitchMarkings = ({ dimensions, mode }) => {
-  const { padding, pitchWidth, stumpOverlap } = dimensions;
-  
-  // Popping crease at full toss level (just below where stumps sit)
-  const creaseY = padding.top - stumpOverlap + 10;
-  
-  return (
-    <g stroke="#86efac" strokeWidth={2} strokeDasharray="8,4">
-      {/* Popping crease */}
-      <line
-        x1={padding.left + 10}
-        y1={creaseY}
-        x2={padding.left + pitchWidth - 10}
-        y2={creaseY}
-      />
-    </g>
-  );
-};
-
-/**
  * Axis labels for line and length
  */
 const AxisLabels = ({ dimensions, mode, scale }) => {
-  const { padding, pitchWidth, pitchHeight, stumpOverlap } = dimensions;
+  const { padding, pitchWidth, pitchHeight } = dimensions;
   const fontSize = 11 * scale;
   
   // Reverse length order to match cell positions (full toss at top near stumps, short at bottom)
@@ -426,12 +395,11 @@ const AxisLabels = ({ dimensions, mode, scale }) => {
         })
       )}
       
-      {/* Length labels (right, in reversed order - full toss at top) */}
+      {/* Length labels (right side) */}
       {(mode === 'grid' || mode === 'length-only') && (
         reversedLengthOrder.map((length, index) => {
           const cellHeight = pitchHeight / LENGTH_ORDER.length;
-          // Offset by stumpOverlap since pitch starts higher
-          const y = (padding.top - stumpOverlap) + index * cellHeight + cellHeight / 2;
+          const y = padding.top + index * cellHeight + cellHeight / 2;
           return (
             <text
               key={length}
@@ -452,46 +420,49 @@ const AxisLabels = ({ dimensions, mode, scale }) => {
 };
 
 /**
- * Stumps indicator at batter's end (TOP of pitch)
- * Positioned so stumps sit at the top of the full toss row
+ * Stumps indicator centered within the full toss row
  */
-const StumpsIndicator = ({ dimensions, scale }) => {
-  const { padding, pitchWidth, pitchHeight, stumpHeight, stumpWidth, stumpGap, stumpOverlap } = dimensions;
+const StumpsIndicator = ({ dimensions, scale, mode }) => {
+  const { padding, pitchWidth, pitchHeight, cellHeight, stumpHeight, stumpWidth, stumpGap } = dimensions;
   const stumpX = padding.left + pitchWidth / 2;
   
-  // Stumps sit at the very top of the pitch, base at top of full toss row
-  const stumpBaseY = padding.top - stumpOverlap + 5; // Just inside the top of full toss cell
-  const stumpY = stumpBaseY - stumpHeight;
+  // Full toss is at the TOP of the pitch (index 0 in reversed order)
+  // Center stumps vertically within the full toss cell
+  const fullTossCellY = padding.top;
+  const fullTossCellCenterY = fullTossCellY + cellHeight / 2;
+  
+  // Position stumps so they're centered in the full toss row
+  const stumpTopY = fullTossCellCenterY - stumpHeight / 2;
   
   return (
     <g>
-      {/* Three stumps - taller and more prominent */}
+      {/* Three stumps centered in full toss row */}
       {[-1, 0, 1].map(offset => (
         <rect
           key={offset}
           x={stumpX + offset * stumpGap - stumpWidth / 2}
-          y={stumpY}
+          y={stumpTopY}
           width={stumpWidth}
           height={stumpHeight}
           fill="#78350f"
           rx={1}
         />
       ))}
-      {/* Bails - on top of stumps */}
+      {/* Bails on top of stumps */}
       <rect
         x={stumpX - stumpGap - stumpWidth}
-        y={stumpY - 6}
+        y={stumpTopY - 5}
         width={stumpGap * 2 + stumpWidth * 2}
-        height={7}
+        height={6}
         fill="#92400e"
         rx={2}
       />
-      {/* Batter label */}
+      {/* Batter label above stumps */}
       <text
         x={stumpX}
-        y={stumpY - 16}
+        y={stumpTopY - 14}
         textAnchor="middle"
-        fontSize={12 * scale}
+        fontSize={11 * scale}
         fontWeight="600"
         fill="#78350f"
       >
@@ -501,9 +472,9 @@ const StumpsIndicator = ({ dimensions, scale }) => {
       {/* Bowler label at bottom */}
       <text
         x={stumpX}
-        y={padding.top + pitchHeight + 42}
+        y={padding.top + pitchHeight + 38}
         textAnchor="middle"
-        fontSize={12 * scale}
+        fontSize={11 * scale}
         fontWeight="500"
         fill="#6b7280"
       >

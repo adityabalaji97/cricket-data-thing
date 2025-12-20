@@ -119,10 +119,32 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   const hasSummaries = metadata.has_summaries || false;
   const pitchMapMode = useMemo(() => getPitchMapMode(groupBy || []), [groupBy]);
   
-  // Merge regular data with summary data and percentages for display
+  // Add percent_balls to data (for pitch map and charts, without summary rows)
+  const dataWithPercentBalls = useMemo(() => {
+    if (!hasSummaries || !summaryData?.percentages || !isGrouped) {
+      return data;
+    }
+    
+    // Create a lookup for percentages
+    const percentageLookup = {};
+    summaryData.percentages.forEach(item => {
+      const key = groupBy.map(col => String(item[col] || 'null')).join('|');
+      percentageLookup[key] = item.percent_balls;
+    });
+    
+    return data.map(row => {
+      const key = groupBy.map(col => String(row[col] || 'null')).join('|');
+      return {
+        ...row,
+        percent_balls: percentageLookup[key] || 0
+      };
+    });
+  }, [data, summaryData, hasSummaries, isGrouped, groupBy]);
+  
+  // Merge regular data with summary data for table display
   const displayData = useMemo(() => {
     // Always add is_summary: false to regular data first
-    const dataWithFlags = data.map(row => ({
+    const dataWithFlags = dataWithPercentBalls.map(row => ({
       ...row,
       is_summary: false
     }));
@@ -132,25 +154,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       return dataWithFlags;
     }
     
-    // Create a lookup for percentages
-    const percentageLookup = {};
-    if (summaryData.percentages) {
-      summaryData.percentages.forEach(item => {
-        const key = groupBy.map(col => String(item[col] || 'null')).join('|');
-        percentageLookup[key] = item.percent_balls;
-      });
-    }
-    
-    // Add percent_balls to regular data
-    const dataWithPercentages = dataWithFlags.map(row => {
-      const key = groupBy.map(col => String(row[col] || 'null')).join('|');
-      const percent_balls = percentageLookup[key] || 0;
-      return {
-        ...row,
-        percent_balls
-      };
-    });
-    
     // If we have multi-level grouping, insert summary rows
     if (groupBy.length > 1 && summaryData[`${groupBy[0]}_summaries`]) {
       const summaries = summaryData[`${groupBy[0]}_summaries`];
@@ -158,7 +161,7 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       
       // Group data by first grouping column to insert summaries
       const groupedByFirst = {};
-      dataWithPercentages.forEach(row => {
+      dataWithFlags.forEach(row => {
         const firstGroupValue = String(row[groupBy[0]] || 'null');
         if (!groupedByFirst[firstGroupValue]) {
           groupedByFirst[firstGroupValue] = [];
@@ -168,25 +171,20 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       
       // Sort by the first group column to match order
       const sortedGroups = Object.keys(groupedByFirst).sort((a, b) => {
-        // Handle numeric sorting for years
         if (!isNaN(a) && !isNaN(b)) {
-          return Number(b) - Number(a); // Descending order for years
+          return Number(b) - Number(a);
         }
         return a.localeCompare(b);
       });
       
       sortedGroups.forEach(groupValue => {
-        // Add the regular rows for this group
         mergedData.push(...groupedByFirst[groupValue]);
         
-        // Add summary row for this group
         const summary = summaries.find(s => String(s[groupBy[0]]) === groupValue);
         if (summary) {
           const summaryRow = {
             ...summary,
-            // Set other grouping columns to null to indicate this is a summary
             ...groupBy.slice(1).reduce((acc, col) => ({ ...acc, [col]: null }), {}),
-            // Rename total_ fields to regular field names for display
             balls: summary.total_balls,
             runs: summary.total_runs,
             wickets: summary.total_wickets,
@@ -194,13 +192,12 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
             boundaries: summary.total_boundaries,
             fours: summary.total_fours,
             sixes: summary.total_sixes,
-            // Add calculated fields for summaries
             average: summary.total_wickets > 0 ? summary.total_runs / summary.total_wickets : null,
             strike_rate: summary.total_balls > 0 ? (summary.total_runs * 100) / summary.total_balls : 0,
             balls_per_dismissal: summary.total_wickets > 0 ? summary.total_balls / summary.total_wickets : null,
             dot_percentage: summary.total_balls > 0 ? (summary.total_dots * 100) / summary.total_balls : 0,
             boundary_percentage: summary.total_balls > 0 ? (summary.total_boundaries * 100) / summary.total_balls : 0,
-            percent_balls: 100.0, // Summary rows represent 100% of their group
+            percent_balls: 100.0,
             is_summary: true,
             summary_level: 1
           };
@@ -211,8 +208,8 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       return mergedData;
     }
     
-    return dataWithPercentages;
-  }, [data, summaryData, hasSummaries, isGrouped, groupBy]);
+    return dataWithFlags;
+  }, [dataWithPercentBalls, summaryData, hasSummaries, isGrouped, groupBy]);
   
   // Apply column filters to displayData
   const filteredData = useMemo(() => {
@@ -225,7 +222,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
         if (!selectedValues || selectedValues.length === 0) return true;
         
         const cellValue = row[column];
-        // Handle null values and convert to string for comparison
         const valueStr = cellValue === null || cellValue === undefined ? 'N/A' : String(cellValue);
         
         return selectedValues.includes(valueStr);
@@ -241,16 +237,13 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
       
-      // Handle null/undefined values
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;
       
-      // Handle different data types
       if (typeof aValue === 'number' && typeof bValue === 'number') {
         return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
       }
       
-      // Handle strings and dates
       const aStr = String(aValue).toLowerCase();
       const bStr = String(bValue).toLowerCase();
       
@@ -269,11 +262,9 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
     );
   }
   
-
   // Chart management functions
   const handleAddBarChart = () => {
     setShowCharts(true);
-    // Small delay to ensure ChartPanel is rendered before calling addBarChart
     setTimeout(() => {
       if (chartPanelRef.current && chartPanelRef.current.addBarChart) {
         chartPanelRef.current.addBarChart();
@@ -283,7 +274,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
 
   const handleAddScatterChart = () => {
     setShowCharts(true);
-    // Small delay to ensure ChartPanel is rendered before calling addScatterChart
     setTimeout(() => {
       if (chartPanelRef.current && chartPanelRef.current.addScatterChart) {
         chartPanelRef.current.addScatterChart();
@@ -298,7 +288,7 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       direction = 'desc';
     }
     setSortConfig({ key: columnKey, direction });
-    setPage(0); // Reset to first page when sorting
+    setPage(0);
   };
   
   // Column filtering logic
@@ -317,7 +307,7 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       ...prev,
       [column]: selectedValues
     }));
-    setPage(0); // Reset to first page when filtering
+    setPage(0);
   };
   
   const clearColumnFilter = (column) => {
@@ -346,19 +336,14 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   const exportToCSV = () => {
     if (!sortedData || sortedData.length === 0) return;
     
-    // Use filtered and sorted data for export
     const exportData = sortedData;
-    
-    // Get all unique keys from the data
     const headers = Object.keys(exportData[0]);
     
-    // Create CSV content
     const csvContent = [
       headers.join(','),
       ...exportData.map(row => 
         headers.map(header => {
           const value = row[header];
-          // Handle null/undefined values and escape commas
           if (value === null || value === undefined) return '';
           if (typeof value === 'string' && value.includes(',')) {
             return `"${value.replace(/"/g, '""')}"`;  
@@ -368,13 +353,11 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       )
     ].join('\n');
     
-    // Download CSV
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     
-    // Include filter info in filename if filters are active
     const filterSuffix = Object.keys(columnFilters).length > 0 ? '-filtered' : '';
     const filename = `cricket-query${filterSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
     link.setAttribute('download', filename);
@@ -388,18 +371,17 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   const formatValue = (value, key) => {
     if (value === null || value === undefined) return 'N/A';
     
-    // Format different types of values
     if (key.includes('percentage') || key === 'percent_balls') {
       return `${Number(value).toFixed(1)}%`;
     }
     if (key === 'strike_rate') {
-      return Number(value).toFixed(1);  // Strike rate is NOT a percentage - just display the number
+      return Number(value).toFixed(1);
     }
     if (key === 'average' || key === 'balls_per_dismissal') {
       return Number(value).toFixed(2);
     }
     if (key === 'year') {
-      return value; // Display year without comma formatting
+      return value;
     }
     if (typeof value === 'number' && value > 1000) {
       return value.toLocaleString();
@@ -454,11 +436,9 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
     
     const allColumns = Object.keys(displayData[0]);
     
-    // For mobile, show fewer columns
     if (isMobile) {
       if (isGrouped) {
         const baseColumns = [...getGroupingColumns(), 'balls', 'runs', 'strike_rate'];
-        // Add percent_balls if available
         if (hasSummaries && allColumns.includes('percent_balls')) {
           baseColumns.push('percent_balls');
         }
@@ -468,11 +448,9 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       }
     }
     
-    // For desktop, show all columns except internal ones
     return allColumns.filter(col => !['is_summary', 'summary_level'].includes(col));
   };
   
-  // Use sorted data for pagination
   const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const visibleColumns = getVisibleColumns();
   const cricketMetrics = getCricketMetrics();
@@ -523,7 +501,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                   </>
                 )}
                 
-                {/* Sort indicator */}
                 {sortConfig.key && (
                   <Chip 
                     label={`Sorted by: ${getColumnDisplayName(sortConfig.key)} (${sortConfig.direction})`} 
@@ -533,7 +510,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                   />
                 )}
                 
-                {/* Filter indicator */}
                 {Object.keys(columnFilters).length > 0 && (
                   <Chip 
                     label={`${Object.keys(columnFilters).length} column filter${Object.keys(columnFilters).length > 1 ? 's' : ''} active`} 
@@ -553,7 +529,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
             
             <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
-                {/* Filter toggle button - only show for grouped data */}
                 {isGrouped && data.length > 0 && (
                   <>
                     <Button
@@ -580,7 +555,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                   </>
                 )}
                 
-                {/* Pitch Map button - show when line or length is in groupBy */}
                 {isGrouped && pitchMapMode && data.length > 0 && (
                   <Button
                     variant={showPitchMap ? "contained" : "outlined"}
@@ -593,7 +567,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                   </Button>
                 )}
                 
-                {/* Chart buttons only for grouped data */}
                 {isGrouped && data.length > 0 && (
                   <>
                     <Button
@@ -630,17 +603,16 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
         </CardContent>
       </Card>
       
-      {/* Pitch Map Visualization */}
+      {/* Pitch Map Visualization - use dataWithPercentBalls which has percent_balls */}
       {showPitchMap && pitchMapMode && isGrouped && (
         <Box sx={{ mb: 3 }}>
           <PitchMapContainer
-            data={data}
+            data={dataWithPercentBalls}
             groupBy={groupBy}
             filters={filters || metadata?.filters_applied || {}}
           />
         </Box>
       )}
-
       
       {/* Cricket Metrics Summary (for grouped results) */}
       {isGrouped && cricketMetrics && (
@@ -703,11 +675,9 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                 ))}
               </TableRow>
               
-              {/* Filter Row */}
               {showFilters && isGrouped && (
                 <TableRow sx={{ backgroundColor: 'grey.50' }}>
                   {visibleColumns.map((column) => {
-                    // Only show filters for grouping columns and string/categorical columns
                     const isFilterableColumn = groupBy.includes(column) || 
                       ['crease_combo', 'ball_direction', 'bowler_type', 'striker_batter_type', 'non_striker_batter_type', 'venue', 'batting_team', 'bowling_team', 'batter', 'bowler', 'competition'].includes(column);
                     
@@ -724,7 +694,7 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                             isMobile={isMobile}
                           />
                         ) : (
-                          <Box sx={{ height: 40 }} /> // Empty space for non-filterable columns
+                          <Box sx={{ height: 40 }} />
                         )}
                       </TableCell>
                     );
@@ -775,7 +745,7 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       {/* Chart Panel */}
       <ChartPanel 
         ref={chartPanelRef}
-        data={sortedData.filter(row => !row.is_summary)} // Filter out summary rows for charts
+        data={sortedData.filter(row => !row.is_summary)}
         groupBy={groupBy}
         isVisible={showCharts && isGrouped}
         onToggle={() => setShowCharts(!showCharts)}

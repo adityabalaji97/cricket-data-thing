@@ -388,7 +388,15 @@ const PitchMapContainer = ({
       </Collapse>
       
       {/* Pitch Map Visualization - wrapped in ref for export */}
-      <Box ref={containerRef} sx={{ bgcolor: '#fff', p: 1 }}>
+      <Box 
+        ref={containerRef} 
+        sx={{ 
+          bgcolor: '#fff', 
+          p: 1,
+          maxWidth: 420,
+          mx: 'auto'
+        }}
+      >
         <PitchMapVisualization
           cells={cells}
           mode={mode}
