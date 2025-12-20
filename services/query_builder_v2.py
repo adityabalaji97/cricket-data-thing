@@ -243,7 +243,6 @@ def build_where_clause(
         expanded_crease = []
         for combo in crease_combo:
             expanded_crease.append(combo)
-            # If user selects LHB_RHB, also include RHB_LHB (they're equivalent mixed combos)
             if combo == "LHB_RHB":
                 expanded_crease.append("RHB_LHB")
             elif combo == "RHB_LHB":
@@ -511,12 +510,27 @@ def handle_grouped_query(
     
     having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
     
-    # First, get total balls matching the WHERE clause (for percent_balls calculation)
+    # Get total balls matching the WHERE clause
     total_balls_query = f"""
         SELECT COUNT(*) FROM delivery_details dd {where_clause}
     """
     total_balls_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
     total_balls = db.execute(text(total_balls_query), total_balls_params).scalar()
+    
+    # For multi-level grouping, get parent group totals (first column)
+    parent_totals = {}
+    if len(group_by) > 1:
+        first_col = group_by[0]
+        first_db_col = grouping_columns[first_col]
+        parent_query = f"""
+            SELECT {first_db_col} as parent_key, COUNT(*) as parent_balls
+            FROM delivery_details dd
+            {where_clause}
+            GROUP BY {first_db_col}
+        """
+        parent_result = db.execute(text(parent_query), total_balls_params).fetchall()
+        for row in parent_result:
+            parent_totals[str(row[0])] = row[1]
     
     # Build aggregation query
     aggregation_query = f"""
@@ -585,6 +599,14 @@ def handle_grouped_query(
         stats_start = len(group_by)
         balls = row[stats_start]
         
+        # Calculate percent_balls relative to parent group (for multi-level) or total (for single-level)
+        if len(group_by) > 1 and parent_totals:
+            parent_key = str(row[0])  # First column value is the parent
+            parent_balls = parent_totals.get(parent_key, total_balls)
+            percent_balls = round((balls / parent_balls) * 100, 2) if parent_balls > 0 else 0
+        else:
+            percent_balls = round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
+        
         row_dict.update({
             "balls": balls,
             "runs": row[stats_start + 1],
@@ -599,8 +621,7 @@ def handle_grouped_query(
             "dot_percentage": float(row[stats_start + 10]) if row[stats_start + 10] is not None else 0,
             "boundary_percentage": float(row[stats_start + 11]) if row[stats_start + 11] is not None else 0,
             "control_percentage": float(row[stats_start + 12]) if row[stats_start + 12] is not None else None,
-            # Percent of total balls this group represents
-            "percent_balls": round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
+            "percent_balls": percent_balls
         })
         
         formatted_results.append(row_dict)
@@ -700,6 +721,7 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
                 
                 stats_start = len(summary_group_by)
                 balls = row[stats_start]
+                # Summary rows show percent of total query
                 percent_balls = round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
                 
                 summary_dict.update({
@@ -713,14 +735,14 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
                 })
                 formatted_summaries.append(summary_dict)
                 
-                # Build key for percentage lookup
+                # Build key for percentage lookup (level 1 only)
                 if level == 1:
                     key = str(row[0])
-                    level_percentages[key] = percent_balls
+                    level_percentages[key] = {"percent": percent_balls, "balls": balls}
             
             summaries[summary_key] = formatted_summaries
             
-            # Only store first-level percentages for easy lookup
+            # Store first-level data for easy lookup
             if level == 1:
                 percentages = level_percentages
         
