@@ -28,6 +28,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import TrophyIcon from '@mui/icons-material/EmojiEvents';
 import { Link } from 'react-router-dom';
 import config from '../config';
+import { getTeamColor as getTeamColorFromUtils } from '../utils/teamColors';
 
 const EloLeaderboard = () => {
   const [rankings, setRankings] = useState([]);
@@ -39,87 +40,9 @@ const EloLeaderboard = () => {
   const [startDate, setStartDate] = useState(''); // empty string = all time
   const [endDate, setEndDate] = useState(''); // empty string = all time
 
-  // Team-specific colors based on your color scheme
+  // Use shared team colors utility
   const getTeamColor = (teamName) => {
-    // Handle both full names and abbreviations
-    const teamColors = {
-      // IPL Teams
-      'Chennai Super Kings': '#eff542',
-      'CSK': '#eff542',
-      'Royal Challengers Bangalore': '#f54242',
-      'Royal Challengers Bengaluru': '#f54242',
-      'RCB': '#f54242',
-      'Mumbai Indians': '#42a7f5',
-      'MI': '#42a7f5',
-      'Rajasthan Royals': '#FF2AA8',
-      'Rising Pune Supergiants': '#FF2AA8',
-      'Rising Pune Supergiant': '#FF2AA8',
-      'RR': '#FF2AA8',
-      'RPSG': '#FF2AA8',
-      'Kolkata Knight Riders': '#610048',
-      'KKR': '#610048',
-      'Kings XI Punjab': '#FF004D',
-      'Punjab Kings': '#FF004D',
-      'PBKS': '#FF004D',
-      'Sunrisers Hyderabad': '#FF7C01',
-      'SRH': '#FF7C01',
-      'Lucknow Super Giants': '#00BBB3',
-      'Pune Warriors': '#00BBB3',
-      'LSG': '#00BBB3',
-      'Delhi Capitals': '#004BC5',
-      'Delhi Daredevils': '#004BC5',
-      'DC': '#004BC5',
-      'Deccan Chargers': '#04378C',
-      'DCh': '#04378C',
-      'Gujarat Lions': '#FF5814',
-      'GL': '#FF5814',
-      'Gujarat Titans': '#01295B',
-      'GT': '#01295B',
-      'Kochi Tuskers Kerala': '#008080',
-      'KTK': '#008080',
-      
-      // International Teams
-      'Australia': '#eff542',
-      'AUS': '#eff542',
-      'England': '#f54242',
-      'ENG': '#f54242',
-      'India': '#42a7f5',
-      'IND': '#42a7f5',
-      'South Africa': '#1cba2e',
-      'SA': '#1cba2e',
-      'Pakistan': '#02450a',
-      'PAK': '#02450a',
-      'West Indies': '#450202',
-      'WI': '#450202',
-      'New Zealand': '#050505',
-      'NZ': '#050505',
-      'Bangladesh': '#022b07',
-      'BAN': '#022b07',
-      'Afghanistan': '#058bf2',
-      'AFG': '#058bf2',
-      'Sri Lanka': '#031459',
-      'SL': '#031459',
-      'Ireland': '#90EE90',
-      'IRE': '#90EE90',
-      'Netherlands': '#FF7C01',
-      'NED': '#FF7C01',
-      'Zimbabwe': '#FF7C01',
-      'ZIM': '#FF7C01',
-      'Scotland': '#4169E1',
-      'SCO': '#4169E1',
-      'Nepal': '#DC143C',
-      'NEP': '#DC143C',
-      'USA': '#B22222',
-      'Oman': '#8B0000',
-      'OMA': '#8B0000',
-      'UAE': '#2F4F4F',
-      'Papua New Guinea': '#228B22',
-      'PNG': '#228B22',
-      'Namibia': '#CD853F',
-      'NAM': '#CD853F'
-    };
-    
-    return teamColors[teamName] || '#666666'; // Default color if team not found
+    return getTeamColorFromUtils(teamName) || '#666666';
   };
 
   // Fetch available leagues on component mount

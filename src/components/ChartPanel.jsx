@@ -30,52 +30,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import ScatterPlotIcon from '@mui/icons-material/ScatterPlot';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
-
-// Generate vibrant, contrasty colors for better visibility
-const generateContrastColor = (index) => {
-  const contrastColors = [
-    '#E91E63', // Pink
-    '#4CAF50', // Green
-    '#2196F3', // Blue
-    '#FF9800', // Orange
-    '#9C27B0', // Purple
-    '#F44336', // Red
-    '#00BCD4', // Cyan
-    '#8BC34A', // Light Green
-    '#3F51B5', // Indigo
-    '#FF5722', // Deep Orange
-    '#607D8B', // Blue Grey
-    '#795548', // Brown
-    '#009688', // Teal
-    '#CDDC39', // Lime
-    '#FFC107', // Amber
-    '#673AB7', // Deep Purple
-    '#FF1744', // Pink Accent
-    '#00E676', // Green Accent
-    '#2979FF', // Blue Accent
-    '#FF6D00'  // Orange Accent
-  ];
-  
-  return contrastColors[index % contrastColors.length];
-};
-
-// Team colors for scatter plots (extracted from VenueNotes.jsx)
-const getTeamColor = (team) => {
-  const teamColors = {
-    'CSK': '#eff542',
-    'RCB': '#f54242', 
-    'MI': '#42a7f5',
-    'RR': '#FF2AA8',
-    'KKR': '#610048',
-    'PBKS': '#FF004D',
-    'SRH': '#FF7C01',
-    'LSG': '#00BBB3',
-    'DC': '#004BC5',
-    'GT': '#01295B'
-  };
-  const currentTeam = team?.split('/')?.pop()?.trim();
-  return teamColors[currentTeam] || '#8884d8';
-};
+import { getDataPointColor, getFallbackColor, hasTeamGrouping } from '../utils/teamColors';
 
 const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = false }, ref) => {
   const [charts, setCharts] = useState([]);
@@ -287,6 +242,9 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
   const chartData = useMemo(() => {
     if (!data || data.length === 0 || !groupBy || groupBy.length === 0) return [];
 
+    // Check if we have team-based grouping
+    const useTeamColors = hasTeamGrouping(groupBy);
+
     return data.map((row, index) => {
       // Create a display name from grouping columns with better formatting
       const groupingName = groupBy
@@ -317,15 +275,17 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
         })
         .join(' • ');
 
-      // Add vibrant color for scatter plots
-      const contrastColor = generateContrastColor(index);
+      // Get color - use team color if available, otherwise fallback to indexed color
+      const pointColor = useTeamColors 
+        ? getDataPointColor(row, index)
+        : getFallbackColor(index);
 
       return {
         ...row,
         name: groupingName,
         shortName: shortName,
         displayIndex: index,
-        teamColor: contrastColor // Use vibrant colors for better visibility
+        teamColor: pointColor
       };
     });
   }, [data, groupBy]);
