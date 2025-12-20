@@ -447,7 +447,9 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
     use_runs_off_bat_only = batter_grouping or has_batter_filters
     runs_calculation = "SUM(d.runs_off_bat)" if use_runs_off_bat_only else "SUM(d.runs_off_bat + d.extras)"
     
-    # First get total balls for percentage calculation
+    query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
+    
+    # Get total balls for percentage calculation
     if total_balls_override is None:
         total_balls_query = f"""
             SELECT COUNT(*) 
@@ -455,10 +457,26 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
             JOIN matches m ON d.match_id = m.id
             {where_clause}
         """
-        query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
         total_balls = db.execute(text(total_balls_query), query_params).scalar() or 0
     else:
         total_balls = total_balls_override
+    
+    # For multi-level grouping, get parent group totals (first column)
+    parent_totals = {}
+    if len(group_by) > 1:
+        first_col = group_by[0]
+        first_db_col = grouping_columns.get(first_col)
+        if first_db_col and first_db_col != "NULL":
+            parent_query = f"""
+                SELECT {first_db_col} as parent_key, COUNT(*) as parent_balls
+                FROM deliveries d
+                JOIN matches m ON d.match_id = m.id
+                {where_clause}
+                GROUP BY {first_db_col}
+            """
+            parent_result = db.execute(text(parent_query), query_params).fetchall()
+            for row in parent_result:
+                parent_totals[str(row[0])] = row[1]
     
     aggregation_query = f"""
         SELECT 
@@ -477,8 +495,6 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
         ORDER BY COUNT(*) DESC
     """
     
-    # Remove pagination params for this query
-    query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
     result = db.execute(text(aggregation_query), query_params).fetchall()
     
     # Format results with fully calculated metrics
@@ -500,6 +516,14 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
         fours = row[stats_start + 5] or 0
         sixes = row[stats_start + 6] or 0
         
+        # Calculate percent_balls relative to parent group (for multi-level) or total (for single-level)
+        if len(group_by) > 1 and parent_totals:
+            parent_key = str(row[0])  # First column value is the parent
+            parent_balls = parent_totals.get(parent_key, total_balls)
+            percent_balls = round((balls / parent_balls) * 100, 2) if parent_balls > 0 else 0
+        else:
+            percent_balls = round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
+        
         # Calculate all derived metrics
         row_dict.update({
             "balls": balls,
@@ -514,7 +538,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
             "balls_per_dismissal": round(balls / wickets, 2) if wickets > 0 else None,
             "dot_percentage": round((dots * 100.0) / balls, 2) if balls > 0 else 0,
             "boundary_percentage": round((boundaries * 100.0) / balls, 2) if balls > 0 else 0,
-            "percent_balls": round((balls / total_balls) * 100, 2) if total_balls > 0 else 0,
+            "percent_balls": percent_balls,
             # control_percentage not available in legacy - don't include it
         })
         
