@@ -205,7 +205,8 @@ def get_legacy_grouping_columns_map():
         
         # Batter attributes (partial coverage in legacy)
         "bat_hand": "NULL",  # Not available
-        "crease_combo": "CASE WHEN d.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE d.crease_combo END",
+        # Normalize crease_combo: swap RHB_LHB -> LHB_RHB and lowercase
+        "crease_combo": "LOWER(CASE WHEN d.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE d.crease_combo END)",
         
         # Bowler attributes
         "bowl_style": "NULL",  # Not available
@@ -348,7 +349,7 @@ def query_legacy_ungrouped(where_clause, params, limit, offset, db):
             NULL as bat_hand,
             NULL as bowl_style,
             NULL as bowl_kind,
-            CASE WHEN d.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE d.crease_combo END as crease_combo,
+            LOWER(CASE WHEN d.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE d.crease_combo END) as crease_combo,
             NULL as line,
             NULL as length,
             NULL as shot,
@@ -599,16 +600,19 @@ def merge_grouped_results(
     """
     Merge grouped results from both tables, combining rows with matching group keys.
     Recalculates derived metrics after merging raw counts.
+    For multi-level groupings, percent_balls is relative to parent group.
     """
     if not legacy_results:
         return new_results
     if not new_results:
-        # Normalize legacy player names
+        # Normalize legacy player names and crease_combo
         for row in legacy_results:
             if 'batter' in row and row.get('batter'):
                 row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
             if 'bowler' in row and row.get('bowler'):
                 row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
+            if 'crease_combo' in row and row.get('crease_combo'):
+                row['crease_combo'] = row['crease_combo'].lower()
         return legacy_results
     
     # Build a lookup by group key
@@ -624,6 +628,9 @@ def merge_grouped_results(
                 val = normalize_player_name_for_merge(val, player_aliases_map)
             elif col == 'bowler' and val:
                 val = normalize_player_name_for_merge(val, player_aliases_map)
+            # Normalize crease_combo to lowercase
+            elif col == 'crease_combo' and val:
+                val = val.lower()
             key_parts.append(str(val) if val is not None else '')
         return tuple(key_parts)
     
@@ -634,11 +641,13 @@ def merge_grouped_results(
     
     # Merge legacy results
     for row in legacy_results:
-        # Normalize player names in the row
+        # Normalize player names and crease_combo in the row
         if 'batter' in row and row.get('batter'):
             row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
         if 'bowler' in row and row.get('bowler'):
             row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
+        if 'crease_combo' in row and row.get('crease_combo'):
+            row['crease_combo'] = row['crease_combo'].lower()
         
         key = make_group_key(row)
         
@@ -656,26 +665,40 @@ def merge_grouped_results(
             # New group from legacy
             merged[key] = row.copy()
     
+    # Convert to list
+    result_list = list(merged.values())
+    
+    # For multi-level grouping, compute parent totals from merged data
+    parent_totals = {}
+    if len(group_by) > 1:
+        for row in result_list:
+            parent_key = str(row.get(group_by[0]))
+            parent_totals[parent_key] = parent_totals.get(parent_key, 0) + (row.get('balls') or 0)
+    
     # Recalculate derived metrics for all rows
-    result_list = []
-    for key, row in merged.items():
+    for row in result_list:
         balls = row.get('balls', 0)
         runs = row.get('runs', 0)
         wickets = row.get('wickets', 0)
         dots = row.get('dots', 0)
         boundaries = row.get('boundaries', 0)
         
-        # Recalculate metrics
+        # Calculate percent_balls relative to parent group (for multi-level) or total (for single-level)
+        if len(group_by) > 1 and parent_totals:
+            parent_key = str(row.get(group_by[0]))
+            parent_balls = parent_totals.get(parent_key, total_balls)
+            row['percent_balls'] = round((balls / parent_balls) * 100, 2) if parent_balls > 0 else 0
+        else:
+            row['percent_balls'] = round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
+        
+        # Recalculate other metrics
         row['average'] = round(runs / wickets, 2) if wickets > 0 else None
         row['strike_rate'] = round((runs * 100.0) / balls, 2) if balls > 0 else 0
         row['balls_per_dismissal'] = round(balls / wickets, 2) if wickets > 0 else None
         row['dot_percentage'] = round((dots * 100.0) / balls, 2) if balls > 0 else 0
         row['boundary_percentage'] = round((boundaries * 100.0) / balls, 2) if balls > 0 else 0
-        row['percent_balls'] = round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
         
         # control_percentage stays as-is from new data (will be None if only legacy)
-        
-        result_list.append(row)
     
     # Sort by balls descending
     result_list.sort(key=lambda x: x.get('balls', 0), reverse=True)
@@ -1239,7 +1262,7 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
             dd.bat_hand,
             dd.bowl_style,
             dd.bowl_kind,
-            CASE WHEN dd.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE dd.crease_combo END as crease_combo,
+            LOWER(CASE WHEN dd.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE dd.crease_combo END) as crease_combo,
             dd.line,
             dd.length,
             dd.shot,
@@ -1341,8 +1364,8 @@ def get_grouping_columns_map():
         
         # Batter attributes
         "bat_hand": "dd.bat_hand",
-        # Normalize crease_combo: RHB_LHB and LHB_RHB are both "mixed" - display as LHB_RHB
-        "crease_combo": "CASE WHEN dd.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE dd.crease_combo END",
+        # Normalize crease_combo: RHB_LHB and LHB_RHB are both "mixed" - normalize to lowercase lhb_rhb
+        "crease_combo": "LOWER(CASE WHEN dd.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE dd.crease_combo END)",
         
         # Bowler attributes
         "bowl_style": "dd.bowl_style",
