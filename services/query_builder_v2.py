@@ -401,8 +401,7 @@ def query_legacy_ungrouped(where_clause, params, limit, offset, db):
             "date": row[23].isoformat() if row[23] else None,
             "competition": row[24],
             "year": row[25],
-            "outcome": row[26],
-            "_source": "legacy"  # Mark source for debugging
+            "outcome": row[26]
         })
     
     # Count total
@@ -418,10 +417,10 @@ def query_legacy_ungrouped(where_clause, params, limit, offset, db):
     return formatted_results, total_count
 
 
-def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=False):
+def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=False, total_balls_override=None):
     """
     Query legacy deliveries table for grouped/aggregated results.
-    Returns raw aggregated data that can be merged with new table results.
+    Returns fully calculated results matching the new table format.
     """
     grouping_columns = get_legacy_grouping_columns_map()
     
@@ -438,7 +437,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
     valid_group_columns = [c for c in group_columns if c != "NULL"]
     if not valid_group_columns:
         # All requested columns are unavailable in legacy - return empty
-        return []
+        return [], 0
     
     group_by_clause = ", ".join(valid_group_columns)
     select_group_clause = ", ".join(select_columns)
@@ -447,6 +446,19 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
     batter_grouping = "batter" in group_by
     use_runs_off_bat_only = batter_grouping or has_batter_filters
     runs_calculation = "SUM(d.runs_off_bat)" if use_runs_off_bat_only else "SUM(d.runs_off_bat + d.extras)"
+    
+    # First get total balls for percentage calculation
+    if total_balls_override is None:
+        total_balls_query = f"""
+            SELECT COUNT(*) 
+            FROM deliveries d
+            JOIN matches m ON d.match_id = m.id
+            {where_clause}
+        """
+        query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
+        total_balls = db.execute(text(total_balls_query), query_params).scalar() or 0
+    else:
+        total_balls = total_balls_override
     
     aggregation_query = f"""
         SELECT 
@@ -462,38 +474,53 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
         JOIN matches m ON d.match_id = m.id
         {where_clause}
         GROUP BY {group_by_clause}
+        ORDER BY COUNT(*) DESC
     """
     
     # Remove pagination params for this query
     query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
     result = db.execute(text(aggregation_query), query_params).fetchall()
     
-    # Format results as list of dicts with raw counts
+    # Format results with fully calculated metrics
     formatted_results = []
     for row in result:
-        row_dict = {"_source": "legacy"}
+        row_dict = {}
         
         # Add grouping columns
         for i, col in enumerate(group_by):
             row_dict[col] = row[i]
         
-        # Add raw statistics (will be merged and recalculated later)
+        # Get raw stats
         stats_start = len(group_by)
+        balls = row[stats_start] or 0
+        runs = row[stats_start + 1] or 0
+        wickets = row[stats_start + 2] or 0
+        dots = row[stats_start + 3] or 0
+        boundaries = row[stats_start + 4] or 0
+        fours = row[stats_start + 5] or 0
+        sixes = row[stats_start + 6] or 0
+        
+        # Calculate all derived metrics
         row_dict.update({
-            "balls": row[stats_start],
-            "runs": row[stats_start + 1],
-            "wickets": row[stats_start + 2],
-            "dots": row[stats_start + 3],
-            "boundaries": row[stats_start + 4],
-            "fours": row[stats_start + 5],
-            "sixes": row[stats_start + 6],
-            # Advanced columns not available in legacy
-            "control_percentage": None
+            "balls": balls,
+            "runs": runs,
+            "wickets": wickets,
+            "dots": dots,
+            "boundaries": boundaries,
+            "fours": fours,
+            "sixes": sixes,
+            "average": round(runs / wickets, 2) if wickets > 0 else None,
+            "strike_rate": round((runs * 100.0) / balls, 2) if balls > 0 else 0,
+            "balls_per_dismissal": round(balls / wickets, 2) if wickets > 0 else None,
+            "dot_percentage": round((dots * 100.0) / balls, 2) if balls > 0 else 0,
+            "boundary_percentage": round((boundaries * 100.0) / balls, 2) if balls > 0 else 0,
+            "percent_balls": round((balls / total_balls) * 100, 2) if total_balls > 0 else 0,
+            # control_percentage not available in legacy - don't include it
         })
         
         formatted_results.append(row_dict)
     
-    return formatted_results
+    return formatted_results, total_balls
 
 
 def get_legacy_total_balls(where_clause, params, db):
@@ -552,24 +579,12 @@ def merge_grouped_results(
     if not legacy_results:
         return new_results
     if not new_results:
-        # Normalize legacy player names and recalculate metrics
+        # Normalize legacy player names
         for row in legacy_results:
             if 'batter' in row and row.get('batter'):
                 row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
             if 'bowler' in row and row.get('bowler'):
                 row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
-            # Recalculate derived metrics
-            balls = row.get('balls', 0)
-            runs = row.get('runs', 0)
-            wickets = row.get('wickets', 0)
-            dots = row.get('dots', 0)
-            boundaries = row.get('boundaries', 0)
-            row['average'] = runs / wickets if wickets > 0 else None
-            row['strike_rate'] = (runs * 100.0) / balls if balls > 0 else 0
-            row['balls_per_dismissal'] = balls / wickets if wickets > 0 else None
-            row['dot_percentage'] = (dots * 100.0) / balls if balls > 0 else 0
-            row['boundary_percentage'] = (boundaries * 100.0) / balls if balls > 0 else 0
-            row['percent_balls'] = round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
         return legacy_results
     
     # Build a lookup by group key
@@ -592,7 +607,6 @@ def merge_grouped_results(
     for row in new_results:
         key = make_group_key(row)
         merged[key] = row.copy()
-        merged[key]['_source'] = 'new'
     
     # Merge legacy results
     for row in legacy_results:
@@ -614,11 +628,9 @@ def merge_grouped_results(
             existing['boundaries'] = (existing.get('boundaries') or 0) + (row.get('boundaries') or 0)
             existing['fours'] = (existing.get('fours') or 0) + (row.get('fours') or 0)
             existing['sixes'] = (existing.get('sixes') or 0) + (row.get('sixes') or 0)
-            existing['_source'] = 'merged'
         else:
             # New group from legacy
             merged[key] = row.copy()
-            merged[key]['_source'] = 'legacy'
     
     # Recalculate derived metrics for all rows
     result_list = []
@@ -630,14 +642,14 @@ def merge_grouped_results(
         boundaries = row.get('boundaries', 0)
         
         # Recalculate metrics
-        row['average'] = runs / wickets if wickets > 0 else None
-        row['strike_rate'] = (runs * 100.0) / balls if balls > 0 else 0
-        row['balls_per_dismissal'] = balls / wickets if wickets > 0 else None
-        row['dot_percentage'] = (dots * 100.0) / balls if balls > 0 else 0
-        row['boundary_percentage'] = (boundaries * 100.0) / balls if balls > 0 else 0
+        row['average'] = round(runs / wickets, 2) if wickets > 0 else None
+        row['strike_rate'] = round((runs * 100.0) / balls, 2) if balls > 0 else 0
+        row['balls_per_dismissal'] = round(balls / wickets, 2) if wickets > 0 else None
+        row['dot_percentage'] = round((dots * 100.0) / balls, 2) if balls > 0 else 0
+        row['boundary_percentage'] = round((boundaries * 100.0) / balls, 2) if balls > 0 else 0
         row['percent_balls'] = round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
         
-        # control_percentage stays as-is (only from new data)
+        # control_percentage stays as-is from new data (will be None if only legacy)
         
         result_list.append(row)
     
@@ -662,10 +674,6 @@ def merge_ungrouped_results(
             row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
         if row.get('bowler'):
             row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
-        row['_source'] = 'legacy'
-    
-    for row in new_results:
-        row['_source'] = 'new'
     
     # Combine and sort by year desc, then match/innings/over/ball
     combined = new_results + legacy_results
@@ -909,7 +917,7 @@ def query_deliveries_service(
                 )
             else:
                 # Grouped query
-                legacy_results = query_legacy_grouped(
+                legacy_results, legacy_total_balls = query_legacy_grouped(
                     legacy_where_clause, legacy_params, group_by, db, has_batter_filters
                 )
                 legacy_total_count = len(legacy_results)
