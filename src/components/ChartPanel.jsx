@@ -425,6 +425,9 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
     
     const xDomain = getDataDomain(chart.xMetric);
     const yDomain = getDataDomain(chart.yMetric);
+
+    // Track selected point for mobile tap-to-show tooltip
+    const [selectedPoint, setSelectedPoint] = React.useState(null);
     
     return (
       <Card key={chart.id} sx={{ mb: 3 }}>
@@ -477,6 +480,36 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
             </FormControl>
           </Stack>
 
+          {/* Mobile Selected Point Info */}
+          {isMobile && selectedPoint && (
+            <Card variant="outlined" sx={{ mb: 2, p: 1.5, backgroundColor: 'grey.50' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    {selectedPoint.name}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>{xMetricData?.label}:</strong> {formatMetricValue(selectedPoint[chart.xMetric], chart.xMetric)}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>{yMetricData?.label}:</strong> {formatMetricValue(selectedPoint[chart.yMetric], chart.yMetric)}
+                  </Typography>
+                  <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selectedPoint.balls && (
+                      <Chip size="small" label={`${selectedPoint.balls.toLocaleString()} balls`} />
+                    )}
+                    {selectedPoint.runs && (
+                      <Chip size="small" label={`${selectedPoint.runs.toLocaleString()} runs`} />
+                    )}
+                  </Box>
+                </Box>
+                <IconButton size="small" onClick={() => setSelectedPoint(null)}>
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            </Card>
+          )}
+
           {/* Scatter Chart */}
           <Box sx={{ width: '100%', height: isMobile ? 400 : 500 }}>
             <ResponsiveContainer>
@@ -488,6 +521,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
                   left: 20,
                   bottom: 40
                 }}
+                onClick={() => isMobile && setSelectedPoint(null)} // Clear selection when tapping empty area
               >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis 
@@ -508,20 +542,40 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
                   tickFormatter={(value) => formatAxisTick(value, chart.yMetric)}
                   fontSize={12}
                 />
-                <Tooltip content={(props) => <CustomTooltip {...props} chartConfig={chart} />} />
+                {!isMobile && (
+                  <Tooltip content={(props) => <CustomTooltip {...props} chartConfig={chart} />} />
+                )}
                 <Scatter 
                   data={chartData} 
                   shape={(props) => {
                     const { cx, cy, payload } = props;
+                    const isSelected = selectedPoint && selectedPoint.displayIndex === payload.displayIndex;
                     return (
-                      <>
+                      <g 
+                        style={{ cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isMobile) {
+                            setSelectedPoint(isSelected ? null : payload);
+                          }
+                        }}
+                      >
+                        {/* Invisible larger touch target for mobile */}
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={24}
+                          fill="transparent"
+                          stroke="none"
+                        />
+                        {/* Visible point */}
                         <circle
                           cx={cx}
                           cy={cy}
                           r={7}
                           fill={payload.teamColor || '#8884d8'}
-                          stroke="#fff"
-                          strokeWidth={2}
+                          stroke={isSelected ? '#000' : '#fff'}
+                          strokeWidth={isSelected ? 3 : 2}
                         />
                         {!isMobile && (
                           <text
@@ -535,7 +589,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
                             {payload.shortName || payload.name}
                           </text>
                         )}
-                      </>
+                      </g>
                     );
                   }}
                 />
