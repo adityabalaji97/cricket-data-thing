@@ -238,10 +238,18 @@ def build_where_clause(
         conditions.append("dd.bowl_kind = ANY(:bowl_kind)")
         params["bowl_kind"] = bowl_kind
     
-    # Crease combo filter (left-right analysis)
+    # Crease combo filter - expand LHB_RHB to include RHB_LHB (mixed combos are equivalent)
     if crease_combo:
+        expanded_crease = []
+        for combo in crease_combo:
+            expanded_crease.append(combo)
+            # If user selects LHB_RHB, also include RHB_LHB (they're equivalent mixed combos)
+            if combo == "LHB_RHB":
+                expanded_crease.append("RHB_LHB")
+            elif combo == "RHB_LHB":
+                expanded_crease.append("LHB_RHB")
         conditions.append("dd.crease_combo = ANY(:crease_combo)")
-        params["crease_combo"] = crease_combo
+        params["crease_combo"] = list(set(expanded_crease))
     
     # Delivery detail filters
     if line:
@@ -337,7 +345,7 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
             dd.bat_hand,
             dd.bowl_style,
             dd.bowl_kind,
-            dd.crease_combo,
+            CASE WHEN dd.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE dd.crease_combo END as crease_combo,
             dd.line,
             dd.length,
             dd.shot,
@@ -439,7 +447,8 @@ def get_grouping_columns_map():
         
         # Batter attributes
         "bat_hand": "dd.bat_hand",
-        "crease_combo": "dd.crease_combo",
+        # Normalize crease_combo: RHB_LHB and LHB_RHB are both "mixed" - display as LHB_RHB
+        "crease_combo": "CASE WHEN dd.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE dd.crease_combo END",
         
         # Bowler attributes
         "bowl_style": "dd.bowl_style",
@@ -502,6 +511,13 @@ def handle_grouped_query(
     
     having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
     
+    # First, get total balls matching the WHERE clause (for percent_balls calculation)
+    total_balls_query = f"""
+        SELECT COUNT(*) FROM delivery_details dd {where_clause}
+    """
+    total_balls_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
+    total_balls = db.execute(text(total_balls_query), total_balls_params).scalar()
+    
     # Build aggregation query
     aggregation_query = f"""
         SELECT 
@@ -539,7 +555,7 @@ def handle_grouped_query(
                 THEN (CAST(SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / COUNT(*)
                 ELSE 0 END as boundary_percentage,
             
-            -- Control percentage (NEW)
+            -- Control percentage
             CASE WHEN SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END) > 0
                 THEN (CAST(SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / 
                       SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END)
@@ -549,7 +565,7 @@ def handle_grouped_query(
         {where_clause}
         GROUP BY {group_by_clause}
         {having_clause}
-        ORDER BY runs DESC
+        ORDER BY balls DESC
         LIMIT :limit
         OFFSET :offset
     """
@@ -567,8 +583,10 @@ def handle_grouped_query(
         
         # Add statistics
         stats_start = len(group_by)
+        balls = row[stats_start]
+        
         row_dict.update({
-            "balls": row[stats_start],
+            "balls": balls,
             "runs": row[stats_start + 1],
             "wickets": row[stats_start + 2],
             "dots": row[stats_start + 3],
@@ -580,7 +598,9 @@ def handle_grouped_query(
             "balls_per_dismissal": float(row[stats_start + 9]) if row[stats_start + 9] is not None else None,
             "dot_percentage": float(row[stats_start + 10]) if row[stats_start + 10] is not None else 0,
             "boundary_percentage": float(row[stats_start + 11]) if row[stats_start + 11] is not None else 0,
-            "control_percentage": float(row[stats_start + 12]) if row[stats_start + 12] is not None else None
+            "control_percentage": float(row[stats_start + 12]) if row[stats_start + 12] is not None else None,
+            # Percent of total balls this group represents
+            "percent_balls": round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
         })
         
         formatted_results.append(row_dict)
@@ -600,15 +620,18 @@ def handle_grouped_query(
     
     # Generate summary data if requested
     summary_data = None
-    if show_summary_rows and len(group_by) > 1:
-        summary_data = generate_summary_data(where_clause, params, group_by, runs_calculation, db)
+    percentages = None
+    if show_summary_rows and len(group_by) >= 1:
+        summary_data, percentages = generate_summary_data(where_clause, params, group_by, runs_calculation, db, total_balls)
     
     return {
         "data": formatted_results,
         "summary_data": summary_data,
+        "percentages": percentages,
         "metadata": {
             "total_groups": total_groups,
             "returned_groups": len(formatted_results),
+            "total_balls_in_query": total_balls,
             "limit": limit,
             "offset": offset,
             "has_more": total_groups > (offset + len(formatted_results)),
@@ -620,15 +643,21 @@ def handle_grouped_query(
     }
 
 
-def generate_summary_data(where_clause, params, group_by, runs_calculation, db):
-    """Generate hierarchical summary data for grouped queries."""
+def generate_summary_data(where_clause, params, group_by, runs_calculation, db, total_balls):
+    """Generate hierarchical summary data for grouped queries with percent_balls."""
     try:
         grouping_columns = get_grouping_columns_map()
         summaries = {}
+        percentages = {}
         
-        for level in range(1, len(group_by)):
+        # Generate summaries for each level of grouping
+        for level in range(1, len(group_by) + 1):
             summary_group_by = group_by[:level]
-            summary_key = f"{summary_group_by[0]}_summaries" if level == 1 else f"level_{level}_summaries"
+            
+            if level == 1:
+                summary_key = f"{summary_group_by[0]}_summaries"
+            else:
+                summary_key = f"level_{level}_summaries"
             
             summary_columns = []
             summary_group_clause = []
@@ -648,36 +677,55 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db):
                     {runs_calculation} as total_runs,
                     SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as total_wickets,
                     SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as total_dots,
-                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as total_boundaries
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as total_boundaries,
+                    CASE WHEN COUNT(*) > 0 
+                        THEN (CAST({runs_calculation} AS DECIMAL) * 100.0) / COUNT(*)
+                        ELSE 0 END as strike_rate
                 FROM delivery_details dd
                 {where_clause}
                 GROUP BY {summary_group_by_clause}
-                ORDER BY total_runs DESC
+                ORDER BY total_balls DESC
             """
             
-            summary_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
+            summary_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
             summary_result = db.execute(text(summary_query), summary_params).fetchall()
             
             formatted_summaries = []
+            level_percentages = {}
+            
             for row in summary_result:
                 summary_dict = {}
                 for i, col in enumerate(summary_group_by):
                     summary_dict[col] = row[i]
                 
                 stats_start = len(summary_group_by)
+                balls = row[stats_start]
+                percent_balls = round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
+                
                 summary_dict.update({
-                    "total_balls": row[stats_start],
+                    "total_balls": balls,
                     "total_runs": row[stats_start + 1],
                     "total_wickets": row[stats_start + 2],
                     "total_dots": row[stats_start + 3],
-                    "total_boundaries": row[stats_start + 4]
+                    "total_boundaries": row[stats_start + 4],
+                    "strike_rate": float(row[stats_start + 5]) if row[stats_start + 5] is not None else 0,
+                    "percent_balls": percent_balls
                 })
                 formatted_summaries.append(summary_dict)
+                
+                # Build key for percentage lookup
+                if level == 1:
+                    key = str(row[0])
+                    level_percentages[key] = percent_balls
             
             summaries[summary_key] = formatted_summaries
+            
+            # Only store first-level percentages for easy lookup
+            if level == 1:
+                percentages = level_percentages
         
-        return summaries
+        return summaries, percentages
         
     except Exception as e:
         logger.error(f"Error generating summary data: {str(e)}")
-        return None
+        return None, None
