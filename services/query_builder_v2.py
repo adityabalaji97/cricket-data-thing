@@ -32,6 +32,7 @@ def query_deliveries_service(
     bat_hand: Optional[str],
     bowl_style: List[str],
     bowl_kind: List[str],
+    crease_combo: List[str],
     
     # Delivery detail filters
     line: List[str],
@@ -89,6 +90,7 @@ def query_deliveries_service(
             bat_hand=bat_hand,
             bowl_style=bowl_style,
             bowl_kind=bowl_kind,
+            crease_combo=crease_combo,
             line=line,
             length=length,
             shot=shot,
@@ -117,6 +119,7 @@ def query_deliveries_service(
             "bat_hand": bat_hand,
             "bowl_style": bowl_style,
             "bowl_kind": bowl_kind,
+            "crease_combo": crease_combo,
             "line": line,
             "length": length,
             "shot": shot,
@@ -145,7 +148,7 @@ def query_deliveries_service(
 
 def build_where_clause(
     venue, start_date, end_date, leagues, teams, batting_teams, bowling_teams,
-    players, batters, bowlers, bat_hand, bowl_style, bowl_kind,
+    players, batters, bowlers, bat_hand, bowl_style, bowl_kind, crease_combo,
     line, length, shot, control, wagon_zone, innings, over_min, over_max,
     include_international, top_teams, base_params
 ):
@@ -234,6 +237,11 @@ def build_where_clause(
     if bowl_kind:
         conditions.append("dd.bowl_kind = ANY(:bowl_kind)")
         params["bowl_kind"] = bowl_kind
+    
+    # Crease combo filter (left-right analysis)
+    if crease_combo:
+        conditions.append("dd.crease_combo = ANY(:crease_combo)")
+        params["crease_combo"] = crease_combo
     
     # Delivery detail filters
     if line:
@@ -329,6 +337,7 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
             dd.bat_hand,
             dd.bowl_style,
             dd.bowl_kind,
+            dd.crease_combo,
             dd.line,
             dd.length,
             dd.shot,
@@ -367,19 +376,20 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
             "bat_hand": row[10],
             "bowl_style": row[11],
             "bowl_kind": row[12],
-            "line": row[13],
-            "length": row[14],
-            "shot": row[15],
-            "control": row[16],
-            "wagon_x": row[17],
-            "wagon_y": row[18],
-            "wagon_zone": row[19],
-            "wicket_type": row[20],
-            "venue": row[21],
-            "date": row[22],
-            "competition": row[23],
-            "year": row[24],
-            "outcome": row[25]
+            "crease_combo": row[13],
+            "line": row[14],
+            "length": row[15],
+            "shot": row[16],
+            "control": row[17],
+            "wagon_x": row[18],
+            "wagon_y": row[19],
+            "wagon_zone": row[20],
+            "wicket_type": row[21],
+            "venue": row[22],
+            "date": row[23],
+            "competition": row[24],
+            "year": row[25],
+            "outcome": row[26]
         })
     
     # Count total
@@ -429,6 +439,7 @@ def get_grouping_columns_map():
         
         # Batter attributes
         "bat_hand": "dd.bat_hand",
+        "crease_combo": "dd.crease_combo",
         
         # Bowler attributes
         "bowl_style": "dd.bowl_style",

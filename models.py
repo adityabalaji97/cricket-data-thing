@@ -288,6 +288,62 @@ class DeliveryDetails(Base):
     p_bat = Column(Integer)  # Batter ID
     p_bowl = Column(Integer)  # Bowler ID
     
+    # Player names
+    batter = Column(String(100))
+    bowler = Column(String(100))
+    non_striker = Column(String(100))
+    
+    # Team info
+    batting_team = Column(String(100))
+    bowling_team = Column(String(100))
+    
+    # Player attributes per delivery
+    bat_hand = Column(String(10))  # RHB/LHB
+    bowl_style = Column(String(20))  # RF, LM, SLO, etc.
+    bowl_kind = Column(String(30))  # pace bowler, spin bowler, etc.
+    
+    # Match context
+    date = Column(Date)
+    year = Column(Integer)
+    ground = Column(String(200))
+    country = Column(String(100))
+    competition = Column(String(100))
+    winner = Column(String(100))
+    toss = Column(String(100))
+    
+    # Ball outcome
+    score = Column(Integer)
+    outcome = Column(String(50))
+    out = Column(Boolean)
+    dismissal = Column(String(50))
+    noball = Column(Integer)
+    wide = Column(Integer)
+    byes = Column(Integer)
+    legbyes = Column(Integer)
+    
+    # Batter running totals
+    batruns = Column(Integer)
+    ballfaced = Column(Integer)
+    cur_bat_runs = Column(Integer)
+    cur_bat_bf = Column(Integer)
+    
+    # Bowler running totals
+    bowlruns = Column(Integer)
+    cur_bowl_ovr = Column(Float)
+    cur_bowl_wkts = Column(Integer)
+    cur_bowl_runs = Column(Integer)
+    
+    # Innings state
+    inns_runs = Column(Integer)
+    inns_wkts = Column(Integer)
+    inns_balls = Column(Integer)
+    inns_runs_rem = Column(Integer)
+    inns_balls_rem = Column(Integer)
+    inns_rr = Column(Float)
+    inns_rrr = Column(Float)
+    target = Column(Integer)
+    max_balls = Column(Integer)
+    
     # Wagon wheel coordinates
     wagon_x = Column(Integer)
     wagon_y = Column(Integer)
@@ -302,3 +358,8 @@ class DeliveryDetails(Base):
     # Predictive metrics
     pred_score = Column(Float)  # Expected score (-1 = no data)
     win_prob = Column(Float)  # Win probability (-1 = no data)
+    
+    # Left-right batter analysis
+    striker_batter_type = Column(String(10))  # RHB/LHB
+    non_striker_batter_type = Column(String(10))  # RHB/LHB
+    crease_combo = Column(String(20))  # e.g., RHB_LHB, LHB_LHB

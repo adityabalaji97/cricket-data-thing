@@ -33,6 +33,7 @@ def query_deliveries(
     bat_hand: Optional[str] = Query(default=None, description="Filter by batting hand (LHB, RHB)"),
     bowl_style: List[str] = Query(default=[], description="Filter by bowling style (RF, RM, SLA, OB, etc.)"),
     bowl_kind: List[str] = Query(default=[], description="Filter by bowl kind (pace bowler, spin bowler, mixture/unknown)"),
+    crease_combo: List[str] = Query(default=[], description="Filter by crease combo (RHB_RHB, RHB_LHB, LHB_RHB, LHB_LHB)"),
     
     # Delivery detail filters (NEW)
     line: List[str] = Query(default=[], description="Filter by line (ON_THE_STUMPS, OUTSIDE_OFFSTUMP, DOWN_LEG, etc.)"),
@@ -75,11 +76,13 @@ def query_deliveries(
     - Shot type analysis (COVER_DRIVE, FLICK, PULL, etc.)
     - Shot control metrics
     - Wagon wheel zone filtering
+    - Crease combo analysis (RHB_RHB, LHB_RHB, etc.)
     
     **Example Queries:**
     - Short ball shots: `?length=SHORT&group_by=shot&min_balls=50`
     - Controlled vs uncontrolled by zone: `?group_by=control,wagon_zone`
     - Spin bowling by line: `?bowl_kind=spin bowler&group_by=line,length`
+    - Left-right combo analysis: `?group_by=crease_combo&min_balls=100`
     """
     try:
         result = query_deliveries_service(
@@ -96,6 +99,7 @@ def query_deliveries(
             bat_hand=bat_hand,
             bowl_style=bowl_style,
             bowl_kind=bowl_kind,
+            crease_combo=crease_combo,
             line=line,
             length=length,
             shot=shot,
@@ -174,7 +178,7 @@ def get_available_columns(db: Session = Depends(get_session)):
             "filter_columns": {
                 "basic": ["venue", "start_date", "end_date", "leagues", "teams", "batting_teams", "bowling_teams", "players", "batters", "bowlers"],
                 "match": ["innings", "over_min", "over_max"],
-                "batter": ["bat_hand"],
+                "batter": ["bat_hand", "crease_combo"],
                 "bowler": ["bowl_style", "bowl_kind"],
                 "delivery": ["line", "length", "shot", "control", "wagon_zone"],
                 "grouped_filters": ["min_balls", "max_balls", "min_runs", "max_runs"]
@@ -184,7 +188,7 @@ def get_available_columns(db: Session = Depends(get_session)):
                 "venue", "country", "match_id", "competition", "year",
                 "batting_team", "bowling_team", "batter", "bowler",
                 "innings", "phase",
-                "bat_hand", "bowl_style", "bowl_kind",
+                "bat_hand", "bowl_style", "bowl_kind", "crease_combo",
                 "line", "length", "shot", "control", "wagon_zone"
             ],
             
@@ -213,6 +217,9 @@ def get_available_columns(db: Session = Depends(get_session)):
             "bat_hand_options": get_values("bat_hand"),
             "bat_hand_coverage": get_coverage("bat_hand"),
             
+            "crease_combo_options": ["RHB_RHB", "RHB_LHB", "LHB_RHB", "LHB_LHB"],
+            "crease_combo_coverage": get_coverage("crease_combo"),
+            
             "innings_options": [1, 2],
             
             # Basic filter options
@@ -226,7 +233,7 @@ def get_available_columns(db: Session = Depends(get_session)):
             
             # Coverage summary for UI warnings
             "coverage_summary": {
-                "high": ["wagon_zone", "bat_hand", "bowl_style", "bowl_kind"],
+                "high": ["wagon_zone", "bat_hand", "bowl_style", "bowl_kind", "crease_combo"],
                 "medium": ["shot", "control"],
                 "low": ["line", "length"]
             }
