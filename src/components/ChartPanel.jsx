@@ -35,6 +35,7 @@ import { getDataPointColor, getFallbackColor, hasTeamGrouping } from '../utils/t
 const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = false }, ref) => {
   const [charts, setCharts] = useState([]);
   const [nextChartId, setNextChartId] = useState(1);
+  const [selectedPoints, setSelectedPoints] = useState({}); // Track selected points per chart: { chartId: payload }
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -426,17 +427,23 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
     const xDomain = getDataDomain(chart.xMetric);
     const yDomain = getDataDomain(chart.yMetric);
 
-    // Track selected point for mobile tap-to-show tooltip
-    const [selectedPoint, setSelectedPoint] = React.useState(null);
+    // Get selected point for this chart from component-level state
+    const selectedPoint = selectedPoints[chart.id] || null;
+    const setSelectedPoint = (point) => {
+      setSelectedPoints(prev => ({
+        ...prev,
+        [chart.id]: point
+      }));
+    };
     
     return (
       <Card key={chart.id} sx={{ mb: 3 }}>
-        <CardContent>
+        <CardContent sx={{ px: isMobile ? 1 : 2 }}>
           {/* Chart Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <ScatterPlotIcon />
-              Scatter Plot - {xMetricData?.label} vs {yMetricData?.label}
+              {isMobile ? `${xMetricData?.label} vs ${yMetricData?.label}` : `Scatter Plot - ${xMetricData?.label} vs ${yMetricData?.label}`}
             </Typography>
             <IconButton
               size="small"
@@ -448,8 +455,8 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
           </Box>
 
           {/* Chart Controls */}
-          <Stack direction={isMobile ? "column" : "row"} spacing={2} sx={{ mb: 3 }}>
-            <FormControl sx={{ minWidth: 150 }}>
+          <Stack direction={isMobile ? "column" : "row"} spacing={2} sx={{ mb: 2 }}>
+            <FormControl size={isMobile ? "small" : "medium"} sx={{ minWidth: isMobile ? 120 : 150 }}>
               <InputLabel>X-Axis</InputLabel>
               <Select
                 value={chart.xMetric}
@@ -464,7 +471,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
               </Select>
             </FormControl>
             
-            <FormControl sx={{ minWidth: 150 }}>
+            <FormControl size={isMobile ? "small" : "medium"} sx={{ minWidth: isMobile ? 120 : 150 }}>
               <InputLabel>Y-Axis</InputLabel>
               <Select
                 value={chart.yMetric}
@@ -511,15 +518,15 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
           )}
 
           {/* Scatter Chart */}
-          <Box sx={{ width: '100%', height: isMobile ? 400 : 500 }}>
+          <Box sx={{ width: '100%', height: isMobile ? 350 : 500 }}>
             <ResponsiveContainer>
               <ScatterChart
                 data={chartData}
                 margin={{
-                  top: 20,
-                  right: 30,
-                  left: 20,
-                  bottom: 40
+                  top: 10,
+                  right: isMobile ? 5 : 30,
+                  left: isMobile ? -15 : 20,
+                  bottom: isMobile ? 20 : 40
                 }}
                 onClick={() => isMobile && setSelectedPoint(null)} // Clear selection when tapping empty area
               >
@@ -531,7 +538,8 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
                   domain={xDomain}
                   ticks={getAxisTicks(chart.xMetric)}
                   tickFormatter={(value) => formatAxisTick(value, chart.xMetric)}
-                  fontSize={12}
+                  fontSize={isMobile ? 10 : 12}
+                  tick={{ fontSize: isMobile ? 10 : 12 }}
                 />
                 <YAxis 
                   type="number"
@@ -540,7 +548,9 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
                   domain={yDomain}
                   ticks={getAxisTicks(chart.yMetric)}
                   tickFormatter={(value) => formatAxisTick(value, chart.yMetric)}
-                  fontSize={12}
+                  fontSize={isMobile ? 10 : 12}
+                  tick={{ fontSize: isMobile ? 10 : 12 }}
+                  width={isMobile ? 35 : 60}
                 />
                 {!isMobile && (
                   <Tooltip content={(props) => <CustomTooltip {...props} chartConfig={chart} />} />
