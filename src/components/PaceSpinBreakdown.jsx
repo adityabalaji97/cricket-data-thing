@@ -49,6 +49,21 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 const PaceSpinBreakdown = ({ stats }) => {
   const [selectedMetric, setSelectedMetric] = useState('strike_rate');
+  
+  // Null safety check
+  if (!stats?.phase_stats?.pace?.overall || !stats?.phase_stats?.spin?.overall) {
+    return (
+      <Card>
+        <CardContent>
+          <Typography variant="h6">Pace vs Spin Analysis</Typography>
+          <Typography color="text.secondary" sx={{ mt: 2 }}>
+            Pace/Spin breakdown data not available
+          </Typography>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   const data = transformData(stats, selectedMetric);
   
   const maxValue = Math.max(
