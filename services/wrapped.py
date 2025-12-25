@@ -693,7 +693,7 @@ class WrappedService:
         }
 
     # ========================================================================
-    # CARD 5: PACE VS SPIN
+    # CARD 5: PACE VS SPIN (BATTERS)
     # ========================================================================
     
     def get_pace_vs_spin_data(
@@ -706,69 +706,70 @@ class WrappedService:
         min_balls: int = 100,
         top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Card 5: Batters who were pace-only vs spin-only monsters."""
+        """Card 5: Batters who were pace-only vs spin-only monsters.
         
-        competition_filter = build_competition_filter(leagues, include_international, top_teams)
-        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
+        Uses delivery_details.bowl_kind for reliable pace/spin classification.
+        """
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        # Note: We don't filter by competition for delivery_details table
+        # because competition values may not match matches table, and year filter is sufficient
         
         query = text(f"""
-            WITH pace_types AS (
-                SELECT name FROM players 
-                WHERE bowler_type IN ('RF', 'RFM', 'RM', 'LF', 'LFM', 'LM')
-            ),
-            spin_types AS (
-                SELECT name FROM players 
-                WHERE bowler_type IN ('RO', 'RL', 'LO', 'LC')
-            ),
-            batter_vs_pace AS (
+            WITH batter_vs_pace AS (
                 SELECT 
-                    d.batter,
-                    d.batting_team as team,
+                    dd.bat as player,
+                    dd.team_bat as team,
                     COUNT(*) as balls,
-                    SUM(d.runs_off_bat + d.extras) as runs
-                FROM deliveries d
-                JOIN matches m ON d.match_id = m.id
-                WHERE d.bowler IN (SELECT name FROM pace_types)
-                AND m.date >= :start_date AND m.date <= :end_date
-                {competition_filter}
-                GROUP BY d.batter, d.batting_team
+                    SUM(dd.batruns) as runs
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bowl_kind = 'pace bowler'
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bat, dd.team_bat
             ),
             batter_vs_spin AS (
                 SELECT 
-                    d.batter,
-                    d.batting_team as team,
+                    dd.bat as player,
+                    dd.team_bat as team,
                     COUNT(*) as balls,
-                    SUM(d.runs_off_bat + d.extras) as runs
-                FROM deliveries d
-                JOIN matches m ON d.match_id = m.id
-                WHERE d.bowler IN (SELECT name FROM spin_types)
-                AND m.date >= :start_date AND m.date <= :end_date
-                {competition_filter}
-                GROUP BY d.batter, d.batting_team
+                    SUM(dd.batruns) as runs
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bowl_kind = 'spin bowler'
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bat, dd.team_bat
             ),
             pace_totals AS (
-                SELECT batter, SUM(balls) as balls, SUM(runs) as runs
+                SELECT player, SUM(balls) as balls, SUM(runs) as runs
                 FROM batter_vs_pace
-                GROUP BY batter
+                GROUP BY player
                 HAVING SUM(balls) >= :min_balls
             ),
             spin_totals AS (
-                SELECT batter, SUM(balls) as balls, SUM(runs) as runs
+                SELECT player, SUM(balls) as balls, SUM(runs) as runs
                 FROM batter_vs_spin
-                GROUP BY batter
+                GROUP BY player
                 HAVING SUM(balls) >= :min_balls
             ),
             player_primary_team AS (
-                SELECT DISTINCT ON (batter) batter, team
+                SELECT DISTINCT ON (player) player, team
                 FROM (
-                    SELECT batter, team, balls FROM batter_vs_pace
+                    SELECT player, team, balls FROM batter_vs_pace
                     UNION ALL
-                    SELECT batter, team, balls FROM batter_vs_spin
+                    SELECT player, team, balls FROM batter_vs_spin
                 ) combined
-                ORDER BY batter, balls DESC
+                ORDER BY player, balls DESC
             )
             SELECT 
-                COALESCE(p.batter, s.batter) as player,
+                COALESCE(p.player, s.player) as player,
                 ppt.team,
                 p.balls as pace_balls, p.runs as pace_runs,
                 ROUND(CAST(p.runs * 100.0 / NULLIF(p.balls, 0) AS numeric), 2) as sr_vs_pace,
@@ -777,8 +778,8 @@ class WrappedService:
                 ROUND(CAST(p.runs * 100.0 / NULLIF(p.balls, 0) AS numeric) - 
                       CAST(s.runs * 100.0 / NULLIF(s.balls, 0) AS numeric), 2) as sr_delta
             FROM pace_totals p
-            FULL OUTER JOIN spin_totals s ON p.batter = s.batter
-            LEFT JOIN player_primary_team ppt ON COALESCE(p.batter, s.batter) = ppt.batter
+            FULL OUTER JOIN spin_totals s ON p.player = s.player
+            LEFT JOIN player_primary_team ppt ON COALESCE(p.player, s.player) = ppt.player
             WHERE p.balls IS NOT NULL AND s.balls IS NOT NULL
             ORDER BY ABS(CAST(p.runs * 100.0 / NULLIF(p.balls, 0) AS numeric) - 
                         CAST(s.runs * 100.0 / NULLIF(s.balls, 0) AS numeric)) DESC
@@ -1202,16 +1203,8 @@ class WrappedService:
             "min_balls": min_balls
         }
         
-        # Build league filter for delivery_details
-        # When no leagues specified and include_international is True, don't filter by competition
-        league_filter = ""
-        if leagues and include_international:
-            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            params["leagues"] = leagues
-        elif leagues:
-            league_filter = "AND dd.competition = ANY(:leagues)"
-            params["leagues"] = leagues
-        # else: no filter needed - include all data
+        # Note: We don't filter by competition for delivery_details table
+        # because competition values may not match matches table, and year filter is sufficient
         
         query = text(f"""
             WITH player_stats AS (
@@ -1228,7 +1221,6 @@ class WrappedService:
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
                 AND dd.bat_hand IN ('LHB', 'RHB')
-                {league_filter}
                 GROUP BY dd.bat, dd.team_bat
             ),
             player_primary_team AS (
@@ -1348,16 +1340,8 @@ class WrappedService:
             "min_balls": min_balls
         }
         
-        # Build league filter for delivery_details
-        # When no leagues specified and include_international is True, don't filter by competition
-        league_filter = ""
-        if leagues and include_international:
-            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            params["leagues"] = leagues
-        elif leagues:
-            league_filter = "AND dd.competition = ANY(:leagues)"
-            params["leagues"] = leagues
-        # else: no filter needed - include all data
+        # Note: We don't filter by competition for delivery_details table
+        # because competition values may not match matches table, and year filter is sufficient
         
         # Query zones 1-8 (zone 0 is dots/no shot data)
         query = text(f"""
@@ -1372,9 +1356,8 @@ class WrappedService:
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
                 AND dd.wagon_zone IS NOT NULL
-                AND dd.wagon_zone BETWEEN 1 AND 8  -- Exclude zone 0 (dots/no data)
+                AND dd.wagon_zone BETWEEN 1 AND 8
                 AND dd.bat_hand IN ('LHB', 'RHB')
-                {league_filter}
                 GROUP BY dd.bat, dd.team_bat, dd.wagon_zone
             ),
             player_primary_team AS (
@@ -1553,16 +1536,8 @@ class WrappedService:
             "min_balls": min_balls
         }
         
-        # Build league filter for delivery_details
-        # When no leagues specified and include_international is True, don't filter by competition
-        league_filter = ""
-        if leagues and include_international:
-            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            params["leagues"] = leagues
-        elif leagues:
-            league_filter = "AND dd.competition = ANY(:leagues)"
-            params["leagues"] = leagues
-        # else: no filter needed - include all data
+        # Note: We don't filter by competition for delivery_details table
+        # because competition values may not match matches table, and year filter is sufficient
         
         # Query 1: Overall stats by bat_hand
         hand_query = text(f"""
@@ -1577,7 +1552,6 @@ class WrappedService:
             WHERE dd.year >= :start_year
             AND dd.year <= :end_year
             AND dd.bat_hand IN ('LHB', 'RHB')
-            {league_filter}
             GROUP BY dd.bat_hand
         """)
         
@@ -1612,7 +1586,6 @@ class WrappedService:
             WHERE dd.year >= :start_year
             AND dd.year <= :end_year
             AND dd.crease_combo IN ('LHB_RHB', 'RHB_LHB', 'RHB_RHB', 'LHB_LHB')
-            {league_filter}
             GROUP BY combo_normalized
             ORDER BY balls DESC
         """)
@@ -1642,7 +1615,6 @@ class WrappedService:
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
                 AND dd.bat_hand = 'LHB'
-                {league_filter}
                 GROUP BY dd.bat, dd.team_bat
             ),
             player_primary_team AS (
@@ -1675,7 +1647,6 @@ class WrappedService:
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
                 AND dd.bat_hand = 'RHB'
-                {league_filter}
                 GROUP BY dd.bat, dd.team_bat
             ),
             player_primary_team AS (
@@ -1754,16 +1725,8 @@ class WrappedService:
             "min_balls": min_balls
         }
         
-        # Build league filter for delivery_details
-        # When no leagues specified and include_international is True, don't filter by competition
-        league_filter = ""
-        if leagues and include_international:
-            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            params["leagues"] = leagues
-        elif leagues:
-            league_filter = "AND dd.competition = ANY(:leagues)"
-            params["leagues"] = leagues
-        # else: no filter needed - include all data
+        # Note: We don't filter by competition for delivery_details table
+        # because competition values may not match matches table, and year filter is sufficient
         
         query = text(f"""
             WITH length_stats AS (
@@ -1778,7 +1741,6 @@ class WrappedService:
                 AND dd.year <= :end_year
                 AND dd.length IS NOT NULL
                 AND dd.bat_hand IN ('LHB', 'RHB')
-                {league_filter}
                 GROUP BY dd.bat, dd.team_bat, dd.length
             ),
             player_primary_team AS (
@@ -1931,26 +1893,18 @@ class WrappedService:
     ) -> Dict[str, Any]:
         """Card 14: Rare Shot Specialists - who excels at unconventional shots."""
         
+        # Rare shots (bottom ~30% by frequency from data exploration)
+        rare_shots = ['REVERSE_SCOOP', 'REVERSE_PULL', 'LATE_CUT', 'PADDLE_SWEEP', 'RAMP', 'HOOK', 'UPPER_CUT']
+        
         params = {
             "start_year": int(start_date[:4]),
             "end_year": int(end_date[:4]),
-            "min_plays": min_plays
+            "min_plays": min_plays,
+            "rare_shots": rare_shots
         }
         
-        # Build league filter for delivery_details
-        # When no leagues specified and include_international is True, don't filter by competition
-        league_filter = ""
-        if leagues and include_international:
-            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            params["leagues"] = leagues
-        elif leagues:
-            league_filter = "AND dd.competition = ANY(:leagues)"
-            params["leagues"] = leagues
-        # else: no filter needed - include all data
-        
-        # Rare shots (bottom ~30% by frequency from data exploration)
-        rare_shots = ['REVERSE_SCOOP', 'REVERSE_PULL', 'LATE_CUT', 'PADDLE_SWEEP', 'RAMP', 'HOOK', 'UPPER_CUT']
-        params["rare_shots"] = rare_shots
+        # Note: We don't filter by competition for delivery_details table
+        # because competition values may not match matches table, and year filter is sufficient
         
         query = text(f"""
             WITH rare_shot_stats AS (
@@ -1966,7 +1920,6 @@ class WrappedService:
                 AND dd.year <= :end_year
                 AND dd.shot = ANY(:rare_shots)
                 AND dd.bat_hand IN ('LHB', 'RHB')
-                {league_filter}
                 GROUP BY dd.bat, dd.team_bat, dd.shot
             ),
             player_primary_team AS (
@@ -2105,15 +2058,8 @@ class WrappedService:
             "min_balls": min_balls
         }
         
-        # Build league filter for delivery_details
-        league_filter = ""
-        if leagues and include_international:
-            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            params["leagues"] = leagues
-        elif leagues:
-            league_filter = "AND dd.competition = ANY(:leagues)"
-            params["leagues"] = leagues
-        # else: no filter needed - include all data
+        # Note: We don't filter by competition for delivery_details table
+        # because competition values may not match matches table, and year filter is sufficient
         
         # Query 1: Overall pace vs spin stats
         kind_query = text(f"""
@@ -2128,7 +2074,6 @@ class WrappedService:
             WHERE dd.year >= :start_year
             AND dd.year <= :end_year
             AND dd.bowl_kind IN ('pace bowler', 'spin bowler')
-            {league_filter}
             GROUP BY dd.bowl_kind
         """)
         
@@ -2162,7 +2107,6 @@ class WrappedService:
             AND dd.year <= :end_year
             AND dd.bowl_style IS NOT NULL
             AND dd.bowl_kind IN ('pace bowler', 'spin bowler')
-            {league_filter}
             GROUP BY dd.bowl_style, dd.bowl_kind
             HAVING COUNT(*) >= 500
             ORDER BY COUNT(*) DESC
@@ -2215,7 +2159,6 @@ class WrappedService:
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
                 AND dd.bowl_kind = 'pace bowler'
-                {league_filter}
                 GROUP BY dd.bowl, dd.team_bowl
             ),
             player_primary_team AS (
@@ -2250,7 +2193,6 @@ class WrappedService:
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
                 AND dd.bowl_kind = 'spin bowler'
-                {league_filter}
                 GROUP BY dd.bowl, dd.team_bowl
             ),
             player_primary_team AS (
