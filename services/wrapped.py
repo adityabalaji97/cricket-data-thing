@@ -213,6 +213,13 @@ class WrappedService:
             logger.error(f"Error fetching length masters: {e}")
             cards.append({"card_id": "length_masters", "error": str(e)})
         
+        # Card 14: Rare Shot Specialists
+        try:
+            cards.append(self.get_rare_shot_specialists_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
+        except Exception as e:
+            logger.error(f"Error fetching rare shot specialists: {e}")
+            cards.append({"card_id": "rare_shot_specialists", "error": str(e)})
+        
         return {
             "year": 2025,
             "date_range": {"start": start_date, "end": end_date},
@@ -250,6 +257,7 @@ class WrappedService:
             "360_batters": self.get_360_batters_data,
             "batter_hand_breakdown": self.get_batter_hand_breakdown_data,
             "length_masters": self.get_length_masters_data,
+            "rare_shot_specialists": self.get_rare_shot_specialists_data,
         }
         
         if card_id not in card_methods:
@@ -1899,5 +1907,173 @@ class WrappedService:
             "players": players_with_score[:15],
             "deep_links": {
                 "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter,length&min_balls={min_balls}"
+            }
+        }
+
+    # ========================================================================
+    # CARD 14: RARE SHOT SPECIALISTS
+    # ========================================================================
+    
+    def get_rare_shot_specialists_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_plays: int = 10,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 14: Rare Shot Specialists - who excels at unconventional shots."""
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_plays": min_plays
+        }
+        
+        league_filter = ""
+        if leagues:
+            league_filter = "AND dd.competition = ANY(:leagues)"
+            params["leagues"] = leagues
+        
+        if include_international:
+            if leagues:
+                league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            else:
+                league_filter = ""
+        
+        # Rare shots (bottom ~30% by frequency from data exploration)
+        rare_shots = ['REVERSE_SCOOP', 'REVERSE_PULL', 'LATE_CUT', 'PADDLE_SWEEP', 'RAMP', 'HOOK', 'UPPER_CUT']
+        params["rare_shots"] = rare_shots
+        
+        query = text(f"""
+            WITH rare_shot_stats AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    dd.shot,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.shot = ANY(:rare_shots)
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                {league_filter}
+                GROUP BY dd.bat, dd.team_bat, dd.shot
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM rare_shot_stats
+                ORDER BY player, SUM(balls) OVER (PARTITION BY player, team) DESC
+            ),
+            player_shot_agg AS (
+                SELECT player, shot, SUM(balls) as balls, SUM(runs) as runs, SUM(boundaries) as boundaries
+                FROM rare_shot_stats
+                GROUP BY player, shot
+                HAVING SUM(balls) >= :min_plays
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as total_rare_balls,
+                    SUM(runs) as total_rare_runs,
+                    SUM(boundaries) as total_boundaries,
+                    COUNT(DISTINCT shot) as rare_shots_used
+                FROM player_shot_agg
+                GROUP BY player
+            )
+            SELECT 
+                psa.player,
+                ppt.team,
+                psa.shot,
+                psa.balls,
+                psa.runs,
+                psa.boundaries,
+                ROUND((psa.runs * 100.0 / NULLIF(psa.balls, 0))::numeric, 2) as strike_rate,
+                pt.total_rare_balls,
+                pt.total_rare_runs,
+                pt.rare_shots_used
+            FROM player_shot_agg psa
+            JOIN player_totals pt ON psa.player = pt.player
+            JOIN player_primary_team ppt ON psa.player = ppt.player
+            ORDER BY psa.player, psa.balls DESC
+        """)
+        
+        results = db.execute(query, params).fetchall()
+        
+        from collections import defaultdict
+        player_data = defaultdict(lambda: {
+            "shots": {},
+            "total_rare_balls": 0,
+            "total_rare_runs": 0,
+            "team": None,
+            "rare_shots_used": 0
+        })
+        
+        for row in results:
+            player = row.player
+            player_data[player]["shots"][row.shot] = {
+                "shot": row.shot,
+                "balls": row.balls,
+                "runs": row.runs,
+                "boundaries": row.boundaries,
+                "strike_rate": float(row.strike_rate) if row.strike_rate else 0
+            }
+            player_data[player]["total_rare_balls"] = row.total_rare_balls
+            player_data[player]["total_rare_runs"] = row.total_rare_runs
+            player_data[player]["team"] = row.team
+            player_data[player]["rare_shots_used"] = row.rare_shots_used
+        
+        players_list = []
+        for player, data in player_data.items():
+            overall_sr = round((data["total_rare_runs"] * 100 / data["total_rare_balls"]), 2) if data["total_rare_balls"] > 0 else 0
+            
+            # Best shot = highest SR with min 5 balls
+            best_shot = None
+            best_sr = 0
+            for shot_name, shot_data in data["shots"].items():
+                if shot_data["balls"] >= 5 and shot_data["strike_rate"] > best_sr:
+                    best_sr = shot_data["strike_rate"]
+                    best_shot = shot_name
+            
+            shot_breakdown = list(data["shots"].values())
+            shot_breakdown.sort(key=lambda x: x["balls"], reverse=True)
+            
+            players_list.append({
+                "name": player,
+                "team": data["team"],
+                "total_rare_balls": data["total_rare_balls"],
+                "total_rare_runs": data["total_rare_runs"],
+                "overall_rare_sr": overall_sr,
+                "rare_shots_used": data["rare_shots_used"],
+                "best_shot": best_shot,
+                "best_shot_sr": best_sr,
+                "shot_breakdown": shot_breakdown
+            })
+        
+        # Sort by total rare runs (volume + quality)
+        players_list.sort(key=lambda x: x['total_rare_runs'], reverse=True)
+        
+        return {
+            "card_id": "rare_shot_specialists",
+            "card_title": "Rare Shot Artists",
+            "card_subtitle": f"Masters of unconventional shots (min {min_plays} plays)",
+            "visualization_type": "shot_showcase",
+            "rare_shots": rare_shots,
+            "shot_labels": {
+                "REVERSE_SCOOP": "Rev Scoop",
+                "REVERSE_PULL": "Rev Pull",
+                "LATE_CUT": "Late Cut",
+                "PADDLE_SWEEP": "Paddle",
+                "RAMP": "Ramp",
+                "HOOK": "Hook",
+                "UPPER_CUT": "Upper Cut"
+            },
+            "players": players_list[:15],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter,shot"
             }
         }

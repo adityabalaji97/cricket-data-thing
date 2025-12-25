@@ -182,6 +182,12 @@ def get_wrapped_metadata():
                 "title": "Length Masters",
                 "subtitle": "Versatile scorers across all lengths",
                 "order": 13
+            },
+            {
+                "id": "rare_shot_specialists",
+                "title": "Rare Shot Artists",
+                "subtitle": "Masters of unconventional shots",
+                "order": 14
             }
         ]
     }
