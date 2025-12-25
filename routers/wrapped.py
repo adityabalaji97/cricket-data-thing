@@ -188,6 +188,12 @@ def get_wrapped_metadata():
                 "title": "Rare Shot Artists",
                 "subtitle": "Masters of unconventional shots",
                 "order": 14
+            },
+            {
+                "id": "bowler_type_dominance",
+                "title": "Pace vs Spin",
+                "subtitle": "The bowling arms race",
+                "order": 15
             }
         ]
     }

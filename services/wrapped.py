@@ -220,6 +220,13 @@ class WrappedService:
             logger.error(f"Error fetching rare shot specialists: {e}")
             cards.append({"card_id": "rare_shot_specialists", "error": str(e)})
         
+        # Card 15: Bowler Type Dominance (NEW - uses delivery_details bowl_kind/bowl_style)
+        try:
+            cards.append(self.get_bowler_type_dominance_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
+        except Exception as e:
+            logger.error(f"Error fetching bowler type dominance: {e}")
+            cards.append({"card_id": "bowler_type_dominance", "error": str(e)})
+        
         return {
             "year": 2025,
             "date_range": {"start": start_date, "end": end_date},
@@ -258,6 +265,7 @@ class WrappedService:
             "batter_hand_breakdown": self.get_batter_hand_breakdown_data,
             "length_masters": self.get_length_masters_data,
             "rare_shot_specialists": self.get_rare_shot_specialists_data,
+            "bowler_type_dominance": self.get_bowler_type_dominance_data,
         }
         
         if card_id not in card_methods:
@@ -1194,17 +1202,16 @@ class WrappedService:
             "min_balls": min_balls
         }
         
-        # Add league filter for delivery_details
+        # Build league filter for delivery_details
+        # When no leagues specified and include_international is True, don't filter by competition
         league_filter = ""
-        if leagues:
+        if leagues and include_international:
+            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            params["leagues"] = leagues
+        elif leagues:
             league_filter = "AND dd.competition = ANY(:leagues)"
             params["leagues"] = leagues
-        
-        if include_international:
-            if leagues:
-                league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            else:
-                league_filter = ""  # Include all
+        # else: no filter needed - include all data
         
         query = text(f"""
             WITH player_stats AS (
@@ -1341,17 +1348,16 @@ class WrappedService:
             "min_balls": min_balls
         }
         
-        # Add league filter for delivery_details
+        # Build league filter for delivery_details
+        # When no leagues specified and include_international is True, don't filter by competition
         league_filter = ""
-        if leagues:
+        if leagues and include_international:
+            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            params["leagues"] = leagues
+        elif leagues:
             league_filter = "AND dd.competition = ANY(:leagues)"
             params["leagues"] = leagues
-        
-        if include_international:
-            if leagues:
-                league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            else:
-                league_filter = ""  # Include all
+        # else: no filter needed - include all data
         
         # Query zones 1-8 (zone 0 is dots/no shot data)
         query = text(f"""
@@ -1547,17 +1553,16 @@ class WrappedService:
             "min_balls": min_balls
         }
         
-        # Add league filter for delivery_details
+        # Build league filter for delivery_details
+        # When no leagues specified and include_international is True, don't filter by competition
         league_filter = ""
-        if leagues:
+        if leagues and include_international:
+            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            params["leagues"] = leagues
+        elif leagues:
             league_filter = "AND dd.competition = ANY(:leagues)"
             params["leagues"] = leagues
-        
-        if include_international:
-            if leagues:
-                league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            else:
-                league_filter = ""  # Include all
+        # else: no filter needed - include all data
         
         # Query 1: Overall stats by bat_hand
         hand_query = text(f"""
@@ -1749,16 +1754,16 @@ class WrappedService:
             "min_balls": min_balls
         }
         
+        # Build league filter for delivery_details
+        # When no leagues specified and include_international is True, don't filter by competition
         league_filter = ""
-        if leagues:
+        if leagues and include_international:
+            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            params["leagues"] = leagues
+        elif leagues:
             league_filter = "AND dd.competition = ANY(:leagues)"
             params["leagues"] = leagues
-        
-        if include_international:
-            if leagues:
-                league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            else:
-                league_filter = ""
+        # else: no filter needed - include all data
         
         query = text(f"""
             WITH length_stats AS (
@@ -1932,16 +1937,16 @@ class WrappedService:
             "min_plays": min_plays
         }
         
+        # Build league filter for delivery_details
+        # When no leagues specified and include_international is True, don't filter by competition
         league_filter = ""
-        if leagues:
+        if leagues and include_international:
+            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            params["leagues"] = leagues
+        elif leagues:
             league_filter = "AND dd.competition = ANY(:leagues)"
             params["leagues"] = leagues
-        
-        if include_international:
-            if leagues:
-                league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
-            else:
-                league_filter = ""
+        # else: no filter needed - include all data
         
         # Rare shots (bottom ~30% by frequency from data exploration)
         rare_shots = ['REVERSE_SCOOP', 'REVERSE_PULL', 'LATE_CUT', 'PADDLE_SWEEP', 'RAMP', 'HOOK', 'UPPER_CUT']
@@ -2075,5 +2080,233 @@ class WrappedService:
             "players": players_list[:15],
             "deep_links": {
                 "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter,shot"
+            }
+        }
+
+    # ========================================================================
+    # CARD 15: BOWLER TYPE DOMINANCE
+    # ========================================================================
+    
+    def get_bowler_type_dominance_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_balls: int = 200,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 15: Bowler Type Dominance - Pace vs Spin breakdown with style analysis."""
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        # Build league filter for delivery_details
+        league_filter = ""
+        if leagues and include_international:
+            league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            params["leagues"] = leagues
+        elif leagues:
+            league_filter = "AND dd.competition = ANY(:leagues)"
+            params["leagues"] = leagues
+        # else: no filter needed - include all data
+        
+        # Query 1: Overall pace vs spin stats
+        kind_query = text(f"""
+            SELECT 
+                dd.bowl_kind,
+                COUNT(*) as balls,
+                SUM(dd.score) as runs,
+                SUM(CASE WHEN dd.out = '1' OR dd.out = 'True' THEN 1 ELSE 0 END) as wickets,
+                SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+            FROM delivery_details dd
+            WHERE dd.year >= :start_year
+            AND dd.year <= :end_year
+            AND dd.bowl_kind IN ('pace bowler', 'spin bowler')
+            {league_filter}
+            GROUP BY dd.bowl_kind
+        """)
+        
+        kind_results = db.execute(kind_query, params).fetchall()
+        
+        kind_stats = {}
+        for row in kind_results:
+            kind = 'pace' if row.bowl_kind == 'pace bowler' else 'spin'
+            kind_stats[kind] = {
+                "kind": kind,
+                "balls": row.balls,
+                "runs": row.runs,
+                "wickets": row.wickets,
+                "economy": round((row.runs * 6 / row.balls), 2) if row.balls > 0 else 0,
+                "strike_rate": round((row.balls / row.wickets), 2) if row.wickets > 0 else 999,
+                "dot_pct": round((row.dots * 100 / row.balls), 2) if row.balls > 0 else 0,
+                "boundary_pct": round((row.boundaries * 100 / row.balls), 2) if row.balls > 0 else 0
+            }
+        
+        # Query 2: Stats by bowling style
+        style_query = text(f"""
+            SELECT 
+                dd.bowl_style,
+                dd.bowl_kind,
+                COUNT(*) as balls,
+                SUM(dd.score) as runs,
+                SUM(CASE WHEN dd.out = '1' OR dd.out = 'True' THEN 1 ELSE 0 END) as wickets,
+                SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots
+            FROM delivery_details dd
+            WHERE dd.year >= :start_year
+            AND dd.year <= :end_year
+            AND dd.bowl_style IS NOT NULL
+            AND dd.bowl_kind IN ('pace bowler', 'spin bowler')
+            {league_filter}
+            GROUP BY dd.bowl_style, dd.bowl_kind
+            HAVING COUNT(*) >= 500
+            ORDER BY COUNT(*) DESC
+        """)
+        
+        style_results = db.execute(style_query, params).fetchall()
+        
+        # Style labels
+        style_labels = {
+            'RF': 'Right Fast',
+            'RFM': 'Right Fast-Medium',
+            'RMF': 'Right Medium-Fast',
+            'RM': 'Right Medium',
+            'LF': 'Left Fast',
+            'LFM': 'Left Fast-Medium',
+            'LMF': 'Left Medium-Fast',
+            'LM': 'Left Medium',
+            'OB': 'Off Break',
+            'LB': 'Leg Break',
+            'LBG': 'Leg Break Googly',
+            'SLA': 'Slow Left Arm',
+            'LWS': 'Left Wrist Spin'
+        }
+        
+        style_stats = []
+        for row in style_results:
+            kind = 'pace' if row.bowl_kind == 'pace bowler' else 'spin'
+            style_stats.append({
+                "style": row.bowl_style,
+                "label": style_labels.get(row.bowl_style, row.bowl_style),
+                "kind": kind,
+                "balls": row.balls,
+                "runs": row.runs,
+                "wickets": row.wickets,
+                "economy": round((row.runs * 6 / row.balls), 2) if row.balls > 0 else 0,
+                "strike_rate": round((row.balls / row.wickets), 2) if row.wickets > 0 else 999,
+                "dot_pct": round((row.dots * 100 / row.balls), 2) if row.balls > 0 else 0
+            })
+        
+        # Query 3: Top bowlers by kind
+        top_pace_query = text(f"""
+            WITH bowler_stats AS (
+                SELECT 
+                    dd.bowl as player,
+                    dd.team_bowl as team,
+                    COUNT(*) as balls,
+                    SUM(dd.score) as runs,
+                    SUM(CASE WHEN dd.out = '1' OR dd.out = 'True' THEN 1 ELSE 0 END) as wickets
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bowl_kind = 'pace bowler'
+                {league_filter}
+                GROUP BY dd.bowl, dd.team_bowl
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM bowler_stats
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT player, SUM(balls) as balls, SUM(runs) as runs, SUM(wickets) as wickets
+                FROM bowler_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT pt.player, ppt.team, pt.balls, pt.runs, pt.wickets,
+                   ROUND((pt.runs * 6.0 / pt.balls)::numeric, 2) as economy,
+                   ROUND((pt.balls::numeric / NULLIF(pt.wickets, 0)), 2) as strike_rate
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY pt.wickets DESC, economy ASC
+            LIMIT 5
+        """)
+        
+        top_spin_query = text(f"""
+            WITH bowler_stats AS (
+                SELECT 
+                    dd.bowl as player,
+                    dd.team_bowl as team,
+                    COUNT(*) as balls,
+                    SUM(dd.score) as runs,
+                    SUM(CASE WHEN dd.out = '1' OR dd.out = 'True' THEN 1 ELSE 0 END) as wickets
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bowl_kind = 'spin bowler'
+                {league_filter}
+                GROUP BY dd.bowl, dd.team_bowl
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM bowler_stats
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT player, SUM(balls) as balls, SUM(runs) as runs, SUM(wickets) as wickets
+                FROM bowler_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT pt.player, ppt.team, pt.balls, pt.runs, pt.wickets,
+                   ROUND((pt.runs * 6.0 / pt.balls)::numeric, 2) as economy,
+                   ROUND((pt.balls::numeric / NULLIF(pt.wickets, 0)), 2) as strike_rate
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY pt.wickets DESC, economy ASC
+            LIMIT 5
+        """)
+        
+        top_pace = db.execute(top_pace_query, params).fetchall()
+        top_spin = db.execute(top_spin_query, params).fetchall()
+        
+        return {
+            "card_id": "bowler_type_dominance",
+            "card_title": "Pace vs Spin",
+            "card_subtitle": f"The bowling arms race (min {min_balls} balls)",
+            "visualization_type": "treemap_with_leaders",
+            "kind_stats": kind_stats,
+            "style_stats": style_stats[:10],  # Top 10 styles by volume
+            "style_labels": style_labels,
+            "top_pace": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "balls": row.balls,
+                    "wickets": row.wickets,
+                    "economy": float(row.economy) if row.economy else 0,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 999
+                }
+                for row in top_pace
+            ],
+            "top_spin": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "balls": row.balls,
+                    "wickets": row.wickets,
+                    "economy": float(row.economy) if row.economy else 0,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 999
+                }
+                for row in top_spin
+            ],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bowler,bowl_kind&min_balls={min_balls}"
             }
         }

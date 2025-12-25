@@ -88,7 +88,7 @@ const ThreeSixtyBattersCard = ({ data }) => {
   const [selectedPlayer, setSelectedPlayer] = useState(0);
 
   if (!data.players || data.players.length === 0) {
-    return <Typography>No 360° batters data available</Typography>;
+    return <Typography sx={{ color: '#fff' }}>No 360° batters data available</Typography>;
   }
 
   const handlePlayerClick = (player) => {
@@ -112,7 +112,7 @@ const ThreeSixtyBattersCard = ({ data }) => {
             sx={{ cursor: 'pointer' }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Typography variant="h6">{currentPlayer.name}</Typography>
+              <Typography variant="h6" sx={{ color: '#fff' }}>{currentPlayer.name}</Typography>
               <TeamBadge team={currentPlayer.team} />
             </Box>
             
@@ -128,10 +128,10 @@ const ThreeSixtyBattersCard = ({ data }) => {
             </Typography>
             
             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 1 }}>
-              <Typography variant="caption">
+              <Typography variant="caption" sx={{ color: '#fff' }}>
                 SR: <strong>{currentPlayer.strike_rate}</strong>
               </Typography>
-              <Typography variant="caption">
+              <Typography variant="caption" sx={{ color: '#fff' }}>
                 Zones: <strong>{currentPlayer.zones_used}/8</strong>
               </Typography>
             </Box>
@@ -181,10 +181,10 @@ const ThreeSixtyBattersCard = ({ data }) => {
       }}>
         {currentPlayer?.zone_breakdown?.map(zone => (
           <Box key={zone.zone} sx={{ textAlign: 'center' }}>
-            <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold' }}>
+            <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: '#fff' }}>
               {zone.run_pct.toFixed(1)}%
             </Typography>
-            <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>
+            <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.6)' }}>
               {data.zone_labels?.[zone.zone] || `Zone ${zone.zone}`}
             </Typography>
           </Box>

@@ -12,3 +12,4 @@ export { default as ThreeSixtyBattersCard } from './ThreeSixtyBattersCard';
 export { default as BatterHandBreakdownCard } from './BatterHandBreakdownCard';
 export { default as LengthMastersCard } from './LengthMastersCard';
 export { default as RareShotSpecialistsCard } from './RareShotSpecialistsCard';
+export { default as BowlerTypeDominanceCard } from './BowlerTypeDominanceCard';

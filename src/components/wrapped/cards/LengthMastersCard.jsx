@@ -6,7 +6,7 @@ const LengthMastersCard = ({ data }) => {
   const [selectedPlayer, setSelectedPlayer] = useState(0);
 
   if (!data.players || data.players.length === 0) {
-    return <Typography>No length masters data available</Typography>;
+    return <Typography sx={{ color: '#fff' }}>No length masters data available</Typography>;
   }
 
   const handlePlayerClick = (player) => {
@@ -27,6 +27,12 @@ const LengthMastersCard = ({ data }) => {
     return 'rgba(255,255,255,0.1)';
   };
 
+  // Text color based on background
+  const getTextColor = (sr) => {
+    if (sr >= 80 && sr < 120) return '#000';  // Dark text on yellow/light green
+    return '#fff';
+  };
+
   return (
     <Box className="table-card-content">
       {/* Hero - Selected Player */}
@@ -40,7 +46,7 @@ const LengthMastersCard = ({ data }) => {
             sx={{ cursor: 'pointer' }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Typography variant="h6">{currentPlayer.name}</Typography>
+              <Typography variant="h6" sx={{ color: '#fff' }}>{currentPlayer.name}</Typography>
               <TeamBadge team={currentPlayer.team} />
             </Box>
             
@@ -63,16 +69,16 @@ const LengthMastersCard = ({ data }) => {
                   p: 0.5,
                   borderRadius: 1,
                   bgcolor: getSRColor(len.strike_rate),
-                  color: len.strike_rate >= 100 ? '#000' : '#fff'
+                  color: getTextColor(len.strike_rate)
                 }}
               >
-                <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.85rem' }}>
+                <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.85rem', color: 'inherit' }}>
                   {len.strike_rate > 0 ? len.strike_rate.toFixed(0) : '-'}
                 </Typography>
-                <Typography variant="caption" sx={{ fontSize: '0.55rem', display: 'block', lineHeight: 1.1 }}>
+                <Typography variant="caption" sx={{ fontSize: '0.55rem', display: 'block', lineHeight: 1.1, color: 'inherit' }}>
                   {data.length_labels?.[len.length] || len.length}
                 </Typography>
-                <Typography variant="caption" sx={{ fontSize: '0.5rem', opacity: 0.7 }}>
+                <Typography variant="caption" sx={{ fontSize: '0.5rem', opacity: 0.7, color: 'inherit' }}>
                   {len.balls}b
                 </Typography>
               </Box>
@@ -80,10 +86,10 @@ const LengthMastersCard = ({ data }) => {
           </Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 1.5 }}>
-            <Typography variant="caption">
+            <Typography variant="caption" sx={{ color: '#fff' }}>
               Overall SR: <strong>{currentPlayer.overall_sr}</strong>
             </Typography>
-            <Typography variant="caption">
+            <Typography variant="caption" sx={{ color: '#fff' }}>
               {currentPlayer.total_balls} balls
             </Typography>
           </Box>
@@ -133,7 +139,7 @@ const LengthMastersCard = ({ data }) => {
         ].map(({ color, label }) => (
           <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
             <Box sx={{ width: 10, height: 10, bgcolor: color, borderRadius: 0.5 }} />
-            <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{label}</Typography>
+            <Typography variant="caption" sx={{ fontSize: '0.6rem', color: '#fff' }}>{label}</Typography>
           </Box>
         ))}
       </Box>

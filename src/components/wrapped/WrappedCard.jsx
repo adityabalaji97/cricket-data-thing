@@ -17,6 +17,7 @@ import ThreeSixtyBattersCard from './cards/ThreeSixtyBattersCard';
 import BatterHandBreakdownCard from './cards/BatterHandBreakdownCard';
 import LengthMastersCard from './cards/LengthMastersCard';
 import RareShotSpecialistsCard from './cards/RareShotSpecialistsCard';
+import BowlerTypeDominanceCard from './cards/BowlerTypeDominanceCard';
 import './wrapped.css';
 
 // Map card IDs to their specific visualization components
@@ -35,6 +36,7 @@ const cardComponents = {
   'batter_hand_breakdown': BatterHandBreakdownCard,
   'length_masters': LengthMastersCard,
   'rare_shot_specialists': RareShotSpecialistsCard,
+  'bowler_type_dominance': BowlerTypeDominanceCard,
 };
 
 const WrappedCard = forwardRef(({ cardData, cardIndex, totalCards, onShareImage, isSharing }, ref) => {

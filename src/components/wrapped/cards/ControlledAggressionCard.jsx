@@ -4,7 +4,7 @@ import TeamBadge from '../TeamBadge';
 
 const ControlledAggressionCard = ({ data }) => {
   if (!data.players || data.players.length === 0) {
-    return <Typography>No controlled aggression data available</Typography>;
+    return <Typography sx={{ color: '#fff' }}>No controlled aggression data available</Typography>;
   }
 
   const handlePlayerClick = (player) => {
@@ -30,7 +30,7 @@ const ControlledAggressionCard = ({ data }) => {
           transition: 'width 0.5s ease'
         }} />
       </Box>
-      <Typography variant="caption" sx={{ width: 40, textAlign: 'right' }}>
+      <Typography variant="caption" sx={{ width: 40, textAlign: 'right', color: '#fff' }}>
         {value.toFixed(1)}
       </Typography>
     </Box>
@@ -46,12 +46,12 @@ const ControlledAggressionCard = ({ data }) => {
             e.stopPropagation();
             handlePlayerClick(topPlayers[0]);
           }}
-          sx={{ mb: 2, p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2 }}
+          sx={{ mb: 2, p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2, cursor: 'pointer' }}
         >
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="h6">👑</Typography>
-              <Typography variant="h6">{topPlayers[0].name}</Typography>
+              <Typography variant="h6" sx={{ color: '#fff' }}>👑</Typography>
+              <Typography variant="h6" sx={{ color: '#fff' }}>{topPlayers[0].name}</Typography>
               <TeamBadge team={topPlayers[0].team} />
             </Box>
             <Typography variant="h4" sx={{ color: '#1DB954', fontWeight: 'bold' }}>
@@ -82,6 +82,7 @@ const ControlledAggressionCard = ({ data }) => {
               alignItems: 'center',
               p: 1,
               borderRadius: 1,
+              cursor: 'pointer',
               '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }
             }}
           >
@@ -89,7 +90,7 @@ const ControlledAggressionCard = ({ data }) => {
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', width: 20 }}>
                 #{index + 2}
               </Typography>
-              <Typography variant="body2">{player.name}</Typography>
+              <Typography variant="body2" sx={{ color: '#fff' }}>{player.name}</Typography>
               <TeamBadge team={player.team} />
             </Box>
             <Typography variant="body1" sx={{ color: '#1DB954', fontWeight: 'bold' }}>

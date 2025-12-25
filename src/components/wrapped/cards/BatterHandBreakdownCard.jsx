@@ -4,7 +4,7 @@ import TeamBadge from '../TeamBadge';
 
 const BatterHandBreakdownCard = ({ data }) => {
   if (!data.hand_stats || Object.keys(data.hand_stats).length === 0) {
-    return <Typography>No batter hand data available</Typography>;
+    return <Typography sx={{ color: '#fff' }}>No batter hand data available</Typography>;
   }
 
   const handlePlayerClick = (player) => {
@@ -45,7 +45,7 @@ const BatterHandBreakdownCard = ({ data }) => {
           </Typography>
           {lhb && (
             <>
-              <Typography variant="h4" sx={{ fontWeight: 'bold', my: 1 }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', my: 1, color: '#fff' }}>
                 {lhb.strike_rate}
               </Typography>
               <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.7)' }}>
@@ -75,7 +75,7 @@ const BatterHandBreakdownCard = ({ data }) => {
           </Typography>
           {rhb && (
             <>
-              <Typography variant="h4" sx={{ fontWeight: 'bold', my: 1 }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', my: 1, color: '#fff' }}>
                 {rhb.strike_rate}
               </Typography>
               <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.7)' }}>
@@ -119,7 +119,7 @@ const BatterHandBreakdownCard = ({ data }) => {
                   {combo.combo === 'Mixed' ? '🫲🫱' : 
                    combo.combo === 'LHB_LHB' ? '🫲🫲' : '🫱🫱'}
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#fff' }}>
                   {combo.strike_rate}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem' }}>
@@ -162,12 +162,13 @@ const BatterHandBreakdownCard = ({ data }) => {
                   maxWidth: 80, 
                   overflow: 'hidden', 
                   textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  color: '#fff'
                 }}>
                   {player.name}
                 </Typography>
               </Box>
-              <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+              <Typography variant="caption" sx={{ fontWeight: 'bold', color: '#fff' }}>
                 {player.strike_rate}
               </Typography>
             </Box>
@@ -203,12 +204,13 @@ const BatterHandBreakdownCard = ({ data }) => {
                   maxWidth: 80, 
                   overflow: 'hidden', 
                   textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  color: '#fff'
                 }}>
                   {player.name}
                 </Typography>
               </Box>
-              <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+              <Typography variant="caption" sx={{ fontWeight: 'bold', color: '#fff' }}>
                 {player.strike_rate}
               </Typography>
             </Box>
