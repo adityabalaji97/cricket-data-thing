@@ -20,8 +20,8 @@ const NeedleMoversCard = ({ data }) => {
   };
 
   const maxImpact = Math.max(
-    ...positive_impact.map(p => Math.abs(p.runs_above_expected || 0)),
-    ...negative_impact.map(p => Math.abs(p.runs_above_expected || 0)),
+    ...positive_impact.map(p => Math.abs(p.pred_score_impact || 0)),
+    ...negative_impact.map(p => Math.abs(p.pred_score_impact || 0)),
     1
   );
 
@@ -52,7 +52,7 @@ const NeedleMoversCard = ({ data }) => {
         </Box>
 
         {positive_impact.slice(0, 5).map((player, idx) => {
-          const barWidth = (Math.abs(player.runs_above_expected) / maxImpact) * 100;
+          const barWidth = (Math.abs(player.pred_score_impact) / maxImpact) * 100;
           
           return (
             <Box 
@@ -74,7 +74,7 @@ const NeedleMoversCard = ({ data }) => {
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ color: '#4ECDC4', fontWeight: 700 }}>
-                  +{player.runs_above_expected?.toFixed(0)}
+                  +{player.pred_score_impact?.toFixed(0)}
                 </Typography>
               </Box>
               
@@ -103,7 +103,7 @@ const NeedleMoversCard = ({ data }) => {
           </Box>
 
           {negative_impact.slice(0, 3).map((player, idx) => {
-            const barWidth = (Math.abs(player.runs_above_expected) / maxImpact) * 100;
+            const barWidth = (Math.abs(player.pred_score_impact) / maxImpact) * 100;
             
             return (
               <Box 
@@ -125,7 +125,7 @@ const NeedleMoversCard = ({ data }) => {
                     </Typography>
                   </Box>
                   <Typography variant="body2" sx={{ color: '#FF6B6B', fontWeight: 700 }}>
-                    {player.runs_above_expected?.toFixed(0)}
+                  {player.pred_score_impact?.toFixed(0)}
                   </Typography>
                 </Box>
                 
@@ -152,7 +152,7 @@ const NeedleMoversCard = ({ data }) => {
         textAlign: 'center'
       }}>
         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-          Runs above/below predicted score (xRuns) based on match situation
+          Total predicted score impact (per-ball delta sum)
         </Typography>
       </Box>
     </Box>

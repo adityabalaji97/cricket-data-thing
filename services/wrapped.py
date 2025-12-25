@@ -2437,7 +2437,7 @@ class WrappedService:
         }
 
     # ========================================================================
-    # CARD 17: NEEDLE MOVERS (pred_score impact)
+    # CARD 17: NEEDLE MOVERS (pred_score per-ball delta impact)
     # ========================================================================
     
     def get_needle_movers_data(
@@ -2450,7 +2450,15 @@ class WrappedService:
         min_balls: int = 100,
         top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Card 17: Needle Movers - Who scored more than expected (pred_score analysis)."""
+        """Card 17: Needle Movers - Who moved pred_score the most (per-ball delta).
+        
+        For each ball faced by a batter:
+          delta = next_pred_score - current_pred_score
+        
+        This measures how much the predicted final score changed after each delivery.
+        Positive delta = batter increased the predicted score (good for batting team).
+        Sum of deltas across all balls = total impact on predicted score.
+        """
         
         params = {
             "start_year": int(start_date[:4]),
@@ -2458,39 +2466,55 @@ class WrappedService:
             "min_balls": min_balls
         }
         
-        # Note: pred_score = -1 means no data available for that ball
+        # Per-ball delta approach: calculate pred_score change for each delivery
         query = text(f"""
-            WITH player_impact AS (
+            WITH ball_deltas AS (
                 SELECT 
                     dd.bat as player,
                     dd.team_bat as team,
-                    COUNT(*) as balls,
-                    SUM(dd.batruns) as actual_runs,
-                    SUM(dd.pred_score) as expected_runs,
-                    SUM(dd.batruns - dd.pred_score) as runs_above_expected,
-                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+                    dd.p_match,
+                    dd.inns,
+                    dd.ball_id,
+                    dd.batruns,
+                    dd.pred_score,
+                    LEAD(dd.pred_score) OVER (
+                        PARTITION BY dd.p_match, dd.inns 
+                        ORDER BY dd.ball_id
+                    ) as next_pred_score
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
                 AND dd.pred_score IS NOT NULL
                 AND dd.pred_score != -1
                 AND dd.bat_hand IN ('LHB', 'RHB')
-                GROUP BY dd.bat, dd.team_bat
+            ),
+            player_ball_impact AS (
+                SELECT 
+                    player,
+                    team,
+                    COUNT(*) as balls,
+                    SUM(batruns) as runs,
+                    SUM(CASE 
+                        WHEN next_pred_score IS NOT NULL AND next_pred_score != -1 
+                        THEN next_pred_score - pred_score 
+                        ELSE 0 
+                    END) as total_pred_delta
+                FROM ball_deltas
+                WHERE next_pred_score IS NOT NULL AND next_pred_score != -1
+                GROUP BY player, team
             ),
             player_primary_team AS (
                 SELECT DISTINCT ON (player) player, team
-                FROM player_impact
+                FROM player_ball_impact
                 ORDER BY player, balls DESC
             ),
             player_totals AS (
                 SELECT 
                     player,
                     SUM(balls) as balls,
-                    SUM(actual_runs) as actual_runs,
-                    SUM(expected_runs) as expected_runs,
-                    SUM(runs_above_expected) as runs_above_expected,
-                    SUM(boundaries) as boundaries
-                FROM player_impact
+                    SUM(runs) as runs,
+                    SUM(total_pred_delta) as total_pred_delta
+                FROM player_ball_impact
                 GROUP BY player
                 HAVING SUM(balls) >= :min_balls
             )
@@ -2498,54 +2522,70 @@ class WrappedService:
                 pt.player,
                 ppt.team,
                 pt.balls,
-                pt.actual_runs,
-                ROUND(pt.expected_runs::numeric, 1) as expected_runs,
-                ROUND(pt.runs_above_expected::numeric, 1) as runs_above_expected,
-                ROUND((pt.runs_above_expected / pt.balls * 100)::numeric, 2) as impact_per_100_balls,
-                ROUND((pt.actual_runs * 100.0 / pt.balls)::numeric, 2) as strike_rate,
-                ROUND((pt.expected_runs * 100.0 / pt.balls)::numeric, 2) as expected_sr
+                pt.runs,
+                ROUND(pt.total_pred_delta::numeric, 1) as pred_score_impact,
+                ROUND((pt.total_pred_delta / pt.balls)::numeric, 2) as impact_per_ball,
+                ROUND((pt.runs * 100.0 / pt.balls)::numeric, 2) as strike_rate
             FROM player_totals pt
             JOIN player_primary_team ppt ON pt.player = ppt.player
-            ORDER BY pt.runs_above_expected DESC
+            ORDER BY pt.total_pred_delta DESC
             LIMIT 20
         """)
         
         results = db.execute(query, params).fetchall()
         
         # Split into positive and negative impact
-        positive_impact = [r for r in results if r.runs_above_expected and r.runs_above_expected > 0][:7]
+        positive_impact = [r for r in results if r.pred_score_impact and r.pred_score_impact > 0][:7]
         
-        # Get bottom performers (below expected)
+        # Get bottom performers
         bottom_query = text(f"""
-            WITH player_impact AS (
+            WITH ball_deltas AS (
                 SELECT 
                     dd.bat as player,
                     dd.team_bat as team,
-                    COUNT(*) as balls,
-                    SUM(dd.batruns) as actual_runs,
-                    SUM(dd.pred_score) as expected_runs,
-                    SUM(dd.batruns - dd.pred_score) as runs_above_expected
+                    dd.p_match,
+                    dd.inns,
+                    dd.ball_id,
+                    dd.batruns,
+                    dd.pred_score,
+                    LEAD(dd.pred_score) OVER (
+                        PARTITION BY dd.p_match, dd.inns 
+                        ORDER BY dd.ball_id
+                    ) as next_pred_score
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
                 AND dd.pred_score IS NOT NULL
                 AND dd.pred_score != -1
                 AND dd.bat_hand IN ('LHB', 'RHB')
-                GROUP BY dd.bat, dd.team_bat
+            ),
+            player_ball_impact AS (
+                SELECT 
+                    player,
+                    team,
+                    COUNT(*) as balls,
+                    SUM(batruns) as runs,
+                    SUM(CASE 
+                        WHEN next_pred_score IS NOT NULL AND next_pred_score != -1 
+                        THEN next_pred_score - pred_score 
+                        ELSE 0 
+                    END) as total_pred_delta
+                FROM ball_deltas
+                WHERE next_pred_score IS NOT NULL AND next_pred_score != -1
+                GROUP BY player, team
             ),
             player_primary_team AS (
                 SELECT DISTINCT ON (player) player, team
-                FROM player_impact
+                FROM player_ball_impact
                 ORDER BY player, balls DESC
             ),
             player_totals AS (
                 SELECT 
                     player,
                     SUM(balls) as balls,
-                    SUM(actual_runs) as actual_runs,
-                    SUM(expected_runs) as expected_runs,
-                    SUM(runs_above_expected) as runs_above_expected
-                FROM player_impact
+                    SUM(runs) as runs,
+                    SUM(total_pred_delta) as total_pred_delta
+                FROM player_ball_impact
                 GROUP BY player
                 HAVING SUM(balls) >= :min_balls
             )
@@ -2553,19 +2593,18 @@ class WrappedService:
                 pt.player,
                 ppt.team,
                 pt.balls,
-                pt.actual_runs,
-                ROUND(pt.expected_runs::numeric, 1) as expected_runs,
-                ROUND(pt.runs_above_expected::numeric, 1) as runs_above_expected,
-                ROUND((pt.actual_runs * 100.0 / pt.balls)::numeric, 2) as strike_rate,
-                ROUND((pt.expected_runs * 100.0 / pt.balls)::numeric, 2) as expected_sr
+                pt.runs,
+                ROUND(pt.total_pred_delta::numeric, 1) as pred_score_impact,
+                ROUND((pt.total_pred_delta / pt.balls)::numeric, 2) as impact_per_ball,
+                ROUND((pt.runs * 100.0 / pt.balls)::numeric, 2) as strike_rate
             FROM player_totals pt
             JOIN player_primary_team ppt ON pt.player = ppt.player
-            ORDER BY pt.runs_above_expected ASC
+            ORDER BY pt.total_pred_delta ASC
             LIMIT 5
         """)
         
         bottom_results = db.execute(bottom_query, params).fetchall()
-        negative_impact = [r for r in bottom_results if r.runs_above_expected and r.runs_above_expected < 0]
+        negative_impact = [r for r in bottom_results if r.pred_score_impact and r.pred_score_impact < 0]
         
         # Get coverage stats
         coverage_query = text(f"""
@@ -2583,20 +2622,19 @@ class WrappedService:
         return {
             "card_id": "needle_movers",
             "card_title": "Needle Movers",
-            "card_subtitle": f"Who outperformed expectations (min {min_balls} balls with pred_score)",
+            "card_subtitle": f"Who moved the predicted score most (min {min_balls} balls)",
             "visualization_type": "diverging_impact",
             "coverage_pct": coverage_pct,
-            "data_note": f"Based on {coverage_pct}% of deliveries with predictive scoring",
+            "data_note": f"Based on {coverage_pct}% of deliveries with pred_score data",
             "positive_impact": [
                 {
                     "name": row.player,
                     "team": row.team,
                     "balls": row.balls,
-                    "actual_runs": row.actual_runs,
-                    "expected_runs": float(row.expected_runs) if row.expected_runs else 0,
-                    "runs_above_expected": float(row.runs_above_expected) if row.runs_above_expected else 0,
-                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
-                    "expected_sr": float(row.expected_sr) if row.expected_sr else 0
+                    "runs": row.runs,
+                    "pred_score_impact": float(row.pred_score_impact) if row.pred_score_impact else 0,
+                    "impact_per_ball": float(row.impact_per_ball) if row.impact_per_ball else 0,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0
                 }
                 for row in positive_impact
             ],
@@ -2605,11 +2643,10 @@ class WrappedService:
                     "name": row.player,
                     "team": row.team,
                     "balls": row.balls,
-                    "actual_runs": row.actual_runs,
-                    "expected_runs": float(row.expected_runs) if row.expected_runs else 0,
-                    "runs_above_expected": float(row.runs_above_expected) if row.runs_above_expected else 0,
-                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
-                    "expected_sr": float(row.expected_sr) if row.expected_sr else 0
+                    "runs": row.runs,
+                    "pred_score_impact": float(row.pred_score_impact) if row.pred_score_impact else 0,
+                    "impact_per_ball": float(row.impact_per_ball) if row.impact_per_ball else 0,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0
                 }
                 for row in negative_impact
             ],
@@ -2619,7 +2656,7 @@ class WrappedService:
         }
 
     # ========================================================================
-    # CARD 18: CHASE MASTERS (win_prob impact)
+    # CARD 18: CHASE MASTERS (win_prob per-ball delta impact)
     # ========================================================================
     
     def get_chase_masters_data(
@@ -2632,7 +2669,17 @@ class WrappedService:
         min_balls: int = 50,
         top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Card 18: Chase Masters - Who moved win probability the most in chases."""
+        """Card 18: Chase Masters - Who moved win probability the most in chases.
+        
+        For each ball faced by a batter in 2nd innings:
+          delta = next_win_prob - current_win_prob
+        
+        This measures how much the batting team's win probability changed after each delivery.
+        Positive delta = batter improved team's chances of winning.
+        Sum of deltas = total win probability contribution.
+        
+        Note: win_prob is stored as percentage (0-100), so deltas are in percentage points.
+        """
         
         params = {
             "start_year": int(start_date[:4]),
@@ -2640,10 +2687,9 @@ class WrappedService:
             "min_balls": min_balls
         }
         
-        # Note: win_prob = -1 means no data available
-        # We only look at innings 2 (chases)
+        # Per-ball delta approach for win probability in chases
         query = text(f"""
-            WITH chase_impact AS (
+            WITH ball_deltas AS (
                 SELECT 
                     dd.bat as player,
                     dd.team_bat as team,
@@ -2651,7 +2697,10 @@ class WrappedService:
                     dd.ball_id,
                     dd.batruns,
                     dd.win_prob,
-                    LEAD(dd.win_prob) OVER (PARTITION BY dd.p_match ORDER BY dd.ball_id) as next_win_prob
+                    LEAD(dd.win_prob) OVER (
+                        PARTITION BY dd.p_match 
+                        ORDER BY dd.ball_id
+                    ) as next_win_prob
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
@@ -2660,22 +2709,25 @@ class WrappedService:
                 AND dd.win_prob != -1
                 AND dd.bat_hand IN ('LHB', 'RHB')
             ),
-            player_impact AS (
+            player_ball_impact AS (
                 SELECT 
                     player,
                     team,
                     COUNT(*) as balls,
                     SUM(batruns) as runs,
-                    SUM(CASE WHEN next_win_prob IS NOT NULL AND next_win_prob != -1 
-                        THEN next_win_prob - win_prob ELSE 0 END) as total_wp_change,
+                    SUM(CASE 
+                        WHEN next_win_prob IS NOT NULL AND next_win_prob != -1 
+                        THEN next_win_prob - win_prob 
+                        ELSE 0 
+                    END) as total_wp_delta,
                     AVG(win_prob) as avg_entry_wp
-                FROM chase_impact
+                FROM ball_deltas
                 WHERE next_win_prob IS NOT NULL AND next_win_prob != -1
                 GROUP BY player, team
             ),
             player_primary_team AS (
                 SELECT DISTINCT ON (player) player, team
-                FROM player_impact
+                FROM player_ball_impact
                 ORDER BY player, balls DESC
             ),
             player_totals AS (
@@ -2683,9 +2735,9 @@ class WrappedService:
                     player,
                     SUM(balls) as balls,
                     SUM(runs) as runs,
-                    SUM(total_wp_change) as total_wp_change,
+                    SUM(total_wp_delta) as total_wp_delta,
                     AVG(avg_entry_wp) as avg_entry_wp
-                FROM player_impact
+                FROM player_ball_impact
                 GROUP BY player
                 HAVING SUM(balls) >= :min_balls
             )
@@ -2694,13 +2746,13 @@ class WrappedService:
                 ppt.team,
                 pt.balls,
                 pt.runs,
-                ROUND((pt.total_wp_change * 100)::numeric, 2) as wp_change_pct,
-                ROUND((pt.total_wp_change * 100 / pt.balls)::numeric, 3) as wp_per_ball,
+                ROUND(pt.total_wp_delta::numeric, 2) as wp_change_pct,
+                ROUND((pt.total_wp_delta / pt.balls)::numeric, 3) as wp_per_ball,
                 ROUND((pt.runs * 100.0 / pt.balls)::numeric, 2) as strike_rate,
-                ROUND((pt.avg_entry_wp * 100)::numeric, 1) as avg_entry_wp_pct
+                ROUND(pt.avg_entry_wp::numeric, 1) as avg_entry_wp_pct
             FROM player_totals pt
             JOIN player_primary_team ppt ON pt.player = ppt.player
-            ORDER BY pt.total_wp_change DESC
+            ORDER BY pt.total_wp_delta DESC
             LIMIT 15
         """)
         
@@ -2711,7 +2763,7 @@ class WrappedService:
         
         # Get bottom performers
         bottom_query = text(f"""
-            WITH chase_impact AS (
+            WITH ball_deltas AS (
                 SELECT 
                     dd.bat as player,
                     dd.team_bat as team,
@@ -2719,7 +2771,10 @@ class WrappedService:
                     dd.ball_id,
                     dd.batruns,
                     dd.win_prob,
-                    LEAD(dd.win_prob) OVER (PARTITION BY dd.p_match ORDER BY dd.ball_id) as next_win_prob
+                    LEAD(dd.win_prob) OVER (
+                        PARTITION BY dd.p_match 
+                        ORDER BY dd.ball_id
+                    ) as next_win_prob
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
@@ -2728,21 +2783,24 @@ class WrappedService:
                 AND dd.win_prob != -1
                 AND dd.bat_hand IN ('LHB', 'RHB')
             ),
-            player_impact AS (
+            player_ball_impact AS (
                 SELECT 
                     player,
                     team,
                     COUNT(*) as balls,
                     SUM(batruns) as runs,
-                    SUM(CASE WHEN next_win_prob IS NOT NULL AND next_win_prob != -1 
-                        THEN next_win_prob - win_prob ELSE 0 END) as total_wp_change
-                FROM chase_impact
+                    SUM(CASE 
+                        WHEN next_win_prob IS NOT NULL AND next_win_prob != -1 
+                        THEN next_win_prob - win_prob 
+                        ELSE 0 
+                    END) as total_wp_delta
+                FROM ball_deltas
                 WHERE next_win_prob IS NOT NULL AND next_win_prob != -1
                 GROUP BY player, team
             ),
             player_primary_team AS (
                 SELECT DISTINCT ON (player) player, team
-                FROM player_impact
+                FROM player_ball_impact
                 ORDER BY player, balls DESC
             ),
             player_totals AS (
@@ -2750,8 +2808,8 @@ class WrappedService:
                     player,
                     SUM(balls) as balls,
                     SUM(runs) as runs,
-                    SUM(total_wp_change) as total_wp_change
-                FROM player_impact
+                    SUM(total_wp_delta) as total_wp_delta
+                FROM player_ball_impact
                 GROUP BY player
                 HAVING SUM(balls) >= :min_balls
             )
@@ -2760,11 +2818,11 @@ class WrappedService:
                 ppt.team,
                 pt.balls,
                 pt.runs,
-                ROUND((pt.total_wp_change * 100)::numeric, 2) as wp_change_pct,
+                ROUND(pt.total_wp_delta::numeric, 2) as wp_change_pct,
                 ROUND((pt.runs * 100.0 / pt.balls)::numeric, 2) as strike_rate
             FROM player_totals pt
             JOIN player_primary_team ppt ON pt.player = ppt.player
-            ORDER BY pt.total_wp_change ASC
+            ORDER BY pt.total_wp_delta ASC
             LIMIT 5
         """)
         
