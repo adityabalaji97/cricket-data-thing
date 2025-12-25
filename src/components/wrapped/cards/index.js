@@ -5,6 +5,7 @@ export { default as DeathHittersCard } from './DeathHittersCard';
 export { default as PaceVsSpinCard } from './PaceVsSpinCard';
 export { default as PowerplayThievesCard } from './PowerplayThievesCard';
 export { default as NineteenthOverGodsCard } from './NineteenthOverGodsCard';
+export { default as MiddleOversSqueezeCard } from './MiddleOversSqueezeCard';
 export { default as EloMoversCard } from './EloMoversCard';
 export { default as VenueVibesCard } from './VenueVibesCard';
 export { default as ControlledAggressionCard } from './ControlledAggressionCard';

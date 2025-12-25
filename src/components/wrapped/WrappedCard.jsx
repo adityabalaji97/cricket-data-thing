@@ -10,6 +10,7 @@ import DeathHittersCard from './cards/DeathHittersCard';
 import PaceVsSpinCard from './cards/PaceVsSpinCard';
 import PowerplayThievesCard from './cards/PowerplayThievesCard';
 import NineteenthOverGodsCard from './cards/NineteenthOverGodsCard';
+import MiddleOversSqueezeCard from './cards/MiddleOversSqueezeCard';
 import EloMoversCard from './cards/EloMoversCard';
 import VenueVibesCard from './cards/VenueVibesCard';
 import ControlledAggressionCard from './cards/ControlledAggressionCard';
@@ -32,6 +33,7 @@ const cardComponents = {
   'pace_vs_spin': PaceVsSpinCard,
   'powerplay_thieves': PowerplayThievesCard,
   'nineteenth_over_gods': NineteenthOverGodsCard,
+  'middle_overs_squeeze': MiddleOversSqueezeCard,
   'elo_movers': EloMoversCard,
   'venue_vibes': VenueVibesCard,
   'controlled_aggression': ControlledAggressionCard,
