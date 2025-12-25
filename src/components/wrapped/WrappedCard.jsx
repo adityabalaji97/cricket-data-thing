@@ -15,6 +15,7 @@ import VenueVibesCard from './cards/VenueVibesCard';
 import ControlledAggressionCard from './cards/ControlledAggressionCard';
 import ThreeSixtyBattersCard from './cards/ThreeSixtyBattersCard';
 import BatterHandBreakdownCard from './cards/BatterHandBreakdownCard';
+import LengthMastersCard from './cards/LengthMastersCard';
 import './wrapped.css';
 
 // Map card IDs to their specific visualization components
@@ -31,6 +32,7 @@ const cardComponents = {
   'controlled_aggression': ControlledAggressionCard,
   '360_batters': ThreeSixtyBattersCard,
   'batter_hand_breakdown': BatterHandBreakdownCard,
+  'length_masters': LengthMastersCard,
 };
 
 const WrappedCard = forwardRef(({ cardData, cardIndex, totalCards, onShareImage, isSharing }, ref) => {

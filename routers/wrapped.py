@@ -176,6 +176,12 @@ def get_wrapped_metadata():
                 "title": "Left vs Right",
                 "subtitle": "Batting hand breakdown",
                 "order": 12
+            },
+            {
+                "id": "length_masters",
+                "title": "Length Masters",
+                "subtitle": "Versatile scorers across all lengths",
+                "order": 13
             }
         ]
     }

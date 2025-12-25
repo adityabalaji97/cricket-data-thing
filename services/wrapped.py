@@ -206,6 +206,13 @@ class WrappedService:
             logger.error(f"Error fetching batter hand breakdown: {e}")
             cards.append({"card_id": "batter_hand_breakdown", "error": str(e)})
         
+        # Card 13: Length Masters (NEW - uses delivery_details length)
+        try:
+            cards.append(self.get_length_masters_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
+        except Exception as e:
+            logger.error(f"Error fetching length masters: {e}")
+            cards.append({"card_id": "length_masters", "error": str(e)})
+        
         return {
             "year": 2025,
             "date_range": {"start": start_date, "end": end_date},
@@ -242,6 +249,7 @@ class WrappedService:
             "controlled_aggression": self.get_controlled_aggression_data,
             "360_batters": self.get_360_batters_data,
             "batter_hand_breakdown": self.get_batter_hand_breakdown_data,
+            "length_masters": self.get_length_masters_data,
         }
         
         if card_id not in card_methods:
@@ -1708,5 +1716,188 @@ class WrappedService:
             ],
             "deep_links": {
                 "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bat_hand&min_balls={min_balls}"
+            }
+        }
+
+    # ========================================================================
+    # CARD 13: LENGTH MASTERS
+    # ========================================================================
+    
+    def get_length_masters_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_balls: int = 150,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 13: Length Masters - batters who dominate across all bowling lengths."""
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        league_filter = ""
+        if leagues:
+            league_filter = "AND dd.competition = ANY(:leagues)"
+            params["leagues"] = leagues
+        
+        if include_international:
+            if leagues:
+                league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            else:
+                league_filter = ""
+        
+        query = text(f"""
+            WITH length_stats AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    dd.length,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.length IS NOT NULL
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                {league_filter}
+                GROUP BY dd.bat, dd.team_bat, dd.length
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM length_stats
+                ORDER BY player, SUM(balls) OVER (PARTITION BY player, team) DESC
+            ),
+            player_length_agg AS (
+                SELECT player, length, SUM(balls) as balls, SUM(runs) as runs
+                FROM length_stats
+                GROUP BY player, length
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as total_balls,
+                    SUM(runs) as total_runs,
+                    COUNT(DISTINCT length) as lengths_faced
+                FROM player_length_agg
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT 
+                pla.player,
+                ppt.team,
+                pla.length,
+                pla.balls,
+                pla.runs,
+                ROUND((pla.runs * 100.0 / NULLIF(pla.balls, 0))::numeric, 2) as strike_rate,
+                pt.total_balls,
+                pt.total_runs,
+                pt.lengths_faced
+            FROM player_length_agg pla
+            JOIN player_totals pt ON pla.player = pt.player
+            JOIN player_primary_team ppt ON pla.player = ppt.player
+            ORDER BY pla.player, pla.length
+        """)
+        
+        results = db.execute(query, params).fetchall()
+        
+        from collections import defaultdict
+        player_data = defaultdict(lambda: {
+            "lengths": {},
+            "total_runs": 0,
+            "total_balls": 0,
+            "team": None,
+            "lengths_faced": 0
+        })
+        
+        for row in results:
+            player = row.player
+            player_data[player]["lengths"][row.length] = {
+                "length": row.length,
+                "balls": row.balls,
+                "runs": row.runs,
+                "strike_rate": float(row.strike_rate) if row.strike_rate else 0
+            }
+            player_data[player]["total_runs"] = row.total_runs
+            player_data[player]["total_balls"] = row.total_balls
+            player_data[player]["team"] = row.team
+            player_data[player]["lengths_faced"] = row.lengths_faced
+        
+        # Length order and difficulty weights
+        length_order = ['YORKER', 'GOOD_LENGTH', 'SHORT_OF_A_GOOD_LENGTH', 'FULL', 'SHORT', 'FULL_TOSS']
+        # Weights: harder lengths worth more (yorker hardest, full toss easiest)
+        length_weights = {
+            'YORKER': 1.5,
+            'GOOD_LENGTH': 1.2,
+            'SHORT_OF_A_GOOD_LENGTH': 1.0,
+            'FULL': 0.9,
+            'SHORT': 0.8,
+            'FULL_TOSS': 0.7
+        }
+        
+        def calc_length_master_score(lengths_data, total_balls):
+            if total_balls < 50:
+                return 0
+            
+            weighted_sr_sum = 0
+            weight_sum = 0
+            
+            for length, weight in length_weights.items():
+                if length in lengths_data and lengths_data[length]['balls'] >= 10:
+                    sr = lengths_data[length]['strike_rate']
+                    weighted_sr_sum += sr * weight
+                    weight_sum += weight
+            
+            if weight_sum == 0:
+                return 0
+            
+            return round(weighted_sr_sum / weight_sum, 1)
+        
+        players_with_score = []
+        for player, data in player_data.items():
+            score = calc_length_master_score(data["lengths"], data["total_balls"])
+            
+            length_breakdown = []
+            for length in length_order:
+                if length in data["lengths"]:
+                    length_breakdown.append(data["lengths"][length])
+                else:
+                    length_breakdown.append({"length": length, "balls": 0, "runs": 0, "strike_rate": 0})
+            
+            players_with_score.append({
+                "name": player,
+                "team": data["team"],
+                "length_master_score": score,
+                "total_runs": data["total_runs"],
+                "total_balls": data["total_balls"],
+                "overall_sr": round((data["total_runs"] * 100 / data["total_balls"]), 2) if data["total_balls"] > 0 else 0,
+                "lengths_faced": data["lengths_faced"],
+                "length_breakdown": length_breakdown
+            })
+        
+        players_with_score.sort(key=lambda x: x['length_master_score'], reverse=True)
+        
+        return {
+            "card_id": "length_masters",
+            "card_title": "Length Masters",
+            "card_subtitle": f"Versatile scorers across all lengths (min {min_balls} balls)",
+            "visualization_type": "length_heatmap",
+            "length_order": length_order,
+            "length_labels": {
+                "YORKER": "Yorker",
+                "GOOD_LENGTH": "Good",
+                "SHORT_OF_A_GOOD_LENGTH": "Back of Length",
+                "FULL": "Full",
+                "SHORT": "Short",
+                "FULL_TOSS": "Full Toss"
+            },
+            "players": players_with_score[:15],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter,length&min_balls={min_balls}"
             }
         }

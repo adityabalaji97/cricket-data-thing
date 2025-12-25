@@ -10,3 +10,4 @@ export { default as VenueVibesCard } from './VenueVibesCard';
 export { default as ControlledAggressionCard } from './ControlledAggressionCard';
 export { default as ThreeSixtyBattersCard } from './ThreeSixtyBattersCard';
 export { default as BatterHandBreakdownCard } from './BatterHandBreakdownCard';
+export { default as LengthMastersCard } from './LengthMastersCard';
