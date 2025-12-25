@@ -3,10 +3,18 @@ import { Box, Typography } from '@mui/material';
 import TeamBadge from '../TeamBadge';
 
 // Simple wagon wheel SVG component
-const WagonWheel = ({ zoneBreakdown, size = 120 }) => {
+const WagonWheel = ({ zoneBreakdown, size = 120, isLHB = false }) => {
   const centerX = size / 2;
   const centerY = size / 2;
   const radius = size * 0.42;
+  
+  // LHB zone mirroring: swap leg side ↔ off side
+  // Zone mapping for LHB: 1↔8, 2↔7, 3↔6, 4↔5
+  const mirrorZone = (zone) => {
+    if (!isLHB) return zone;
+    const mirrorMap = { 1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1 };
+    return mirrorMap[zone] || zone;
+  };
   
   // Zone angles (8 zones, each 45 degrees, starting from fine leg)
   const zones = [
@@ -57,7 +65,9 @@ const WagonWheel = ({ zoneBreakdown, size = 120 }) => {
       
       {/* Zone segments */}
       {zones.map(({ zone, startAngle, endAngle }) => {
-        const zoneData = zoneBreakdown?.find(z => z.zone === zone);
+        // For LHB, look up data from mirrored zone
+        const dataZone = mirrorZone(zone);
+        const zoneData = zoneBreakdown?.find(z => z.zone === dataZone);
         const runPct = zoneData?.run_pct || 0;
         
         return (
@@ -114,10 +124,29 @@ const ThreeSixtyBattersCard = ({ data }) => {
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, mb: 1 }}>
               <Typography variant="h6" sx={{ color: '#fff' }}>{currentPlayer.name}</Typography>
               <TeamBadge team={currentPlayer.team} />
+              {currentPlayer.bat_hand === 'LHB' && (
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    bgcolor: 'rgba(255,255,255,0.15)', 
+                    px: 0.8, 
+                    py: 0.2, 
+                    borderRadius: 1,
+                    fontSize: '0.65rem',
+                    color: 'rgba(255,255,255,0.8)'
+                  }}
+                >
+                  LHB
+                </Typography>
+              )}
             </Box>
             
             <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
-              <WagonWheel zoneBreakdown={currentPlayer.zone_breakdown} size={140} />
+              <WagonWheel 
+                zoneBreakdown={currentPlayer.zone_breakdown} 
+                size={140} 
+                isLHB={currentPlayer.bat_hand === 'LHB'}
+              />
             </Box>
             
             <Typography variant="h3" sx={{ color: '#1DB954', fontWeight: 'bold' }}>

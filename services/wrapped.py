@@ -1714,6 +1714,7 @@ class WrappedService:
                 SELECT 
                     dd.bat as player,
                     dd.team_bat as team,
+                    dd.bat_hand,
                     dd.wagon_zone,
                     COUNT(*) as balls,
                     SUM(dd.batruns) as runs
@@ -1723,10 +1724,10 @@ class WrappedService:
                 AND dd.wagon_zone IS NOT NULL
                 AND dd.wagon_zone BETWEEN 1 AND 8
                 AND dd.bat_hand IN ('LHB', 'RHB')
-                GROUP BY dd.bat, dd.team_bat, dd.wagon_zone
+                GROUP BY dd.bat, dd.team_bat, dd.bat_hand, dd.wagon_zone
             ),
             player_primary_team AS (
-                SELECT DISTINCT ON (player) player, team
+                SELECT DISTINCT ON (player) player, team, bat_hand
                 FROM zone_stats
                 ORDER BY player, SUM(balls) OVER (PARTITION BY player, team) DESC
             ),
@@ -1767,6 +1768,7 @@ class WrappedService:
             SELECT 
                 pzp.player,
                 ppt.team,
+                ppt.bat_hand,
                 pzp.wagon_zone,
                 pzp.runs,
                 pzp.balls,
@@ -1788,6 +1790,7 @@ class WrappedService:
             "total_runs": 0,
             "total_balls": 0,
             "team": None,
+            "bat_hand": None,
             "zones_used": 0
         })
         
@@ -1802,6 +1805,7 @@ class WrappedService:
             player_data[player]["total_runs"] = row.total_runs
             player_data[player]["total_balls"] = row.total_balls
             player_data[player]["team"] = row.team
+            player_data[player]["bat_hand"] = row.bat_hand
             player_data[player]["zones_used"] = row.zones_used
         
         def calc_360_score(zones_data, total_runs):
@@ -1847,6 +1851,7 @@ class WrappedService:
             players_with_360.append({
                 "name": player,
                 "team": data["team"],
+                "bat_hand": data["bat_hand"],
                 "score_360": score_360,
                 "total_runs": data["total_runs"],
                 "total_balls": data["total_balls"],

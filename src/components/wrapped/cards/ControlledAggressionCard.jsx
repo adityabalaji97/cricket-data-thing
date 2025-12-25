@@ -1,8 +1,12 @@
-import React from 'react';
-import { Box, Typography } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Typography, Collapse } from '@mui/material';
 import TeamBadge from '../TeamBadge';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 const ControlledAggressionCard = ({ data }) => {
+  const [showMore, setShowMore] = useState(false);
+
   if (!data.players || data.players.length === 0) {
     return <Typography sx={{ color: '#fff' }}>No controlled aggression data available</Typography>;
   }
@@ -66,39 +70,68 @@ const ControlledAggressionCard = ({ data }) => {
         </Box>
       )}
 
-      {/* Remaining players */}
-      <Box className="remaining-list">
-        {topPlayers.slice(1).map((player, index) => (
+      {/* Show more button + Collapsible remaining players */}
+      {topPlayers.length > 1 && (
+        <>
           <Box 
-            key={player.name} 
-            className="list-item"
             onClick={(e) => {
               e.stopPropagation();
-              handlePlayerClick(player);
+              setShowMore(!showMore);
             }}
             sx={{ 
               display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              p: 1,
-              borderRadius: 1,
+              alignItems: 'center', 
+              justifyContent: 'center',
+              gap: 0.5,
+              py: 1,
               cursor: 'pointer',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }
+              color: 'rgba(255,255,255,0.7)',
+              '&:hover': { color: '#1DB954' },
+              transition: 'color 0.2s ease'
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', width: 20 }}>
-                #{index + 2}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#fff' }}>{player.name}</Typography>
-              <TeamBadge team={player.team} />
-            </Box>
-            <Typography variant="body1" sx={{ color: '#1DB954', fontWeight: 'bold' }}>
-              {player.ca_score}
+            <Typography variant="caption">
+              {showMore ? 'Hide' : 'Show'} #2-{Math.min(5, topPlayers.length)}
             </Typography>
+            {showMore ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
           </Box>
-        ))}
-      </Box>
+          
+          <Collapse in={showMore}>
+            <Box className="remaining-list">
+              {topPlayers.slice(1).map((player, index) => (
+                <Box 
+                  key={player.name} 
+                  className="list-item"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePlayerClick(player);
+                  }}
+                  sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    p: 1,
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', width: 20 }}>
+                      #{index + 2}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#fff' }}>{player.name}</Typography>
+                    <TeamBadge team={player.team} />
+                  </Box>
+                  <Typography variant="body1" sx={{ color: '#1DB954', fontWeight: 'bold' }}>
+                    {player.ca_score}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Collapse>
+        </>
+      )}
 
       {/* Legend */}
       <Box sx={{ mt: 2, pt: 1, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
