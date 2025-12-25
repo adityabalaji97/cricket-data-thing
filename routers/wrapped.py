@@ -190,10 +190,28 @@ def get_wrapped_metadata():
                 "order": 14
             },
             {
-                "id": "bowler_type_dominance",
-                "title": "Pace vs Spin",
-                "subtitle": "The bowling arms race",
-                "order": 15
-            }
-        ]
+            "id": "bowler_type_dominance",
+            "title": "Pace vs Spin",
+            "subtitle": "The bowling arms race",
+            "order": 15
+            },
+                {
+            "id": "sweep_evolution",
+            "title": "Sweep Evolution",
+            "subtitle": "How sweeps conquered 2025",
+            "order": 16
+        },
+        {
+            "id": "needle_movers",
+            "title": "Needle Movers",
+            "subtitle": "Who outperformed expectations",
+            "order": 17
+        },
+        {
+            "id": "chase_masters",
+            "title": "Chase Masters",
+            "subtitle": "Clutch performers in chases",
+            "order": 18
+        }
+    ]
     }

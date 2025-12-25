@@ -18,6 +18,9 @@ import BatterHandBreakdownCard from './cards/BatterHandBreakdownCard';
 import LengthMastersCard from './cards/LengthMastersCard';
 import RareShotSpecialistsCard from './cards/RareShotSpecialistsCard';
 import BowlerTypeDominanceCard from './cards/BowlerTypeDominanceCard';
+import SweepEvolutionCard from './cards/SweepEvolutionCard';
+import NeedleMoversCard from './cards/NeedleMoversCard';
+import ChaseMastersCard from './cards/ChaseMastersCard';
 import './wrapped.css';
 
 // Map card IDs to their specific visualization components
@@ -37,6 +40,9 @@ const cardComponents = {
   'length_masters': LengthMastersCard,
   'rare_shot_specialists': RareShotSpecialistsCard,
   'bowler_type_dominance': BowlerTypeDominanceCard,
+  'sweep_evolution': SweepEvolutionCard,
+  'needle_movers': NeedleMoversCard,
+  'chase_masters': ChaseMastersCard,
 };
 
 const WrappedCard = forwardRef(({ cardData, cardIndex, totalCards, onShareImage, isSharing }, ref) => {

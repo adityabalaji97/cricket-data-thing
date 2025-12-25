@@ -227,6 +227,27 @@ class WrappedService:
             logger.error(f"Error fetching bowler type dominance: {e}")
             cards.append({"card_id": "bowler_type_dominance", "error": str(e)})
         
+        # Card 16: Sweep Evolution (NEW - uses delivery_details shot)
+        try:
+            cards.append(self.get_sweep_evolution_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
+        except Exception as e:
+            logger.error(f"Error fetching sweep evolution: {e}")
+            cards.append({"card_id": "sweep_evolution", "error": str(e)})
+        
+        # Card 17: Needle Movers (NEW - uses delivery_details pred_score)
+        try:
+            cards.append(self.get_needle_movers_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
+        except Exception as e:
+            logger.error(f"Error fetching needle movers: {e}")
+            cards.append({"card_id": "needle_movers", "error": str(e)})
+        
+        # Card 18: Chase Masters (NEW - uses delivery_details win_prob)
+        try:
+            cards.append(self.get_chase_masters_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
+        except Exception as e:
+            logger.error(f"Error fetching chase masters: {e}")
+            cards.append({"card_id": "chase_masters", "error": str(e)})
+        
         return {
             "year": 2025,
             "date_range": {"start": start_date, "end": end_date},
@@ -266,6 +287,9 @@ class WrappedService:
             "length_masters": self.get_length_masters_data,
             "rare_shot_specialists": self.get_rare_shot_specialists_data,
             "bowler_type_dominance": self.get_bowler_type_dominance_data,
+            "sweep_evolution": self.get_sweep_evolution_data,
+            "needle_movers": self.get_needle_movers_data,
+            "chase_masters": self.get_chase_masters_data,
         }
         
         if card_id not in card_methods:
@@ -1547,7 +1571,7 @@ class WrappedService:
                 SUM(dd.batruns) as runs,
                 SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
                 SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-                SUM(CASE WHEN dd.out = '1' OR dd.out = 'True' THEN 1 ELSE 0 END) as wickets
+                SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
             FROM delivery_details dd
             WHERE dd.year >= :start_year
             AND dd.year <= :end_year
@@ -2067,7 +2091,7 @@ class WrappedService:
                 dd.bowl_kind,
                 COUNT(*) as balls,
                 SUM(dd.score) as runs,
-                SUM(CASE WHEN dd.out = '1' OR dd.out = 'True' THEN 1 ELSE 0 END) as wickets,
+                SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
                 SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
                 SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
             FROM delivery_details dd
@@ -2100,7 +2124,7 @@ class WrappedService:
                 dd.bowl_kind,
                 COUNT(*) as balls,
                 SUM(dd.score) as runs,
-                SUM(CASE WHEN dd.out = '1' OR dd.out = 'True' THEN 1 ELSE 0 END) as wickets,
+                SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
                 SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots
             FROM delivery_details dd
             WHERE dd.year >= :start_year
@@ -2154,7 +2178,7 @@ class WrappedService:
                     dd.team_bowl as team,
                     COUNT(*) as balls,
                     SUM(dd.score) as runs,
-                    SUM(CASE WHEN dd.out = '1' OR dd.out = 'True' THEN 1 ELSE 0 END) as wickets
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
@@ -2188,7 +2212,7 @@ class WrappedService:
                     dd.team_bowl as team,
                     COUNT(*) as balls,
                     SUM(dd.score) as runs,
-                    SUM(CASE WHEN dd.out = '1' OR dd.out = 'True' THEN 1 ELSE 0 END) as wickets
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
@@ -2250,5 +2274,549 @@ class WrappedService:
             ],
             "deep_links": {
                 "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bowler,bowl_kind&min_balls={min_balls}"
+            }
+        }
+
+    # ========================================================================
+    # CARD 16: SWEEP EVOLUTION
+    # ========================================================================
+    
+    def get_sweep_evolution_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_plays: int = 20,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 16: Sweep Evolution - How sweep shots have been used in 2025."""
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_plays": min_plays
+        }
+        
+        # Sweep shot variants
+        sweep_shots = ['SWEEP', 'PADDLE_SWEEP', 'REVERSE_SWEEP', 'SLOG_SWEEP']
+        params["sweep_shots"] = sweep_shots
+        
+        # Query 1: Overall sweep stats vs spin and pace
+        sweep_vs_kind_query = text(f"""
+            SELECT 
+                dd.shot,
+                dd.bowl_kind,
+                COUNT(*) as balls,
+                SUM(dd.batruns) as runs,
+                SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
+            FROM delivery_details dd
+            WHERE dd.year >= :start_year
+            AND dd.year <= :end_year
+            AND dd.shot = ANY(:sweep_shots)
+            AND dd.bowl_kind IN ('pace bowler', 'spin bowler')
+            GROUP BY dd.shot, dd.bowl_kind
+            ORDER BY dd.shot, dd.bowl_kind
+        """)
+        
+        sweep_kind_results = db.execute(sweep_vs_kind_query, params).fetchall()
+        
+        # Build sweep stats by type and bowler kind
+        sweep_stats = {}
+        for row in sweep_kind_results:
+            shot = row.shot
+            kind = 'pace' if row.bowl_kind == 'pace bowler' else 'spin'
+            
+            if shot not in sweep_stats:
+                sweep_stats[shot] = {'pace': None, 'spin': None, 'total_balls': 0}
+            
+            sweep_stats[shot][kind] = {
+                'balls': row.balls,
+                'runs': row.runs,
+                'strike_rate': round((row.runs * 100 / row.balls), 2) if row.balls > 0 else 0,
+                'boundary_pct': round((row.boundaries * 100 / row.balls), 2) if row.balls > 0 else 0,
+                'wickets': row.wickets,
+                'dismissal_pct': round((row.wickets * 100 / row.balls), 2) if row.balls > 0 else 0
+            }
+            sweep_stats[shot]['total_balls'] += row.balls
+        
+        # Query 2: Top sweep merchants
+        top_sweepers_query = text(f"""
+            WITH sweep_stats AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    dd.shot,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.shot = ANY(:sweep_shots)
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bat, dd.team_bat, dd.shot
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM sweep_stats
+                ORDER BY player, SUM(balls) OVER (PARTITION BY player, team) DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as total_balls,
+                    SUM(runs) as total_runs,
+                    SUM(boundaries) as total_boundaries,
+                    SUM(wickets) as total_wickets,
+                    COUNT(DISTINCT shot) as sweep_types_used
+                FROM sweep_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_plays
+            )
+            SELECT 
+                pt.player,
+                ppt.team,
+                pt.total_balls,
+                pt.total_runs,
+                pt.total_boundaries,
+                pt.total_wickets,
+                pt.sweep_types_used,
+                ROUND((pt.total_runs * 100.0 / pt.total_balls)::numeric, 2) as strike_rate,
+                ROUND((pt.total_boundaries * 100.0 / pt.total_balls)::numeric, 2) as boundary_pct
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY pt.total_runs DESC
+            LIMIT 10
+        """)
+        
+        top_sweepers = db.execute(top_sweepers_query, params).fetchall()
+        
+        # Convert sweep_stats to list sorted by usage
+        sweep_list = []
+        for shot, stats in sweep_stats.items():
+            sweep_list.append({
+                'shot': shot,
+                'total_balls': stats['total_balls'],
+                'vs_pace': stats['pace'],
+                'vs_spin': stats['spin']
+            })
+        sweep_list.sort(key=lambda x: x['total_balls'], reverse=True)
+        
+        return {
+            "card_id": "sweep_evolution",
+            "card_title": "Sweep Evolution",
+            "card_subtitle": f"How sweeps conquered 2025 (min {min_plays} plays)",
+            "visualization_type": "sweep_breakdown",
+            "sweep_types": sweep_shots,
+            "shot_labels": {
+                "SWEEP": "Sweep",
+                "PADDLE_SWEEP": "Paddle",
+                "REVERSE_SWEEP": "Rev Sweep",
+                "SLOG_SWEEP": "Slog Sweep"
+            },
+            "sweep_stats": sweep_list,
+            "top_sweepers": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "total_balls": row.total_balls,
+                    "total_runs": row.total_runs,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
+                    "boundary_pct": float(row.boundary_pct) if row.boundary_pct else 0,
+                    "sweep_types_used": row.sweep_types_used
+                }
+                for row in top_sweepers
+            ],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter,shot"
+            }
+        }
+
+    # ========================================================================
+    # CARD 17: NEEDLE MOVERS (pred_score impact)
+    # ========================================================================
+    
+    def get_needle_movers_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_balls: int = 100,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 17: Needle Movers - Who scored more than expected (pred_score analysis)."""
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        # Note: pred_score = -1 means no data available for that ball
+        query = text(f"""
+            WITH player_impact AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as actual_runs,
+                    SUM(dd.pred_score) as expected_runs,
+                    SUM(dd.batruns - dd.pred_score) as runs_above_expected,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.pred_score IS NOT NULL
+                AND dd.pred_score != -1
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bat, dd.team_bat
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM player_impact
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(actual_runs) as actual_runs,
+                    SUM(expected_runs) as expected_runs,
+                    SUM(runs_above_expected) as runs_above_expected,
+                    SUM(boundaries) as boundaries
+                FROM player_impact
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT 
+                pt.player,
+                ppt.team,
+                pt.balls,
+                pt.actual_runs,
+                ROUND(pt.expected_runs::numeric, 1) as expected_runs,
+                ROUND(pt.runs_above_expected::numeric, 1) as runs_above_expected,
+                ROUND((pt.runs_above_expected / pt.balls * 100)::numeric, 2) as impact_per_100_balls,
+                ROUND((pt.actual_runs * 100.0 / pt.balls)::numeric, 2) as strike_rate,
+                ROUND((pt.expected_runs * 100.0 / pt.balls)::numeric, 2) as expected_sr
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY pt.runs_above_expected DESC
+            LIMIT 20
+        """)
+        
+        results = db.execute(query, params).fetchall()
+        
+        # Split into positive and negative impact
+        positive_impact = [r for r in results if r.runs_above_expected and r.runs_above_expected > 0][:7]
+        
+        # Get bottom performers (below expected)
+        bottom_query = text(f"""
+            WITH player_impact AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as actual_runs,
+                    SUM(dd.pred_score) as expected_runs,
+                    SUM(dd.batruns - dd.pred_score) as runs_above_expected
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.pred_score IS NOT NULL
+                AND dd.pred_score != -1
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bat, dd.team_bat
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM player_impact
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(actual_runs) as actual_runs,
+                    SUM(expected_runs) as expected_runs,
+                    SUM(runs_above_expected) as runs_above_expected
+                FROM player_impact
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT 
+                pt.player,
+                ppt.team,
+                pt.balls,
+                pt.actual_runs,
+                ROUND(pt.expected_runs::numeric, 1) as expected_runs,
+                ROUND(pt.runs_above_expected::numeric, 1) as runs_above_expected,
+                ROUND((pt.actual_runs * 100.0 / pt.balls)::numeric, 2) as strike_rate,
+                ROUND((pt.expected_runs * 100.0 / pt.balls)::numeric, 2) as expected_sr
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY pt.runs_above_expected ASC
+            LIMIT 5
+        """)
+        
+        bottom_results = db.execute(bottom_query, params).fetchall()
+        negative_impact = [r for r in bottom_results if r.runs_above_expected and r.runs_above_expected < 0]
+        
+        # Get coverage stats
+        coverage_query = text(f"""
+            SELECT 
+                COUNT(*) as total_balls,
+                SUM(CASE WHEN pred_score IS NOT NULL AND pred_score != -1 THEN 1 ELSE 0 END) as balls_with_data
+            FROM delivery_details dd
+            WHERE dd.year >= :start_year
+            AND dd.year <= :end_year
+        """)
+        
+        coverage_result = db.execute(coverage_query, params).fetchone()
+        coverage_pct = round((coverage_result.balls_with_data * 100 / coverage_result.total_balls), 1) if coverage_result.total_balls > 0 else 0
+        
+        return {
+            "card_id": "needle_movers",
+            "card_title": "Needle Movers",
+            "card_subtitle": f"Who outperformed expectations (min {min_balls} balls with pred_score)",
+            "visualization_type": "diverging_impact",
+            "coverage_pct": coverage_pct,
+            "data_note": f"Based on {coverage_pct}% of deliveries with predictive scoring",
+            "positive_impact": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "balls": row.balls,
+                    "actual_runs": row.actual_runs,
+                    "expected_runs": float(row.expected_runs) if row.expected_runs else 0,
+                    "runs_above_expected": float(row.runs_above_expected) if row.runs_above_expected else 0,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
+                    "expected_sr": float(row.expected_sr) if row.expected_sr else 0
+                }
+                for row in positive_impact
+            ],
+            "negative_impact": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "balls": row.balls,
+                    "actual_runs": row.actual_runs,
+                    "expected_runs": float(row.expected_runs) if row.expected_runs else 0,
+                    "runs_above_expected": float(row.runs_above_expected) if row.runs_above_expected else 0,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
+                    "expected_sr": float(row.expected_sr) if row.expected_sr else 0
+                }
+                for row in negative_impact
+            ],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter"
+            }
+        }
+
+    # ========================================================================
+    # CARD 18: CHASE MASTERS (win_prob impact)
+    # ========================================================================
+    
+    def get_chase_masters_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_balls: int = 50,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 18: Chase Masters - Who moved win probability the most in chases."""
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        # Note: win_prob = -1 means no data available
+        # We only look at innings 2 (chases)
+        query = text(f"""
+            WITH chase_impact AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    dd.p_match,
+                    dd.ball_id,
+                    dd.batruns,
+                    dd.win_prob,
+                    LEAD(dd.win_prob) OVER (PARTITION BY dd.p_match ORDER BY dd.ball_id) as next_win_prob
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.inns = 2
+                AND dd.win_prob IS NOT NULL
+                AND dd.win_prob != -1
+                AND dd.bat_hand IN ('LHB', 'RHB')
+            ),
+            player_impact AS (
+                SELECT 
+                    player,
+                    team,
+                    COUNT(*) as balls,
+                    SUM(batruns) as runs,
+                    SUM(CASE WHEN next_win_prob IS NOT NULL AND next_win_prob != -1 
+                        THEN next_win_prob - win_prob ELSE 0 END) as total_wp_change,
+                    AVG(win_prob) as avg_entry_wp
+                FROM chase_impact
+                WHERE next_win_prob IS NOT NULL AND next_win_prob != -1
+                GROUP BY player, team
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM player_impact
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(total_wp_change) as total_wp_change,
+                    AVG(avg_entry_wp) as avg_entry_wp
+                FROM player_impact
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT 
+                pt.player,
+                ppt.team,
+                pt.balls,
+                pt.runs,
+                ROUND((pt.total_wp_change * 100)::numeric, 2) as wp_change_pct,
+                ROUND((pt.total_wp_change * 100 / pt.balls)::numeric, 3) as wp_per_ball,
+                ROUND((pt.runs * 100.0 / pt.balls)::numeric, 2) as strike_rate,
+                ROUND((pt.avg_entry_wp * 100)::numeric, 1) as avg_entry_wp_pct
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY pt.total_wp_change DESC
+            LIMIT 15
+        """)
+        
+        results = db.execute(query, params).fetchall()
+        
+        # Split into clutch performers and pressure folders
+        clutch_performers = [r for r in results if r.wp_change_pct and r.wp_change_pct > 0][:7]
+        
+        # Get bottom performers
+        bottom_query = text(f"""
+            WITH chase_impact AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    dd.p_match,
+                    dd.ball_id,
+                    dd.batruns,
+                    dd.win_prob,
+                    LEAD(dd.win_prob) OVER (PARTITION BY dd.p_match ORDER BY dd.ball_id) as next_win_prob
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.inns = 2
+                AND dd.win_prob IS NOT NULL
+                AND dd.win_prob != -1
+                AND dd.bat_hand IN ('LHB', 'RHB')
+            ),
+            player_impact AS (
+                SELECT 
+                    player,
+                    team,
+                    COUNT(*) as balls,
+                    SUM(batruns) as runs,
+                    SUM(CASE WHEN next_win_prob IS NOT NULL AND next_win_prob != -1 
+                        THEN next_win_prob - win_prob ELSE 0 END) as total_wp_change
+                FROM chase_impact
+                WHERE next_win_prob IS NOT NULL AND next_win_prob != -1
+                GROUP BY player, team
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM player_impact
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(total_wp_change) as total_wp_change
+                FROM player_impact
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT 
+                pt.player,
+                ppt.team,
+                pt.balls,
+                pt.runs,
+                ROUND((pt.total_wp_change * 100)::numeric, 2) as wp_change_pct,
+                ROUND((pt.runs * 100.0 / pt.balls)::numeric, 2) as strike_rate
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY pt.total_wp_change ASC
+            LIMIT 5
+        """)
+        
+        bottom_results = db.execute(bottom_query, params).fetchall()
+        pressure_folders = [r for r in bottom_results if r.wp_change_pct and r.wp_change_pct < 0]
+        
+        # Get coverage stats
+        coverage_query = text(f"""
+            SELECT 
+                COUNT(*) as total_chase_balls,
+                SUM(CASE WHEN win_prob IS NOT NULL AND win_prob != -1 THEN 1 ELSE 0 END) as balls_with_data
+            FROM delivery_details dd
+            WHERE dd.year >= :start_year
+            AND dd.year <= :end_year
+            AND dd.inns = 2
+        """)
+        
+        coverage_result = db.execute(coverage_query, params).fetchone()
+        coverage_pct = round((coverage_result.balls_with_data * 100 / coverage_result.total_chase_balls), 1) if coverage_result.total_chase_balls > 0 else 0
+        
+        return {
+            "card_id": "chase_masters",
+            "card_title": "Chase Masters",
+            "card_subtitle": f"Who moves the needle in chases (min {min_balls} chase balls)",
+            "visualization_type": "clutch_ranking",
+            "coverage_pct": coverage_pct,
+            "data_note": f"Based on {coverage_pct}% of chase deliveries with win probability",
+            "clutch_performers": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "balls": row.balls,
+                    "runs": row.runs,
+                    "wp_change_pct": float(row.wp_change_pct) if row.wp_change_pct else 0,
+                    "wp_per_ball": float(row.wp_per_ball) if row.wp_per_ball else 0,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
+                    "avg_entry_wp_pct": float(row.avg_entry_wp_pct) if row.avg_entry_wp_pct else 0
+                }
+                for row in clutch_performers
+            ],
+            "pressure_folders": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "balls": row.balls,
+                    "runs": row.runs,
+                    "wp_change_pct": float(row.wp_change_pct) if row.wp_change_pct else 0,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0
+                }
+                for row in pressure_folders
+            ],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&innings=2&group_by=batter"
             }
         }
