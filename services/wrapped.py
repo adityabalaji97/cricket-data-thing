@@ -48,7 +48,7 @@ def build_competition_filter(
     include_international: bool,
     top_teams: Optional[int] = None
 ) -> str:
-    """Build the competition filter clause used across all queries."""
+    """Build the competition filter clause for matches table queries."""
     conditions = []
     
     if leagues:
@@ -76,10 +76,60 @@ def get_base_params(
     leagues: List[str],
     top_teams: Optional[int] = None
 ) -> Dict:
-    """Returns base parameters used in most queries."""
+    """Returns base parameters used in most queries (matches table)."""
     params = {
         "start_date": start_date,
         "end_date": end_date,
+        "leagues": leagues if leagues else []
+    }
+    
+    if top_teams:
+        params["top_team_list"] = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+    
+    return params
+
+
+def build_dd_competition_filter(
+    leagues: List[str], 
+    include_international: bool,
+    top_teams: Optional[int] = None
+) -> str:
+    """Build the competition filter clause for delivery_details table.
+    
+    Note: delivery_details uses 'competition' column directly and
+    'team_bat'/'team_bowl' for team filtering.
+    """
+    conditions = []
+    
+    if leagues:
+        conditions.append("dd.competition = ANY(:leagues)")
+    
+    if include_international:
+        if top_teams:
+            conditions.append(
+                "(dd.competition = 'T20I' "
+                "AND dd.team_bat = ANY(:top_team_list) "
+                "AND dd.team_bowl = ANY(:top_team_list))"
+            )
+        else:
+            conditions.append("dd.competition = 'T20I'")
+    
+    if conditions:
+        return " AND (" + " OR ".join(conditions) + ")"
+    else:
+        return " AND FALSE"
+
+
+def get_dd_base_params(
+    start_date: str, 
+    end_date: str, 
+    leagues: List[str],
+    top_teams: Optional[int] = None
+) -> Dict:
+    """Returns base parameters for delivery_details queries."""
+    params = {
+        "start_year": int(start_date[:4]),
+        "end_year": int(end_date[:4]),
         "leagues": leagues if leagues else []
     }
     
@@ -170,6 +220,13 @@ class WrappedService:
         except Exception as e:
             logger.error(f"Error fetching 19th over gods: {e}")
             cards.append({"card_id": "nineteenth_over_gods", "error": str(e)})
+        
+        # Card 7.5: Middle Overs Squeeze (NEW - bowlers)
+        try:
+            cards.append(self.get_middle_overs_squeeze_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
+        except Exception as e:
+            logger.error(f"Error fetching middle overs squeeze: {e}")
+            cards.append({"card_id": "middle_overs_squeeze", "error": str(e)})
         
         # Card 8: ELO Movers
         try:
@@ -279,6 +336,7 @@ class WrappedService:
             "pace_vs_spin": self.get_pace_vs_spin_data,
             "powerplay_thieves": self.get_powerplay_wicket_thieves_data,
             "nineteenth_over_gods": self.get_nineteenth_over_gods_data,
+            "middle_overs_squeeze": self.get_middle_overs_squeeze_data,
             "elo_movers": self.get_elo_movers_data,
             "venue_vibes": self.get_venue_vibes_data,
             "controlled_aggression": self.get_controlled_aggression_data,
@@ -310,31 +368,30 @@ class WrappedService:
         db: Session,
         top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Card 1: Global run rate and wicket cost by phase."""
+        """Card 1: Global run rate and wicket cost by phase - using delivery_details."""
         
-        competition_filter = build_competition_filter(leagues, include_international, top_teams)
-        params = get_base_params(start_date, end_date, leagues, top_teams)
+        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
+        params = get_dd_base_params(start_date, end_date, leagues, top_teams)
         
         query = text(f"""
             WITH phase_data AS (
                 SELECT 
                     CASE 
-                        WHEN d.over < 6 THEN 'powerplay'
-                        WHEN d.over >= 6 AND d.over < 15 THEN 'middle'
+                        WHEN dd.over < 6 THEN 'powerplay'
+                        WHEN dd.over >= 6 AND dd.over < 15 THEN 'middle'
                         ELSE 'death'
                     END as phase,
                     COUNT(*) as balls,
-                    SUM(d.runs_off_bat + d.extras) as runs,
-                    SUM(CASE WHEN d.wicket_type IS NOT NULL 
-                        AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out')
+                    SUM(dd.score) as runs,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != ''
+                        AND dd.dismissal NOT IN ('run out', 'retired hurt', 'retired out')
                         THEN 1 ELSE 0 END) as wickets,
-                    SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
-                    SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries
-                FROM deliveries d
-                JOIN matches m ON d.match_id = m.id
-                WHERE m.date >= :start_date
-                AND m.date <= :end_date
-                {competition_filter}
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                {dd_filter}
                 GROUP BY phase
             )
             SELECT 
@@ -359,34 +416,39 @@ class WrappedService:
         
         results = db.execute(query, params).fetchall()
         
-        # Get total matches count
+        # Get total matches count from delivery_details
         matches_query = text(f"""
-            SELECT COUNT(DISTINCT m.id) as total_matches
-            FROM matches m
-            WHERE m.date >= :start_date
-            AND m.date <= :end_date
-            {competition_filter}
+            SELECT COUNT(DISTINCT dd.p_match) as total_matches
+            FROM delivery_details dd
+            WHERE dd.year >= :start_year
+            AND dd.year <= :end_year
+            {dd_filter}
         """)
         
         matches_result = db.execute(matches_query, params).fetchone()
         
-        # Get batting first vs chase win statistics
+        # Get batting first vs chase win statistics using delivery_details
         toss_query = text(f"""
+            WITH match_results AS (
+                SELECT DISTINCT 
+                    dd.p_match,
+                    dd.winner,
+                    FIRST_VALUE(dd.team_bat) OVER (
+                        PARTITION BY dd.p_match 
+                        ORDER BY dd.inns, dd.over, dd.ball
+                    ) as batting_first_team
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.winner IS NOT NULL
+                AND dd.winner != ''
+                {dd_filter}
+            )
             SELECT 
-                SUM(CASE WHEN 
-                    (m.toss_decision = 'bat' AND m.winner = m.toss_winner) OR
-                    (m.toss_decision = 'field' AND m.winner != m.toss_winner AND m.winner IS NOT NULL)
-                    THEN 1 ELSE 0 END) as bat_first_wins,
-                SUM(CASE WHEN 
-                    (m.toss_decision = 'field' AND m.winner = m.toss_winner) OR
-                    (m.toss_decision = 'bat' AND m.winner != m.toss_winner AND m.winner IS NOT NULL)
-                    THEN 1 ELSE 0 END) as chase_wins,
-                COUNT(*) FILTER (WHERE m.winner IS NOT NULL) as total_decided
-            FROM matches m
-            WHERE m.date >= :start_date
-            AND m.date <= :end_date
-            AND m.winner IS NOT NULL
-            {competition_filter}
+                SUM(CASE WHEN winner = batting_first_team THEN 1 ELSE 0 END) as bat_first_wins,
+                SUM(CASE WHEN winner != batting_first_team THEN 1 ELSE 0 END) as chase_wins,
+                COUNT(DISTINCT p_match) as total_decided
+            FROM match_results
         """)
         
         toss_result = db.execute(toss_query, params).fetchone()
@@ -440,29 +502,29 @@ class WrappedService:
         min_balls: int = 100,
         top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Card 2: Top batters in powerplay by strike rate."""
+        """Card 2: Top batters in powerplay by strike rate - using delivery_details."""
         
-        competition_filter = build_competition_filter(leagues, include_international, top_teams)
-        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
+        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
+        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
         
         query = text(f"""
             WITH powerplay_stats AS (
                 SELECT 
-                    bs.striker as player,
-                    bs.batting_team as team,
-                    SUM(bs.pp_balls) as balls,
-                    SUM(bs.pp_runs) as runs,
-                    SUM(bs.pp_wickets) as wickets,
-                    SUM(bs.pp_dots) as dots,
-                    SUM(bs.pp_boundaries) as boundaries,
-                    COUNT(DISTINCT bs.match_id) as innings
-                FROM batting_stats bs
-                JOIN matches m ON bs.match_id = m.id
-                WHERE m.date >= :start_date
-                AND m.date <= :end_date
-                AND bs.pp_balls > 0
-                {competition_filter}
-                GROUP BY bs.striker, bs.batting_team
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    COUNT(DISTINCT dd.p_match) as innings
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.over < 6  -- Powerplay overs 0-5
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                {dd_filter}
+                GROUP BY dd.bat, dd.team_bat
             ),
             player_primary_team AS (
                 SELECT DISTINCT ON (player) player, team
@@ -537,29 +599,29 @@ class WrappedService:
         min_balls: int = 150,
         top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Card 3: Best middle-overs batters by average AND strike rate."""
+        """Card 3: Best middle-overs batters - prioritizing low dot% and high boundary%."""
         
-        competition_filter = build_competition_filter(leagues, include_international, top_teams)
-        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
+        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
+        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
         
         query = text(f"""
             WITH middle_stats AS (
                 SELECT 
-                    bs.striker as player,
-                    bs.batting_team as team,
-                    SUM(bs.middle_balls) as balls,
-                    SUM(bs.middle_runs) as runs,
-                    SUM(bs.middle_wickets) as wickets,
-                    SUM(bs.middle_dots) as dots,
-                    SUM(bs.middle_boundaries) as boundaries,
-                    COUNT(DISTINCT bs.match_id) as innings
-                FROM batting_stats bs
-                JOIN matches m ON bs.match_id = m.id
-                WHERE m.date >= :start_date
-                AND m.date <= :end_date
-                AND bs.middle_balls > 0
-                {competition_filter}
-                GROUP BY bs.striker, bs.batting_team
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    COUNT(DISTINCT dd.p_match) as innings
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.over >= 6 AND dd.over < 15  -- Middle overs 6-14
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                {dd_filter}
+                GROUP BY dd.bat, dd.team_bat
             ),
             player_primary_team AS (
                 SELECT DISTINCT ON (player) player, team
@@ -584,12 +646,17 @@ class WrappedService:
                 ROUND(CAST(pt.runs * 100.0 / NULLIF(pt.balls, 0) AS numeric), 2) as strike_rate,
                 ROUND(CAST(pt.runs AS numeric) / NULLIF(pt.wickets, 0), 2) as average,
                 ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage,
-                ROUND(CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as boundary_percentage
+                ROUND(CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as boundary_percentage,
+                -- Composite score: high boundary%, low dot%, high SR
+                ROUND(
+                    (CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric) * 2) +
+                    (50 - CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric)) +
+                    (CAST(pt.runs * 100.0 / NULLIF(pt.balls, 0) AS numeric) - 100) / 10
+                , 2) as middle_overs_score
             FROM player_totals pt
             JOIN player_primary_team ppt ON pt.player = ppt.player
             WHERE pt.wickets > 0
-            ORDER BY (CAST(pt.runs * 100.0 / NULLIF(pt.balls, 0) AS numeric) * 
-                     CAST(pt.runs AS numeric) / NULLIF(pt.wickets, 0)) / 100 DESC
+            ORDER BY middle_overs_score DESC
             LIMIT 20
         """)
         
@@ -600,8 +667,9 @@ class WrappedService:
             "card_title": "Middle Merchants",
             "card_subtitle": f"Masters of overs 7-15 (min {min_balls} balls)",
             "visualization_type": "scatter",
-            "x_axis": "average",
-            "y_axis": "strike_rate",
+            "x_axis": "dot_percentage",
+            "y_axis": "boundary_percentage",
+            "ranking_note": "Ranked by composite score: high boundary%, low dot%, high SR",
             "players": [
                 {
                     "name": row.player,
@@ -612,7 +680,8 @@ class WrappedService:
                     "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
                     "average": float(row.average) if row.average else 0,
                     "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0,
-                    "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0
+                    "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0,
+                    "middle_overs_score": float(row.middle_overs_score) if row.middle_overs_score else 0
                 }
                 for row in results
             ],
@@ -635,29 +704,32 @@ class WrappedService:
         min_balls: int = 75,
         top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Card 4: Best death-overs hitters."""
+        """Card 4: Best death-overs hitters - prioritizing six-hitting."""
         
-        competition_filter = build_competition_filter(leagues, include_international, top_teams)
-        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
+        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
+        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
         
         query = text(f"""
             WITH death_stats AS (
                 SELECT 
-                    bs.striker as player,
-                    bs.batting_team as team,
-                    SUM(bs.death_balls) as balls,
-                    SUM(bs.death_runs) as runs,
-                    SUM(bs.death_wickets) as wickets,
-                    SUM(bs.death_dots) as dots,
-                    SUM(bs.death_boundaries) as boundaries,
-                    COUNT(DISTINCT bs.match_id) as innings
-                FROM batting_stats bs
-                JOIN matches m ON bs.match_id = m.id
-                WHERE m.date >= :start_date
-                AND m.date <= :end_date
-                AND bs.death_balls > 0
-                {competition_filter}
-                GROUP BY bs.striker, bs.batting_team
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) as fours,
+                    SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) as sixes,
+                    SUM(CASE WHEN dd.batruns = 6 THEN 6 ELSE 0 END) as runs_from_sixes,
+                    COUNT(DISTINCT dd.p_match) as innings
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.over >= 15  -- Death overs 15-19
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                {dd_filter}
+                GROUP BY dd.bat, dd.team_bat
             ),
             player_primary_team AS (
                 SELECT DISTINCT ON (player) player, team
@@ -672,20 +744,29 @@ class WrappedService:
                     SUM(wickets) as wickets,
                     SUM(dots) as dots,
                     SUM(boundaries) as boundaries,
+                    SUM(fours) as fours,
+                    SUM(sixes) as sixes,
+                    SUM(runs_from_sixes) as runs_from_sixes,
                     SUM(innings) as innings
                 FROM death_stats
                 GROUP BY player
                 HAVING SUM(balls) >= :min_balls
             )
             SELECT 
-                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, pt.boundaries, pt.innings,
+                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, 
+                pt.boundaries, pt.fours, pt.sixes, pt.innings,
                 ROUND(CAST(pt.runs * 100.0 / NULLIF(pt.balls, 0) AS numeric), 2) as strike_rate,
                 ROUND(CAST(pt.runs AS numeric) / NULLIF(pt.wickets, 0), 2) as average,
                 ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage,
-                ROUND(CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as boundary_percentage
+                ROUND(CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as boundary_percentage,
+                ROUND(CAST(pt.runs_from_sixes * 100.0 / NULLIF(pt.runs, 0) AS numeric), 1) as six_runs_percentage,
+                ROUND(CAST(pt.sixes AS numeric) / NULLIF(pt.innings, 0), 2) as sixes_per_innings
             FROM player_totals pt
             JOIN player_primary_team ppt ON pt.player = ppt.player
-            ORDER BY strike_rate DESC
+            -- Order by composite of SR (60%) and six_runs_percentage (40%)
+            ORDER BY 
+                (CAST(pt.runs * 100.0 / NULLIF(pt.balls, 0) AS numeric) * 0.6 +
+                 CAST(pt.runs_from_sixes * 100.0 / NULLIF(pt.runs, 0) AS numeric) * 0.4) DESC
             LIMIT 15
         """)
         
@@ -694,8 +775,9 @@ class WrappedService:
         return {
             "card_id": "death_hitters",
             "card_title": "Death Hitters",
-            "card_subtitle": f"The finishers who lived dangerously (min {min_balls} balls)",
+            "card_subtitle": f"Six-hitting finishers (min {min_balls} balls)",
             "visualization_type": "table_with_highlight",
+            "ranking_note": "Ranked by strike rate (60%) + % runs from sixes (40%)",
             "players": [
                 {
                     "name": row.player,
@@ -703,16 +785,20 @@ class WrappedService:
                     "balls": row.balls,
                     "runs": row.runs,
                     "innings": row.innings,
+                    "sixes": row.sixes,
+                    "fours": row.fours,
                     "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
                     "average": float(row.average) if row.average else 0,
                     "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0,
-                    "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0
+                    "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0,
+                    "six_runs_percentage": float(row.six_runs_percentage) if row.six_runs_percentage else 0,
+                    "sixes_per_innings": float(row.sixes_per_innings) if row.sixes_per_innings else 0
                 }
                 for row in results
             ],
             "deep_links": {
                 "comparison": f"/comparison?start_date={start_date}&end_date={end_date}",
-                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&over_min=16&over_max=19&group_by=batter&min_balls={min_balls}"
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&over_min=15&over_max=19&group_by=batter&min_balls={min_balls}"
             }
         }
 
@@ -863,27 +949,29 @@ class WrappedService:
         min_wickets: int = 10,
         top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Card 6: Best powerplay wicket-takers."""
+        """Card 6: Best powerplay wicket-takers - using delivery_details."""
         
-        competition_filter = build_competition_filter(leagues, include_international, top_teams)
-        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_wickets": min_wickets}
+        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
+        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_wickets": min_wickets}
         
         query = text(f"""
             WITH pp_bowling AS (
                 SELECT 
-                    bw.bowler as player,
-                    bw.bowling_team as team,
-                    SUM(bw.pp_overs) * 6 as balls,
-                    SUM(bw.pp_runs) as runs,
-                    SUM(bw.pp_wickets) as wickets,
-                    SUM(bw.pp_dots) as dots,
-                    COUNT(DISTINCT bw.match_id) as innings
-                FROM bowling_stats bw
-                JOIN matches m ON bw.match_id = m.id
-                WHERE m.date >= :start_date AND m.date <= :end_date
-                AND bw.pp_overs > 0
-                {competition_filter}
-                GROUP BY bw.bowler, bw.bowling_team
+                    dd.bowl as player,
+                    dd.team_bowl as team,
+                    COUNT(*) as balls,
+                    SUM(dd.score) as runs,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' 
+                        AND dd.dismissal NOT IN ('run out', 'retired hurt', 'retired out')
+                        THEN 1 ELSE 0 END) as wickets,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    COUNT(DISTINCT dd.p_match) as innings
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year AND dd.year <= :end_year
+                AND dd.over < 6  -- Powerplay overs 0-5
+                {dd_filter}
+                GROUP BY dd.bowl, dd.team_bowl
             ),
             player_primary_team AS (
                 SELECT DISTINCT ON (player) player, team
@@ -897,19 +985,21 @@ class WrappedService:
                     SUM(runs) as runs,
                     SUM(wickets) as wickets,
                     SUM(dots) as dots,
+                    SUM(boundaries) as boundaries,
                     SUM(innings) as innings
                 FROM pp_bowling
                 GROUP BY player
                 HAVING SUM(wickets) >= :min_wickets
             )
             SELECT 
-                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, pt.innings,
+                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, pt.boundaries, pt.innings,
                 ROUND(CAST(pt.balls AS numeric) / NULLIF(pt.wickets, 0), 2) as strike_rate,
                 ROUND(CAST(pt.runs * 6.0 / NULLIF(pt.balls, 0) AS numeric), 2) as economy,
-                ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage
+                ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage,
+                ROUND(CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as boundary_percentage
             FROM player_totals pt
             JOIN player_primary_team ppt ON pt.player = ppt.player
-            ORDER BY strike_rate ASC
+            ORDER BY strike_rate ASC, boundary_percentage ASC
             LIMIT 15
         """)
         
@@ -920,6 +1010,7 @@ class WrappedService:
             "card_title": "PP Wicket Thieves",
             "card_subtitle": f"Early breakthrough specialists (min {min_wickets} wickets)",
             "visualization_type": "table",
+            "highlight_metrics": ["dot_percentage", "boundary_percentage"],
             "bowlers": [
                 {
                     "name": row.player,
@@ -930,7 +1021,8 @@ class WrappedService:
                     "innings": row.innings,
                     "strike_rate": float(row.strike_rate) if row.strike_rate else 999,
                     "economy": float(row.economy) if row.economy else 0,
-                    "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0
+                    "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0,
+                    "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0
                 }
                 for row in results
             ],
@@ -953,27 +1045,29 @@ class WrappedService:
         min_overs: int = 10,
         top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Card 7: Bowlers who dominated death overs."""
+        """Card 7: Bowlers who dominated death overs - using delivery_details."""
         
-        competition_filter = build_competition_filter(leagues, include_international, top_teams)
-        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_overs": min_overs}
+        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
+        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_overs * 6}
         
         query = text(f"""
             WITH death_bowling AS (
                 SELECT 
-                    bw.bowler as player,
-                    bw.bowling_team as team,
-                    SUM(bw.death_overs) * 6 as balls,
-                    SUM(bw.death_runs) as runs,
-                    SUM(bw.death_wickets) as wickets,
-                    SUM(bw.death_dots) as dots,
-                    COUNT(DISTINCT bw.match_id) as innings
-                FROM bowling_stats bw
-                JOIN matches m ON bw.match_id = m.id
-                WHERE m.date >= :start_date AND m.date <= :end_date
-                AND bw.death_overs > 0
-                {competition_filter}
-                GROUP BY bw.bowler, bw.bowling_team
+                    dd.bowl as player,
+                    dd.team_bowl as team,
+                    COUNT(*) as balls,
+                    SUM(dd.score) as runs,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' 
+                        AND dd.dismissal NOT IN ('run out', 'retired hurt', 'retired out')
+                        THEN 1 ELSE 0 END) as wickets,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    COUNT(DISTINCT dd.p_match) as innings
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year AND dd.year <= :end_year
+                AND dd.over >= 15  -- Death overs 15-19
+                {dd_filter}
+                GROUP BY dd.bowl, dd.team_bowl
             ),
             player_primary_team AS (
                 SELECT DISTINCT ON (player) player, team
@@ -987,19 +1081,28 @@ class WrappedService:
                     SUM(runs) as runs,
                     SUM(wickets) as wickets,
                     SUM(dots) as dots,
+                    SUM(boundaries) as boundaries,
                     SUM(innings) as innings
                 FROM death_bowling
                 GROUP BY player
-                HAVING SUM(balls) / 6 >= :min_overs
+                HAVING SUM(balls) >= :min_balls
             )
             SELECT 
-                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, pt.innings,
+                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, pt.dots, pt.boundaries, pt.innings,
                 ROUND(CAST(pt.runs * 6.0 / NULLIF(pt.balls, 0) AS numeric), 2) as economy,
                 ROUND(CAST(pt.balls AS numeric) / NULLIF(pt.wickets, 0), 2) as strike_rate,
-                ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage
+                ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage,
+                ROUND(CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as boundary_percentage,
+                -- Composite score: low economy + high dot% + low boundary%
+                ROUND(
+                    (15 - CAST(pt.runs * 6.0 / NULLIF(pt.balls, 0) AS numeric)) * 5 +
+                    (CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric)) * 0.5 +
+                    (30 - CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric)) * 0.3 +
+                    (CAST(pt.wickets AS numeric) / NULLIF(pt.innings, 0)) * 10
+                , 2) as death_bowling_score
             FROM player_totals pt
             JOIN player_primary_team ppt ON pt.player = ppt.player
-            ORDER BY economy ASC
+            ORDER BY death_bowling_score DESC
             LIMIT 15
         """)
         
@@ -1010,22 +1113,141 @@ class WrappedService:
             "card_title": "Death Over Gods",
             "card_subtitle": f"Overs 16-20 bowling excellence (min {min_overs} overs)",
             "visualization_type": "table",
+            "ranking_note": "Composite: economy + wickets + dot% + low boundary%",
             "bowlers": [
                 {
                     "name": row.player,
                     "team": row.team,
                     "balls": row.balls,
+                    "overs": round(row.balls / 6, 1),
                     "runs": row.runs,
                     "wickets": row.wickets,
                     "innings": row.innings,
                     "economy": float(row.economy) if row.economy else 0,
                     "strike_rate": float(row.strike_rate) if row.strike_rate else 999,
-                    "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0
+                    "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0,
+                    "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0,
+                    "death_bowling_score": float(row.death_bowling_score) if row.death_bowling_score else 0
                 }
                 for row in results
             ],
             "deep_links": {
-                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&over_min=16&over_max=19&group_by=bowler"
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&over_min=15&over_max=19&group_by=bowler"
+            }
+        }
+
+    # ========================================================================
+    # CARD 7.5: MIDDLE OVERS SQUEEZE (NEW)
+    # ========================================================================
+    
+    def get_middle_overs_squeeze_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_overs: int = 15,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 7.5: Middle Overs Squeeze - Bowlers who strangled scoring in overs 7-15.
+        
+        Focuses on economy and dot ball percentage as primary metrics,
+        with wickets as a bonus factor.
+        """
+        
+        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
+        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_overs * 6}
+        
+        query = text(f"""
+            WITH middle_bowling AS (
+                SELECT 
+                    dd.bowl as player,
+                    dd.team_bowl as team,
+                    COUNT(*) as balls,
+                    SUM(dd.score) as runs,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' 
+                        AND dd.dismissal NOT IN ('run out', 'retired hurt', 'retired out')
+                        THEN 1 ELSE 0 END) as wickets,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    SUM(CASE WHEN dd.batruns = 1 OR dd.batruns = 2 THEN 1 ELSE 0 END) as singles_doubles,
+                    COUNT(DISTINCT dd.p_match) as innings
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year AND dd.year <= :end_year
+                AND dd.over >= 6 AND dd.over < 15  -- Middle overs 6-14
+                {dd_filter}
+                GROUP BY dd.bowl, dd.team_bowl
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM middle_bowling
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(wickets) as wickets,
+                    SUM(dots) as dots,
+                    SUM(boundaries) as boundaries,
+                    SUM(singles_doubles) as singles_doubles,
+                    SUM(innings) as innings
+                FROM middle_bowling
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT 
+                pt.player, ppt.team, pt.balls, pt.runs, pt.wickets, 
+                pt.dots, pt.boundaries, pt.singles_doubles, pt.innings,
+                ROUND(CAST(pt.runs * 6.0 / NULLIF(pt.balls, 0) AS numeric), 2) as economy,
+                ROUND(CAST(pt.balls AS numeric) / NULLIF(pt.wickets, 0), 2) as strike_rate,
+                ROUND(CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as dot_percentage,
+                ROUND(CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric), 1) as boundary_percentage,
+                -- Squeeze score: low economy + high dot% + low boundary% + wicket bonus
+                ROUND(
+                    (10 - CAST(pt.runs * 6.0 / NULLIF(pt.balls, 0) AS numeric)) * 8 +
+                    (CAST(pt.dots * 100.0 / NULLIF(pt.balls, 0) AS numeric)) * 0.6 +
+                    (20 - CAST(pt.boundaries * 100.0 / NULLIF(pt.balls, 0) AS numeric)) * 0.5 +
+                    (CAST(pt.wickets AS numeric) / NULLIF(pt.innings, 0)) * 8
+                , 2) as squeeze_score
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY squeeze_score DESC
+            LIMIT 15
+        """)
+        
+        results = db.execute(query, params).fetchall()
+        
+        return {
+            "card_id": "middle_overs_squeeze",
+            "card_title": "Middle Overs Squeeze",
+            "card_subtitle": f"Who choked the scoring in overs 7-15 (min {min_overs} overs)",
+            "visualization_type": "scatter",
+            "x_axis": "dot_percentage",
+            "y_axis": "economy",
+            "invert_y": True,  # Lower economy is better, show at top
+            "ranking_note": "Composite: economy + dot% + low boundary% + wickets",
+            "bowlers": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "balls": row.balls,
+                    "overs": round(row.balls / 6, 1),
+                    "runs": row.runs,
+                    "wickets": row.wickets,
+                    "innings": row.innings,
+                    "economy": float(row.economy) if row.economy else 0,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 999,
+                    "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0,
+                    "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0,
+                    "squeeze_score": float(row.squeeze_score) if row.squeeze_score else 0
+                }
+                for row in results
+            ],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&over_min=6&over_max=14&group_by=bowler"
             }
         }
 
@@ -1141,35 +1363,48 @@ class WrappedService:
         min_matches: int = 5,
         top_teams: int = DEFAULT_TOP_TEAMS
     ) -> Dict[str, Any]:
-        """Card 9: Venue leaderboard - par score + chase bias."""
+        """Card 9: Venue leaderboard - par score + chase bias - using delivery_details."""
         
-        competition_filter = build_competition_filter(leagues, include_international, top_teams)
-        params = {**get_base_params(start_date, end_date, leagues, top_teams), "min_matches": min_matches}
+        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
+        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_matches": min_matches}
         
         query = text(f"""
             WITH innings_totals AS (
-                SELECT match_id, innings, SUM(runs_off_bat + extras) as total
-                FROM deliveries
-                GROUP BY match_id, innings
+                SELECT 
+                    dd.p_match,
+                    dd.ground as venue,
+                    dd.inns,
+                    dd.winner,
+                    FIRST_VALUE(dd.team_bat) OVER (
+                        PARTITION BY dd.p_match 
+                        ORDER BY dd.inns, dd.over, dd.ball
+                    ) as batting_first_team,
+                    SUM(dd.score) OVER (PARTITION BY dd.p_match, dd.inns) as innings_total
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                {dd_filter}
+            ),
+            match_summary AS (
+                SELECT DISTINCT
+                    p_match,
+                    venue,
+                    winner,
+                    batting_first_team,
+                    MAX(CASE WHEN inns = 1 THEN innings_total END) OVER (PARTITION BY p_match) as first_innings_total
+                FROM innings_totals
             ),
             venue_stats AS (
                 SELECT 
-                    m.venue,
-                    COUNT(DISTINCT m.id) as matches,
-                    SUM(CASE WHEN m.winner = m.team1 AND m.toss_decision = 'bat' THEN 1
-                             WHEN m.winner = m.team2 AND m.toss_decision = 'field' THEN 1
-                             ELSE 0 END) as bat_first_wins,
-                    SUM(CASE WHEN m.winner = m.team1 AND m.toss_decision = 'field' THEN 1
-                             WHEN m.winner = m.team2 AND m.toss_decision = 'bat' THEN 1
-                             ELSE 0 END) as chase_wins,
-                    AVG(CASE WHEN it.innings = 1 THEN it.total END) as avg_first_innings
-                FROM matches m
-                LEFT JOIN innings_totals it ON m.id = it.match_id
-                WHERE m.date >= :start_date AND m.date <= :end_date
-                AND m.winner IS NOT NULL
-                {competition_filter}
-                GROUP BY m.venue
-                HAVING COUNT(DISTINCT m.id) >= :min_matches
+                    venue,
+                    COUNT(DISTINCT p_match) as matches,
+                    SUM(CASE WHEN winner = batting_first_team AND winner IS NOT NULL AND winner != '' THEN 1 ELSE 0 END) as bat_first_wins,
+                    SUM(CASE WHEN winner != batting_first_team AND winner IS NOT NULL AND winner != '' THEN 1 ELSE 0 END) as chase_wins,
+                    AVG(first_innings_total) as avg_first_innings
+                FROM match_summary
+                WHERE winner IS NOT NULL AND winner != ''
+                GROUP BY venue
+                HAVING COUNT(DISTINCT p_match) >= :min_matches
             )
             SELECT 
                 venue, matches, bat_first_wins, chase_wins,
