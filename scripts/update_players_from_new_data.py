@@ -4,6 +4,9 @@ Update players table with bat_hand/bowl_style from delivery_details.
 Usage:
     python scripts/update_players_from_new_data.py --db-url "postgres://..." --dry-run
     python scripts/update_players_from_new_data.py --db-url "postgres://..."
+    
+    # Using environment variable:
+    DATABASE_URL="postgres://..." python scripts/update_players_from_new_data.py
 """
 
 import os
@@ -43,7 +46,6 @@ def build_player_mapping(engine):
     """
     print("\nBuilding player mapping from DB...")
     
-    # Batter mapping: join on match/innings/over/ball, get existing name + new name + bat_hand
     batter_query = """
     SELECT 
         d.batter as existing_name,
@@ -107,7 +109,6 @@ def update_players(engine, batters, bowlers, dry_run=False):
     
     updates = []
     
-    # Combine batter and bowler info
     all_players = set(batters.keys()) | set(bowlers.keys())
     
     for name in all_players:
@@ -117,7 +118,7 @@ def update_players(engine, batters, bowlers, dry_run=False):
             update['aliases'] |= batters[name]['aliases']
             hands = batters[name]['bat_hands']
             if hands:
-                update['batter_type'] = list(hands)[0]  # Take first
+                update['batter_type'] = list(hands)[0]
         
         if name in bowlers:
             update['aliases'] |= bowlers[name]['aliases']
@@ -135,19 +136,16 @@ def update_players(engine, batters, bowlers, dry_run=False):
             print(f"  {u['name']}: bat={u.get('batter_type')}, bowl={u.get('bowler_type')}, aliases={list(u['aliases'])[:2]}")
         return
     
-    # Execute updates
     updated = 0
     aliases_added = 0
     
     with engine.begin() as conn:
         for u in updates:
-            # Update batter_type
             if u.get('batter_type'):
                 conn.execute(text(
                     "UPDATE players SET batter_type = :bt WHERE name = :name"
                 ), {'bt': u['batter_type'], 'name': u['name']})
             
-            # Update bowler_type
             if u.get('bowler_type'):
                 conn.execute(text(
                     "UPDATE players SET bowler_type = :bs WHERE name = :name"
@@ -155,7 +153,6 @@ def update_players(engine, batters, bowlers, dry_run=False):
             
             updated += 1
             
-            # Add aliases
             for alias in u['aliases']:
                 if alias != u['name']:
                     conn.execute(text("""
@@ -205,13 +202,23 @@ def print_summary(engine):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--db-url', required=True)
-    parser.add_argument('--dry-run', action='store_true')
+    parser = argparse.ArgumentParser(description='Update players with bat_hand/bowl_style from delivery_details')
+    parser.add_argument('--db-url', help='Database URL (or set DATABASE_URL env var)')
+    parser.add_argument('--dry-run', action='store_true', help='Show what would be updated without making changes')
     args = parser.parse_args()
     
-    engine = get_engine(args.db_url)
-    print(f"Connecting to: {args.db_url.split('@')[1]}")
+    # Get database URL
+    db_url = args.db_url or os.environ.get('DATABASE_URL')
+    if not db_url:
+        print("ERROR: Database URL required. Use --db-url or set DATABASE_URL environment variable.")
+        sys.exit(1)
+    
+    engine = get_engine(db_url)
+    db_display = db_url.split('@')[1] if '@' in db_url else 'localhost'
+    print(f"Connecting to: {db_display}")
+    
+    if args.dry_run:
+        print("\n*** DRY RUN MODE ***")
     
     create_aliases_table(engine)
     batters, bowlers = build_player_mapping(engine)

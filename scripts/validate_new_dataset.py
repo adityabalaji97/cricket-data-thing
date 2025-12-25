@@ -9,8 +9,11 @@ database to identify:
 4. Coverage analysis
 
 Usage:
-    python scripts/validate_new_dataset.py --csv /path/to/t20_bbb.csv
+    python scripts/validate_new_dataset.py --csv /path/to/t20_bbb.csv --db-url "postgres://..."
     python scripts/validate_new_dataset.py --csv /path/to/t20_bbb.csv --sample 100000
+    
+    # Using environment variable:
+    DATABASE_URL="postgres://..." python scripts/validate_new_dataset.py --csv /path/to/t20_bbb.csv
 """
 
 import os
@@ -21,32 +24,37 @@ from collections import defaultdict
 
 import pandas as pd
 from sqlalchemy import create_engine, text
-from dotenv import load_dotenv
 
-# Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-
+# Global override for DB URL (used by pipeline imports)
 DB_URL_OVERRIDE = None
 
+
 def get_database_url():
-    """Get database URL from environment or CLI override."""
+    """Get database URL from override, args, or environment."""
     global DB_URL_OVERRIDE
     if DB_URL_OVERRIDE:
         db_url = DB_URL_OVERRIDE
     else:
-        load_dotenv()
-        db_url = os.getenv("DATABASE_URL", "postgresql://aditya:aditya123@localhost:5432/cricket_db")
+        db_url = os.environ.get("DATABASE_URL")
+    
+    if not db_url:
+        return None
+    
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
     return db_url
 
 
-def connect_to_database():
+def connect_to_database(db_url=None):
     """Create database connection."""
-    db_url = get_database_url()
-    print(f"Connecting to: {db_url.split('@')[1] if '@' in db_url else 'localhost'}")
-    engine = create_engine(db_url)
+    url = db_url or get_database_url()
+    if not url:
+        print("ERROR: Database URL required")
+        sys.exit(1)
+    print(f"Connecting to: {url.split('@')[1] if '@' in url else 'localhost'}")
+    engine = create_engine(url)
     return engine
 
 
@@ -58,7 +66,6 @@ def get_existing_match_ids(engine):
         result = conn.execute(query)
         match_ids = set()
         for row in result:
-            # Handle both string and numeric IDs
             match_id = row[0]
             try:
                 match_ids.add(int(match_id))
@@ -107,17 +114,7 @@ def get_existing_player_names(engine):
 
 
 def load_new_dataset(csv_path, sample_size=None, chunk_size=100000):
-    """
-    Load new dataset from CSV, optionally sampling.
-    
-    Args:
-        csv_path: Path to the CSV file
-        sample_size: If provided, only load this many rows
-        chunk_size: Size of chunks for reading large files
-    
-    Returns:
-        DataFrame with the new dataset
-    """
+    """Load new dataset from CSV, optionally sampling."""
     print(f"\nLoading new dataset from: {csv_path}")
     
     if not os.path.exists(csv_path):
@@ -149,7 +146,6 @@ def analyze_match_overlap(new_df, existing_match_ids):
     print("MATCH ID ANALYSIS")
     print("="*60)
     
-    # Get unique match IDs from new dataset
     new_match_ids = set(new_df['p_match'].unique())
     print(f"\nUnique matches in new dataset: {len(new_match_ids):,}")
     
@@ -168,7 +164,6 @@ def analyze_match_overlap(new_df, existing_match_ids):
         except (ValueError, TypeError):
             existing_match_ids_int.add(mid)
     
-    # Calculate overlaps
     overlap = new_match_ids_int & existing_match_ids_int
     new_only = new_match_ids_int - existing_match_ids_int
     existing_only = existing_match_ids_int - new_match_ids_int
@@ -177,12 +172,10 @@ def analyze_match_overlap(new_df, existing_match_ids):
     print(f"Matches in NEW only (not in current DB): {len(new_only):,}")
     print(f"Matches in EXISTING only (no enhanced data): {len(existing_only):,}")
     
-    # Sample of new-only matches
     if new_only:
         sample_new = list(new_only)[:10]
         print(f"\nSample of NEW-ONLY match IDs: {sample_new}")
         
-        # Try to get info about these matches from new dataset
         sample_matches = new_df[new_df['p_match'].isin(sample_new)].drop_duplicates('p_match')
         if 'competition' in sample_matches.columns:
             print("Competitions for new-only matches:")
@@ -203,7 +196,6 @@ def analyze_player_names(new_df, existing_players):
     print("PLAYER NAME ANALYSIS")
     print("="*60)
     
-    # Get unique player names from new dataset
     new_batters = set(new_df['bat'].dropna().unique())
     new_bowlers = set(new_df['bowl'].dropna().unique())
     new_players = new_batters | new_bowlers
@@ -212,7 +204,6 @@ def analyze_player_names(new_df, existing_players):
     print(f"  - Batters: {len(new_batters):,}")
     print(f"  - Bowlers: {len(new_bowlers):,}")
     
-    # Check for exact matches
     exact_matches = new_players & existing_players
     new_only_players = new_players - existing_players
     existing_only_players = existing_players - new_players
@@ -221,7 +212,6 @@ def analyze_player_names(new_df, existing_players):
     print(f"Players in NEW only: {len(new_only_players):,}")
     print(f"Players in EXISTING only: {len(existing_only_players):,}")
     
-    # Sample mismatches for investigation
     if new_only_players:
         print(f"\nSample of NEW-ONLY player names (first 20):")
         for name in sorted(list(new_only_players))[:20]:
@@ -247,7 +237,6 @@ def analyze_data_quality(new_df):
         null_pct = (null_count / len(new_df)) * 100
         print(f"  - {col}: {null_pct:.1f}% null")
     
-    # Check key columns for the wagon wheel / shot data
     key_columns = ['wagonX', 'wagonY', 'wagonZone', 'line', 'length', 'shot', 'control', 'predscore', 'wprob']
     print("\nKey enhanced columns analysis:")
     for col in key_columns:
@@ -255,7 +244,6 @@ def analyze_data_quality(new_df):
             non_null = new_df[col].notna().sum()
             non_null_pct = (non_null / len(new_df)) * 100
             
-            # Check for sentinel values (-1)
             if col in ['predscore', 'wprob']:
                 valid = new_df[(new_df[col].notna()) & (new_df[col] != -1)]
                 valid_pct = (len(valid) / len(new_df)) * 100
@@ -263,19 +251,16 @@ def analyze_data_quality(new_df):
             else:
                 print(f"  - {col}: {non_null_pct:.1f}% non-null")
                 
-            # Show unique values for categorical columns
             if col in ['line', 'length', 'shot', 'wagonZone']:
                 unique_vals = new_df[col].dropna().unique()
                 print(f"    Unique values ({len(unique_vals)}): {list(unique_vals)[:10]}...")
     
-    # Competition breakdown
     if 'competition' in new_df.columns:
         print("\nCompetition breakdown:")
         comp_counts = new_df.groupby('competition')['p_match'].nunique()
         for comp, count in comp_counts.sort_values(ascending=False).items():
             print(f"  - {comp}: {count:,} matches")
     
-    # Year breakdown
     if 'year' in new_df.columns:
         print("\nYear range:", new_df['year'].min(), "-", new_df['year'].max())
 
@@ -290,18 +275,15 @@ def analyze_ball_integrity(new_df, overlap_matches, engine):
         print("No overlapping matches to check.")
         return {}
     
-    # Sample a few overlapping matches for detailed comparison
     sample_matches = list(overlap_matches)[:5]
     print(f"\nChecking {len(sample_matches)} sample matches: {sample_matches}")
     
     results = {}
     
     for match_id in sample_matches:
-        # Get deliveries from new dataset
         new_deliveries = new_df[new_df['p_match'] == match_id]
         new_ball_count = len(new_deliveries)
         
-        # Get deliveries from existing database
         query = text("SELECT COUNT(*) FROM deliveries WHERE match_id = :match_id")
         with engine.connect() as conn:
             result = conn.execute(query, {"match_id": str(match_id)})
@@ -327,23 +309,20 @@ def generate_report(results, output_path):
         f.write("# New Dataset Validation Report\n\n")
         f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         
-        # Match Analysis
         f.write("## Match ID Analysis\n\n")
         match_results = results.get('match_analysis', {})
         f.write(f"- **Matches in new dataset**: {len(match_results.get('new_match_ids', set())):,}\n")
         f.write(f"- **Matches in existing DB**: {len(match_results.get('existing_match_ids', set())):,}\n")
         f.write(f"- **Overlapping matches**: {len(match_results.get('overlap', set())):,}\n")
-        f.write(f"- **New matches only** (not in DB): {len(match_results.get('new_only', set())):,}\n")
-        f.write(f"- **Existing matches only** (no enhanced data): {len(match_results.get('existing_only', set())):,}\n\n")
+        f.write(f"- **New matches only**: {len(match_results.get('new_only', set())):,}\n")
+        f.write(f"- **Existing matches only**: {len(match_results.get('existing_only', set())):,}\n\n")
         
-        # Player Analysis
         f.write("## Player Name Analysis\n\n")
         player_results = results.get('player_analysis', {})
         f.write(f"- **Exact name matches**: {len(player_results.get('exact_matches', set())):,}\n")
         f.write(f"- **Players in new only**: {len(player_results.get('new_only', set())):,}\n")
         f.write(f"- **Players in existing only**: {len(player_results.get('existing_only', set())):,}\n\n")
         
-        # New-only players list
         new_only_players = player_results.get('new_only', set())
         if new_only_players:
             f.write("### Sample New-Only Players (first 50)\n\n")
@@ -351,7 +330,6 @@ def generate_report(results, output_path):
                 f.write(f"- {name}\n")
             f.write("\n")
         
-        # Ball Integrity
         f.write("## Ball-Level Integrity\n\n")
         ball_results = results.get('ball_integrity', {})
         if ball_results:
@@ -364,7 +342,6 @@ def generate_report(results, output_path):
             f.write("No overlapping matches to check.\n")
         f.write("\n")
         
-        # Recommendations
         f.write("## Recommendations\n\n")
         overlap_count = len(match_results.get('overlap', set()))
         new_only_count = len(match_results.get('new_only', set()))
@@ -373,12 +350,6 @@ def generate_report(results, output_path):
             f.write(f"1. **{overlap_count:,} matches can be enhanced** with wagon wheel and shot data\n")
         if new_only_count > 0:
             f.write(f"2. **{new_only_count:,} new matches** available - consider adding to main database\n")
-        
-        f.write("\n### Next Steps\n\n")
-        f.write("1. Create `delivery_details` table for enhanced ball data\n")
-        f.write("2. Load overlapping match data first\n")
-        f.write("3. Evaluate whether to add new-only matches to main tables\n")
-        f.write("4. Build player ID mapping table for cleaner references\n")
     
     print(f"Report saved to: {output_path}")
 
@@ -386,47 +357,39 @@ def generate_report(results, output_path):
 def main():
     parser = argparse.ArgumentParser(description='Validate new ball-by-ball dataset')
     parser.add_argument('--csv', type=str, required=True, help='Path to t20_bbb.csv')
+    parser.add_argument('--db-url', type=str, help='Database URL (or set DATABASE_URL env var)')
     parser.add_argument('--sample', type=int, default=None, help='Sample size (rows) to load')
     parser.add_argument('--output', type=str, default='validation_report.md', help='Output report path')
-    parser.add_argument('--db-url', type=str, default=None, help='Database URL (overrides env)')
-    
     args = parser.parse_args()
     
-    if args.db_url:
-        global DB_URL_OVERRIDE
-        DB_URL_OVERRIDE = args.db_url
+    # Get database URL
+    db_url = args.db_url or os.environ.get('DATABASE_URL')
+    if not db_url:
+        print("ERROR: Database URL required. Use --db-url or set DATABASE_URL environment variable.")
+        sys.exit(1)
+    
+    global DB_URL_OVERRIDE
+    DB_URL_OVERRIDE = db_url
     
     print("="*60)
     print("NEW DATASET VALIDATION SCRIPT")
     print("="*60)
     
-    # Connect to database
-    engine = connect_to_database()
+    engine = connect_to_database(db_url)
     
-    # Get existing data
     existing_match_ids = get_existing_match_ids(engine)
     existing_players = get_existing_player_names(engine)
     
-    # Load new dataset
     new_df = load_new_dataset(args.csv, sample_size=args.sample)
     
-    # Run analyses
     results = {}
-    
-    # Match analysis
     results['match_analysis'] = analyze_match_overlap(new_df, existing_match_ids)
-    
-    # Player analysis
     results['player_analysis'] = analyze_player_names(new_df, existing_players)
-    
-    # Data quality
     analyze_data_quality(new_df)
     
-    # Ball integrity (only if there's overlap)
     overlap = results['match_analysis'].get('overlap', set())
     results['ball_integrity'] = analyze_ball_integrity(new_df, overlap, engine)
     
-    # Generate report
     generate_report(results, args.output)
     
     print("\n" + "="*60)

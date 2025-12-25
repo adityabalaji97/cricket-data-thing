@@ -15,6 +15,74 @@ from services.query_builder_v2 import query_deliveries_service
 router = APIRouter(prefix="/query", tags=["query_builder"])
 
 
+def preprocess_list_param(items: List[str]) -> List[str]:
+    """
+    Preprocess list parameters to handle comma-separated values.
+    
+    This fixes an issue where URLs like ?group_by=batter,shot are parsed
+    by FastAPI as ['batter,shot'] instead of ['batter', 'shot'].
+    
+    Converts ['a,b', 'c'] to ['a', 'b', 'c']
+    Also removes empty strings and duplicates while preserving order.
+    """
+    if not items:
+        return []
+    
+    processed = []
+    for item in items:
+        if item is None:
+            continue
+        item_str = str(item)
+        if ',' in item_str:
+            # Split comma-separated values and strip whitespace
+            processed.extend([x.strip() for x in item_str.split(',')])
+        else:
+            processed.append(item_str.strip())
+    
+    # Remove empty strings and duplicates while preserving order
+    seen = set()
+    result = []
+    for item in processed:
+        if item and item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+
+def preprocess_int_list_param(items: List[int]) -> List[int]:
+    """
+    Preprocess integer list parameters to handle comma-separated string values.
+    
+    Handles cases where wagon_zone might come in as ['0,1,2'] instead of [0, 1, 2].
+    """
+    if not items:
+        return []
+    
+    processed = []
+    for item in items:
+        if item is None:
+            continue
+        # Handle case where it might be a string like "0,1,2"
+        if isinstance(item, str):
+            if ',' in item:
+                processed.extend([int(x.strip()) for x in item.split(',') if x.strip().isdigit()])
+            elif item.strip().isdigit():
+                processed.append(int(item.strip()))
+        else:
+            processed.append(int(item))
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    result = []
+    for item in processed:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+
 @router.get("/deliveries")
 def query_deliveries(
     # Basic filters
@@ -85,6 +153,26 @@ def query_deliveries(
     - Left-right combo analysis: `?group_by=crease_combo&min_balls=100`
     """
     try:
+        # PREPROCESSING: Handle comma-separated list parameters
+        # This fixes URLs like ?group_by=batter,shot which FastAPI parses as ['batter,shot']
+        leagues = preprocess_list_param(leagues)
+        teams = preprocess_list_param(teams)
+        batting_teams = preprocess_list_param(batting_teams)
+        bowling_teams = preprocess_list_param(bowling_teams)
+        players = preprocess_list_param(players)
+        batters = preprocess_list_param(batters)
+        bowlers = preprocess_list_param(bowlers)
+        bowl_style = preprocess_list_param(bowl_style)
+        bowl_kind = preprocess_list_param(bowl_kind)
+        crease_combo = preprocess_list_param(crease_combo)
+        line = preprocess_list_param(line)
+        length = preprocess_list_param(length)
+        shot = preprocess_list_param(shot)
+        group_by = preprocess_list_param(group_by)
+        
+        # Handle wagon_zone separately since it's List[int]
+        wagon_zone = preprocess_int_list_param(wagon_zone)
+        
         result = query_deliveries_service(
             venue=venue,
             start_date=start_date,

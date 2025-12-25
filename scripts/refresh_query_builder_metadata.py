@@ -3,6 +3,10 @@ Refresh query_builder_metadata table with precomputed values.
 
 Run after data loads or periodically:
     python scripts/refresh_query_builder_metadata.py --db-url "postgres://..."
+    python scripts/refresh_query_builder_metadata.py --show-only
+    
+    # Using environment variable:
+    DATABASE_URL="postgres://..." python scripts/refresh_query_builder_metadata.py
 """
 
 import os
@@ -126,11 +130,19 @@ def show_metadata(engine):
 
 def main():
     parser = argparse.ArgumentParser(description='Refresh query builder metadata')
-    parser.add_argument('--db-url', required=True, help='Database URL')
+    parser.add_argument('--db-url', help='Database URL (or set DATABASE_URL env var)')
     parser.add_argument('--show-only', action='store_true', help='Only show current metadata')
     args = parser.parse_args()
     
-    engine = get_engine(args.db_url)
+    # Get database URL
+    db_url = args.db_url or os.environ.get('DATABASE_URL')
+    if not db_url:
+        print("ERROR: Database URL required. Use --db-url or set DATABASE_URL environment variable.")
+        sys.exit(1)
+    
+    engine = get_engine(db_url)
+    db_display = db_url.split('@')[1] if '@' in db_url else 'localhost'
+    print(f"Connecting to: {db_display}")
     
     if args.show_only:
         show_metadata(engine)

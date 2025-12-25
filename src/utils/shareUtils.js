@@ -17,6 +17,7 @@ const getHtml2Canvas = async () => {
 
 /**
  * Capture a DOM element as a PNG data URL
+ * Handles overlay/backdrop cleanup to prevent grey tint issues
  * @param {HTMLElement} element - The DOM element to capture
  * @returns {Promise<string|null>} - Base64 data URL of the image
  */
@@ -29,22 +30,114 @@ export const captureElementAsImage = async (element) => {
   const html2canvas = await getHtml2Canvas();
   if (!html2canvas) return null;
 
+  // Track elements we've modified so we can restore them
+  const modifiedElements = [];
+
   try {
+    // STEP 1: Hide overlay elements that cause grey tint
+    const overlaySelectors = [
+      '.MuiBackdrop-root',
+      '.MuiModal-root',
+      '.wrapped-nav-hints',
+      '.wrapped-action-btn-share',
+      '[class*="Backdrop"]',
+      '[class*="backdrop"]'
+    ];
+    
+    overlaySelectors.forEach(selector => {
+      document.querySelectorAll(selector).forEach(el => {
+        if (el.style.display !== 'none') {
+          modifiedElements.push({
+            element: el,
+            property: 'display',
+            originalValue: el.style.display
+          });
+          el.style.display = 'none';
+        }
+      });
+    });
+
+    // STEP 2: Remove filter/opacity from parent containers
+    const container = element.closest('.wrapped-container');
+    if (container) {
+      // Store and clear filter
+      if (container.style.filter) {
+        modifiedElements.push({
+          element: container,
+          property: 'filter',
+          originalValue: container.style.filter
+        });
+        container.style.filter = 'none';
+      }
+      // Store and set full opacity
+      if (container.style.opacity && container.style.opacity !== '1') {
+        modifiedElements.push({
+          element: container,
+          property: 'opacity',
+          originalValue: container.style.opacity
+        });
+        container.style.opacity = '1';
+      }
+    }
+
+    // STEP 3: Also check the card itself
+    if (element.style.filter) {
+      modifiedElements.push({
+        element: element,
+        property: 'filter',
+        originalValue: element.style.filter
+      });
+      element.style.filter = 'none';
+    }
+
+    // Small delay to ensure DOM updates are applied
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // STEP 4: Capture the element
     const canvas = await html2canvas(element, {
       backgroundColor: '#121212', // Match wrapped background
       scale: 2, // Higher quality for retina displays
       useCORS: true,
       logging: false,
       allowTaint: true,
-      // Capture the full element
       width: element.offsetWidth,
       height: element.offsetHeight,
+      // Ignore elements that might cause overlay issues
+      ignoreElements: (el) => {
+        // Skip if element or its classes contain these patterns
+        const classNames = el.className || '';
+        const classStr = typeof classNames === 'string' ? classNames : classNames.toString();
+        
+        return (
+          classStr.includes('MuiBackdrop') ||
+          classStr.includes('wrapped-nav-hints') ||
+          classStr.includes('wrapped-action-btn-share') ||
+          classStr.includes('Backdrop') ||
+          el.tagName === 'NOSCRIPT'
+        );
+      },
+      // Ensure we capture with solid background
+      onclone: (clonedDoc, clonedElement) => {
+        // Ensure the cloned element has solid background
+        clonedElement.style.backgroundColor = '#121212';
+        clonedElement.style.filter = 'none';
+        clonedElement.style.opacity = '1';
+        
+        // Remove any backdrop elements from the clone
+        const clonedBackdrops = clonedDoc.querySelectorAll(overlaySelectors.join(', '));
+        clonedBackdrops.forEach(el => el.remove());
+      }
     });
 
     return canvas.toDataURL('image/png');
   } catch (error) {
     console.error('Error capturing element:', error);
     return null;
+  } finally {
+    // STEP 5: Restore all modified elements
+    modifiedElements.forEach(({ element: el, property, originalValue }) => {
+      el.style[property] = originalValue;
+    });
   }
 };
 

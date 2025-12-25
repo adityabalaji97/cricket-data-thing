@@ -1,27 +1,28 @@
 """
 Add left-right analysis columns to delivery_details.
-Data is already loaded - just need to add and populate 4 columns.
+Data is already loaded - just need to add and populate columns.
 
 Usage:
+    python scripts/add_left_right_columns.py --db-url "postgres://..."
+    python scripts/add_left_right_columns.py --dry-run
+    
+    # Using environment variable:
     DATABASE_URL="postgresql://..." python scripts/add_left_right_columns.py
 """
 
 import os
 import sys
+import argparse
 from sqlalchemy import create_engine, text
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-if not DATABASE_URL:
-    print("ERROR: DATABASE_URL environment variable is required")
-    sys.exit(1)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def get_engine():
-    url = DATABASE_URL
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
-    return create_engine(url)
+def get_engine(db_url):
+    """Create database engine."""
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    return create_engine(db_url)
 
 
 def add_columns(engine):
@@ -60,9 +61,6 @@ def populate_non_striker(engine):
     print("STEP 2: Populating non_striker from deliveries table...")
     print("=" * 60)
     
-    # delivery_details uses: p_match (int), inns, over, ball
-    # deliveries uses: match_id (string), innings, over, ball
-    
     sql = """
         UPDATE delivery_details dd
         SET non_striker = d.non_striker
@@ -85,7 +83,8 @@ def populate_non_striker(engine):
         has_ns = result.scalar()
         result = conn.execute(text("SELECT COUNT(*) FROM delivery_details"))
         total = result.scalar()
-        print(f"  Coverage: {has_ns:,} / {total:,} ({100*has_ns/total:.1f}%)")
+        if total > 0:
+            print(f"  Coverage: {has_ns:,} / {total:,} ({100*has_ns/total:.1f}%)")
     
     return has_ns
 
@@ -180,7 +179,8 @@ def populate_non_striker_batter_type(engine):
         has_type = result.scalar()
         result = conn.execute(text("SELECT COUNT(*) FROM delivery_details WHERE non_striker IS NOT NULL"))
         has_ns = result.scalar()
-        print(f"  Coverage: {has_type:,} / {has_ns:,} ({100*has_type/has_ns:.1f}% of rows with non_striker)")
+        if has_ns > 0:
+            print(f"  Coverage: {has_type:,} / {has_ns:,} ({100*has_type/has_ns:.1f}% of rows with non_striker)")
 
 
 def generate_crease_combo(engine):
@@ -215,8 +215,9 @@ def print_summary(engine):
         with_cc = conn.execute(text("SELECT COUNT(*) FROM delivery_details WHERE crease_combo IS NOT NULL")).scalar()
         
         print(f"  Total records: {total:,}")
-        print(f"  With non_striker: {with_ns:,} ({100*with_ns/total:.1f}%)")
-        print(f"  With crease_combo: {with_cc:,} ({100*with_cc/total:.1f}%)")
+        if total > 0:
+            print(f"  With non_striker: {with_ns:,} ({100*with_ns/total:.1f}%)")
+            print(f"  With crease_combo: {with_cc:,} ({100*with_cc/total:.1f}%)")
         
         result = conn.execute(text("""
             SELECT crease_combo, COUNT(*) as cnt FROM delivery_details
@@ -230,11 +231,29 @@ def print_summary(engine):
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Add left-right analysis columns to delivery_details')
+    parser.add_argument('--db-url', help='Database URL (or set DATABASE_URL env var)')
+    parser.add_argument('--dry-run', action='store_true', help='Show current state without making changes')
+    args = parser.parse_args()
+    
+    # Get database URL
+    db_url = args.db_url or os.environ.get('DATABASE_URL')
+    if not db_url:
+        print("ERROR: Database URL required. Use --db-url or set DATABASE_URL environment variable.")
+        sys.exit(1)
+    
     print("=" * 60)
     print("ADD LEFT-RIGHT ANALYSIS COLUMNS")
     print("=" * 60)
     
-    engine = get_engine()
+    engine = get_engine(db_url)
+    db_display = db_url.split('@')[1] if '@' in db_url else 'localhost'
+    print(f"Connecting to: {db_display}")
+    
+    if args.dry_run:
+        print("\n*** DRY RUN MODE ***")
+        print_summary(engine)
+        return
     
     add_columns(engine)
     populate_non_striker(engine)
