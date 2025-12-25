@@ -1551,7 +1551,7 @@ class WrappedService:
                 SUM(dd.batruns) as runs,
                 SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
                 SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-                SUM(CASE WHEN dd.out = 1 THEN 1 ELSE 0 END) as wickets
+                SUM(CASE WHEN dd.out = '1' OR dd.out = 'True' THEN 1 ELSE 0 END) as wickets
             FROM delivery_details dd
             WHERE dd.year >= :start_year
             AND dd.year <= :end_year
