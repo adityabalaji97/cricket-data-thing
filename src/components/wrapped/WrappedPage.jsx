@@ -43,7 +43,7 @@ const WrappedPage = () => {
     return (
       <Box className="wrapped-loading">
         <CircularProgress size={60} sx={{ color: '#1DB954' }} />
-        <p>Loading your 2025 Wrapped...</p>
+        <p>Loading 2025 In Hindsight...</p>
       </Box>
     );
   }

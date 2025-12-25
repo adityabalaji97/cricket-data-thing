@@ -9,7 +9,7 @@ const WrappedHeader = ({ onMenuClick, onClose }) => {
         <div className="wrapped-logo">
           <span>H</span>
         </div>
-        <span className="wrapped-header-title">hindsight wrapped 2025</span>
+        <span className="wrapped-header-title">2025 in hindsight</span>
       </div>
       
       {/* Right side: Menu + Close */}

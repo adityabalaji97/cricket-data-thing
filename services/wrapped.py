@@ -1,8 +1,8 @@
 """
-Wrapped 2025 Service Layer
+2025 In Hindsight Service Layer
 
-This module contains all the data fetching logic for the Wrapped 2025 feature.
-Each function corresponds to a specific card in the wrapped experience.
+This module contains all the data fetching logic for the 2025 In Hindsight feature.
+Each function corresponds to a specific card in the hindsight experience.
 """
 
 from sqlalchemy.orm import Session
@@ -94,7 +94,7 @@ def get_base_params(
 # ============================================================================
 
 class WrappedService:
-    """Service class for all Wrapped 2025 data operations."""
+    """Service class for all 2025 In Hindsight data operations."""
     
     def get_all_cards(
         self,
@@ -185,6 +185,27 @@ class WrappedService:
             logger.error(f"Error fetching venue vibes: {e}")
             cards.append({"card_id": "venue_vibes", "error": str(e)})
         
+        # Card 10: Controlled Aggression (NEW - uses delivery_details)
+        try:
+            cards.append(self.get_controlled_aggression_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
+        except Exception as e:
+            logger.error(f"Error fetching controlled aggression: {e}")
+            cards.append({"card_id": "controlled_aggression", "error": str(e)})
+        
+        # Card 11: 360° Batters (NEW - uses delivery_details wagon_zone)
+        try:
+            cards.append(self.get_360_batters_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
+        except Exception as e:
+            logger.error(f"Error fetching 360 batters: {e}")
+            cards.append({"card_id": "360_batters", "error": str(e)})
+        
+        # Card 12: Batter Hand Breakdown (NEW - uses delivery_details bat_hand/crease_combo)
+        try:
+            cards.append(self.get_batter_hand_breakdown_data(start_date, end_date, leagues, include_international, db, top_teams=top_teams))
+        except Exception as e:
+            logger.error(f"Error fetching batter hand breakdown: {e}")
+            cards.append({"card_id": "batter_hand_breakdown", "error": str(e)})
+        
         return {
             "year": 2025,
             "date_range": {"start": start_date, "end": end_date},
@@ -218,6 +239,9 @@ class WrappedService:
             "nineteenth_over_gods": self.get_nineteenth_over_gods_data,
             "elo_movers": self.get_elo_movers_data,
             "venue_vibes": self.get_venue_vibes_data,
+            "controlled_aggression": self.get_controlled_aggression_data,
+            "360_batters": self.get_360_batters_data,
+            "batter_hand_breakdown": self.get_batter_hand_breakdown_data,
         }
         
         if card_id not in card_methods:
@@ -1129,5 +1153,560 @@ class WrappedService:
             ],
             "deep_links": {
                 "venue_analysis": f"/venue?start_date={start_date}&end_date={end_date}"
+            }
+        }
+
+    # ========================================================================
+    # CARD 10: CONTROLLED AGGRESSION
+    # ========================================================================
+    
+    def get_controlled_aggression_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_balls: int = 150,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 10: Controlled Aggression - composite metric combining control%, SR, boundary%, dot%."""
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        # Add league filter for delivery_details
+        league_filter = ""
+        if leagues:
+            league_filter = "AND dd.competition = ANY(:leagues)"
+            params["leagues"] = leagues
+        
+        if include_international:
+            if leagues:
+                league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            else:
+                league_filter = ""  # Include all
+        
+        query = text(f"""
+            WITH player_stats AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) as controlled_shots,
+                    SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END) as control_data_balls
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                {league_filter}
+                GROUP BY dd.bat, dd.team_bat
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM player_stats
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(dots) as dots,
+                    SUM(boundaries) as boundaries,
+                    SUM(controlled_shots) as controlled_shots,
+                    SUM(control_data_balls) as control_data_balls
+                FROM player_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+                AND SUM(control_data_balls) >= 50  -- Need enough control data
+            )
+            SELECT 
+                pt.player,
+                ppt.team,
+                pt.balls,
+                pt.runs,
+                ROUND(pt.runs * 100.0 / NULLIF(pt.balls, 0), 2) as strike_rate,
+                ROUND(pt.dots * 100.0 / NULLIF(pt.balls, 0), 2) as dot_pct,
+                ROUND(pt.boundaries * 100.0 / NULLIF(pt.balls, 0), 2) as boundary_pct,
+                ROUND(pt.controlled_shots * 100.0 / NULLIF(pt.control_data_balls, 0), 2) as control_pct
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY pt.runs DESC
+            LIMIT 50
+        """)
+        
+        results = db.execute(query, params).fetchall()
+        
+        # Calculate Controlled Aggression score for each player
+        def calc_ca_score(sr, dot_pct, boundary_pct, control_pct):
+            """
+            Controlled Aggression Score formula:
+            - Control% contributes 25% (higher = better)
+            - Strike Rate contributes 35% (higher = better, normalized from 100)
+            - Boundary% contributes 25% (higher = better)
+            - Anti-Dot (50 - dot%) contributes 15% (lower dot% = better)
+            """
+            if control_pct is None:
+                control_pct = 70  # Default assumption
+            
+            control_score = (control_pct / 100) * 25
+            sr_score = min(35, max(0, ((sr - 100) / 70) * 35))  # 100-170 SR maps to 0-35
+            boundary_score = min(25, (boundary_pct / 25) * 25)  # 0-25% boundary maps to 0-25
+            anti_dot_score = min(15, max(0, ((50 - dot_pct) / 30) * 15))  # 20-50% dot maps to 15-0
+            
+            return round(control_score + sr_score + boundary_score + anti_dot_score, 1)
+        
+        players_with_ca = []
+        for row in results:
+            ca_score = calc_ca_score(
+                float(row.strike_rate) if row.strike_rate else 100,
+                float(row.dot_pct) if row.dot_pct else 35,
+                float(row.boundary_pct) if row.boundary_pct else 12,
+                float(row.control_pct) if row.control_pct else 70
+            )
+            players_with_ca.append({
+                "name": row.player,
+                "team": row.team,
+                "balls": row.balls,
+                "runs": row.runs,
+                "ca_score": ca_score,
+                "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
+                "dot_pct": float(row.dot_pct) if row.dot_pct else 0,
+                "boundary_pct": float(row.boundary_pct) if row.boundary_pct else 0,
+                "control_pct": float(row.control_pct) if row.control_pct else 0
+            })
+        
+        # Sort by CA score
+        players_with_ca.sort(key=lambda x: x['ca_score'], reverse=True)
+        
+        return {
+            "card_id": "controlled_aggression",
+            "card_title": "Controlled Chaos",
+            "card_subtitle": f"The most efficient aggressors (min {min_balls} balls)",
+            "visualization_type": "radar_comparison",
+            "metric_weights": {
+                "control_pct": 0.25,
+                "strike_rate": 0.35,
+                "boundary_pct": 0.25,
+                "anti_dot": 0.15
+            },
+            "players": players_with_ca[:15],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter&min_balls={min_balls}"
+            }
+        }
+
+    # ========================================================================
+    # CARD 11: 360° BATTERS
+    # ========================================================================
+    
+    def get_360_batters_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_balls: int = 200,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 11: 360° Batters - who scores evenly across all wagon wheel zones."""
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        # Add league filter for delivery_details
+        league_filter = ""
+        if leagues:
+            league_filter = "AND dd.competition = ANY(:leagues)"
+            params["leagues"] = leagues
+        
+        if include_international:
+            if leagues:
+                league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            else:
+                league_filter = ""  # Include all
+        
+        # Query zones 1-8 (zone 0 is dots/no shot data)
+        query = text(f"""
+            WITH zone_stats AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    dd.wagon_zone,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.wagon_zone IS NOT NULL
+                AND dd.wagon_zone BETWEEN 1 AND 8  -- Exclude zone 0 (dots/no data)
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                {league_filter}
+                GROUP BY dd.bat, dd.team_bat, dd.wagon_zone
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM zone_stats
+                ORDER BY player, SUM(balls) OVER (PARTITION BY player, team) DESC
+            ),
+            player_zone_agg AS (
+                SELECT 
+                    player,
+                    wagon_zone,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs
+                FROM zone_stats
+                GROUP BY player, wagon_zone
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as total_balls,
+                    SUM(runs) as total_runs,
+                    COUNT(DISTINCT wagon_zone) as zones_used
+                FROM player_zone_agg
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            ),
+            player_zone_pcts AS (
+                SELECT 
+                    pza.player,
+                    pza.wagon_zone,
+                    pza.runs,
+                    pza.balls,
+                    pt.total_runs,
+                    pt.total_balls,
+                    pt.zones_used,
+                    CASE WHEN pt.total_runs > 0 
+                        THEN ROUND((pza.runs * 100.0 / pt.total_runs)::numeric, 2)
+                        ELSE 0 END as run_pct
+                FROM player_zone_agg pza
+                JOIN player_totals pt ON pza.player = pt.player
+            )
+            SELECT 
+                pzp.player,
+                ppt.team,
+                pzp.wagon_zone,
+                pzp.runs,
+                pzp.balls,
+                pzp.run_pct,
+                pzp.total_runs,
+                pzp.total_balls,
+                pzp.zones_used
+            FROM player_zone_pcts pzp
+            JOIN player_primary_team ppt ON pzp.player = ppt.player
+            ORDER BY pzp.player, pzp.wagon_zone
+        """)
+        
+        results = db.execute(query, params).fetchall()
+        
+        # Group by player and calculate 360 score
+        from collections import defaultdict
+        player_data = defaultdict(lambda: {
+            "zones": {},
+            "total_runs": 0,
+            "total_balls": 0,
+            "team": None,
+            "zones_used": 0
+        })
+        
+        for row in results:
+            player = row.player
+            player_data[player]["zones"][row.wagon_zone] = {
+                "zone": row.wagon_zone,
+                "runs": row.runs,
+                "balls": row.balls,
+                "run_pct": float(row.run_pct) if row.run_pct else 0
+            }
+            player_data[player]["total_runs"] = row.total_runs
+            player_data[player]["total_balls"] = row.total_balls
+            player_data[player]["team"] = row.team
+            player_data[player]["zones_used"] = row.zones_used
+        
+        def calc_360_score(zones_data, total_runs):
+            """
+            360 Score = 100 - (StdDev of zone run percentages * scaling_factor)
+            Perfect distribution = 12.5% per zone (100/8 zones)
+            Lower std dev = higher score (more evenly spread)
+            """
+            if total_runs == 0 or len(zones_data) < 4:
+                return 0
+            
+            # Get run percentages for all 8 zones (0 if not used)
+            zone_pcts = []
+            for zone in range(1, 9):  # Zones 1-8
+                if zone in zones_data:
+                    zone_pcts.append(zones_data[zone]["run_pct"])
+                else:
+                    zone_pcts.append(0)
+            
+            # Calculate standard deviation
+            mean_pct = sum(zone_pcts) / 8  # Should be ~12.5 for perfect distribution
+            variance = sum((pct - mean_pct) ** 2 for pct in zone_pcts) / 8
+            std_dev = variance ** 0.5
+            
+            # Convert to 0-100 score (lower std_dev = higher score)
+            # Max std_dev would be ~35 (all runs in one zone)
+            score = max(0, min(100, 100 - (std_dev * 2.5)))
+            return round(score, 1)
+        
+        # Calculate 360 score for each player
+        players_with_360 = []
+        for player, data in player_data.items():
+            score_360 = calc_360_score(data["zones"], data["total_runs"])
+            
+            # Build zone breakdown list
+            zone_breakdown = []
+            for zone in range(1, 9):
+                if zone in data["zones"]:
+                    zone_breakdown.append(data["zones"][zone])
+                else:
+                    zone_breakdown.append({"zone": zone, "runs": 0, "balls": 0, "run_pct": 0})
+            
+            players_with_360.append({
+                "name": player,
+                "team": data["team"],
+                "score_360": score_360,
+                "total_runs": data["total_runs"],
+                "total_balls": data["total_balls"],
+                "zones_used": data["zones_used"],
+                "strike_rate": round((data["total_runs"] * 100 / data["total_balls"]), 2) if data["total_balls"] > 0 else 0,
+                "zone_breakdown": zone_breakdown
+            })
+        
+        # Sort by 360 score
+        players_with_360.sort(key=lambda x: x['score_360'], reverse=True)
+        
+        return {
+            "card_id": "360_batters",
+            "card_title": "360° Batters",
+            "card_subtitle": f"Who scores all around the ground (min {min_balls} balls)",
+            "visualization_type": "wagon_wheel",
+            "zone_labels": {
+                1: "Fine Leg",
+                2: "Square Leg", 
+                3: "Midwicket",
+                4: "Long On",
+                5: "Long Off",
+                6: "Cover",
+                7: "Point",
+                8: "Third Man"
+            },
+            "players": players_with_360[:15],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter,wagon_zone&min_balls={min_balls}"
+            }
+        }
+
+    # ========================================================================
+    # CARD 12: BATTER HAND BREAKDOWN
+    # ========================================================================
+    
+    def get_batter_hand_breakdown_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_balls: int = 100,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 12: Batter Hand Breakdown - LHB vs RHB performance + crease combo analysis."""
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        # Add league filter for delivery_details
+        league_filter = ""
+        if leagues:
+            league_filter = "AND dd.competition = ANY(:leagues)"
+            params["leagues"] = leagues
+        
+        if include_international:
+            if leagues:
+                league_filter = "AND (dd.competition = ANY(:leagues) OR dd.competition = 'T20I')"
+            else:
+                league_filter = ""  # Include all
+        
+        # Query 1: Overall stats by bat_hand
+        hand_query = text(f"""
+            SELECT 
+                dd.bat_hand,
+                COUNT(*) as balls,
+                SUM(dd.batruns) as runs,
+                SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                SUM(CASE WHEN dd.out = 1 THEN 1 ELSE 0 END) as wickets
+            FROM delivery_details dd
+            WHERE dd.year >= :start_year
+            AND dd.year <= :end_year
+            AND dd.bat_hand IN ('LHB', 'RHB')
+            {league_filter}
+            GROUP BY dd.bat_hand
+        """)
+        
+        hand_results = db.execute(hand_query, params).fetchall()
+        
+        hand_stats = {}
+        for row in hand_results:
+            hand_stats[row.bat_hand] = {
+                "bat_hand": row.bat_hand,
+                "balls": row.balls,
+                "runs": row.runs,
+                "strike_rate": round((row.runs * 100 / row.balls), 2) if row.balls > 0 else 0,
+                "dot_pct": round((row.dots * 100 / row.balls), 2) if row.balls > 0 else 0,
+                "boundary_pct": round((row.boundaries * 100 / row.balls), 2) if row.balls > 0 else 0,
+                "average": round((row.runs / row.wickets), 2) if row.wickets > 0 else 0
+            }
+        
+        # Query 2: Stats by crease_combo (normalized)
+        crease_query = text(f"""
+            SELECT 
+                CASE 
+                    WHEN dd.crease_combo IN ('LHB_RHB', 'RHB_LHB') THEN 'Mixed'
+                    WHEN dd.crease_combo = 'RHB_RHB' THEN 'RHB_RHB'
+                    WHEN dd.crease_combo = 'LHB_LHB' THEN 'LHB_LHB'
+                    ELSE 'Other'
+                END as combo_normalized,
+                COUNT(*) as balls,
+                SUM(dd.batruns) as runs,
+                SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+            FROM delivery_details dd
+            WHERE dd.year >= :start_year
+            AND dd.year <= :end_year
+            AND dd.crease_combo IN ('LHB_RHB', 'RHB_LHB', 'RHB_RHB', 'LHB_LHB')
+            {league_filter}
+            GROUP BY combo_normalized
+            ORDER BY balls DESC
+        """)
+        
+        crease_results = db.execute(crease_query, params).fetchall()
+        
+        crease_stats = []
+        for row in crease_results:
+            crease_stats.append({
+                "combo": row.combo_normalized,
+                "balls": row.balls,
+                "runs": row.runs,
+                "strike_rate": round((row.runs * 100 / row.balls), 2) if row.balls > 0 else 0,
+                "dot_pct": round((row.dots * 100 / row.balls), 2) if row.balls > 0 else 0,
+                "boundary_pct": round((row.boundaries * 100 / row.balls), 2) if row.balls > 0 else 0
+            })
+        
+        # Query 3: Top 5 performers per hand
+        top_lhb_query = text(f"""
+            WITH player_stats AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bat_hand = 'LHB'
+                {league_filter}
+                GROUP BY dd.bat, dd.team_bat
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM player_stats
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT player, SUM(balls) as balls, SUM(runs) as runs
+                FROM player_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT pt.player, ppt.team, pt.balls, pt.runs,
+                   ROUND((pt.runs * 100.0 / pt.balls)::numeric, 2) as strike_rate
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY strike_rate DESC
+            LIMIT 5
+        """)
+        
+        top_rhb_query = text(f"""
+            WITH player_stats AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bat_hand = 'RHB'
+                {league_filter}
+                GROUP BY dd.bat, dd.team_bat
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM player_stats
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT player, SUM(balls) as balls, SUM(runs) as runs
+                FROM player_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT pt.player, ppt.team, pt.balls, pt.runs,
+                   ROUND((pt.runs * 100.0 / pt.balls)::numeric, 2) as strike_rate
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            ORDER BY strike_rate DESC
+            LIMIT 5
+        """)
+        
+        top_lhb = db.execute(top_lhb_query, params).fetchall()
+        top_rhb = db.execute(top_rhb_query, params).fetchall()
+        
+        return {
+            "card_id": "batter_hand_breakdown",
+            "card_title": "Left vs Right",
+            "card_subtitle": f"Batting hand breakdown (min {min_balls} balls)",
+            "visualization_type": "comparison_with_crease",
+            "hand_stats": hand_stats,
+            "crease_combo_stats": crease_stats,
+            "top_lhb": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "balls": row.balls,
+                    "runs": row.runs,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0
+                }
+                for row in top_lhb
+            ],
+            "top_rhb": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "balls": row.balls,
+                    "runs": row.runs,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0
+                }
+                for row in top_rhb
+            ],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bat_hand&min_balls={min_balls}"
             }
         }

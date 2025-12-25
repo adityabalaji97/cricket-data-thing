@@ -1,7 +1,7 @@
 """
-Wrapped 2025 API Router
+2025 In Hindsight API Router
 
-Provides endpoints for the "Hindsight 2025 Wrapped" feature - 
+Provides endpoints for the "2025 In Hindsight" feature - 
 a Spotify Wrapped-style experience for T20 cricket statistics.
 """
 
@@ -16,7 +16,7 @@ from services.wrapped import WrappedService
 router = APIRouter(prefix="/wrapped", tags=["wrapped"])
 logger = logging.getLogger(__name__)
 
-# Default date range for 2025 Wrapped
+# Default date range for 2025 In Hindsight
 DEFAULT_START_DATE = "2025-01-01"
 DEFAULT_END_DATE = "2025-12-31"
 
@@ -98,8 +98,8 @@ def get_wrapped_metadata():
     """
     return {
         "year": 2025,
-        "title": "Hindsight 2025 Wrapped",
-        "subtitle": "The Year in Overs",
+        "title": "2025 In Hindsight",
+        "subtitle": "The Year in Review",
         "date_range": {
             "start": DEFAULT_START_DATE,
             "end": DEFAULT_END_DATE
@@ -158,6 +158,24 @@ def get_wrapped_metadata():
                 "title": "Venue Vibes",
                 "subtitle": "Par scores and chase bias",
                 "order": 9
+            },
+            {
+                "id": "controlled_aggression",
+                "title": "Controlled Chaos",
+                "subtitle": "The most efficient aggressors",
+                "order": 10
+            },
+            {
+                "id": "360_batters",
+                "title": "360° Batters",
+                "subtitle": "Who scores all around the ground",
+                "order": 11
+            },
+            {
+                "id": "batter_hand_breakdown",
+                "title": "Left vs Right",
+                "subtitle": "Batting hand breakdown",
+                "order": 12
             }
         ]
     }

@@ -12,6 +12,9 @@ import PowerplayThievesCard from './cards/PowerplayThievesCard';
 import NineteenthOverGodsCard from './cards/NineteenthOverGodsCard';
 import EloMoversCard from './cards/EloMoversCard';
 import VenueVibesCard from './cards/VenueVibesCard';
+import ControlledAggressionCard from './cards/ControlledAggressionCard';
+import ThreeSixtyBattersCard from './cards/ThreeSixtyBattersCard';
+import BatterHandBreakdownCard from './cards/BatterHandBreakdownCard';
 import './wrapped.css';
 
 // Map card IDs to their specific visualization components
@@ -25,6 +28,9 @@ const cardComponents = {
   'nineteenth_over_gods': NineteenthOverGodsCard,
   'elo_movers': EloMoversCard,
   'venue_vibes': VenueVibesCard,
+  'controlled_aggression': ControlledAggressionCard,
+  '360_batters': ThreeSixtyBattersCard,
+  'batter_hand_breakdown': BatterHandBreakdownCard,
 };
 
 const WrappedCard = forwardRef(({ cardData, cardIndex, totalCards, onShareImage, isSharing }, ref) => {
