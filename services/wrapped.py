@@ -901,6 +901,105 @@ class WrappedService:
         pace_crushers = [r for r in results if r.sr_delta and r.sr_delta > 0][:5]
         spin_crushers = [r for r in results if r.sr_delta and r.sr_delta < 0][:5]
         
+        # Query for "Complete Batters" - excel against BOTH pace and spin
+        # Criteria: SR > 120, dot% < 35, boundary% > 10 vs BOTH types
+        complete_query = text(f"""
+            WITH batter_vs_pace AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bowl_kind = 'pace bowler'
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bat, dd.team_bat
+            ),
+            batter_vs_spin AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bowl_kind = 'spin bowler'
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bat, dd.team_bat
+            ),
+            pace_totals AS (
+                SELECT player, SUM(balls) as balls, SUM(runs) as runs, SUM(dots) as dots, SUM(boundaries) as boundaries
+                FROM batter_vs_pace
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            ),
+            spin_totals AS (
+                SELECT player, SUM(balls) as balls, SUM(runs) as runs, SUM(dots) as dots, SUM(boundaries) as boundaries
+                FROM batter_vs_spin
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM (
+                    SELECT player, team, balls FROM batter_vs_pace
+                    UNION ALL
+                    SELECT player, team, balls FROM batter_vs_spin
+                ) combined
+                ORDER BY player, balls DESC
+            )
+            SELECT 
+                p.player,
+                ppt.team,
+                p.balls as pace_balls, p.runs as pace_runs,
+                ROUND(CAST(p.runs * 100.0 / NULLIF(p.balls, 0) AS numeric), 2) as sr_vs_pace,
+                ROUND(CAST(p.dots * 100.0 / NULLIF(p.balls, 0) AS numeric), 1) as dot_pct_vs_pace,
+                ROUND(CAST(p.boundaries * 100.0 / NULLIF(p.balls, 0) AS numeric), 1) as boundary_pct_vs_pace,
+                s.balls as spin_balls, s.runs as spin_runs,
+                ROUND(CAST(s.runs * 100.0 / NULLIF(s.balls, 0) AS numeric), 2) as sr_vs_spin,
+                ROUND(CAST(s.dots * 100.0 / NULLIF(s.balls, 0) AS numeric), 1) as dot_pct_vs_spin,
+                ROUND(CAST(s.boundaries * 100.0 / NULLIF(s.balls, 0) AS numeric), 1) as boundary_pct_vs_spin
+            FROM pace_totals p
+            INNER JOIN spin_totals s ON p.player = s.player
+            LEFT JOIN player_primary_team ppt ON p.player = ppt.player
+            WHERE 
+                (p.runs * 100.0 / NULLIF(p.balls, 0)) > 120
+                AND (s.runs * 100.0 / NULLIF(s.balls, 0)) > 120
+                AND (p.dots * 100.0 / NULLIF(p.balls, 0)) < 35
+                AND (s.dots * 100.0 / NULLIF(s.balls, 0)) < 35
+                AND (p.boundaries * 100.0 / NULLIF(p.balls, 0)) > 10
+                AND (s.boundaries * 100.0 / NULLIF(s.balls, 0)) > 10
+            ORDER BY 
+                ((p.runs * 100.0 / NULLIF(p.balls, 0)) + (s.runs * 100.0 / NULLIF(s.balls, 0))) / 2 DESC
+            LIMIT 5
+        """)
+        
+        complete_results = db.execute(complete_query, params).fetchall()
+        
+        complete_batters = [
+            {
+                "name": row.player,
+                "team": row.team,
+                "sr_vs_pace": float(row.sr_vs_pace) if row.sr_vs_pace else 0,
+                "sr_vs_spin": float(row.sr_vs_spin) if row.sr_vs_spin else 0,
+                "dot_pct_vs_pace": float(row.dot_pct_vs_pace) if row.dot_pct_vs_pace else 0,
+                "dot_pct_vs_spin": float(row.dot_pct_vs_spin) if row.dot_pct_vs_spin else 0,
+                "boundary_pct_vs_pace": float(row.boundary_pct_vs_pace) if row.boundary_pct_vs_pace else 0,
+                "boundary_pct_vs_spin": float(row.boundary_pct_vs_spin) if row.boundary_pct_vs_spin else 0,
+                "pace_balls": row.pace_balls,
+                "spin_balls": row.spin_balls,
+                "combined_sr": round((float(row.sr_vs_pace) + float(row.sr_vs_spin)) / 2, 2) if row.sr_vs_pace and row.sr_vs_spin else 0
+            }
+            for row in complete_results
+        ]
+        
         return {
             "card_id": "pace_vs_spin",
             "card_title": "Pace vs Spin",
@@ -930,6 +1029,13 @@ class WrappedService:
                 }
                 for row in spin_crushers
             ],
+            "complete_batters": complete_batters,
+            "complete_batters_criteria": {
+                "min_sr": 120,
+                "max_dot_pct": 35,
+                "min_boundary_pct": 10,
+                "note": "Players who excel against BOTH pace and spin"
+            },
             "deep_links": {
                 "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter,bowler_type&min_balls={min_balls}"
             }
@@ -2274,6 +2380,66 @@ class WrappedService:
         # Sort by total rare runs (volume + quality)
         players_list.sort(key=lambda x: x['total_rare_runs'], reverse=True)
         
+        # Query for best player PER rare shot type (by SR with min balls)
+        best_per_shot_query = text(f"""
+            WITH shot_stats AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    dd.shot,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.shot = ANY(:rare_shots)
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bat, dd.team_bat, dd.shot
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM shot_stats
+                ORDER BY player, SUM(balls) OVER (PARTITION BY player, team) DESC
+            ),
+            player_shot_agg AS (
+                SELECT player, shot, SUM(balls) as balls, SUM(runs) as runs, SUM(boundaries) as boundaries
+                FROM shot_stats
+                GROUP BY player, shot
+                HAVING SUM(balls) >= 5
+            ),
+            ranked_per_shot AS (
+                SELECT 
+                    psa.player,
+                    ppt.team,
+                    psa.shot,
+                    psa.balls,
+                    psa.runs,
+                    psa.boundaries,
+                    ROUND((psa.runs * 100.0 / NULLIF(psa.balls, 0))::numeric, 2) as strike_rate,
+                    ROW_NUMBER() OVER (PARTITION BY psa.shot ORDER BY (psa.runs * 100.0 / NULLIF(psa.balls, 0)) DESC) as rn
+                FROM player_shot_agg psa
+                JOIN player_primary_team ppt ON psa.player = ppt.player
+            )
+            SELECT player, team, shot, balls, runs, boundaries, strike_rate
+            FROM ranked_per_shot
+            WHERE rn = 1
+            ORDER BY shot
+        """)
+        
+        best_per_shot_results = db.execute(best_per_shot_query, params).fetchall()
+        
+        best_per_shot = {}
+        for row in best_per_shot_results:
+            best_per_shot[row.shot] = {
+                "name": row.player,
+                "team": row.team,
+                "balls": row.balls,
+                "runs": row.runs,
+                "boundaries": row.boundaries,
+                "strike_rate": float(row.strike_rate) if row.strike_rate else 0
+            }
+        
         return {
             "card_id": "rare_shot_specialists",
             "card_title": "Rare Shot Artists",
@@ -2289,6 +2455,8 @@ class WrappedService:
                 "HOOK": "Hook",
                 "UPPER_CUT": "Upper Cut"
             },
+            "best_per_shot": best_per_shot,
+            "best_per_shot_note": "Top player by strike rate for each shot type (min 5 balls)",
             "players": players_list[:15],
             "deep_links": {
                 "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter,shot"
