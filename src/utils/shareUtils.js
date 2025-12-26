@@ -40,6 +40,8 @@ export const captureElementAsImage = async (element) => {
       '.MuiModal-root',
       '.wrapped-nav-hints',
       '.wrapped-action-btn-share',
+      '.wrapped-top-section',
+      '.wrapped-card-actions',
       '[class*="Backdrop"]',
       '[class*="backdrop"]'
     ];
@@ -57,7 +59,16 @@ export const captureElementAsImage = async (element) => {
       });
     });
 
-    // STEP 2: Remove filter/opacity from parent containers
+    // STEP 2: Temporarily set solid background on element
+    const originalBg = element.style.backgroundColor;
+    element.style.backgroundColor = '#121212';
+    modifiedElements.push({
+      element: element,
+      property: 'backgroundColor',
+      originalValue: originalBg
+    });
+
+    // STEP 3: Remove filter/opacity from parent containers and element
     const container = element.closest('.wrapped-container');
     if (container) {
       // Store and clear filter
@@ -70,28 +81,31 @@ export const captureElementAsImage = async (element) => {
         container.style.filter = 'none';
       }
       // Store and set full opacity
-      if (container.style.opacity && container.style.opacity !== '1') {
-        modifiedElements.push({
-          element: container,
-          property: 'opacity',
-          originalValue: container.style.opacity
-        });
-        container.style.opacity = '1';
-      }
+      modifiedElements.push({
+        element: container,
+        property: 'opacity',
+        originalValue: container.style.opacity
+      });
+      container.style.opacity = '1';
     }
 
-    // STEP 3: Also check the card itself
-    if (element.style.filter) {
-      modifiedElements.push({
-        element: element,
-        property: 'filter',
-        originalValue: element.style.filter
-      });
-      element.style.filter = 'none';
-    }
+    // Also check the card itself
+    modifiedElements.push({
+      element: element,
+      property: 'filter',
+      originalValue: element.style.filter
+    });
+    element.style.filter = 'none';
+    
+    modifiedElements.push({
+      element: element,
+      property: 'opacity', 
+      originalValue: element.style.opacity
+    });
+    element.style.opacity = '1';
 
     // Small delay to ensure DOM updates are applied
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // STEP 4: Capture the element
     const canvas = await html2canvas(element, {
@@ -112,7 +126,10 @@ export const captureElementAsImage = async (element) => {
           classStr.includes('MuiBackdrop') ||
           classStr.includes('wrapped-nav-hints') ||
           classStr.includes('wrapped-action-btn-share') ||
+          classStr.includes('wrapped-top-section') ||
+          classStr.includes('wrapped-card-actions') ||
           classStr.includes('Backdrop') ||
+          classStr.includes('progress-') ||
           el.tagName === 'NOSCRIPT'
         );
       },
@@ -122,10 +139,25 @@ export const captureElementAsImage = async (element) => {
         clonedElement.style.backgroundColor = '#121212';
         clonedElement.style.filter = 'none';
         clonedElement.style.opacity = '1';
+        clonedElement.style.paddingTop = '40px'; // Reduce top padding since we hide header
         
-        // Remove any backdrop elements from the clone
-        const clonedBackdrops = clonedDoc.querySelectorAll(overlaySelectors.join(', '));
-        clonedBackdrops.forEach(el => el.remove());
+        // Remove any potential overlay elements from the clone
+        const selectorsToRemove = [
+          '.MuiBackdrop-root',
+          '.wrapped-nav-hints',
+          '.wrapped-card-actions',
+          '.wrapped-top-section',
+          '[class*="Backdrop"]'
+        ];
+        
+        selectorsToRemove.forEach(selector => {
+          clonedDoc.querySelectorAll(selector).forEach(el => el.remove());
+        });
+        
+        // Also remove from cloned element itself if nested
+        selectorsToRemove.forEach(selector => {
+          clonedElement.querySelectorAll(selector).forEach(el => el.remove());
+        });
       }
     });
 
@@ -136,7 +168,7 @@ export const captureElementAsImage = async (element) => {
   } finally {
     // STEP 5: Restore all modified elements
     modifiedElements.forEach(({ element: el, property, originalValue }) => {
-      el.style[property] = originalValue;
+      el.style[property] = originalValue || '';
     });
   }
 };

@@ -213,6 +213,7 @@
   padding: 70px 20px 20px;
   overflow-y: auto;
   animation: fadeIn 0.3s ease;
+  background: var(--wrapped-bg); /* Explicit background for image capture */
 }
 
 .wrapped-card-body {
