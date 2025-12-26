@@ -22,7 +22,7 @@ import logging
 
 from database import get_session
 from services.player_patterns import detect_batter_patterns, detect_bowler_patterns
-from services.player_aliases import resolve_player_name
+from services.player_aliases import resolve_to_legacy_name
 
 logger = logging.getLogger(__name__)
 
@@ -373,8 +373,8 @@ async def get_batter_summary(
     If no competition filters are provided, automatically includes ALL leagues + international (top 20 teams).
     """
     try:
-        # Resolve player alias to canonical name
-        resolved_name = resolve_player_name(player_name, db)
+        # Resolve player alias to legacy name (used in players/deliveries tables)
+        resolved_name = resolve_to_legacy_name(player_name, db)
         logger.info(f"Resolved player name: '{player_name}' -> '{resolved_name}'")
         
         # If no filters provided, use ALL leagues + international
@@ -491,8 +491,8 @@ async def get_bowler_summary(
     If no competition filters are provided, automatically includes ALL leagues + international (top 20 teams).
     """
     try:
-        # Resolve player alias to canonical name
-        resolved_name = resolve_player_name(player_name, db)
+        # Resolve player alias to legacy name (used in players/deliveries tables)
+        resolved_name = resolve_to_legacy_name(player_name, db)
         logger.info(f"Resolved bowler name: '{player_name}' -> '{resolved_name}'")
         
         # If no filters provided, use ALL leagues + international

@@ -33,14 +33,15 @@ const GoogleSearchLanding = () => {
     setLuckyLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/search/random`);
-      const { name, type } = response.data;
+      const data = response.data;
       
-      if (type === 'player') {
-        setSelectedEntity({ name, type });
-      } else if (type === 'team') {
-        navigate(`/team?team=${encodeURIComponent(name)}&autoload=true`);
-      } else if (type === 'venue') {
-        navigate(`/venue?venue=${encodeURIComponent(name)}&autoload=true`);
+      if (data.type === 'player') {
+        // Use legacy name for profile lookup, full object for state
+        setSelectedEntity(data);
+      } else if (data.type === 'team') {
+        navigate(`/team?team=${encodeURIComponent(data.name)}&autoload=true`);
+      } else if (data.type === 'venue') {
+        navigate(`/venue?venue=${encodeURIComponent(data.name)}&autoload=true`);
       }
     } catch (error) {
       console.error('Lucky search error:', error);

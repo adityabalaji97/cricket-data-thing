@@ -194,7 +194,7 @@ const PlayerSearchResult = ({ playerName }) => {
         <PersonIcon sx={{ fontSize: 40, color: 'primary.main' }} />
         <Box>
           <Typography variant="h5" fontWeight="bold">
-            {profile.player_name}
+            {profile.display_name || profile.player_name}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
             {player_info.batter_type && (

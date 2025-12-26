@@ -6,8 +6,8 @@ import logging
 import random
 
 from services.player_aliases import (
-    resolve_player_name, 
-    get_canonical_name,
+    resolve_to_legacy_name,
+    get_player_names,
     search_players_with_aliases
 )
 
@@ -31,7 +31,8 @@ def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
     Returns results ranked by relevance (exact > prefix > contains).
     
     Player search includes alias matching - searching "Virat Kohli" 
-    will also find "V Kohli" but return the canonical name only.
+    will find "V Kohli" and show "Virat Kohli" as display name.
+    Returns both legacy_name (for routing) and display_name (for UI).
     """
     if not query or len(query.strip()) < 2:
         return []
@@ -40,7 +41,7 @@ def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
     search_lower = search_term.lower()
     
     try:
-        # Search players with alias support (returns canonical names)
+        # Search players with alias support (returns deduplicated with both names)
         players = search_players_with_aliases(query, db, limit)
         
         # Search teams - use subquery
@@ -90,22 +91,32 @@ def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
         results = []
         
         # Players already formatted from search_players_with_aliases
+        # Each has: name, display_name, details_name, type
         results.extend(players)
         
         for row in teams:
-            results.append({"name": row.name, "type": row.type})
+            results.append({
+                "name": row.name, 
+                "display_name": row.name,
+                "type": row.type
+            })
         for row in venues:
-            results.append({"name": row.name, "type": row.type})
+            results.append({
+                "name": row.name, 
+                "display_name": row.name,
+                "type": row.type
+            })
         
-        # Sort combined results by relevance
+        # Sort combined results by relevance (using display_name for matching)
         def relevance_key(item):
-            name_lower = item["name"].lower()
+            # Use display_name for relevance scoring
+            name_lower = item.get("display_name", item["name"]).lower()
             if name_lower == search_lower:
-                return (0, item["name"])
+                return (0, item.get("display_name", item["name"]))
             elif name_lower.startswith(search_lower):
-                return (1, item["name"])
+                return (1, item.get("display_name", item["name"]))
             else:
-                return (2, item["name"])
+                return (2, item.get("display_name", item["name"]))
         
         results.sort(key=relevance_key)
         return results[:limit]
@@ -148,10 +159,19 @@ def get_random_entity(db: Session) -> Dict:
         result = db.execute(query).fetchone()
         
         if result:
-            return {"name": result.name, "type": entity_type}
+            if entity_type == "player":
+                # Get both names for players
+                names = get_player_names(result.name, db)
+                return {
+                    "name": names["legacy_name"],
+                    "display_name": names["details_name"],
+                    "details_name": names["details_name"],
+                    "type": entity_type
+                }
+            return {"name": result.name, "display_name": result.name, "type": entity_type}
         
         # Fallback if no result
-        return {"name": "Virat Kohli", "type": "player"}
+        return {"name": "V Kohli", "display_name": "Virat Kohli", "type": "player"}
         
     except Exception as e:
         logger.error(f"Error in get_random_entity: {str(e)}")
@@ -168,22 +188,23 @@ def get_player_profile(
     Get unified player profile with both batting and bowling career stats.
     Uses default date range if not specified.
     
-    Supports player aliases - if an old/alternate name is provided,
-    it will be resolved to the canonical name automatically.
+    Supports player aliases - if a new name (from delivery_details) is provided,
+    it will be resolved to the legacy name for querying.
+    
+    Returns both legacy_name and details_name for routing flexibility.
     """
     defaults = get_default_params()
     start = start_date or defaults["start_date"]
     end = end_date or defaults["end_date"]
     
     try:
-        # Resolve player name to canonical form
-        canonical_name = get_canonical_name(player_name, db)
+        # Get both name formats
+        names = get_player_names(player_name, db)
+        legacy_name = names["legacy_name"]
+        details_name = names["details_name"]
         
-        if not canonical_name:
-            return {"error": f"Player '{player_name}' not found", "found": False}
-        
-        # Use canonical name for all queries
-        resolved_name = canonical_name
+        # Use legacy name for querying players/deliveries/batting_stats/bowling_stats
+        resolved_name = legacy_name
         
         # Get player info
         player_info_query = text("""
@@ -308,10 +329,12 @@ def get_player_profile(
         else:
             role = "unknown"
         
-        # Return canonical name (resolved_name) so frontend uses correct name for links
+        # Return BOTH names for routing flexibility
         return {
             "found": True,
-            "player_name": resolved_name,  # Always return canonical name
+            "player_name": legacy_name,  # For /player, /bowler routes (queries deliveries)
+            "display_name": details_name,  # For UI display
+            "details_name": details_name,  # For delivery_details queries
             "player_info": {
                 "batter_type": player_info.batter_type,
                 "bowler_type": player_info.bowler_type,

@@ -79,9 +79,11 @@ const SearchBar = ({ onSelect, placeholder = "Search players, teams, or venues..
   }, [query]);
 
   const handleSelect = (item) => {
-    setQuery(item.name);
+    // Use display_name for the input field if available
+    setQuery(item.display_name || item.name);
     setShowSuggestions(false);
     if (onSelect) {
+      // Pass the full item with both name (legacy) and display_name
       onSelect(item);
     }
   };
@@ -150,7 +152,7 @@ const SearchBar = ({ onSelect, placeholder = "Search players, teams, or venues..
                     {getIcon(item.type)}
                   </ListItemIcon>
                   <ListItemText
-                    primary={item.name}
+                    primary={item.display_name || item.name}
                     secondary={
                       <Typography variant="caption" color="text.secondary">
                         {getTypeLabel(item.type)}
