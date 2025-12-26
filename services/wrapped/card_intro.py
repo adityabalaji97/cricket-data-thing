@@ -38,11 +38,12 @@ def get_intro_data(
     )
     
     # Get total deliveries, runs, wickets
+    # Note: dd.dismissal is a string column (NULL when not out, contains dismissal type when out)
     stats_query = f"""
         SELECT 
             COUNT(*) as total_balls,
-            SUM(dd.batruns) as total_runs,
-            SUM(CASE WHEN dd.out = true THEN 1 ELSE 0 END) as total_wickets,
+            COALESCE(SUM(dd.batruns), 0) as total_runs,
+            SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as total_wickets,
             SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) as total_sixes,
             SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) as total_fours,
             COUNT(DISTINCT dd.p_match) as total_matches,
@@ -58,7 +59,7 @@ def get_intro_data(
         row = result[0]
         stats = {
             "total_balls": row.total_balls or 0,
-            "total_runs": row.total_runs or 0,
+            "total_runs": int(row.total_runs) if row.total_runs else 0,
             "total_wickets": row.total_wickets or 0,
             "total_sixes": row.total_sixes or 0,
             "total_fours": row.total_fours or 0,

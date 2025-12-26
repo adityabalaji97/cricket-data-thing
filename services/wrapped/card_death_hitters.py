@@ -50,10 +50,10 @@ def get_death_hitters_data(
                 dd.bat as player,
                 dd.team_bat as team,
                 COUNT(*) as balls,
-                SUM(dd.batruns) as runs,
-                SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) as sixes,
-                SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) as fours,
-                SUM(CASE WHEN dd.batruns = 0 AND dd.wide IS NULL THEN 1 ELSE 0 END) as dots
+                SUM(dd.score) as runs,
+                SUM(CASE WHEN dd.score = 6 THEN 1 ELSE 0 END) as sixes,
+                SUM(CASE WHEN dd.score = 4 THEN 1 ELSE 0 END) as fours,
+                SUM(CASE WHEN dd.score = 0 AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) as dots
             FROM delivery_details dd
             {where_clause}
             GROUP BY dd.bat, dd.team_bat
@@ -98,9 +98,9 @@ def get_death_hitters_data(
             "name": row.player,
             "team": row.team,
             "balls": row.balls,
-            "runs": row.runs,
-            "sixes": row.sixes,
-            "fours": row.fours,
+            "runs": int(row.runs) if row.runs else 0,
+            "sixes": row.sixes or 0,
+            "fours": row.fours or 0,
             "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
             "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0,
             "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0
