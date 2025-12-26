@@ -22,6 +22,7 @@ import BowlerTypeDominanceCard from './cards/BowlerTypeDominanceCard';
 import SweepEvolutionCard from './cards/SweepEvolutionCard';
 import NeedleMoversCard from './cards/NeedleMoversCard';
 import ChaseMastersCard from './cards/ChaseMastersCard';
+import UncontrolledChaosCard from './cards/UncontrolledChaosCard';
 import './wrapped.css';
 
 // Map card IDs to their specific visualization components
@@ -45,6 +46,7 @@ const cardComponents = {
   'sweep_evolution': SweepEvolutionCard,
   'needle_movers': NeedleMoversCard,
   'chase_masters': ChaseMastersCard,
+  'uncontrolled_chaos': UncontrolledChaosCard,
 };
 
 const WrappedCard = forwardRef(({ cardData, cardIndex, totalCards, onShareImage, isSharing }, ref) => {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
+import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 import TeamBadge from '../TeamBadge';
 
 const MiddleOversSqueezeCard = ({ data }) => {
@@ -8,133 +9,100 @@ const MiddleOversSqueezeCard = ({ data }) => {
   }
 
   const handleBowlerClick = (bowler) => {
-    const url = `/search?q=${encodeURIComponent(bowler.name)}`;
+    const url = `/search?q=${encodeURIComponent(bowler.name)}&start_date=2025-01-01`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const topBowlers = data.bowlers.slice(0, 5);
+  // Calculate averages for reference lines
+  const avgDot = data.bowlers.reduce((sum, b) => sum + (b.dot_percentage || 0), 0) / data.bowlers.length;
+  const avgEcon = data.bowlers.reduce((sum, b) => sum + (b.economy || 0), 0) / data.bowlers.length;
+
+  // Custom tooltip
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      const bowler = payload[0].payload;
+      return (
+        <Box className="wrapped-tooltip">
+          <Typography variant="subtitle2">
+            {bowler.name} {bowler.team && <TeamBadge team={bowler.team} />}
+          </Typography>
+          <Typography variant="body2">Wickets: {bowler.wickets}</Typography>
+          <Typography variant="body2">Economy: {bowler.economy}</Typography>
+          <Typography variant="body2">Dot%: {bowler.dot_percentage}%</Typography>
+          <Typography variant="body2">Boundary%: {bowler.boundary_percentage}%</Typography>
+          <Typography variant="body2">Overs: {bowler.overs}</Typography>
+        </Box>
+      );
+    }
+    return null;
+  };
 
   return (
-    <Box className="table-card-content">
-      {/* Podium-style top 3 - by squeeze score (economy + dot%) */}
-      <Box className="podium">
-        {/* Second place */}
-        {topBowlers[1] && (
-          <Box 
-            className="podium-item second" 
-            onClick={(e) => {
-              e.stopPropagation();
-              handleBowlerClick(topBowlers[1]);
-            }}
-          >
-            <Typography variant="h6" className="podium-rank">2</Typography>
-            <Typography variant="body2" className="podium-name">{topBowlers[1]?.name}</Typography>
-            <TeamBadge team={topBowlers[1]?.team} />
-            <Typography variant="h5" className="podium-stat">{topBowlers[1]?.economy}</Typography>
-            <Typography variant="caption">Econ</Typography>
-            <Typography variant="caption" sx={{ color: 'var(--wrapped-primary)', fontSize: '10px', mt: 0.5 }}>
-              {topBowlers[1]?.dot_percentage}% dots
-            </Typography>
-          </Box>
-        )}
-        
-        {/* First place */}
-        {topBowlers[0] && (
-          <Box 
-            className="podium-item first" 
-            onClick={(e) => {
-              e.stopPropagation();
-              handleBowlerClick(topBowlers[0]);
-            }}
-          >
-            <Typography variant="h5" className="podium-rank">🔒</Typography>
-            <Typography variant="subtitle1" className="podium-name">{topBowlers[0]?.name}</Typography>
-            <TeamBadge team={topBowlers[0]?.team} size="medium" />
-            <Typography variant="h4" className="podium-stat">{topBowlers[0]?.economy}</Typography>
-            <Typography variant="caption">Econ</Typography>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '11px', mt: 0.5 }}>
-              {topBowlers[0]?.dot_percentage}% dots
-            </Typography>
-          </Box>
-        )}
-        
-        {/* Third place */}
-        {topBowlers[2] && (
-          <Box 
-            className="podium-item third" 
-            onClick={(e) => {
-              e.stopPropagation();
-              handleBowlerClick(topBowlers[2]);
-            }}
-          >
-            <Typography variant="h6" className="podium-rank">3</Typography>
-            <Typography variant="body2" className="podium-name">{topBowlers[2]?.name}</Typography>
-            <TeamBadge team={topBowlers[2]?.team} />
-            <Typography variant="h5" className="podium-stat">{topBowlers[2]?.economy}</Typography>
-            <Typography variant="caption">Econ</Typography>
-            <Typography variant="caption" sx={{ color: 'var(--wrapped-primary)', fontSize: '10px', mt: 0.5 }}>
-              {topBowlers[2]?.dot_percentage}% dots
-            </Typography>
-          </Box>
-        )}
-      </Box>
-
-      {/* Remaining bowlers in compact list */}
-      <Box className="remaining-list">
-        {topBowlers.slice(3).map((bowler, index) => (
+    <Box className="scatter-card-content">
+      {/* Top 3 highlight */}
+      <Box className="top-players-list">
+        {data.bowlers.slice(0, 3).map((bowler, index) => (
           <Box 
             key={bowler.name} 
-            className="list-item"
+            className="top-player-item"
             onClick={(e) => {
               e.stopPropagation();
               handleBowlerClick(bowler);
             }}
           >
-            <Typography variant="body2" className="list-rank">#{index + 4}</Typography>
-            <Typography variant="body2" className="list-name" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              {bowler.name}
-              <TeamBadge team={bowler.team} />
-            </Typography>
-            <Typography variant="body2" className="list-stat">
-              {bowler.economy} econ | {bowler.dot_percentage}% dots
-            </Typography>
+            <Typography variant="h5" className="rank">#{index + 1}</Typography>
+            <Box className="player-info">
+              <Typography variant="subtitle1" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {bowler.name}
+                <TeamBadge team={bowler.team} />
+              </Typography>
+              <Typography variant="body2">
+                Econ: {bowler.economy} | {bowler.dot_percentage}% dots | {bowler.wickets} wkts
+              </Typography>
+            </Box>
           </Box>
         ))}
       </Box>
 
-      {/* Summary stats */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        gap: 3, 
-        mt: 2,
-        pt: 2,
-        borderTop: '1px solid var(--wrapped-border)'
-      }}>
-        <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="caption" sx={{ color: 'var(--wrapped-secondary)' }}>
-            Avg Economy
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'var(--wrapped-text)', fontWeight: 600 }}>
-            {(topBowlers.reduce((sum, b) => sum + b.economy, 0) / topBowlers.length).toFixed(2)}
-          </Typography>
-        </Box>
-        <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="caption" sx={{ color: 'var(--wrapped-secondary)' }}>
-            Avg Dot %
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'var(--wrapped-text)', fontWeight: 600 }}>
-            {(topBowlers.reduce((sum, b) => sum + b.dot_percentage, 0) / topBowlers.length).toFixed(1)}%
-          </Typography>
-        </Box>
-        <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="caption" sx={{ color: 'var(--wrapped-secondary)' }}>
-            Total Wkts
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'var(--wrapped-text)', fontWeight: 600 }}>
-            {topBowlers.reduce((sum, b) => sum + b.wickets, 0)}
-          </Typography>
-        </Box>
+      {/* Scatter Plot - High dot% and low economy is better */}
+      <Box className="scatter-chart">
+        <ResponsiveContainer width="100%" height={180}>
+          <ScatterChart margin={{ top: 10, right: 10, bottom: 20, left: 10 }}>
+            <XAxis 
+              type="number" 
+              dataKey="dot_percentage" 
+              name="Dot %" 
+              domain={['dataMin - 3', 'dataMax + 3']}
+              tick={{ fontSize: 10, fill: '#b3b3b3' }}
+              label={{ value: 'Dot % (→ better)', position: 'bottom', fontSize: 10, fill: '#b3b3b3' }}
+            />
+            <YAxis 
+              type="number" 
+              dataKey="economy" 
+              name="Economy" 
+              domain={['dataMin - 0.5', 'dataMax + 0.5']}
+              tick={{ fontSize: 10, fill: '#b3b3b3' }}
+              label={{ value: 'Econ (↓ better)', angle: -90, position: 'left', fontSize: 10, fill: '#b3b3b3' }}
+              reversed={true}
+            />
+            <ReferenceLine y={avgEcon} stroke="#666" strokeDasharray="3 3" />
+            <ReferenceLine x={avgDot} stroke="#666" strokeDasharray="3 3" />
+            <Tooltip content={<CustomTooltip />} />
+            <Scatter 
+              data={data.bowlers} 
+              fill="#9C27B0"
+              cursor="pointer"
+            >
+              {data.bowlers.map((entry, index) => (
+                <Cell 
+                  key={index} 
+                  fill={index < 3 ? '#9C27B0' : '#666'}
+                  opacity={index < 3 ? 1 : 0.6}
+                />
+              ))}
+            </Scatter>
+          </ScatterChart>
+        </ResponsiveContainer>
       </Box>
     </Box>
   );

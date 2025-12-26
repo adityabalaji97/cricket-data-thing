@@ -56,6 +56,7 @@ CARD_CONFIG = [
     {"id": "sweep_evolution", "title": "Sweep Evolution", "subtitle": "How sweeps conquered 2025", "initial": False},
     {"id": "needle_movers", "title": "Needle Movers", "subtitle": "Who outperformed expectations", "initial": False},
     {"id": "chase_masters", "title": "Chase Masters", "subtitle": "Clutch performers in chases", "initial": False},
+    {"id": "uncontrolled_chaos", "title": "Uncontrolled Chaos", "subtitle": "High SR despite low control", "initial": False},
 ]
 
 # Helper to get card IDs in order
@@ -390,6 +391,7 @@ class WrappedService:
             "sweep_evolution": self.get_sweep_evolution_data,
             "needle_movers": self.get_needle_movers_data,
             "chase_masters": self.get_chase_masters_data,
+            "uncontrolled_chaos": self.get_uncontrolled_chaos_data,
         }
         
         if card_id not in card_methods:
@@ -885,7 +887,9 @@ class WrappedService:
             "card_id": "death_hitters",
             "card_title": "Death Hitters",
             "card_subtitle": f"Six-hitting finishers (min {min_balls} balls)",
-            "visualization_type": "table_with_highlight",
+            "visualization_type": "scatter",
+            "x_axis": "boundary_percentage",
+            "y_axis": "strike_rate",
             "ranking_note": "Ranked by strike rate (60%) + % runs from sixes (40%)",
             "players": [
                 {
@@ -901,7 +905,8 @@ class WrappedService:
                     "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0,
                     "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0,
                     "six_runs_percentage": float(row.six_runs_percentage) if row.six_runs_percentage else 0,
-                    "sixes_per_innings": float(row.sixes_per_innings) if row.sixes_per_innings else 0
+                    "sixes_per_innings": float(row.sixes_per_innings) if row.sixes_per_innings else 0,
+                    "balls_per_six": round(row.balls / row.sixes, 1) if row.sixes and row.sixes > 0 else 999
                 }
                 for row in results
             ],
@@ -3404,4 +3409,239 @@ class WrappedService:
             ],
             # No query_builder link - win_prob per-ball delta not reproducible in Query Builder
             "deep_links": {}
+        }
+
+    # ========================================================================
+    # CARD 19: UNCONTROLLED CHAOS
+    # ========================================================================
+    
+    def get_uncontrolled_chaos_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_balls: int = 100,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 19: Uncontrolled Chaos - High SR despite low control%.
+        
+        Criteria: control_pct < 70%, SR > 130, boundary% > 15%
+        These are batters who score quickly through unconventional means.
+        """
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        query = text(f"""
+            WITH player_stats AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) as sixes,
+                    SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) as controlled_shots,
+                    SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END) as control_data_balls,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as dismissals
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bat, dd.team_bat
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM player_stats
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(dots) as dots,
+                    SUM(boundaries) as boundaries,
+                    SUM(sixes) as sixes,
+                    SUM(controlled_shots) as controlled_shots,
+                    SUM(control_data_balls) as control_data_balls,
+                    SUM(dismissals) as dismissals
+                FROM player_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+                AND SUM(control_data_balls) >= 50
+            )
+            SELECT 
+                pt.player,
+                ppt.team,
+                pt.balls,
+                pt.runs,
+                pt.boundaries,
+                pt.sixes,
+                pt.dismissals,
+                ROUND(pt.runs * 100.0 / NULLIF(pt.balls, 0), 2) as strike_rate,
+                ROUND(pt.dots * 100.0 / NULLIF(pt.balls, 0), 2) as dot_pct,
+                ROUND(pt.boundaries * 100.0 / NULLIF(pt.balls, 0), 2) as boundary_pct,
+                ROUND(pt.controlled_shots * 100.0 / NULLIF(pt.control_data_balls, 0), 2) as control_pct
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            WHERE 
+                (pt.controlled_shots * 100.0 / NULLIF(pt.control_data_balls, 0)) < 70
+                AND (pt.runs * 100.0 / NULLIF(pt.balls, 0)) > 130
+                AND (pt.boundaries * 100.0 / NULLIF(pt.balls, 0)) > 15
+            ORDER BY (pt.runs * 100.0 / NULLIF(pt.balls, 0)) DESC
+            LIMIT 15
+        """)
+        
+        results = db.execute(query, params).fetchall()
+        
+        return {
+            "card_id": "uncontrolled_chaos",
+            "card_title": "Uncontrolled Chaos",
+            "card_subtitle": f"High SR despite low control (min {min_balls} balls)",
+            "visualization_type": "scatter",
+            "x_axis": "control_pct",
+            "y_axis": "strike_rate",
+            "criteria": {
+                "max_control_pct": 70,
+                "min_sr": 130,
+                "min_boundary_pct": 15
+            },
+            "players": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "balls": row.balls,
+                    "runs": row.runs,
+                    "boundaries": row.boundaries,
+                    "sixes": row.sixes,
+                    "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
+                    "dot_pct": float(row.dot_pct) if row.dot_pct else 0,
+                    "boundary_pct": float(row.boundary_pct) if row.boundary_pct else 0,
+                    "control_pct": float(row.control_pct) if row.control_pct else 0
+                }
+                for row in results
+            ],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter&min_balls={min_balls}"
+            }
+        }
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        query = text(f"""
+            WITH player_stats AS (
+                SELECT 
+                    dd.bat as player,
+                    dd.team_bat as team,
+                    COUNT(*) as balls,
+                    SUM(dd.batruns) as runs,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) as sixes,
+                    SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) as controlled_shots,
+                    SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END) as control_data_balls,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as dismissals
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bat, dd.team_bat
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM player_stats
+                ORDER BY player, balls DESC
+            ),
+            player_totals AS (
+                SELECT 
+                    player,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(dots) as dots,
+                    SUM(boundaries) as boundaries,
+                    SUM(sixes) as sixes,
+                    SUM(controlled_shots) as controlled_shots,
+                    SUM(control_data_balls) as control_data_balls,
+                    SUM(dismissals) as dismissals
+                FROM player_stats
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+                AND SUM(control_data_balls) >= 50
+            )
+            SELECT 
+                pt.player,
+                ppt.team,
+                pt.balls,
+                pt.runs,
+                pt.boundaries,
+                pt.sixes,
+                pt.dismissals,
+                ROUND((pt.runs * 100.0 / NULLIF(pt.balls, 0))::numeric, 2) as strike_rate,
+                ROUND((pt.dots * 100.0 / NULLIF(pt.balls, 0))::numeric, 2) as dot_pct,
+                ROUND((pt.boundaries * 100.0 / NULLIF(pt.balls, 0))::numeric, 2) as boundary_pct,
+                ROUND((pt.controlled_shots * 100.0 / NULLIF(pt.control_data_balls, 0))::numeric, 2) as control_pct
+            FROM player_totals pt
+            JOIN player_primary_team ppt ON pt.player = ppt.player
+            WHERE (pt.controlled_shots * 100.0 / NULLIF(pt.control_data_balls, 0)) < 70
+            AND (pt.runs * 100.0 / NULLIF(pt.balls, 0)) > 130
+            AND (pt.boundaries * 100.0 / NULLIF(pt.balls, 0)) > 15
+            ORDER BY (pt.runs * 100.0 / NULLIF(pt.balls, 0)) DESC
+            LIMIT 15
+        """)
+        
+        results = db.execute(query, params).fetchall()
+        
+        # Calculate "chaos score" = SR * (1 - control_pct/100) * boundary_pct/10
+        players = []
+        for row in results:
+            control_pct = float(row.control_pct) if row.control_pct else 70
+            sr = float(row.strike_rate) if row.strike_rate else 100
+            boundary_pct = float(row.boundary_pct) if row.boundary_pct else 10
+            
+            chaos_score = round(sr * (1 - control_pct/100) * (boundary_pct/10), 1)
+            
+            players.append({
+                "name": row.player,
+                "team": row.team,
+                "balls": row.balls,
+                "runs": row.runs,
+                "boundaries": row.boundaries,
+                "sixes": row.sixes,
+                "strike_rate": sr,
+                "dot_pct": float(row.dot_pct) if row.dot_pct else 0,
+                "boundary_pct": boundary_pct,
+                "control_pct": control_pct,
+                "chaos_score": chaos_score
+            })
+        
+        # Sort by chaos score
+        players.sort(key=lambda x: x['chaos_score'], reverse=True)
+        
+        return {
+            "card_id": "uncontrolled_chaos",
+            "card_title": "Uncontrolled Chaos",
+            "card_subtitle": f"High SR despite low control (min {min_balls} balls)",
+            "visualization_type": "scatter",
+            "x_axis": "control_pct",
+            "y_axis": "strike_rate",
+            "criteria": {
+                "max_control_pct": 70,
+                "min_sr": 130,
+                "min_boundary_pct": 15
+            },
+            "players": players,
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter&min_balls={min_balls}"
+            }
         }

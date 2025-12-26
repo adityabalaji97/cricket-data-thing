@@ -80,8 +80,8 @@ const WrappedPage = () => {
     try {
       const remainingIds = cardsData.remaining_card_ids;
       
-      // Fetch in batches of 5 for better UX
-      const batchSize = 5;
+      // Fetch in batches of 8 for faster loading
+      const batchSize = 8;
       for (let i = 0; i < remainingIds.length; i += batchSize) {
         const batch = remainingIds.slice(i, i + batchSize);
         const queryParams = batch.map(id => `card_ids=${encodeURIComponent(id)}`).join('&');
@@ -130,11 +130,17 @@ const WrappedPage = () => {
   // Start fetching remaining cards after initial load
   useEffect(() => {
     if (cardsData && !loading && cardsData.remaining_card_ids?.length > 0) {
-      // Small delay to let UI render first
-      const timer = setTimeout(() => {
-        fetchRemainingCards();
-      }, 500);
-      return () => clearTimeout(timer);
+      // Use requestIdleCallback to fetch when browser is idle (no arbitrary delay)
+      if ('requestIdleCallback' in window) {
+        const idleId = requestIdleCallback(() => {
+          fetchRemainingCards();
+        }, { timeout: 100 }); // Max 100ms wait
+        return () => cancelIdleCallback(idleId);
+      } else {
+        // Fallback for Safari - minimal delay
+        const timer = setTimeout(fetchRemainingCards, 50);
+        return () => clearTimeout(timer);
+      }
     }
   }, [cardsData, loading, fetchRemainingCards]);
 

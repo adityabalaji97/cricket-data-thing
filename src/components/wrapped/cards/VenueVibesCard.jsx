@@ -1,17 +1,15 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
-import { useNavigate } from 'react-router-dom';
-
 const VenueVibesCard = ({ data }) => {
-  const navigate = useNavigate();
 
   if (!data.venues || data.venues.length === 0) {
     return <Typography>No venue data available</Typography>;
   }
 
   const handleVenueClick = (venue) => {
-    navigate(`/venue?venue=${encodeURIComponent(venue.name)}&start_date=2025-01-01&end_date=2025-12-31`);
+    const url = `/venue?venue=${encodeURIComponent(venue.name)}&start_date=2025-01-01&end_date=2025-12-31`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Calculate average for reference lines

@@ -8,7 +8,7 @@ const ControlledAggressionCard = ({ data }) => {
   }
 
   const handlePlayerClick = (player) => {
-    const url = `/search?q=${encodeURIComponent(player.name)}`;
+    const url = `/search?q=${encodeURIComponent(player.name)}&start_date=2025-01-01`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
