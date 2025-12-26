@@ -11,7 +11,13 @@ from typing import List, Optional
 import logging
 
 from database import get_session
-from services.wrapped import WrappedService
+from services.wrapped import (
+    WrappedService, 
+    CARD_CONFIG, 
+    get_card_order, 
+    get_initial_card_ids, 
+    get_lazy_card_ids
+)
 
 router = APIRouter(prefix="/wrapped", tags=["wrapped"])
 logger = logging.getLogger(__name__)
@@ -38,6 +44,9 @@ def get_wrapped_cards(
     Get all card data for the 2025 Wrapped experience.
     Returns an array of card objects with their data and metadata.
     
+    NOTE: This endpoint loads ALL cards. For faster initial load,
+    use /2025/cards/initial instead.
+    
     - leagues: List of leagues to filter. If empty, includes ALL leagues from database.
     - include_international: Include international matches (default True)
     - top_teams: Number of top international teams to include (default 20)
@@ -53,6 +62,73 @@ def get_wrapped_cards(
         )
     except Exception as e:
         logger.error(f"Error fetching wrapped cards: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/2025/cards/initial")
+def get_initial_cards(
+    leagues: List[str] = Query(default=[]),
+    include_international: bool = Query(default=True),
+    top_teams: int = Query(default=DEFAULT_TOP_TEAMS),
+    db: Session = Depends(get_session)
+):
+    """
+    Get only the initial batch of cards for fast first load.
+    Returns cards marked as 'initial: True' in CARD_CONFIG.
+    
+    Use this endpoint for the initial page load, then lazy-load
+    remaining cards using /2025/cards/batch as user navigates.
+    """
+    try:
+        initial_ids = get_initial_card_ids()
+        result = wrapped_service.get_cards_batch(
+            card_ids=initial_ids,
+            start_date=DEFAULT_START_DATE,
+            end_date=DEFAULT_END_DATE,
+            leagues=leagues,
+            include_international=include_international,
+            db=db,
+            top_teams=top_teams
+        )
+        # Add metadata about remaining cards
+        result["initial_load"] = True
+        result["remaining_card_ids"] = get_lazy_card_ids()
+        result["total_cards_available"] = len(CARD_CONFIG)
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching initial cards: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/2025/cards/batch")
+def get_cards_batch(
+    card_ids: List[str] = Query(..., description="List of card IDs to fetch"),
+    leagues: List[str] = Query(default=[]),
+    include_international: bool = Query(default=True),
+    top_teams: int = Query(default=DEFAULT_TOP_TEAMS),
+    db: Session = Depends(get_session)
+):
+    """
+    Get data for a specific batch of cards.
+    Use this for lazy-loading cards as user navigates through the experience.
+    
+    - card_ids: List of card IDs to fetch (required)
+    - leagues: List of leagues to filter
+    - include_international: Include international matches
+    - top_teams: Number of top international teams to include
+    """
+    try:
+        return wrapped_service.get_cards_batch(
+            card_ids=card_ids,
+            start_date=DEFAULT_START_DATE,
+            end_date=DEFAULT_END_DATE,
+            leagues=leagues,
+            include_international=include_international,
+            db=db,
+            top_teams=top_teams
+        )
+    except Exception as e:
+        logger.error(f"Error fetching cards batch: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -95,6 +171,9 @@ def get_wrapped_metadata():
     """
     Get metadata about the wrapped experience.
     Includes card order, titles, descriptions for the UI.
+    
+    Card order is determined by position in CARD_CONFIG.
+    To reorder cards, modify CARD_CONFIG in services/wrapped.py.
     """
     return {
         "year": 2025,
@@ -104,114 +183,17 @@ def get_wrapped_metadata():
             "start": DEFAULT_START_DATE,
             "end": DEFAULT_END_DATE
         },
+        "total_cards": len(CARD_CONFIG),
+        "initial_card_ids": get_initial_card_ids(),
+        "lazy_card_ids": get_lazy_card_ids(),
         "cards": [
             {
-                "id": "intro",
-                "title": "2025 in One Breath",
-                "subtitle": "The rhythm of T20 cricket",
-                "order": 1
-            },
-            {
-                "id": "powerplay_bullies",
-                "title": "Powerplay Bullies",
-                "subtitle": "Who dominated the first 6 overs",
-                "order": 2
-            },
-            {
-                "id": "middle_merchants",
-                "title": "Middle Merchants",
-                "subtitle": "Masters of overs 7-15",
-                "order": 3
-            },
-            {
-                "id": "death_hitters",
-                "title": "Death Hitters",
-                "subtitle": "The finishers who lived dangerously",
-                "order": 4
-            },
-            {
-                "id": "pace_vs_spin",
-                "title": "Pace vs Spin",
-                "subtitle": "2025's split personality batters",
-                "order": 5
-            },
-            {
-                "id": "powerplay_thieves",
-                "title": "PP Wicket Thieves",
-                "subtitle": "Early breakthrough specialists",
-                "order": 6
-            },
-            {
-                "id": "nineteenth_over_gods",
-                "title": "Death Over Gods",
-                "subtitle": "Overs 16-20 bowling excellence",
-                "order": 7
-            },
-            {
-                "id": "elo_movers",
-                "title": "ELO Movers",
-                "subtitle": "Teams that transformed in 2025",
-                "order": 8
-            },
-            {
-                "id": "venue_vibes",
-                "title": "Venue Vibes",
-                "subtitle": "Par scores and chase bias",
-                "order": 9
-            },
-            {
-                "id": "controlled_aggression",
-                "title": "Controlled Chaos",
-                "subtitle": "The most efficient aggressors",
-                "order": 10
-            },
-            {
-                "id": "360_batters",
-                "title": "360° Batters",
-                "subtitle": "Who scores all around the ground",
-                "order": 11
-            },
-            {
-                "id": "batter_hand_breakdown",
-                "title": "Left vs Right",
-                "subtitle": "Batting hand breakdown",
-                "order": 12
-            },
-            {
-                "id": "length_masters",
-                "title": "Length Masters",
-                "subtitle": "Versatile scorers across all lengths",
-                "order": 13
-            },
-            {
-                "id": "rare_shot_specialists",
-                "title": "Rare Shot Artists",
-                "subtitle": "Masters of unconventional shots",
-                "order": 14
-            },
-            {
-            "id": "bowler_type_dominance",
-            "title": "Pace vs Spin",
-            "subtitle": "The bowling arms race",
-            "order": 15
-            },
-                {
-            "id": "sweep_evolution",
-            "title": "Sweep Evolution",
-            "subtitle": "How sweeps conquered 2025",
-            "order": 16
-        },
-        {
-            "id": "needle_movers",
-            "title": "Needle Movers",
-            "subtitle": "Who outperformed expectations",
-            "order": 17
-        },
-        {
-            "id": "chase_masters",
-            "title": "Chase Masters",
-            "subtitle": "Clutch performers in chases",
-            "order": 18
-        }
-    ]
+                "id": card["id"],
+                "title": card["title"],
+                "subtitle": card["subtitle"],
+                "initial": card.get("initial", False),
+                "order": idx + 1
+            }
+            for idx, card in enumerate(CARD_CONFIG)
+        ]
     }

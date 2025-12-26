@@ -28,6 +28,48 @@ DEFAULT_TOP_TEAMS = 20
 
 
 # ============================================================================
+# CARD CONFIGURATION - Single source of truth for card order and metadata
+# To reorder cards: just move items in this list
+# To mark cards for initial load: set "initial": True
+# ============================================================================
+
+CARD_CONFIG = [
+    # Initial batch - loaded immediately (~3-4 cards for fast first paint)
+    {"id": "intro", "title": "2025 in One Breath", "subtitle": "The rhythm of T20 cricket", "initial": True},
+    {"id": "powerplay_bullies", "title": "Powerplay Bullies", "subtitle": "Who dominated the first 6 overs", "initial": True},
+    {"id": "middle_merchants", "title": "Middle Merchants", "subtitle": "Masters of overs 7-15", "initial": True},
+    {"id": "death_hitters", "title": "Death Hitters", "subtitle": "The finishers who lived dangerously", "initial": True},
+    
+    # Lazy loaded cards
+    {"id": "pace_vs_spin", "title": "Pace vs Spin", "subtitle": "2025's split personality batters", "initial": False},
+    {"id": "powerplay_thieves", "title": "PP Wicket Thieves", "subtitle": "Early breakthrough specialists", "initial": False},
+    {"id": "nineteenth_over_gods", "title": "Death Over Gods", "subtitle": "Overs 16-20 bowling excellence", "initial": False},
+    {"id": "middle_overs_squeeze", "title": "Middle Overs Squeeze", "subtitle": "Who choked the scoring in overs 7-15", "initial": False},
+    {"id": "elo_movers", "title": "ELO Movers", "subtitle": "Teams that transformed in 2025", "initial": False},
+    {"id": "venue_vibes", "title": "Venue Vibes", "subtitle": "Par scores and chase bias", "initial": False},
+    {"id": "controlled_aggression", "title": "Controlled Chaos", "subtitle": "The most efficient aggressors", "initial": False},
+    {"id": "360_batters", "title": "360° Batters", "subtitle": "Who scores all around the ground", "initial": False},
+    {"id": "batter_hand_breakdown", "title": "Left vs Right", "subtitle": "Batting hand breakdown", "initial": False},
+    {"id": "length_masters", "title": "Length Masters", "subtitle": "Versatile scorers across all lengths", "initial": False},
+    {"id": "rare_shot_specialists", "title": "Rare Shot Artists", "subtitle": "Masters of unconventional shots", "initial": False},
+    {"id": "bowler_type_dominance", "title": "Pace vs Spin", "subtitle": "The bowling arms race", "initial": False},
+    {"id": "sweep_evolution", "title": "Sweep Evolution", "subtitle": "How sweeps conquered 2025", "initial": False},
+    {"id": "needle_movers", "title": "Needle Movers", "subtitle": "Who outperformed expectations", "initial": False},
+    {"id": "chase_masters", "title": "Chase Masters", "subtitle": "Clutch performers in chases", "initial": False},
+]
+
+# Helper to get card IDs in order
+def get_card_order() -> List[str]:
+    return [card["id"] for card in CARD_CONFIG]
+
+def get_initial_card_ids() -> List[str]:
+    return [card["id"] for card in CARD_CONFIG if card.get("initial", False)]
+
+def get_lazy_card_ids() -> List[str]:
+    return [card["id"] for card in CARD_CONFIG if not card.get("initial", False)]
+
+
+# ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
@@ -354,6 +396,64 @@ class WrappedService:
             raise ValueError(f"Unknown card ID: {card_id}")
         
         return card_methods[card_id](start_date, end_date, leagues, include_international, db, top_teams=top_teams)
+
+    def get_cards_batch(
+        self,
+        card_ids: List[str],
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool = True,
+        db: Session = None,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Fetch data for a batch of cards by their IDs.
+        
+        Used for lazy loading - fetch only the cards needed.
+        
+        Args:
+            card_ids: List of card IDs to fetch
+            start_date: Start date for filtering
+            end_date: End date for filtering  
+            leagues: List of leagues to include
+            include_international: Include international matches
+            db: Database session
+            top_teams: Number of top teams for international filtering
+        
+        Returns:
+            Dict with cards array containing requested card data
+        """
+        # If no leagues specified, get all available leagues from DB
+        if not leagues:
+            leagues = get_all_leagues_from_db(db)
+            logger.info(f"Using all available leagues: {len(leagues)} leagues found")
+        
+        cards = []
+        for card_id in card_ids:
+            try:
+                card_data = self.get_single_card(
+                    card_id=card_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    leagues=leagues,
+                    include_international=include_international,
+                    db=db,
+                    top_teams=top_teams
+                )
+                cards.append(card_data)
+            except ValueError as e:
+                logger.warning(f"Unknown card ID requested: {card_id}")
+                cards.append({"card_id": card_id, "error": str(e)})
+            except Exception as e:
+                logger.error(f"Error fetching card {card_id}: {e}")
+                cards.append({"card_id": card_id, "error": str(e)})
+        
+        return {
+            "year": 2025,
+            "date_range": {"start": start_date, "end": end_date},
+            "total_cards": len(cards),
+            "cards": cards
+        }
 
     # ========================================================================
     # CARD 1: INTRO - "2025 in One Breath"

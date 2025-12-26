@@ -7,7 +7,7 @@ import WrappedCard from './WrappedCard';
 import { captureAndShare } from '../../utils/shareUtils';
 import './wrapped.css';
 
-const WrappedStoryContainer = ({ cards, initialCardId, year }) => {
+const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable, isLoadingMore, loadedCardIds }) => {
   const navigate = useNavigate();
   const containerRef = useRef(null);
   const cardRef = useRef(null);
@@ -155,9 +155,11 @@ const WrappedStoryContainer = ({ cards, initialCardId, year }) => {
       <div className="wrapped-top-section">
         {/* Progress Bar */}
         <WrappedProgressBar 
-          totalCards={cards.length} 
+          totalCards={totalCardsAvailable || cards.length} 
           currentIndex={currentIndex}
           onProgressClick={goToCard}
+          loadedCount={cards.length}
+          isLoadingMore={isLoadingMore}
         />
 
         {/* Header Row */}

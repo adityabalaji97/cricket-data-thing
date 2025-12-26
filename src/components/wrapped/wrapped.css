@@ -98,6 +98,36 @@
   background: rgba(255, 255, 255, 0.5);
 }
 
+.progress-segment.unloaded {
+  background: rgba(255, 255, 255, 0.15);
+  cursor: default;
+}
+
+.progress-segment.unloaded:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.progress-loading-indicator {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--wrapped-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+.wrapped-progress-bar {
+  position: relative;
+}
+
 /* ============================================
    Top Section (Progress + Header)
    ============================================ */
