@@ -33,7 +33,7 @@ const PaceVsSpinCard = ({ data }) => {
   ].sort((a, b) => b.value - a.value);
 
   const handlePlayerClick = (playerName) => {
-    const url = `/player?name=${encodeURIComponent(playerName)}&start_date=2025-01-01&end_date=2025-12-31&autoload=true`;
+    const url = `/search?q=${encodeURIComponent(playerName)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

@@ -8,7 +8,7 @@ const MiddleOversSqueezeCard = ({ data }) => {
   }
 
   const handleBowlerClick = (bowler) => {
-    const url = `/bowler?name=${encodeURIComponent(bowler.name)}&start_date=2025-01-01&end_date=2025-12-31&autoload=true`;
+    const url = `/search?q=${encodeURIComponent(bowler.name)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

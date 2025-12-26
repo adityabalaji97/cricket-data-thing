@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Box,
@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import CasinoIcon from '@mui/icons-material/Casino';
 import SportsCricketIcon from '@mui/icons-material/SportsCricket';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import SearchBar from './SearchBar';
 import PlayerSearchResult from './PlayerSearchResult';
@@ -16,12 +16,24 @@ import { API_BASE_URL } from './searchConfig';
 
 const GoogleSearchLanding = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [luckyLoading, setLuckyLoading] = useState(false);
+
+  // Auto-search from URL parameter
+  useEffect(() => {
+    const query = searchParams.get('q');
+    if (query && !selectedEntity) {
+      // Auto-select as player search
+      setSelectedEntity({ name: query, type: 'player' });
+    }
+  }, [searchParams, selectedEntity]);
 
   const handleSelect = (item) => {
     if (item.type === 'player') {
       setSelectedEntity(item);
+      // Update URL to reflect the search
+      navigate(`/search?q=${encodeURIComponent(item.name)}`, { replace: true });
     } else if (item.type === 'team') {
       navigate(`/team?team=${encodeURIComponent(item.name)}&autoload=true`);
     } else if (item.type === 'venue') {
@@ -38,6 +50,7 @@ const GoogleSearchLanding = () => {
       if (data.type === 'player') {
         // Use legacy name for profile lookup, full object for state
         setSelectedEntity(data);
+        navigate(`/search?q=${encodeURIComponent(data.name)}`, { replace: true });
       } else if (data.type === 'team') {
         navigate(`/team?team=${encodeURIComponent(data.name)}&autoload=true`);
       } else if (data.type === 'venue') {
@@ -52,6 +65,7 @@ const GoogleSearchLanding = () => {
 
   const handleClear = () => {
     setSelectedEntity(null);
+    navigate('/search', { replace: true });
   };
 
   return (

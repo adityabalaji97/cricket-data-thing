@@ -90,19 +90,7 @@ const WrappedCardActions = ({ deepLinks, onShareImage, isSharing }) => {
 
   return (
     <Box className="wrapped-card-actions" onClick={(e) => e.stopPropagation()}>
-      {/* Open in App Buttons - Now open in new tab */}
-      {deepLinks.comparison && (
-        <Button
-          variant="contained"
-          size="small"
-          endIcon={<ExternalLinkIcon />}
-          onClick={() => handleOpenInNewTab(deepLinks.comparison)}
-          className="wrapped-action-btn"
-        >
-          Compare Players
-        </Button>
-      )}
-      
+      {/* Team Profile Button */}
       {deepLinks.team_profile && (
         <Button
           variant="contained"
@@ -115,6 +103,7 @@ const WrappedCardActions = ({ deepLinks, onShareImage, isSharing }) => {
         </Button>
       )}
       
+      {/* Venue Analysis Button */}
       {deepLinks.venue_analysis && (
         <Button
           variant="contained"

@@ -13,7 +13,7 @@ const MiddleMerchantsCard = ({ data }) => {
   const avgAvg = data.players.reduce((sum, p) => sum + (p.average || 0), 0) / data.players.length;
 
   const handlePlayerClick = (player) => {
-    const url = `/player?name=${encodeURIComponent(player.name)}&start_date=2025-01-01&end_date=2025-12-31&autoload=true`;
+    const url = `/search?q=${encodeURIComponent(player.name)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
