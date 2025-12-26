@@ -27,6 +27,10 @@ WRAPPED_DEFAULT_LEAGUES = [
 WRAPPED_DEFAULT_TOP_TEAMS = 20  # Top 20 international teams for T20Is
 WRAPPED_DEFAULT_INCLUDE_INTERNATIONAL = True
 
+# Legacy constant aliases for backward compatibility
+DEFAULT_TOP_TEAMS = WRAPPED_DEFAULT_TOP_TEAMS
+DEFAULT_MIN_BALLS = 100
+
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 from typing import List, Dict, Any, Optional
