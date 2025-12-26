@@ -60,18 +60,18 @@ CARD_CONFIG = [
         "method": "get_powerplay_bullies_data"
     },
     {
+        "id": "middle_merchants",
+        "title": "Middle Merchants",
+        "subtitle": "Best performers in overs 7-15",
+        "initial": True,
+        "method": "get_middle_merchants_data"
+    },
+    {
         "id": "death_hitters",
         "title": "Death Hitters",
         "subtitle": "Most destructive in overs 16-20",
         "initial": True,
         "method": "get_death_hitters_data"
-    },
-    {
-        "id": "middle_merchants",
-        "title": "Middle Merchants",
-        "subtitle": "Best performers in overs 7-15",
-        "initial": False,
-        "method": "get_middle_merchants_data"
     },
     {
         "id": "pace_vs_spin",

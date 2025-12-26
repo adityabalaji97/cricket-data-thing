@@ -23,10 +23,13 @@ def get_intro_data(
     """
     Card: Intro
     
-    Provides overview statistics for the year.
+    Provides overview statistics for the year including:
+    - Total matches
+    - Phase-wise run rates
+    - Toss/chase statistics
     """
     
-    # Build filters
+    # Build filters for delivery_details
     where_clause, params = build_base_filters(
         start_date=start_date,
         end_date=end_date,
@@ -37,64 +40,106 @@ def get_intro_data(
         use_year=True
     )
     
-    # Get total deliveries, runs, wickets
-    # Note: dd.dismissal is a string column (NULL when not out, contains dismissal type when out)
-    stats_query = f"""
-        SELECT 
-            COUNT(*) as total_balls,
-            COALESCE(SUM(dd.batruns), 0) as total_runs,
-            SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as total_wickets,
-            SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) as total_sixes,
-            SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) as total_fours,
-            COUNT(DISTINCT dd.p_match) as total_matches,
-            COUNT(DISTINCT dd.bat) as total_batters,
-            COUNT(DISTINCT dd.bowl) as total_bowlers
+    # Get total matches
+    matches_query = f"""
+        SELECT COUNT(DISTINCT dd.p_match) as total_matches
         FROM delivery_details dd
         {where_clause}
     """
     
-    result = execute_query(db, stats_query, params)
+    matches_result = execute_query(db, matches_query, params)
+    total_matches = matches_result[0].total_matches if matches_result else 0
     
-    if result and len(result) > 0:
-        row = result[0]
-        stats = {
-            "total_balls": row.total_balls or 0,
-            "total_runs": int(row.total_runs) if row.total_runs else 0,
-            "total_wickets": row.total_wickets or 0,
-            "total_sixes": row.total_sixes or 0,
-            "total_fours": row.total_fours or 0,
-            "total_matches": row.total_matches or 0,
-            "total_batters": row.total_batters or 0,
-            "total_bowlers": row.total_bowlers or 0
-        }
-    else:
-        stats = {
-            "total_balls": 0,
-            "total_runs": 0,
-            "total_wickets": 0,
-            "total_sixes": 0,
-            "total_fours": 0,
-            "total_matches": 0,
-            "total_batters": 0,
-            "total_bowlers": 0
-        }
+    # Get phase-wise run rates
+    phases_query = f"""
+        SELECT 
+            phase,
+            balls,
+            runs,
+            run_rate
+        FROM (
+            SELECT 
+                CASE 
+                    WHEN dd.over < 6 THEN 'powerplay'
+                    WHEN dd.over < 15 THEN 'middle'
+                    ELSE 'death'
+                END as phase,
+                COUNT(*) as balls,
+                SUM(dd.score) as runs,
+                ROUND((SUM(dd.score) * 6.0 / COUNT(*))::numeric, 2) as run_rate
+            FROM delivery_details dd
+            {where_clause}
+            GROUP BY 
+                CASE 
+                    WHEN dd.over < 6 THEN 'powerplay'
+                    WHEN dd.over < 15 THEN 'middle'
+                    ELSE 'death'
+                END
+        ) phase_stats
+        ORDER BY 
+            CASE phase
+                WHEN 'powerplay' THEN 1
+                WHEN 'middle' THEN 2
+                ELSE 3
+            END
+    """
     
-    # Calculate derived stats
-    if stats["total_balls"] > 0:
-        stats["avg_run_rate"] = round((stats["total_runs"] * 6) / stats["total_balls"], 2)
-        stats["boundary_percentage"] = round(
-            ((stats["total_fours"] + stats["total_sixes"]) * 100) / stats["total_balls"], 2
-        )
-    else:
-        stats["avg_run_rate"] = 0
-        stats["boundary_percentage"] = 0
+    phases_result = execute_query(db, phases_query, params)
+    
+    phases = []
+    for row in phases_result:
+        phases.append({
+            "phase": row.phase,
+            "balls": row.balls,
+            "runs": int(row.runs) if row.runs else 0,
+            "run_rate": float(row.run_rate) if row.run_rate else 0
+        })
+    
+    # Get toss/batting first stats using matches table
+    match_where, match_params = build_base_filters(
+        start_date=start_date,
+        end_date=end_date,
+        leagues=leagues,
+        include_international=include_international,
+        top_teams=top_teams,
+        table_alias="m",
+        use_year=False  # matches table uses date column
+    )
+    
+    toss_query = f"""
+        SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN m.winner = m.bat_first THEN 1 ELSE 0 END) as bat_first_wins,
+            SUM(CASE WHEN m.winner = m.bowl_first THEN 1 ELSE 0 END) as chase_wins
+        FROM matches m
+        {match_where}
+        AND m.winner IS NOT NULL
+        AND m.bat_first IS NOT NULL
+    """
+    
+    toss_result = execute_query(db, toss_query, match_params)
+    
+    toss_stats = None
+    if toss_result and toss_result[0].total and toss_result[0].total > 0:
+        total = toss_result[0].total
+        bat_first_wins = toss_result[0].bat_first_wins or 0
+        chase_wins = toss_result[0].chase_wins or 0
+        
+        toss_stats = {
+            "total_decided": total,
+            "bat_first_wins": bat_first_wins,
+            "chase_wins": chase_wins,
+            "bat_first_pct": round((bat_first_wins * 100) / total, 1) if total > 0 else 50
+        }
     
     return {
         "card_id": "intro",
         "card_title": "2025 In Hindsight",
-        "card_subtitle": f"The Year in T20 Cricket",
-        "visualization_type": "stats_grid",
-        "stats": stats,
+        "card_subtitle": "The Year in T20 Cricket",
+        "visualization_type": "intro",
+        "total_matches": total_matches,
+        "phases": phases,
+        "toss_stats": toss_stats,
         "date_range": {
             "start": start_date,
             "end": end_date

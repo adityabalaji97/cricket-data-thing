@@ -4,7 +4,7 @@ Query Helpers for Wrapped Cards
 Shared SQL query building utilities with proper competition/league filtering.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Session
 
@@ -20,7 +20,7 @@ def build_competition_filter(
     include_international: bool,
     top_teams: int = WRAPPED_DEFAULT_TOP_TEAMS,
     table_alias: str = "dd"
-) -> tuple:
+) -> Tuple[str, Dict]:
     """
     Build SQL WHERE clause for competition filtering.
     
@@ -32,10 +32,6 @@ def build_competition_filter(
     
     Returns:
         Tuple of (where_clause_fragment, params_dict)
-    
-    Example:
-        clause, params = build_competition_filter(['IPL', 'BBL'], True, 20)
-        # Returns: ("AND (dd.competition = ANY(:leagues) OR (dd.competition = 'T20I' AND ...))", {...})
     """
     conditions = []
     params = {}
@@ -56,7 +52,7 @@ def build_competition_filter(
                  AND {table_alias}.team_bowl = ANY(:wrapped_top_teams))
             """
         else:
-            # For matches table
+            # For matches table, use team1 and team2
             int_condition = f"""
                 ({table_alias}.competition = 'T20I' 
                  AND {table_alias}.team1 = ANY(:wrapped_top_teams) 
@@ -79,7 +75,7 @@ def build_date_filter(
     end_date: str,
     table_alias: str = "dd",
     use_year: bool = True
-) -> tuple:
+) -> Tuple[str, Dict]:
     """
     Build SQL WHERE clause for date filtering.
     
@@ -117,7 +113,7 @@ def build_base_filters(
     table_alias: str = "dd",
     use_year: bool = True,
     extra_conditions: List[str] = None
-) -> tuple:
+) -> Tuple[str, Dict]:
     """
     Build complete WHERE clause combining date and competition filters.
     
@@ -154,52 +150,6 @@ def build_base_filters(
             where_clause += f" AND {condition}"
     
     return where_clause, params
-
-
-def get_primary_team_for_player(player_col: str = "player", team_col: str = "team") -> str:
-    """
-    SQL CTE fragment to get primary team for each player based on most balls.
-    """
-    return f"""
-        player_primary_team AS (
-            SELECT DISTINCT ON ({player_col}) {player_col}, {team_col}
-            FROM player_stats_agg
-            ORDER BY {player_col}, balls DESC
-        )
-    """
-
-
-def format_player_result(row, extra_fields: Dict[str, str] = None) -> Dict[str, Any]:
-    """
-    Format a player result row into a dictionary.
-    
-    Args:
-        row: Database row
-        extra_fields: Mapping of field names to extract
-    
-    Returns:
-        Formatted dictionary
-    """
-    result = {
-        "name": row.player if hasattr(row, 'player') else row.name,
-        "team": row.team if hasattr(row, 'team') else None,
-    }
-    
-    # Standard fields
-    standard_fields = ['balls', 'runs', 'strike_rate', 'wickets', 'economy', 'dot_percentage']
-    for field in standard_fields:
-        if hasattr(row, field):
-            value = getattr(row, field)
-            result[field] = float(value) if value is not None else None
-    
-    # Extra fields
-    if extra_fields:
-        for key, attr in extra_fields.items():
-            if hasattr(row, attr):
-                value = getattr(row, attr)
-                result[key] = float(value) if value is not None else None
-    
-    return result
 
 
 def execute_query(db: Session, query: str, params: Dict) -> list:

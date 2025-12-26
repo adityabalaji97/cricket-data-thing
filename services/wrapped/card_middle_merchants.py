@@ -25,7 +25,7 @@ def get_middle_merchants_data(
     Card: Middle Merchants
     
     Finds batters who excel in middle overs (7-15).
-    Balance of strike rate and low dot percentage valued.
+    Shows strike rate vs batting average scatter plot.
     """
     
     # Build filters with middle overs condition
@@ -52,6 +52,7 @@ def get_middle_merchants_data(
                 dd.team_bat as team,
                 COUNT(*) as balls,
                 SUM(dd.score) as runs,
+                SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as dismissals,
                 SUM(CASE WHEN dd.score = 0 AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) as dots,
                 SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) as boundaries
             FROM delivery_details dd
@@ -68,6 +69,7 @@ def get_middle_merchants_data(
                 ps.player,
                 SUM(ps.balls) as balls,
                 SUM(ps.runs) as runs,
+                SUM(ps.dismissals) as dismissals,
                 SUM(ps.dots) as dots,
                 SUM(ps.boundaries) as boundaries
             FROM player_stats ps
@@ -79,12 +81,18 @@ def get_middle_merchants_data(
             ppt.team,
             pt.balls,
             pt.runs,
+            pt.dismissals,
             pt.boundaries,
             ROUND((pt.runs * 100.0 / pt.balls)::numeric, 2) as strike_rate,
+            CASE 
+                WHEN pt.dismissals > 0 THEN ROUND((pt.runs::numeric / pt.dismissals), 2)
+                ELSE NULL
+            END as average,
             ROUND((pt.dots * 100.0 / pt.balls)::numeric, 2) as dot_percentage,
             ROUND((pt.boundaries * 100.0 / pt.balls)::numeric, 2) as boundary_percentage
         FROM player_totals pt
         JOIN player_primary_team ppt ON pt.player = ppt.player
+        WHERE pt.dismissals > 0
         ORDER BY strike_rate DESC
         LIMIT 20
     """
@@ -97,8 +105,10 @@ def get_middle_merchants_data(
             "team": row.team,
             "balls": row.balls,
             "runs": int(row.runs) if row.runs else 0,
+            "dismissals": row.dismissals or 0,
             "boundaries": row.boundaries or 0,
             "strike_rate": float(row.strike_rate) if row.strike_rate else 0,
+            "average": float(row.average) if row.average else 0,
             "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0,
             "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0
         }
@@ -111,9 +121,9 @@ def get_middle_merchants_data(
         "card_subtitle": f"Best performers in overs 7-15 (min {min_balls} balls)",
         "visualization_type": "scatter",
         "axes": {
-            "x": "dot_percentage",
+            "x": "average",
             "y": "strike_rate",
-            "x_label": "Dot %",
+            "x_label": "Average",
             "y_label": "Strike Rate"
         },
         "players": players,
