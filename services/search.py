@@ -5,6 +5,12 @@ from datetime import date, timedelta
 import logging
 import random
 
+from services.player_aliases import (
+    resolve_player_name, 
+    get_canonical_name,
+    search_players_with_aliases
+)
+
 logger = logging.getLogger(__name__)
 
 # Default parameters for searches
@@ -23,6 +29,9 @@ def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
     """
     Unified search across players, teams, and venues.
     Returns results ranked by relevance (exact > prefix > contains).
+    
+    Player search includes alias matching - searching "Virat Kohli" 
+    will also find "V Kohli" but return the canonical name only.
     """
     if not query or len(query.strip()) < 2:
         return []
@@ -31,22 +40,8 @@ def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
     search_lower = search_term.lower()
     
     try:
-        # Search players - use subquery to avoid DISTINCT + ORDER BY issue
-        player_query = text("""
-            SELECT name, type FROM (
-                SELECT DISTINCT name, 'player' as type
-                FROM players
-                WHERE LOWER(name) LIKE :search_pattern
-            ) p
-            ORDER BY 
-                CASE 
-                    WHEN LOWER(name) = :exact THEN 1
-                    WHEN LOWER(name) LIKE :prefix THEN 2
-                    ELSE 3
-                END,
-                name
-            LIMIT :limit
-        """)
+        # Search players with alias support (returns canonical names)
+        players = search_players_with_aliases(query, db, limit)
         
         # Search teams - use subquery
         team_query = text("""
@@ -88,14 +83,15 @@ def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
             "limit": limit
         }
         
-        players = db.execute(player_query, params).fetchall()
         teams = db.execute(team_query, params).fetchall()
         venues = db.execute(venue_query, params).fetchall()
         
         # Combine and format results
         results = []
-        for row in players:
-            results.append({"name": row.name, "type": row.type})
+        
+        # Players already formatted from search_players_with_aliases
+        results.extend(players)
+        
         for row in teams:
             results.append({"name": row.name, "type": row.type})
         for row in venues:
@@ -171,19 +167,31 @@ def get_player_profile(
     """
     Get unified player profile with both batting and bowling career stats.
     Uses default date range if not specified.
+    
+    Supports player aliases - if an old/alternate name is provided,
+    it will be resolved to the canonical name automatically.
     """
     defaults = get_default_params()
     start = start_date or defaults["start_date"]
     end = end_date or defaults["end_date"]
     
     try:
+        # Resolve player name to canonical form
+        canonical_name = get_canonical_name(player_name, db)
+        
+        if not canonical_name:
+            return {"error": f"Player '{player_name}' not found", "found": False}
+        
+        # Use canonical name for all queries
+        resolved_name = canonical_name
+        
         # Get player info
         player_info_query = text("""
             SELECT name, batter_type, bowler_type
             FROM players
             WHERE name = :player_name
         """)
-        player_info = db.execute(player_info_query, {"player_name": player_name}).fetchone()
+        player_info = db.execute(player_info_query, {"player_name": resolved_name}).fetchone()
         
         if not player_info:
             return {"error": f"Player '{player_name}' not found", "found": False}
@@ -210,7 +218,7 @@ def get_player_profile(
         """)
         
         batting_stats = db.execute(batting_query, {
-            "player_name": player_name,
+            "player_name": resolved_name,
             "start_date": start,
             "end_date": end
         }).fetchone()
@@ -246,7 +254,7 @@ def get_player_profile(
         """)
         
         bowling_stats = db.execute(bowling_query, {
-            "player_name": player_name,
+            "player_name": resolved_name,
             "start_date": start,
             "end_date": end
         }).fetchone()
@@ -262,7 +270,7 @@ def get_player_profile(
             LIMIT 5
         """)
         recent_teams = db.execute(recent_teams_query, {
-            "player_name": player_name,
+            "player_name": resolved_name,
             "start_date": start
         }).fetchall()
         
@@ -300,9 +308,10 @@ def get_player_profile(
         else:
             role = "unknown"
         
+        # Return canonical name (resolved_name) so frontend uses correct name for links
         return {
             "found": True,
-            "player_name": player_name,
+            "player_name": resolved_name,  # Always return canonical name
             "player_info": {
                 "batter_type": player_info.batter_type,
                 "bowler_type": player_info.bowler_type,

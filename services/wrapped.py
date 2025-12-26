@@ -3058,9 +3058,8 @@ class WrappedService:
                 }
                 for row in negative_impact
             ],
-            "deep_links": {
-                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter"
-            }
+            # No query_builder link - pred_score per-ball delta not reproducible in Query Builder
+            "deep_links": {}
         }
 
     # ========================================================================
@@ -3282,7 +3281,6 @@ class WrappedService:
                 }
                 for row in pressure_folders
             ],
-            "deep_links": {
-                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&innings=2&group_by=batter"
-            }
+            # No query_builder link - win_prob per-ball delta not reproducible in Query Builder
+            "deep_links": {}
         }

@@ -261,9 +261,9 @@ const PlayerSearchResult = ({ playerName }) => {
             </Typography>
           </Box>
           
-          {/* Batter DNA Summary - pass date range */}
+          {/* Batter DNA Summary - use canonical name from profile */}
           <DNASummary 
-            playerName={playerName} 
+            playerName={profile.player_name} 
             playerType="batter" 
             color="#d32f2f"
             startDate={date_range.start_date}
@@ -272,7 +272,7 @@ const PlayerSearchResult = ({ playerName }) => {
           
           <Button
             component={Link}
-            to={`/player?name=${encodeURIComponent(playerName)}&autoload=true`}
+            to={`/player?name=${encodeURIComponent(profile.player_name)}&autoload=true`}
             variant="outlined"
             size="small"
             sx={{ mt: 2 }}
@@ -316,9 +316,9 @@ const PlayerSearchResult = ({ playerName }) => {
             </Typography>
           </Box>
           
-          {/* Bowler DNA Summary - pass date range */}
+          {/* Bowler DNA Summary - use canonical name from profile */}
           <DNASummary 
-            playerName={playerName} 
+            playerName={profile.player_name} 
             playerType="bowler" 
             color="#ed6c02"
             startDate={date_range.start_date}
@@ -327,7 +327,7 @@ const PlayerSearchResult = ({ playerName }) => {
           
           <Button
             component={Link}
-            to={`/bowler?name=${encodeURIComponent(playerName)}&autoload=true`}
+            to={`/bowler?name=${encodeURIComponent(profile.player_name)}&autoload=true`}
             variant="outlined"
             size="small"
             sx={{ mt: 2 }}

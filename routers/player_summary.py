@@ -22,6 +22,7 @@ import logging
 
 from database import get_session
 from services.player_patterns import detect_batter_patterns, detect_bowler_patterns
+from services.player_aliases import resolve_player_name
 
 logger = logging.getLogger(__name__)
 
@@ -372,9 +373,13 @@ async def get_batter_summary(
     If no competition filters are provided, automatically includes ALL leagues + international (top 20 teams).
     """
     try:
+        # Resolve player alias to canonical name
+        resolved_name = resolve_player_name(player_name, db)
+        logger.info(f"Resolved player name: '{player_name}' -> '{resolved_name}'")
+        
         # If no filters provided, use ALL leagues + international
         if not leagues and not include_international:
-            logger.info(f"No competition filters provided for {player_name}, using all leagues + international")
+            logger.info(f"No competition filters provided for {resolved_name}, using all leagues + international")
             leagues_result = db.execute(text(
                 "SELECT DISTINCT competition FROM matches WHERE competition IS NOT NULL AND match_type = 'league'"
             )).fetchall()
@@ -393,14 +398,14 @@ async def get_batter_summary(
             "venue": venue
         }
         
-        # Check cache
-        cache_key = get_cache_key(player_name, "batter", filters)
+        # Check cache (use resolved_name for cache key)
+        cache_key = get_cache_key(resolved_name, "batter", filters)
         if cache_key in summary_cache:
-            logger.info(f"Cache hit for {player_name}")
+            logger.info(f"Cache hit for {resolved_name}")
             cached_result = summary_cache[cache_key]
             return SummaryResponse(
                 success=True,
-                player_name=player_name,
+                player_name=resolved_name,
                 player_type="batter",
                 summary=cached_result["summary"],
                 patterns=cached_result["patterns"] if include_patterns else None,
@@ -408,11 +413,11 @@ async def get_batter_summary(
             )
         
         # Fetch stats from existing endpoint
-        logger.info(f"Fetching stats for {player_name}")
+        logger.info(f"Fetching stats for {resolved_name}")
         from main import get_player_stats
         
         stats = get_player_stats(
-            player_name=player_name,
+            player_name=resolved_name,
             start_date=start_date,
             end_date=end_date,
             leagues=leagues,
@@ -426,20 +431,20 @@ async def get_batter_summary(
         if not stats or not stats.get("overall") or stats.get("overall", {}).get("matches", 0) == 0:
             return SummaryResponse(
                 success=False,
-                player_name=player_name,
+                player_name=resolved_name,
                 player_type="batter",
                 error="No batting statistics found for this player in the selected date range"
             )
         
         # Add player name to stats
-        stats["player_name"] = player_name
+        stats["player_name"] = resolved_name
         
         # Detect patterns
-        logger.info(f"Detecting patterns for {player_name}")
+        logger.info(f"Detecting patterns for {resolved_name}")
         patterns = detect_batter_patterns(stats)
         
         # Generate summary
-        logger.info(f"Generating summary for {player_name}")
+        logger.info(f"Generating summary for {resolved_name}")
         summary = generate_summary_with_llm(patterns, "batter")
         
         # Cache result
@@ -448,10 +453,10 @@ async def get_batter_summary(
             "patterns": patterns
         }
         
-        logger.info(f"Successfully generated summary for {player_name}")
+        logger.info(f"Successfully generated summary for {resolved_name}")
         return SummaryResponse(
             success=True,
-            player_name=player_name,
+            player_name=resolved_name,
             player_type="batter",
             summary=summary,
             patterns=patterns if include_patterns else None,
@@ -462,7 +467,7 @@ async def get_batter_summary(
         logger.error(f"Error generating batter summary for {player_name}: {str(e)}", exc_info=True)
         return SummaryResponse(
             success=False,
-            player_name=player_name,
+            player_name=player_name,  # Keep original name in error for debugging
             player_type="batter",
             error=str(e)
         )
@@ -486,9 +491,13 @@ async def get_bowler_summary(
     If no competition filters are provided, automatically includes ALL leagues + international (top 20 teams).
     """
     try:
+        # Resolve player alias to canonical name
+        resolved_name = resolve_player_name(player_name, db)
+        logger.info(f"Resolved bowler name: '{player_name}' -> '{resolved_name}'")
+        
         # If no filters provided, use ALL leagues + international
         if not leagues and not include_international:
-            logger.info(f"No competition filters provided for bowler {player_name}, using all leagues + international")
+            logger.info(f"No competition filters provided for bowler {resolved_name}, using all leagues + international")
             leagues_result = db.execute(text(
                 "SELECT DISTINCT competition FROM matches WHERE competition IS NOT NULL AND match_type = 'league'"
             )).fetchall()
@@ -506,14 +515,14 @@ async def get_bowler_summary(
             "venue": venue
         }
         
-        # Check cache
-        cache_key = get_cache_key(player_name, "bowler", filters)
+        # Check cache (use resolved_name for cache key)
+        cache_key = get_cache_key(resolved_name, "bowler", filters)
         if cache_key in summary_cache:
-            logger.info(f"Cache hit for bowler {player_name}")
+            logger.info(f"Cache hit for bowler {resolved_name}")
             cached_result = summary_cache[cache_key]
             return SummaryResponse(
                 success=True,
-                player_name=player_name,
+                player_name=resolved_name,
                 player_type="bowler",
                 summary=cached_result["summary"],
                 patterns=cached_result["patterns"] if include_patterns else None,
@@ -521,11 +530,11 @@ async def get_bowler_summary(
             )
         
         # Fetch bowling stats
-        logger.info(f"Fetching bowling stats for {player_name}")
+        logger.info(f"Fetching bowling stats for {resolved_name}")
         from main import get_player_bowling_stats
         
         stats = get_player_bowling_stats(
-            player_name=player_name,
+            player_name=resolved_name,
             start_date=start_date,
             end_date=end_date,
             leagues=leagues,
@@ -539,19 +548,19 @@ async def get_bowler_summary(
         if not stats or not stats.get("overall") or stats.get("overall", {}).get("matches", 0) == 0:
             return SummaryResponse(
                 success=False,
-                player_name=player_name,
+                player_name=resolved_name,
                 player_type="bowler",
                 error="No bowling statistics found for this player in the selected date range"
             )
         
-        stats["player_name"] = player_name
+        stats["player_name"] = resolved_name
         
         # Detect patterns (pass db and filters for advanced queries)
-        logger.info(f"Detecting bowler patterns for {player_name}")
+        logger.info(f"Detecting bowler patterns for {resolved_name}")
         patterns = detect_bowler_patterns(stats, db=db, filters=filters)
         
         # Generate summary
-        logger.info(f"Generating bowler summary for {player_name}")
+        logger.info(f"Generating bowler summary for {resolved_name}")
         summary = generate_summary_with_llm(patterns, "bowler")
         
         # Cache result
@@ -560,10 +569,10 @@ async def get_bowler_summary(
             "patterns": patterns
         }
         
-        logger.info(f"Successfully generated bowler summary for {player_name}")
+        logger.info(f"Successfully generated bowler summary for {resolved_name}")
         return SummaryResponse(
             success=True,
-            player_name=player_name,
+            player_name=resolved_name,
             player_type="bowler",
             summary=summary,
             patterns=patterns if include_patterns else None,
@@ -574,7 +583,7 @@ async def get_bowler_summary(
         logger.error(f"Error generating bowler summary for {player_name}: {str(e)}", exc_info=True)
         return SummaryResponse(
             success=False,
-            player_name=player_name,
+            player_name=player_name,  # Keep original name in error for debugging
             player_type="bowler",
             error=str(e)
         )
