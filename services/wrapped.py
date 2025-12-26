@@ -37,26 +37,27 @@ CARD_CONFIG = [
     # Initial batch - loaded immediately (~3-4 cards for fast first paint)
     {"id": "intro", "title": "2025 in One Breath", "subtitle": "The rhythm of T20 cricket", "initial": True},
     {"id": "powerplay_bullies", "title": "Powerplay Bullies", "subtitle": "Who dominated the first 6 overs", "initial": True},
+    {"id": "powerplay_thieves", "title": "PP Wicket Thieves", "subtitle": "Early breakthrough specialists", "initial": True},
     {"id": "middle_merchants", "title": "Middle Merchants", "subtitle": "Masters of overs 7-15", "initial": True},
-    {"id": "death_hitters", "title": "Death Hitters", "subtitle": "The finishers who lived dangerously", "initial": True},
     
     # Lazy loaded cards
-    {"id": "pace_vs_spin", "title": "Pace vs Spin", "subtitle": "2025's split personality batters", "initial": False},
-    {"id": "powerplay_thieves", "title": "PP Wicket Thieves", "subtitle": "Early breakthrough specialists", "initial": False},
-    {"id": "nineteenth_over_gods", "title": "Death Over Gods", "subtitle": "Overs 16-20 bowling excellence", "initial": False},
     {"id": "middle_overs_squeeze", "title": "Middle Overs Squeeze", "subtitle": "Who choked the scoring in overs 7-15", "initial": False},
-    {"id": "elo_movers", "title": "ELO Movers", "subtitle": "Teams that transformed in 2025", "initial": False},
-    {"id": "venue_vibes", "title": "Venue Vibes", "subtitle": "Par scores and chase bias", "initial": False},
+    {"id": "death_hitters", "title": "Death Hitters", "subtitle": "The finishers who lived dangerously", "initial": False},
+    {"id": "nineteenth_over_gods", "title": "Death Over Gods", "subtitle": "Overs 16-20 bowling excellence", "initial": False},
+    {"id": "pace_vs_spin", "title": "Pace vs Spin", "subtitle": "2025's split personality batters", "initial": False},
+    {"id": "bowler_handedness", "title": "Handedness Hunters", "subtitle": "Bowlers who exploit batting hand", "initial": False},
     {"id": "controlled_aggression", "title": "Controlled Chaos", "subtitle": "The most efficient aggressors", "initial": False},
+    {"id": "uncontrolled_chaos", "title": "Uncontrolled Chaos", "subtitle": "High SR despite low control", "initial": False},
     {"id": "360_batters", "title": "360° Batters", "subtitle": "Who scores all around the ground", "initial": False},
-    {"id": "batter_hand_breakdown", "title": "Left vs Right", "subtitle": "Batting hand breakdown", "initial": False},
     {"id": "length_masters", "title": "Length Masters", "subtitle": "Versatile scorers across all lengths", "initial": False},
     {"id": "rare_shot_specialists", "title": "Rare Shot Artists", "subtitle": "Masters of unconventional shots", "initial": False},
-    {"id": "bowler_type_dominance", "title": "Pace vs Spin", "subtitle": "The bowling arms race", "initial": False},
     {"id": "sweep_evolution", "title": "Sweep Evolution", "subtitle": "How sweeps conquered 2025", "initial": False},
     {"id": "needle_movers", "title": "Needle Movers", "subtitle": "Who outperformed expectations", "initial": False},
     {"id": "chase_masters", "title": "Chase Masters", "subtitle": "Clutch performers in chases", "initial": False},
-    {"id": "uncontrolled_chaos", "title": "Uncontrolled Chaos", "subtitle": "High SR despite low control", "initial": False},
+    {"id": "batter_hand_breakdown", "title": "Left vs Right", "subtitle": "Batting hand breakdown", "initial": False},
+    {"id": "bowler_type_dominance", "title": "Pace vs Spin", "subtitle": "The bowling arms race", "initial": False},
+    {"id": "elo_movers", "title": "ELO Movers", "subtitle": "Teams that transformed in 2025", "initial": False},
+    {"id": "venue_vibes", "title": "Venue Vibes", "subtitle": "Par scores and chase bias", "initial": False}
 ]
 
 # Helper to get card IDs in order
@@ -392,6 +393,7 @@ class WrappedService:
             "needle_movers": self.get_needle_movers_data,
             "chase_masters": self.get_chase_masters_data,
             "uncontrolled_chaos": self.get_uncontrolled_chaos_data,
+            "bowler_handedness": self.get_bowler_handedness_data,
         }
         
         if card_id not in card_methods:
@@ -1806,6 +1808,143 @@ class WrappedService:
             "players": players_with_ca[:15],
             "deep_links": {
                 "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter&min_balls={min_balls}"
+            }
+        }
+
+    # ========================================================================
+    # CARD 20: BOWLER HANDEDNESS (LHB/RHB Specialists)
+    # ========================================================================
+    
+    def get_bowler_handedness_data(
+        self,
+        start_date: str,
+        end_date: str,
+        leagues: List[str],
+        include_international: bool,
+        db: Session,
+        min_balls: int = 100,
+        top_teams: int = DEFAULT_TOP_TEAMS
+    ) -> Dict[str, Any]:
+        """Card 20: Bowler Handedness - Bowlers who dominate vs LHB or RHB.
+        
+        Identifies specialists who have significantly better numbers against
+        one batting hand vs the other.
+        """
+        
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
+        
+        # Query bowler stats split by batter handedness
+        query = text(f"""
+            WITH bowler_vs_hand AS (
+                SELECT 
+                    dd.bowl as player,
+                    dd.team_bowl as team,
+                    dd.bat_hand,
+                    COUNT(*) as balls,
+                    SUM(dd.score) as runs,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' 
+                        AND dd.dismissal NOT IN ('run out', 'retired hurt', 'retired out')
+                        THEN 1 ELSE 0 END) as wickets,
+                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots
+                FROM delivery_details dd
+                WHERE dd.year >= :start_year
+                AND dd.year <= :end_year
+                AND dd.bat_hand IN ('LHB', 'RHB')
+                GROUP BY dd.bowl, dd.team_bowl, dd.bat_hand
+            ),
+            player_primary_team AS (
+                SELECT DISTINCT ON (player) player, team
+                FROM bowler_vs_hand
+                ORDER BY player, SUM(balls) OVER (PARTITION BY player, team) DESC
+            ),
+            lhb_stats AS (
+                SELECT player, SUM(balls) as balls, SUM(runs) as runs, SUM(wickets) as wickets, SUM(dots) as dots
+                FROM bowler_vs_hand WHERE bat_hand = 'LHB'
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            ),
+            rhb_stats AS (
+                SELECT player, SUM(balls) as balls, SUM(runs) as runs, SUM(wickets) as wickets, SUM(dots) as dots
+                FROM bowler_vs_hand WHERE bat_hand = 'RHB'
+                GROUP BY player
+                HAVING SUM(balls) >= :min_balls
+            )
+            SELECT 
+                COALESCE(l.player, r.player) as player,
+                ppt.team,
+                l.balls as lhb_balls, l.runs as lhb_runs, l.wickets as lhb_wickets,
+                ROUND(CAST(l.runs * 6.0 / NULLIF(l.balls, 0) AS numeric), 2) as econ_vs_lhb,
+                ROUND(CAST(l.balls AS numeric) / NULLIF(l.wickets, 0), 2) as sr_vs_lhb,
+                ROUND(CAST(l.dots * 100.0 / NULLIF(l.balls, 0) AS numeric), 1) as dot_pct_vs_lhb,
+                r.balls as rhb_balls, r.runs as rhb_runs, r.wickets as rhb_wickets,
+                ROUND(CAST(r.runs * 6.0 / NULLIF(r.balls, 0) AS numeric), 2) as econ_vs_rhb,
+                ROUND(CAST(r.balls AS numeric) / NULLIF(r.wickets, 0), 2) as sr_vs_rhb,
+                ROUND(CAST(r.dots * 100.0 / NULLIF(r.balls, 0) AS numeric), 1) as dot_pct_vs_rhb,
+                ROUND(
+                    CAST(r.runs * 6.0 / NULLIF(r.balls, 0) AS numeric) - 
+                    CAST(l.runs * 6.0 / NULLIF(l.balls, 0) AS numeric)
+                , 2) as econ_delta
+            FROM lhb_stats l
+            FULL OUTER JOIN rhb_stats r ON l.player = r.player
+            LEFT JOIN player_primary_team ppt ON COALESCE(l.player, r.player) = ppt.player
+            WHERE l.balls IS NOT NULL AND r.balls IS NOT NULL
+            ORDER BY ABS(
+                CAST(r.runs * 6.0 / NULLIF(r.balls, 0) AS numeric) - 
+                CAST(l.runs * 6.0 / NULLIF(l.balls, 0) AS numeric)
+            ) DESC
+            LIMIT 20
+        """)
+        
+        results = db.execute(query, params).fetchall()
+        
+        # Split into LHB specialists (lower economy vs LHB) and RHB specialists
+        lhb_specialists = [r for r in results if r.econ_delta and r.econ_delta > 0.5][:5]
+        rhb_specialists = [r for r in results if r.econ_delta and r.econ_delta < -0.5][:5]
+        
+        return {
+            "card_id": "bowler_handedness",
+            "card_title": "Handedness Hunters",
+            "card_subtitle": f"Bowlers who exploit batting hand (min {min_balls} balls each)",
+            "visualization_type": "diverging_bar",
+            "metric_note": "Economy difference: positive = better vs LHB, negative = better vs RHB",
+            "lhb_specialists": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "econ_vs_lhb": float(row.econ_vs_lhb) if row.econ_vs_lhb else 0,
+                    "econ_vs_rhb": float(row.econ_vs_rhb) if row.econ_vs_rhb else 0,
+                    "econ_delta": float(row.econ_delta) if row.econ_delta else 0,
+                    "sr_vs_lhb": float(row.sr_vs_lhb) if row.sr_vs_lhb else 999,
+                    "sr_vs_rhb": float(row.sr_vs_rhb) if row.sr_vs_rhb else 999,
+                    "wickets_vs_lhb": row.lhb_wickets,
+                    "wickets_vs_rhb": row.rhb_wickets,
+                    "lhb_balls": row.lhb_balls,
+                    "rhb_balls": row.rhb_balls
+                }
+                for row in lhb_specialists
+            ],
+            "rhb_specialists": [
+                {
+                    "name": row.player,
+                    "team": row.team,
+                    "econ_vs_lhb": float(row.econ_vs_lhb) if row.econ_vs_lhb else 0,
+                    "econ_vs_rhb": float(row.econ_vs_rhb) if row.econ_vs_rhb else 0,
+                    "econ_delta": float(row.econ_delta) if row.econ_delta else 0,
+                    "sr_vs_lhb": float(row.sr_vs_lhb) if row.sr_vs_lhb else 999,
+                    "sr_vs_rhb": float(row.sr_vs_rhb) if row.sr_vs_rhb else 999,
+                    "wickets_vs_lhb": row.lhb_wickets,
+                    "wickets_vs_rhb": row.rhb_wickets,
+                    "lhb_balls": row.lhb_balls,
+                    "rhb_balls": row.rhb_balls
+                }
+                for row in rhb_specialists
+            ],
+            "deep_links": {
+                "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bowler,bat_hand&min_balls={min_balls}"
             }
         }
 
