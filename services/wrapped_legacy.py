@@ -31,8 +31,61 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 from typing import List, Dict, Any, Optional
 import logging
+from models import INTERNATIONAL_TEAMS_RANKED
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# HELPER FUNCTION FOR COMPETITION FILTERING
+# =============================================================================
+
+def build_competition_filter(
+    leagues: List[str],
+    include_international: bool,
+    top_teams: int = WRAPPED_DEFAULT_TOP_TEAMS,
+    table_alias: str = "dd"
+) -> tuple:
+    """
+    Build SQL WHERE clause conditions for competition filtering.
+    
+    Args:
+        leagues: List of league names/abbreviations to include
+        include_international: Whether to include T20I matches
+        top_teams: Number of top international teams (uses INTERNATIONAL_TEAMS_RANKED)
+        table_alias: Table alias for delivery_details (default 'dd')
+    
+    Returns:
+        Tuple of (sql_conditions: str, params: dict)
+        
+    The returned SQL should be AND-ed to existing WHERE clause.
+    """
+    conditions = []
+    params = {}
+    
+    # Build league filter
+    league_conditions = []
+    
+    if leagues:
+        league_conditions.append(f"{table_alias}.competition = ANY(:leagues)")
+        params["leagues"] = leagues
+    
+    # Build international filter
+    if include_international:
+        top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+        # T20I matches where both teams are in top N
+        league_conditions.append(
+            f"({table_alias}.competition = 'T20I' AND {table_alias}.team_bat = ANY(:top_teams) AND {table_alias}.team_bowl = ANY(:top_teams))"
+        )
+        params["top_teams"] = top_team_list
+    
+    # Combine with OR (match leagues OR international)
+    if league_conditions:
+        conditions.append(f"({' OR '.join(league_conditions)})")
+    
+    sql = " AND ".join(conditions) if conditions else "1=1"
+    return sql, params
+
 
 # Import team rankings for top_teams filter
 try:
@@ -46,7 +99,7 @@ except ImportError:
     ]
 
 # Default settings
-DEFAULT_TOP_TEAMS = 20
+# DEFAULT_TOP_TEAMS is now WRAPPED_DEFAULT_TOP_TEAMS
 
 # =============================================================================
 # CENTRALIZED WRAPPED FILTER DEFAULTS
