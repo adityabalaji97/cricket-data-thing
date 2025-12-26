@@ -19,10 +19,27 @@ const GoogleSearchLanding = () => {
   const [searchParams] = useSearchParams();
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [luckyLoading, setLuckyLoading] = useState(false);
+  
+  // Extract URL parameters for date filtering
+  const [dateFilters, setDateFilters] = useState({
+    startDate: null,
+    endDate: null
+  });
 
-  // Auto-search from URL parameter
+  // Auto-search from URL parameter and extract date filters
   useEffect(() => {
     const query = searchParams.get('q');
+    const startDate = searchParams.get('start_date');
+    const endDate = searchParams.get('end_date');
+    
+    // Update date filters if provided in URL
+    if (startDate || endDate) {
+      setDateFilters({
+        startDate: startDate || null,
+        endDate: endDate || null
+      });
+    }
+    
     if (query && !selectedEntity) {
       // Auto-select as player search
       setSelectedEntity({ name: query, type: 'player' });
@@ -32,8 +49,12 @@ const GoogleSearchLanding = () => {
   const handleSelect = (item) => {
     if (item.type === 'player') {
       setSelectedEntity(item);
-      // Update URL to reflect the search
-      navigate(`/search?q=${encodeURIComponent(item.name)}`, { replace: true });
+      // Build URL with any existing date filters
+      const params = new URLSearchParams();
+      params.set('q', item.name);
+      if (dateFilters.startDate) params.set('start_date', dateFilters.startDate);
+      if (dateFilters.endDate) params.set('end_date', dateFilters.endDate);
+      navigate(`/search?${params.toString()}`, { replace: true });
     } else if (item.type === 'team') {
       navigate(`/team?team=${encodeURIComponent(item.name)}&autoload=true`);
     } else if (item.type === 'venue') {
@@ -50,7 +71,11 @@ const GoogleSearchLanding = () => {
       if (data.type === 'player') {
         // Use legacy name for profile lookup, full object for state
         setSelectedEntity(data);
-        navigate(`/search?q=${encodeURIComponent(data.name)}`, { replace: true });
+        const params = new URLSearchParams();
+        params.set('q', data.name);
+        if (dateFilters.startDate) params.set('start_date', dateFilters.startDate);
+        if (dateFilters.endDate) params.set('end_date', dateFilters.endDate);
+        navigate(`/search?${params.toString()}`, { replace: true });
       } else if (data.type === 'team') {
         navigate(`/team?team=${encodeURIComponent(data.name)}&autoload=true`);
       } else if (data.type === 'venue') {
@@ -65,8 +90,23 @@ const GoogleSearchLanding = () => {
 
   const handleClear = () => {
     setSelectedEntity(null);
+    setDateFilters({ startDate: null, endDate: null });
     navigate('/search', { replace: true });
   };
+
+  // Format date range for display
+  const getDateRangeLabel = () => {
+    if (dateFilters.startDate && dateFilters.endDate) {
+      return `${dateFilters.startDate} to ${dateFilters.endDate}`;
+    } else if (dateFilters.startDate) {
+      return `From ${dateFilters.startDate}`;
+    } else if (dateFilters.endDate) {
+      return `Until ${dateFilters.endDate}`;
+    }
+    return null;
+  };
+
+  const dateRangeLabel = getDateRangeLabel();
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -90,6 +130,24 @@ const GoogleSearchLanding = () => {
         <Typography variant="body1" color="text.secondary">
           Search players, teams, and venues for T20 cricket analytics
         </Typography>
+        {/* Show date filter badge if dates are applied */}
+        {dateRangeLabel && (
+          <Box sx={{ mt: 1 }}>
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                bgcolor: 'primary.main', 
+                color: 'white', 
+                px: 1.5, 
+                py: 0.5, 
+                borderRadius: 1,
+                display: 'inline-block'
+              }}
+            >
+              📅 {dateRangeLabel}
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       {/* Search Bar */}
@@ -121,7 +179,11 @@ const GoogleSearchLanding = () => {
 
       {/* Results */}
       {selectedEntity && selectedEntity.type === 'player' && (
-        <PlayerSearchResult playerName={selectedEntity.name} />
+        <PlayerSearchResult 
+          playerName={selectedEntity.name}
+          startDate={dateFilters.startDate}
+          endDate={dateFilters.endDate}
+        />
       )}
 
       {/* Quick Links when no selection */}

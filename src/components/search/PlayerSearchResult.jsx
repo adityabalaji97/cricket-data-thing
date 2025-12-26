@@ -20,7 +20,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { API_BASE_URL } from './searchConfig';
+import { API_BASE_URL, DEFAULT_SEARCH_PARAMS } from './searchConfig';
 
 const StatCard = ({ label, value, subtitle }) => (
   <Box sx={{ textAlign: 'center', p: 1 }}>
@@ -145,17 +145,27 @@ const DNASummary = ({ playerName, playerType, color, startDate, endDate }) => {
   );
 };
 
-const PlayerSearchResult = ({ playerName }) => {
+const PlayerSearchResult = ({ playerName, startDate, endDate }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Use provided dates or fallback to defaults
+  const effectiveStartDate = startDate || DEFAULT_SEARCH_PARAMS.start_date;
+  const effectiveEndDate = endDate || DEFAULT_SEARCH_PARAMS.end_date;
 
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await axios.get(`${API_BASE_URL}/search/player/${encodeURIComponent(playerName)}`);
+        // Build URL with date parameters
+        const params = new URLSearchParams();
+        params.append('start_date', effectiveStartDate);
+        params.append('end_date', effectiveEndDate);
+        
+        const url = `${API_BASE_URL}/search/player/${encodeURIComponent(playerName)}?${params.toString()}`;
+        const response = await axios.get(url);
         setProfile(response.data);
       } catch (err) {
         setError(err.response?.data?.detail || 'Failed to load player profile');
@@ -167,7 +177,7 @@ const PlayerSearchResult = ({ playerName }) => {
     if (playerName) {
       fetchProfile();
     }
-  }, [playerName]);
+  }, [playerName, effectiveStartDate, effectiveEndDate]);
 
   if (loading) {
     return (
@@ -186,6 +196,11 @@ const PlayerSearchResult = ({ playerName }) => {
   }
 
   const { player_info, batting, bowling, date_range } = profile;
+
+  // Determine if custom date range is being used
+  const isCustomDateRange = startDate || endDate;
+  const displayStartDate = date_range?.start_date || effectiveStartDate;
+  const displayEndDate = date_range?.end_date || effectiveEndDate;
 
   return (
     <Paper elevation={2} sx={{ p: 3, maxWidth: 800, mx: 'auto' }}>
@@ -223,7 +238,16 @@ const PlayerSearchResult = ({ playerName }) => {
 
       {/* Date Range */}
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-        Stats from {date_range.start_date} to {date_range.end_date}
+        Stats from {displayStartDate} to {displayEndDate}
+        {isCustomDateRange && (
+          <Chip 
+            size="small" 
+            label="Custom Range" 
+            color="primary" 
+            variant="outlined"
+            sx={{ ml: 1, height: 18, '& .MuiChip-label': { px: 1, fontSize: '0.65rem' } }}
+          />
+        )}
       </Typography>
 
       <Divider sx={{ my: 2 }} />
@@ -266,13 +290,13 @@ const PlayerSearchResult = ({ playerName }) => {
             playerName={profile.player_name} 
             playerType="batter" 
             color="#d32f2f"
-            startDate={date_range.start_date}
-            endDate={date_range.end_date}
+            startDate={displayStartDate}
+            endDate={displayEndDate}
           />
           
           <Button
             component={Link}
-            to={`/player?name=${encodeURIComponent(profile.player_name)}&autoload=true`}
+            to={`/player?name=${encodeURIComponent(profile.player_name)}&autoload=true&start_date=${effectiveStartDate}&end_date=${effectiveEndDate}`}
             variant="outlined"
             size="small"
             sx={{ mt: 2 }}
@@ -321,13 +345,13 @@ const PlayerSearchResult = ({ playerName }) => {
             playerName={profile.player_name} 
             playerType="bowler" 
             color="#ed6c02"
-            startDate={date_range.start_date}
-            endDate={date_range.end_date}
+            startDate={displayStartDate}
+            endDate={displayEndDate}
           />
           
           <Button
             component={Link}
-            to={`/bowler?name=${encodeURIComponent(profile.player_name)}&autoload=true`}
+            to={`/bowler?name=${encodeURIComponent(profile.player_name)}&autoload=true&start_date=${effectiveStartDate}&end_date=${effectiveEndDate}`}
             variant="outlined"
             size="small"
             sx={{ mt: 2 }}

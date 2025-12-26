@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 import TeamBadge from '../TeamBadge';
+import { handleWrappedPlayerClick } from '../wrappedUrlUtils';
 
 const PowerplayBulliesCard = ({ data }) => {
   if (!data.players || data.players.length === 0) {
@@ -11,11 +12,6 @@ const PowerplayBulliesCard = ({ data }) => {
   // Calculate averages for reference lines
   const avgSR = data.players.reduce((sum, p) => sum + p.strike_rate, 0) / data.players.length;
   const avgDot = data.players.reduce((sum, p) => sum + p.dot_percentage, 0) / data.players.length;
-
-  const handlePlayerClick = (player) => {
-    const url = `/search?q=${encodeURIComponent(player.name)}&start_date=2025-01-01`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload }) => {
@@ -45,7 +41,7 @@ const PowerplayBulliesCard = ({ data }) => {
             className="top-player-item"
             onClick={(e) => {
               e.stopPropagation();
-              handlePlayerClick(player);
+              handleWrappedPlayerClick(player);
             }}
           >
             <Typography variant="h5" className="rank">#{index + 1}</Typography>

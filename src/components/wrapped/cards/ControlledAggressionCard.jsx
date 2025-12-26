@@ -1,16 +1,12 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import TeamBadge from '../TeamBadge';
+import { handleWrappedPlayerClick } from '../wrappedUrlUtils';
 
 const ControlledAggressionCard = ({ data }) => {
   if (!data.players || data.players.length === 0) {
     return <Typography sx={{ color: '#fff' }}>No controlled aggression data available</Typography>;
   }
-
-  const handlePlayerClick = (player) => {
-    const url = `/search?q=${encodeURIComponent(player.name)}&start_date=2025-01-01`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
 
   // Top 5 for display
   const topPlayers = data.players.slice(0, 5);
@@ -44,7 +40,7 @@ const ControlledAggressionCard = ({ data }) => {
           className="hero-player"
           onClick={(e) => {
             e.stopPropagation();
-            handlePlayerClick(topPlayers[0]);
+            handleWrappedPlayerClick(topPlayers[0]);
           }}
           sx={{ mb: 2, p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2, cursor: 'pointer' }}
         >
@@ -75,7 +71,7 @@ const ControlledAggressionCard = ({ data }) => {
               className="list-item"
               onClick={(e) => {
                 e.stopPropagation();
-                handlePlayerClick(player);
+                handleWrappedPlayerClick(player);
               }}
               sx={{ 
                 display: 'flex', 

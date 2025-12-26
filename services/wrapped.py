@@ -5,6 +5,28 @@ This module contains all the data fetching logic for the 2025 In Hindsight featu
 Each function corresponds to a specific card in the hindsight experience.
 """
 
+# =============================================================================
+# CENTRALIZED FILTER DEFAULTS
+# =============================================================================
+# These are the default filters applied to all Wrapped cards
+# Top 5 T20 leagues + PSL, plus T20Is between top 20 international teams
+
+WRAPPED_DEFAULT_LEAGUES = [
+    'Indian Premier League',
+    'IPL',
+    'SA20', 
+    'Big Bash League',
+    'BBL',
+    'Vitality Blast',
+    'T20 Blast',
+    'Super Smash',
+    'Pakistan Super League',
+    'PSL'
+]
+
+WRAPPED_DEFAULT_TOP_TEAMS = 20  # Top 20 international teams for T20Is
+WRAPPED_DEFAULT_INCLUDE_INTERNATIONAL = True
+
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 from typing import List, Dict, Any, Optional
@@ -25,6 +47,43 @@ except ImportError:
 
 # Default settings
 DEFAULT_TOP_TEAMS = 20
+
+# =============================================================================
+# CENTRALIZED WRAPPED FILTER DEFAULTS
+# =============================================================================
+# These defaults are used across all wrapped cards for consistent filtering.
+# To customize, users can pass different values via API query parameters.
+# The three-dot menu in the UI can also be used to modify these filters.
+
+# Top 5 T20 leagues + PSL (6 leagues total)
+WRAPPED_DEFAULT_LEAGUES = [
+    'Indian Premier League',
+    'IPL',
+    'SA20',
+    'Big Bash League',
+    'BBL',
+    'Vitality Blast',
+    'T20 Blast',
+    'NatWest T20 Blast',
+    'Super Smash',
+    'HRV Cup',
+    'Pakistan Super League',
+    'PSL'
+]
+
+# Include T20Is between top 20 international teams
+WRAPPED_DEFAULT_INCLUDE_INTERNATIONAL = True
+WRAPPED_DEFAULT_TOP_TEAMS = 20
+
+# League display names for UI
+WRAPPED_LEAGUE_DISPLAY_NAMES = {
+    'IPL': 'Indian Premier League',
+    'SA20': 'SA20',
+    'BBL': 'Big Bash League', 
+    'Vitality Blast': 'Vitality Blast (T20 Blast)',
+    'Super Smash': 'Super Smash',
+    'PSL': 'Pakistan Super League'
+}
 
 
 # ============================================================================
