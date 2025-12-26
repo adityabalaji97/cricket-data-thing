@@ -28,12 +28,14 @@ const WagonWheel = ({ zoneBreakdown, size = 120, isLHB = false }) => {
     { zone: 8, label: 'Third Man', startAngle: 135, endAngle: 180 },
   ];
 
+  // Color scale: darker green = higher run% (more contrasty)
   const getColor = (runPct) => {
-    if (runPct >= 15) return '#1DB954';  // High
-    if (runPct >= 10) return '#4CAF50';  // Good
-    if (runPct >= 5) return '#8BC34A';   // Medium
-    if (runPct > 0) return '#CDDC39';    // Low
-    return 'rgba(255,255,255,0.1)';      // None
+    if (runPct >= 20) return '#064E3B';  // Very high - Deep forest green
+    if (runPct >= 15) return '#047857';  // High - Dark emerald
+    if (runPct >= 10) return '#10B981';  // Good - Emerald
+    if (runPct >= 5) return '#6EE7B7';   // Medium - Light emerald
+    if (runPct > 0) return '#A7F3D0';    // Low - Very light mint
+    return 'rgba(255,255,255,0.08)';     // None
   };
 
   const polarToCartesian = (angle, r) => {
