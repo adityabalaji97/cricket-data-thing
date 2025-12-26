@@ -370,10 +370,13 @@ class WrappedService:
     ) -> Dict[str, Any]:
         """Card 1: Global run rate and wicket cost by phase - using delivery_details."""
         
-        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
-        params = get_dd_base_params(start_date, end_date, leagues, top_teams)
+        # Use year-only filter to include ALL T20 data (leagues + internationals)
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4])
+        }
         
-        query = text(f"""
+        query = text("""
             WITH phase_data AS (
                 SELECT 
                     CASE 
@@ -391,7 +394,6 @@ class WrappedService:
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
-                {dd_filter}
                 GROUP BY phase
             )
             SELECT 
@@ -417,18 +419,17 @@ class WrappedService:
         results = db.execute(query, params).fetchall()
         
         # Get total matches count from delivery_details
-        matches_query = text(f"""
+        matches_query = text("""
             SELECT COUNT(DISTINCT dd.p_match) as total_matches
             FROM delivery_details dd
             WHERE dd.year >= :start_year
             AND dd.year <= :end_year
-            {dd_filter}
         """)
         
         matches_result = db.execute(matches_query, params).fetchone()
         
         # Get batting first vs chase win statistics using delivery_details
-        toss_query = text(f"""
+        toss_query = text("""
             WITH match_results AS (
                 SELECT DISTINCT 
                     dd.p_match,
@@ -442,7 +443,6 @@ class WrappedService:
                 AND dd.year <= :end_year
                 AND dd.winner IS NOT NULL
                 AND dd.winner != ''
-                {dd_filter}
             )
             SELECT 
                 SUM(CASE WHEN winner = batting_first_team THEN 1 ELSE 0 END) as bat_first_wins,
@@ -504,10 +504,14 @@ class WrappedService:
     ) -> Dict[str, Any]:
         """Card 2: Top batters in powerplay by strike rate - using delivery_details."""
         
-        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
-        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
+        # Use year-only filter to include ALL T20 data (leagues + internationals)
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
         
-        query = text(f"""
+        query = text("""
             WITH powerplay_stats AS (
                 SELECT 
                     dd.bat as player,
@@ -523,7 +527,6 @@ class WrappedService:
                 AND dd.year <= :end_year
                 AND dd.over < 6  -- Powerplay overs 0-5
                 AND dd.bat_hand IN ('LHB', 'RHB')
-                {dd_filter}
                 GROUP BY dd.bat, dd.team_bat
             ),
             player_primary_team AS (
@@ -601,10 +604,14 @@ class WrappedService:
     ) -> Dict[str, Any]:
         """Card 3: Best middle-overs batters - prioritizing low dot% and high boundary%."""
         
-        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
-        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
+        # Use year-only filter to include ALL T20 data (leagues + internationals)
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
         
-        query = text(f"""
+        query = text("""
             WITH middle_stats AS (
                 SELECT 
                     dd.bat as player,
@@ -620,7 +627,6 @@ class WrappedService:
                 AND dd.year <= :end_year
                 AND dd.over >= 6 AND dd.over < 15  -- Middle overs 6-14
                 AND dd.bat_hand IN ('LHB', 'RHB')
-                {dd_filter}
                 GROUP BY dd.bat, dd.team_bat
             ),
             player_primary_team AS (
@@ -706,10 +712,14 @@ class WrappedService:
     ) -> Dict[str, Any]:
         """Card 4: Best death-overs hitters - prioritizing six-hitting."""
         
-        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
-        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_balls}
+        # Use year-only filter to include ALL T20 data (leagues + internationals)
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_balls
+        }
         
-        query = text(f"""
+        query = text("""
             WITH death_stats AS (
                 SELECT 
                     dd.bat as player,
@@ -728,7 +738,6 @@ class WrappedService:
                 AND dd.year <= :end_year
                 AND dd.over >= 15  -- Death overs 15-19
                 AND dd.bat_hand IN ('LHB', 'RHB')
-                {dd_filter}
                 GROUP BY dd.bat, dd.team_bat
             ),
             player_primary_team AS (
@@ -1057,10 +1066,14 @@ class WrappedService:
     ) -> Dict[str, Any]:
         """Card 6: Best powerplay wicket-takers - using delivery_details."""
         
-        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
-        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_wickets": min_wickets}
+        # Use year-only filter to include ALL T20 data (leagues + internationals)
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_wickets": min_wickets
+        }
         
-        query = text(f"""
+        query = text("""
             WITH pp_bowling AS (
                 SELECT 
                     dd.bowl as player,
@@ -1076,7 +1089,6 @@ class WrappedService:
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year AND dd.year <= :end_year
                 AND dd.over < 6  -- Powerplay overs 0-5
-                {dd_filter}
                 GROUP BY dd.bowl, dd.team_bowl
             ),
             player_primary_team AS (
@@ -1153,10 +1165,14 @@ class WrappedService:
     ) -> Dict[str, Any]:
         """Card 7: Bowlers who dominated death overs - using delivery_details."""
         
-        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
-        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_overs * 6}
+        # Use year-only filter to include ALL T20 data (leagues + internationals)
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_overs * 6
+        }
         
-        query = text(f"""
+        query = text("""
             WITH death_bowling AS (
                 SELECT 
                     dd.bowl as player,
@@ -1172,7 +1188,6 @@ class WrappedService:
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year AND dd.year <= :end_year
                 AND dd.over >= 15  -- Death overs 15-19
-                {dd_filter}
                 GROUP BY dd.bowl, dd.team_bowl
             ),
             player_primary_team AS (
@@ -1262,10 +1277,14 @@ class WrappedService:
         with wickets as a bonus factor.
         """
         
-        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
-        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_balls": min_overs * 6}
+        # Use year-only filter to include ALL T20 data (leagues + internationals)
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_balls": min_overs * 6
+        }
         
-        query = text(f"""
+        query = text("""
             WITH middle_bowling AS (
                 SELECT 
                     dd.bowl as player,
@@ -1282,7 +1301,6 @@ class WrappedService:
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year AND dd.year <= :end_year
                 AND dd.over >= 6 AND dd.over < 15  -- Middle overs 6-14
-                {dd_filter}
                 GROUP BY dd.bowl, dd.team_bowl
             ),
             player_primary_team AS (
@@ -1471,10 +1489,14 @@ class WrappedService:
     ) -> Dict[str, Any]:
         """Card 9: Venue leaderboard - par score + chase bias - using delivery_details."""
         
-        dd_filter = build_dd_competition_filter(leagues, include_international, top_teams)
-        params = {**get_dd_base_params(start_date, end_date, leagues, top_teams), "min_matches": min_matches}
+        # Use year-only filter to include ALL T20 data (leagues + internationals)
+        params = {
+            "start_year": int(start_date[:4]),
+            "end_year": int(end_date[:4]),
+            "min_matches": min_matches
+        }
         
-        query = text(f"""
+        query = text("""
             WITH innings_totals AS (
                 SELECT 
                     dd.p_match,
@@ -1489,7 +1511,6 @@ class WrappedService:
                 FROM delivery_details dd
                 WHERE dd.year >= :start_year
                 AND dd.year <= :end_year
-                {dd_filter}
             ),
             match_summary AS (
                 SELECT DISTINCT
