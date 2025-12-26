@@ -9,28 +9,20 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
 from .query_helpers import build_base_filters, execute_query
-from .constants import DEFAULT_MIN_BALLS, DEFAULT_TOP_TEAMS
+from .constants import DEFAULT_TOP_TEAMS
 
-
-# Rare shots to track
-RARE_SHOTS = [
-    'REVERSE_SCOOP',
-    'REVERSE_PULL', 
-    'LATE_CUT',
-    'PADDLE_SWEEP',
-    'RAMP',
-    'HOOK',
-    'UPPER_CUT'
-]
 
 SHOT_LABELS = {
-    'REVERSE_SCOOP': 'Rev Scoop',
-    'REVERSE_PULL': 'Rev Pull',
-    'LATE_CUT': 'Late Cut',
-    'PADDLE_SWEEP': 'Paddle',
+    'REVERSE_SCOOP': 'Reverse Scoop',
+    'REVERSE_SWEEP': 'Reverse Sweep',
+    'SCOOP': 'Scoop',
     'RAMP': 'Ramp',
+    'PADDLE_SWEEP': 'Paddle Sweep',
+    'SWITCH_HIT': 'Switch Hit',
+    'LATE_CUT': 'Late Cut',
+    'UPPER_CUT': 'Upper Cut',
     'HOOK': 'Hook',
-    'UPPER_CUT': 'Upper Cut'
+    'REVERSE_PULL': 'Reverse Pull'
 }
 
 
@@ -40,13 +32,13 @@ def get_rare_shot_specialists_data(
     leagues: List[str],
     include_international: bool,
     db: Session,
-    min_balls_per_shot: int = 5,
+    min_balls_per_shot: int = 3,  # Lowered threshold
     top_teams: int = DEFAULT_TOP_TEAMS
 ) -> Dict[str, Any]:
     """
     Card: Rare Shot Specialists
     
-    Finds the best player for each rare shot type by strike rate.
+    Finds the best player for each rare/unconventional shot type.
     """
     
     where_clause, params = build_base_filters(
@@ -64,7 +56,33 @@ def get_rare_shot_specialists_data(
     )
     
     params["min_balls"] = min_balls_per_shot
-    params["rare_shots"] = RARE_SHOTS
+    
+    # First get all distinct shots to see what's in the data
+    shots_query = f"""
+        SELECT DISTINCT UPPER(REPLACE(dd.shot, ' ', '_')) as shot_type
+        FROM delivery_details dd
+        {where_clause}
+    """
+    
+    all_shots = execute_query(db, shots_query, params)
+    available_shots = [row.shot_type for row in all_shots]
+    
+    # Filter to rare shots that exist in data
+    rare_shot_list = [s for s in SHOT_LABELS.keys() if s in available_shots]
+    
+    if not rare_shot_list:
+        return {
+            "card_id": "rare_shot_specialists",
+            "card_title": "Rare Shot Specialists",
+            "card_subtitle": "Masters of unconventional shots",
+            "visualization_type": "shot_grid",
+            "rare_shots": [],
+            "shot_labels": SHOT_LABELS,
+            "best_per_shot": {},
+            "message": "No rare shot data available for this period"
+        }
+    
+    params["rare_shots"] = rare_shot_list
     
     query = f"""
         WITH shot_stats AS (
@@ -101,33 +119,37 @@ def get_rare_shot_specialists_data(
         )
         SELECT *
         FROM ranked_by_shot
-        WHERE rn = 1
-        ORDER BY shot_type
+        WHERE rn <= 3
+        ORDER BY shot_type, rn
     """
     
     results = execute_query(db, query, params)
     
     best_per_shot = {}
-    found_shots = []
+    found_shots = set()
     
     for row in results:
         shot_type = row.shot_type
-        found_shots.append(shot_type)
-        best_per_shot[shot_type] = {
+        found_shots.add(shot_type)
+        
+        if shot_type not in best_per_shot:
+            best_per_shot[shot_type] = []
+        
+        best_per_shot[shot_type].append({
             "name": row.player,
             "team": row.team,
             "balls": row.balls,
             "runs": int(row.runs) if row.runs else 0,
             "boundaries": row.boundaries or 0,
             "strike_rate": float(row.strike_rate) if row.strike_rate else 0
-        }
+        })
     
     return {
         "card_id": "rare_shot_specialists",
         "card_title": "Rare Shot Specialists",
-        "card_subtitle": f"Masters of unconventional shots (min {min_balls_per_shot} balls)",
+        "card_subtitle": f"Masters of unconventional shots (min {min_balls_per_shot} attempts)",
         "visualization_type": "shot_grid",
-        "rare_shots": found_shots,
+        "rare_shots": list(found_shots),
         "shot_labels": SHOT_LABELS,
         "best_per_shot": best_per_shot,
         "deep_links": {

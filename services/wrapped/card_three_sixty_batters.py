@@ -25,7 +25,7 @@ def get_three_sixty_batters_data(
     Card: 360° Batters
     
     Identifies batters who score evenly across all wagon wheel zones.
-    360° Score rewards even distribution + high strike rate.
+    Uses zones 0-7 (8 zones total).
     """
     
     where_clause, params = build_base_filters(
@@ -39,7 +39,7 @@ def get_three_sixty_batters_data(
         extra_conditions=[
             "dd.bat_hand IN ('LHB', 'RHB')",
             "dd.wagon_zone IS NOT NULL",
-            "dd.wagon_zone BETWEEN 1 AND 8"
+            "dd.wagon_zone BETWEEN 0 AND 8"  # Include 0-8 to cover both indexing options
         ]
     )
     
@@ -61,7 +61,7 @@ def get_three_sixty_batters_data(
         player_primary AS (
             SELECT DISTINCT ON (player) player, team, bat_hand
             FROM zone_stats
-            ORDER BY player, balls DESC
+            ORDER BY player, SUM(balls) OVER (PARTITION BY player, team) DESC
         ),
         player_zone_totals AS (
             SELECT 
@@ -87,11 +87,13 @@ def get_three_sixty_batters_data(
                 pzt.player,
                 pzt.zone,
                 pzt.zone_runs,
-                ROUND((pzt.zone_runs * 100.0 / pt.total_runs)::numeric, 2) as run_pct
+                CASE WHEN pt.total_runs > 0 
+                    THEN ROUND((pzt.zone_runs * 100.0 / pt.total_runs)::numeric, 2)
+                    ELSE 0 
+                END as run_pct
             FROM player_zone_totals pzt
             JOIN player_totals pt ON pzt.player = pt.player
         ),
-        -- Calculate 360 score: rewards even distribution + volume
         player_360_scores AS (
             SELECT 
                 pt.player,
@@ -99,8 +101,6 @@ def get_three_sixty_batters_data(
                 pt.total_balls,
                 pt.zones_used,
                 ROUND((pt.total_runs * 100.0 / pt.total_balls)::numeric, 2) as strike_rate,
-                -- Evenness: stddev of zone percentages (lower is better, invert for score)
-                -- 360 Score = zones_used * 10 + SR/10 - stddev_penalty
                 ROUND((
                     pt.zones_used * 10 + 
                     (pt.total_runs * 100.0 / pt.total_balls) / 10 +
@@ -129,17 +129,15 @@ def get_three_sixty_batters_data(
     
     players = []
     for row in results:
-        # Get zone breakdown for this player
         zone_query = f"""
             SELECT 
                 dd.wagon_zone as zone,
                 COUNT(*) as balls,
-                SUM(dd.score) as runs,
-                ROUND((SUM(dd.score) * 100.0 / SUM(SUM(dd.score)) OVER ())::numeric, 2) as run_pct
+                SUM(dd.score) as runs
             FROM delivery_details dd
             {where_clause}
             AND dd.bat = :player_name
-            AND dd.wagon_zone BETWEEN 1 AND 8
+            AND dd.wagon_zone IS NOT NULL
             GROUP BY dd.wagon_zone
             ORDER BY dd.wagon_zone
         """
@@ -147,12 +145,13 @@ def get_three_sixty_batters_data(
         zone_params = {**params, "player_name": row.player}
         zone_results = execute_query(db, zone_query, zone_params)
         
+        total_runs = sum(int(zr.runs) if zr.runs else 0 for zr in zone_results)
         zone_breakdown = [
             {
                 "zone": zr.zone,
                 "runs": int(zr.runs) if zr.runs else 0,
                 "balls": zr.balls,
-                "run_pct": float(zr.run_pct) if zr.run_pct else 0
+                "run_pct": round((int(zr.runs) * 100.0 / total_runs), 2) if total_runs > 0 else 0
             }
             for zr in zone_results
         ]
@@ -170,20 +169,21 @@ def get_three_sixty_batters_data(
         })
     
     zone_labels = {
-        1: "Fine Leg",
-        2: "Sq Leg", 
-        3: "Midwicket",
+        0: "Third Man",
+        1: "Point",
+        2: "Cover",
+        3: "Long Off",
         4: "Long On",
-        5: "Long Off",
-        6: "Cover",
-        7: "Point",
-        8: "Third Man"
+        5: "Midwicket",
+        6: "Square Leg",
+        7: "Fine Leg",
+        8: "Behind"
     }
     
     return {
         "card_id": "three_sixty_batters",
         "card_title": "360° Batters",
-        "card_subtitle": f"Most zones hit by batters (min {min_balls} balls)",
+        "card_subtitle": f"Scoring all around the ground (min {min_balls} balls)",
         "visualization_type": "wagon_wheel",
         "zone_labels": zone_labels,
         "players": players,

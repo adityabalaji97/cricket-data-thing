@@ -12,14 +12,19 @@ from .query_helpers import build_base_filters, execute_query
 from .constants import DEFAULT_MIN_BALLS, DEFAULT_TOP_TEAMS
 
 
-# Standard bowling lengths
-LENGTHS = ['YORKER', 'FULL', 'GOOD', 'SHORT']
+# Standard bowling lengths in logical order (pitcher to batter)
+LENGTH_ORDER = ['YORKER', 'FULL', 'GOOD_LENGTH', 'GOOD', 'SHORT_OF_GOOD_LENGTH', 'SHORT', 'BOUNCER']
 
 LENGTH_LABELS = {
     'YORKER': 'Yorker',
     'FULL': 'Full',
+    'GOOD_LENGTH': 'Good Length',
     'GOOD': 'Good',
-    'SHORT': 'Short'
+    'SHORT_OF_GOOD_LENGTH': 'Short of Good',
+    'SHORT': 'Short',
+    'BOUNCER': 'Bouncer',
+    'HALF_VOLLEY': 'Half Volley',
+    'OVERPITCHED': 'Overpitched'
 }
 
 
@@ -36,7 +41,6 @@ def get_length_masters_data(
     Card: Length Masters
     
     Finds batters who dominate balls of all lengths.
-    Length Master Score rewards consistency across all lengths.
     """
     
     where_clause, params = build_base_filters(
@@ -90,7 +94,7 @@ def get_length_masters_data(
                 ROUND((ls.runs * 100.0 / ls.balls)::numeric, 2) as strike_rate
             FROM length_stats ls
             JOIN player_totals pt ON ls.player = pt.player
-            WHERE ls.balls >= 10  -- min balls per length
+            WHERE ls.balls >= 10
         ),
         player_scores AS (
             SELECT 
@@ -98,7 +102,6 @@ def get_length_masters_data(
                 pt.total_runs,
                 pt.total_balls,
                 ROUND((pt.total_runs * 100.0 / pt.total_balls)::numeric, 2) as overall_sr,
-                -- Length Master Score: avg SR across lengths + bonus for consistency
                 ROUND((
                     AVG(pls.strike_rate) + 
                     (100 - COALESCE(STDDEV(pls.strike_rate), 0)) * 0.2
@@ -106,7 +109,7 @@ def get_length_masters_data(
             FROM player_totals pt
             JOIN player_length_sr pls ON pt.player = pls.player
             GROUP BY pt.player, pt.total_runs, pt.total_balls
-            HAVING COUNT(DISTINCT pls.length_type) >= 3  -- must have data for 3+ lengths
+            HAVING COUNT(DISTINCT pls.length_type) >= 3
         )
         SELECT 
             ps.player,
@@ -125,7 +128,6 @@ def get_length_masters_data(
     
     players = []
     for row in results:
-        # Get length breakdown for this player
         length_query = f"""
             SELECT 
                 UPPER(REPLACE(dd.length, ' ', '_')) as length_type,
@@ -138,28 +140,28 @@ def get_length_masters_data(
             AND dd.length IS NOT NULL
             GROUP BY UPPER(REPLACE(dd.length, ' ', '_'))
             HAVING COUNT(*) >= 5
-            ORDER BY 
-                CASE UPPER(REPLACE(dd.length, ' ', '_'))
-                    WHEN 'YORKER' THEN 1
-                    WHEN 'FULL' THEN 2
-                    WHEN 'GOOD' THEN 3
-                    WHEN 'SHORT' THEN 4
-                    ELSE 5
-                END
         """
         
         length_params = {**params, "player_name": row.player}
         length_results = execute_query(db, length_query, length_params)
         
-        length_breakdown = [
+        # Sort by logical length order
+        def get_length_order(length_type):
+            try:
+                return LENGTH_ORDER.index(length_type)
+            except ValueError:
+                return 99
+        
+        length_breakdown = sorted([
             {
                 "length": lr.length_type,
+                "length_label": LENGTH_LABELS.get(lr.length_type, lr.length_type.replace('_', ' ').title()),
                 "balls": lr.balls,
                 "runs": int(lr.runs) if lr.runs else 0,
                 "strike_rate": float(lr.strike_rate) if lr.strike_rate else 0
             }
             for lr in length_results
-        ]
+        ], key=lambda x: get_length_order(x['length']))
         
         players.append({
             "name": row.player,
@@ -174,9 +176,10 @@ def get_length_masters_data(
     return {
         "card_id": "length_masters",
         "card_title": "Length Masters",
-        "card_subtitle": f"Bowlers who nail their lengths (min {min_balls} balls)",
+        "card_subtitle": f"Dominating all lengths (min {min_balls} balls)",
         "visualization_type": "length_heatmap",
         "length_labels": LENGTH_LABELS,
+        "length_order": LENGTH_ORDER,
         "players": players,
         "deep_links": {
             "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter&min_balls={min_balls}"
