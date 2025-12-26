@@ -2,7 +2,7 @@
 Wrapped Service
 
 Main service class that orchestrates all wrapped card data fetching.
-Supports both new modular cards and legacy cards during migration.
+All cards now use proper competition filtering.
 """
 
 from typing import Dict, Any, List
@@ -17,20 +17,54 @@ from .constants import (
     get_card_config_by_id
 )
 
-# Import NEW modular card functions (properly filtered)
+# Import ALL modular card functions
 from .card_intro import get_intro_data
 from .card_powerplay_bullies import get_powerplay_bullies_data
 from .card_death_hitters import get_death_hitters_data
 from .card_middle_merchants import get_middle_merchants_data
+from .card_pace_vs_spin import get_pace_vs_spin_data
+from .card_controlled_aggression import get_controlled_aggression_data
+from .card_uncontrolled_chaos import get_uncontrolled_chaos_data
+from .card_three_sixty_batters import get_three_sixty_batters_data
+from .card_rare_shot_specialists import get_rare_shot_specialists_data
+from .card_length_masters import get_length_masters_data
+from .card_sweep_evolution import get_sweep_evolution_data
+from .card_powerplay_thieves import get_powerplay_thieves_data
+from .card_middle_overs_squeeze import get_middle_overs_squeeze_data
+from .card_nineteenth_over_gods import get_nineteenth_over_gods_data
+from .card_bowler_type_dominance import get_bowler_type_dominance_data
+from .card_needle_movers import get_needle_movers_data
+from .card_chase_masters import get_chase_masters_data
+from .card_venue_vibes import get_venue_vibes_data
+from .card_elo_movers import get_elo_movers_data
+from .card_batter_hand_breakdown import get_batter_hand_breakdown_data
+from .card_bowler_handedness import get_bowler_handedness_data
 
 logger = logging.getLogger(__name__)
 
-# Cards that have been migrated to new modular structure
+# All cards are now migrated to new modular structure with proper filtering
 MIGRATED_CARDS = {
     "intro": get_intro_data,
     "powerplay_bullies": get_powerplay_bullies_data,
-    "death_hitters": get_death_hitters_data,
     "middle_merchants": get_middle_merchants_data,
+    "death_hitters": get_death_hitters_data,
+    "pace_vs_spin": get_pace_vs_spin_data,
+    "controlled_aggression": get_controlled_aggression_data,
+    "uncontrolled_chaos": get_uncontrolled_chaos_data,
+    "three_sixty_batters": get_three_sixty_batters_data,
+    "rare_shot_specialists": get_rare_shot_specialists_data,
+    "length_masters": get_length_masters_data,
+    "sweep_evolution": get_sweep_evolution_data,
+    "powerplay_thieves": get_powerplay_thieves_data,
+    "middle_overs_squeeze": get_middle_overs_squeeze_data,
+    "nineteenth_over_gods": get_nineteenth_over_gods_data,
+    "bowler_type_dominance": get_bowler_type_dominance_data,
+    "needle_movers": get_needle_movers_data,
+    "chase_masters": get_chase_masters_data,
+    "venue_vibes": get_venue_vibes_data,
+    "elo_movers": get_elo_movers_data,
+    "batter_hand_breakdown": get_batter_hand_breakdown_data,
+    "bowler_handedness": get_bowler_handedness_data,
 }
 
 
@@ -38,24 +72,11 @@ class WrappedService:
     """
     Service class for fetching wrapped card data.
     
-    Uses new modular cards where available, falls back to legacy for others.
+    All cards now use the new modular structure with proper competition filtering.
     """
     
     def __init__(self):
-        self._legacy_service = None
         self._card_methods = MIGRATED_CARDS.copy()
-    
-    def _get_legacy_service(self):
-        """Lazy load legacy service for unmigrated cards."""
-        if self._legacy_service is None:
-            try:
-                # Import legacy wrapped module
-                from services import wrapped_legacy as legacy_wrapped
-                self._legacy_service = legacy_wrapped.WrappedService()
-            except ImportError:
-                logger.warning("Legacy wrapped service not available")
-                self._legacy_service = None
-        return self._legacy_service
     
     def get_card_data(
         self,
@@ -69,12 +90,9 @@ class WrappedService:
     ) -> Dict[str, Any]:
         """
         Get data for a single card by ID.
-        Uses migrated method if available, otherwise falls back to legacy.
         """
-        # Check if we have a migrated method for this card
         if card_id in self._card_methods:
             method = self._card_methods[card_id]
-            logger.info(f"Using NEW modular method for card: {card_id}")
             return method(
                 start_date=start_date,
                 end_date=end_date,
@@ -84,26 +102,7 @@ class WrappedService:
                 top_teams=top_teams
             )
         
-        # Try legacy service for unmigrated cards
-        legacy = self._get_legacy_service()
-        if legacy:
-            logger.info(f"Using LEGACY method for card: {card_id}")
-            # Use get_single_card which returns {success, card}
-            result = legacy.get_single_card(
-                card_id=card_id,
-                start_date=start_date,
-                end_date=end_date,
-                leagues=leagues,
-                include_international=include_international,
-                db=db,
-                top_teams=top_teams
-            )
-            # Extract the card data from the result
-            if result.get("success") and result.get("card"):
-                return result["card"]
-            return result
-        
-        # Fallback: return placeholder
+        # Fallback: return placeholder for unknown cards
         card_config = get_card_config_by_id(card_id)
         if card_config:
             return {
