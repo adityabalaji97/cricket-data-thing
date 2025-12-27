@@ -53,48 +53,6 @@ CARD_CONFIG = [
         "method": "get_intro_data"
     },
     {
-        "id": "powerplay_bullies",
-        "title": "Powerplay Bullies",
-        "subtitle": "Highest strike rates in overs 1-6",
-        "initial": False,
-        "method": "get_powerplay_bullies_data"
-    },
-    {
-        "id": "powerplay_thieves",
-        "title": "Powerplay Thieves",
-        "subtitle": "Best economy in overs 1-6",
-        "initial": False,
-        "method": "get_powerplay_thieves_data"
-    },
-    {
-        "id": "middle_merchants",
-        "title": "Middle Merchants",
-        "subtitle": "Best performers in overs 7-15",
-        "initial": False,
-        "method": "get_middle_merchants_data"
-    },
-    {
-        "id": "middle_overs_squeeze",
-        "title": "Middle Overs Squeeze",
-        "subtitle": "Spinners who choked the run flow",
-        "initial": False,
-        "method": "get_middle_overs_squeeze_data"
-    },
-    {
-        "id": "death_hitters",
-        "title": "Death Hitters",
-        "subtitle": "Most destructive in overs 16-20",
-        "initial": False,
-        "method": "get_death_hitters_data"
-    },
-    {
-        "id": "nineteenth_over_gods",
-        "title": "Death Over Gods",
-        "subtitle": "Who owned the crucial 19th over?",
-        "initial": False,
-        "method": "get_nineteenth_over_gods_data"
-    },
-    {
         "id": "needle_movers",
         "title": "Needle Movers",
         "subtitle": "Who moved the predicted score most?",
@@ -163,6 +121,48 @@ CARD_CONFIG = [
         "subtitle": "The rise of the sweep shots",
         "initial": False,
         "method": "get_sweep_evolution_data"
+    },
+    {
+        "id": "powerplay_bullies",
+        "title": "Powerplay Bullies",
+        "subtitle": "Highest strike rates in overs 1-6",
+        "initial": False,
+        "method": "get_powerplay_bullies_data"
+    },
+    {
+        "id": "powerplay_thieves",
+        "title": "Powerplay Thieves",
+        "subtitle": "Best economy in overs 1-6",
+        "initial": False,
+        "method": "get_powerplay_thieves_data"
+    },
+    {
+        "id": "middle_merchants",
+        "title": "Middle Merchants",
+        "subtitle": "Best performers in overs 7-15",
+        "initial": False,
+        "method": "get_middle_merchants_data"
+    },
+    {
+        "id": "middle_overs_squeeze",
+        "title": "Middle Overs Squeeze",
+        "subtitle": "Spinners who choked the run flow",
+        "initial": False,
+        "method": "get_middle_overs_squeeze_data"
+    },
+    {
+        "id": "death_hitters",
+        "title": "Death Hitters",
+        "subtitle": "Most destructive in overs 16-20",
+        "initial": False,
+        "method": "get_death_hitters_data"
+    },
+    {
+        "id": "nineteenth_over_gods",
+        "title": "Death Over Gods",
+        "subtitle": "Who owned the crucial 19th over?",
+        "initial": False,
+        "method": "get_nineteenth_over_gods_data"
     }
 ]
 """
