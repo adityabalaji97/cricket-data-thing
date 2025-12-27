@@ -324,7 +324,7 @@ const PlayerSearchResult = ({ playerName, startDate, endDate }) => {
             </Button>
             <Button
               component={Link}
-              to={buildQueryBuilderUrl(profile.player_name, 'batter', effectiveStartDate, effectiveEndDate)}
+              to={buildQueryBuilderUrl(profile.display_name || profile.player_name, 'batter', effectiveStartDate, effectiveEndDate)}
               variant="outlined"
               size="small"
               color="secondary"
@@ -390,7 +390,7 @@ const PlayerSearchResult = ({ playerName, startDate, endDate }) => {
             </Button>
             <Button
               component={Link}
-              to={buildQueryBuilderUrl(profile.player_name, 'bowler', effectiveStartDate, effectiveEndDate)}
+              to={buildQueryBuilderUrl(profile.display_name || profile.player_name, 'bowler', effectiveStartDate, effectiveEndDate)}
               variant="outlined"
               size="small"
               color="secondary"

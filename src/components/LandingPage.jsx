@@ -236,11 +236,11 @@ const LandingPage = () => {
         </Box>
         
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3, fontSize: { xs: '0.85rem', md: '1rem' } }}>
-          Search players, teams, and venues for T20 cricket analytics
+          Search players, teams or venues to get started
         </Typography>
         
-        {/* Search Bar */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+        {/* Search Bar - with extra height for suggestions */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2, minHeight: { xs: 180, md: 160 }, alignItems: 'flex-start', pt: 1 }}>
           <SearchBar 
             onSelect={handleSearchSelect} 
             placeholder="Search players, teams, or venues..."
