@@ -28,9 +28,7 @@ const WrappedProgressBar = ({ totalCards, currentIndex, onProgressClick, loadedC
           />
         );
       })}
-      {isLoadingMore && (
-        <Box className="progress-loading-indicator" />
-      )}
+
     </Box>
   );
 };

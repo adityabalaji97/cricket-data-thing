@@ -73,9 +73,12 @@ def get_wrapped_cards(
 
 @router.get("/2025/cards/initial")
 def get_initial_cards(
+    start_date: str = Query(default=DEFAULT_START_DATE),
+    end_date: str = Query(default=DEFAULT_END_DATE),
     leagues: List[str] = Query(default=None),
     include_international: bool = Query(default=None),
     top_teams: int = Query(default=None),
+    no_leagues: bool = Query(default=False, description="If true, don't include any leagues (T20I only)"),
     db: Session = Depends(get_session)
 ):
     """
@@ -84,18 +87,28 @@ def get_initial_cards(
     
     Use this endpoint for the initial page load, then lazy-load
     remaining cards using /2025/cards/batch as user navigates.
+    
+    - start_date: Start date (YYYY-MM-DD), default 2025-01-01
+    - end_date: End date (YYYY-MM-DD), default 2025-12-31
+    - leagues: List of leagues to filter (if not provided, uses defaults)
+    - include_international: Include T20I matches between top teams
+    - no_leagues: If true, don't include any leagues (for T20I only mode)
     """
     try:
-        # Apply defaults if not provided
-        effective_leagues = leagues if leagues is not None else WRAPPED_DEFAULT_LEAGUES
+        # Handle leagues: if no_leagues is True, use empty list; otherwise use provided or defaults
+        if no_leagues:
+            effective_leagues = []
+        else:
+            effective_leagues = leagues if leagues is not None else WRAPPED_DEFAULT_LEAGUES
+        
         effective_include_international = include_international if include_international is not None else WRAPPED_DEFAULT_INCLUDE_INTERNATIONAL
         effective_top_teams = top_teams if top_teams is not None else WRAPPED_DEFAULT_TOP_TEAMS
         
         initial_ids = get_initial_card_ids()
         result = wrapped_service.get_cards_batch(
             card_ids=initial_ids,
-            start_date=DEFAULT_START_DATE,
-            end_date=DEFAULT_END_DATE,
+            start_date=start_date,
+            end_date=end_date,
             leagues=effective_leagues,
             include_international=effective_include_international,
             db=db,
@@ -105,6 +118,13 @@ def get_initial_cards(
         result["initial_load"] = True
         result["remaining_card_ids"] = get_lazy_card_ids()
         result["total_cards_available"] = len(CARD_CONFIG)
+        # Include current filters in response
+        result["applied_filters"] = {
+            "start_date": start_date,
+            "end_date": end_date,
+            "leagues": effective_leagues,
+            "include_international": effective_include_international
+        }
         return result
     except Exception as e:
         logger.error(f"Error fetching initial cards: {str(e)}")
@@ -114,9 +134,12 @@ def get_initial_cards(
 @router.get("/2025/cards/batch")
 def get_cards_batch(
     card_ids: List[str] = Query(..., description="List of card IDs to fetch"),
+    start_date: str = Query(default=DEFAULT_START_DATE),
+    end_date: str = Query(default=DEFAULT_END_DATE),
     leagues: List[str] = Query(default=None),
     include_international: bool = Query(default=None),
     top_teams: int = Query(default=None),
+    no_leagues: bool = Query(default=False, description="If true, don't include any leagues (T20I only)"),
     db: Session = Depends(get_session)
 ):
     """
@@ -124,20 +147,27 @@ def get_cards_batch(
     Use this for lazy-loading cards as user navigates through the experience.
     
     - card_ids: List of card IDs to fetch (required)
+    - start_date: Start date (YYYY-MM-DD), default 2025-01-01
+    - end_date: End date (YYYY-MM-DD), default 2025-12-31
     - leagues: List of leagues to filter
     - include_international: Include international matches
     - top_teams: Number of top international teams to include
+    - no_leagues: If true, don't include any leagues (for T20I only mode)
     """
     try:
-        # Apply defaults if not provided
-        effective_leagues = leagues if leagues is not None else WRAPPED_DEFAULT_LEAGUES
+        # Handle leagues: if no_leagues is True, use empty list; otherwise use provided or defaults
+        if no_leagues:
+            effective_leagues = []
+        else:
+            effective_leagues = leagues if leagues is not None else WRAPPED_DEFAULT_LEAGUES
+        
         effective_include_international = include_international if include_international is not None else WRAPPED_DEFAULT_INCLUDE_INTERNATIONAL
         effective_top_teams = top_teams if top_teams is not None else WRAPPED_DEFAULT_TOP_TEAMS
         
         return wrapped_service.get_cards_batch(
             card_ids=card_ids,
-            start_date=DEFAULT_START_DATE,
-            end_date=DEFAULT_END_DATE,
+            start_date=start_date,
+            end_date=end_date,
             leagues=effective_leagues,
             include_international=effective_include_international,
             db=db,

@@ -53,45 +53,24 @@ CARD_CONFIG = [
         "method": "get_intro_data"
     },
     {
-        "id": "powerplay_bullies",
-        "title": "Powerplay Bullies",
-        "subtitle": "Highest strike rates in overs 1-6",
-        "initial": True,
-        "method": "get_powerplay_bullies_data"
-    },
-    {
-        "id": "middle_merchants",
-        "title": "Middle Merchants",
-        "subtitle": "Best performers in overs 7-15",
-        "initial": True,
-        "method": "get_middle_merchants_data"
-    },
-    {
-        "id": "death_hitters",
-        "title": "Death Hitters",
-        "subtitle": "Most destructive in overs 16-20",
-        "initial": True,
-        "method": "get_death_hitters_data"
-    },
-    {
         "id": "pace_vs_spin",
         "title": "Pace vs Spin",
         "subtitle": "Who dominated which bowling type?",
-        "initial": False,
+        "initial": True,
         "method": "get_pace_vs_spin_data"
     },
     {
         "id": "controlled_aggression",
         "title": "Controlled Aggression",
         "subtitle": "High strike rate + high control %",
-        "initial": False,
+        "initial": True,
         "method": "get_controlled_aggression_data"
     },
     {
         "id": "uncontrolled_chaos",
         "title": "Uncontrolled Chaos",
         "subtitle": "High strike rate, low control - but it works!",
-        "initial": False,
+        "initial": True,
         "method": "get_uncontrolled_chaos_data"
     },
     {
@@ -123,34 +102,6 @@ CARD_CONFIG = [
         "method": "get_sweep_evolution_data"
     },
     {
-        "id": "powerplay_thieves",
-        "title": "Powerplay Thieves",
-        "subtitle": "Best economy in overs 1-6",
-        "initial": False,
-        "method": "get_powerplay_thieves_data"
-    },
-    {
-        "id": "middle_overs_squeeze",
-        "title": "Middle Overs Squeeze",
-        "subtitle": "Spinners who choked the run flow",
-        "initial": False,
-        "method": "get_middle_overs_squeeze_data"
-    },
-    {
-        "id": "nineteenth_over_gods",
-        "title": "19th Over Gods",
-        "subtitle": "Who owned the crucial 19th over?",
-        "initial": False,
-        "method": "get_nineteenth_over_gods_data"
-    },
-    {
-        "id": "bowler_type_dominance",
-        "title": "Bowler Type Dominance",
-        "subtitle": "Which bowling styles ruled?",
-        "initial": False,
-        "method": "get_bowler_type_dominance_data"
-    },
-    {
         "id": "needle_movers",
         "title": "Needle Movers",
         "subtitle": "Who moved the predicted score most?",
@@ -163,6 +114,13 @@ CARD_CONFIG = [
         "subtitle": "Who moves win probability in chases?",
         "initial": False,
         "method": "get_chase_masters_data"
+    },
+    {
+        "id": "bowler_handedness",
+        "title": "Bowler Handedness",
+        "subtitle": "Left arm vs Right arm bowling",
+        "initial": False,
+        "method": "get_bowler_handedness_data"
     },
     {
         "id": "venue_vibes",
@@ -185,12 +143,54 @@ CARD_CONFIG = [
         "initial": False,
         "method": "get_batter_hand_breakdown_data"
     },
-    {
-        "id": "bowler_handedness",
-        "title": "Bowler Handedness",
-        "subtitle": "Left arm vs Right arm bowling",
+        {
+        "id": "powerplay_bullies",
+        "title": "Powerplay Bullies",
+        "subtitle": "Highest strike rates in overs 1-6",
         "initial": False,
-        "method": "get_bowler_handedness_data"
+        "method": "get_powerplay_bullies_data"
+    },
+    {
+        "id": "powerplay_thieves",
+        "title": "Powerplay Thieves",
+        "subtitle": "Best economy in overs 1-6",
+        "initial": False,
+        "method": "get_powerplay_thieves_data"
+    },
+    {
+        "id": "middle_merchants",
+        "title": "Middle Merchants",
+        "subtitle": "Best performers in overs 7-15",
+        "initial": False,
+        "method": "get_middle_merchants_data"
+    },
+    {
+        "id": "middle_overs_squeeze",
+        "title": "Middle Overs Squeeze",
+        "subtitle": "Spinners who choked the run flow",
+        "initial": False,
+        "method": "get_middle_overs_squeeze_data"
+    },
+    {
+        "id": "death_hitters",
+        "title": "Death Hitters",
+        "subtitle": "Most destructive in overs 16-20",
+        "initial": False,
+        "method": "get_death_hitters_data"
+    },
+    {
+        "id": "nineteenth_over_gods",
+        "title": "19th Over Gods",
+        "subtitle": "Who owned the crucial 19th over?",
+        "initial": False,
+        "method": "get_nineteenth_over_gods_data"
+    },
+    {
+        "id": "bowler_type_dominance",
+        "title": "Bowler Type Dominance",
+        "subtitle": "Which bowling styles ruled?",
+        "initial": False,
+        "method": "get_bowler_type_dominance_data"
     }
 ]
 

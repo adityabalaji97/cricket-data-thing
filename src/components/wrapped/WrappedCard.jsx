@@ -74,38 +74,40 @@ const WrappedCard = forwardRef(({ cardData, cardIndex, totalCards, onShareImage,
   const CardComponent = cardComponents[cardData.card_id];
 
   return (
-    <Box className="wrapped-card" ref={ref}>
-      {/* Card Body - Vertically centered */}
-      <Box className="wrapped-card-body">
-        {/* Card Header */}
-        <Box className="wrapped-card-header">
-          <Typography variant="h4" className="wrapped-card-title">
-            {cardData.card_title}
-          </Typography>
-          {cardData.card_subtitle && (
-            <Typography variant="subtitle1" className="wrapped-card-subtitle">
-              {cardData.card_subtitle}
+    <>
+      <Box className="wrapped-card" ref={ref}>
+        {/* Card Body - Vertically centered */}
+        <Box className="wrapped-card-body">
+          {/* Card Header */}
+          <Box className="wrapped-card-header">
+            <Typography variant="h4" className="wrapped-card-title">
+              {cardData.card_title}
             </Typography>
-          )}
-        </Box>
+            {cardData.card_subtitle && (
+              <Typography variant="subtitle1" className="wrapped-card-subtitle">
+                {cardData.card_subtitle}
+              </Typography>
+            )}
+          </Box>
 
-        {/* Card Content - Specific visualization */}
-        <Box className="wrapped-card-content">
-          {CardComponent ? (
-            <CardComponent data={cardData} />
-          ) : (
-            <Typography>Visualization not available for this card type</Typography>
-          )}
+          {/* Card Content - Specific visualization */}
+          <Box className="wrapped-card-content">
+            {CardComponent ? (
+              <CardComponent data={cardData} />
+            ) : (
+              <Typography>Visualization not available for this card type</Typography>
+            )}
+          </Box>
         </Box>
       </Box>
 
-      {/* Card Actions - Stays at bottom */}
+      {/* Card Actions - Fixed at bottom of screen */}
       <WrappedCardActions 
         deepLinks={cardData.deep_links} 
         onShareImage={onShareImage}
         isSharing={isSharing}
       />
-    </Box>
+    </>
   );
 });
 

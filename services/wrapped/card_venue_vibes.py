@@ -45,28 +45,28 @@ def get_venue_vibes_data(
         WITH venue_innings AS (
             SELECT 
                 dd.ground as venue,
-                dd.p_match,
+                dd.match_id,
                 dd.innings,
                 SUM(dd.score) as inns_runs,
                 COUNT(*) as balls
             FROM delivery_details dd
             {where_clause}
-            GROUP BY dd.ground, dd.p_match, dd.innings
+            GROUP BY dd.ground, dd.match_id, dd.innings
         ),
         venue_matches AS (
             SELECT 
                 venue,
-                p_match,
+                match_id,
                 MAX(CASE WHEN innings = 1 THEN inns_runs END) as first_inns_score,
                 MAX(CASE WHEN innings = 2 THEN inns_runs END) as second_inns_score
             FROM venue_innings
-            GROUP BY venue, p_match
+            GROUP BY venue, match_id
             HAVING COUNT(DISTINCT innings) = 2
         ),
         venue_stats AS (
             SELECT 
                 venue,
-                COUNT(DISTINCT p_match) as matches,
+                COUNT(DISTINCT match_id) as matches,
                 ROUND(AVG(first_inns_score + second_inns_score) / 2.0, 0) as par_score,
                 ROUND(
                     SUM(CASE WHEN second_inns_score > first_inns_score THEN 1 ELSE 0 END) * 100.0 

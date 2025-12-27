@@ -4,10 +4,11 @@ import { Box } from '@mui/material';
 import WrappedProgressBar from './WrappedProgressBar';
 import WrappedHeader from './WrappedHeader';
 import WrappedCard from './WrappedCard';
+import WrappedFilterModal from './WrappedFilterModal';
 import { captureAndShare } from '../../utils/shareUtils';
 import './wrapped.css';
 
-const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable, isLoadingMore, loadedCardIds }) => {
+const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable, isLoadingMore, loadedCardIds, onFilterChange, currentFilters }) => {
   const navigate = useNavigate();
   const containerRef = useRef(null);
   const cardRef = useRef(null);
@@ -32,7 +33,7 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
   const [currentIndex, setCurrentIndex] = useState(getInitialIndex());
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
 
   // Minimum swipe distance (in px)
@@ -151,8 +152,8 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
     const x = e.clientX - rect.left;
     const containerWidth = rect.width;
 
-    // Left third = previous, right two-thirds = next
-    if (x < containerWidth / 3) {
+    // Left 20% = previous, right 80% = next (bigger touch zones)
+    if (x < containerWidth * 0.2) {
       goToPrevious();
     } else {
       goToNext();
@@ -183,10 +184,18 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
 
         {/* Header Row */}
         <WrappedHeader 
-          onMenuClick={() => setShowFilterMenu(true)}
+          onMenuClick={() => setShowFilterModal(true)}
           onClose={handleClose}
         />
       </div>
+
+      {/* Filter Modal */}
+      <WrappedFilterModal
+        open={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        onApply={onFilterChange}
+        currentFilters={currentFilters}
+      />
 
       {/* Current Card */}
       <WrappedCard 

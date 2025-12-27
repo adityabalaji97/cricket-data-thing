@@ -5,6 +5,51 @@ import WrappedStoryContainer from './WrappedStoryContainer';
 import config from '../../config';
 import './wrapped.css';
 
+// Default filter settings
+const DEFAULT_FILTERS = {
+  startDate: '2025-01-01',
+  endDate: '2025-12-31',
+  leagues: ['IPL', 'BBL', 'PSL', 'SA20', 'BLAST', 'SMASH'],
+  leagueValues: [
+    'Indian Premier League', 'IPL',
+    'Big Bash League', 'BBL',
+    'Pakistan Super League', 'PSL',
+    'SA20',
+    'Vitality Blast', 'T20 Blast',
+    'Super Smash'
+  ],
+  includeInternational: true
+};
+
+// Build query string from filters
+const buildFilterParams = (filters) => {
+  const params = new URLSearchParams();
+  
+  if (filters.startDate) {
+    params.append('start_date', filters.startDate);
+  }
+  if (filters.endDate) {
+    params.append('end_date', filters.endDate);
+  }
+  
+  // Use leagueValues (full names) for API, not league IDs
+  const leagueValues = filters.leagueValues || [];
+  if (leagueValues.length > 0) {
+    leagueValues.forEach(league => {
+      params.append('leagues', league);
+    });
+  } else {
+    // Explicitly tell backend no leagues selected (T20I only mode)
+    params.append('no_leagues', 'true');
+  }
+  
+  if (filters.includeInternational !== undefined) {
+    params.append('include_international', filters.includeInternational);
+  }
+  
+  return params.toString();
+};
+
 const WrappedPage = () => {
   const [searchParams] = useSearchParams();
   const [cardsData, setCardsData] = useState(null);
@@ -15,6 +60,15 @@ const WrappedPage = () => {
   // Track which cards have been loaded
   const [loadedCardIds, setLoadedCardIds] = useState(new Set());
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // Filter state
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  
+  // Ref to track current filters for use in callbacks
+  const filtersRef = useRef(filters);
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
   
   // Ref to track if lazy cards are being fetched
   const lazyFetchInProgress = useRef(false);
@@ -44,7 +98,8 @@ const WrappedPage = () => {
         setLoading(true);
         setError(null);
         
-        const response = await fetch(`${config.API_URL}/wrapped/2025/cards/initial`);
+        const filterParams = buildFilterParams(filters);
+        const response = await fetch(`${config.API_URL}/wrapped/2025/cards/initial?${filterParams}`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -66,7 +121,7 @@ const WrappedPage = () => {
     };
 
     fetchInitialCards();
-  }, []);
+  }, []); // Only run once on mount - filter changes handled separately
 
   // Function to fetch remaining cards in background
   const fetchRemainingCards = useCallback(async () => {
@@ -79,14 +134,16 @@ const WrappedPage = () => {
     
     try {
       const remainingIds = cardsData.remaining_card_ids;
+      const currentFilters = filtersRef.current;
       
       // Fetch in batches of 8 for faster loading
       const batchSize = 8;
       for (let i = 0; i < remainingIds.length; i += batchSize) {
         const batch = remainingIds.slice(i, i + batchSize);
-        const queryParams = batch.map(id => `card_ids=${encodeURIComponent(id)}`).join('&');
+        const cardParams = batch.map(id => `card_ids=${encodeURIComponent(id)}`).join('&');
+        const filterParams = buildFilterParams(currentFilters);
         
-        const response = await fetch(`${config.API_URL}/wrapped/2025/cards/batch?${queryParams}`);
+        const response = await fetch(`${config.API_URL}/wrapped/2025/cards/batch?${cardParams}&${filterParams}`);
         
         if (!response.ok) {
           console.error(`Error fetching batch: ${response.status}`);
@@ -133,22 +190,40 @@ const WrappedPage = () => {
     }
   }, [cardsData]);
 
-  // Start fetching remaining cards after initial load
+  // Start fetching remaining cards immediately after initial load
   useEffect(() => {
     if (cardsData && !loading && cardsData.remaining_card_ids?.length > 0) {
-      // Use requestIdleCallback to fetch when browser is idle (no arbitrary delay)
-      if ('requestIdleCallback' in window) {
-        const idleId = requestIdleCallback(() => {
-          fetchRemainingCards();
-        }, { timeout: 100 }); // Max 100ms wait
-        return () => cancelIdleCallback(idleId);
-      } else {
-        // Fallback for Safari - minimal delay
-        const timer = setTimeout(fetchRemainingCards, 50);
-        return () => clearTimeout(timer);
-      }
+      // Fetch immediately - no delay
+      fetchRemainingCards();
     }
   }, [cardsData, loading, fetchRemainingCards]);
+
+  // Handle filter changes - reset and refetch
+  const handleFilterChange = useCallback((newFilters) => {
+    setFilters(newFilters);
+    // Reset state for refetch
+    setCardsData(null);
+    setLoadedCardIds(new Set());
+    setLoading(true);
+    lazyFetchInProgress.current = false;
+    
+    const fetchWithFilters = async () => {
+      try {
+        const filterParams = buildFilterParams(newFilters);
+        const response = await fetch(`${config.API_URL}/wrapped/2025/cards/initial?${filterParams}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        setCardsData(data);
+        setLoadedCardIds(new Set(data.cards.map(c => c.card_id)));
+      } catch (err) {
+        console.error('Error refetching:', err);
+        setError('Failed to load data with new filters.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWithFilters();
+  }, []);
 
   // Sort cards based on metadata order
   const getSortedCards = useCallback(() => {
@@ -207,6 +282,8 @@ const WrappedPage = () => {
       totalCardsAvailable={metadata?.total_cards || sortedCards.length}
       isLoadingMore={isLoadingMore}
       loadedCardIds={loadedCardIds}
+      onFilterChange={handleFilterChange}
+      currentFilters={filters}
     />
   );
 };
