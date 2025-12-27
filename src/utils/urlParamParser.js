@@ -39,7 +39,10 @@ export const parseUrlParams = (search) => {
   filters.venue = getSingleParam('venue');
   filters.start_date = getSingleParam('start_date');
   filters.end_date = getSingleParam('end_date');
-  filters.leagues = getArrayParam('leagues');
+  // Accept both 'leagues' and 'league' for backwards compatibility
+  const leaguesPlural = getArrayParam('leagues');
+  const leaguesSingular = getArrayParam('league');
+  filters.leagues = [...leaguesPlural, ...leaguesSingular];
   filters.teams = getArrayParam('teams');
   filters.batting_teams = getArrayParam('batting_teams');
   filters.bowling_teams = getArrayParam('bowling_teams');

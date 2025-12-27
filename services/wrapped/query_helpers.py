@@ -197,7 +197,7 @@ def build_query_url(
     
     # Leagues - add each as separate parameter
     for league in leagues:
-        params.append(f"league={league}")
+        params.append(f"leagues={league}")
     
     # International settings
     if include_international:
