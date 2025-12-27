@@ -499,33 +499,35 @@ const AppContent = () => {
             </IconButton>
           </>
         ) : (
-          <Tabs 
-            value={currentTab} 
-            onChange={handleTabChange}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-            sx={{ flexGrow: 1 }}
-          >
-            <Tab label="Home" component={Link} to="/" />
-            <Tab label="Search" component={Link} to="/search" />
-            <Tab label="Venue Analysis" component={Link} to="/venue" />
-            <Tab label="Batter Profile" component={Link} to="/player" />
-            <Tab label="Bowler Profile" component={Link} to="/bowler" />
-            <Tab label="Batter Comparison" component={Link} to="/comparison" />
-            <Tab label="Matchups" component={Link} to="/matchups" />
-            <Tab label="Query Builder" component={Link} to="/query" />
-            <Tab label="Team Profile" component={Link} to="/team" />
-            <Tab label="Team Comparison" component={Link} to="/team-comparison" />
-          </Tabs>
-          <IconButton
-            onClick={() => setSearchExpanded(true)}
-            size="small"
-            sx={{ ml: 1 }}
-            aria-label="search"
-          >
-            <SearchIcon />
-          </IconButton>
+          <>
+            <Tabs 
+              value={currentTab} 
+              onChange={handleTabChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+              sx={{ flexGrow: 1 }}
+            >
+              <Tab label="Home" component={Link} to="/" />
+              <Tab label="Search" component={Link} to="/search" />
+              <Tab label="Venue Analysis" component={Link} to="/venue" />
+              <Tab label="Batter Profile" component={Link} to="/player" />
+              <Tab label="Bowler Profile" component={Link} to="/bowler" />
+              <Tab label="Batter Comparison" component={Link} to="/comparison" />
+              <Tab label="Matchups" component={Link} to="/matchups" />
+              <Tab label="Query Builder" component={Link} to="/query" />
+              <Tab label="Team Profile" component={Link} to="/team" />
+              <Tab label="Team Comparison" component={Link} to="/team-comparison" />
+            </Tabs>
+            <IconButton
+              onClick={() => setSearchExpanded(true)}
+              size="small"
+              sx={{ ml: 1 }}
+              aria-label="search"
+            >
+              <SearchIcon />
+            </IconButton>
+          </>
         )}
       </Box>
 
