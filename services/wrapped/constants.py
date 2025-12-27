@@ -121,30 +121,8 @@ CARD_CONFIG = [
         "subtitle": "The rise of the sweep shots",
         "initial": False,
         "method": "get_sweep_evolution_data"
-    }
-    """
-    {
-        "id": "venue_vibes",
-        "title": "Venue Vibes",
-        "subtitle": "How different grounds played",
-        "initial": False,
-        "method": "get_venue_vibes_data"
     },
     {
-        "id": "elo_movers",
-        "title": "ELO Movers",
-        "subtitle": "Biggest rating changes",
-        "initial": False,
-        "method": "get_elo_movers_data"
-    },
-    {
-        "id": "batter_hand_breakdown",
-        "title": "Batter Hand Breakdown",
-        "subtitle": "Left vs Right hand performance",
-        "initial": False,
-        "method": "get_batter_hand_breakdown_data"
-    },
-        {
         "id": "powerplay_bullies",
         "title": "Powerplay Bullies",
         "subtitle": "Highest strike rates in overs 1-6",
@@ -186,6 +164,28 @@ CARD_CONFIG = [
         "initial": False,
         "method": "get_nineteenth_over_gods_data"
     }
+    """
+    {
+        "id": "venue_vibes",
+        "title": "Venue Vibes",
+        "subtitle": "How different grounds played",
+        "initial": False,
+        "method": "get_venue_vibes_data"
+    },
+    {
+        "id": "elo_movers",
+        "title": "ELO Movers",
+        "subtitle": "Biggest rating changes",
+        "initial": False,
+        "method": "get_elo_movers_data"
+    },
+    {
+        "id": "batter_hand_breakdown",
+        "title": "Batter Hand Breakdown",
+        "subtitle": "Left vs Right hand performance",
+        "initial": False,
+        "method": "get_batter_hand_breakdown_data"
+    },
     """
 ]
 
