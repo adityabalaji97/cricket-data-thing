@@ -113,7 +113,8 @@ const AppContent = () => {
     path === '/matchups' ? 6 : 
     path === '/query' ? 7 : 
     path === '/team' ? 8 : 
-    path === '/team-comparison' ? 9 : 0
+    path === '/team-comparison' ? 9 :
+    path === '/wrapped/2025' ? 10 : 0
       );
             }
   };
@@ -133,7 +134,8 @@ const AppContent = () => {
         path === '/matchups' ? 6 : 
         path === '/query' ? 7 : 
         path === '/team' ? 8 : 
-        path === '/team-comparison' ? 9 : 0
+        path === '/team-comparison' ? 9 :
+        path === '/wrapped/2025' || path.startsWith('/wrapped') ? 10 : 0
       );
     }
   }, [location]);
@@ -392,7 +394,8 @@ const AppContent = () => {
            currentTab === 6 ? 'Matchups' : 
            currentTab === 7 ? 'Query Builder' : 
            currentTab === 8 ? 'Team Profile' : 
-           currentTab === 9 ? 'Team Comparison' : 'Home';
+           currentTab === 9 ? 'Team Comparison' :
+           currentTab === 10 ? '2025 Wrapped' : 'Home';
   };
 
   return (
@@ -485,6 +488,9 @@ const AppContent = () => {
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/team-comparison')}>                Team Comparison
               </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/wrapped/2025')} sx={{ color: '#1DB954', fontWeight: 600 }}>
+                🎁 2025 Wrapped
+              </MenuItem>
             </Menu>
             <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap' }}>
               {getPageTitle()}
@@ -518,6 +524,7 @@ const AppContent = () => {
               <Tab label="Query Builder" component={Link} to="/query" />
               <Tab label="Team Profile" component={Link} to="/team" />
               <Tab label="Team Comparison" component={Link} to="/team-comparison" />
+              <Tab label="🎁 2025 Wrapped" component={Link} to="/wrapped/2025" sx={{ color: '#1DB954' }} />
             </Tabs>
             <IconButton
               onClick={() => setSearchExpanded(true)}

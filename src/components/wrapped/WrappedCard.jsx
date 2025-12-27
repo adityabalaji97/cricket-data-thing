@@ -24,6 +24,7 @@ import NeedleMoversCard from './cards/NeedleMoversCard';
 import ChaseMastersCard from './cards/ChaseMastersCard';
 import UncontrolledChaosCard from './cards/UncontrolledChaosCard';
 import BowlerHandednessCard from './cards/BowlerHandednessCard';
+import OutroCard from './cards/OutroCard';
 import './wrapped.css';
 
 // Map card IDs to their specific visualization components
@@ -49,9 +50,10 @@ const cardComponents = {
   'chase_masters': ChaseMastersCard,
   'uncontrolled_chaos': UncontrolledChaosCard,
   'bowler_handedness': BowlerHandednessCard,
+  'outro': OutroCard,
 };
 
-const WrappedCard = forwardRef(({ cardData, cardIndex, totalCards, onShareImage, isSharing }, ref) => {
+const WrappedCard = forwardRef(({ cardData, cardIndex, totalCards, onShareImage, isSharing, onNavigateToCard, allCards = [] }, ref) => {
   if (!cardData) {
     return (
       <Box className="wrapped-card wrapped-card-error">
@@ -93,7 +95,11 @@ const WrappedCard = forwardRef(({ cardData, cardIndex, totalCards, onShareImage,
           {/* Card Content - Specific visualization */}
           <Box className="wrapped-card-content">
             {CardComponent ? (
-              <CardComponent data={cardData} />
+              <CardComponent 
+                data={cardData} 
+                onNavigateToCard={onNavigateToCard}
+                availableCards={allCards}
+              />
             ) : (
               <Typography>Visualization not available for this card type</Typography>
             )}

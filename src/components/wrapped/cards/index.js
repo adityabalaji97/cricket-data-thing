@@ -1,4 +1,5 @@
 export { default as IntroCard } from './IntroCard';
+export { default as OutroCard } from './OutroCard';
 export { default as PowerplayBulliesCard } from './PowerplayBulliesCard';
 export { default as MiddleMerchantsCard } from './MiddleMerchantsCard';
 export { default as DeathHittersCard } from './DeathHittersCard';

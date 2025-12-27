@@ -76,6 +76,30 @@ const WrappedPage = () => {
   // Get initial card from URL if present
   const initialCardId = searchParams.get('card');
 
+  // Set document title for better social sharing
+  useEffect(() => {
+    document.title = '2025 In Hindsight - T20 Cricket Wrapped';
+    
+    // Update OG meta tags dynamically (helps with some mobile share scenarios)
+    const updateMetaTag = (property, content) => {
+      let meta = document.querySelector(`meta[property="${property}"]`);
+      if (meta) {
+        meta.setAttribute('content', content);
+      }
+    };
+    
+    updateMetaTag('og:title', '2025 In Hindsight - T20 Cricket Wrapped');
+    updateMetaTag('og:description', 'Your year in T20 cricket data. Explore the stats, stories, and standout performances of 2025.');
+    updateMetaTag('og:url', 'https://hindsight2020.vercel.app/wrapped/2025');
+    updateMetaTag('twitter:title', '2025 In Hindsight - T20 Cricket Wrapped');
+    updateMetaTag('twitter:description', 'Your year in T20 cricket data. Explore the stats, stories, and standout performances of 2025.');
+    
+    // Cleanup on unmount
+    return () => {
+      document.title = 'Hindsight - T20 Cricket Analytics';
+    };
+  }, []);
+
   // Fetch metadata first (instant)
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -225,7 +249,7 @@ const WrappedPage = () => {
     fetchWithFilters();
   }, []);
 
-  // Sort cards based on metadata order
+  // Sort cards based on metadata order and add outro at end
   const getSortedCards = useCallback(() => {
     if (!cardsData?.cards || !metadata?.cards) {
       return cardsData?.cards || [];
@@ -235,11 +259,21 @@ const WrappedPage = () => {
       metadata.cards.map((card, idx) => [card.id, idx])
     );
     
-    return [...cardsData.cards].sort((a, b) => {
+    const sorted = [...cardsData.cards].sort((a, b) => {
       const orderA = orderMap.get(a.card_id) ?? 999;
       const orderB = orderMap.get(b.card_id) ?? 999;
       return orderA - orderB;
     });
+    
+    // Add outro card at the end
+    const outroCard = {
+      card_id: 'outro',
+      card_title: "That's a Wrap!",
+      card_subtitle: '2025 In Hindsight',
+      data: {}
+    };
+    
+    return [...sorted, outroCard];
   }, [cardsData, metadata]);
 
   if (loading) {
@@ -247,11 +281,6 @@ const WrappedPage = () => {
       <Box className="wrapped-loading">
         <CircularProgress size={60} sx={{ color: '#1DB954' }} />
         <p>Loading 2025 In Hindsight...</p>
-        {metadata && (
-          <p style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: '0.5rem' }}>
-            {metadata.total_cards} cards to explore
-          </p>
-        )}
       </Box>
     );
   }

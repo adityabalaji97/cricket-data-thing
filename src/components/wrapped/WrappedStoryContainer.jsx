@@ -63,6 +63,14 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
     }
   }, [cards.length]);
 
+  // Navigate to a specific card by its ID
+  const goToCardById = useCallback((cardId) => {
+    const index = cards.findIndex(card => card.card_id === cardId);
+    if (index >= 0) {
+      setCurrentIndex(index);
+    }
+  }, [cards]);
+
   const handleClose = () => {
     navigate('/');
   };
@@ -287,6 +295,8 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
         totalCards={cards.length}
         onShareImage={handleShareImage}
         isSharing={isSharing}
+        onNavigateToCard={goToCardById}
+        allCards={cards}
       />
     </Box>
   );
