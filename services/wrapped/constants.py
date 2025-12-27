@@ -53,6 +53,27 @@ CARD_CONFIG = [
         "method": "get_intro_data"
     },
     {
+        "id": "needle_movers",
+        "title": "Needle Movers",
+        "subtitle": "Who moved the predicted score most?",
+        "initial": True,
+        "method": "get_needle_movers_data"
+    },
+    {
+        "id": "chase_masters",
+        "title": "Chase Masters",
+        "subtitle": "Who moves win probability in chases?",
+        "initial": True,
+        "method": "get_chase_masters_data"
+    },
+    {
+        "id": "bowler_type_dominance",
+        "title": "Bowler Type Dominance",
+        "subtitle": "Which bowling styles ruled?",
+        "initial": False,
+        "method": "get_bowler_type_dominance_data"
+    },
+    {
         "id": "pace_vs_spin",
         "title": "Pace vs Spin",
         "subtitle": "Who dominated which bowling type?",
@@ -63,15 +84,15 @@ CARD_CONFIG = [
         "id": "controlled_aggression",
         "title": "Controlled Aggression",
         "subtitle": "High strike rate + high control %",
-        "initial": True,
+        "initial": False,
         "method": "get_controlled_aggression_data"
     },
     {
-        "id": "uncontrolled_chaos",
-        "title": "Uncontrolled Chaos",
-        "subtitle": "High strike rate, low control - but it works!",
-        "initial": True,
-        "method": "get_uncontrolled_chaos_data"
+        "id": "bowler_handedness",
+        "title": "Bowler Handedness",
+        "subtitle": "Left arm vs Right arm bowling",
+        "initial": False,
+        "method": "get_bowler_handedness_data"
     },
     {
         "id": "three_sixty_batters",
@@ -100,28 +121,8 @@ CARD_CONFIG = [
         "subtitle": "The rise of the sweep shots",
         "initial": False,
         "method": "get_sweep_evolution_data"
-    },
-    {
-        "id": "needle_movers",
-        "title": "Needle Movers",
-        "subtitle": "Who moved the predicted score most?",
-        "initial": False,
-        "method": "get_needle_movers_data"
-    },
-    {
-        "id": "chase_masters",
-        "title": "Chase Masters",
-        "subtitle": "Who moves win probability in chases?",
-        "initial": False,
-        "method": "get_chase_masters_data"
-    },
-    {
-        "id": "bowler_handedness",
-        "title": "Bowler Handedness",
-        "subtitle": "Left arm vs Right arm bowling",
-        "initial": False,
-        "method": "get_bowler_handedness_data"
-    },
+    }
+    """
     {
         "id": "venue_vibes",
         "title": "Venue Vibes",
@@ -184,14 +185,8 @@ CARD_CONFIG = [
         "subtitle": "Who owned the crucial 19th over?",
         "initial": False,
         "method": "get_nineteenth_over_gods_data"
-    },
-    {
-        "id": "bowler_type_dominance",
-        "title": "Bowler Type Dominance",
-        "subtitle": "Which bowling styles ruled?",
-        "initial": False,
-        "method": "get_bowler_type_dominance_data"
     }
+    """
 ]
 
 
