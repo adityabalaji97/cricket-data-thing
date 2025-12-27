@@ -16,6 +16,10 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
   // Track if we've navigated to the initial card (to handle lazy-loaded cards)
   const hasNavigatedToInitial = useRef(false);
   
+  // Track scroll position to prevent tap navigation during scroll
+  const scrollStartY = useRef(null);
+  const didScroll = useRef(false);
+  
   // Find initial card index
   const getInitialIndex = () => {
     if (initialCardId) {
@@ -38,6 +42,8 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
 
   // Minimum swipe distance (in px)
   const minSwipeDistance = 50;
+  // Minimum scroll distance to consider it a scroll (not a tap)
+  const minScrollDistance = 10;
 
   const goToNext = useCallback(() => {
     if (currentIndex < cards.length - 1) {
@@ -114,17 +120,38 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
     }
   }, [cards, initialCardId]);
 
-  // Touch handlers for swipe
+  // Touch handlers for swipe (horizontal navigation)
   const onTouchStart = (e) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
+    scrollStartY.current = e.targetTouches[0].clientY;
+    didScroll.current = false;
   };
 
   const onTouchMove = (e) => {
     setTouchEnd(e.targetTouches[0].clientX);
+    
+    // Check if user is scrolling vertically
+    if (scrollStartY.current !== null) {
+      const deltaY = Math.abs(e.targetTouches[0].clientY - scrollStartY.current);
+      if (deltaY > minScrollDistance) {
+        didScroll.current = true;
+      }
+    }
   };
 
   const onTouchEnd = () => {
+    // Don't navigate if user was scrolling
+    if (didScroll.current) {
+      setTouchStart(null);
+      setTouchEnd(null);
+      // Reset after a short delay so next interaction works
+      setTimeout(() => {
+        didScroll.current = false;
+      }, 100);
+      return;
+    }
+    
     if (!touchStart || !touchEnd) return;
     
     const distance = touchStart - touchEnd;
@@ -136,12 +163,26 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
     } else if (isRightSwipe) {
       goToPrevious();
     }
+    
+    // Reset scroll tracking
+    didScroll.current = false;
   };
 
-  // Tap navigation (Instagram-style)
-  const handleTap = (e) => {
-    // Don't trigger tap navigation if clicking on interactive elements
-    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.MuiSlider-root')) {
+  // Tap navigation for areas outside nav targets (middle of screen)
+  const handleContainerClick = (e) => {
+    // Don't trigger if clicking on interactive elements or nav targets
+    if (
+      e.target.closest('button') || 
+      e.target.closest('a') || 
+      e.target.closest('.MuiSlider-root') ||
+      e.target.closest('.wrapped-nav-target') ||
+      e.target.closest('.wrapped-card-actions')
+    ) {
+      return;
+    }
+    
+    // Don't trigger if user was scrolling
+    if (didScroll.current) {
       return;
     }
 
@@ -152,12 +193,25 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
     const x = e.clientX - rect.left;
     const containerWidth = rect.width;
 
-    // Left 20% = previous, right 80% = next (bigger touch zones)
+    // Left 20% = previous, right 80% = next
     if (x < containerWidth * 0.2) {
       goToPrevious();
     } else {
       goToNext();
     }
+  };
+
+  // Navigation button handlers (for dedicated touch targets)
+  const handlePrevClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    goToPrevious();
+  };
+
+  const handleNextClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    goToNext();
   };
 
   const currentCard = cards[currentIndex];
@@ -169,9 +223,9 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      onClick={handleTap}
+      onClick={handleContainerClick}
     >
-      {/* Top Section: Progress + Header */}
+      {/* Top Section: Progress + Header - Fixed position */}
       <div className="wrapped-top-section">
         {/* Progress Bar */}
         <WrappedProgressBar 
@@ -197,6 +251,34 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
         currentFilters={currentFilters}
       />
 
+      {/* Navigation Touch Targets - Separate elements that don't propagate */}
+      <div 
+        className="wrapped-nav-target wrapped-nav-target-left"
+        onClick={handlePrevClick}
+        onTouchEnd={(e) => {
+          e.stopPropagation();
+          if (!didScroll.current) {
+            goToPrevious();
+          }
+        }}
+        aria-label="Previous card"
+      >
+        {currentIndex > 0 && <span className="nav-hint">‹</span>}
+      </div>
+      <div 
+        className="wrapped-nav-target wrapped-nav-target-right"
+        onClick={handleNextClick}
+        onTouchEnd={(e) => {
+          e.stopPropagation();
+          if (!didScroll.current) {
+            goToNext();
+          }
+        }}
+        aria-label="Next card"
+      >
+        {currentIndex < cards.length - 1 && <span className="nav-hint">›</span>}
+      </div>
+
       {/* Current Card */}
       <WrappedCard 
         ref={cardRef}
@@ -206,12 +288,6 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
         onShareImage={handleShareImage}
         isSharing={isSharing}
       />
-
-      {/* Navigation hints */}
-      <Box className="wrapped-nav-hints">
-        {currentIndex > 0 && <span className="nav-hint nav-hint-left">‹</span>}
-        {currentIndex < cards.length - 1 && <span className="nav-hint nav-hint-right">›</span>}
-      </Box>
     </Box>
   );
 };

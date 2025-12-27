@@ -34,11 +34,9 @@
   touch-action: pan-y;
   user-select: none;
   z-index: 1000;
-  /* Safe area insets for notched devices */
-  padding-top: env(safe-area-inset-top);
+  /* Safe area insets handled by fixed elements */
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  /* Bottom safe area handled by card-actions */
 }
 
 .wrapped-loading {
@@ -129,15 +127,17 @@
 }
 
 /* ============================================
-   Top Section (Progress + Header)
+   Top Section (Progress + Header) - Fixed
    ============================================ */
 
 .wrapped-top-section {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 10;
+  z-index: 100;
+  background: var(--wrapped-bg);
+  padding-top: env(safe-area-inset-top);
 }
 
 /* ============================================
@@ -210,7 +210,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 70px 20px 70px; /* Extra bottom padding for fixed actions */
+  padding: 80px 20px 70px; /* Top accounts for fixed header, bottom for fixed actions */
+  padding-top: calc(80px + env(safe-area-inset-top)); /* Add safe area */
   overflow-y: auto;
   animation: fadeIn 0.3s ease;
   background: var(--wrapped-bg); /* Explicit background for image capture */
@@ -311,29 +312,61 @@
 }
 
 /* ============================================
-   Navigation Hints
+   Navigation Touch Targets
    ============================================ */
 
-.wrapped-nav-hints {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
+.wrapped-nav-target {
+  position: fixed;
+  top: calc(70px + env(safe-area-inset-top)); /* Below header including safe area */
+  bottom: calc(70px + env(safe-area-inset-bottom)); /* Above action buttons including safe area */
+  width: 60px;
   display: flex;
-  justify-content: space-between;
-  padding: 0 8px;
-  pointer-events: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  cursor: pointer;
+  /* Prevent touch events from passing through */
+  touch-action: manipulation;
+}
+
+.wrapped-nav-target-left {
+  left: 0;
+  padding-left: 8px;
+}
+
+.wrapped-nav-target-right {
+  right: 0;
+  padding-right: 8px;
+}
+
+.wrapped-nav-target .nav-hint {
+  font-size: 32px;
+  color: var(--wrapped-text);
   opacity: 0;
   transition: opacity 0.2s;
 }
 
-.wrapped-container:hover .wrapped-nav-hints {
-  opacity: 0.3;
+.wrapped-nav-target:hover .nav-hint,
+.wrapped-nav-target:active .nav-hint {
+  opacity: 0.5;
 }
 
-.nav-hint {
-  font-size: 48px;
-  color: var(--wrapped-text);
+/* Show hints on touch devices when tapped */
+@media (hover: none) {
+  .wrapped-nav-target:active .nav-hint {
+    opacity: 0.7;
+  }
+}
+
+/* Wider touch targets on desktop */
+@media (min-width: 768px) {
+  .wrapped-nav-target {
+    width: 100px;
+  }
+  
+  .wrapped-nav-target .nav-hint {
+    font-size: 40px;
+  }
 }
 
 /* ============================================
@@ -755,7 +788,8 @@
 
 @media (min-width: 768px) {
   .wrapped-card {
-    padding: 80px 40px 40px;
+    padding: 90px 40px 80px;
+    padding-top: calc(90px + env(safe-area-inset-top));
     max-width: 600px;
     margin: 0 auto;
   }

@@ -13,7 +13,7 @@ from .constants import DEFAULT_MIN_BALLS, DEFAULT_TOP_TEAMS
 
 
 # Standard bowling lengths in logical order (pitcher to batter)
-LENGTH_ORDER = ['YORKER', 'FULL', 'GOOD_LENGTH', 'GOOD', 'SHORT_OF_GOOD_LENGTH', 'SHORT', 'BOUNCER']
+LENGTH_ORDER = ['FULL_TOSS', 'YORKER', 'FULL', 'GOOD_LENGTH', 'SHORT_OF_A_GOOD_LENGTH', 'SHORT_OF_GOOD_LENGTH', 'SHORT']
 
 LENGTH_LABELS = {
     'YORKER': 'Yorker',
