@@ -132,17 +132,16 @@ def get_rare_shot_specialists_data(
         shot_type = row.shot_type
         found_shots.add(shot_type)
         
+        # Only keep the best player per shot (rn=1)
         if shot_type not in best_per_shot:
-            best_per_shot[shot_type] = []
-        
-        best_per_shot[shot_type].append({
-            "name": row.player,
-            "team": row.team,
-            "balls": row.balls,
-            "runs": int(row.runs) if row.runs else 0,
-            "boundaries": row.boundaries or 0,
-            "strike_rate": float(row.strike_rate) if row.strike_rate else 0
-        })
+            best_per_shot[shot_type] = {
+                "name": row.player,
+                "team": row.team,
+                "balls": row.balls,
+                "runs": int(row.runs) if row.runs else 0,
+                "boundaries": row.boundaries or 0,
+                "strike_rate": float(row.strike_rate) if row.strike_rate else 0
+            }
     
     return {
         "card_id": "rare_shot_specialists",

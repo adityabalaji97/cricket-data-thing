@@ -12,12 +12,20 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
   const containerRef = useRef(null);
   const cardRef = useRef(null);
   
+  // Track if we've navigated to the initial card (to handle lazy-loaded cards)
+  const hasNavigatedToInitial = useRef(false);
+  
   // Find initial card index
   const getInitialIndex = () => {
     if (initialCardId) {
       const index = cards.findIndex(card => card.card_id === initialCardId);
-      return index >= 0 ? index : 0;
+      if (index >= 0) {
+        hasNavigatedToInitial.current = true;
+        return index;
+      }
+      return 0; // Card not loaded yet, will be handled by effect
     }
+    hasNavigatedToInitial.current = true; // No target card, so we're "done"
     return 0;
   };
   
@@ -93,6 +101,17 @@ const WrappedStoryContainer = ({ cards, initialCardId, year, totalCardsAvailable
       window.history.replaceState(null, '', newUrl);
     }
   }, [currentIndex, cards]);
+
+  // Navigate to initial card once it's loaded (handles lazy-loaded cards on refresh)
+  useEffect(() => {
+    if (hasNavigatedToInitial.current || !initialCardId) return;
+    
+    const targetIndex = cards.findIndex(card => card.card_id === initialCardId);
+    if (targetIndex >= 0) {
+      hasNavigatedToInitial.current = true;
+      setCurrentIndex(targetIndex);
+    }
+  }, [cards, initialCardId]);
 
   // Touch handlers for swipe
   const onTouchStart = (e) => {

@@ -42,48 +42,59 @@ def get_elo_movers_data(
     """
     
     # Get first and last ELO for each team
+    # Fixed: Apply ROW_NUMBER after UNION ALL to avoid duplicates
     query = f"""
-        WITH team_matches AS (
-            -- Get all team appearances with their ELO
+        WITH all_team_elos AS (
+            -- Combine team1 and team2 appearances
+            SELECT team, elo, date, match_id
+            FROM (
+                SELECT 
+                    m.team1 as team,
+                    m.team1_elo as elo,
+                    m.date,
+                    m.id as match_id
+                FROM matches m
+                WHERE m.date >= :start_date 
+                AND m.date <= :end_date
+                AND m.team1_elo IS NOT NULL
+                {comp_filter}
+                
+                UNION ALL
+                
+                SELECT 
+                    m.team2 as team,
+                    m.team2_elo as elo,
+                    m.date,
+                    m.id as match_id
+                FROM matches m
+                WHERE m.date >= :start_date 
+                AND m.date <= :end_date
+                AND m.team2_elo IS NOT NULL
+                {comp_filter}
+            ) combined
+        ),
+        team_ranked AS (
             SELECT 
-                m.team1 as team,
-                m.team1_elo as elo,
-                m.date,
-                ROW_NUMBER() OVER (PARTITION BY m.team1 ORDER BY m.date ASC, m.id ASC) as first_rn,
-                ROW_NUMBER() OVER (PARTITION BY m.team1 ORDER BY m.date DESC, m.id DESC) as last_rn
-            FROM matches m
-            WHERE m.date >= :start_date 
-            AND m.date <= :end_date
-            AND m.team1_elo IS NOT NULL
-            {comp_filter}
-            
-            UNION ALL
-            
-            SELECT 
-                m.team2 as team,
-                m.team2_elo as elo,
-                m.date,
-                ROW_NUMBER() OVER (PARTITION BY m.team2 ORDER BY m.date ASC, m.id ASC) as first_rn,
-                ROW_NUMBER() OVER (PARTITION BY m.team2 ORDER BY m.date DESC, m.id DESC) as last_rn
-            FROM matches m
-            WHERE m.date >= :start_date 
-            AND m.date <= :end_date
-            AND m.team2_elo IS NOT NULL
-            {comp_filter}
+                team,
+                elo,
+                date,
+                ROW_NUMBER() OVER (PARTITION BY team ORDER BY date ASC, match_id ASC) as first_rn,
+                ROW_NUMBER() OVER (PARTITION BY team ORDER BY date DESC, match_id DESC) as last_rn
+            FROM all_team_elos
         ),
         first_elo AS (
             SELECT team, elo as start_elo
-            FROM team_matches
+            FROM team_ranked
             WHERE first_rn = 1
         ),
         last_elo AS (
             SELECT team, elo as end_elo
-            FROM team_matches
+            FROM team_ranked
             WHERE last_rn = 1
         ),
         team_counts AS (
             SELECT team, COUNT(*) as matches
-            FROM team_matches
+            FROM all_team_elos
             GROUP BY team
             HAVING COUNT(*) >= 3
         )
@@ -104,9 +115,9 @@ def get_elo_movers_data(
     teams = [
         {
             "team": row.team,
-            "start_elo": row.start_elo,
-            "end_elo": row.end_elo,
-            "elo_change": row.elo_change,
+            "start_elo": float(row.start_elo) if row.start_elo else 1500,
+            "end_elo": float(row.end_elo) if row.end_elo else 1500,
+            "elo_change": float(row.elo_change) if row.elo_change else 0,
             "matches": row.matches
         }
         for row in results

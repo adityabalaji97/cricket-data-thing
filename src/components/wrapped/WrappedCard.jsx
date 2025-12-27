@@ -39,7 +39,7 @@ const cardComponents = {
   'elo_movers': EloMoversCard,
   'venue_vibes': VenueVibesCard,
   'controlled_aggression': ControlledAggressionCard,
-  '360_batters': ThreeSixtyBattersCard,
+  'three_sixty_batters': ThreeSixtyBattersCard,
   'batter_hand_breakdown': BatterHandBreakdownCard,
   'length_masters': LengthMastersCard,
   'rare_shot_specialists': RareShotSpecialistsCard,

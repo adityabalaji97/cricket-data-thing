@@ -119,11 +119,17 @@ const WrappedPage = () => {
           return updated;
         });
       }
+      
+      // Clear remaining_card_ids to prevent re-fetching
+      setCardsData(prev => ({
+        ...prev,
+        remaining_card_ids: []
+      }));
     } catch (err) {
       console.error('Error fetching remaining cards:', err);
     } finally {
       setIsLoadingMore(false);
-      lazyFetchInProgress.current = false;
+      // Don't reset lazyFetchInProgress - keep it true to prevent re-triggering
     }
   }, [cardsData]);
 
