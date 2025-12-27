@@ -112,8 +112,10 @@ def get_bowler_handedness_data(
             "econ_delta": float(row.econ_delta) if row.econ_delta else 0
         }
         
-        # Negative econ_delta_lhb means better vs LHB (lower economy)
-        if row.econ_delta_lhb < 0:
+        # Positive econ_delta_lhb means better vs LHB (lower economy vs lefties)
+        # econ_delta_lhb = rhb.economy - lhb.economy
+        # If positive: LHB economy < RHB economy → better vs LHB
+        if row.econ_delta_lhb > 0:
             lhb_specialists.append(bowler_data)
         else:
             rhb_specialists.append(bowler_data)

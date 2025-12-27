@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
 from .query_helpers import build_base_filters, execute_query
-from .constants import DEFAULT_TOP_TEAMS, WRAPPED_DEFAULT_LEAGUES, INTERNATIONAL_TEAMS_RANKED
+from .constants import DEFAULT_TOP_TEAMS
 
 
 def get_venue_vibes_data(
@@ -23,62 +23,60 @@ def get_venue_vibes_data(
     """
     Card: Venue Vibes
     
-    Compares venue characteristics - par scores, chase win %, etc.
-    Uses matches table for accurate match-level stats.
+    Compares venue characteristics - par scores, boundary %, run rates.
+    Uses delivery_details table for accurate ball-by-ball data.
     """
     
-    params = {
-        "start_date": start_date,
-        "end_date": end_date,
-        "wrapped_leagues": leagues,
-        "wrapped_top_teams": INTERNATIONAL_TEAMS_RANKED[:top_teams]
-    }
+    where_clause, params = build_base_filters(
+        start_date=start_date,
+        end_date=end_date,
+        leagues=leagues,
+        include_international=include_international,
+        top_teams=top_teams,
+        table_alias="dd",
+        use_year=True,
+        extra_conditions=[
+            "dd.ground IS NOT NULL"
+        ]
+    )
     
-    # Build competition filter for matches table
-    comp_filter = """
-        AND (m.competition = ANY(:wrapped_leagues) 
-             OR (m.competition = 'T20I' 
-                 AND m.team1 = ANY(:wrapped_top_teams) 
-                 AND m.team2 = ANY(:wrapped_top_teams)))
-    """
-    
+    # Get venue stats including estimated par score and chase win %
     query = f"""
-        WITH venue_matches AS (
+        WITH venue_innings AS (
             SELECT 
-                m.ground as venue,
-                m.id,
-                m.team1_score,
-                m.team2_score,
-                m.winner,
-                m.team1,
-                m.team2,
-                m.toss_winner,
-                m.toss_decision
-            FROM matches m
-            WHERE m.date >= :start_date 
-            AND m.date <= :end_date
-            AND m.ground IS NOT NULL
-            AND m.team1_score IS NOT NULL
-            AND m.team2_score IS NOT NULL
-            {comp_filter}
+                dd.ground as venue,
+                dd.p_match,
+                dd.innings,
+                SUM(dd.score) as inns_runs,
+                COUNT(*) as balls
+            FROM delivery_details dd
+            {where_clause}
+            GROUP BY dd.ground, dd.p_match, dd.innings
+        ),
+        venue_matches AS (
+            SELECT 
+                venue,
+                p_match,
+                MAX(CASE WHEN innings = 1 THEN inns_runs END) as first_inns_score,
+                MAX(CASE WHEN innings = 2 THEN inns_runs END) as second_inns_score
+            FROM venue_innings
+            GROUP BY venue, p_match
+            HAVING COUNT(DISTINCT innings) = 2
         ),
         venue_stats AS (
             SELECT 
                 venue,
-                COUNT(*) as matches,
-                ROUND(AVG(team1_score + team2_score) / 2.0, 0) as par_score,
-                -- Chase win % = matches where team batting second won
+                COUNT(DISTINCT p_match) as matches,
+                ROUND(AVG(first_inns_score + second_inns_score) / 2.0, 0) as par_score,
                 ROUND(
-                    SUM(CASE 
-                        WHEN toss_decision = 'field' AND winner = toss_winner THEN 1
-                        WHEN toss_decision = 'bat' AND winner != toss_winner AND winner IS NOT NULL THEN 1
-                        ELSE 0
-                    END) * 100.0 / NULLIF(COUNT(*), 0),
+                    SUM(CASE WHEN second_inns_score > first_inns_score THEN 1 ELSE 0 END) * 100.0 
+                    / NULLIF(COUNT(*), 0), 
                     1
                 ) as chase_win_pct
             FROM venue_matches
+            WHERE first_inns_score IS NOT NULL AND second_inns_score IS NOT NULL
             GROUP BY venue
-            HAVING COUNT(*) >= 3
+            HAVING COUNT(DISTINCT p_match) >= 3
         )
         SELECT 
             venue,
