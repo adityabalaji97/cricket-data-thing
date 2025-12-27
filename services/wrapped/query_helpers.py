@@ -165,3 +165,54 @@ def execute_query(db: Session, query: str, params: Dict) -> list:
         List of result rows
     """
     return db.execute(text(query), params).fetchall()
+
+
+def build_query_url(
+    start_date: str,
+    end_date: str,
+    leagues: List[str],
+    include_international: bool,
+    top_teams: int = WRAPPED_DEFAULT_TOP_TEAMS,
+    **extra_params
+) -> str:
+    """
+    Build a query builder URL with all filter parameters.
+    
+    Args:
+        start_date: Start date string
+        end_date: End date string
+        leagues: List of leagues
+        include_international: Include international matches
+        top_teams: Top teams count
+        **extra_params: Additional URL parameters (group_by, min_balls, over_min, etc.)
+    
+    Returns:
+        Query builder URL string
+    """
+    params = []
+    
+    # Date range
+    params.append(f"start_date={start_date}")
+    params.append(f"end_date={end_date}")
+    
+    # Leagues - add each as separate parameter
+    for league in leagues:
+        params.append(f"league={league}")
+    
+    # International settings
+    if include_international:
+        params.append("include_international=true")
+        params.append(f"top_teams={top_teams}")
+    else:
+        params.append("include_international=false")
+    
+    # Add extra parameters
+    for key, value in extra_params.items():
+        if value is not None:
+            if isinstance(value, list):
+                for v in value:
+                    params.append(f"{key}={v}")
+            else:
+                params.append(f"{key}={value}")
+    
+    return "/query?" + "&".join(params)

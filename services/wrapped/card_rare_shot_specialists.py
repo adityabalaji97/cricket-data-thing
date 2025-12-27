@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query
+from .query_helpers import build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_TOP_TEAMS
 
 
@@ -152,6 +152,15 @@ def get_rare_shot_specialists_data(
         "shot_labels": SHOT_LABELS,
         "best_per_shot": best_per_shot,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&shot=HOOK&shot=PULL_HOOK_ON_BACK_FOOT&shot=RAMP&shot=PADDLE_SWEEP&shot=REVERSE_SCOOP&shot=REVERSE_SWEEP&shot=UPPER_CUT&shot=LATE_CUT&min_balls=3&group_by=batter&group_by=shot"
+            "query_builder": build_query_url(
+                start_date=start_date,
+                end_date=end_date,
+                leagues=leagues,
+                include_international=include_international,
+                top_teams=top_teams,
+                shot=["HOOK", "PULL_HOOK_ON_BACK_FOOT", "RAMP", "PADDLE_SWEEP", "REVERSE_SCOOP", "REVERSE_SWEEP", "UPPER_CUT", "LATE_CUT"],
+                min_balls=3,
+                group_by=["batter", "shot"]
+            )
         }
     }

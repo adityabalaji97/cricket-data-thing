@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query
+from .query_helpers import build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_TOP_TEAMS
 
 
@@ -192,6 +192,13 @@ def get_bowler_type_dominance_data(
         "top_spin": top_spin,
         "style_stats": style_stats,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bowl_kind&group_by=bowl_style"
+            "query_builder": build_query_url(
+                start_date=start_date,
+                end_date=end_date,
+                leagues=leagues,
+                include_international=include_international,
+                top_teams=top_teams,
+                group_by=["bowl_kind", "bowl_style"]
+            )
         }
     }

@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query
+from .query_helpers import build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_MIN_BALLS, DEFAULT_TOP_TEAMS
 
 
@@ -121,6 +121,15 @@ def get_death_hitters_data(
         },
         "players": players,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&over_min=15&group_by=batter&min_balls={min_balls}"
+            "query_builder": build_query_url(
+                start_date=start_date,
+                end_date=end_date,
+                leagues=leagues,
+                include_international=include_international,
+                top_teams=top_teams,
+                over_min=15,
+                group_by="batter",
+                min_balls=min_balls
+            )
         }
     }

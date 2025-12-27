@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query
+from .query_helpers import build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_MIN_BALLS, DEFAULT_TOP_TEAMS
 
 
@@ -177,6 +177,14 @@ def get_sweep_evolution_data(
         "sweep_stats": sweep_stats,
         "top_sweepers": top_sweepers,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&shot=PADDLE_SWEEP&shot=SLOG_SWEEP&shot=SWEEP&shot=SWEEP_SHOT&group_by=batter"
+            "query_builder": build_query_url(
+                start_date=start_date,
+                end_date=end_date,
+                leagues=leagues,
+                include_international=include_international,
+                top_teams=top_teams,
+                shot=["PADDLE_SWEEP", "SLOG_SWEEP", "SWEEP", "SWEEP_SHOT"],
+                group_by="batter"
+            )
         }
     }
