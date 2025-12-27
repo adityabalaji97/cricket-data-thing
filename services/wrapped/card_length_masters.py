@@ -184,6 +184,6 @@ def get_length_masters_data(
         "length_order": LENGTH_ORDER,
         "players": players,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter&min_balls={min_balls}"
+            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter&group_by=length&min_balls={min_balls}"
         }
     }

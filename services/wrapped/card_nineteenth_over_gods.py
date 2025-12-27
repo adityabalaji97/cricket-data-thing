@@ -1,7 +1,7 @@
 """
-Nineteenth Over Gods Card
+Death Over Specialists Card
 
-Best performers in the crucial 19th over.
+Best performers in the death overs (16-20).
 """
 
 from typing import Dict, Any, List
@@ -18,13 +18,13 @@ def get_nineteenth_over_gods_data(
     leagues: List[str],
     include_international: bool,
     db: Session,
-    min_balls: int = 18,  # ~3 overs worth
+    min_balls: int = 50,  # ~8 overs worth for death phase
     top_teams: int = DEFAULT_TOP_TEAMS
 ) -> Dict[str, Any]:
     """
-    Card: 19th Over Gods
+    Card: Death Over Specialists
     
-    Bowlers who excel in the crucial 19th over (over index 18).
+    Bowlers who excel in death overs (16-20, over index 15-19).
     Returns `bowlers` array with economy, dot_percentage, boundary_percentage, overs.
     """
     
@@ -37,7 +37,7 @@ def get_nineteenth_over_gods_data(
         table_alias="dd",
         use_year=True,
         extra_conditions=[
-            "dd.over = 18"  # 19th over (0-indexed)
+            "dd.over >= 15"  # Death overs: 16-20 (0-indexed: 15-19)
         ]
     )
     
@@ -113,11 +113,11 @@ def get_nineteenth_over_gods_data(
     
     return {
         "card_id": "nineteenth_over_gods",
-        "card_title": "19th Over Gods",
-        "card_subtitle": f"Best economy in the crucial 19th over (min {min_balls} balls)",
+        "card_title": "Death Over Specialists",
+        "card_subtitle": f"Best economy in overs 16-20 (min {min_balls} balls)",
         "visualization_type": "scatter",
-        "bowlers": bowlers,  # Frontend expects `bowlers` not `players`
+        "bowlers": bowlers,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&over_min=18&over_max=18&group_by=bowler"
+            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&over_min=15&group_by=bowler&min_balls={min_balls}"
         }
     }

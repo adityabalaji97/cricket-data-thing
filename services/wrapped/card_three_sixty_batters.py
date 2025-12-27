@@ -187,7 +187,5 @@ def get_three_sixty_batters_data(
         "visualization_type": "wagon_wheel",
         "zone_labels": zone_labels,
         "players": players,
-        "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter&min_balls={min_balls}"
-        }
+        "deep_links": {}
     }

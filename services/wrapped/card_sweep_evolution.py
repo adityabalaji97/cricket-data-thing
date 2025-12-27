@@ -177,6 +177,6 @@ def get_sweep_evolution_data(
         "sweep_stats": sweep_stats,
         "top_sweepers": top_sweepers,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter"
+            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&shot=PADDLE_SWEEP&shot=SLOG_SWEEP&shot=SWEEP&shot=SWEEP_SHOT&group_by=batter"
         }
     }

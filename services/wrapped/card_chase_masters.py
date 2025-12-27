@@ -161,7 +161,5 @@ def get_chase_masters_data(
         "visualization_type": "clutch_ranking",
         "clutch_performers": clutch_performers,
         "pressure_folders": pressure_folders,
-        "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&innings=2&group_by=batter"
-        }
+        "deep_links": {}
     }

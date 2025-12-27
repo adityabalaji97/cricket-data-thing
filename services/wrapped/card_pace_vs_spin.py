@@ -173,6 +173,6 @@ def get_pace_vs_spin_data(
         "spin_crushers": spin_crushers[:5],
         "complete_batters": complete_batters[:5],
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter"
+            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter&group_by=bowl_kind"
         }
     }

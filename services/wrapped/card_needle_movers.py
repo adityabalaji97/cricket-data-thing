@@ -160,7 +160,5 @@ def get_needle_movers_data(
         "visualization_type": "diverging_impact",
         "positive_impact": positive_impact,
         "negative_impact": negative_impact,
-        "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter"
-        }
+        "deep_links": {}
     }

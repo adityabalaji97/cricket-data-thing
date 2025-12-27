@@ -152,6 +152,6 @@ def get_rare_shot_specialists_data(
         "shot_labels": SHOT_LABELS,
         "best_per_shot": best_per_shot,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter"
+            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&shot=HOOK&shot=PULL_HOOK_ON_BACK_FOOT&shot=RAMP&shot=PADDLE_SWEEP&shot=REVERSE_SCOOP&shot=REVERSE_SWEEP&shot=UPPER_CUT&shot=LATE_CUT&min_balls=3&group_by=batter&group_by=shot"
         }
     }

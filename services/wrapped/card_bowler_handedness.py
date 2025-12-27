@@ -132,6 +132,6 @@ def get_bowler_handedness_data(
         "lhb_specialists": lhb_specialists,
         "rhb_specialists": rhb_specialists,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bowler"
+            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bowler&group_by=bat_hand"
         }
     }

@@ -126,7 +126,7 @@ const WrappedCardActions = ({ deepLinks, onShareImage, isSharing }) => {
           onClick={() => handleOpenInNewTab(deepLinks.query_builder)}
           className="wrapped-action-btn wrapped-action-btn-secondary"
         >
-          Recreate Query
+          Show data
         </Button>
       )}
 

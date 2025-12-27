@@ -139,7 +139,5 @@ def get_controlled_aggression_data(
         "card_subtitle": f"High strike rate + high control % (min {min_balls} balls)",
         "visualization_type": "ranked_bars",
         "players": players,
-        "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=batter&min_balls={min_balls}"
-        }
+        "deep_links": {}
     }

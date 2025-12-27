@@ -192,6 +192,6 @@ def get_bowler_type_dominance_data(
         "top_spin": top_spin,
         "style_stats": style_stats,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bowl_kind"
+            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bowl_kind&group_by=bowl_style"
         }
     }

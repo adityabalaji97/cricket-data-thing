@@ -136,7 +136,5 @@ def get_elo_movers_data(
         "risers": risers,
         "fallers": fallers,
         "all_teams": teams,
-        "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}"
-        }
+        "deep_links": {}
     }

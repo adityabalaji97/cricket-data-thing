@@ -112,7 +112,5 @@ def get_venue_vibes_data(
         "venues": venues,
         "highest_scoring": highest_scoring,
         "lowest_scoring": lowest_scoring,
-        "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=venue"
-        }
+        "deep_links": {}
     }

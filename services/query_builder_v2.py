@@ -244,20 +244,26 @@ def build_legacy_where_clause(
         conditions.append("m.date <= :end_date")
         params["end_date"] = end_date
     
-    # League filters
+    # Competition filters (leagues and/or international)
+    # These should be OR'd together - a delivery can be from a league OR international
+    competition_conditions = []
+    
     if leagues:
         expanded_leagues = expand_league_abbreviations(leagues)
-        conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
+        competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
         params["leagues"] = expanded_leagues
     
-    # International matches
     if include_international:
         if top_teams:
             top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
-            conditions.append("(m.match_type = 'international' AND m.team1 = ANY(:top_teams) AND m.team2 = ANY(:top_teams))")
+            competition_conditions.append("(m.match_type = 'international' AND m.team1 = ANY(:top_teams) AND m.team2 = ANY(:top_teams))")
             params["top_teams"] = top_team_list
         else:
-            conditions.append("m.match_type = 'international'")
+            competition_conditions.append("m.match_type = 'international'")
+    
+    # Combine competition conditions with OR
+    if competition_conditions:
+        conditions.append("(" + " OR ".join(competition_conditions) + ")")
     
     # Team filters
     team_conditions = []
@@ -1088,20 +1094,26 @@ def build_where_clause(
         conditions.append("dd.year <= :end_year")
         params["end_year"] = end_date.year
     
-    # League filters
+    # Competition filters (leagues and/or international)
+    # These should be OR'd together - a delivery can be from a league OR international
+    competition_conditions = []
+    
     if leagues:
         expanded_leagues = expand_league_abbreviations(leagues)
-        conditions.append("dd.competition = ANY(:leagues)")
+        competition_conditions.append("dd.competition = ANY(:leagues)")
         params["leagues"] = expanded_leagues
     
-    # International matches
     if include_international:
         if top_teams:
             top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
-            conditions.append("(dd.competition = 'T20I' AND dd.team_bat = ANY(:top_teams) AND dd.team_bowl = ANY(:top_teams))")
+            competition_conditions.append("(dd.competition = 'T20I' AND dd.team_bat = ANY(:top_teams) AND dd.team_bowl = ANY(:top_teams))")
             params["top_teams"] = top_team_list
         else:
-            conditions.append("dd.competition = 'T20I'")
+            competition_conditions.append("dd.competition = 'T20I'")
+    
+    # Combine competition conditions with OR
+    if competition_conditions:
+        conditions.append("(" + " OR ".join(competition_conditions) + ")")
     
     # Team filters
     team_conditions = []

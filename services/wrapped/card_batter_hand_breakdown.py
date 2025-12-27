@@ -187,6 +187,6 @@ def get_batter_hand_breakdown_data(
         "top_rhb": top_rhb,
         "crease_combo_stats": crease_combo_stats,
         "deep_links": {
-            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=bat_hand"
+            "query_builder": f"/query?start_date={start_date}&end_date={end_date}&group_by=crease_combo"
         }
     }
