@@ -430,41 +430,77 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        {/* Row 7: Grouping */}
+        {/* Row 7: Grouping - KEY FEATURE */}
         <Grid item xs={12}>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, mt: 1 }}>
-            Grouping & Aggregation
-          </Typography>
-        </Grid>
-        
-        <Grid item xs={12}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Autocomplete
-              multiple
-              value={groupBy}
-              onChange={handleGroupByChange}
-              options={availableColumns?.group_by_columns || []}
-              renderTags={(value, getTagProps) =>
-                value.map((option, index) => (
-                  <Chip 
-                    variant="outlined" 
-                    label={option} 
-                    size="small" 
-                    color="primary"
-                    {...getTagProps({ index })} 
+          <Box sx={{ 
+            mt: 2, 
+            p: 2, 
+            borderRadius: 2, 
+            border: '2px solid',
+            borderColor: 'primary.main',
+            backgroundColor: 'primary.50',
+            position: 'relative'
+          }}>
+            {/* Key insight badge */}
+            <Box sx={{ 
+              position: 'absolute', 
+              top: -12, 
+              left: 16, 
+              backgroundColor: 'primary.main', 
+              color: 'white',
+              px: 1.5,
+              py: 0.25,
+              borderRadius: 1,
+              fontSize: '0.7rem',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5
+            }}>
+              🔑 KEY INSIGHT
+            </Box>
+            
+            <Typography variant="subtitle2" color="primary.dark" sx={{ mb: 1, mt: 0.5, fontWeight: 'bold' }}>
+              Group By — This changes everything!
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+              Choose how to slice your data. Try "batter + phase" or "bowler_type + length" for powerful insights.
+            </Typography>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Autocomplete
+                multiple
+                value={groupBy}
+                onChange={handleGroupByChange}
+                options={availableColumns?.group_by_columns || []}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip 
+                      variant="filled" 
+                      label={option} 
+                      size="small" 
+                      color="primary"
+                      {...getTagProps({ index })} 
+                    />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    label="Group By Columns" 
+                    size="small"
+                    placeholder="Select dimensions to analyze..."
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: 'white',
+                      }
+                    }}
                   />
-                ))
-              }
-              renderInput={(params) => (
-                <TextField 
-                  {...params} 
-                  label="Group By Columns" 
-                  size="small"
-                />
-              )}
-              sx={{ flexGrow: 1 }}
-            />
-            <InfoTooltip tooltip="Leave empty for individual deliveries. Group for aggregated stats." />
+                )}
+                sx={{ flexGrow: 1 }}
+              />
+              <InfoTooltip tooltip="Leave empty for individual deliveries. Group for aggregated stats with charts." />
+            </Box>
           </Box>
         </Grid>
         

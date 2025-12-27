@@ -33,14 +33,27 @@ import { getUpcomingMatches, formatDate, formatVenue } from '../data/iplSchedule
 import EloLeaderboard from './EloLeaderboard';
 import EloRacerChart from './EloRacerChart';
 import RecentMatchesSummaryCard from './RecentMatchesSummaryCard';
+import SearchBar from './search/SearchBar';
 
 // This will be a new component that serves as a landing page
 const LandingPage = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isMedium = useMediaQuery(theme.breakpoints.down('md'));
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Handle search selection - navigate to appropriate page
+  const handleSearchSelect = (item) => {
+    if (item.type === 'player') {
+      navigate(`/search?q=${encodeURIComponent(item.name)}`);
+    } else if (item.type === 'team') {
+      navigate(`/team?team=${encodeURIComponent(item.name)}&autoload=true`);
+    } else if (item.type === 'venue') {
+      navigate(`/venue?venue=${encodeURIComponent(item.name)}&autoload=true`);
+    }
+  };
 
   // URLs for analysis pages are now created inline with template literals
   // This avoids the need for a separate createAnalysisUrl function
@@ -178,17 +191,16 @@ const LandingPage = () => {
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 0.5, md: 2 } }}>
-      {/* Hero Section */}
+      {/* Hero Section with Search */}
       <Paper 
         elevation={0}
         sx={{
-          p: { xs: 0.5, md: 3 },
-          mb: 1,
-          background: 'linear-gradient(to right, #0057b7, #1976d2)',
+          p: { xs: 2, md: 4 },
+          mb: 2,
+          background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)',
           borderRadius: 4,
           position: 'relative',
           overflow: 'hidden',
-          color: 'white',
           textAlign: 'center'
         }}
       >
@@ -197,24 +209,65 @@ const LandingPage = () => {
             position: 'absolute', 
             top: -50, 
             right: -50, 
-            fontSize: 300, 
-            opacity: 0.1,
-            transform: 'rotate(15deg)'
+            fontSize: 250, 
+            opacity: 0.05,
+            transform: 'rotate(15deg)',
+            color: 'primary.main'
           }}
         >
           <SportsCricketIcon fontSize="inherit" />
         </Box>
         
-        <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ fontSize: { xs: '1.25rem', md: '1.75rem' } }}>
-          Welcome to Hindsight
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
+          <SportsCricketIcon sx={{ fontSize: { xs: 28, md: 36 }, color: 'primary.main' }} />
+          <Typography 
+            variant="h4" 
+            fontWeight="bold" 
+            sx={{ 
+              fontSize: { xs: '1.5rem', md: '2rem' },
+              background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}
+          >
+            Hindsight
+          </Typography>
+        </Box>
+        
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3, fontSize: { xs: '0.85rem', md: '1rem' } }}>
+          Search players, teams, and venues for T20 cricket analytics
         </Typography>
         
-        <Typography variant="h5" sx={{ maxWidth: 800, mx: 'auto', fontSize: { xs: '0.85rem', md: '1rem' } }}>
-          Because hindsight is 20/20,
-        </Typography>
-        <Typography variant="h5" sx={{ maxWidth: 800, mx: 'auto', fontSize: { xs: '0.85rem', md: '1rem' } }}>
-          and this is all about 20-20 cricket data
-        </Typography>
+        {/* Search Bar */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <SearchBar 
+            onSelect={handleSearchSelect} 
+            placeholder="Search players, teams, or venues..."
+          />
+        </Box>
+        
+        {/* Quick Links */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Chip 
+            label="V Kohli" 
+            size="small" 
+            onClick={() => handleSearchSelect({ name: 'V Kohli', type: 'player' })}
+            sx={{ cursor: 'pointer' }}
+          />
+          <Chip 
+            label="JJ Bumrah" 
+            size="small" 
+            onClick={() => handleSearchSelect({ name: 'JJ Bumrah', type: 'player' })}
+            sx={{ cursor: 'pointer' }}
+          />
+          <Chip 
+            label="MS Dhoni" 
+            size="small" 
+            onClick={() => handleSearchSelect({ name: 'MS Dhoni', type: 'player' })}
+            sx={{ cursor: 'pointer' }}
+          />
+        </Box>
       </Paper>
 
       {/* Features Section */}
@@ -571,20 +624,20 @@ const LandingPage = () => {
                   variant="text"
                   color="primary"
                   component={Link}
-                  to="/query?batters=V%20Kohli&bowler_type=LC&bowler_type=LO&bowler_type=RL&bowler_type=RO&leagues=IPL&start_date=2023-01-01&min_balls=10&group_by=phase&group_by=ball_direction"
+                  to="/query?bowl_kind=spin%20bowler&min_balls=100&start_date=2023-01-01&group_by=length&group_by=line"
                   sx={{ justifyContent: 'flex-start', mb: 0.3, textAlign: 'left', fontSize: '0.75rem', py: 0.3 }}
                 >
-                  Kohli vs spinners by phase & direction
+                  Spin bowling by line & length
                 </Button>
                 <Button
                   fullWidth
                   variant="text"
                   color="primary"
                   component={Link}
-                  to="/query?start_date=2020-01-01&bowler_type=LO&bowler_type=LC&bowler_type=RO&bowler_type=RL&min_balls=100&group_by=crease_combo"
+                  to="/query?start_date=2024-01-01&min_balls=50&group_by=shot&group_by=control"
                   sx={{ justifyContent: 'flex-start', textAlign: 'left', fontSize: '0.75rem', py: 0.3 }}
                 >
-                  T20 crease combos vs spin
+                  Shot types: controlled vs uncontrolled
                 </Button>
               </Box>
             </CardContent>

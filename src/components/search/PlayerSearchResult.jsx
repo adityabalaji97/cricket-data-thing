@@ -18,9 +18,28 @@ import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import BoltIcon from '@mui/icons-material/Bolt';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL, DEFAULT_SEARCH_PARAMS } from './searchConfig';
+
+// Helper to build query builder URL for a player
+const buildQueryBuilderUrl = (playerName, type, startDate, endDate) => {
+  const params = new URLSearchParams();
+  
+  if (type === 'batter') {
+    params.set('batters', playerName);
+  } else {
+    params.set('bowlers', playerName);
+  }
+  
+  if (startDate) params.set('start_date', startDate);
+  if (endDate) params.set('end_date', endDate);
+  params.set('min_balls', '20');
+  params.set('group_by', 'phase');
+  
+  return `/query?${params.toString()}`;
+};
 
 const StatCard = ({ label, value, subtitle }) => (
   <Box sx={{ textAlign: 'center', p: 1 }}>
@@ -294,15 +313,26 @@ const PlayerSearchResult = ({ playerName, startDate, endDate }) => {
             endDate={displayEndDate}
           />
           
-          <Button
-            component={Link}
-            to={`/player?name=${encodeURIComponent(profile.player_name)}&autoload=true&start_date=${effectiveStartDate}&end_date=${effectiveEndDate}`}
-            variant="outlined"
-            size="small"
-            sx={{ mt: 2 }}
-          >
-            View Full Batting Profile →
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
+            <Button
+              component={Link}
+              to={`/player?name=${encodeURIComponent(profile.player_name)}&autoload=true&start_date=${effectiveStartDate}&end_date=${effectiveEndDate}`}
+              variant="outlined"
+              size="small"
+            >
+              View Full Batting Profile →
+            </Button>
+            <Button
+              component={Link}
+              to={buildQueryBuilderUrl(profile.player_name, 'batter', effectiveStartDate, effectiveEndDate)}
+              variant="outlined"
+              size="small"
+              color="secondary"
+              startIcon={<QueryStatsIcon />}
+            >
+              Explore in Query Builder
+            </Button>
+          </Box>
         </Box>
       )}
 
@@ -349,15 +379,26 @@ const PlayerSearchResult = ({ playerName, startDate, endDate }) => {
             endDate={displayEndDate}
           />
           
-          <Button
-            component={Link}
-            to={`/bowler?name=${encodeURIComponent(profile.player_name)}&autoload=true&start_date=${effectiveStartDate}&end_date=${effectiveEndDate}`}
-            variant="outlined"
-            size="small"
-            sx={{ mt: 2 }}
-          >
-            View Full Bowling Profile →
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
+            <Button
+              component={Link}
+              to={`/bowler?name=${encodeURIComponent(profile.player_name)}&autoload=true&start_date=${effectiveStartDate}&end_date=${effectiveEndDate}`}
+              variant="outlined"
+              size="small"
+            >
+              View Full Bowling Profile →
+            </Button>
+            <Button
+              component={Link}
+              to={buildQueryBuilderUrl(profile.player_name, 'bowler', effectiveStartDate, effectiveEndDate)}
+              variant="outlined"
+              size="small"
+              color="secondary"
+              startIcon={<QueryStatsIcon />}
+            >
+              Explore in Query Builder
+            </Button>
+          </Box>
         </Box>
       )}
 

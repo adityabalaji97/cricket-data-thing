@@ -43,7 +43,9 @@ export const captureElementAsImage = async (element) => {
       '.wrapped-top-section',
       '.wrapped-card-actions',
       '[class*="Backdrop"]',
-      '[class*="backdrop"]'
+      '[class*="backdrop"]',
+      '.MuiDialog-root',
+      '.MuiDrawer-root'
     ];
     
     overlaySelectors.forEach(selector => {
@@ -68,44 +70,46 @@ export const captureElementAsImage = async (element) => {
       originalValue: originalBg
     });
 
-    // STEP 3: Remove filter/opacity from parent containers and element
-    const container = element.closest('.wrapped-container');
-    if (container) {
-      // Store and clear filter
-      if (container.style.filter) {
+    // STEP 3: Remove filter/opacity from ALL ancestor elements up to body
+    let current = element;
+    while (current && current !== document.body) {
+      const computedStyle = window.getComputedStyle(current);
+      
+      // Check for any filters
+      if (computedStyle.filter !== 'none') {
         modifiedElements.push({
-          element: container,
+          element: current,
           property: 'filter',
-          originalValue: container.style.filter
+          originalValue: current.style.filter
         });
-        container.style.filter = 'none';
+        current.style.filter = 'none';
       }
-      // Store and set full opacity
-      modifiedElements.push({
-        element: container,
-        property: 'opacity',
-        originalValue: container.style.opacity
-      });
-      container.style.opacity = '1';
+      
+      // Check for reduced opacity
+      if (parseFloat(computedStyle.opacity) < 1) {
+        modifiedElements.push({
+          element: current,
+          property: 'opacity',
+          originalValue: current.style.opacity
+        });
+        current.style.opacity = '1';
+      }
+      
+      // Check for any backdrop-filter
+      if (computedStyle.backdropFilter && computedStyle.backdropFilter !== 'none') {
+        modifiedElements.push({
+          element: current,
+          property: 'backdropFilter',
+          originalValue: current.style.backdropFilter
+        });
+        current.style.backdropFilter = 'none';
+      }
+      
+      current = current.parentElement;
     }
 
-    // Also check the card itself
-    modifiedElements.push({
-      element: element,
-      property: 'filter',
-      originalValue: element.style.filter
-    });
-    element.style.filter = 'none';
-    
-    modifiedElements.push({
-      element: element,
-      property: 'opacity', 
-      originalValue: element.style.opacity
-    });
-    element.style.opacity = '1';
-
     // Small delay to ensure DOM updates are applied
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 150));
 
     // STEP 4: Capture the element
     const canvas = await html2canvas(element, {
@@ -116,11 +120,15 @@ export const captureElementAsImage = async (element) => {
       allowTaint: true,
       width: element.offsetWidth,
       height: element.offsetHeight,
+      removeContainer: true,
       // Ignore elements that might cause overlay issues
       ignoreElements: (el) => {
+        if (!el || !el.className) return false;
+        
         // Skip if element or its classes contain these patterns
-        const classNames = el.className || '';
-        const classStr = typeof classNames === 'string' ? classNames : classNames.toString();
+        const classNames = el.className;
+        const classStr = typeof classNames === 'string' ? classNames : 
+                        (classNames.baseVal ? classNames.baseVal : String(classNames));
         
         return (
           classStr.includes('MuiBackdrop') ||
@@ -130,16 +138,32 @@ export const captureElementAsImage = async (element) => {
           classStr.includes('wrapped-card-actions') ||
           classStr.includes('Backdrop') ||
           classStr.includes('progress-') ||
+          classStr.includes('MuiModal') ||
           el.tagName === 'NOSCRIPT'
         );
       },
       // Ensure we capture with solid background
       onclone: (clonedDoc, clonedElement) => {
-        // Ensure the cloned element has solid background
+        // Set solid background on body and html
+        clonedDoc.body.style.backgroundColor = '#121212';
+        clonedDoc.documentElement.style.backgroundColor = '#121212';
+        
+        // Ensure the cloned element has solid background and no filters
         clonedElement.style.backgroundColor = '#121212';
         clonedElement.style.filter = 'none';
         clonedElement.style.opacity = '1';
+        clonedElement.style.backdropFilter = 'none';
         clonedElement.style.paddingTop = '40px'; // Reduce top padding since we hide header
+        
+        // Walk up the cloned element's ancestors and clear filters/opacity
+        let parent = clonedElement.parentElement;
+        while (parent && parent !== clonedDoc.body) {
+          parent.style.filter = 'none';
+          parent.style.opacity = '1';
+          parent.style.backdropFilter = 'none';
+          parent.style.backgroundColor = 'transparent';
+          parent = parent.parentElement;
+        }
         
         // Remove any potential overlay elements from the clone
         const selectorsToRemove = [
@@ -147,16 +171,18 @@ export const captureElementAsImage = async (element) => {
           '.wrapped-nav-hints',
           '.wrapped-card-actions',
           '.wrapped-top-section',
-          '[class*="Backdrop"]'
+          '[class*="Backdrop"]',
+          '.MuiModal-root',
+          '.MuiDialog-root'
         ];
         
         selectorsToRemove.forEach(selector => {
-          clonedDoc.querySelectorAll(selector).forEach(el => el.remove());
-        });
-        
-        // Also remove from cloned element itself if nested
-        selectorsToRemove.forEach(selector => {
-          clonedElement.querySelectorAll(selector).forEach(el => el.remove());
+          try {
+            clonedDoc.querySelectorAll(selector).forEach(el => el.remove());
+            clonedElement.querySelectorAll(selector).forEach(el => el.remove());
+          } catch (e) {
+            // Ignore selector errors
+          }
         });
       }
     });

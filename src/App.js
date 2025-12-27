@@ -17,6 +17,8 @@ import {
   useTheme
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import SearchIcon from '@mui/icons-material/Search';
+import CloseIcon from '@mui/icons-material/Close';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import VenueNotes from './components/VenueNotes';
 import MatchHistory from './components/MatchHistory';
@@ -31,7 +33,7 @@ import QueryBuilder from './components/QueryBuilder'; // Import the new QueryBui
 import TeamProfile from './components/TeamProfile';
 import TeamComparison from './components/TeamComparison';
 import WrappedPage from './components/wrapped/WrappedPage';
-import { GoogleSearchLanding } from './components/search';
+import { GoogleSearchLanding, SearchBar } from './components/search';
 import axios from 'axios';
 
 import config from './config';
@@ -71,6 +73,7 @@ const AppContent = () => {
   const [currentTab, setCurrentTab] = useState(0);
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
+  const [searchExpanded, setSearchExpanded] = useState(false);
 
   const [venueFantasyStats, setVenueFantasyStats] = useState({ team1_players: [], team2_players: [] });
   const [venuePlayerHistory, setVenuePlayerHistory] = useState({ players: [] });
@@ -81,6 +84,18 @@ const AppContent = () => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  // Handle header search selection
+  const handleHeaderSearchSelect = (item) => {
+    setSearchExpanded(false);
+    if (item.type === 'player') {
+      navigate(`/search?q=${encodeURIComponent(item.name)}`);
+    } else if (item.type === 'team') {
+      navigate(`/team?team=${encodeURIComponent(item.name)}&autoload=true`);
+    } else if (item.type === 'venue') {
+      navigate(`/venue?venue=${encodeURIComponent(item.name)}&autoload=true`);
+    }
   };
 
   const handleNavigate = (path) => {
@@ -386,11 +401,44 @@ const AppContent = () => {
         borderBottom: 1, 
         borderColor: 'divider', 
         mb: 3, 
-        display: 'flex', // Always show the tabs
+        display: 'flex',
         alignItems: 'center',
         flexDirection: 'row',
-        flexWrap: 'nowrap'
+        flexWrap: 'nowrap',
+        position: 'relative'
       }}>
+        {/* Expandable Search Bar Overlay */}
+        {searchExpanded && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              bgcolor: 'background.paper',
+              zIndex: 1200,
+              display: 'flex',
+              alignItems: 'center',
+              px: 1,
+              gap: 1
+            }}
+          >
+            <Box sx={{ flexGrow: 1 }}>
+              <SearchBar 
+                onSelect={handleHeaderSearchSelect}
+                placeholder="Search players, teams, venues..."
+              />
+            </Box>
+            <IconButton 
+              onClick={() => setSearchExpanded(false)}
+              size="small"
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        )}
+        
         {isMobile ? (
           <>
             <IconButton
@@ -441,6 +489,14 @@ const AppContent = () => {
             <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap' }}>
               {getPageTitle()}
             </Typography>
+            <IconButton
+              onClick={() => setSearchExpanded(true)}
+              size="small"
+              sx={{ ml: 'auto' }}
+              aria-label="search"
+            >
+              <SearchIcon />
+            </IconButton>
           </>
         ) : (
           <Tabs 
@@ -449,7 +505,7 @@ const AppContent = () => {
             variant="scrollable"
             scrollButtons="auto"
             allowScrollButtonsMobile
-            sx={{ width: '100%' }}
+            sx={{ flexGrow: 1 }}
           >
             <Tab label="Home" component={Link} to="/" />
             <Tab label="Search" component={Link} to="/search" />
@@ -462,6 +518,14 @@ const AppContent = () => {
             <Tab label="Team Profile" component={Link} to="/team" />
             <Tab label="Team Comparison" component={Link} to="/team-comparison" />
           </Tabs>
+          <IconButton
+            onClick={() => setSearchExpanded(true)}
+            size="small"
+            sx={{ ml: 1 }}
+            aria-label="search"
+          >
+            <SearchIcon />
+          </IconButton>
         )}
       </Box>
 
