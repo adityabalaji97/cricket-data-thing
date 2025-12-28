@@ -179,13 +179,14 @@ def get_team_matches_with_elo_service(
                 GROUP BY match_id, innings
             ),
             -- Scores from new delivery_details table
+            -- Note: 'out' column is a string, not boolean
             dd_scores AS (
                 SELECT 
                     p_match as match_id,
                     inns as innings,
                     COALESCE(SUM(score), 0) + COALESCE(SUM(wide), 0) + COALESCE(SUM(noball), 0) + 
                     COALESCE(SUM(byes), 0) + COALESCE(SUM(legbyes), 0) as runs,
-                    COUNT(CASE WHEN out = true THEN 1 END) as wickets
+                    COUNT(CASE WHEN out IS NOT NULL AND out != '' THEN 1 END) as wickets
                 FROM delivery_details
                 WHERE p_match IS NOT NULL
                 GROUP BY p_match, inns
