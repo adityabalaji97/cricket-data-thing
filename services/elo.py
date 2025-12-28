@@ -8,13 +8,10 @@ def get_delhi_team_name_variations(team_name: str) -> List[str]:
     """Special handler for Delhi teams to manage the DD->DC transition properly"""
     delhi_names = ['Delhi Capitals', 'Delhi Daredevils']
     
-    # If requesting Delhi Capitals, return both names to get complete history
     if team_name == 'Delhi Capitals':
         return delhi_names
-    # If requesting Delhi Daredevils, return both names to get complete history  
     elif team_name == 'Delhi Daredevils':
         return delhi_names
-    # If requesting DC abbreviation, return both names
     elif team_name == 'DC':
         return delhi_names
     else:
@@ -23,28 +20,22 @@ def get_delhi_team_name_variations(team_name: str) -> List[str]:
 def get_all_team_name_variations(team_name: str) -> List[str]:
     """Get all possible name variations for a given team based on teams_mapping"""
     
-    # Special handling for Delhi teams
     if team_name in ['Delhi Capitals', 'Delhi Daredevils', 'DC']:
         return get_delhi_team_name_variations(team_name)
     
-    # Regular handling for other teams
-    # Create a reverse mapping from abbreviation to all team names
     reverse_mapping = {}
     for full_name, abbrev in teams_mapping.items():
         if abbrev not in reverse_mapping:
             reverse_mapping[abbrev] = []
         reverse_mapping[abbrev].append(full_name)
     
-    # If team_name is an abbreviation, return all full names for it
     if team_name in reverse_mapping:
         return reverse_mapping[team_name]
     
-    # If it's a full name, find its abbreviation and return all related names
     abbrev = teams_mapping.get(team_name)
     if abbrev and abbrev in reverse_mapping:
         return reverse_mapping[abbrev]
     
-    # If not found in mapping, return just the original name
     return [team_name]
 
 def get_team_elo_stats_service(
@@ -53,20 +44,10 @@ def get_team_elo_stats_service(
     end_date: Optional[date],
     db
 ) -> Dict:
-    """
-    Get ELO statistics for a team within the specified date range
-    
-    Returns:
-        - Starting ELO (as of start date)
-        - Ending ELO (as of end date) 
-        - Peak ELO in the time period
-        - Lowest ELO in the time period
-        - ELO evolution over time
-    """
+    """Get ELO statistics for a team within the specified date range"""
     try:
         team_variations = get_all_team_name_variations(team_name)
         
-        # Get ELO data for the team within date range
         elo_query = text("""
             WITH team_elo_data AS (
                 SELECT 
@@ -107,7 +88,6 @@ def get_team_elo_stats_service(
                 opponent,
                 opponent_elo,
                 winner,
-                -- Calculate if team won
                 CASE 
                     WHEN winner = ANY(:team_variations) THEN 'W'
                     WHEN winner IS NULL THEN 'NR'
@@ -135,16 +115,12 @@ def get_team_elo_stats_service(
                 "elo_history": []
             }
         
-        # Extract ELO values
         elo_values = [row.team_elo for row in results]
-        
-        # Calculate statistics
         starting_elo = elo_values[0]
         ending_elo = elo_values[-1]
         peak_elo = max(elo_values)
         lowest_elo = min(elo_values)
         
-        # Build ELO history for visualization
         elo_history = []
         for row in results:
             elo_history.append({
@@ -182,24 +158,65 @@ def get_team_matches_with_elo_service(
     db
 ) -> List[dict]:
     """
-    Get all matches played by a team with ELO information included
+    Get all matches played by a team with ELO information included.
+    Uses hybrid approach to get scores from both deliveries (legacy) and delivery_details (new) tables.
     """
     try:
         team_variations = get_all_team_name_variations(team_name)
         
+        # Hybrid query: check both deliveries (legacy) and delivery_details (new) tables
+        # Use COALESCE to pick whichever has data
         matches_query = text("""
-            WITH match_scores AS (
+            WITH 
+            -- Scores from legacy deliveries table
+            legacy_scores AS (
+                SELECT 
+                    match_id,
+                    innings,
+                    COALESCE(SUM(runs_off_bat + extras), 0) as runs,
+                    COUNT(CASE WHEN wicket_type IS NOT NULL THEN 1 END) as wickets
+                FROM deliveries
+                GROUP BY match_id, innings
+            ),
+            -- Scores from new delivery_details table
+            dd_scores AS (
+                SELECT 
+                    p_match as match_id,
+                    inns as innings,
+                    COALESCE(SUM(score), 0) + COALESCE(SUM(wide), 0) + COALESCE(SUM(noball), 0) + 
+                    COALESCE(SUM(byes), 0) + COALESCE(SUM(legbyes), 0) as runs,
+                    COUNT(CASE WHEN out = true THEN 1 END) as wickets
+                FROM delivery_details
+                WHERE p_match IS NOT NULL
+                GROUP BY p_match, inns
+            ),
+            -- Combine scores, preferring legacy if available, else use delivery_details
+            combined_scores AS (
+                SELECT 
+                    COALESCE(ls.match_id, dd.match_id) as match_id,
+                    COALESCE(ls.innings, dd.innings) as innings,
+                    COALESCE(ls.runs, dd.runs, 0) as runs,
+                    COALESCE(ls.wickets, dd.wickets, 0) as wickets
+                FROM legacy_scores ls
+                FULL OUTER JOIN dd_scores dd 
+                    ON ls.match_id = dd.match_id AND ls.innings = dd.innings
+            ),
+            match_scores AS (
                 SELECT 
                     m.id, m.date, m.venue, m.city, m.event_name,
                     m.team1, m.team2, m.winner, m.toss_winner, m.toss_decision,
                     m.competition, m.match_type,
                     m.team1_elo, m.team2_elo,
-                    (SELECT CONCAT(COALESCE(SUM(d1.runs_off_bat + d1.extras), 0), '/', 
-                                   COALESCE(COUNT(CASE WHEN d1.wicket_type IS NOT NULL THEN 1 END), 0))
-                     FROM deliveries d1 WHERE d1.match_id = m.id AND d1.innings = 1) as team1_score,
-                    (SELECT CONCAT(COALESCE(SUM(d2.runs_off_bat + d2.extras), 0), '/', 
-                                   COALESCE(COUNT(CASE WHEN d2.wicket_type IS NOT NULL THEN 1 END), 0))
-                     FROM deliveries d2 WHERE d2.match_id = m.id AND d2.innings = 2) as team2_score
+                    CONCAT(
+                        COALESCE((SELECT runs FROM combined_scores WHERE match_id = m.id AND innings = 1), 0),
+                        '/',
+                        COALESCE((SELECT wickets FROM combined_scores WHERE match_id = m.id AND innings = 1), 0)
+                    ) as team1_score,
+                    CONCAT(
+                        COALESCE((SELECT runs FROM combined_scores WHERE match_id = m.id AND innings = 2), 0),
+                        '/',
+                        COALESCE((SELECT wickets FROM combined_scores WHERE match_id = m.id AND innings = 2), 0)
+                    ) as team2_score
                 FROM matches m
                 WHERE (m.team1 = ANY(:team_variations) OR m.team2 = ANY(:team_variations))
                 AND (:start_date IS NULL OR m.date >= :start_date)
@@ -222,7 +239,6 @@ def get_team_matches_with_elo_service(
             team_score = row.team1_score if team_was_team1 else row.team2_score
             opponent_score = row.team2_score if team_was_team1 else row.team1_score
             
-            # Get ELO ratings
             team_elo = row.team1_elo if team_was_team1 else row.team2_elo
             opponent_elo = row.team2_elo if team_was_team1 else row.team1_elo
             
@@ -247,7 +263,6 @@ def get_team_matches_with_elo_service(
                 "toss_decision": row.toss_decision,
                 "batted_first": team_was_team1,
                 "winner": teams_mapping.get(row.winner, row.winner) if row.winner else None,
-                # ELO information
                 "elo": {
                     "team_elo": team_elo,
                     "opponent_elo": opponent_elo,
@@ -269,22 +284,8 @@ def get_teams_elo_rankings_service(
     end_date: Optional[date] = None,
     db = None
 ) -> List[dict]:
-    """
-    Get current ELO rankings for teams based on their most recent ratings
-    
-    Args:
-        league: Specific league to filter by (e.g., 'Indian Premier League')
-        include_international: Whether to include international teams
-        top_teams: Limit to top N international teams (only applies to international matches)
-        start_date: Optional start date for filtering matches used to calculate latest ELO
-        end_date: Optional end date for filtering matches used to calculate latest ELO
-        db: Database session
-    
-    Returns:
-        List of team ELO rankings with current ratings
-    """
+    """Get current ELO rankings for teams based on their most recent ratings"""
     try:
-        # Build the base query to get the latest ELO rating for each team
         params = {
             "league": league,
             "include_international": include_international,
@@ -292,7 +293,6 @@ def get_teams_elo_rankings_service(
             "end_date": end_date
         }
         
-        # Determine competition filter
         competition_conditions = []
         
         if league:
@@ -300,7 +300,6 @@ def get_teams_elo_rankings_service(
         
         if include_international:
             if top_teams:
-                # Use the predefined ranked international teams list
                 from models import INTERNATIONAL_TEAMS_RANKED
                 top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
                 params["top_team_list"] = top_team_list
@@ -310,16 +309,13 @@ def get_teams_elo_rankings_service(
             else:
                 competition_conditions.append("(m.match_type = 'international')")
         
-        # Build competition filter
         if competition_conditions:
             competition_filter = "AND (" + " OR ".join(competition_conditions) + ")"
         else:
-            competition_filter = "AND false"  # No teams if no conditions
+            competition_filter = "AND false"
         
-        # Query to get latest ELO for each team
         elo_rankings_query = text(f"""
             WITH latest_team_elos AS (
-                -- Get the most recent ELO rating for each team from either team1 or team2 position
                 SELECT DISTINCT ON (team_name)
                     team_name,
                     latest_elo,
@@ -331,7 +327,6 @@ def get_teams_elo_rankings_service(
                     match_type,
                     latest_competition
                 FROM (
-                    -- Team1 ELOs
                     SELECT 
                         m.team1 as team_name,
                         m.team1_elo as latest_elo,
@@ -355,7 +350,6 @@ def get_teams_elo_rankings_service(
                     
                     UNION ALL
                     
-                    -- Team2 ELOs  
                     SELECT 
                         m.team2 as team_name,
                         m.team2_elo as latest_elo,
@@ -400,7 +394,6 @@ def get_teams_elo_rankings_service(
         if not results:
             return []
         
-        # Format results
         rankings = []
         for i, row in enumerate(results, 1):
             team_data = {
@@ -429,30 +422,17 @@ def get_teams_elo_history_service(
     end_date: Optional[date] = None,
     db = None
 ) -> Dict[str, List[dict]]:
-    """
-    Get ELO history for multiple teams over a specified time period for racer chart visualization
-    
-    Args:
-        teams: List of team names (full names or abbreviations)
-        start_date: Start date for the ELO history
-        end_date: End date for the ELO history
-        db: Database session
-    
-    Returns:
-        Dictionary with team names as keys and ELO history arrays as values
-    """
+    """Get ELO history for multiple teams over a specified time period"""
     try:
         if not teams:
             return {}
         
-        # Get all team name variations for the requested teams
         all_team_variations = []
-        team_mapping = {}  # Maps any variation to the standardized name
+        team_mapping = {}
         
         for team in teams:
             variations = get_all_team_name_variations(team)
             all_team_variations.extend(variations)
-            # Map all variations to the original requested team name (preserve full names)
             for var in variations:
                 team_mapping[var] = team
         
@@ -462,10 +442,8 @@ def get_teams_elo_history_service(
             "end_date": end_date
         }
         
-        # Query to get ELO evolution for all requested teams
         elo_history_query = text("""
             WITH team_elo_evolution AS (
-                -- Get ELO ratings from team1 position
                 SELECT 
                     m.team1 as team_name,
                     m.team1_elo as elo_rating,
@@ -482,7 +460,6 @@ def get_teams_elo_history_service(
                 
                 UNION ALL
                 
-                -- Get ELO ratings from team2 position
                 SELECT 
                     m.team2 as team_name,
                     m.team2_elo as elo_rating,
@@ -511,20 +488,16 @@ def get_teams_elo_history_service(
         
         results = db.execute(elo_history_query, params).fetchall()
         
-        # Group results by team
         team_histories = {}
         
         for row in results:
-            # Use the standardized team name
             std_team_name = team_mapping.get(row.team_name, row.team_name)
             
             if std_team_name not in team_histories:
                 team_histories[std_team_name] = []
             
-            # Determine match result for this team
-            match_result = "NR"  # No result
+            match_result = "NR"
             if row.winner:
-                # Check if this team won
                 winner_variations = get_all_team_name_variations(row.winner)
                 match_result = "W" if row.team_name in winner_variations else "L"
             
