@@ -6,7 +6,6 @@ from models import teams_mapping
 from services.teams import get_all_team_name_variations
 import logging
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -18,79 +17,95 @@ def get_team_bowling_order_service(
     db
 ) -> dict:
     """
-    Get bowling order with aggregated overall and phase-wise statistics
-    Supports both team-based and custom player list queries
+    Get bowling order with aggregated overall and phase-wise statistics.
+    Uses hybrid approach - checks both deliveries (legacy) and delivery_details (new) tables.
     """
     try:
         logger.info(f"Starting bowling order service for team: {team_name}, players: {players}")
-        logger.info(f"Date range: {start_date} to {end_date}")
         
         if players:
-            # Custom player list mode
             player_filter = "bs.bowler = ANY(:players)"
             filter_params = {"players": players}
-            logger.info(f"Using custom players: {players}")
         else:
-            # Team-based mode
             team_variations = get_all_team_name_variations(team_name)
             player_filter = "bs.bowling_team = ANY(:team_variations)"
             filter_params = {"team_variations": team_variations}
-            logger.info(f"Using team variations: {team_variations}")
         
-        # Add date parameters
         filter_params.update({
             "start_date": start_date,
             "end_date": end_date
         })
         
-        logger.info(f"Filter params: {filter_params}")
-        
-        # Complete query with over combinations - fixed type casting
+        # Hybrid query using both deliveries and delivery_details tables
         bowling_order_query = text(f"""
-            WITH player_over_combinations AS (
-                -- Find most frequent over combination for each player
-                WITH bowler_overs AS (
-                    SELECT 
-                        d.bowler,
-                        d.match_id,
-                        d.innings,
-                        d.over,
-                        COUNT(CASE WHEN COALESCE(d.wides, 0) = 0 AND COALESCE(d.noballs, 0) = 0 THEN 1 END) as legal_balls
-                    FROM deliveries d
-                    JOIN matches m ON d.match_id = m.id
-                    WHERE d.bowler IS NOT NULL
-                    AND (:start_date IS NULL OR m.date >= :start_date)
-                    AND (:end_date IS NULL OR m.date <= :end_date)
-                    GROUP BY d.bowler, d.match_id, d.innings, d.over
-                    HAVING COUNT(CASE WHEN COALESCE(d.wides, 0) = 0 AND COALESCE(d.noballs, 0) = 0 THEN 1 END) >= 3
-                ),
-                innings_overs AS (
-                    SELECT 
-                        bowler,
-                        match_id,
-                        innings,
-                        ARRAY_AGG(over ORDER BY over) as overs_bowled,
-                        COUNT(*) as num_overs
-                    FROM bowler_overs
-                    GROUP BY bowler, match_id, innings
-                    HAVING COUNT(*) >= 2  -- At least 2 overs in an innings
-                ),
-                over_combinations AS (
-                    SELECT 
-                        bowler,
-                        overs_bowled,
-                        COUNT(*) as frequency
-                    FROM innings_overs
-                    GROUP BY bowler, overs_bowled
-                ),
-                top_combinations AS (
-                    SELECT 
-                        bowler,
-                        overs_bowled,
-                        frequency,
-                        ROW_NUMBER() OVER (PARTITION BY bowler ORDER BY frequency DESC, overs_bowled) as combo_rank
-                    FROM over_combinations
-                )
+            WITH 
+            -- Over combinations from LEGACY deliveries table
+            legacy_bowler_overs AS (
+                SELECT 
+                    d.bowler,
+                    d.match_id,
+                    d.innings,
+                    d.over,
+                    COUNT(CASE WHEN COALESCE(d.wides, 0) = 0 AND COALESCE(d.noballs, 0) = 0 THEN 1 END) as legal_balls
+                FROM deliveries d
+                JOIN matches m ON d.match_id = m.id
+                WHERE d.bowler IS NOT NULL
+                AND (:start_date IS NULL OR m.date >= :start_date)
+                AND (:end_date IS NULL OR m.date <= :end_date)
+                GROUP BY d.bowler, d.match_id, d.innings, d.over
+                HAVING COUNT(CASE WHEN COALESCE(d.wides, 0) = 0 AND COALESCE(d.noballs, 0) = 0 THEN 1 END) >= 3
+            ),
+            -- Over combinations from NEW delivery_details table
+            dd_bowler_overs AS (
+                SELECT 
+                    dd.bowl as bowler,
+                    dd.p_match as match_id,
+                    dd.inns as innings,
+                    dd.over,
+                    COUNT(CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 END) as legal_balls
+                FROM delivery_details dd
+                JOIN matches m ON dd.p_match = m.id
+                WHERE dd.bowl IS NOT NULL
+                AND dd.p_match IS NOT NULL
+                AND (:start_date IS NULL OR m.date >= :start_date)
+                AND (:end_date IS NULL OR m.date <= :end_date)
+                GROUP BY dd.bowl, dd.p_match, dd.inns, dd.over
+                HAVING COUNT(CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 END) >= 3
+            ),
+            -- Combined bowler overs (UNION removes duplicates)
+            combined_bowler_overs AS (
+                SELECT * FROM legacy_bowler_overs
+                UNION
+                SELECT * FROM dd_bowler_overs
+            ),
+            innings_overs AS (
+                SELECT 
+                    bowler,
+                    match_id,
+                    innings,
+                    ARRAY_AGG(over ORDER BY over) as overs_bowled,
+                    COUNT(*) as num_overs
+                FROM combined_bowler_overs
+                GROUP BY bowler, match_id, innings
+                HAVING COUNT(*) >= 2
+            ),
+            over_combinations AS (
+                SELECT 
+                    bowler,
+                    overs_bowled,
+                    COUNT(*) as frequency
+                FROM innings_overs
+                GROUP BY bowler, overs_bowled
+            ),
+            top_combinations AS (
+                SELECT 
+                    bowler,
+                    overs_bowled,
+                    frequency,
+                    ROW_NUMBER() OVER (PARTITION BY bowler ORDER BY frequency DESC, overs_bowled) as combo_rank
+                FROM over_combinations
+            ),
+            player_over_combinations AS (
                 SELECT 
                     bowler,
                     overs_bowled as most_frequent_overs,
@@ -99,12 +114,9 @@ def get_team_bowling_order_service(
                 WHERE combo_rank = 1
             ),
             player_aggregates AS (
-                -- Aggregate all stats for each player
                 SELECT 
                     bs.bowler,
                     COUNT(DISTINCT bs.match_id) as total_innings,
-                    
-                    -- Overall stats (convert overs to balls) - ensure proper casting
                     COALESCE(SUM(CAST(bs.overs AS NUMERIC) * 6), 0) as total_balls,
                     COALESCE(SUM(bs.runs_conceded), 0) as total_runs,
                     COALESCE(SUM(bs.wickets), 0) as total_wickets,
@@ -112,7 +124,6 @@ def get_team_bowling_order_service(
                     COALESCE(SUM(bs.fours_conceded), 0) as total_fours,
                     COALESCE(SUM(bs.sixes_conceded), 0) as total_sixes,
                     
-                    -- Phase-wise stats (convert overs to balls, handle NULLs)
                     COALESCE(SUM(CAST(COALESCE(bs.pp_overs, 0) AS NUMERIC) * 6), 0) as pp_balls,
                     COALESCE(SUM(COALESCE(bs.pp_runs, 0)), 0) as pp_runs,
                     COALESCE(SUM(COALESCE(bs.pp_wickets, 0)), 0) as pp_wickets,
@@ -144,7 +155,6 @@ def get_team_bowling_order_service(
                 COALESCE(poc.over_combination_frequency, 0) as over_combination_frequency,
                 pa.total_innings,
                 
-                -- Overall calculated metrics - fixed type casting
                 pa.total_balls,
                 pa.total_runs,
                 pa.total_wickets,
@@ -157,36 +167,21 @@ def get_team_bowling_order_service(
                 CASE WHEN pa.total_balls > 0 THEN ROUND((CAST(pa.total_fours AS NUMERIC) + CAST(pa.total_sixes AS NUMERIC)) * 100 / CAST(pa.total_balls AS NUMERIC), 2) ELSE 0 END as overall_boundary_percentage,
                 CASE WHEN pa.total_balls > 0 THEN ROUND(CAST(pa.total_dots AS NUMERIC) * 100 / CAST(pa.total_balls AS NUMERIC), 2) ELSE 0 END as overall_dot_percentage,
                 
-                -- Powerplay calculated metrics
-                pa.pp_balls,
-                pa.pp_runs,
-                pa.pp_wickets,
-                pa.pp_dots,
-                pa.pp_boundaries,
+                pa.pp_balls, pa.pp_runs, pa.pp_wickets, pa.pp_dots, pa.pp_boundaries,
                 CASE WHEN pa.pp_wickets > 0 THEN ROUND(CAST(pa.pp_runs AS NUMERIC) / CAST(pa.pp_wickets AS NUMERIC), 2) ELSE NULL END as pp_average,
                 CASE WHEN pa.pp_wickets > 0 THEN ROUND(CAST(pa.pp_balls AS NUMERIC) / CAST(pa.pp_wickets AS NUMERIC), 2) ELSE NULL END as pp_strike_rate,
                 CASE WHEN pa.pp_balls > 0 THEN ROUND(CAST(pa.pp_runs AS NUMERIC) * 6 / CAST(pa.pp_balls AS NUMERIC), 2) ELSE 0 END as pp_economy,
                 CASE WHEN pa.pp_balls > 0 THEN ROUND(CAST(pa.pp_boundaries AS NUMERIC) * 100 / CAST(pa.pp_balls AS NUMERIC), 2) ELSE 0 END as pp_boundary_percentage,
                 CASE WHEN pa.pp_balls > 0 THEN ROUND(CAST(pa.pp_dots AS NUMERIC) * 100 / CAST(pa.pp_balls AS NUMERIC), 2) ELSE 0 END as pp_dot_percentage,
                 
-                -- Middle overs calculated metrics
-                pa.middle_balls,
-                pa.middle_runs,
-                pa.middle_wickets,
-                pa.middle_dots,
-                pa.middle_boundaries,
+                pa.middle_balls, pa.middle_runs, pa.middle_wickets, pa.middle_dots, pa.middle_boundaries,
                 CASE WHEN pa.middle_wickets > 0 THEN ROUND(CAST(pa.middle_runs AS NUMERIC) / CAST(pa.middle_wickets AS NUMERIC), 2) ELSE NULL END as middle_average,
                 CASE WHEN pa.middle_wickets > 0 THEN ROUND(CAST(pa.middle_balls AS NUMERIC) / CAST(pa.middle_wickets AS NUMERIC), 2) ELSE NULL END as middle_strike_rate,
                 CASE WHEN pa.middle_balls > 0 THEN ROUND(CAST(pa.middle_runs AS NUMERIC) * 6 / CAST(pa.middle_balls AS NUMERIC), 2) ELSE 0 END as middle_economy,
                 CASE WHEN pa.middle_balls > 0 THEN ROUND(CAST(pa.middle_boundaries AS NUMERIC) * 100 / CAST(pa.middle_balls AS NUMERIC), 2) ELSE 0 END as middle_boundary_percentage,
                 CASE WHEN pa.middle_balls > 0 THEN ROUND(CAST(pa.middle_dots AS NUMERIC) * 100 / CAST(pa.middle_balls AS NUMERIC), 2) ELSE 0 END as middle_dot_percentage,
                 
-                -- Death overs calculated metrics
-                pa.death_balls,
-                pa.death_runs,
-                pa.death_wickets,
-                pa.death_dots,
-                pa.death_boundaries,
+                pa.death_balls, pa.death_runs, pa.death_wickets, pa.death_dots, pa.death_boundaries,
                 CASE WHEN pa.death_wickets > 0 THEN ROUND(CAST(pa.death_runs AS NUMERIC) / CAST(pa.death_wickets AS NUMERIC), 2) ELSE NULL END as death_average,
                 CASE WHEN pa.death_wickets > 0 THEN ROUND(CAST(pa.death_balls AS NUMERIC) / CAST(pa.death_wickets AS NUMERIC), 2) ELSE NULL END as death_strike_rate,
                 CASE WHEN pa.death_balls > 0 THEN ROUND(CAST(pa.death_runs AS NUMERIC) * 6 / CAST(pa.death_balls AS NUMERIC), 2) ELSE 0 END as death_economy,
@@ -195,7 +190,7 @@ def get_team_bowling_order_service(
                 
             FROM player_aggregates pa
             LEFT JOIN player_over_combinations poc ON pa.bowler = poc.bowler
-            WHERE pa.total_balls > 0  -- Only include players who have bowled
+            WHERE pa.total_balls > 0
             ORDER BY pa.total_wickets DESC, pa.total_runs ASC
         """)
         
@@ -205,7 +200,6 @@ def get_team_bowling_order_service(
         
         bowling_order = []
         for row in results:
-            # Format over combination for display
             over_combination_display = "N/A"
             if row.most_frequent_overs and len(row.most_frequent_overs) > 0:
                 over_combination_display = f"[{', '.join(map(str, row.most_frequent_overs))}]"
@@ -258,7 +252,7 @@ def get_team_bowling_order_service(
             }
             bowling_order.append(player_data)
         
-        result = {
+        return {
             "team": team_name if not players else "Custom Players",
             "date_range": {
                 "start": start_date.isoformat() if start_date else None,
@@ -267,9 +261,6 @@ def get_team_bowling_order_service(
             "total_players": len(bowling_order),
             "bowling_order": bowling_order
         }
-        
-        logger.info(f"Successfully created bowling order response with {len(bowling_order)} players")
-        return result
         
     except Exception as e:
         logger.error(f"Error in get_team_bowling_order_service: {str(e)}", exc_info=True)
