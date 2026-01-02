@@ -359,3 +359,135 @@ def get_venue_match_stats(
 
     # No data found
     return None
+
+
+def get_match_scores_from_deliveries(
+    match_ids: List[str],
+    db: Session
+) -> Dict[str, Dict[int, str]]:
+    """
+    Get match scores (runs/wickets) from deliveries table.
+
+    Args:
+        match_ids: List of match IDs to get scores for
+        db: Database session
+
+    Returns:
+        Dict mapping match_id to innings scores:
+        {
+            'match_123': {1: '186/5', 2: '187/3'},
+            ...
+        }
+    """
+    if not match_ids:
+        return {}
+
+    query = text("""
+        SELECT
+            match_id,
+            innings,
+            CONCAT(
+                COALESCE(SUM(runs_off_bat + extras), 0),
+                '/',
+                COALESCE(COUNT(CASE WHEN wicket_type IS NOT NULL THEN 1 END), 0)
+            ) as score
+        FROM deliveries
+        WHERE match_id = ANY(:match_ids)
+        GROUP BY match_id, innings
+        ORDER BY match_id, innings
+    """)
+
+    result = db.execute(query, {'match_ids': match_ids}).fetchall()
+
+    scores = {}
+    for row in result:
+        if row[0] not in scores:
+            scores[row[0]] = {}
+        scores[row[0]][row[1]] = row[2]
+
+    return scores
+
+
+def get_match_scores_from_delivery_details(
+    match_ids: List[str],
+    db: Session
+) -> Dict[str, Dict[int, str]]:
+    """
+    Get match scores (runs/wickets) from delivery_details table.
+
+    Args:
+        match_ids: List of match IDs to get scores for
+        db: Database session
+
+    Returns:
+        Dict mapping match_id to innings scores:
+        {
+            'match_123': {1: '186/5', 2: '187/3'},
+            ...
+        }
+    """
+    if not match_ids:
+        return {}
+
+    query = text("""
+        SELECT
+            p_match as match_id,
+            inns as innings,
+            CONCAT(
+                COALESCE(SUM(score), 0),
+                '/',
+                COALESCE(COUNT(CASE WHEN out = 'true' THEN 1 END), 0)
+            ) as score
+        FROM delivery_details
+        WHERE p_match = ANY(:match_ids)
+        GROUP BY p_match, inns
+        ORDER BY p_match, inns
+    """)
+
+    result = db.execute(query, {'match_ids': match_ids}).fetchall()
+
+    scores = {}
+    for row in result:
+        if row[0] not in scores:
+            scores[row[0]] = {}
+        scores[row[0]][row[1]] = row[2]
+
+    return scores
+
+
+def get_match_scores(
+    match_ids: List[str],
+    start_date: Optional[date],
+    end_date: Optional[date],
+    db: Session
+) -> Dict[str, Dict[int, str]]:
+    """
+    Get match scores with automatic dual-table routing.
+
+    Args:
+        match_ids: List of match IDs to get scores for
+        start_date: Optional date filter for routing decision
+        end_date: Optional date filter for routing decision
+        db: Database session
+
+    Returns:
+        Dict mapping match_id to innings scores
+    """
+    if not match_ids:
+        return {}
+
+    routing = should_use_delivery_details(start_date, end_date)
+
+    # Try delivery_details first for recent data
+    if routing['use_delivery_details']:
+        scores = get_match_scores_from_delivery_details(match_ids, db)
+        if scores:
+            return scores
+
+    # Fall back to deliveries
+    if routing['use_deliveries'] or not routing['use_delivery_details']:
+        scores = get_match_scores_from_deliveries(match_ids, db)
+        if scores:
+            return scores
+
+    return {}

@@ -34,7 +34,8 @@ from routers.recent_matches import router as recent_matches_router
 from routers.player_summary import router as player_summary_router
 from routers.wrapped import router as wrapped_router
 from routers.search import router as search_router
-from services.delivery_data_service import get_venue_match_stats
+from services.delivery_data_service import get_venue_match_stats, get_match_scores
+from services.bowler_types import BOWLER_CATEGORY_SQL
 import math
 
 from dotenv import load_dotenv
@@ -1140,227 +1141,6 @@ def get_match_history(
     db: Session = Depends(get_session)
 ):
     try:
-        base_query = """
-            WITH match_scores AS (
-                SELECT 
-                    m.id,
-                    m.date,
-                    m.team1,
-                    m.team2,
-                    m.winner,
-                    m.venue,
-                    m.won_batting_first,
-                    m.won_fielding_first,
-                    (
-                        SELECT CONCAT(
-                            COALESCE(SUM(d1.runs_off_bat + d1.extras), 0),
-                            '/',
-                            COALESCE(COUNT(CASE WHEN d1.wicket_type IS NOT NULL THEN 1 END), 0)
-                        )
-                        FROM deliveries d1
-                        WHERE d1.match_id = m.id AND d1.innings = 1
-                    ) as team1_score,
-                    (
-                        SELECT CONCAT(
-                            COALESCE(SUM(d2.runs_off_bat + d2.extras), 0),
-                            '/',
-                            COALESCE(COUNT(CASE WHEN d2.wicket_type IS NOT NULL THEN 1 END), 0)
-                        )
-                        FROM deliveries d2
-                        WHERE d2.match_id = m.id AND d2.innings = 2
-                    ) as team2_score
-                FROM matches m
-                WHERE (:start_date IS NULL OR m.date >= :start_date)
-                AND (:end_date IS NULL OR m.date <= :end_date)
-                {where_clause}
-                ORDER BY m.date DESC
-                LIMIT {limit}
-            )
-            SELECT 
-                date,
-                team1,
-                team2,
-                team1_score,
-                team2_score,
-                winner,
-                venue,
-                won_batting_first,
-                won_fielding_first
-            FROM match_scores
-        """
-
-        # Venue matches
-        venue_results = db.execute(
-            text("""
-                WITH match_scores AS (
-                    SELECT 
-                        m.id,
-                        m.date,
-                        m.team1,
-                        m.team2,
-                        m.winner,
-                        m.venue,
-                        m.won_batting_first,
-                        m.won_fielding_first,
-                        (
-                            SELECT CONCAT(
-                                COALESCE(SUM(d1.runs_off_bat + d1.extras), 0),
-                                '/',
-                                COALESCE(COUNT(CASE WHEN d1.wicket_type IS NOT NULL THEN 1 END), 0)
-                            )
-                            FROM deliveries d1
-                            WHERE d1.match_id = m.id AND d1.innings = 1
-                        ) as team1_score,
-                        (
-                            SELECT CONCAT(
-                                COALESCE(SUM(d2.runs_off_bat + d2.extras), 0),
-                                '/',
-                                COALESCE(COUNT(CASE WHEN d2.wicket_type IS NOT NULL THEN 1 END), 0)
-                            )
-                            FROM deliveries d2
-                            WHERE d2.match_id = m.id AND d2.innings = 2
-                        ) as team2_score
-                    FROM matches m
-                    WHERE (:start_date IS NULL OR m.date >= :start_date)
-                    AND (:end_date IS NULL OR m.date <= :end_date)
-                    {where_clause}
-                    ORDER BY m.date DESC
-                    LIMIT {limit}
-                )
-                SELECT 
-                    date,
-                    team1,
-                    team2,
-                    team1_score,
-                    team2_score,
-                    winner,
-                    venue,
-                    won_batting_first,
-                    won_fielding_first
-                FROM match_scores
-            """.format(
-                    where_clause="AND m.venue = :venue",
-                    limit="7"
-                )),
-            {"venue": venue, "start_date": start_date, "end_date": end_date}
-        ).fetchall()
-
-        # Get all possible name variations for both teams
-        team1_names = get_all_team_name_variations(team1)
-        team2_names = get_all_team_name_variations(team2)
-
-        # Team 1 results
-        team1_results = db.execute(
-            text("""
-                WITH match_scores AS (
-                    SELECT 
-                        m.id,
-                        m.date,
-                        m.team1,
-                        m.team2,
-                        m.winner,
-                        m.venue,
-                        m.won_batting_first,
-                        m.won_fielding_first,
-                        (
-                            SELECT CONCAT(
-                                COALESCE(SUM(d1.runs_off_bat + d1.extras), 0),
-                                '/',
-                                COALESCE(COUNT(CASE WHEN d1.wicket_type IS NOT NULL THEN 1 END), 0)
-                            )
-                            FROM deliveries d1
-                            WHERE d1.match_id = m.id AND d1.innings = 1
-                        ) as team1_score,
-                        (
-                            SELECT CONCAT(
-                                COALESCE(SUM(d2.runs_off_bat + d2.extras), 0),
-                                '/',
-                                COALESCE(COUNT(CASE WHEN d2.wicket_type IS NOT NULL THEN 1 END), 0)
-                            )
-                            FROM deliveries d2
-                            WHERE d2.match_id = m.id AND d2.innings = 2
-                        ) as team2_score
-                    FROM matches m
-                    WHERE (:start_date IS NULL OR m.date >= :start_date)
-                    AND (:end_date IS NULL OR m.date <= :end_date)
-                    {where_clause}
-                    ORDER BY m.date DESC
-                    LIMIT {limit}
-                )
-                SELECT 
-                    date,
-                    team1,
-                    team2,
-                    team1_score,
-                    team2_score,
-                    winner,
-                    venue,
-                    won_batting_first,
-                    won_fielding_first
-                FROM match_scores
-            """.format(
-                    where_clause="AND (m.team1 = ANY(:team1_names) OR m.team2 = ANY(:team1_names))",
-                    limit="5"
-                )),
-            {"team1_names": team1_names, "start_date": start_date, "end_date": end_date}
-        ).fetchall()
-
-        # Team 2 results
-        team2_results = db.execute(
-            text("""
-            WITH match_scores AS (
-                SELECT 
-                    m.id,
-                    m.date,
-                    m.team1,
-                    m.team2,
-                    m.winner,
-                    m.venue,
-                    m.won_batting_first,
-                    m.won_fielding_first,
-                    (
-                        SELECT CONCAT(
-                            COALESCE(SUM(d1.runs_off_bat + d1.extras), 0),
-                            '/',
-                            COALESCE(COUNT(CASE WHEN d1.wicket_type IS NOT NULL THEN 1 END), 0)
-                        )
-                        FROM deliveries d1
-                        WHERE d1.match_id = m.id AND d1.innings = 1
-                    ) as team1_score,
-                    (
-                        SELECT CONCAT(
-                            COALESCE(SUM(d2.runs_off_bat + d2.extras), 0),
-                            '/',
-                            COALESCE(COUNT(CASE WHEN d2.wicket_type IS NOT NULL THEN 1 END), 0)
-                        )
-                        FROM deliveries d2
-                        WHERE d2.match_id = m.id AND d2.innings = 2
-                    ) as team2_score
-                FROM matches m
-                WHERE (:start_date IS NULL OR m.date >= :start_date)
-                AND (:end_date IS NULL OR m.date <= :end_date)
-                {where_clause}
-                ORDER BY m.date DESC
-                LIMIT {limit}
-            )
-            SELECT 
-                date,
-                team1,
-                team2,
-                team1_score,
-                team2_score,
-                winner,
-                venue,
-                won_batting_first,
-                won_fielding_first
-            FROM match_scores
-        """.format(
-                where_clause="AND (m.team1 = ANY(:team2_names) OR m.team2 = ANY(:team2_names))",
-                limit="5"
-            )),
-            {"team2_names": team2_names, "start_date": start_date, "end_date": end_date}
-        ).fetchall()
-
         # Get all possible name variations for both teams
         team1_names = get_all_team_name_variations(team1)
         team2_names = get_all_team_name_variations(team2)
@@ -1368,71 +1148,83 @@ def get_match_history(
         # Log team names for debugging
         logging.info(f"Searching for matches between: {team1_names} and {team2_names}")
 
-        # Head to head matches
-        h2h_matches = db.execute(
+        # Get venue matches (simplified - just get match metadata)
+        venue_matches = db.execute(
             text("""
-            WITH match_scores AS (
-                SELECT 
-                    m.id,
-                    m.date,
-                    m.team1,
-                    m.team2,
-                    m.winner,
-                    m.venue,
-                    m.won_batting_first,
-                    m.won_fielding_first,
-                    (
-                        SELECT CONCAT(
-                            COALESCE(SUM(d1.runs_off_bat + d1.extras), 0),
-                            '/',
-                            COALESCE(COUNT(CASE WHEN d1.wicket_type IS NOT NULL THEN 1 END), 0)
-                        )
-                        FROM deliveries d1
-                        WHERE d1.match_id = m.id AND d1.innings = 1
-                    ) as team1_score,
-                    (
-                        SELECT CONCAT(
-                            COALESCE(SUM(d2.runs_off_bat + d2.extras), 0),
-                            '/',
-                            COALESCE(COUNT(CASE WHEN d2.wicket_type IS NOT NULL THEN 1 END), 0)
-                        )
-                        FROM deliveries d2
-                        WHERE d2.match_id = m.id AND d2.innings = 2
-                    ) as team2_score
+                SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
                 FROM matches m
                 WHERE (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
-                {where_clause}
+                AND m.venue = :venue
                 ORDER BY m.date DESC
-                LIMIT {limit}
-            )
-            SELECT 
-                date,
-                team1,
-                team2,
-                team1_score,
-                team2_score,
-                winner,
-                venue,
-                won_batting_first,
-                won_fielding_first
-            FROM match_scores
-        """.format(
-                where_clause="AND ((m.team1 = ANY(:team1_names) AND m.team2 = ANY(:team2_names)) OR (m.team1 = ANY(:team2_names) AND m.team2 = ANY(:team1_names)))",
-                limit="5"
-            )),
+                LIMIT 7
+            """),
+            {"venue": venue, "start_date": start_date, "end_date": end_date}
+        ).fetchall()
+
+        # Get team1 matches
+        team1_matches = db.execute(
+            text("""
+                SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
+                FROM matches m
+                WHERE (:start_date IS NULL OR m.date >= :start_date)
+                AND (:end_date IS NULL OR m.date <= :end_date)
+                AND (m.team1 = ANY(:team1_names) OR m.team2 = ANY(:team1_names))
+                ORDER BY m.date DESC
+                LIMIT 5
+            """),
+            {"team1_names": team1_names, "start_date": start_date, "end_date": end_date}
+        ).fetchall()
+
+        # Get team2 matches
+        team2_matches = db.execute(
+            text("""
+                SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
+                FROM matches m
+                WHERE (:start_date IS NULL OR m.date >= :start_date)
+                AND (:end_date IS NULL OR m.date <= :end_date)
+                AND (m.team1 = ANY(:team2_names) OR m.team2 = ANY(:team2_names))
+                ORDER BY m.date DESC
+                LIMIT 5
+            """),
+            {"team2_names": team2_names, "start_date": start_date, "end_date": end_date}
+        ).fetchall()
+
+        # Get head-to-head matches
+        h2h_matches = db.execute(
+            text("""
+                SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
+                FROM matches m
+                WHERE (:start_date IS NULL OR m.date >= :start_date)
+                AND (:end_date IS NULL OR m.date <= :end_date)
+                AND ((m.team1 = ANY(:team1_names) AND m.team2 = ANY(:team2_names))
+                     OR (m.team1 = ANY(:team2_names) AND m.team2 = ANY(:team1_names)))
+                ORDER BY m.date DESC
+                LIMIT 5
+            """),
             {"team1_names": team1_names, "team2_names": team2_names, "start_date": start_date, "end_date": end_date}
         ).fetchall()
 
+        # Get scores for all matches using the dual-table service
+        all_match_ids = list(set(
+            [m.id for m in venue_matches] +
+            [m.id for m in team1_matches] +
+            [m.id for m in team2_matches] +
+            [m.id for m in h2h_matches]
+        ))
+
+        scores = get_match_scores(all_match_ids, start_date, end_date, db)
+
         def format_match(match):
+            match_scores = scores.get(match.id, {})
             return {
                 "date": match.date.isoformat(),
                 "team1": teams_mapping.get(match.team1, match.team1),
                 "team2": teams_mapping.get(match.team2, match.team2),
-                "score1": match.team1_score,
-                "score2": match.team2_score,
+                "score1": match_scores.get(1, "0/0"),
+                "score2": match_scores.get(2, "0/0"),
                 "venue": match.venue,
-                "winner": teams_mapping.get(match.winner, match.winner) if match.winner else None,
+                "winner": teams_mapping.get(match.winner, match.winner) if match.winner else "-",
                 "won_batting_first": match.won_batting_first
             }
 
@@ -1444,9 +1236,9 @@ def get_match_history(
         }
 
         return {
-            "venue_results": [format_match(m) for m in venue_results],
-            "team1_results": [format_match(m) for m in team1_results],
-            "team2_results": [format_match(m) for m in team2_results],
+            "venue_results": [format_match(m) for m in venue_matches],
+            "team1_results": [format_match(m) for m in team1_matches],
+            "team2_results": [format_match(m) for m in team2_matches],
             "h2h_stats": h2h_stats
         }
 
@@ -1709,15 +1501,12 @@ async def get_venue_bowling_stats(
             }
             return column_indices.get(column_name, 0)  # Default to 0 if not found
 
-        base_query = """
+        base_query = f"""
         WITH BowlerTypes AS (
-            SELECT 
+            SELECT
                 p.name,
                 p.bowler_type,
-                CASE 
-                    WHEN p.bowler_type IN ('RF', 'RM', 'RS', 'LF', 'LM', 'LS') THEN 'pace'
-                    WHEN p.bowler_type IN ('RO', 'RL', 'LO', 'LC') THEN 'spin'
-                END as bowling_category
+                {BOWLER_CATEGORY_SQL} as bowling_category
             FROM players p
             WHERE p.bowler_type IS NOT NULL
         ),

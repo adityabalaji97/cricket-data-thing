@@ -67,15 +67,51 @@ def should_use_delivery_details(start_date, end_date):
 }
 ```
 
+### Test Case 2: Match Scores (2025-12-27)
+
+**Before Fix:**
+```json
+{
+  "score1": "0/0",
+  "score2": "0/0"
+}
+```
+
+**After Fix:**
+```json
+{
+  "score1": "186/4",
+  "score2": "30/4"
+}
+```
+
+## Bowler Types Service
+
+### Created: `services/bowler_types.py`
+
+A comprehensive bowling style categorization service that:
+- Maps all 44 unique bowling types/styles to pace/spin/unknown
+- Based on analysis of both `players.bowler_type` and `delivery_details.bowl_style`
+- Provides SQL CASE statements for use in queries
+- Handles combo types (e.g., 'RFM/OB' = pace bowler who also bowls spin)
+
+**Coverage:**
+- **Pace types**: 29 variations (RF, RM, RMF, LF, LM, etc.)
+- **Spin types**: 15 variations (OB, LB, SLA, LWS, etc.)
+- **Unknown**: 3 types (-, NaN, unknown)
+
+**Fixed Issue:** Off-break (OB) bowlers were previously uncategorized, now correctly classified as spin.
+
 ## Remaining Work
 
-### Endpoints Still Need Updating:
+### Endpoints Status:
 
-1. ❌ `/venue-bowling-stats` - Still queries `deliveries` only
-2. ❌ `/venues/{venue}/teams/{team1}/{team2}/history` - Still queries `deliveries` only
-3. ❌ `/teams/{team1}/{team2}/matchups` - Needs dual-table support
+1. ✅ `/venue_notes` - **FIXED** - Uses dual-table service for venue statistics
+2. ✅ `/venue-bowling-stats` - **FIXED** - Uses comprehensive bowler types service
+3. ✅ `/venues/{venue}/teams/{team1}/{team2}/history` - **FIXED** - Uses dual-table service for match scores
+4. ❓ `/teams/{team1}/{team2}/matchups` - **TO BE CHECKED** - May already use `batting_stats`/`bowling_stats` which are populated
 
-These endpoints will continue to return empty/zero values for recent matches until updated.
+All critical endpoints now support recent match data from `delivery_details` table!
 
 ### Phase-Wise Stats
 
@@ -93,8 +129,12 @@ The `player_aliases` table (3,625 mappings) is already used by search and query 
 
 ## Files Modified
 
-1. **Created:** `services/delivery_data_service.py` - Dual-table routing service
-2. **Modified:** `main.py` - Updated `/venue_notes` endpoint to use new service
+1. **Created:** `services/delivery_data_service.py` - Dual-table routing service with match scores support
+2. **Created:** `services/bowler_types.py` - Comprehensive bowling style categorization (44 types)
+3. **Modified:** `main.py` - Updated 3 endpoints:
+   - `/venue_notes` - Uses `get_venue_match_stats()`
+   - `/venue-bowling-stats` - Uses `BOWLER_CATEGORY_SQL`
+   - `/venues/{venue}/teams/{team1}/{team2}/history` - Uses `get_match_scores()`
 
 ## Next Steps
 
