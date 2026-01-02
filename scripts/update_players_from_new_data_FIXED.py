@@ -1,12 +1,14 @@
 """
 Update players table with bat_hand/bowl_style from delivery_details.
 
+FIXED VERSION: Adds last name validation to prevent incorrect alias mappings.
+
 Usage:
-    python scripts/update_players_from_new_data.py --db-url "postgres://..." --dry-run
-    python scripts/update_players_from_new_data.py --db-url "postgres://..."
-    
+    python scripts/update_players_from_new_data_FIXED.py --db-url "postgres://..." --dry-run
+    python scripts/update_players_from_new_data_FIXED.py --db-url "postgres://..."
+
     # Using environment variable:
-    DATABASE_URL="postgres://..." python scripts/update_players_from_new_data.py
+    DATABASE_URL="postgres://..." python scripts/update_players_from_new_data_FIXED.py
 """
 
 import os
@@ -22,6 +24,34 @@ def get_engine(db_url):
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
     return create_engine(db_url)
+
+
+def get_last_name(full_name):
+    """Extract last name from a player name."""
+    if not full_name:
+        return ""
+    parts = full_name.strip().split()
+    return parts[-1] if parts else ""
+
+
+def is_valid_alias(existing_name, new_name):
+    """
+    Check if new_name is a valid alias for existing_name.
+
+    Returns True only if last names match.
+    This prevents cross-linking completely different players like:
+    - "N Wadhera" → "Tilak Varma" (Wadhera ≠ Varma)
+    - "FH Allen" → "Avishka Fernando" (Allen ≠ Fernando)
+    """
+    existing_last = get_last_name(existing_name)
+    new_last = get_last_name(new_name)
+
+    # Both must have a last name
+    if not existing_last or not new_last:
+        return False
+
+    # Last names must match
+    return existing_last == new_last
 
 
 def create_aliases_table(engine):
@@ -40,38 +70,11 @@ def create_aliases_table(engine):
     print("✓ player_aliases table ready")
 
 
-def get_last_name(full_name):
-    """Extract last name from a player name."""
-    if not full_name:
-        return ""
-    parts = full_name.strip().split()
-    return parts[-1] if parts else ""
-
-
-def is_valid_alias(existing_name, new_name):
-    """
-    Check if new_name is a valid alias for existing_name.
-
-    Returns True only if last names match.
-    This prevents cross-linking completely different players due to
-    data mismatches between deliveries and delivery_details tables.
-    """
-    existing_last = get_last_name(existing_name)
-    new_last = get_last_name(new_name)
-
-    # Both must have a last name
-    if not existing_last or not new_last:
-        return False
-
-    # Last names must match
-    return existing_last == new_last
-
-
 def build_player_mapping(engine):
     """
     Join deliveries with delivery_details to map player names and get bat_hand/bowl_style.
 
-    FIXED: Adds last name validation to prevent incorrect aliases from data mismatches.
+    FIXED: Adds last name validation to prevent incorrect aliases.
     """
     print("\nBuilding player mapping from DB...")
 
@@ -149,57 +152,57 @@ def build_player_mapping(engine):
 
 def update_players(engine, batters, bowlers, dry_run=False):
     """Update players table."""
-    
+
     print("\n" + "="*60)
     print("UPDATING PLAYERS TABLE")
     print("="*60)
-    
+
     updates = []
-    
+
     all_players = set(batters.keys()) | set(bowlers.keys())
-    
+
     for name in all_players:
         update = {'name': name, 'aliases': set()}
-        
+
         if name in batters:
             update['aliases'] |= batters[name]['aliases']
             hands = batters[name]['bat_hands']
             if hands:
                 update['batter_type'] = list(hands)[0]
-        
+
         if name in bowlers:
             update['aliases'] |= bowlers[name]['aliases']
             styles = bowlers[name]['bowl_styles']
             if styles:
                 update['bowler_type'] = list(styles)[0]
-        
+
         updates.append(update)
-    
+
     print(f"Prepared {len(updates):,} player updates")
-    
+
     if dry_run:
         print("\n[DRY RUN] Sample updates:")
         for u in updates[:15]:
             print(f"  {u['name']}: bat={u.get('batter_type')}, bowl={u.get('bowler_type')}, aliases={list(u['aliases'])[:2]}")
         return
-    
+
     updated = 0
     aliases_added = 0
-    
+
     with engine.begin() as conn:
         for u in updates:
             if u.get('batter_type'):
                 conn.execute(text(
                     "UPDATE players SET batter_type = :bt WHERE name = :name"
                 ), {'bt': u['batter_type'], 'name': u['name']})
-            
+
             if u.get('bowler_type'):
                 conn.execute(text(
                     "UPDATE players SET bowler_type = :bs WHERE name = :name"
                 ), {'bs': u['bowler_type'], 'name': u['name']})
-            
+
             updated += 1
-            
+
             for alias in u['aliases']:
                 if alias != u['name']:
                     conn.execute(text("""
@@ -208,10 +211,10 @@ def update_players(engine, batters, bowlers, dry_run=False):
                         ON CONFLICT (player_name, alias_name) DO NOTHING
                     """), {'pn': u['name'], 'an': alias})
                     aliases_added += 1
-            
+
             if updated % 500 == 0:
                 print(f"  Updated {updated:,}...", end='\r')
-    
+
     print(f"\n✓ Updated {updated:,} players, added {aliases_added:,} aliases")
 
 
@@ -220,27 +223,37 @@ def print_summary(engine):
     print("\n" + "="*60)
     print("SUMMARY")
     print("="*60)
-    
+
     with engine.connect() as conn:
         r = conn.execute(text("SELECT COUNT(*) FROM players WHERE batter_type IS NOT NULL"))
         print(f"Players with batter_type: {r.scalar():,}")
-        
+
         r = conn.execute(text("SELECT COUNT(*) FROM players WHERE bowler_type IS NOT NULL"))
         print(f"Players with bowler_type: {r.scalar():,}")
-        
+
         r = conn.execute(text("SELECT COUNT(*) FROM player_aliases"))
         print(f"Total aliases: {r.scalar():,}")
-        
+
+        # Check for problematic aliases
         r = conn.execute(text("""
-            SELECT batter_type, COUNT(*) FROM players 
+            SELECT COUNT(DISTINCT alias_name)
+            FROM player_aliases
+            GROUP BY alias_name
+            HAVING COUNT(DISTINCT player_name) > 1
+        """))
+        problematic = len(list(r))
+        print(f"Aliases pointing to multiple players: {problematic}")
+
+        r = conn.execute(text("""
+            SELECT batter_type, COUNT(*) FROM players
             WHERE batter_type IS NOT NULL GROUP BY batter_type
         """))
         print("\nBatter types:")
         for row in r:
             print(f"  {row[0]}: {row[1]:,}")
-        
+
         r = conn.execute(text("""
-            SELECT bowler_type, COUNT(*) FROM players 
+            SELECT bowler_type, COUNT(*) FROM players
             WHERE bowler_type IS NOT NULL GROUP BY bowler_type ORDER BY COUNT(*) DESC LIMIT 10
         """))
         print("\nBowler types (top 10):")
@@ -249,28 +262,30 @@ def print_summary(engine):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Update players with bat_hand/bowl_style from delivery_details')
+    parser = argparse.ArgumentParser(description='Update players with bat_hand/bowl_style from delivery_details (FIXED VERSION)')
     parser.add_argument('--db-url', help='Database URL (or set DATABASE_URL env var)')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be updated without making changes')
     args = parser.parse_args()
-    
+
     # Get database URL
     db_url = args.db_url or os.environ.get('DATABASE_URL')
     if not db_url:
         print("ERROR: Database URL required. Use --db-url or set DATABASE_URL environment variable.")
         sys.exit(1)
-    
+
     engine = get_engine(db_url)
     db_display = db_url.split('@')[1] if '@' in db_url else 'localhost'
     print(f"Connecting to: {db_display}")
-    
+
     if args.dry_run:
         print("\n*** DRY RUN MODE ***")
-    
+
+    print("\n🔧 FIXED VERSION: Last name validation enabled")
+
     create_aliases_table(engine)
     batters, bowlers = build_player_mapping(engine)
     update_players(engine, batters, bowlers, dry_run=args.dry_run)
-    
+
     if not args.dry_run:
         print_summary(engine)
 

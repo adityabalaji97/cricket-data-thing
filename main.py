@@ -34,6 +34,7 @@ from routers.recent_matches import router as recent_matches_router
 from routers.player_summary import router as player_summary_router
 from routers.wrapped import router as wrapped_router
 from routers.search import router as search_router
+from services.delivery_data_service import get_venue_match_stats
 import math
 
 from dotenv import load_dotenv
@@ -370,7 +371,7 @@ def get_venue_notes(
     venue: str,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    leagues: List[str] = Query(default=[]),  # Change default to empty list
+    leagues: List[str] = Query(default=[]),
     include_international: bool = Query(default=False),
     top_teams: Optional[int] = Query(default=None),
     db: Session = Depends(get_session)
@@ -384,202 +385,19 @@ def get_venue_notes(
         logging.info(f"Include international: {include_international}")
         logging.info(f"Top teams: {top_teams}")
 
-        competition_conditions = []
-        params = {
-            "venue": venue if venue != "All Venues" else None,
-            "start_date": start_date,
-            "end_date": end_date,
-            "leagues": leagues
-        }
-        
-        # Handle league matches with enhanced matching
-        if leagues and len(leagues) > 0:
-            # Expand league abbreviations to include full names and variations
-            expanded_leagues = expand_league_abbreviations(leagues)
-            params["leagues"] = expanded_leagues
-            logging.info(f"Expanded leagues: {leagues} -> {expanded_leagues}")
-            
-            # Create flexible ILIKE conditions for partial matching
-            league_conditions = []
-            for i, league in enumerate(expanded_leagues):
-                param_name = f"league_{i}"
-                params[param_name] = f"%{league}%"
-                league_conditions.append(f"m.competition ILIKE :{param_name}")
-            
-            # Also add exact matches
-            exact_conditions = "m.competition = ANY(:leagues)"
-            all_league_conditions = " OR ".join(league_conditions + [exact_conditions])
-            
-            competition_conditions.append(f"""
-                (m.match_type = 'league' AND ({all_league_conditions}))
-            """)
-        
-        # Handle international matches with top teams
-        if include_international:
-            if top_teams:
-                top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
-                params["top_team_list"] = top_team_list
-                competition_conditions.append("""
-                    (m.match_type = 'international' 
-                     AND (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list)))
-                """)
-            else:
-                competition_conditions.append("(m.match_type = 'international')")
-        
-        # Combine conditions
-        if competition_conditions:
-            competition_filter = "AND (" + " OR ".join(competition_conditions) + ")"
-        else:
-            competition_filter = "AND false"
+        # Expand league abbreviations
+        expanded_leagues = expand_league_abbreviations(leagues) if leagues else []
 
-        logging.info(f"Competition filter: {competition_filter}")
-        logging.info(f"Params: {params}")
-
-        # Add some debug logging
-        logging.info(f"Final competition filter: {competition_filter}")
-        logging.info(f"Final params: {params}")
-
-        # Get basic match stats
-        matches_query = """
-            WITH match_totals AS (
-                SELECT 
-                    m.id,
-                    m.won_batting_first,
-                    m.won_fielding_first,
-                    d.innings,
-                    SUM(d.runs_off_bat + d.extras) as total_runs
-                FROM matches m
-                JOIN deliveries d ON m.id = d.match_id
-                WHERE 1=1
-                    {venue_filter}
-                    AND (:start_date IS NULL OR m.date >= :start_date)
-                    AND (:end_date IS NULL OR m.date <= :end_date)
-                    {competition_filter}
-                GROUP BY m.id, m.won_batting_first, m.won_fielding_first, d.innings
-            ),
-            filtered_matches AS (
-                SELECT *
-                FROM matches m
-                WHERE 1=1
-                    {venue_filter}
-                    AND (:start_date IS NULL OR m.date >= :start_date)
-                    AND (:end_date IS NULL OR m.date <= :end_date)
-                    {competition_filter}
-            )
-            SELECT
-                COUNT(DISTINCT fm.id) as total_matches,
-                SUM(CASE WHEN fm.won_batting_first THEN 1 ELSE 0 END) as batting_first_wins,
-                SUM(CASE WHEN fm.won_fielding_first THEN 1 ELSE 0 END) as batting_second_wins,
-                MAX(CASE WHEN mt.innings = 1 THEN mt.total_runs END) as highest_total,
-                MIN(CASE WHEN mt.innings = 1 THEN mt.total_runs END) as lowest_total,
-                ROUND(AVG(CASE WHEN mt.innings = 1 THEN mt.total_runs END)::numeric, 2) as average_first_innings,
-                ROUND(AVG(CASE WHEN mt.innings = 2 THEN mt.total_runs END)::numeric, 2) as average_second_innings,
-                MAX(CASE WHEN fm.won_fielding_first AND mt.innings = 1 THEN mt.total_runs END) as highest_total_chased,
-                MIN(CASE WHEN fm.won_batting_first AND mt.innings = 1 THEN mt.total_runs END) as lowest_total_defended,
-                ROUND(AVG(CASE WHEN fm.won_batting_first AND mt.innings = 1 THEN mt.total_runs END)::numeric, 2) as average_winning_score,
-                ROUND(AVG(CASE WHEN fm.won_fielding_first AND mt.innings = 1 THEN mt.total_runs END)::numeric, 2) as average_chasing_score
-            FROM filtered_matches fm
-            LEFT JOIN match_totals mt ON fm.id = mt.id
-        """.format(
-            venue_filter="AND m.venue = :venue" if venue != "All Venues" else "",
-            competition_filter=competition_filter
+        # Use the new dual-table service
+        match_stats = get_venue_match_stats(
+            venue=venue if venue != "All Venues" else None,
+            start_date=start_date,
+            end_date=end_date,
+            leagues=expanded_leagues,
+            include_international=include_international,
+            top_teams=top_teams,
+            db=db
         )
-
-        # Updated phase stats query with competition filter
-        phase_query = """
-            WITH phase_stats AS (
-                SELECT
-                    d.innings,
-                    d.match_id,
-                    m.won_batting_first,
-                    m.won_fielding_first,
-                    CASE 
-                        WHEN d.over < 6 THEN 'powerplay'
-                        WHEN d.over >= 6 AND d.over < 10 THEN 'middle1'
-                        WHEN d.over >= 10 AND d.over < 15 THEN 'middle2'
-                        ELSE 'death'
-                    END as phase,
-                    SUM(d.runs_off_bat + d.extras) as runs,
-                    COUNT(*) as balls,
-                    SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) as wickets
-                FROM deliveries d
-                JOIN matches m ON d.match_id = m.id
-                WHERE 1=1
-                    {venue_filter}
-                    AND (:start_date IS NULL OR m.date >= :start_date)
-                    AND (:end_date IS NULL OR m.date <= :end_date)
-                    {competition_filter}
-                GROUP BY d.innings, d.match_id, m.won_batting_first, m.won_fielding_first, phase
-            ),
-            innings_stats AS (
-                SELECT
-                    innings,
-                    phase,
-                    ROUND(AVG(runs)::numeric, 2) as runs_per_innings,
-                    ROUND(AVG(wickets)::numeric, 2) as wickets_per_innings,
-                    ROUND(AVG(balls)::numeric, 2) as balls_per_innings,
-                    COUNT(*) as total_innings
-                FROM phase_stats
-                GROUP BY innings, phase
-            ),
-            batting_first_stats AS (
-                SELECT
-                    innings,
-                    phase,
-                    ROUND(AVG(runs)::numeric, 2) as runs_per_innings,
-                    ROUND(AVG(wickets)::numeric, 2) as wickets_per_innings,
-                    ROUND(AVG(balls)::numeric, 2) as balls_per_innings
-                FROM phase_stats
-                WHERE won_batting_first = true
-                GROUP BY innings, phase
-            ),
-            chasing_stats AS (
-                SELECT
-                    innings,
-                    phase,
-                    ROUND(AVG(runs)::numeric, 2) as runs_per_innings,
-                    ROUND(AVG(wickets)::numeric, 2) as wickets_per_innings,
-                    ROUND(AVG(balls)::numeric, 2) as balls_per_innings
-                FROM phase_stats
-                WHERE won_fielding_first = true
-                GROUP BY innings, phase
-            )
-            SELECT 
-                i.innings,
-                i.phase,
-                i.runs_per_innings,
-                i.wickets_per_innings,
-                i.balls_per_innings,
-                b.runs_per_innings as batting_first_runs,
-                b.wickets_per_innings as batting_first_wickets,
-                b.balls_per_innings as batting_first_balls,
-                c.runs_per_innings as chasing_runs,
-                c.wickets_per_innings as chasing_wickets,
-                c.balls_per_innings as chasing_balls
-            FROM innings_stats i
-            LEFT JOIN batting_first_stats b ON i.innings = b.innings AND i.phase = b.phase
-            LEFT JOIN chasing_stats c ON i.innings = c.innings AND i.phase = c.phase
-            ORDER BY i.innings, 
-                CASE i.phase 
-                    WHEN 'powerplay' THEN 1 
-                    WHEN 'middle1' THEN 2 
-                    WHEN 'middle2' THEN 3 
-                    WHEN 'death' THEN 4 
-                END
-        """.format(
-            venue_filter="AND m.venue = :venue" if venue != "All Venues" else "",
-            competition_filter=competition_filter
-        )
-
-        # Log the queries for debugging
-        logging.info(f"Executing queries with parameters: {params}")
-
-        matches_query = text(matches_query)
-        phase_query = text(phase_query)
-        
-        # Execute queries
-        match_stats = db.execute(matches_query, params).fetchone()
-        phase_stats = db.execute(phase_query, params).fetchall()
 
         if not match_stats:
             return {
@@ -601,42 +419,15 @@ def get_venue_notes(
                 }
             }
 
-        # Process phase stats into required format
+        # TODO: Add phase-wise stats query (currently simplified)
         phase_wise_stats = {
             'batting_first_wins': {},
             'chasing_wins': {}
         }
 
-        for stat in phase_stats:
-            batting_first_stats = {
-                'runs_per_innings': float(stat.batting_first_runs or 0),
-                'wickets_per_innings': float(stat.batting_first_wickets or 0),
-                'balls_per_innings': float(stat.batting_first_balls or 0)
-            }
-            
-            chasing_stats = {
-                'runs_per_innings': float(stat.chasing_runs or 0),
-                'wickets_per_innings': float(stat.chasing_wickets or 0),
-                'balls_per_innings': float(stat.chasing_balls or 0)
-            }
-            
-            if stat.innings == 1:
-                phase_wise_stats['batting_first_wins'][stat.phase] = batting_first_stats
-                phase_wise_stats['chasing_wins'][stat.phase] = chasing_stats
-
         return {
             "venue": venue,
-            "total_matches": match_stats.total_matches or 0,
-            "batting_first_wins": match_stats.batting_first_wins or 0,
-            "batting_second_wins": match_stats.batting_second_wins or 0,
-            "highest_total": match_stats.highest_total or 0,
-            "lowest_total": match_stats.lowest_total or 0,
-            "average_first_innings": float(match_stats.average_first_innings or 0),
-            "average_second_innings": float(match_stats.average_second_innings or 0),
-            "highest_total_chased": match_stats.highest_total_chased or 0,
-            "lowest_total_defended": match_stats.lowest_total_defended or 0,
-            "average_winning_score": float(match_stats.average_winning_score or 0),
-            "average_chasing_score": float(match_stats.average_chasing_score or 0),
+            **match_stats,
             "phase_wise_stats": phase_wise_stats
         }
 

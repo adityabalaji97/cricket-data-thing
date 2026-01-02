@@ -50,7 +50,7 @@ def get_match_deliveries_legacy(session, match_id):
     """Get deliveries from legacy deliveries table."""
     query = text("""
         SELECT match_id, innings, over, ball,
-               striker as batter, batting_team, 
+               batter, batting_team, 
                runs_off_bat + extras as score, wides as wide
         FROM deliveries
         WHERE match_id = :match_id
