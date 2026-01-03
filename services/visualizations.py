@@ -9,8 +9,29 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Optional, Any
 from datetime import date
 import logging
+from models import leagues_mapping
 
 logger = logging.getLogger(__name__)
+
+
+def convert_league_names(leagues: List[str]) -> List[str]:
+    """Convert full league names to abbreviations used in database."""
+    if not leagues:
+        return []
+
+    converted = []
+    for league in leagues:
+        # Check if it's already an abbreviation
+        if league in leagues_mapping.values():
+            converted.append(league)
+        # Check if it's a full name that needs conversion
+        elif league in leagues_mapping:
+            converted.append(leagues_mapping[league])
+        else:
+            # Keep as-is if no mapping found
+            converted.append(league)
+
+    return converted
 
 
 def get_wagon_wheel_data(
@@ -71,10 +92,12 @@ def get_wagon_wheel_data(
         if leagues or include_international:
             comp_conditions = []
             if leagues:
+                # Convert full league names to abbreviations
+                converted_leagues = convert_league_names(leagues)
                 # Use parameterized list for leagues
-                league_placeholders = ", ".join([f":league_{i}" for i in range(len(leagues))])
+                league_placeholders = ", ".join([f":league_{i}" for i in range(len(converted_leagues))])
                 comp_conditions.append(f"dd.competition IN ({league_placeholders})")
-                for i, league in enumerate(leagues):
+                for i, league in enumerate(converted_leagues):
                     params[f"league_{i}"] = league
 
             if include_international:
@@ -221,9 +244,11 @@ def get_pitch_map_data(
         if leagues or include_international:
             comp_conditions = []
             if leagues:
-                league_placeholders = ", ".join([f":league_{i}" for i in range(len(leagues))])
+                # Convert full league names to abbreviations
+                converted_leagues = convert_league_names(leagues)
+                league_placeholders = ", ".join([f":league_{i}" for i in range(len(converted_leagues))])
                 comp_conditions.append(f"dd.competition IN ({league_placeholders})")
-                for i, league in enumerate(leagues):
+                for i, league in enumerate(converted_leagues):
                     params[f"league_{i}"] = league
 
             if include_international:
