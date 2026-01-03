@@ -34,6 +34,7 @@ from routers.recent_matches import router as recent_matches_router
 from routers.player_summary import router as player_summary_router
 from routers.wrapped import router as wrapped_router
 from routers.search import router as search_router
+from routers.visualizations import router as visualizations_router
 from services.delivery_data_service import get_venue_match_stats, get_match_scores
 from services.bowler_types import BOWLER_CATEGORY_SQL
 import math
@@ -166,6 +167,7 @@ app.include_router(recent_matches_router)
 app.include_router(player_summary_router)
 app.include_router(wrapped_router)
 app.include_router(search_router)
+app.include_router(visualizations_router)
 
 # Add CORS middleware
 app.add_middleware(

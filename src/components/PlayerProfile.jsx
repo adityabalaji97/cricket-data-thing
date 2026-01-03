@@ -16,6 +16,8 @@ import ContextualQueryPrompts from './ContextualQueryPrompts'
 import { getBatterContextualQueries } from '../utils/queryBuilderLinks'
 import config from '../config';
 import PlayerDNASummary from './PlayerDNASummary';
+import WagonWheel from './WagonWheel';
+import PlayerPitchMap from './PlayerPitchMap';
 
 const DEFAULT_START_DATE = "2020-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
@@ -341,17 +343,40 @@ const PlayerProfile = () => {
             />
             
             <Box sx={{ mt: 3 }}>
-              <ContributionGraph 
-                innings={stats.innings || []} 
-                mode="batter" 
-                dateRange={dateRange} 
+              <ContributionGraph
+                innings={stats.innings || []}
+                mode="batter"
+                dateRange={dateRange}
               />
             </Box>
+
+            {/* Wagon Wheel and Pitch Map Visualizations */}
+            <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
+              <WagonWheel
+                playerName={selectedPlayer}
+                startDate={dateRange.start}
+                endDate={dateRange.end}
+                venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                leagues={competitionFilters.leagues}
+                includeInternational={competitionFilters.international}
+                topTeams={competitionFilters.topTeams}
+              />
+              <PlayerPitchMap
+                playerName={selectedPlayer}
+                startDate={dateRange.start}
+                endDate={dateRange.end}
+                venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                leagues={competitionFilters.leagues}
+                includeInternational={competitionFilters.international}
+                topTeams={competitionFilters.topTeams}
+              />
+            </Box>
+
             <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
               <PhasePerformanceRadar stats={stats} />
               <PaceSpinBreakdown stats={stats} />
               <InningsScatter innings={stats.innings} />
-              <StrikeRateProgression 
+              <StrikeRateProgression
                 selectedPlayer={selectedPlayer}
                 dateRange={dateRange}
                 selectedVenue={selectedVenue}
