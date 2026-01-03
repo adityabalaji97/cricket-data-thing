@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, Typography, Box, FormControl, Select, MenuItem, InputLabel } from '@mui/material';
+import { Card, CardContent, Typography, Box, FormControl, Select, MenuItem, InputLabel, useMediaQuery, useTheme } from '@mui/material';
 import {
   ScatterChart,
   Scatter,
@@ -14,6 +14,8 @@ import {
 const InningsScatter = ({ innings }) => {
   const [xMetric, setXMetric] = useState('balls');
   const [yMetric, setYMetric] = useState('strike_rate');
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const getPhase = (over) => {
     if (over < 6) return 0;
@@ -37,37 +39,47 @@ const InningsScatter = ({ innings }) => {
   }));
 
   const xAxisMetrics = {
-    balls: { key: 'balls', label: 'Balls Faced' },
-    position: { key: 'position', label: 'Batting Position' },
-    entry: { key: 'entry_over', label: 'Entry Point (overs)' },
-    phase: { key: 'phase', label: 'Entry Phase' }
+    balls: { key: 'balls', label: isMobile ? 'Balls' : 'Balls Faced' },
+    position: { key: 'position', label: isMobile ? 'Position' : 'Batting Position' },
+    entry: { key: 'entry_over', label: isMobile ? 'Entry' : 'Entry Point (overs)' },
+    phase: { key: 'phase', label: isMobile ? 'Phase' : 'Entry Phase' }
   };
 
   const yAxisMetrics = {
     runs: { key: 'runs', label: 'Runs' },
-    strike_rate: { key: 'strike_rate', label: 'Strike Rate' },
-    sr_diff: { key: 'sr_diff', label: 'SR vs Team' },
-    average: { key: 'average', label: 'Average' }
+    strike_rate: { key: 'strike_rate', label: isMobile ? 'SR' : 'Strike Rate' },
+    sr_diff: { key: 'sr_diff', label: isMobile ? 'SR vs Team' : 'SR vs Team' },
+    average: { key: 'average', label: isMobile ? 'Avg' : 'Average' }
   };
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const inning = payload[0].payload;
       const phaseNames = ['0-6', '6-10', '10-15', '15-20'];
-      
+
       return (
-        <Card sx={{ p: 1, bgcolor: 'background.paper' }}>
-          <Typography variant="body1">{`${inning.runs} (${inning.balls})`}</Typography>
-          <Typography variant="body2" color="text.secondary">{`SR: ${inning.strike_rate.toFixed(1)}`}</Typography>
-          <Typography variant="body2" color="text.secondary">
+        <Card sx={{ p: isMobile ? 0.75 : 1, bgcolor: 'background.paper' }}>
+          <Typography variant="body2" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem', fontWeight: 600 }}>
+            {`${inning.runs} (${inning.balls})`}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
+            {`SR: ${inning.strike_rate.toFixed(1)}`}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
             {`Team SR: ${inning.team_sr.toFixed(1)} (Diff: ${inning.sr_diff.toFixed(1)})`}
           </Typography>
-          <Typography variant="body2" color="text.secondary">{`Position: ${inning.position}`}</Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
+            {`Position: ${inning.position}`}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
             {`Entry: Over ${inning.entry_over.toFixed(1)} (${phaseNames[inning.phase]})`}
           </Typography>
-          <Typography variant="caption" display="block">{inning.competition}</Typography>
-          <Typography variant="caption" display="block">{new Date(inning.date).toLocaleDateString()}</Typography>
+          <Typography variant="caption" display="block" sx={{ fontSize: isMobile ? '0.65rem' : '0.7rem' }}>
+            {inning.competition}
+          </Typography>
+          <Typography variant="caption" display="block" sx={{ fontSize: isMobile ? '0.65rem' : '0.7rem' }}>
+            {new Date(inning.date).toLocaleDateString()}
+          </Typography>
         </Card>
       );
     }
@@ -88,73 +100,99 @@ const InningsScatter = ({ innings }) => {
     };
   };
 
+  // Responsive height calculation - fits in mobile viewport for screenshots
+  const chartHeight = isMobile ?
+    Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.55 : 400, 450) :
+    400;
+
   return (
     <Card>
-      <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h6">Innings Distribution</Typography>
+      <CardContent sx={{ p: isMobile ? 1.5 : 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: isMobile ? 1.5 : 3 }}>
+          <Typography variant={isMobile ? "body1" : "h6"} sx={{ fontWeight: 600 }}>
+            Innings Distribution
+          </Typography>
         </Box>
-        
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-          <FormControl sx={{ minWidth: 200 }}>
-            <InputLabel>X-Axis</InputLabel>
+
+        <Box sx={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: isMobile ? 1.5 : 2,
+          mb: isMobile ? 2 : 3
+        }}>
+          <FormControl sx={{ flex: 1, minWidth: isMobile ? '100%' : 200 }} size={isMobile ? "small" : "medium"}>
+            <InputLabel sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>X-Axis</InputLabel>
             <Select
               value={xMetric}
               label="X-Axis"
               onChange={(e) => setXMetric(e.target.value)}
+              sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}
             >
               {Object.entries(xAxisMetrics).map(([key, { label }]) => (
-                <MenuItem key={key} value={key}>{label}</MenuItem>
+                <MenuItem key={key} value={key} sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                  {label}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
-          
-          <FormControl sx={{ minWidth: 200 }}>
-            <InputLabel>Y-Axis</InputLabel>
+
+          <FormControl sx={{ flex: 1, minWidth: isMobile ? '100%' : 200 }} size={isMobile ? "small" : "medium"}>
+            <InputLabel sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>Y-Axis</InputLabel>
             <Select
               value={yMetric}
               label="Y-Axis"
               onChange={(e) => setYMetric(e.target.value)}
+              sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}
             >
               {Object.entries(yAxisMetrics).map(([key, { label }]) => (
-                <MenuItem key={key} value={key}>{label}</MenuItem>
+                <MenuItem key={key} value={key} sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                  {label}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
         </Box>
 
-        <div style={{ height: 400, width: '100%' }}>
+        <Box sx={{ height: chartHeight, width: '100%' }}>
           <ResponsiveContainer>
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 40 }}>
+            <ScatterChart margin={{
+              top: 10,
+              right: isMobile ? 10 : 20,
+              bottom: isMobile ? 30 : 40,
+              left: isMobile ? 30 : 40
+            }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
+              <XAxis
                 {...getAxisProps(xMetric)}
                 dataKey={xAxisMetrics[xMetric].key}
                 name={xAxisMetrics[xMetric].label}
-                label={{ value: xAxisMetrics[xMetric].label, position: 'bottom' }}
+                label={isMobile ? undefined : { value: xAxisMetrics[xMetric].label, position: 'bottom' }}
+                tick={{ fontSize: isMobile ? 9 : 12 }}
               />
-              <YAxis 
+              <YAxis
                 type="number"
                 dataKey={yAxisMetrics[yMetric].key}
                 name={yAxisMetrics[yMetric].label}
-                label={{ 
+                label={isMobile ? undefined : {
                   value: yAxisMetrics[yMetric].label,
-                  angle: -90, 
-                  position: 'left' 
+                  angle: -90,
+                  position: 'left'
                 }}
+                tick={{ fontSize: isMobile ? 9 : 12 }}
               />
               {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke="#666" strokeDasharray="3 3" />}
               {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />}
               <Tooltip content={<CustomTooltip />} />
-              <Scatter 
-                name="Innings" 
-                data={data} 
+              <Scatter
+                name="Innings"
+                data={data}
                 fill="#8884d8"
                 opacity={0.6}
+                r={isMobile ? 5 : 6}
               />
             </ScatterChart>
           </ResponsiveContainer>
-        </div>
+        </Box>
       </CardContent>
     </Card>
   );

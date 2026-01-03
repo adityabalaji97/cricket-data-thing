@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, Typography, Box } from '@mui/material';
+import { Card, CardContent, Typography, Box, useMediaQuery, useTheme } from '@mui/material';
 import {
   BarChart,
   Bar,
@@ -13,6 +13,9 @@ import {
 } from 'recharts';
 
 const WicketDistribution = ({ stats }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   // Early return if no data is provided
   if (!stats || !stats.phase_stats) {
     return null;
@@ -56,36 +59,36 @@ const WicketDistribution = ({ stats }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
-      
+
       return (
         <Box
           sx={{
             backgroundColor: '#fff',
-            padding: 1.5,
+            padding: isMobile ? 1 : 1.5,
             border: '1px solid #ccc',
             borderRadius: 1,
             boxShadow: 2
           }}
         >
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: data.color }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: data.color, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
             {label} Phase
           </Typography>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
             Wickets: <strong>{data.wickets}</strong>
           </Typography>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
             Overs Bowled: <strong>{data.overs}</strong>
           </Typography>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
             Economy Rate: <strong>{data.economy}</strong>
           </Typography>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
             Dot Percentage: <strong>{data.dot_percentage}%</strong>
           </Typography>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
             Bowling Average: <strong>{data.bowling_average}</strong>
           </Typography>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
             Bowling Strike Rate: <strong>{data.bowling_strike_rate}</strong>
           </Typography>
         </Box>
@@ -94,39 +97,58 @@ const WicketDistribution = ({ stats }) => {
     return null;
   };
 
+  // Responsive height calculation - fits in mobile viewport for screenshots
+  const chartHeight = isMobile ?
+    Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.5 : 350, 380) :
+    400;
+
   return (
     <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
+      <CardContent sx={{ p: isMobile ? 1.5 : 2 }}>
+        <Typography variant={isMobile ? "body1" : "h6"} gutterBottom sx={{ fontWeight: 600 }}>
           Wicket Distribution by Phase
         </Typography>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
+        <Typography variant="body2" color="text.secondary" gutterBottom sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
           Breakdown of bowling performance across different match phases
         </Typography>
-        
-        <Box sx={{ width: '100%', height: 400 }}>
+
+        <Box sx={{ width: '100%', height: chartHeight }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={phaseData}
               margin={{
-                top: 20,
-                right: 30,
-                left: 20,
-                bottom: 30,
+                top: 10,
+                right: isMobile ? 15 : 30,
+                left: isMobile ? 10 : 20,
+                bottom: isMobile ? 5 : 30,
               }}
             >
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="phase">
-                <Label value="Match Phase" position="bottom" offset={10} />
+              <XAxis
+                dataKey="phase"
+                tick={{ fontSize: isMobile ? 10 : 12 }}
+              >
+                {!isMobile && <Label value="Match Phase" position="bottom" offset={10} />}
               </XAxis>
-              <YAxis yAxisId="left">
-                <Label value="Wickets" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />
+              <YAxis
+                yAxisId="left"
+                tick={{ fontSize: isMobile ? 9 : 11 }}
+              >
+                {!isMobile && <Label value="Wickets" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
               </YAxis>
-              <YAxis yAxisId="right" orientation="right" domain={[0, 15]}>
-                <Label value="Economy Rate" angle={90} position="insideRight" style={{ textAnchor: 'middle' }} />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                domain={[0, 15]}
+                tick={{ fontSize: isMobile ? 9 : 11 }}
+              >
+                {!isMobile && <Label value="Economy Rate" angle={90} position="insideRight" style={{ textAnchor: 'middle' }} />}
               </YAxis>
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend
+                wrapperStyle={{ fontSize: isMobile ? '0.7rem' : '0.875rem' }}
+                iconSize={isMobile ? 8 : 14}
+              />
               <Bar
                 yAxisId="left"
                 dataKey="wickets"
@@ -145,15 +167,15 @@ const WicketDistribution = ({ stats }) => {
                 yAxisId="left"
                 dataKey="dot_percentage"
                 fill="#ffc658"
-                name="Dot Percentage (%)"
+                name={isMobile ? "Dot %" : "Dot Percentage (%)"}
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
           </ResponsiveContainer>
         </Box>
-        
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-          Powerplay (overs 1-6), Middle (overs 7-15), Death (overs 16-20)
+
+        <Typography variant="body2" color="text.secondary" sx={{ mt: isMobile ? 1 : 2, textAlign: 'center', fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
+          {isMobile ? "PP (1-6), Mid (7-15), Death (16-20)" : "Powerplay (overs 1-6), Middle (overs 7-15), Death (overs 16-20)"}
         </Typography>
       </CardContent>
     </Card>
