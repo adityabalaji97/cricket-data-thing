@@ -9,14 +9,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   CircularProgress,
   Alert,
   Chip
 } from '@mui/material';
+import Card from './ui/Card';
+import FilterBar from './ui/FilterBar';
 import config from '../config';
 
 
@@ -318,78 +316,75 @@ const WagonWheel = ({
     );
   }
 
+  const filterConfig = [
+    {
+      key: 'phase',
+      label: 'Phase',
+      options: [
+        { value: 'overall', label: 'Overall' },
+        { value: 'powerplay', label: isMobile ? 'PP' : 'Powerplay' },
+        { value: 'middle', label: 'Middle' },
+        { value: 'death', label: 'Death' },
+      ],
+    },
+    {
+      key: 'bowlKind',
+      label: 'Bowl',
+      options: [
+        { value: 'all', label: 'All' },
+        { value: 'pace bowler', label: 'Pace' },
+        { value: 'spin bowler', label: 'Spin' },
+      ],
+    },
+    ...(availableLines.length > 0 ? [{
+      key: 'line',
+      label: 'Line',
+      options: [
+        { value: 'all', label: 'All' },
+        ...availableLines.map(l => ({ value: l, label: l })),
+      ],
+    }] : []),
+    ...(availableLengths.length > 0 ? [{
+      key: 'length',
+      label: 'Length',
+      options: [
+        { value: 'all', label: 'All' },
+        ...availableLengths.map(l => ({ value: l, label: l })),
+      ],
+    }] : []),
+    ...(availableShots.length > 0 ? [{
+      key: 'shot',
+      label: 'Shot',
+      options: [
+        { value: 'all', label: 'All' },
+        ...availableShots.map(s => ({ value: s, label: s })),
+      ],
+    }] : []),
+  ];
+
+  const handleFilterChange = (key, value) => {
+    if (key === 'phase') setPhase(value);
+    else if (key === 'bowlKind') setBowlKind(value);
+    else if (key === 'line') setLine(value);
+    else if (key === 'length') setLength(value);
+    else if (key === 'shot') setShot(value);
+  };
+
   return (
-    <Box sx={{
-      width: '100%',
-      px: isMobile ? 0 : 1,
-      backgroundColor: isMobile ? 'transparent' : undefined,
-      boxShadow: isMobile ? 0 : undefined
-    }}>
-      <Typography variant={isMobile ? "body1" : "h6"} gutterBottom sx={{ textAlign: 'center', fontWeight: 600, fontSize: isMobile ? '0.875rem' : undefined }}>
+    <Card isMobile={isMobile}>
+      <Typography variant={isMobile ? "h6" : "h5"} gutterBottom sx={{ textAlign: 'center', fontWeight: 600, mb: 2 }}>
         Wagon Wheel
       </Typography>
 
       {/* Filters */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 1 : 1.5, mb: 2, justifyContent: 'center' }}>
-        {/* Phase Filter */}
-        <FormControl size="small" sx={{ minWidth: isMobile ? 90 : 120 }}>
-          <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Phase</InputLabel>
-          <Select value={phase} label="Phase" onChange={(e) => setPhase(e.target.value)} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>
-            <MenuItem value="overall" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Overall</MenuItem>
-            <MenuItem value="powerplay" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>{isMobile ? 'PP' : 'Powerplay'}</MenuItem>
-            <MenuItem value="middle" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Middle</MenuItem>
-            <MenuItem value="death" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Death</MenuItem>
-          </Select>
-        </FormControl>
-
-        {/* Bowl Kind Filter */}
-        <FormControl size="small" sx={{ minWidth: isMobile ? 90 : 120 }}>
-          <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Bowl</InputLabel>
-          <Select value={bowlKind} label="Bowl" onChange={(e) => setBowlKind(e.target.value)} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>
-            <MenuItem value="all" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>All</MenuItem>
-            <MenuItem value="pace bowler" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Pace</MenuItem>
-            <MenuItem value="spin bowler" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Spin</MenuItem>
-          </Select>
-        </FormControl>
-
-        {/* Line Filter */}
-        {availableLines.length > 0 && (
-          <FormControl size="small" sx={{ minWidth: isMobile ? 90 : 120 }}>
-            <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Line</InputLabel>
-            <Select value={line} label="Line" onChange={(e) => setLine(e.target.value)} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>
-              <MenuItem value="all" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>All</MenuItem>
-              {availableLines.map(l => (
-                <MenuItem key={l} value={l} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>{l}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        )}
-
-        {/* Length Filter */}
-        {availableLengths.length > 0 && (
-          <FormControl size="small" sx={{ minWidth: isMobile ? 90 : 120 }}>
-            <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Length</InputLabel>
-            <Select value={length} label="Length" onChange={(e) => setLength(e.target.value)} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>
-              <MenuItem value="all" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>All</MenuItem>
-              {availableLengths.map(len => (
-                <MenuItem key={len} value={len} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>{len}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        )}
-
-        {/* Shot Filter */}
-        {availableShots.length > 0 && (
-          <FormControl size="small" sx={{ minWidth: isMobile ? 90 : 120 }}>
-            <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Shot</InputLabel>
-            <Select value={shot} label="Shot" onChange={(e) => setShot(e.target.value)} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>
-              <MenuItem value="all" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>All</MenuItem>
-              {availableShots.map(s => (
-                <MenuItem key={s} value={s} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>{s}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        )}
+      <Box sx={{ mb: 2 }}>
+        <FilterBar
+          filters={filterConfig}
+          activeFilters={{ phase, bowlKind, line, length, shot }}
+          onFilterChange={handleFilterChange}
+          isMobile={isMobile}
+          showActiveCount={false}
+        />
       </Box>
 
       {/* Stats Summary */}
