@@ -14,24 +14,36 @@ from models import leagues_mapping
 logger = logging.getLogger(__name__)
 
 
-def convert_league_names(leagues: List[str]) -> List[str]:
-    """Convert full league names to abbreviations used in database."""
-    if not leagues:
+def expand_league_abbreviations(abbrevs: List[str]) -> List[str]:
+    """
+    Expand league abbreviations to include all variations.
+    This matches the approach used in query_builder_v2.
+
+    For each league, includes:
+    - The input value itself
+    - Both full name and abbreviation (if mapping exists)
+    - Any aliases (if applicable)
+    """
+    if not abbrevs:
         return []
 
-    converted = []
-    for league in leagues:
-        # Check if it's already an abbreviation
-        if league in leagues_mapping.values():
-            converted.append(league)
-        # Check if it's a full name that needs conversion
-        elif league in leagues_mapping:
-            converted.append(leagues_mapping[league])
-        else:
-            # Keep as-is if no mapping found
-            converted.append(league)
+    expanded = []
+    for abbrev in abbrevs:
+        expanded.append(abbrev)
 
-    return converted
+        # If input is a full name, add the abbreviation
+        if abbrev in leagues_mapping:
+            expanded.append(leagues_mapping[abbrev])
+        # If input is an abbreviation, add the full name
+        else:
+            # Try to find full name by looking up in reverse
+            for full_name, short_name in leagues_mapping.items():
+                if short_name == abbrev:
+                    expanded.append(full_name)
+                    break
+
+    # Remove duplicates while preserving order
+    return list(dict.fromkeys(expanded))
 
 
 def get_wagon_wheel_data(
@@ -92,13 +104,10 @@ def get_wagon_wheel_data(
         if leagues or include_international:
             comp_conditions = []
             if leagues:
-                # Convert full league names to abbreviations
-                converted_leagues = convert_league_names(leagues)
-                # Use parameterized list for leagues
-                league_placeholders = ", ".join([f":league_{i}" for i in range(len(converted_leagues))])
-                comp_conditions.append(f"dd.competition IN ({league_placeholders})")
-                for i, league in enumerate(converted_leagues):
-                    params[f"league_{i}"] = league
+                # Expand leagues to include both full names and abbreviations
+                expanded_leagues = expand_league_abbreviations(leagues)
+                comp_conditions.append("dd.competition = ANY(:leagues)")
+                params["leagues"] = expanded_leagues
 
             if include_international:
                 if top_teams:
@@ -244,12 +253,10 @@ def get_pitch_map_data(
         if leagues or include_international:
             comp_conditions = []
             if leagues:
-                # Convert full league names to abbreviations
-                converted_leagues = convert_league_names(leagues)
-                league_placeholders = ", ".join([f":league_{i}" for i in range(len(converted_leagues))])
-                comp_conditions.append(f"dd.competition IN ({league_placeholders})")
-                for i, league in enumerate(converted_leagues):
-                    params[f"league_{i}"] = league
+                # Expand leagues to include both full names and abbreviations
+                expanded_leagues = expand_league_abbreviations(leagues)
+                comp_conditions.append("dd.competition = ANY(:leagues)")
+                params["leagues"] = expanded_leagues
 
             if include_international:
                 if top_teams:
