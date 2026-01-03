@@ -420,7 +420,7 @@ const WagonWheel = ({
       <Box sx={{ display: 'flex', justifyContent: 'center' }}>
         {renderWagonWheel()}
       </Box>
-    </Box>
+    </Card>
   );
 };
 
