@@ -498,21 +498,21 @@ def get_venue_phase_stats(
         }
 
         for stat in phase_results:
-            batting_first_stats = {
-                'runs_per_innings': float(stat.batting_first_runs or 0),
-                'wickets_per_innings': float(stat.batting_first_wickets or 0),
-                'balls_per_innings': float(stat.batting_first_balls or 0)
-            }
-
-            chasing_stats = {
-                'runs_per_innings': float(stat.chasing_runs or 0),
-                'wickets_per_innings': float(stat.chasing_wickets or 0),
-                'balls_per_innings': float(stat.chasing_balls or 0)
-            }
-
+            # Only use innings 1 data for phase stats (represents first innings performance)
             if stat.innings == 1:
-                phase_wise_stats['batting_first_wins'][stat.phase] = batting_first_stats
-                phase_wise_stats['chasing_wins'][stat.phase] = chasing_stats
+                if stat.batting_first_runs is not None:
+                    phase_wise_stats['batting_first_wins'][stat.phase] = {
+                        'runs_per_innings': float(stat.batting_first_runs),
+                        'wickets_per_innings': float(stat.batting_first_wickets or 0),
+                        'balls_per_innings': float(stat.batting_first_balls or 0)
+                    }
+
+                if stat.chasing_runs is not None:
+                    phase_wise_stats['chasing_wins'][stat.phase] = {
+                        'runs_per_innings': float(stat.chasing_runs),
+                        'wickets_per_innings': float(stat.chasing_wickets or 0),
+                        'balls_per_innings': float(stat.chasing_balls or 0)
+                    }
 
         return phase_wise_stats
 

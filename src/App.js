@@ -375,6 +375,13 @@ const AppContent = () => {
     fetchMatchHistory();
   }, [selectedVenue, selectedTeam1, selectedTeam2, startDate, endDate, showVisualizations, competitions]);
 
+  // Collapse filters after data has loaded
+  useEffect(() => {
+    if (showVisualizations && !loading) {
+      setFiltersExpanded(false);
+    }
+  }, [showVisualizations, loading]);
+
   const handleFilterChange = (filters) => {
     setCompetitions(filters);
     if (showVisualizations) {
@@ -696,7 +703,6 @@ const AppContent = () => {
                         variant="contained"
                         onClick={() => {
                           setShowVisualizations(true);
-                          setFiltersExpanded(false);
                         }}
                         disabled={loading || error}
                         sx={{

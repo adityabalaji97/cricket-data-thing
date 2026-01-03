@@ -106,7 +106,10 @@ const InningsScatter = ({ innings }) => {
     400;
 
   return (
-    <Card>
+    <Card sx={{
+      backgroundColor: isMobile ? 'transparent' : undefined,
+      boxShadow: isMobile ? 0 : undefined
+    }}>
       <CardContent sx={{ p: isMobile ? 1.5 : 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: isMobile ? 1.5 : 3 }}>
           <Typography variant={isMobile ? "body1" : "h6"} sx={{ fontWeight: 600 }}>

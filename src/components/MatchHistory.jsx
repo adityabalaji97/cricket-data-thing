@@ -5,7 +5,15 @@ const HeadToHeadStats = ({ team1, team2, stats, isMobile }) => {
     if (!stats) return null;
     
     return (
-        <Card sx={{ mb: 2, p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Card sx={{
+            mb: 2,
+            p: 2,
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: isMobile ? 'transparent' : undefined,
+            boxShadow: isMobile ? 0 : undefined
+        }}>
             <Typography variant={isMobile ? "h6" : "h5"} gutterBottom>
                 Head to Head Stats
             </Typography>
@@ -90,7 +98,15 @@ const HeadToHeadStats = ({ team1, team2, stats, isMobile }) => {
 };
 
 const ResultsSection = ({ title, matches, showVenue = true, isMobile }) => (
-    <Card sx={{ mb: 2, p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Card sx={{
+        mb: 2,
+        p: 2,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: isMobile ? 'transparent' : undefined,
+        boxShadow: isMobile ? 0 : undefined
+    }}>
         <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
             {title}
         </Typography>

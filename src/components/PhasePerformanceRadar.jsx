@@ -62,7 +62,10 @@ const PhasePerformanceRadar = ({ stats }) => {
     400;
 
   return (
-    <Card>
+    <Card sx={{
+      backgroundColor: isMobile ? 'transparent' : undefined,
+      boxShadow: isMobile ? 0 : undefined
+    }}>
       <CardContent sx={{ p: isMobile ? 1.5 : 2 }}>
         <Box sx={{
           display: 'flex',

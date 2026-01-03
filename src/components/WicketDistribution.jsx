@@ -103,7 +103,10 @@ const WicketDistribution = ({ stats }) => {
     400;
 
   return (
-    <Card>
+    <Card sx={{
+      backgroundColor: isMobile ? 'transparent' : undefined,
+      boxShadow: isMobile ? 0 : undefined
+    }}>
       <CardContent sx={{ p: isMobile ? 1.5 : 2 }}>
         <Typography variant={isMobile ? "body1" : "h6"} gutterBottom sx={{ fontWeight: 600 }}>
           Wicket Distribution by Phase

@@ -370,11 +370,11 @@ const BattingScatter = ({ data, isMobile }) => {
                             fill="#8884d8"
                             shape={(props) => {
                                 const { cx, cy, fill, payload } = props;
-                                // Extract first name or initials
+                                // Extract last name
                                 const nameParts = payload.name?.split(' ') || [];
                                 const label = nameParts.length > 1
-                                    ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`
-                                    : nameParts[0]?.substring(0, 2) || '';
+                                    ? nameParts[nameParts.length - 1]
+                                    : nameParts[0] || '';
 
                                 return (
                                     <g>
@@ -391,8 +391,8 @@ const BattingScatter = ({ data, isMobile }) => {
                                             y={cy + (isMobile ? 16 : 18)}
                                             textAnchor="middle"
                                             fill="#333"
-                                            fontSize={isMobile ? 8 : 9}
-                                            fontWeight="500"
+                                            fontSize={isMobile ? 7 : 8}
+                                            fontWeight="600"
                                         >
                                             {label}
                                         </text>

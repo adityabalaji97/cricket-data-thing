@@ -184,7 +184,13 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
         520;
 
     return (
-        <Card sx={{ width: '100%', p: isMobile ? 1.5 : 2, pb: 0 }}>
+        <Card sx={{
+            width: '100%',
+            p: isMobile ? 1.5 : 2,
+            pb: 0,
+            backgroundColor: isMobile ? 'transparent' : undefined,
+            boxShadow: isMobile ? 0 : undefined
+        }}>
             <Typography variant={isMobile ? "body1" : "h6"} sx={{ mb: isMobile ? 1 : 2, fontWeight: 600 }}>
                 Batting Performance Analysis
             </Typography>

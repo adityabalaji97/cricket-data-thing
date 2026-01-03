@@ -386,7 +386,12 @@ const ConsolidatedFantasyAnalysis = ({ matchupData, isMobile }) => {
     if (players.length === 0) return null;
 
     return (
-        <Card sx={{ p: 2, mb: 3 }}>
+        <Card sx={{
+            p: 2,
+            mb: 3,
+            backgroundColor: isMobile ? 'transparent' : undefined,
+            boxShadow: isMobile ? 0 : undefined
+        }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
                 <TrendingUp size={20} />
                 <Typography variant={isMobile ? "subtitle1" : "h6"}>
@@ -490,7 +495,12 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile }) => {
     };
 
     return (
-        <Card sx={{ p: 2, mb: 3 }}>
+        <Card sx={{
+            p: 2,
+            mb: 3,
+            backgroundColor: isMobile ? 'transparent' : undefined,
+            boxShadow: isMobile ? 0 : undefined
+        }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
                 <Trophy size={20} />
                 <Typography variant={isMobile ? "subtitle1" : "h6"}>
@@ -625,7 +635,12 @@ const MatchupMatrix = ({
     };
 
     return (
-        <Card sx={{ p: 2, mb: 3 }}>
+        <Card sx={{
+            p: 2,
+            mb: 3,
+            backgroundColor: isMobile ? 'transparent' : undefined,
+            boxShadow: isMobile ? 0 : undefined
+        }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
                 <Typography variant={isMobile ? "subtitle1" : "h6"}>
                     {decodeURIComponent(batting_team)} vs {decodeURIComponent(bowling_team)} Matchups
