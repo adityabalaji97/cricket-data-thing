@@ -52,16 +52,16 @@ def get_wagon_wheel_data(
         logger.info(f"Fetching wagon wheel data for {batter}")
 
         # Build WHERE conditions
-        conditions = ["dd.batter = :batter", "dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"]
+        conditions = ["dd.bat = :batter", "dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"]
         params = {"batter": batter}
 
         if start_date:
-            conditions.append("dd.date >= :start_date")
-            params["start_date"] = start_date
+            conditions.append("dd.match_date >= :start_date")
+            params["start_date"] = str(start_date)
 
         if end_date:
-            conditions.append("dd.date <= :end_date")
-            params["end_date"] = end_date
+            conditions.append("dd.match_date <= :end_date")
+            params["end_date"] = str(end_date)
 
         if venue:
             conditions.append("dd.ground = :venue")
@@ -85,7 +85,7 @@ def get_wagon_wheel_data(
                     team_placeholders = ", ".join([f":team_{i}" for i in range(len(top_team_names))])
                     comp_conditions.append(f"""(
                         dd.competition LIKE '%International%'
-                        AND (dd.batting_team IN ({team_placeholders}) OR dd.bowling_team IN ({team_placeholders}))
+                        AND (dd.team_bat IN ({team_placeholders}) OR dd.team_bowl IN ({team_placeholders}))
                     )""")
                     for i, team in enumerate(top_team_names):
                         params[f"team_{i}"] = team
@@ -126,10 +126,10 @@ def get_wagon_wheel_data(
                 dd.length,
                 dd.bowl_kind,
                 dd.bowl_style,
-                dd.bowler,
+                dd.bowl as bowler,
                 dd.over,
-                dd.match_id,
-                dd.date,
+                dd.p_match as match_id,
+                dd.match_date as date,
                 dd.ground as venue,
                 dd.competition,
                 CASE
@@ -202,16 +202,16 @@ def get_pitch_map_data(
         logger.info(f"Fetching pitch map data for {batter}")
 
         # Build WHERE conditions (same as wagon wheel)
-        conditions = ["dd.batter = :batter", "dd.line IS NOT NULL", "dd.length IS NOT NULL"]
+        conditions = ["dd.bat = :batter", "dd.line IS NOT NULL", "dd.length IS NOT NULL"]
         params = {"batter": batter}
 
         if start_date:
-            conditions.append("dd.date >= :start_date")
-            params["start_date"] = start_date
+            conditions.append("dd.match_date >= :start_date")
+            params["start_date"] = str(start_date)
 
         if end_date:
-            conditions.append("dd.date <= :end_date")
-            params["end_date"] = end_date
+            conditions.append("dd.match_date <= :end_date")
+            params["end_date"] = str(end_date)
 
         if venue:
             conditions.append("dd.ground = :venue")
@@ -233,7 +233,7 @@ def get_pitch_map_data(
                     team_placeholders = ", ".join([f":team_{i}" for i in range(len(top_team_names))])
                     comp_conditions.append(f"""(
                         dd.competition LIKE '%International%'
-                        AND (dd.batting_team IN ({team_placeholders}) OR dd.bowling_team IN ({team_placeholders}))
+                        AND (dd.team_bat IN ({team_placeholders}) OR dd.team_bowl IN ({team_placeholders}))
                     )""")
                     for i, team in enumerate(top_team_names):
                         params[f"team_{i}"] = team
