@@ -424,30 +424,29 @@ const getTeamColor = (team) => {
     return teamColors[currentTeam] || '#000000';
 };
 
-const BattingLeaders = ({ data }) => {
+const BattingLeaders = ({ data, isMobile }) => {
     if (!data || data.length === 0) return null;
-    
+
     return (
-        <TableContainer>
+        <TableContainer sx={{ overflowX: 'hidden' }}>
             <Typography variant="h6" gutterBottom align="center">Most Runs</Typography>
             <Table size="small">
                 <TableHead>
                     <TableRow>
-                        <TableCell>Name</TableCell>
-                        <TableCell align="right">Inns</TableCell>
-                        <TableCell align="right">Runs</TableCell>
-                        <TableCell align="right">Avg</TableCell>
-                        <TableCell align="right">SR</TableCell>
-                        <TableCell align="right">BPD</TableCell>
+                        <TableCell sx={{ px: isMobile ? 0.5 : 1 }}>Name</TableCell>
+                        <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1 }}>Inns</TableCell>
+                        <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1 }}>Runs</TableCell>
+                        <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1 }}>Avg @ SR</TableCell>
+                        <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1 }}>BPD</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
                     {data.map((row, index) => (
-                        <TableRow 
-                            key={`${row.name}-${index}`} 
+                        <TableRow
+                            key={`${row.name}-${index}`}
                             sx={{ '&:nth-of-type(odd)': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}
                         >
-                            <TableCell>
+                            <TableCell sx={{ px: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
                                 <Box
                                     component="span"
                                     sx={{
@@ -460,11 +459,18 @@ const BattingLeaders = ({ data }) => {
                                     {row.name}
                                 </Box>
                             </TableCell>
-                            <TableCell align="right">{row.batInns}</TableCell>
-                            <TableCell align="right">{row.batRuns}</TableCell>
-                            <TableCell align="right">{row.batAvg?.toFixed(2) || '0.00'}</TableCell>
-                            <TableCell align="right">{row.batSR?.toFixed(2) || '0.00'}</TableCell>
-                            <TableCell align="right">{row.batBPD?.toFixed(2) || '0.00'}</TableCell>
+                            <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                                {row.batInns}
+                            </TableCell>
+                            <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                                {row.batRuns}
+                            </TableCell>
+                            <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.75rem' : '0.875rem', whiteSpace: 'nowrap' }}>
+                                {row.batAvg?.toFixed(1) || '0'} @ {row.batSR?.toFixed(0) || '0'}
+                            </TableCell>
+                            <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                                {row.batBPD?.toFixed(1) || '0'}
+                            </TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
@@ -473,53 +479,59 @@ const BattingLeaders = ({ data }) => {
     );
 };
 
-const BowlingLeaders = ({ data }) => {
+const BowlingLeaders = ({ data, isMobile }) => {
     if (!data || data.length === 0) return null;
 
     return (
-        <TableContainer>
+        <TableContainer sx={{ overflowX: 'hidden' }}>
             <Typography variant="h6" gutterBottom align="center">Most Wickets</Typography>
             <Table size="small">
                 <TableHead>
                     <TableRow>
-                        <TableCell>Name</TableCell>
-                        <TableCell align="right">Inns</TableCell>
-                        <TableCell align="right">Wkts</TableCell>
-                        <TableCell align="right">Avg</TableCell>
-                        <TableCell align="right">SR</TableCell>
-                        <TableCell align="right">ER</TableCell>
+                        <TableCell sx={{ px: isMobile ? 0.5 : 1 }}>Name</TableCell>
+                        <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1 }}>Inns</TableCell>
+                        <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1 }}>Wkts</TableCell>
+                        <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1 }}>Avg @ ER</TableCell>
+                        <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1 }}>BPD</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
                     {data.map((row, index) => (
-                        <TableRow 
-                        key={`${row.name}-${index}`} 
-                        sx={{ '&:nth-of-type(odd)': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}
-                    >
-                        <TableCell>
-                            <Box
-                                component="span"
-                                sx={{
-                                    cursor: 'help',
-                                    textDecoration: 'underline',
-                                    textDecorationStyle: 'dotted'
-                                }}
-                                title={`Teams: ${row.bowling_team}`}
-                            >
-                                {row.name}
-                            </Box>
-                        </TableCell>
-                        <TableCell align="right">{row.bowlInns}</TableCell>
-                        <TableCell align="right">{row.bowlWickets}</TableCell>
-                        <TableCell align="right">{row.bowlAvg?.toFixed(2) || '0.00'}</TableCell>
-                        <TableCell align="right">{row.bowlBPD?.toFixed(2) || '0.00'}</TableCell>
-                        <TableCell align="right">{row.bowlER?.toFixed(2) || '0.00'}</TableCell>
-                    </TableRow>
-                ))}
-            </TableBody>
-        </Table>
-    </TableContainer>
-);
+                        <TableRow
+                            key={`${row.name}-${index}`}
+                            sx={{ '&:nth-of-type(odd)': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}
+                        >
+                            <TableCell sx={{ px: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                                <Box
+                                    component="span"
+                                    sx={{
+                                        cursor: 'help',
+                                        textDecoration: 'underline',
+                                        textDecorationStyle: 'dotted'
+                                    }}
+                                    title={`Teams: ${row.bowling_team}`}
+                                >
+                                    {row.name}
+                                </Box>
+                            </TableCell>
+                            <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                                {row.bowlInns}
+                            </TableCell>
+                            <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                                {row.bowlWickets}
+                            </TableCell>
+                            <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.75rem' : '0.875rem', whiteSpace: 'nowrap' }}>
+                                {row.bowlAvg?.toFixed(1) || '0'} @ {row.bowlER?.toFixed(1) || '0'}
+                            </TableCell>
+                            <TableCell align="right" sx={{ px: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                                {row.bowlBPD?.toFixed(1) || '0'}
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    );
 };
 
 const VenueNotes = ({ 
@@ -1016,14 +1028,14 @@ return (
             
             {statsData?.batting_leaders && statsData.batting_leaders.length > 0 && (
                 <Grid item xs={12} md={6}>
-                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%', overflowX: 'auto' }}>
+                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
                         <BattingLeaders data={statsData.batting_leaders} isMobile={isMobile} />
                     </Card>
                 </Grid>
             )}
             {statsData?.bowling_leaders && statsData.bowling_leaders.length > 0 && (
                 <Grid item xs={12} md={6}>
-                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%', overflowX: 'auto' }}>
+                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
                         <BowlingLeaders data={statsData.bowling_leaders} isMobile={isMobile} />
                     </Card>
                 </Grid>
