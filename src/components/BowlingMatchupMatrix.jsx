@@ -41,8 +41,29 @@ const MetricCell = ({ stats }) => {
 };
 
 const BowlingMatchupMatrix = ({ stats }) => {
-  const bowlingTypes = ['LF', 'LM', 'RF', 'RM', 'LO', 'LC', 'RO', 'RL'];
+  // Dynamically get all bowling types from the stats data
+  const bowlingTypes = stats?.phase_stats?.bowling_types
+    ? Object.keys(stats.phase_stats.bowling_types).sort()
+    : [];
   const phases = ['powerplay', 'middle', 'death', 'overall'];
+
+  if (!bowlingTypes.length) {
+    return (
+      <Card>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+            <Typography variant="h6">Bowling Type Matchups</Typography>
+            <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
+              <InfoIcon size={16} />
+            </Tooltip>
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            Bowling matchup data not available
+          </Typography>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

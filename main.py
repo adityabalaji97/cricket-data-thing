@@ -1862,13 +1862,10 @@ def get_player_stats(
 
         pace_spin_query = text(f"""
             WITH BowlerTypes AS (
-                SELECT 
+                SELECT
                     p.name,
                     p.bowler_type,
-                    CASE 
-                        WHEN p.bowler_type IN ('RF', 'RM', 'RS', 'LF', 'LM', 'LS') THEN 'pace'
-                        WHEN p.bowler_type IN ('RO', 'RL', 'LO', 'LC') THEN 'spin'
-                    END as bowling_category
+                    {BOWLER_CATEGORY_SQL} as bowling_category
                 FROM players p
                 WHERE p.bowler_type IS NOT NULL
             )
