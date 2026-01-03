@@ -35,7 +35,7 @@ from routers.player_summary import router as player_summary_router
 from routers.wrapped import router as wrapped_router
 from routers.search import router as search_router
 from routers.visualizations import router as visualizations_router
-from services.delivery_data_service import get_venue_match_stats, get_match_scores
+from services.delivery_data_service import get_venue_match_stats, get_match_scores, get_venue_phase_stats
 from services.bowler_types import BOWLER_CATEGORY_SQL
 import math
 
@@ -422,11 +422,16 @@ def get_venue_notes(
                 }
             }
 
-        # TODO: Add phase-wise stats query (currently simplified)
-        phase_wise_stats = {
-            'batting_first_wins': {},
-            'chasing_wins': {}
-        }
+        # Get phase-wise stats
+        phase_wise_stats = get_venue_phase_stats(
+            venue=venue if venue != "All Venues" else None,
+            start_date=start_date,
+            end_date=end_date,
+            leagues=expanded_leagues,
+            include_international=include_international,
+            top_teams=top_teams,
+            db=db
+        )
 
         return {
             "venue": venue,

@@ -361,6 +361,169 @@ def get_venue_match_stats(
     return None
 
 
+def get_venue_phase_stats(
+    venue: Optional[str],
+    start_date: Optional[date],
+    end_date: Optional[date],
+    leagues: List[str],
+    include_international: bool,
+    top_teams: Optional[int],
+    db: Session
+) -> Dict[str, Any]:
+    """
+    Get phase-wise statistics for a venue.
+
+    Returns stats for batting first wins and chasing wins across different phases.
+    """
+    # Build competition filter
+    competition_conditions = []
+    params = {
+        "venue": venue,
+        "start_date": start_date,
+        "end_date": end_date
+    }
+
+    if leagues and len(leagues) > 0:
+        params["leagues"] = leagues
+        competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
+
+    if include_international:
+        if top_teams:
+            from main import INTERNATIONAL_TEAMS_RANKED
+            top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+            params["top_team_list"] = top_team_list
+            competition_conditions.append(
+                "(m.match_type = 'international' AND "
+                "(m.team1 = ANY(:top_team_list) OR m.team2 = ANY(:top_team_list)))"
+            )
+        else:
+            competition_conditions.append("m.match_type = 'international'")
+
+    competition_filter = ""
+    if competition_conditions:
+        competition_filter = f"AND ({' OR '.join(competition_conditions)})"
+
+    venue_filter = "AND m.venue = :venue" if venue else ""
+
+    # Phase stats query - adapted from backup version
+    phase_query = text(f"""
+        WITH phase_stats AS (
+            SELECT
+                d.innings,
+                d.match_id,
+                m.won_batting_first,
+                m.won_fielding_first,
+                CASE
+                    WHEN d.over < 6 THEN 'powerplay'
+                    WHEN d.over >= 6 AND d.over < 10 THEN 'middle1'
+                    WHEN d.over >= 10 AND d.over < 15 THEN 'middle2'
+                    ELSE 'death'
+                END as phase,
+                SUM(d.runs_off_bat + d.extras) as runs,
+                COUNT(*) as balls,
+                SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) as wickets
+            FROM deliveries d
+            JOIN matches m ON d.match_id = m.id
+            WHERE 1=1
+                {venue_filter}
+                AND (:start_date IS NULL OR m.date >= :start_date)
+                AND (:end_date IS NULL OR m.date <= :end_date)
+                {competition_filter}
+            GROUP BY d.innings, d.match_id, m.won_batting_first, m.won_fielding_first, phase
+        ),
+        innings_stats AS (
+            SELECT
+                innings,
+                phase,
+                ROUND(AVG(runs)::numeric, 2) as runs_per_innings,
+                ROUND(AVG(wickets)::numeric, 2) as wickets_per_innings,
+                ROUND(AVG(balls)::numeric, 2) as balls_per_innings,
+                COUNT(*) as total_innings
+            FROM phase_stats
+            GROUP BY innings, phase
+        ),
+        batting_first_stats AS (
+            SELECT
+                innings,
+                phase,
+                ROUND(AVG(runs)::numeric, 2) as runs_per_innings,
+                ROUND(AVG(wickets)::numeric, 2) as wickets_per_innings,
+                ROUND(AVG(balls)::numeric, 2) as balls_per_innings
+            FROM phase_stats
+            WHERE won_batting_first = true
+            GROUP BY innings, phase
+        ),
+        chasing_stats AS (
+            SELECT
+                innings,
+                phase,
+                ROUND(AVG(runs)::numeric, 2) as runs_per_innings,
+                ROUND(AVG(wickets)::numeric, 2) as wickets_per_innings,
+                ROUND(AVG(balls)::numeric, 2) as balls_per_innings
+            FROM phase_stats
+            WHERE won_fielding_first = true
+            GROUP BY innings, phase
+        )
+        SELECT
+            i.innings,
+            i.phase,
+            i.runs_per_innings,
+            i.wickets_per_innings,
+            i.balls_per_innings,
+            b.runs_per_innings as batting_first_runs,
+            b.wickets_per_innings as batting_first_wickets,
+            b.balls_per_innings as batting_first_balls,
+            c.runs_per_innings as chasing_runs,
+            c.wickets_per_innings as chasing_wickets,
+            c.balls_per_innings as chasing_balls
+        FROM innings_stats i
+        LEFT JOIN batting_first_stats b ON i.innings = b.innings AND i.phase = b.phase
+        LEFT JOIN chasing_stats c ON i.innings = c.innings AND i.phase = c.phase
+        ORDER BY i.innings,
+            CASE i.phase
+                WHEN 'powerplay' THEN 1
+                WHEN 'middle1' THEN 2
+                WHEN 'middle2' THEN 3
+                WHEN 'death' THEN 4
+            END
+    """)
+
+    try:
+        phase_results = db.execute(phase_query, params).fetchall()
+
+        # Process phase stats into required format
+        phase_wise_stats = {
+            'batting_first_wins': {},
+            'chasing_wins': {}
+        }
+
+        for stat in phase_results:
+            batting_first_stats = {
+                'runs_per_innings': float(stat.batting_first_runs or 0),
+                'wickets_per_innings': float(stat.batting_first_wickets or 0),
+                'balls_per_innings': float(stat.batting_first_balls or 0)
+            }
+
+            chasing_stats = {
+                'runs_per_innings': float(stat.chasing_runs or 0),
+                'wickets_per_innings': float(stat.chasing_wickets or 0),
+                'balls_per_innings': float(stat.chasing_balls or 0)
+            }
+
+            if stat.innings == 1:
+                phase_wise_stats['batting_first_wins'][stat.phase] = batting_first_stats
+                phase_wise_stats['chasing_wins'][stat.phase] = chasing_stats
+
+        return phase_wise_stats
+
+    except Exception as e:
+        logger.error(f"Error getting phase stats: {e}", exc_info=True)
+        return {
+            'batting_first_wins': {},
+            'chasing_wins': {}
+        }
+
+
 def get_match_scores_from_deliveries(
     match_ids: List[str],
     db: Session
