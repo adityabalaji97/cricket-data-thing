@@ -262,7 +262,7 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
                         top: 10,
                         right: isMobile ? 10 : 20,
                         bottom: 0,
-                        left: isMobile ? -10 : 0
+                        left: isMobile ? -25 : 0
                     }}>
                         {plotType === 'avgsr' ? (
                             <>
@@ -378,14 +378,14 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
                                         <circle
                                             cx={cx}
                                             cy={cy}
-                                            r={isMobile ? 8 : 6}
+                                            r={isMobile ? 5 : 6}
                                             fill={fill || '#8884d8'}
                                             stroke="#fff"
-                                            strokeWidth={isMobile ? 1.5 : 1}
+                                            strokeWidth={isMobile ? 1 : 1}
                                         />
                                         <text
                                             x={cx}
-                                            y={cy + (isMobile ? 16 : 18)}
+                                            y={cy + (isMobile ? 13 : 18)}
                                             textAnchor="middle"
                                             fill="#333"
                                             fontSize={isMobile ? 7 : 8}
@@ -404,7 +404,7 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
                             fill="#000"
                             shape={(props) => {
                                 const { cx, cy } = props;
-                                const size = isMobile ? 9 : 8;
+                                const size = isMobile ? 6 : 8;
                                 return (
                                     <polygon
                                         points={`${cx},${cy-size} ${cx+size},${cy} ${cx},${cy+size} ${cx-size},${cy}`}
