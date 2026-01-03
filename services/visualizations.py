@@ -14,6 +14,47 @@ from models import leagues_mapping
 logger = logging.getLogger(__name__)
 
 
+def get_player_name_for_delivery_details(db: Session, player_name: str) -> List[str]:
+    """
+    Get all name variations for a player to query delivery_details table.
+
+    The deliveries table uses abbreviated names (e.g., "V Kohli")
+    The delivery_details table uses full names (e.g., "Virat Kohli")
+    The player_aliases table maps between them.
+
+    Returns a list of all possible names to match.
+    """
+    names = [player_name]  # Always include the input name
+
+    try:
+        # Check if this is an old name (from deliveries) that maps to a new name (in delivery_details)
+        query = text("""
+            SELECT alias_name
+            FROM player_aliases
+            WHERE player_name = :name
+        """)
+        result = db.execute(query, {'name': player_name}).fetchone()
+
+        if result:
+            names.append(result[0])
+
+        # Also check reverse - if this is already a new name, include it
+        query_reverse = text("""
+            SELECT player_name
+            FROM player_aliases
+            WHERE alias_name = :name
+        """)
+        result_reverse = db.execute(query_reverse, {'name': player_name}).fetchone()
+
+        if result_reverse:
+            names.append(result_reverse[0])
+
+    except Exception as e:
+        logger.warning(f"Could not resolve player aliases for {player_name}: {e}")
+
+    return list(set(names))  # Remove duplicates
+
+
 def expand_league_abbreviations(abbrevs: List[str]) -> List[str]:
     """
     Expand league abbreviations to include all variations.
@@ -84,9 +125,13 @@ def get_wagon_wheel_data(
     try:
         logger.info(f"Fetching wagon wheel data for {batter}")
 
+        # Resolve player name variations (e.g., "V Kohli" -> ["V Kohli", "Virat Kohli"])
+        batter_names = get_player_name_for_delivery_details(db, batter)
+        logger.info(f"Resolved batter names: {batter_names}")
+
         # Build WHERE conditions
-        conditions = ["dd.bat = :batter", "dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"]
-        params = {"batter": batter}
+        conditions = ["dd.bat = ANY(:batter_names)", "dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"]
+        params = {"batter_names": batter_names}
 
         if start_date:
             conditions.append("dd.match_date >= :start_date")
@@ -233,9 +278,13 @@ def get_pitch_map_data(
     try:
         logger.info(f"Fetching pitch map data for {batter}")
 
+        # Resolve player name variations (e.g., "V Kohli" -> ["V Kohli", "Virat Kohli"])
+        batter_names = get_player_name_for_delivery_details(db, batter)
+        logger.info(f"Resolved batter names: {batter_names}")
+
         # Build WHERE conditions (same as wagon wheel)
-        conditions = ["dd.bat = :batter", "dd.line IS NOT NULL", "dd.length IS NOT NULL"]
-        params = {"batter": batter}
+        conditions = ["dd.bat = ANY(:batter_names)", "dd.line IS NOT NULL", "dd.length IS NOT NULL"]
+        params = {"batter_names": batter_names}
 
         if start_date:
             conditions.append("dd.match_date >= :start_date")
