@@ -25,17 +25,17 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
     const [minInnings, setMinInnings] = useState(5);
     const [phase, setPhase] = useState('overall');
     const [plotType, setPlotType] = useState('avgsr');
-    
+
     const phases = [
         { value: 'overall', label: 'Overall' },
         { value: 'pp', label: 'Powerplay' },
-        { value: 'middle', label: 'Middle Overs' },
-        { value: 'death', label: 'Death Overs' }
+        { value: 'middle', label: isMobile ? 'Middle' : 'Middle Overs' },
+        { value: 'death', label: isMobile ? 'Death' : 'Death Overs' }
     ];
 
     const plotTypes = [
-        { value: 'avgsr', label: 'Average vs Strike Rate' },
-        { value: 'dotbound', label: 'Dot% vs Boundary%' }
+        { value: 'avgsr', label: isMobile ? 'Avg vs SR' : 'Average vs Strike Rate' },
+        { value: 'dotbound', label: isMobile ? 'Dot vs Bnd' : 'Dot% vs Boundary%' }
     ];
     
     const getAxesData = () => {
@@ -60,36 +60,38 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
         if (active && payload && payload[0]) {
             const data = payload[0].payload;
             const phasePrefix = phase === 'overall' ? '' : `${phase}_`;
-            const phaseInnings = phase === 'overall' ? data.innings : 
+            const phaseInnings = phase === 'overall' ? data.innings :
                 data[`${phasePrefix}innings`] || 0;
-            const phaseRuns = phase === 'overall' ? data.total_runs : 
+            const phaseRuns = phase === 'overall' ? data.total_runs :
                 data[`${phasePrefix}runs`] || 0;
             const avg = data[`${phasePrefix}avg`];
             const sr = data[`${phasePrefix}sr`];
             const dotPercent = data[`${phasePrefix}dot_percent`];
             const boundaryPercent = data[`${phasePrefix}boundary_percent`];
-    
+
             return (
-                <Box sx={{ bgcolor: 'white', p: 2, border: '1px solid #ccc', borderRadius: 1 }}>
-                    <Typography variant="subtitle2">{data.name}</Typography>
-                    <Typography variant="body2">
+                <Box sx={{ bgcolor: 'white', p: isMobile ? 1 : 2, border: '1px solid #ccc', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem', fontWeight: 600 }}>
+                        {data.name}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
                         {`${phaseRuns} runs in ${phaseInnings} innings`}
                     </Typography>
                     {plotType === 'avgsr' ? (
                         <>
-                            <Typography variant="body2">
+                            <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
                                 Average: {avg?.toFixed(2) || 'N/A'}
                             </Typography>
-                            <Typography variant="body2">
+                            <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
                                 Strike Rate: {sr?.toFixed(2) || 'N/A'}
                             </Typography>
                         </>
                     ) : (
                         <>
-                            <Typography variant="body2">
+                            <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
                                 Dot %: {dotPercent?.toFixed(2) || 'N/A'}
                             </Typography>
-                            <Typography variant="body2">
+                            <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
                                 Boundary %: {boundaryPercent?.toFixed(2) || 'N/A'}
                             </Typography>
                         </>
@@ -126,8 +128,8 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
     const filteredData = data
         .filter(d => {
             const phasePrefix = phase === 'overall' ? '' : `${phase}_`;
-            const phaseInnings = phase === 'overall' ? 
-                d.innings : 
+            const phaseInnings = phase === 'overall' ?
+                d.innings :
                 d[`${phasePrefix}innings`] || 0;
             return d.name !== 'Average Batter' && phaseInnings >= minInnings;
         })
@@ -143,11 +145,15 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
             return bRuns - aRuns; // Descending order
         });
 
+    // Limit number of players shown on mobile to reduce crowding
+    const maxPlayers = isMobile ? 15 : 30;
+    const displayData = filteredData.slice(0, maxPlayers);
+
     const metrics = getAxesData();
-    
-    // Calculate domain boundaries from the filtered data
-    const axisData = filteredData.length > 0 
-        ? filteredData.map(d => ({
+
+    // Calculate domain boundaries from the display data
+    const axisData = displayData.length > 0
+        ? displayData.map(d => ({
             x: d[metrics.xKey],
             y: d[metrics.yKey]
           }))
@@ -172,24 +178,31 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
     const minY = allYValues.length > 0 ? Math.floor(Math.min(...allYValues) * (1 - padding)) : 0;
     const maxY = allYValues.length > 0 ? Math.ceil(Math.max(...allYValues) * (1 + padding)) : 150;
 
+    // Responsive height calculation - fits in mobile viewport for screenshots
+    const chartHeight = isMobile ?
+        Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.65 : 450, 500) :
+        520;
+
     return (
-        <Card sx={{ width: '100%', p: 2, pb: 0 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
+        <Card sx={{ width: '100%', p: isMobile ? 1.5 : 2, pb: 0 }}>
+            <Typography variant={isMobile ? "body1" : "h6"} sx={{ mb: isMobile ? 1 : 2, fontWeight: 600 }}>
                 Batting Performance Analysis
             </Typography>
-            
-            <Stack 
-                direction={isMobile ? "column" : "row"} 
-                spacing={isMobile ? 3 : 2} 
-                alignItems="stretch" 
-                sx={{ 
-                    mb: 2,
-                    width: '100%'
-                }}
+
+            {filteredData.length > maxPlayers && (
+                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 1, fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
+                    Showing top {maxPlayers} players by runs (from {filteredData.length} total)
+                </Typography>
+            )}
+
+            <Stack
+                direction="column"
+                spacing={isMobile ? 1 : 2}
+                sx={{ mb: isMobile ? 1 : 2 }}
             >
                 <Box sx={{ width: '100%' }}>
-                    <Typography variant="body2" gutterBottom>
-                        Minimum Innings: {minInnings} ({filteredData.length} players)
+                    <Typography variant="body2" gutterBottom sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem' }}>
+                        Min Innings: {minInnings} ({filteredData.length} players)
                     </Typography>
                     <Slider
                         value={minInnings}
@@ -197,42 +210,54 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
                         min={1}
                         max={15}
                         step={1}
-                        marks
+                        marks={!isMobile}
                         aria-label="Minimum Innings"
                         valueLabelDisplay="auto"
+                        size={isMobile ? "small" : "medium"}
                     />
                 </Box>
-                <FormControl sx={{ width: '100%' }}>
-                    <InputLabel>Phase</InputLabel>
-                    <Select
-                        value={phase}
-                        onChange={(e) => setPhase(e.target.value)}
-                        label="Phase"
-                        fullWidth
-                    >
-                        {phases.map(p => (
-                            <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-                <FormControl sx={{ width: '100%' }}>
-                    <InputLabel>Plot Type</InputLabel>
-                    <Select
-                        value={plotType}
-                        onChange={(e) => setPlotType(e.target.value)}
-                        label="Plot Type"
-                        fullWidth
-                    >
-                        {plotTypes.map(p => (
-                            <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+                <Stack direction="row" spacing={isMobile ? 1 : 2} sx={{ width: '100%' }}>
+                    <FormControl sx={{ flex: 1 }} size={isMobile ? "small" : "medium"}>
+                        <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : '1rem' }}>Phase</InputLabel>
+                        <Select
+                            value={phase}
+                            onChange={(e) => setPhase(e.target.value)}
+                            label="Phase"
+                            sx={{ fontSize: isMobile ? '0.75rem' : '1rem' }}
+                        >
+                            {phases.map(p => (
+                                <MenuItem key={p.value} value={p.value} sx={{ fontSize: isMobile ? '0.75rem' : '1rem' }}>
+                                    {p.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    <FormControl sx={{ flex: 1 }} size={isMobile ? "small" : "medium"}>
+                        <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : '1rem' }}>Plot Type</InputLabel>
+                        <Select
+                            value={plotType}
+                            onChange={(e) => setPlotType(e.target.value)}
+                            label="Plot Type"
+                            sx={{ fontSize: isMobile ? '0.75rem' : '1rem' }}
+                        >
+                            {plotTypes.map(p => (
+                                <MenuItem key={p.value} value={p.value} sx={{ fontSize: isMobile ? '0.75rem' : '1rem' }}>
+                                    {p.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </Stack>
             </Stack>
 
-            <Box sx={{ width: '100%', height: 520, mt: 2, mb: 0 }}>
+            <Box sx={{ width: '100%', height: chartHeight, mt: isMobile ? 1 : 2, mb: 0 }}>
                 <ResponsiveContainer>
-                    <ScatterChart margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                    <ScatterChart margin={{
+                        top: 10,
+                        right: isMobile ? 10 : 20,
+                        bottom: 0,
+                        left: isMobile ? 0 : 0
+                    }}>
                         {plotType === 'avgsr' ? (
                             <>
                                 <ReferenceArea
@@ -304,25 +329,27 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
                                 />
                             </>
                         )}
-                        <XAxis 
-                            type="number" 
+                        <XAxis
+                            type="number"
                             dataKey={metrics.xKey}
                             domain={[minX, maxX]}
                             axisLine={{ strokeWidth: 1 }}
                             tickSize={4}
                             dy={0}
                             padding={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                            tick={{ fontSize: isMobile ? 9 : 12 }}
                         />
-                        <YAxis 
-                            type="number" 
+                        <YAxis
+                            type="number"
                             dataKey={metrics.yKey}
                             domain={[minY, maxY]}
                             axisLine={{ strokeWidth: 1 }}
                             tickSize={4}
                             dx={0}
                             padding={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                            tick={{ fontSize: isMobile ? 9 : 12 }}
                         />
-                        
+
                         <ReferenceLine x={avgBatter[metrics.xKey]} stroke="#666" strokeDasharray="3 3" />
                         <ReferenceLine y={avgBatter[metrics.yKey]} stroke="#666" strokeDasharray="3 3" />
 
@@ -330,59 +357,37 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
 
                         <Scatter
                             name="Players"
-                            data={filteredData.length > 30 ? filteredData.slice(0, 30) : filteredData}
+                            data={displayData}
                             fill="#8884d8"
                             shape={(props) => {
-                                const { cx, cy, fill, payload } = props;
+                                const { cx, cy, fill } = props;
                                 return (
-                                    <>
-                                        <circle
-                                            cx={cx}
-                                            cy={cy}
-                                            r={6}
-                                            fill={fill || '#8884d8'}
-                                            stroke="#fff"
-                                            strokeWidth={1}
-                                        />
-                                        <text
-                                            x={cx}
-                                            y={cy + 15}
-                                            textAnchor="middle"
-                                            fontSize={12}
-                                            fill="#000"
-                                        >
-                                            {payload.name.length > 8 ? payload.name.substring(0, 8) + '...' : payload.name}
-                                        </text>
-                                    </>
+                                    <circle
+                                        cx={cx}
+                                        cy={cy}
+                                        r={isMobile ? 8 : 6}
+                                        fill={fill || '#8884d8'}
+                                        stroke="#fff"
+                                        strokeWidth={isMobile ? 1.5 : 1}
+                                    />
                                 );
                             }}
                         />
-                        
+
                         <Scatter
                             name="Average Batter"
                             data={[avgBatter]}
                             fill="#000"
                             shape={(props) => {
                                 const { cx, cy } = props;
+                                const size = isMobile ? 9 : 8;
                                 return (
-                                    <>
-                                        <polygon
-                                            points={`${cx},${cy-8} ${cx+8},${cy} ${cx},${cy+8} ${cx-8},${cy}`}
-                                            fill="#000"
-                                            stroke="#fff"
-                                            strokeWidth={1}
-                                        />
-                                        <text
-                                            x={cx}
-                                            y={cy + 20}
-                                            textAnchor="middle"
-                                            fontSize={11}
-                                            fontWeight="bold"
-                                            fill="#000"
-                                        >
-                                            Avg. Batter
-                                        </text>
-                                    </>
+                                    <polygon
+                                        points={`${cx},${cy-size} ${cx+size},${cy} ${cx},${cy+size} ${cx-size},${cy}`}
+                                        fill="#000"
+                                        stroke="#fff"
+                                        strokeWidth={1.5}
+                                    />
                                 );
                             }}
                         />
