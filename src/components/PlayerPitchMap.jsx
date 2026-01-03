@@ -27,7 +27,8 @@ const PlayerPitchMap = ({
   venue,
   leagues = [],
   includeInternational = false,
-  topTeams = null
+  topTeams = null,
+  isMobile = false
 }) => {
   const [pitchData, setPitchData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -37,9 +38,15 @@ const PlayerPitchMap = ({
   const [phase, setPhase] = useState('overall');
   const [bowlKind, setBowlKind] = useState('all');
   const [bowlStyle, setBowlStyle] = useState('all');
+  const [line, setLine] = useState('all');
+  const [length, setLength] = useState('all');
+  const [shot, setShot] = useState('all');
 
-  // Available bowling styles from data
+  // Available options from data
   const [availableStyles, setAvailableStyles] = useState([]);
+  const [availableLines, setAvailableLines] = useState([]);
+  const [availableLengths, setAvailableLengths] = useState([]);
+  const [availableShots, setAvailableShots] = useState([]);
 
   useEffect(() => {
     if (!playerName) return;
@@ -62,6 +69,9 @@ const PlayerPitchMap = ({
       params.append('phase', phase);
       if (bowlKind !== 'all') params.append('bowl_kind', bowlKind);
       if (bowlStyle !== 'all') params.append('bowl_style', bowlStyle);
+      if (line !== 'all') params.append('line', line);
+      if (length !== 'all') params.append('length', length);
+      if (shot !== 'all') params.append('shot', shot);
 
       try {
         const response = await fetch(
@@ -75,8 +85,8 @@ const PlayerPitchMap = ({
         const data = await response.json();
         setPitchData(data);
 
-        // Get unique bowling styles by fetching wagon wheel data
-        // (pitch map aggregates, so we need raw data for styles)
+        // Get unique values by fetching wagon wheel data
+        // (pitch map aggregates, so we need raw data for filter options)
         const wagonResponse = await fetch(
           `${config.API_URL}/visualizations/player/${encodeURIComponent(playerName)}/wagon-wheel?${params}`
         );
@@ -84,6 +94,15 @@ const PlayerPitchMap = ({
           const wagonData = await wagonResponse.json();
           const styles = [...new Set(wagonData.deliveries.map(d => d.bowl_style).filter(Boolean))];
           setAvailableStyles(styles.sort());
+
+          const lines = [...new Set(wagonData.deliveries.map(d => d.line).filter(Boolean))];
+          setAvailableLines(lines.sort());
+
+          const lengths = [...new Set(wagonData.deliveries.map(d => d.length).filter(Boolean))];
+          setAvailableLengths(lengths.sort());
+
+          const shots = [...new Set(wagonData.deliveries.map(d => d.shot).filter(Boolean))];
+          setAvailableShots(shots.sort());
         }
       } catch (err) {
         console.error('Error fetching pitch map data:', err);
@@ -94,7 +113,7 @@ const PlayerPitchMap = ({
     };
 
     fetchPitchData();
-  }, [playerName, startDate, endDate, venue, leagues, includeInternational, topTeams, phase, bowlKind, bowlStyle]);
+  }, [playerName, startDate, endDate, venue, leagues, includeInternational, topTeams, phase, bowlKind, bowlStyle, line, length, shot]);
 
   if (loading) {
     return (
@@ -122,42 +141,73 @@ const PlayerPitchMap = ({
   }
 
   return (
-    <Box sx={{ width: '100%', px: 1 }}>
-      <Typography variant="h6" gutterBottom sx={{ textAlign: 'center' }}>
+    <Box sx={{
+      width: '100%',
+      px: isMobile ? 0 : 1,
+      backgroundColor: isMobile ? 'transparent' : undefined,
+      boxShadow: isMobile ? 0 : undefined
+    }}>
+      <Typography variant={isMobile ? "body1" : "h6"} gutterBottom sx={{ textAlign: 'center', fontWeight: 600, fontSize: isMobile ? '0.875rem' : undefined }}>
         Pitch Map
       </Typography>
 
       {/* Filters */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2, justifyContent: 'center' }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 1 : 1.5, mb: 2, justifyContent: 'center' }}>
         {/* Phase Filter */}
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Phase</InputLabel>
-          <Select value={phase} label="Phase" onChange={(e) => setPhase(e.target.value)}>
-            <MenuItem value="overall">Overall</MenuItem>
-            <MenuItem value="powerplay">Powerplay</MenuItem>
-            <MenuItem value="middle">Middle</MenuItem>
-            <MenuItem value="death">Death</MenuItem>
+        <FormControl size="small" sx={{ minWidth: isMobile ? 90 : 120 }}>
+          <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Phase</InputLabel>
+          <Select value={phase} label="Phase" onChange={(e) => setPhase(e.target.value)} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>
+            <MenuItem value="overall" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Overall</MenuItem>
+            <MenuItem value="powerplay" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>{isMobile ? 'PP' : 'Powerplay'}</MenuItem>
+            <MenuItem value="middle" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Middle</MenuItem>
+            <MenuItem value="death" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Death</MenuItem>
           </Select>
         </FormControl>
 
         {/* Bowl Kind Filter */}
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Bowl Kind</InputLabel>
-          <Select value={bowlKind} label="Bowl Kind" onChange={(e) => setBowlKind(e.target.value)}>
-            <MenuItem value="all">All</MenuItem>
-            <MenuItem value="pace bowler">Pace</MenuItem>
-            <MenuItem value="spin bowler">Spin</MenuItem>
+        <FormControl size="small" sx={{ minWidth: isMobile ? 90 : 120 }}>
+          <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Bowl</InputLabel>
+          <Select value={bowlKind} label="Bowl" onChange={(e) => setBowlKind(e.target.value)} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>
+            <MenuItem value="all" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>All</MenuItem>
+            <MenuItem value="pace bowler" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Pace</MenuItem>
+            <MenuItem value="spin bowler" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Spin</MenuItem>
           </Select>
         </FormControl>
 
-        {/* Bowl Style Filter */}
-        {availableStyles.length > 0 && (
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Bowl Style</InputLabel>
-            <Select value={bowlStyle} label="Bowl Style" onChange={(e) => setBowlStyle(e.target.value)}>
-              <MenuItem value="all">All</MenuItem>
-              {availableStyles.map(style => (
-                <MenuItem key={style} value={style}>{style}</MenuItem>
+        {/* Line Filter */}
+        {availableLines.length > 0 && (
+          <FormControl size="small" sx={{ minWidth: isMobile ? 90 : 120 }}>
+            <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Line</InputLabel>
+            <Select value={line} label="Line" onChange={(e) => setLine(e.target.value)} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>
+              <MenuItem value="all" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>All</MenuItem>
+              {availableLines.map(l => (
+                <MenuItem key={l} value={l} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>{l}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+
+        {/* Length Filter */}
+        {availableLengths.length > 0 && (
+          <FormControl size="small" sx={{ minWidth: isMobile ? 90 : 120 }}>
+            <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Length</InputLabel>
+            <Select value={length} label="Length" onChange={(e) => setLength(e.target.value)} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>
+              <MenuItem value="all" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>All</MenuItem>
+              {availableLengths.map(len => (
+                <MenuItem key={len} value={len} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>{len}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+
+        {/* Shot Filter */}
+        {availableShots.length > 0 && (
+          <FormControl size="small" sx={{ minWidth: isMobile ? 90 : 120 }}>
+            <InputLabel sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>Shot</InputLabel>
+            <Select value={shot} label="Shot" onChange={(e) => setShot(e.target.value)} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>
+              <MenuItem value="all" sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>All</MenuItem>
+              {availableShots.map(s => (
+                <MenuItem key={s} value={s} sx={{ fontSize: isMobile ? '0.75rem' : undefined }}>{s}</MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -165,8 +215,8 @@ const PlayerPitchMap = ({
       </Box>
 
       {/* Stats Summary */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <Chip label={`${pitchData.total_balls} balls`} size="small" color="primary" />
+      <Box sx={{ display: 'flex', gap: isMobile ? 0.5 : 1, mb: isMobile ? 1.5 : 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <Chip label={`${pitchData.total_balls} balls`} size="small" color="primary" sx={{ fontSize: isMobile ? '0.7rem' : undefined, height: isMobile ? 24 : undefined }} />
       </Box>
 
       {/* Pitch Map Visualization */}

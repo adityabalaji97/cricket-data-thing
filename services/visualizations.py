@@ -99,6 +99,9 @@ def get_wagon_wheel_data(
     phase: Optional[str] = None,  # overall, powerplay, middle, death
     bowl_kind: Optional[str] = None,  # pace, spin
     bowl_style: Optional[str] = None,  # specific bowler types
+    line: Optional[str] = None,  # ball line (e.g., OUTSIDE_OFFSTUMP)
+    length: Optional[str] = None,  # ball length (e.g., FULL, GOOD_LENGTH)
+    shot: Optional[str] = None,  # shot type (e.g., COVER_DRIVE)
 ) -> List[Dict[str, Any]]:
     """
     Get wagon wheel data for a batter with optional filters.
@@ -118,6 +121,9 @@ def get_wagon_wheel_data(
         phase: Match phase (powerplay: 0-5, middle: 6-14, death: 15+)
         bowl_kind: Filter by bowling kind (pace bowler, spin bowler)
         bowl_style: Filter by specific bowling style
+        line: Filter by ball line
+        length: Filter by ball length
+        shot: Filter by shot type
 
     Returns:
         List of deliveries with wagon coordinates and metadata
@@ -189,6 +195,19 @@ def get_wagon_wheel_data(
         if bowl_style:
             conditions.append("dd.bowl_style = :bowl_style")
             params["bowl_style"] = bowl_style
+
+        # Ball delivery filters
+        if line:
+            conditions.append("dd.line = :line")
+            params["line"] = line
+
+        if length:
+            conditions.append("dd.length = :length")
+            params["length"] = length
+
+        if shot:
+            conditions.append("dd.shot = :shot")
+            params["shot"] = shot
 
         where_clause = " AND ".join(conditions)
 
@@ -263,6 +282,9 @@ def get_pitch_map_data(
     phase: Optional[str] = None,
     bowl_kind: Optional[str] = None,
     bowl_style: Optional[str] = None,
+    line: Optional[str] = None,
+    length: Optional[str] = None,
+    shot: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Get pitch map data for a batter with optional filters.
@@ -341,6 +363,19 @@ def get_pitch_map_data(
         if bowl_style:
             conditions.append("dd.bowl_style = :bowl_style")
             params["bowl_style"] = bowl_style
+
+        # Ball delivery filters
+        if line:
+            conditions.append("dd.line = :line")
+            params["line"] = line
+
+        if length:
+            conditions.append("dd.length = :length")
+            params["length"] = length
+
+        if shot:
+            conditions.append("dd.shot = :shot")
+            params["shot"] = shot
 
         where_clause = " AND ".join(conditions)
 

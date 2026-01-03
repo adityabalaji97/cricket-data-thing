@@ -7,7 +7,11 @@ import {
   Button,
   Box,
   useMediaQuery,
-  useTheme
+  useTheme,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   RadarChart,
@@ -41,10 +45,11 @@ const transformPhaseData = (stats, type = 'overall') => {
   return phaseData;
 };
 
-const PhasePerformanceRadar = ({ stats }) => {
+const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp }) => {
   const [selectedView, setSelectedView] = useState('overall');
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
 
   const data = transformPhaseData(stats, selectedView);
 
@@ -75,38 +80,48 @@ const PhasePerformanceRadar = ({ stats }) => {
           mb: 2,
           gap: isMobile ? 1 : 0
         }}>
-          <Typography variant={isMobile ? "body1" : "h6"} sx={{ fontWeight: 600 }}>
+          <Typography variant={isMobile ? "body1" : "h6"} sx={{ fontWeight: 600, fontSize: isMobile ? '0.875rem' : undefined }}>
             Phase-wise Performance
           </Typography>
-          <ButtonGroup
-            variant="outlined"
-            size={isMobile ? "small" : "small"}
-            sx={{
-              '& .MuiButton-root': {
-                fontSize: isMobile ? '0.7rem' : '0.875rem',
-                px: isMobile ? 1 : 1.5
-              }
-            }}
-          >
-            <Button
-              onClick={() => setSelectedView('overall')}
-              variant={selectedView === 'overall' ? 'contained' : 'outlined'}
+          {isMobile ? (
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel sx={{ fontSize: '0.75rem' }}>View</InputLabel>
+              <Select
+                value={selectedView}
+                onChange={(e) => setSelectedView(e.target.value)}
+                label="View"
+                sx={{ fontSize: '0.75rem' }}
+              >
+                <MenuItem value="overall" sx={{ fontSize: '0.75rem' }}>Overall</MenuItem>
+                <MenuItem value="pace" sx={{ fontSize: '0.75rem' }}>vs Pace</MenuItem>
+                <MenuItem value="spin" sx={{ fontSize: '0.75rem' }}>vs Spin</MenuItem>
+              </Select>
+            </FormControl>
+          ) : (
+            <ButtonGroup
+              variant="outlined"
+              size="small"
             >
-              Overall
-            </Button>
-            <Button
-              onClick={() => setSelectedView('pace')}
-              variant={selectedView === 'pace' ? 'contained' : 'outlined'}
-            >
-              {isMobile ? 'Pace' : 'vs Pace'}
-            </Button>
-            <Button
-              onClick={() => setSelectedView('spin')}
-              variant={selectedView === 'spin' ? 'contained' : 'outlined'}
-            >
-              {isMobile ? 'Spin' : 'vs Spin'}
-            </Button>
-          </ButtonGroup>
+              <Button
+                onClick={() => setSelectedView('overall')}
+                variant={selectedView === 'overall' ? 'contained' : 'outlined'}
+              >
+                Overall
+              </Button>
+              <Button
+                onClick={() => setSelectedView('pace')}
+                variant={selectedView === 'pace' ? 'contained' : 'outlined'}
+              >
+                vs Pace
+              </Button>
+              <Button
+                onClick={() => setSelectedView('spin')}
+                variant={selectedView === 'spin' ? 'contained' : 'outlined'}
+              >
+                vs Spin
+              </Button>
+            </ButtonGroup>
+          )}
         </Box>
 
         <Box sx={{ width: '100%', height: chartHeight }}>
@@ -114,7 +129,7 @@ const PhasePerformanceRadar = ({ stats }) => {
             <RadarChart
               outerRadius={isMobile ? "70%" : 150}
               data={data}
-              margin={{ top: 10, right: isMobile ? 10 : 20, bottom: isMobile ? 10 : 20, left: isMobile ? 10 : 20 }}
+              margin={{ top: 10, right: isMobile ? 5 : 20, bottom: isMobile ? 5 : 20, left: isMobile ? 5 : 20 }}
             >
               <PolarGrid />
               <PolarAngleAxis

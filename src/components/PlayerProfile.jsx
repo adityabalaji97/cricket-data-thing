@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Box, Button, Typography, TextField, CircularProgress, Alert, Autocomplete } from '@mui/material';
+import { Container, Box, Button, Typography, TextField, CircularProgress, Alert, Autocomplete, useMediaQuery, useTheme, Collapse, IconButton } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useLocation, useNavigate } from 'react-router-dom';
 import CareerStatsCards from './CareerStatsCards';
 import PhasePerformanceRadar from './PhasePerformanceRadar';
@@ -25,13 +27,15 @@ const TODAY = new Date().toISOString().split('T')[0];
 const PlayerProfile = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   // Helper function to get URL parameters
   const getQueryParam = (param) => {
     const searchParams = new URLSearchParams(location.search);
     return searchParams.get(param);
   };
-  
+
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [dateRange, setDateRange] = useState({ start: DEFAULT_START_DATE, end: TODAY });
   const [selectedVenue, setSelectedVenue] = useState("All Venues");
@@ -48,6 +52,7 @@ const PlayerProfile = () => {
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [dnaFetchTrigger, setDnaFetchTrigger] = useState(0);
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
 
   // Add a direct event listener to trigger analysis on page load if needed
   useEffect(() => {
@@ -197,11 +202,18 @@ const PlayerProfile = () => {
     setShouldFetch(true);
   };
 
+  // Auto-collapse filters on mobile when loading starts
+  useEffect(() => {
+    if (isMobile && loading && stats) {
+      setFiltersExpanded(false);
+    }
+  }, [isMobile, loading, stats]);
+
   useEffect(() => {
     // Inside fetchPlayerStats function in useEffect
     const fetchPlayerStats = async () => {
         if (!shouldFetch || !selectedPlayer) return;
-        
+
         console.log('Fetching stats for player:', selectedPlayer);
         setLoading(true);
         const params = new URLSearchParams();
@@ -248,67 +260,89 @@ const PlayerProfile = () => {
 
   return (
     <Container maxWidth="xl">
-      <Box sx={{ py: 4 }}>
+      <Box sx={{ py: isMobile ? 2 : 4 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 4 }}>
-          <Autocomplete
-            value={selectedPlayer}
-            onChange={(_, newValue) => setSelectedPlayer(newValue)}
-            options={players}
-            sx={{ width: { xs: '100%', md: 300 } }}
-            getOptionLabel={(option) => {
-              // If option is a string, return it directly
-              if (typeof option === 'string') {
-                return option;
-              }
-              // If option is an object, return option.name or default to empty string
-              return option || '';
-            }}
-            isOptionEqualToValue={(option, value) => {
-              // Handle string values (from URL) and object values
-              if (typeof value === 'string') {
-                return option === value;
-              }
-              return option === value;
-            }}
-            renderInput={(params) => <TextField {...params} label="Select Player" variant="outlined" required />}
-          />
-
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <TextField
-              label="Start Date"
-              type="date"
-              value={dateRange.start}
-              onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="End Date"
-              type="date"
-              value={dateRange.end}
-              onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-            />
-            <Autocomplete
-              value={selectedVenue}
-              onChange={(_, newValue) => setSelectedVenue(newValue)}
-              options={venues}
-              sx={{ width: 250 }}
-              renderInput={(params) => <TextField {...params} label="Select Venue" />}
-            />
-            <Button 
-              variant="contained"
-              onClick={handleFetch}
-              disabled={!selectedPlayer || loading}
-              id="go-button"
+        {isMobile && stats && (
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+              {selectedPlayer}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              sx={{ p: 0.5 }}
             >
-              GO
-            </Button>
+              {filtersExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+            </IconButton>
           </Box>
-        </Box>
+        )}
 
-        <CompetitionFilter onFilterChange={setCompetitionFilters} />
+        <Collapse in={!isMobile || filtersExpanded} timeout="auto">
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: isMobile ? 2 : 4 }}>
+            <Autocomplete
+              value={selectedPlayer}
+              onChange={(_, newValue) => setSelectedPlayer(newValue)}
+              options={players}
+              sx={{ width: { xs: '100%', md: 300 } }}
+              size={isMobile ? "small" : "medium"}
+              getOptionLabel={(option) => {
+                // If option is a string, return it directly
+                if (typeof option === 'string') {
+                  return option;
+                }
+                // If option is an object, return option.name or default to empty string
+                return option || '';
+              }}
+              isOptionEqualToValue={(option, value) => {
+                // Handle string values (from URL) and object values
+                if (typeof value === 'string') {
+                  return option === value;
+                }
+                return option === value;
+              }}
+              renderInput={(params) => <TextField {...params} label="Select Player" variant="outlined" required />}
+            />
+
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <TextField
+                label="Start Date"
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+                size={isMobile ? "small" : "medium"}
+              />
+              <TextField
+                label="End Date"
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+                size={isMobile ? "small" : "medium"}
+              />
+              <Autocomplete
+                value={selectedVenue}
+                onChange={(_, newValue) => setSelectedVenue(newValue)}
+                options={venues}
+                sx={{ width: isMobile ? '100%' : 250 }}
+                size={isMobile ? "small" : "medium"}
+                renderInput={(params) => <TextField {...params} label="Select Venue" />}
+              />
+              <Button
+                variant="contained"
+                onClick={handleFetch}
+                disabled={!selectedPlayer || loading}
+                id="go-button"
+                size={isMobile ? "small" : "medium"}
+              >
+                GO
+              </Button>
+            </Box>
+          </Box>
+
+          <CompetitionFilter onFilterChange={setCompetitionFilters} isMobile={isMobile} />
+        </Collapse>
 
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -317,8 +351,8 @@ const PlayerProfile = () => {
         )}
 
         {stats && !loading && (
-          <Box sx={{ mt: 4 }}>
-            <CareerStatsCards stats={stats} />
+          <Box sx={{ mt: isMobile ? 2 : 4 }}>
+            <CareerStatsCards stats={stats} isMobile={isMobile} />
 
             <PlayerDNASummary
               playerName={selectedPlayer}
@@ -329,10 +363,11 @@ const PlayerProfile = () => {
               topTeams={competitionFilters.topTeams}
               venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
               fetchTrigger={dnaFetchTrigger}
+              isMobile={isMobile}
             />
-            
+
             {/* Contextual Query Prompts */}
-            <ContextualQueryPrompts 
+            <ContextualQueryPrompts
               queries={getBatterContextualQueries(selectedPlayer, {
                 startDate: dateRange.start,
                 endDate: dateRange.end,
@@ -340,18 +375,20 @@ const PlayerProfile = () => {
                 venue: selectedVenue !== 'All Venues' ? selectedVenue : null,
               })}
               title={`🔍 Explore ${selectedPlayer.split(' ').pop()}'s Data`}
+              isMobile={isMobile}
             />
-            
-            <Box sx={{ mt: 3 }}>
+
+            <Box sx={{ mt: isMobile ? 2 : 3 }}>
               <ContributionGraph
                 innings={stats.innings || []}
                 mode="batter"
                 dateRange={dateRange}
+                isMobile={isMobile}
               />
             </Box>
 
             {/* Wagon Wheel and Pitch Map Visualizations */}
-            <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
+            <Box sx={{ mt: isMobile ? 2 : 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: isMobile ? 2 : 3 }}>
               <WagonWheel
                 playerName={selectedPlayer}
                 startDate={dateRange.start}
@@ -360,6 +397,7 @@ const PlayerProfile = () => {
                 leagues={competitionFilters.leagues}
                 includeInternational={competitionFilters.international}
                 topTeams={competitionFilters.topTeams}
+                isMobile={isMobile}
               />
               <PlayerPitchMap
                 playerName={selectedPlayer}
@@ -369,24 +407,26 @@ const PlayerProfile = () => {
                 leagues={competitionFilters.leagues}
                 includeInternational={competitionFilters.international}
                 topTeams={competitionFilters.topTeams}
+                isMobile={isMobile}
               />
             </Box>
 
-            <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
-              <PhasePerformanceRadar stats={stats} />
-              <PaceSpinBreakdown stats={stats} />
-              <InningsScatter innings={stats.innings} />
+            <Box sx={{ mt: isMobile ? 2 : 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: isMobile ? 2 : 3 }}>
+              <PhasePerformanceRadar stats={stats} isMobile={isMobile} />
+              <PaceSpinBreakdown stats={stats} isMobile={isMobile} />
+              <InningsScatter innings={stats.innings} isMobile={isMobile} />
               <StrikeRateProgression
                 selectedPlayer={selectedPlayer}
                 dateRange={dateRange}
                 selectedVenue={selectedVenue}
                 competitionFilters={competitionFilters}
+                isMobile={isMobile}
               />
-              <BallRunDistribution innings={stats.innings} />
-              <StrikeRateIntervals ballStats={stats.ball_by_ball_stats} />
+              <BallRunDistribution innings={stats.innings} isMobile={isMobile} />
+              <StrikeRateIntervals ballStats={stats.ball_by_ball_stats} isMobile={isMobile} />
             </Box>
-            <TopInnings innings={stats.innings} count={10} />
-            <BowlingMatchupMatrix stats={stats} />
+            <TopInnings innings={stats.innings} count={10} isMobile={isMobile} />
+            <BowlingMatchupMatrix stats={stats} isMobile={isMobile} />
           </Box>
         )}
       </Box>

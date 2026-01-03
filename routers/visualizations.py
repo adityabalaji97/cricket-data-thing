@@ -24,6 +24,9 @@ def get_player_wagon_wheel(
     phase: Optional[str] = Query(default="overall"),
     bowl_kind: Optional[str] = Query(default=None),
     bowl_style: Optional[str] = Query(default=None),
+    line: Optional[str] = Query(default=None),
+    length: Optional[str] = Query(default=None),
+    shot: Optional[str] = Query(default=None),
     db: Session = Depends(get_session)
 ):
     """
@@ -43,6 +46,9 @@ def get_player_wagon_wheel(
     - **phase**: Match phase filter - "overall", "powerplay" (0-5), "middle" (6-14), "death" (15+)
     - **bowl_kind**: Filter by bowling kind - "pace bowler" or "spin bowler"
     - **bowl_style**: Filter by specific bowling style (e.g., "RF", "SLO", etc.)
+    - **line**: Filter by ball line (e.g., "OUTSIDE_OFFSTUMP", "ON_STUMPS", etc.)
+    - **length**: Filter by ball length (e.g., "FULL", "GOOD_LENGTH", "SHORT", etc.)
+    - **shot**: Filter by shot type (e.g., "COVER_DRIVE", "PULL", "CUT", etc.)
 
     **Returns:**
     ```json
@@ -89,7 +95,10 @@ def get_player_wagon_wheel(
             top_teams=top_teams,
             phase=phase,
             bowl_kind=bowl_kind,
-            bowl_style=bowl_style
+            bowl_style=bowl_style,
+            line=line,
+            length=length,
+            shot=shot
         )
 
         return {
@@ -98,7 +107,10 @@ def get_player_wagon_wheel(
             "filters": {
                 "phase": phase,
                 "bowl_kind": bowl_kind,
-                "bowl_style": bowl_style
+                "bowl_style": bowl_style,
+                "line": line,
+                "length": length,
+                "shot": shot
             }
         }
 
@@ -118,6 +130,9 @@ def get_player_pitch_map(
     phase: Optional[str] = Query(default="overall"),
     bowl_kind: Optional[str] = Query(default=None),
     bowl_style: Optional[str] = Query(default=None),
+    line: Optional[str] = Query(default=None),
+    length: Optional[str] = Query(default=None),
+    shot: Optional[str] = Query(default=None),
     db: Session = Depends(get_session)
 ):
     """
@@ -172,7 +187,10 @@ def get_player_pitch_map(
             top_teams=top_teams,
             phase=phase,
             bowl_kind=bowl_kind,
-            bowl_style=bowl_style
+            bowl_style=bowl_style,
+            line=line,
+            length=length,
+            shot=shot
         )
 
         total_balls = sum(cell["balls"] for cell in cells)
@@ -183,7 +201,10 @@ def get_player_pitch_map(
             "filters": {
                 "phase": phase,
                 "bowl_kind": bowl_kind,
-                "bowl_style": bowl_style
+                "bowl_style": bowl_style,
+                "line": line,
+                "length": length,
+                "shot": shot
             }
         }
 

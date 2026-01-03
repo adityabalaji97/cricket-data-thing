@@ -10,10 +10,14 @@ import {
   Typography,
   ToggleButtonGroup,
   ToggleButton,
-  Box
+  Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 
-const TopInnings = ({ innings, count = 10 }) => {
+const TopInnings = ({ innings, count = 10, isMobile = false }) => {
   const [viewMode, setViewMode] = useState('topScoring');
 
   const processedInnings = useMemo(() => {
@@ -58,70 +62,101 @@ const TopInnings = ({ innings, count = 10 }) => {
   };
 
   return (
-    <Paper elevation={2} sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 500 }}>
+    <Paper elevation={2} sx={{
+      p: isMobile ? 1.5 : 3,
+      backgroundColor: isMobile ? 'transparent' : undefined,
+      boxShadow: isMobile ? 0 : undefined
+    }}>
+      <Box sx={{
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        justifyContent: 'space-between',
+        alignItems: isMobile ? 'flex-start' : 'center',
+        mb: isMobile ? 1.5 : 3,
+        gap: isMobile ? 1 : 0
+      }}>
+        <Typography variant={isMobile ? "body1" : "h5"} sx={{ fontWeight: isMobile ? 600 : 500, fontSize: isMobile ? '0.875rem' : undefined }}>
           {viewMode === 'topScoring' ? 'Top Scoring Innings' : 'Recent Form'}
         </Typography>
-        <ToggleButtonGroup
-          value={viewMode}
-          exclusive
-          onChange={handleViewChange}
-          size="small"
-        >
-          <ToggleButton value="topScoring">
-            Top Scoring
-          </ToggleButton>
-          <ToggleButton value="recentForm">
-            Recent Form
-          </ToggleButton>
-        </ToggleButtonGroup>
+        {isMobile ? (
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel sx={{ fontSize: '0.75rem' }}>View</InputLabel>
+            <Select
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+              label="View"
+              sx={{ fontSize: '0.75rem' }}
+            >
+              <MenuItem value="topScoring" sx={{ fontSize: '0.75rem' }}>Top Scoring</MenuItem>
+              <MenuItem value="recentForm" sx={{ fontSize: '0.75rem' }}>Recent Form</MenuItem>
+            </Select>
+          </FormControl>
+        ) : (
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={handleViewChange}
+            size="small"
+          >
+            <ToggleButton value="topScoring">
+              Top Scoring
+            </ToggleButton>
+            <ToggleButton value="recentForm">
+              Recent Form
+            </ToggleButton>
+          </ToggleButtonGroup>
+        )}
       </Box>
-      
+
       <TableContainer>
-        <Table size="medium" sx={{
+        <Table size={isMobile ? "small" : "medium"} sx={{
           '& .MuiTableCell-root': {
             borderBottom: '1px solid rgba(224, 224, 224, 1)',
-            py: 1.5
+            py: isMobile ? 0.75 : 1.5,
+            px: isMobile ? 0.5 : 2,
+            fontSize: isMobile ? '0.7rem' : undefined
           }
         }}>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{isMobile ? 'Date' : 'Date'}</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Score</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Opposition</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{isMobile ? 'Opp' : 'Opposition'}</TableCell>
               <TableCell align="right" sx={{ fontWeight: 600 }}>SR</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>SR Diff</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>% Team</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Context</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>Winner</TableCell>
+              {!isMobile && <TableCell align="right" sx={{ fontWeight: 600 }}>SR Diff</TableCell>}
+              {!isMobile && <TableCell align="right" sx={{ fontWeight: 600 }}>% Team</TableCell>}
+              {!isMobile && <TableCell sx={{ fontWeight: 600 }}>Context</TableCell>}
+              {!isMobile && <TableCell align="right" sx={{ fontWeight: 600 }}>Winner</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {processedInnings.map((inning, idx) => (
-              <TableRow 
+              <TableRow
                 key={`${inning.match_id}-${idx}`}
                 hover
                 sx={{
                   '&:last-child td': { borderBottom: 0 }
                 }}
               >
-                <TableCell>
-                  {inning.date.toLocaleDateString('en-GB', { 
-                    day: 'numeric', 
-                    month: 'short', 
-                    year: 'numeric'
-                  })}
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  {isMobile
+                    ? inning.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                    : inning.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                  }
                 </TableCell>
-                <TableCell>{inning.runs}({inning.balls_faced})</TableCell>
-                <TableCell>{inning.bowling_team}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{inning.runs}({inning.balls_faced})</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: isMobile ? 60 : 'auto' }}>
+                  {isMobile ? inning.bowling_team.substring(0, 3).toUpperCase() : inning.bowling_team}
+                </TableCell>
                 <TableCell align="right">{inning.strike_rate.toFixed(1)}</TableCell>
-                <TableCell align="right">{inning.team_comparison.sr_diff.toFixed(1)}</TableCell>
-                <TableCell align="right">
-                  {inning.runPercentage.toFixed(1)}% ({inning.runs}/{inning.totalTeamRuns})
-                </TableCell>
-                <TableCell>{inning.venue}, {inning.competition}</TableCell>
-                <TableCell align="right">{inning.winner}</TableCell>
+                {!isMobile && <TableCell align="right">{inning.team_comparison.sr_diff.toFixed(1)}</TableCell>}
+                {!isMobile && (
+                  <TableCell align="right">
+                    {inning.runPercentage.toFixed(1)}% ({inning.runs}/{inning.totalTeamRuns})
+                  </TableCell>
+                )}
+                {!isMobile && <TableCell>{inning.venue}, {inning.competition}</TableCell>}
+                {!isMobile && <TableCell align="right">{inning.winner}</TableCell>}
               </TableRow>
             ))}
           </TableBody>
