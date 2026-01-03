@@ -264,14 +264,14 @@ const BattingScatter = ({ data, isMobile }) => {
                 </Stack>
             </Stack>
 
-            <Box sx={{ flex: 1, width: '100%', px: 1 }}>
+            <Box sx={{ flex: 1, width: '100%', px: isMobile ? 0 : 1 }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart
                         margin={{
                             top: 10,
-                            right: isMobile ? 10 : 20,
-                            bottom: isMobile ? 10 : 20,
-                            left: isMobile ? 5 : 20
+                            right: isMobile ? 5 : 20,
+                            bottom: isMobile ? 20 : 20,
+                            left: isMobile ? 0 : 20
                         }}
                     >
                         {plotType === 'avgsr' ? (
@@ -369,16 +369,34 @@ const BattingScatter = ({ data, isMobile }) => {
                             data={displayData}
                             fill="#8884d8"
                             shape={(props) => {
-                                const { cx, cy, fill } = props;
+                                const { cx, cy, fill, payload } = props;
+                                // Extract first name or initials
+                                const nameParts = payload.name?.split(' ') || [];
+                                const label = nameParts.length > 1
+                                    ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`
+                                    : nameParts[0]?.substring(0, 2) || '';
+
                                 return (
-                                    <circle
-                                        cx={cx}
-                                        cy={cy}
-                                        r={isMobile ? 8 : 8}
-                                        fill={fill || '#8884d8'}
-                                        stroke="#fff"
-                                        strokeWidth={isMobile ? 1.5 : 1}
-                                    />
+                                    <g>
+                                        <circle
+                                            cx={cx}
+                                            cy={cy}
+                                            r={isMobile ? 8 : 8}
+                                            fill={fill || '#8884d8'}
+                                            stroke="#fff"
+                                            strokeWidth={isMobile ? 1.5 : 1}
+                                        />
+                                        <text
+                                            x={cx}
+                                            y={cy + (isMobile ? 16 : 18)}
+                                            textAnchor="middle"
+                                            fill="#333"
+                                            fontSize={isMobile ? 8 : 9}
+                                            fontWeight="500"
+                                        >
+                                            {label}
+                                        </text>
+                                    </g>
                                 );
                             }}
                         />
