@@ -890,17 +890,17 @@ return (
         </Typography>
         <Grid container spacing={isMobile ? 2 : 3}>
             <Grid item xs={12} md={6}>
-                <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
+                <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
                     <WinPercentagesPie data={venueStats} />
                 </Card>
             </Grid>
             <Grid item xs={12} md={6}>
-                <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
+                <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
                     <ScoresBarChart data={venueStats} />
                 </Card>
             </Grid>
             <Grid item xs={12} md={12}>
-                <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
+                <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
                     <PhaseWiseStrategy data={venueStats} isMobile={isMobile} />
                 </Card>
             </Grid>
@@ -1028,14 +1028,14 @@ return (
             
             {statsData?.batting_leaders && statsData.batting_leaders.length > 0 && (
                 <Grid item xs={12} md={6}>
-                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
+                    <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
                         <BattingLeaders data={statsData.batting_leaders} isMobile={isMobile} />
                     </Card>
                 </Grid>
             )}
             {statsData?.bowling_leaders && statsData.bowling_leaders.length > 0 && (
                 <Grid item xs={12} md={6}>
-                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
+                    <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
                         <BowlingLeaders data={statsData.bowling_leaders} isMobile={isMobile} />
                     </Card>
                 </Grid>
