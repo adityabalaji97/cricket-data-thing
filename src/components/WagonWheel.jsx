@@ -41,6 +41,15 @@ const WagonWheel = ({
   // Available bowling styles from data
   const [availableStyles, setAvailableStyles] = useState([]);
 
+  // Force re-render on window resize for responsive wagon wheel
+  const [, forceUpdate] = useState(0);
+
+  useEffect(() => {
+    const handleResize = () => forceUpdate(prev => prev + 1);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     if (!playerName) return;
 
@@ -130,12 +139,14 @@ const WagonWheel = ({
   const renderWagonWheel = () => {
     if (!wagonData || !stats) return null;
 
-    const width = 400;
-    const height = 450; // Increased height for labels
+    // Responsive dimensions based on container
+    const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - 32, 400) : 400;
+    const width = containerWidth;
+    const height = containerWidth * 1.125; // Maintain aspect ratio (450/400)
     const centerX = width / 2;
-    const centerY = (height / 2) - 10; // Shifted up slightly
-    const maxRadius = 170; // Reduced radius for better fit with labels
-    const batterRadius = 8; // Size of batter circle at center
+    const centerY = (height / 2) - (height * 0.022); // Shifted up slightly (10/450)
+    const maxRadius = width * 0.425; // 42.5% of width (170/400)
+    const batterRadius = width * 0.02; // 2% of width (8/400)
 
     // Field zones (8 zones + center)
     const zoneLines = [];
@@ -238,10 +249,10 @@ const WagonWheel = ({
 
         {/* Pitch */}
         <rect
-          x={centerX - 5}
-          y={centerY - 30}
-          width={10}
-          height={60}
+          x={centerX - (width * 0.0125)}
+          y={centerY - (width * 0.075)}
+          width={width * 0.025}
+          height={width * 0.15}
           fill="#d4a574"
           stroke="#8d6e63"
           strokeWidth="1"
@@ -254,10 +265,11 @@ const WagonWheel = ({
         <circle cx={centerX} cy={centerY} r={batterRadius} fill="#333" stroke="#000" strokeWidth="1" />
 
         {/* Zone labels - Cricket orientation: batter faces down, bowler at bottom */}
-        <text x={centerX} y={centerY + maxRadius + 20} textAnchor="middle" fontSize="12" fill="#666" fontWeight="600">Straight</text>
-        <text x={centerX + maxRadius + 10} y={centerY + 5} textAnchor="start" fontSize="12" fill="#666" fontWeight="600">Off</text>
-        <text x={centerX - maxRadius - 10} y={centerY + 5} textAnchor="end" fontSize="12" fill="#666" fontWeight="600">Leg</text>
-        <text x={centerX} y={centerY - maxRadius - 10} textAnchor="middle" fontSize="12" fill="#666" fontWeight="600">Behind</text>
+        {/* For right-handed batter: off side is LEFT (towards covers), leg side is RIGHT (towards square leg) */}
+        <text x={centerX} y={centerY + maxRadius + 20} textAnchor="middle" fontSize={Math.max(11, width * 0.03)} fill="#666" fontWeight="600">Straight</text>
+        <text x={centerX - maxRadius - 10} y={centerY + 5} textAnchor="end" fontSize={Math.max(11, width * 0.03)} fill="#666" fontWeight="600">Off</text>
+        <text x={centerX + maxRadius + 10} y={centerY + 5} textAnchor="start" fontSize={Math.max(11, width * 0.03)} fill="#666" fontWeight="600">Leg</text>
+        <text x={centerX} y={centerY - maxRadius - 10} textAnchor="middle" fontSize={Math.max(11, width * 0.03)} fill="#666" fontWeight="600">Behind</text>
       </svg>
     );
   };
