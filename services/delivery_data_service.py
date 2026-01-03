@@ -491,6 +491,13 @@ def get_venue_phase_stats(
     try:
         phase_results = db.execute(phase_query, params).fetchall()
 
+        # Debug logging
+        logger.info(f"Phase query returned {len(phase_results)} rows")
+        for stat in phase_results:
+            logger.info(f"Row: innings={stat.innings}, phase={stat.phase}, "
+                       f"batting_first_runs={stat.batting_first_runs}, "
+                       f"chasing_runs={stat.chasing_runs}")
+
         # Process phase stats into required format
         phase_wise_stats = {
             'batting_first_wins': {},
