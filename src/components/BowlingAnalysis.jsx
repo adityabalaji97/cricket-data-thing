@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Box, 
-    Typography, 
+import {
+    Box,
+    Typography,
     Stack,
-    ToggleButton,
-    ToggleButtonGroup
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem
 } from '@mui/material';
 import {
     BarChart,
@@ -105,53 +107,43 @@ const BowlingAnalysis = ({
 
     return (
         <Box>
-            {/* Phase Selection */}
-            <Stack 
-                direction={{ xs: 'column', md: 'row' }} 
-                spacing={2} 
+            {/* Phase and Metric Selection */}
+            <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={2}
                 sx={{ mb: 3 }}
-                alignItems="center"
             >
-                <ToggleButtonGroup
-                    value={selectedPhase}
-                    exclusive
-                    onChange={(_, value) => value && setSelectedPhase(value)}
-                    sx={{ 
-                        mb: { xs: 1, md: 2 },
-                        flexWrap: 'wrap',
-                        '& .MuiToggleButton-root': {
-                            px: { xs: 1, md: 2 },
-                            py: { xs: 0.5, md: 1 },
-                            fontSize: { xs: '0.7rem', md: '0.875rem' }
-                        }
-                    }}
-                >
-                    {Object.entries(phases).map(([phase, label]) => (
-                        <ToggleButton key={phase} value={phase}>
-                            {label}
-                        </ToggleButton>
-                    ))}
-                </ToggleButtonGroup>
+                <FormControl sx={{ flex: 1, minWidth: isMobile ? '100%' : 200 }} size={isMobile ? "small" : "medium"}>
+                    <InputLabel sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>Phase</InputLabel>
+                    <Select
+                        value={selectedPhase}
+                        label="Phase"
+                        onChange={(e) => setSelectedPhase(e.target.value)}
+                        sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}
+                    >
+                        {Object.entries(phases).map(([phase, label]) => (
+                            <MenuItem key={phase} value={phase} sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                                {label}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
 
-                <ToggleButtonGroup
-                    value={selectedMetric}
-                    exclusive
-                    onChange={(_, value) => value && setSelectedMetric(value)}
-                    sx={{ 
-                        flexWrap: 'wrap',
-                        '& .MuiToggleButton-root': {
-                            px: { xs: 1, md: 2 },
-                            py: { xs: 0.5, md: 1 },
-                            fontSize: { xs: '0.7rem', md: '0.875rem' }
-                        }
-                    }}
-                >
-                    {Object.entries(metrics).map(([key, { label }]) => (
-                        <ToggleButton key={key} value={key}>
-                            {label}
-                        </ToggleButton>
-                    ))}
-                </ToggleButtonGroup>
+                <FormControl sx={{ flex: 1, minWidth: isMobile ? '100%' : 200 }} size={isMobile ? "small" : "medium"}>
+                    <InputLabel sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>Metric</InputLabel>
+                    <Select
+                        value={selectedMetric}
+                        label="Metric"
+                        onChange={(e) => setSelectedMetric(e.target.value)}
+                        sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}
+                    >
+                        {Object.entries(metrics).map(([key, { label }]) => (
+                            <MenuItem key={key} value={key} sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                                {label}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
             </Stack>
 
             {/* Charts */}
