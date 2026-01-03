@@ -1,74 +1,66 @@
 import React from 'react';
-import { Card, CardContent, Typography, Box } from '@mui/material';
+import { Box } from '@mui/material';
 import {
   EmojiEvents as TrophyIcon,
   PercentOutlined as PercentIcon,
   Timer as TimerIcon,
   TrendingUp as TrendingUpIcon,
-  GpsFixed as TargetIcon,  // Changed from Target
-  Bolt as FlashIcon  // Changed from FlashOn
+  GpsFixed as TargetIcon,
+  Bolt as FlashIcon
 } from '@mui/icons-material';
-
-const StatCard = ({ title, value, icon: Icon, subtitle = null }) => (
-  <Card>
-    <CardContent>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <Typography color="text.secondary" variant="body2">
-            {title}
-          </Typography>
-          <Typography variant="h4" sx={{ mt: 1 }}>
-            {value}
-          </Typography>
-          {subtitle && (
-            <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>
-              {subtitle}
-            </Typography>
-          )}
-        </div>
-        <Box sx={{ p: 1, bgcolor: 'primary.light', borderRadius: '50%' }}>
-          <Icon sx={{ color: 'primary.main' }} />
-        </Box>
-      </Box>
-    </CardContent>
-  </Card>
-);
-
-const MobileStatItem = ({ label, value }) => (
-  <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 'fit-content' }}>
-    <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', mb: 0.25 }}>
-      {label}
-    </Typography>
-    <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 600 }}>
-      {value}
-    </Typography>
-  </Box>
-);
+import StatCard from './ui/StatCard';
 
 const CareerStatsCards = ({ stats, isMobile = false }) => {
   const { overall } = stats;
 
   if (isMobile) {
     return (
-      <Card sx={{ mb: 2, backgroundColor: 'transparent', boxShadow: 0 }}>
-        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {/* Row 1: Runs and Innings */}
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <MobileStatItem label="Matches" value={overall.matches} />
-              <MobileStatItem label="Runs" value={overall.runs} />
-              <MobileStatItem label="Avg" value={overall.average.toFixed(2)} />
-              <MobileStatItem label="SR" value={overall.strike_rate.toFixed(2)} />
-            </Box>
-            {/* Row 2: Other stats */}
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <MobileStatItem label="50s/100s" value={`${overall.fifties}/${overall.hundreds}`} />
-              <MobileStatItem label="Dot %" value={`${overall.dot_percentage.toFixed(1)}%`} />
-              <MobileStatItem label="Boundary %" value={`${overall.boundary_percentage.toFixed(1)}%`} />
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: 2,
+        mb: 3
+      }}>
+        <StatCard
+          label="MATCHES"
+          value={overall.matches}
+          icon={TrophyIcon}
+          variant="primary"
+          isMobile={isMobile}
+        />
+        <StatCard
+          label="RUNS"
+          value={overall.runs}
+          subtitle={`Avg: ${overall.average.toFixed(2)}`}
+          icon={TrendingUpIcon}
+          variant="primary"
+          isMobile={isMobile}
+        />
+        <StatCard
+          label="STRIKE RATE"
+          value={overall.strike_rate.toFixed(1)}
+          icon={TimerIcon}
+          isMobile={isMobile}
+        />
+        <StatCard
+          label="50s/100s"
+          value={`${overall.fifties}/${overall.hundreds}`}
+          icon={TargetIcon}
+          isMobile={isMobile}
+        />
+        <StatCard
+          label="DOT %"
+          value={`${overall.dot_percentage.toFixed(1)}%`}
+          icon={PercentIcon}
+          isMobile={isMobile}
+        />
+        <StatCard
+          label="BOUNDARY %"
+          value={`${overall.boundary_percentage.toFixed(1)}%`}
+          icon={FlashIcon}
+          isMobile={isMobile}
+        />
+      </Box>
     );
   }
 
@@ -81,42 +73,51 @@ const CareerStatsCards = ({ stats, isMobile = false }) => {
         sm: '1fr 1fr',
         md: '1fr 1fr 1fr',
         lg: 'repeat(6, 1fr)'
-      }
+      },
+      mb: 4
     }}>
       <StatCard
-        title="Matches"
+        label="MATCHES"
         value={overall.matches}
-        icon={TrophyIcon}
         subtitle="Total Innings"
+        icon={TrophyIcon}
+        variant="primary"
+        isMobile={isMobile}
       />
       <StatCard
-        title="Runs"
+        label="RUNS"
         value={overall.runs}
-        icon={TrendingUpIcon}
         subtitle={`Avg: ${overall.average.toFixed(2)}`}
+        icon={TrendingUpIcon}
+        variant="primary"
+        isMobile={isMobile}
       />
       <StatCard
-        title="Strike Rate"
-        value={overall.strike_rate.toFixed(2)}
+        label="STRIKE RATE"
+        value={overall.strike_rate.toFixed(1)}
         icon={TimerIcon}
+        isMobile={isMobile}
       />
       <StatCard
-        title="50s/100s"
+        label="50s/100s"
         value={`${overall.fifties}/${overall.hundreds}`}
-        icon={TargetIcon}
         subtitle={`${overall.fifties + overall.hundreds} milestone innings`}
+        icon={TargetIcon}
+        isMobile={isMobile}
       />
       <StatCard
-        title="Dot %"
+        label="DOT %"
         value={`${overall.dot_percentage.toFixed(1)}%`}
-        icon={PercentIcon}
         subtitle="Dot ball percentage"
+        icon={PercentIcon}
+        isMobile={isMobile}
       />
       <StatCard
-        title="Boundary %"
+        label="BOUNDARY %"
         value={`${overall.boundary_percentage.toFixed(1)}%`}
-        icon={FlashIcon}
         subtitle="Boundary percentage"
+        icon={FlashIcon}
+        isMobile={isMobile}
       />
     </Box>
   );
