@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Container, 
-  TextField, 
-  Box, 
-  Autocomplete, 
-  CircularProgress, 
+import {
+  Container,
+  TextField,
+  Box,
+  Autocomplete,
+  CircularProgress,
   Alert,
   Typography,
   Button,
@@ -14,7 +14,10 @@ import {
   Menu,
   MenuItem,
   useMediaQuery,
-  useTheme
+  useTheme,
+  Collapse,
+  Card,
+  CardContent
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
@@ -74,6 +77,7 @@ const AppContent = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const [searchExpanded, setSearchExpanded] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
 
   const [venueFantasyStats, setVenueFantasyStats] = useState({ team1_players: [], team2_players: [] });
   const [venuePlayerHistory, setVenuePlayerHistory] = useState({ players: [] });
@@ -556,135 +560,158 @@ const AppContent = () => {
                 {error}
               </Alert>
             )}
-            
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: { xs: 'column', md: 'row' },
-              gap: 2, 
-              mb: 2 
-            }}>
-              <Autocomplete
-                value={selectedVenue}
-                onChange={(event, newValue) => {
-                  setSelectedVenue(newValue || "All Venues");
-                  setShowVisualizations(false);
-                }}
-                options={venues}
-                sx={{ width: '100%' }}
-                loading={loading}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Select Venue"
-                    required
-                    fullWidth
-                    InputProps={{
-                      ...params.InputProps,
-                      endAdornment: (
-                        <>
-                          {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                          {params.InputProps.endAdornment}
-                        </>
-                      ),
-                    }}
-                  />
-                )}
-              />
-              
-              <TextField
-                label="Start Date"
-                type="date"
-                value={startDate}
-                onChange={(e) => handleDateChange(e.target.value, true)}
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ max: endDate }}
-                required
-                fullWidth
-              />
-              
-              <TextField
-                label="End Date"
-                type="date"
-                value={endDate}
-                onChange={(e) => handleDateChange(e.target.value, false)}
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ max: TODAY }}
-                required
-                fullWidth
-              />
-            </Box>
 
-            <CompetitionFilter onFilterChange={handleFilterChange} isMobile={isMobile} />
-
-            {startDate && endDate && !error && (
-              <Box sx={{ 
-                display: 'flex', 
-                flexDirection: { xs: 'column', md: 'row' },
-                gap: 2, 
-                mb: 2 
-              }}>
-                <Autocomplete
-                  value={selectedTeam1}
-                  onChange={(event, newValue) => {
-                    setSelectedTeam1(newValue);
-                    setShowVisualizations(false);
-                  }}
-                  options={teams}
-                  sx={{ width: '100%' }}
-                  getOptionLabel={(option) => option?.abbreviated_name || ''}
-                  renderOption={(props, option) => (
-                    <li {...props}>
-                      <Typography>
-                        {option.abbreviated_name} - {option.full_name}
-                      </Typography>
-                    </li>
-                  )}
-                  renderInput={(params) => (
-                    <TextField {...params} label="Team 1" fullWidth />
-                  )}
-                  isOptionEqualToValue={(option, value) => 
-                    option?.full_name === value?.full_name
-                  }
-                />
-                
-                <Autocomplete
-                  value={selectedTeam2}
-                  onChange={(event, newValue) => {
-                    setSelectedTeam2(newValue);
-                    setShowVisualizations(false);
-                  }}
-                  options={teams.filter(team => team?.full_name !== selectedTeam1?.full_name)}
-                  sx={{ width: '100%' }}
-                  getOptionLabel={(option) => option?.abbreviated_name || ''}
-                  renderOption={(props, option) => (
-                    <li {...props}>
-                      <Typography>
-                        {option.abbreviated_name} - {option.full_name}
-                      </Typography>
-                    </li>
-                  )}
-                  renderInput={(params) => (
-                    <TextField {...params} label="Team 2" fullWidth />
-                  )}
-                  isOptionEqualToValue={(option, value) => 
-                    option?.full_name === value?.full_name
-                  }
-                />
-
-                <Button 
-                  variant="contained"
-                  onClick={() => setShowVisualizations(true)}
-                  disabled={loading || error}
-                  sx={{ 
-                    mt: { xs: 1, md: 0 },
-                    width: { xs: '100%', md: 'auto' },
-                    height: { xs: 'auto', md: '56px' }  // Match the height of Autocomplete
-                  }}
+            {/* Show toggle button when visualizations are shown */}
+            {showVisualizations && (
+              <Box sx={{ mb: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => setFiltersExpanded(!filtersExpanded)}
+                  fullWidth
+                  sx={{ justifyContent: 'space-between' }}
                 >
-                  Go
+                  {filtersExpanded ? 'Hide Filters' : 'Show Filters'}
                 </Button>
               </Box>
             )}
+
+            <Collapse in={filtersExpanded || !showVisualizations}>
+              <Card sx={{ mb: 2, boxShadow: showVisualizations ? 2 : 0, backgroundColor: showVisualizations ? undefined : 'transparent' }}>
+                <CardContent sx={{ p: showVisualizations ? 2 : 0 }}>
+                  <Box sx={{
+                    display: 'flex',
+                    flexDirection: { xs: 'column', md: 'row' },
+                    gap: 2,
+                    mb: 2
+                  }}>
+                    <Autocomplete
+                      value={selectedVenue}
+                      onChange={(event, newValue) => {
+                        setSelectedVenue(newValue || "All Venues");
+                        setShowVisualizations(false);
+                      }}
+                      options={venues}
+                      sx={{ width: '100%' }}
+                      loading={loading}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Select Venue"
+                          required
+                          fullWidth
+                          InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                              <>
+                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                {params.InputProps.endAdornment}
+                              </>
+                            ),
+                          }}
+                        />
+                      )}
+                    />
+
+                    <TextField
+                      label="Start Date"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => handleDateChange(e.target.value, true)}
+                      InputLabelProps={{ shrink: true }}
+                      inputProps={{ max: endDate }}
+                      required
+                      fullWidth
+                    />
+
+                    <TextField
+                      label="End Date"
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => handleDateChange(e.target.value, false)}
+                      InputLabelProps={{ shrink: true }}
+                      inputProps={{ max: TODAY }}
+                      required
+                      fullWidth
+                    />
+                  </Box>
+
+                  <CompetitionFilter onFilterChange={handleFilterChange} isMobile={isMobile} />
+
+                  {startDate && endDate && !error && (
+                    <Box sx={{
+                      display: 'flex',
+                      flexDirection: { xs: 'column', md: 'row' },
+                      gap: 2,
+                      mb: 0
+                    }}>
+                      <Autocomplete
+                        value={selectedTeam1}
+                        onChange={(event, newValue) => {
+                          setSelectedTeam1(newValue);
+                          setShowVisualizations(false);
+                        }}
+                        options={teams}
+                        sx={{ width: '100%' }}
+                        getOptionLabel={(option) => option?.abbreviated_name || ''}
+                        renderOption={(props, option) => (
+                          <li {...props}>
+                            <Typography>
+                              {option.abbreviated_name} - {option.full_name}
+                            </Typography>
+                          </li>
+                        )}
+                        renderInput={(params) => (
+                          <TextField {...params} label="Team 1" fullWidth />
+                        )}
+                        isOptionEqualToValue={(option, value) =>
+                          option?.full_name === value?.full_name
+                        }
+                      />
+
+                      <Autocomplete
+                        value={selectedTeam2}
+                        onChange={(event, newValue) => {
+                          setSelectedTeam2(newValue);
+                          setShowVisualizations(false);
+                        }}
+                        options={teams.filter(team => team?.full_name !== selectedTeam1?.full_name)}
+                        sx={{ width: '100%' }}
+                        getOptionLabel={(option) => option?.abbreviated_name || ''}
+                        renderOption={(props, option) => (
+                          <li {...props}>
+                            <Typography>
+                              {option.abbreviated_name} - {option.full_name}
+                            </Typography>
+                          </li>
+                        )}
+                        renderInput={(params) => (
+                          <TextField {...params} label="Team 2" fullWidth />
+                        )}
+                        isOptionEqualToValue={(option, value) =>
+                          option?.full_name === value?.full_name
+                        }
+                      />
+
+                      <Button
+                        variant="contained"
+                        onClick={() => {
+                          setShowVisualizations(true);
+                          setFiltersExpanded(false);
+                        }}
+                        disabled={loading || error}
+                        sx={{
+                          mt: { xs: 1, md: 0 },
+                          width: { xs: '100%', md: 'auto' },
+                          height: { xs: 'auto', md: '56px' }
+                        }}
+                      >
+                        Go
+                      </Button>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Collapse>
 
             {showVisualizations && !loading && !error && (
               <>
