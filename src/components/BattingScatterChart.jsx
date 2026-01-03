@@ -262,7 +262,7 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
                         top: 10,
                         right: isMobile ? 10 : 20,
                         bottom: 0,
-                        left: isMobile ? 0 : 0
+                        left: isMobile ? -10 : 0
                     }}>
                         {plotType === 'avgsr' ? (
                             <>
@@ -366,16 +366,34 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
                             data={displayData}
                             fill="#8884d8"
                             shape={(props) => {
-                                const { cx, cy, fill } = props;
+                                const { cx, cy, fill, payload } = props;
+                                // Extract last name for label
+                                const nameParts = payload.name?.split(' ') || [];
+                                const label = nameParts.length > 1
+                                    ? nameParts[nameParts.length - 1]
+                                    : nameParts[0] || '';
+
                                 return (
-                                    <circle
-                                        cx={cx}
-                                        cy={cy}
-                                        r={isMobile ? 8 : 6}
-                                        fill={fill || '#8884d8'}
-                                        stroke="#fff"
-                                        strokeWidth={isMobile ? 1.5 : 1}
-                                    />
+                                    <g>
+                                        <circle
+                                            cx={cx}
+                                            cy={cy}
+                                            r={isMobile ? 8 : 6}
+                                            fill={fill || '#8884d8'}
+                                            stroke="#fff"
+                                            strokeWidth={isMobile ? 1.5 : 1}
+                                        />
+                                        <text
+                                            x={cx}
+                                            y={cy + (isMobile ? 16 : 18)}
+                                            textAnchor="middle"
+                                            fill="#333"
+                                            fontSize={isMobile ? 7 : 8}
+                                            fontWeight="600"
+                                        >
+                                            {label}
+                                        </text>
+                                    </g>
                                 );
                             }}
                         />

@@ -377,8 +377,17 @@ const AppContent = () => {
 
   // Collapse filters after data has loaded
   useEffect(() => {
+    // Only collapse if we're showing visualizations AND loading is done
+    // This prevents collapsing when GO is clicked but before loading starts
     if (showVisualizations && !loading) {
-      setFiltersExpanded(false);
+      // Use a small delay to ensure all rendering is complete
+      const timer = setTimeout(() => {
+        setFiltersExpanded(false);
+      }, 100);
+      return () => clearTimeout(timer);
+    } else if (showVisualizations && loading) {
+      // Keep filters expanded while loading
+      setFiltersExpanded(true);
     }
   }, [showVisualizations, loading]);
 

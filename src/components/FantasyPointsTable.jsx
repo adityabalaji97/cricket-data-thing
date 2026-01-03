@@ -1,19 +1,23 @@
 // FantasyPointsTable.jsx component
 import React, { useState } from 'react';
-import { 
-  Table, 
-  TableHead, 
-  TableBody, 
-  TableRow, 
-  TableCell, 
-  Button, 
-  ButtonGroup, 
-  Typography, 
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Button,
+  ButtonGroup,
+  Typography,
   Box,
   Paper,
   TableContainer,
   Pagination,
-  Stack
+  Stack,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 
 const FantasyPointsTable = ({ players, title, isMobile }) => {
@@ -59,37 +63,64 @@ const FantasyPointsTable = ({ players, title, isMobile }) => {
   return (
     <Box sx={{ mb: 4 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>{title}</Typography>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="body2" color="text.secondary">Sort by:</Typography>
-        <ButtonGroup size="small" orientation={isMobile ? "vertical" : "horizontal"} sx={{ width: isMobile ? '100%' : 'auto' }}>
-          <Button 
-            variant={sortField === 'avg_fantasy_points' ? 'contained' : 'outlined'}
-            onClick={() => handleSort('avg_fantasy_points')}
-          >
-            Total Points
-          </Button>
-          <Button 
-            variant={sortField === 'avg_batting_points' ? 'contained' : 'outlined'}
-            onClick={() => handleSort('avg_batting_points')}
-          >
-            Batting
-          </Button>
-          <Button 
-            variant={sortField === 'avg_bowling_points' ? 'contained' : 'outlined'}
-            onClick={() => handleSort('avg_bowling_points')}
-          >
-            Bowling
-          </Button>
-          <Button 
-            variant={sortField === 'avg_fielding_points' ? 'contained' : 'outlined'}
-            onClick={() => handleSort('avg_fielding_points')}
-          >
-            Fielding
-          </Button>
-        </ButtonGroup>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2 }}>
+        {isMobile ? (
+          <FormControl size="small" fullWidth>
+            <InputLabel sx={{ fontSize: '0.875rem' }}>Sort by</InputLabel>
+            <Select
+              value={sortField}
+              onChange={(e) => handleSort(e.target.value)}
+              label="Sort by"
+              sx={{ fontSize: '0.875rem' }}
+            >
+              <MenuItem value="avg_fantasy_points" sx={{ fontSize: '0.875rem' }}>Total Points</MenuItem>
+              <MenuItem value="avg_batting_points" sx={{ fontSize: '0.875rem' }}>Batting</MenuItem>
+              <MenuItem value="avg_bowling_points" sx={{ fontSize: '0.875rem' }}>Bowling</MenuItem>
+              <MenuItem value="avg_fielding_points" sx={{ fontSize: '0.875rem' }}>Fielding</MenuItem>
+            </Select>
+          </FormControl>
+        ) : (
+          <>
+            <Typography variant="body2" color="text.secondary">Sort by:</Typography>
+            <ButtonGroup size="small">
+              <Button
+                variant={sortField === 'avg_fantasy_points' ? 'contained' : 'outlined'}
+                onClick={() => handleSort('avg_fantasy_points')}
+              >
+                Total Points
+              </Button>
+              <Button
+                variant={sortField === 'avg_batting_points' ? 'contained' : 'outlined'}
+                onClick={() => handleSort('avg_batting_points')}
+              >
+                Batting
+              </Button>
+              <Button
+                variant={sortField === 'avg_bowling_points' ? 'contained' : 'outlined'}
+                onClick={() => handleSort('avg_bowling_points')}
+              >
+                Bowling
+              </Button>
+              <Button
+                variant={sortField === 'avg_fielding_points' ? 'contained' : 'outlined'}
+                onClick={() => handleSort('avg_fielding_points')}
+              >
+                Fielding
+              </Button>
+            </ButtonGroup>
+          </>
+        )}
       </Box>
       
-      <TableContainer component={Paper} sx={{ maxHeight: 440, overflow: 'auto' }}>
+      <TableContainer
+        component={Paper}
+        sx={{
+          maxHeight: 440,
+          overflow: 'auto',
+          backgroundColor: isMobile ? 'transparent' : undefined,
+          boxShadow: isMobile ? 0 : undefined
+        }}
+      >
         <Table size={isMobile ? "small" : "medium"} sx={{ minWidth: isMobile ? 300 : 650 }} stickyHeader>
           <TableHead>
             <TableRow>

@@ -393,73 +393,79 @@ const ConsolidatedFantasyAnalysis = ({ matchupData, isMobile }) => {
             boxShadow: isMobile ? 0 : undefined
         }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                <TrendingUp size={20} />
-                <Typography variant={isMobile ? "subtitle1" : "h6"}>
-                    Expected Fantasy Points (Consolidated Matchup Data)
+                <TrendingUp size={isMobile ? 16 : 20} />
+                <Typography variant={isMobile ? "body1" : "h6"} sx={{ fontSize: isMobile ? '0.9rem' : '1.25rem', fontWeight: 600 }}>
+                    {isMobile ? 'Expected Fantasy Points' : 'Expected Fantasy Points (Consolidated Matchup Data)'}
                 </Typography>
             </Box>
-            
-            <TableContainer sx={{ maxHeight: 400 }}>
-                <Table size="small" stickyHeader>
+
+            <TableContainer sx={{ maxHeight: isMobile ? 'none' : 400, overflow: isMobile ? 'visible' : 'auto' }}>
+                <Table size="small" stickyHeader={!isMobile}>
                     <TableHead>
                         <TableRow>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Player</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Role</TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 'bold' }}>Expected FP</TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 'bold' }}>Confidence</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem', p: isMobile ? 1 : 2 }}>Player</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem', p: isMobile ? 1 : 2 }}>Role</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem', p: isMobile ? 1 : 2 }}>Expected FP</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem', p: isMobile ? 1 : 2 }}>Confidence</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {players.map((player, index) => (
-                            <TableRow key={player.player_name} sx={{ 
+                            <TableRow key={player.player_name} sx={{
                                 backgroundColor: index < 3 ? `rgba(${index === 0 ? '255, 215, 0' : index === 1 ? '192, 192, 192' : '205, 127, 50'}, 0.1)` : 'inherit'
                             }}>
-                                <TableCell>
+                                <TableCell sx={{ p: isMobile ? 1 : 2 }}>
                                     <Box>
-                                        <Typography variant="body2" fontWeight="bold">
-                                            {index < 3 && '🏆 '}{player.player_name}
+                                        <Typography variant="body2" fontWeight="bold" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                                            {player.player_name}
                                         </Typography>
-                                        <Typography variant="caption" color="text.secondary">
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
                                             {player.team}
                                         </Typography>
                                     </Box>
                                 </TableCell>
-                                <TableCell>
-                                    <Chip 
-                                        label={player.role} 
-                                        size="small" 
-                                        sx={{ 
-                                            backgroundColor: getRoleColor(player.role),
-                                            color: 'white',
-                                            fontSize: '0.75rem'
-                                        }}
-                                    />
+                                <TableCell sx={{ p: isMobile ? 1 : 2 }}>
+                                    {isMobile ? (
+                                        <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
+                                            {player.role}
+                                        </Typography>
+                                    ) : (
+                                        <Chip
+                                            label={player.role}
+                                            size="small"
+                                            sx={{
+                                                backgroundColor: getRoleColor(player.role),
+                                                color: 'white',
+                                                fontSize: '0.75rem'
+                                            }}
+                                        />
+                                    )}
                                 </TableCell>
-                                <TableCell align="center">
-                                    <Typography variant="h6" color="primary">
+                                <TableCell align="center" sx={{ p: isMobile ? 1 : 2 }}>
+                                    <Typography variant={isMobile ? "body1" : "h6"} color="primary" sx={{ fontSize: isMobile ? '0.9rem' : '1.25rem' }}>
                                         {player.total_points.toFixed(1)}
                                     </Typography>
                                     {player.role === 'All-round' && (
-                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
                                             B: {player.batting_points.toFixed(1)} + Bl: {player.bowling_points.toFixed(1)}
                                         </Typography>
                                     )}
                                 </TableCell>
-                                <TableCell align="center">
+                                <TableCell align="center" sx={{ p: isMobile ? 1 : 2 }}>
                                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                        <Typography 
-                                            variant="body2" 
-                                            sx={{ color: getConfidenceColor(player.confidence) }}
+                                        <Typography
+                                            variant="body2"
+                                            sx={{ color: getConfidenceColor(player.confidence), fontSize: isMobile ? '0.75rem' : '0.875rem' }}
                                             fontWeight="bold"
                                         >
                                             {(player.confidence * 100).toFixed(0)}%
                                         </Typography>
-                                        <LinearProgress 
-                                            variant="determinate" 
-                                            value={player.confidence * 100} 
-                                            sx={{ 
-                                                width: 30, 
-                                                height: 4,
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={player.confidence * 100}
+                                            sx={{
+                                                width: isMobile ? 25 : 30,
+                                                height: isMobile ? 3 : 4,
                                                 mt: 0.5,
                                                 '& .MuiLinearProgress-bar': {
                                                     backgroundColor: getConfidenceColor(player.confidence)

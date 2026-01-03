@@ -1066,13 +1066,18 @@ return (
             )}
             {statsData?.batting_scatter && statsData.batting_scatter.length > 0 && (
                 <Grid item xs={12} md={12}>
-                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
-                        <Typography variant="h6" gutterBottom>
+                    <Card sx={{
+                        p: { xs: 1, sm: 2 },
+                        width: '100%',
+                        backgroundColor: isMobile ? 'transparent' : undefined,
+                        boxShadow: isMobile ? 0 : undefined
+                    }}>
+                        <Typography variant={isMobile ? "body1" : "h6"} gutterBottom sx={{ fontWeight: 600 }}>
                             Bowling Type Analysis
                         </Typography>
                         {/* Wrap BowlingAnalysis in error boundary */}
                         <Box sx={{ position: 'relative' }}>
-                            <BowlingAnalysis 
+                            <BowlingAnalysis
                             venue={venue}
                             startDate={startDate}
                             endDate={endDate}
