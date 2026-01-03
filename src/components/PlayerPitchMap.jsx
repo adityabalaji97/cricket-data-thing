@@ -8,7 +8,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   FormControl,
   InputLabel,
@@ -99,50 +98,50 @@ const PlayerPitchMap = ({
 
   if (loading) {
     return (
-      <Paper elevation={2} sx={{ p: 3, textAlign: 'center' }}>
+      <Box sx={{ textAlign: 'center', py: 3 }}>
         <CircularProgress />
         <Typography sx={{ mt: 2 }}>Loading pitch map data...</Typography>
-      </Paper>
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <Paper elevation={2} sx={{ p: 3 }}>
+      <Box sx={{ py: 2 }}>
         <Alert severity="error">{error}</Alert>
-      </Paper>
+      </Box>
     );
   }
 
   if (!pitchData || pitchData.total_balls === 0) {
     return (
-      <Paper elevation={2} sx={{ p: 3 }}>
+      <Box sx={{ py: 2 }}>
         <Alert severity="info">No pitch map data available for the selected filters.</Alert>
-      </Paper>
+      </Box>
     );
   }
 
   return (
-    <Paper elevation={2} sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>
+    <Box sx={{ width: '100%' }}>
+      <Typography variant="h6" gutterBottom sx={{ textAlign: 'center' }}>
         Pitch Map
       </Typography>
 
       {/* Filters */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2, justifyContent: 'center' }}>
         {/* Phase Filter */}
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" sx={{ minWidth: 120 }}>
           <InputLabel>Phase</InputLabel>
           <Select value={phase} label="Phase" onChange={(e) => setPhase(e.target.value)}>
             <MenuItem value="overall">Overall</MenuItem>
-            <MenuItem value="powerplay">Powerplay (0-5)</MenuItem>
-            <MenuItem value="middle">Middle (6-14)</MenuItem>
-            <MenuItem value="death">Death (15+)</MenuItem>
+            <MenuItem value="powerplay">Powerplay</MenuItem>
+            <MenuItem value="middle">Middle</MenuItem>
+            <MenuItem value="death">Death</MenuItem>
           </Select>
         </FormControl>
 
         {/* Bowl Kind Filter */}
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" sx={{ minWidth: 120 }}>
           <InputLabel>Bowl Kind</InputLabel>
           <Select value={bowlKind} label="Bowl Kind" onChange={(e) => setBowlKind(e.target.value)}>
             <MenuItem value="all">All</MenuItem>
@@ -153,7 +152,7 @@ const PlayerPitchMap = ({
 
         {/* Bowl Style Filter */}
         {availableStyles.length > 0 && (
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Bowl Style</InputLabel>
             <Select value={bowlStyle} label="Bowl Style" onChange={(e) => setBowlStyle(e.target.value)}>
               <MenuItem value="all">All</MenuItem>
@@ -166,7 +165,7 @@ const PlayerPitchMap = ({
       </Box>
 
       {/* Stats Summary */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
         <Chip label={`${pitchData.total_balls} balls`} size="small" color="primary" />
       </Box>
 
@@ -181,9 +180,10 @@ const PlayerPitchMap = ({
           minBalls={5}
           title={playerName}
           subtitle={`${phase === 'overall' ? 'All Phases' : phase} ${bowlKind !== 'all' ? `• ${bowlKind}` : ''}`}
+          hideStumps={true}
         />
       </Box>
-    </Paper>
+    </Box>
   );
 };
 

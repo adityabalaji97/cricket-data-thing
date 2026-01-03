@@ -32,7 +32,8 @@ const PitchMapVisualization = ({
   title,
   subtitle,
   width: propWidth,
-  svgRef
+  svgRef,
+  hideStumps = false
 }) => {
   // Use ref to measure container if no width prop
   const [containerWidth, setContainerWidth] = React.useState(propWidth || PITCH_DIMENSIONS.width);
@@ -188,7 +189,7 @@ const PitchMapVisualization = ({
         ))}
         
         {/* Stumps centered within full toss row */}
-        <StumpsIndicator dimensions={scaledDimensions} scale={scale} mode={mode} />
+        {!hideStumps && <StumpsIndicator dimensions={scaledDimensions} scale={scale} mode={mode} />}
         
         {/* Axis labels */}
         <AxisLabels dimensions={scaledDimensions} mode={mode} scale={scale} />

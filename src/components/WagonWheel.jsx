@@ -8,7 +8,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   FormControl,
   InputLabel,
@@ -16,24 +15,10 @@ import {
   MenuItem,
   CircularProgress,
   Alert,
-  ToggleButtonGroup,
-  ToggleButton,
   Chip
 } from '@mui/material';
 import config from '../config';
 
-// Wagon wheel zones (0-8, clockwise from fine leg)
-const ZONE_LABELS = {
-  0: 'Fine Leg',
-  1: 'Square Leg',
-  2: 'Mid Wicket',
-  3: 'Long On',
-  4: 'Long Off',
-  5: 'Extra Cover',
-  6: 'Point',
-  7: 'Third Man',
-  8: 'Straight'
-};
 
 const WagonWheel = ({
   playerName,
@@ -150,6 +135,7 @@ const WagonWheel = ({
     const centerX = width / 2;
     const centerY = height / 2;
     const maxRadius = 180;
+    const batterRadius = 8; // Size of batter circle at center
 
     // Field zones (8 zones + center)
     const zoneLines = [];
@@ -171,39 +157,55 @@ const WagonWheel = ({
       );
     }
 
-    // Plot deliveries
-    const deliveryDots = wagonData.deliveries
+    // Plot deliveries as lines from batter to shot endpoint
+    const deliveryLines = wagonData.deliveries
       .filter(d => d.wagon_x !== null && d.wagon_y !== null)
       .map((delivery, idx) => {
         // Scale coordinates to fit in our SVG (assuming wagon_x/y are in range 0-300)
         const scale = maxRadius / 300;
-        const x = centerX + (delivery.wagon_x - 150) * scale;
-        const y = centerY + (delivery.wagon_y - 150) * scale;
+        let x = centerX + (delivery.wagon_x - 150) * scale;
+        let y = centerY + (delivery.wagon_y - 150) * scale;
+
+        // For boundaries (4s and 6s), extend to the circumference
+        if (delivery.runs === 4 || delivery.runs === 6) {
+          const dx = x - centerX;
+          const dy = y - centerY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance > 0) {
+            x = centerX + (dx / distance) * maxRadius;
+            y = centerY + (dy / distance) * maxRadius;
+          }
+        }
 
         // Color by runs
         let color = '#9e9e9e'; // dots
-        let radius = 2;
+        let strokeWidth = 1;
+        let opacity = 0.4;
         if (delivery.runs === 6) {
           color = '#e91e63'; // sixes - pink
-          radius = 4;
+          strokeWidth = 2.5;
+          opacity = 0.7;
         } else if (delivery.runs === 4) {
           color = '#2196f3'; // fours - blue
-          radius = 3;
+          strokeWidth = 2;
+          opacity = 0.6;
         } else if (delivery.runs > 0) {
           color = '#4caf50'; // runs - green
-          radius = 2.5;
+          strokeWidth = 1.5;
+          opacity = 0.5;
         }
 
         return (
-          <circle
+          <line
             key={`delivery-${idx}`}
-            cx={x}
-            cy={y}
-            r={radius}
-            fill={color}
-            fillOpacity={0.6}
+            x1={centerX}
+            y1={centerY}
+            x2={x}
+            y2={y}
             stroke={color}
-            strokeWidth="0.5"
+            strokeWidth={strokeWidth}
+            opacity={opacity}
+            strokeLinecap="round"
           />
         );
       });
@@ -245,11 +247,11 @@ const WagonWheel = ({
           strokeWidth="1"
         />
 
-        {/* Stumps */}
-        <circle cx={centerX} cy={centerY} r={3} fill="#8d6e63" />
+        {/* Delivery lines */}
+        {deliveryLines}
 
-        {/* Deliveries */}
-        {deliveryDots}
+        {/* Batter position (circle at center) */}
+        <circle cx={centerX} cy={centerY} r={batterRadius} fill="#333" stroke="#000" strokeWidth="1" />
 
         {/* Zone labels */}
         <text x={centerX} y={centerY - maxRadius - 10} textAnchor="middle" fontSize="11" fill="#666">Straight</text>
@@ -262,50 +264,50 @@ const WagonWheel = ({
 
   if (loading) {
     return (
-      <Paper elevation={2} sx={{ p: 3, textAlign: 'center' }}>
+      <Box sx={{ textAlign: 'center', py: 3 }}>
         <CircularProgress />
         <Typography sx={{ mt: 2 }}>Loading wagon wheel data...</Typography>
-      </Paper>
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <Paper elevation={2} sx={{ p: 3 }}>
+      <Box sx={{ py: 2 }}>
         <Alert severity="error">{error}</Alert>
-      </Paper>
+      </Box>
     );
   }
 
   if (!wagonData || wagonData.total_deliveries === 0) {
     return (
-      <Paper elevation={2} sx={{ p: 3 }}>
+      <Box sx={{ py: 2 }}>
         <Alert severity="info">No wagon wheel data available for the selected filters.</Alert>
-      </Paper>
+      </Box>
     );
   }
 
   return (
-    <Paper elevation={2} sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>
+    <Box sx={{ width: '100%' }}>
+      <Typography variant="h6" gutterBottom sx={{ textAlign: 'center' }}>
         Wagon Wheel
       </Typography>
 
       {/* Filters */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2, justifyContent: 'center' }}>
         {/* Phase Filter */}
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" sx={{ minWidth: 120 }}>
           <InputLabel>Phase</InputLabel>
           <Select value={phase} label="Phase" onChange={(e) => setPhase(e.target.value)}>
             <MenuItem value="overall">Overall</MenuItem>
-            <MenuItem value="powerplay">Powerplay (0-5)</MenuItem>
-            <MenuItem value="middle">Middle (6-14)</MenuItem>
-            <MenuItem value="death">Death (15+)</MenuItem>
+            <MenuItem value="powerplay">Powerplay</MenuItem>
+            <MenuItem value="middle">Middle</MenuItem>
+            <MenuItem value="death">Death</MenuItem>
           </Select>
         </FormControl>
 
         {/* Bowl Kind Filter */}
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" sx={{ minWidth: 120 }}>
           <InputLabel>Bowl Kind</InputLabel>
           <Select value={bowlKind} label="Bowl Kind" onChange={(e) => setBowlKind(e.target.value)}>
             <MenuItem value="all">All</MenuItem>
@@ -316,7 +318,7 @@ const WagonWheel = ({
 
         {/* Bowl Style Filter */}
         {availableStyles.length > 0 && (
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Bowl Style</InputLabel>
             <Select value={bowlStyle} label="Bowl Style" onChange={(e) => setBowlStyle(e.target.value)}>
               <MenuItem value="all">All</MenuItem>
@@ -329,17 +331,16 @@ const WagonWheel = ({
       </Box>
 
       {/* Stats Summary */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
         <Chip label={`${stats.totalBalls} balls`} size="small" />
         <Chip label={`${stats.totalRuns} runs`} size="small" color="primary" />
         <Chip label={`SR: ${stats.strikeRate}`} size="small" />
         <Chip label={`${stats.fours} x 4s`} size="small" sx={{ bgcolor: '#2196f3', color: 'white' }} />
         <Chip label={`${stats.sixes} x 6s`} size="small" sx={{ bgcolor: '#e91e63', color: 'white' }} />
-        <Chip label={`${stats.boundaryPercentage}% boundaries`} size="small" />
       </Box>
 
       {/* Legend */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', fontSize: '0.875rem' }}>
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', justifyContent: 'center', fontSize: '0.875rem' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#e91e63' }} />
           <Typography variant="caption">Sixes</Typography>
@@ -359,38 +360,10 @@ const WagonWheel = ({
       </Box>
 
       {/* Wagon Wheel Visualization */}
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center' }}>
         {renderWagonWheel()}
       </Box>
-
-      {/* Zone Statistics */}
-      {Object.keys(stats.byZone).length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="subtitle2" gutterBottom>
-            Scoring by Zone
-          </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 1 }}>
-            {Object.entries(stats.byZone)
-              .sort(([a], [b]) => parseInt(a) - parseInt(b))
-              .map(([zone, data]) => (
-                <Box key={zone} sx={{ p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-                  <Typography variant="caption" display="block" fontWeight="bold">
-                    {ZONE_LABELS[zone] || `Zone ${zone}`}
-                  </Typography>
-                  <Typography variant="caption" display="block">
-                    {data.runs} runs ({data.count} balls)
-                  </Typography>
-                  {data.boundaries > 0 && (
-                    <Typography variant="caption" display="block" color="primary">
-                      {data.boundaries} boundaries
-                    </Typography>
-                  )}
-                </Box>
-              ))}
-          </Box>
-        </Box>
-      )}
-    </Paper>
+    </Box>
   );
 };
 
