@@ -131,10 +131,10 @@ const WagonWheel = ({
     if (!wagonData || !stats) return null;
 
     const width = 400;
-    const height = 400;
+    const height = 450; // Increased height for labels
     const centerX = width / 2;
-    const centerY = height / 2;
-    const maxRadius = 180;
+    const centerY = (height / 2) - 10; // Shifted up slightly
+    const maxRadius = 170; // Reduced radius for better fit with labels
     const batterRadius = 8; // Size of batter circle at center
 
     // Field zones (8 zones + center)
@@ -253,11 +253,11 @@ const WagonWheel = ({
         {/* Batter position (circle at center) */}
         <circle cx={centerX} cy={centerY} r={batterRadius} fill="#333" stroke="#000" strokeWidth="1" />
 
-        {/* Zone labels */}
-        <text x={centerX} y={centerY - maxRadius - 10} textAnchor="middle" fontSize="11" fill="#666">Straight</text>
-        <text x={centerX + maxRadius + 10} y={centerY + 5} textAnchor="start" fontSize="11" fill="#666">Off</text>
-        <text x={centerX - maxRadius - 10} y={centerY + 5} textAnchor="end" fontSize="11" fill="#666">Leg</text>
-        <text x={centerX} y={centerY + maxRadius + 20} textAnchor="middle" fontSize="11" fill="#666">Behind</text>
+        {/* Zone labels - Cricket orientation: batter faces down, bowler at bottom */}
+        <text x={centerX} y={centerY + maxRadius + 20} textAnchor="middle" fontSize="12" fill="#666" fontWeight="600">Straight</text>
+        <text x={centerX + maxRadius + 10} y={centerY + 5} textAnchor="start" fontSize="12" fill="#666" fontWeight="600">Off</text>
+        <text x={centerX - maxRadius - 10} y={centerY + 5} textAnchor="end" fontSize="12" fill="#666" fontWeight="600">Leg</text>
+        <text x={centerX} y={centerY - maxRadius - 10} textAnchor="middle" fontSize="12" fill="#666" fontWeight="600">Behind</text>
       </svg>
     );
   };
@@ -288,7 +288,7 @@ const WagonWheel = ({
   }
 
   return (
-    <Box sx={{ width: '100%' }}>
+    <Box sx={{ width: '100%', px: 1 }}>
       <Typography variant="h6" gutterBottom sx={{ textAlign: 'center' }}>
         Wagon Wheel
       </Typography>

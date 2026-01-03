@@ -122,7 +122,7 @@ const PlayerPitchMap = ({
   }
 
   return (
-    <Box sx={{ width: '100%' }}>
+    <Box sx={{ width: '100%', px: 1 }}>
       <Typography variant="h6" gutterBottom sx={{ textAlign: 'center' }}>
         Pitch Map
       </Typography>
