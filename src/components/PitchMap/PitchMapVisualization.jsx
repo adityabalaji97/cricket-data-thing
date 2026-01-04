@@ -160,7 +160,7 @@ const PitchMapVisualization = ({
         ref={svgRef}
         width={scaledDimensions.width} 
         height={scaledDimensions.height}
-        style={{ overflow: 'visible', maxWidth: '100%' }}
+        style={{ overflow: 'hidden', maxWidth: '100%', display: 'block' }}
       >
         {/* Background pitch */}
         <rect

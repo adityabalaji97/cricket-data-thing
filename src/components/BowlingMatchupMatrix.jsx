@@ -3,6 +3,7 @@ import { Typography, Box, Tooltip, useMediaQuery, useTheme } from '@mui/material
 import { Info as InfoIcon } from 'lucide-react';
 import Card from './ui/Card';
 import { EmptyState } from './ui';
+import { colors } from '../theme/designSystem';
 
 const MetricCell = ({ stats, isMobile }) => {
   if (!stats || !stats.runs) return <td style={{ textAlign: 'center', padding: '8px' }}>-</td>;
@@ -86,25 +87,48 @@ const BowlingMatchupMatrix = ({ stats, isMobile: isMobileProp, wrapInCard = true
           <InfoIcon size={isMobile ? 14 : 16} />
         </Tooltip>
       </Box>
-      <Box sx={{ overflow: 'auto' }}>
+      <Box sx={{ overflowY: 'auto', maxHeight: isMobile ? 360 : 420 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? '0.75rem' : undefined }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', padding: isMobile ? '6px' : '8px' }}>Phase</th>
-              {bowlingTypes.map(type => (
-                <th key={type} style={{ textAlign: 'center', padding: isMobile ? '6px' : '8px', minWidth: isMobile ? '100px' : '120px' }}>
-                  {type}
+              <th
+                style={{
+                  textAlign: 'left',
+                  padding: isMobile ? '6px' : '8px',
+                  position: 'sticky',
+                  top: 0,
+                  background: colors.neutral[0],
+                  zIndex: 2
+                }}
+              >
+                Bowling Type
+              </th>
+              {phases.map(phase => (
+                <th
+                  key={phase}
+                  style={{
+                    textAlign: 'center',
+                    padding: isMobile ? '6px' : '8px',
+                    minWidth: isMobile ? '100px' : '120px',
+                    position: 'sticky',
+                    top: 0,
+                    background: colors.neutral[0],
+                    zIndex: 2,
+                    textTransform: 'capitalize'
+                  }}
+                >
+                  {phase}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {phases.map(phase => (
-              <tr key={phase}>
-                <td style={{ padding: isMobile ? '6px' : '8px', textTransform: 'capitalize' }}>{phase}</td>
-                {bowlingTypes.map(type => (
+            {bowlingTypes.map(type => (
+              <tr key={type}>
+                <td style={{ padding: isMobile ? '6px' : '8px', textTransform: 'capitalize' }}>{type}</td>
+                {phases.map(phase => (
                   <MetricCell
-                    key={type}
+                    key={phase}
                     stats={stats?.phase_stats?.bowling_types?.[type]?.[phase]}
                     isMobile={isMobile}
                   />

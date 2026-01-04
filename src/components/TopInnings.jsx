@@ -106,8 +106,10 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
           minHeight={isMobile ? 240 : 280}
         />
       ) : (
-      <TableContainer>
+      <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
         <Table size={isMobile ? "small" : "medium"} sx={{
+          tableLayout: 'fixed',
+          width: '100%',
           '& .MuiTableCell-root': {
             borderBottom: '1px solid rgba(224, 224, 224, 1)',
             py: isMobile ? `${spacing.xs}px` : `${spacing.md}px`,

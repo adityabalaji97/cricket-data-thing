@@ -37,7 +37,7 @@ const PlayerPitchMap = ({
   const isCompact = shareView || isMobile;
   const Wrapper = wrapInCard ? Card : Box;
   const frameSx = isMobile
-    ? { minHeight: 420, aspectRatio: '4 / 5' }
+    ? { minHeight: 420 }
     : {};
   const wrapperProps = wrapInCard
     ? { isMobile, shareFrame: shareView, sx: frameSx }
@@ -253,7 +253,14 @@ const PlayerPitchMap = ({
       </Box>
 
       {/* Pitch Map Visualization */}
-      <Box sx={{ maxWidth: isCompact ? 360 : 420, mx: 'auto', width: '100%' }}>
+      <Box
+        sx={{
+          maxWidth: isCompact ? 360 : 420,
+          mx: 'auto',
+          width: '100%',
+          overflow: 'hidden'
+        }}
+      >
         <PitchMapVisualization
           cells={pitchData.cells}
           mode="grid"
