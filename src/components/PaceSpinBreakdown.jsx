@@ -94,21 +94,23 @@ const PaceSpinBreakdown = ({ stats, isMobile: isMobileProp }) => {
     <Card isMobile={isMobile}>
       <Box sx={{
         display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'space-between',
-        alignItems: isMobile ? 'flex-start' : 'center',
+        alignItems: 'center',
         mb: 2,
-        gap: isMobile ? 1.5 : 0
+        gap: 1,
+        flexWrap: isMobile ? 'wrap' : 'nowrap'
       }}>
-        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
-          Pace vs Spin Analysis
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
+          Pace vs Spin
         </Typography>
-        <FilterBar
-          filters={filterConfig}
-          activeFilters={{ metric: selectedMetric }}
-          onFilterChange={handleFilterChange}
-          isMobile={isMobile}
-        />
+        <Box sx={{ flexShrink: 1, minWidth: 0 }}>
+          <FilterBar
+            filters={filterConfig}
+            activeFilters={{ metric: selectedMetric }}
+            onFilterChange={handleFilterChange}
+            isMobile={isMobile}
+          />
+        </Box>
       </Box>
 
       <Box sx={{ width: '100%', height: chartHeight, mt: 2 }}>
@@ -128,22 +130,12 @@ const PaceSpinBreakdown = ({ stats, isMobile: isMobileProp }) => {
             <YAxis type="category" dataKey="phase" axisLine={false} tick={{ fontSize: isMobile ? 10 : 12 }} />
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }} />
-            <Bar dataKey="pace" name="vs Pace" fill={designColors.primary[500]} barSize={20} />
-            <Bar dataKey="spin" name="vs Spin" fill={designColors.chart[2]} barSize={20} />
-            <Bar dataKey="overall" name="Overall" fill={designColors.chart[5]} barSize={20} />
+            <Bar dataKey="pace" name="vs Pace" fill={designColors.chart.blue} barSize={20} />
+            <Bar dataKey="spin" name="vs Spin" fill={designColors.chart.orange} barSize={20} />
+            <Bar dataKey="overall" name="Overall" fill={designColors.chart.green} barSize={20} />
           </BarChart>
         </ResponsiveContainer>
       </Box>
-
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2, fontSize: isMobile ? '0.7rem' : undefined }}>
-        {selectedMetric === 'strike_rate'
-          ? 'Higher values indicate faster scoring'
-          : selectedMetric === 'average'
-          ? 'Higher values indicate better consistency'
-          : selectedMetric === 'boundary_percentage'
-          ? 'Higher values indicate more boundaries'
-          : 'Higher values indicate more dot balls'}
-      </Typography>
     </Card>
   );
 };

@@ -98,21 +98,23 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp }) => {  /
     <Card isMobile={isMobile}>
       <Box sx={{
         display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'space-between',
-        alignItems: isMobile ? 'flex-start' : 'center',
+        alignItems: 'center',
         mb: 2,
-        gap: isMobile ? 1.5 : 0
+        gap: 1,
+        flexWrap: isMobile ? 'wrap' : 'nowrap'
       }}>
-        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
-          Strike Rate Progression by Intervals
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
+          SR Progression
         </Typography>
-        <FilterBar
-          filters={filterConfig}
-          activeFilters={{ interval }}
-          onFilterChange={handleFilterChange}
-          isMobile={isMobile}
-        />
+        <Box sx={{ flexShrink: 1, minWidth: 0 }}>
+          <FilterBar
+            filters={filterConfig}
+            activeFilters={{ interval }}
+            onFilterChange={handleFilterChange}
+            isMobile={isMobile}
+          />
+        </Box>
       </Box>
       <Box sx={{ width: '100%', height: chartHeight }}>
         <ResponsiveContainer>
@@ -160,19 +162,19 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp }) => {  /
               yAxisId="left"
               dataKey="strikeRate"
               name="Strike Rate"
-              fill={designColors.primary[500]}
+              fill={designColors.chart.blue}
             />
             <Bar
               yAxisId="right"
               dataKey="boundaryPercentage"
               name="Boundary %"
-              fill={designColors.chart[2]}
+              fill={designColors.chart.green}
             />
             <Bar
               yAxisId="right"
               dataKey="dotPercentage"
               name="Dot %"
-              fill={designColors.chart[4]}
+              fill={designColors.chart.orange}
             />
           </BarChart>
         </ResponsiveContainer>

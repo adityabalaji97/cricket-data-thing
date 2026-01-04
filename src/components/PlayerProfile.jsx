@@ -366,18 +366,6 @@ const PlayerProfile = () => {
               isMobile={isMobile}
             />
 
-            {/* Contextual Query Prompts */}
-            <ContextualQueryPrompts
-              queries={getBatterContextualQueries(selectedPlayer, {
-                startDate: dateRange.start,
-                endDate: dateRange.end,
-                leagues: competitionFilters.leagues,
-                venue: selectedVenue !== 'All Venues' ? selectedVenue : null,
-              })}
-              title={`🔍 Explore ${selectedPlayer.split(' ').pop()}'s Data`}
-              isMobile={isMobile}
-            />
-
             <Box sx={{ mt: isMobile ? 2 : 3 }}>
               <ContributionGraph
                 innings={stats.innings || []}
@@ -427,6 +415,18 @@ const PlayerProfile = () => {
             </Box>
             <TopInnings innings={stats.innings} count={10} isMobile={isMobile} />
             <BowlingMatchupMatrix stats={stats} isMobile={isMobile} />
+
+            {/* Contextual Query Prompts */}
+            <ContextualQueryPrompts
+              queries={getBatterContextualQueries(selectedPlayer, {
+                startDate: dateRange.start,
+                endDate: dateRange.end,
+                leagues: competitionFilters.leagues,
+                venue: selectedVenue !== 'All Venues' ? selectedVenue : null,
+              })}
+              title={`🔍 Explore ${selectedPlayer.split(' ').pop()}'s Data`}
+              isMobile={isMobile}
+            />
           </Box>
         )}
       </Box>

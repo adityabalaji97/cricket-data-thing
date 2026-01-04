@@ -246,6 +246,7 @@ const PlayerPitchMap = ({
           title={playerName}
           subtitle={`${phase === 'overall' ? 'All Phases' : phase} ${bowlKind !== 'all' ? `• ${bowlKind}` : ''}`}
           hideStumps={true}
+          hideLegend={true}
         />
       </Box>
     </Card>

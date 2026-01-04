@@ -129,7 +129,7 @@ const InningsScatter = ({ innings }) => {
   return (
     <Card isMobile={isMobile}>
       <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
-        Innings Distribution
+        Balls Faced vs Runs
       </Typography>
 
       <Box sx={{ mb: isMobile ? 2 : 3 }}>
@@ -146,15 +146,15 @@ const InningsScatter = ({ innings }) => {
           <ScatterChart margin={{
             top: 10,
             right: isMobile ? 5 : 20,
-            bottom: isMobile ? 25 : 40,
-            left: isMobile ? 5 : 40
+            bottom: isMobile ? 30 : 45,
+            left: isMobile ? 10 : 50
           }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               {...getAxisProps(xMetric)}
               dataKey={xAxisMetrics[xMetric].key}
               name={xAxisMetrics[xMetric].label}
-              label={isMobile ? undefined : { value: xAxisMetrics[xMetric].label, position: 'bottom' }}
+              label={isMobile ? undefined : { value: xAxisMetrics[xMetric].label, position: 'bottom', offset: 0 }}
               tick={{ fontSize: isMobile ? 9 : 12 }}
             />
             <YAxis
@@ -164,7 +164,8 @@ const InningsScatter = ({ innings }) => {
               label={isMobile ? undefined : {
                 value: yAxisMetrics[yMetric].label,
                 angle: -90,
-                position: 'left'
+                position: 'insideLeft',
+                offset: 10
               }}
               tick={{ fontSize: isMobile ? 9 : 12 }}
             />

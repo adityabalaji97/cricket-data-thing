@@ -72,9 +72,9 @@ const CareerStatsCards = ({ stats, isMobile = false }) => {
         xs: '1fr',
         sm: '1fr 1fr',
         md: '1fr 1fr 1fr',
-        lg: 'repeat(6, 1fr)'
+        lg: 'repeat(3, 1fr)'
       },
-      mb: 4
+      mb: 3
     }}>
       <StatCard
         label="MATCHES"

@@ -52,17 +52,14 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
 
   return (
     <Card isMobile={isMobile}>
-      <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 1 }}>
-        Ball-by-Ball Strike Rate Progression
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: isMobile ? '0.75rem' : undefined }}>
-        Strike rate evolution through innings
+      <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
+        nth Ball SR
       </Typography>
       <Box sx={{ height: chartHeight, width: '100%' }}>
         <ResponsiveContainer>
           <LineChart
             data={data}
-            margin={{ top: 20, right: isMobile ? 5 : 30, bottom: isMobile ? 25 : 40, left: isMobile ? 5 : 40 }}
+            margin={{ top: 20, right: isMobile ? 10 : 40, bottom: isMobile ? 15 : 30, left: isMobile ? 10 : 50 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
@@ -99,8 +96,8 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
               verticalAlign="bottom"
               height={36}
               wrapperStyle={{
-                paddingTop: '20px',
-                paddingBottom: '10px',
+                paddingTop: '10px',
+                paddingBottom: '0px',
                 display: 'flex',
                 justifyContent: 'center',
                 gap: isMobile ? '20px' : '50px',
@@ -110,7 +107,7 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
             <Line
               type="monotone"
               dataKey="strike_rate"
-              stroke={designColors.primary[500]}
+              stroke={designColors.chart.blue}
               name="Strike Rate"
               yAxisId="left"
               dot={false}
@@ -118,7 +115,7 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
             <Line
               type="monotone"
               dataKey="innings_with_n_balls"
-              stroke={designColors.chart[2]}
+              stroke={designColors.chart.orange}
               name="Innings Count"
               yAxisId="right"
               dot={false}
