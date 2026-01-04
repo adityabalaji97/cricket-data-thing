@@ -16,6 +16,7 @@ import {
 import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
 import config from '../config';
+import { colors as designColors } from '../theme/designSystem';
 
 
 const WagonWheel = ({
@@ -27,13 +28,20 @@ const WagonWheel = ({
   includeInternational = false,
   topTeams = null,
   isMobile = false,
-  wrapInCard = true
+  wrapInCard = true,
+  shareView = false
 }) => {
   const [wagonData, setWagonData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const isCompact = shareView || isMobile;
   const Wrapper = wrapInCard ? Card : Box;
-  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
+  const frameSx = isMobile
+    ? { minHeight: 420, aspectRatio: '4 / 5' }
+    : {};
+  const wrapperProps = wrapInCard
+    ? { isMobile, shareFrame: shareView, sx: frameSx }
+    : { sx: { width: '100%', ...frameSx } };
 
   // Filters
   const [phase, setPhase] = useState('overall');
@@ -160,7 +168,7 @@ const WagonWheel = ({
     if (!wagonData || !stats) return null;
 
     // Responsive dimensions - circular field
-    const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - (isMobile ? 48 : 80), 400) : 400;
+    const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - (isCompact ? 48 : 80), 400) : 400;
     const width = containerWidth;
     const height = containerWidth; // Circular - same width and height
     const centerX = width / 2;
@@ -181,7 +189,7 @@ const WagonWheel = ({
           y1={centerY}
           x2={x2}
           y2={y2}
-          stroke="#e0e0e0"
+          stroke={designColors.neutral[200]}
           strokeWidth="1"
           strokeDasharray="4,4"
         />
@@ -211,19 +219,19 @@ const WagonWheel = ({
         }
 
         // Color by runs
-        let color = '#9e9e9e'; // dots
+        let color = designColors.neutral[400]; // dots
         let strokeWidth = 1;
         let opacity = 0.4;
         if (delivery.runs === 6) {
-          color = '#e91e63'; // sixes - pink
+          color = designColors.chart.pink; // sixes - pink
           strokeWidth = 2.5;
           opacity = 0.7;
         } else if (delivery.runs === 4) {
-          color = '#2196f3'; // fours - blue
+          color = designColors.chart.blue; // fours - blue
           strokeWidth = 2;
           opacity = 0.6;
         } else if (delivery.runs > 0) {
-          color = '#4caf50'; // runs - green
+          color = designColors.chart.green; // runs - green
           strokeWidth = 1.5;
           opacity = 0.5;
         }
@@ -250,8 +258,8 @@ const WagonWheel = ({
           cx={centerX}
           cy={centerY}
           r={maxRadius}
-          fill="#f5f5f5"
-          stroke="#bdbdbd"
+          fill={designColors.neutral[50]}
+          stroke={designColors.neutral[300]}
           strokeWidth="2"
         />
 
@@ -264,7 +272,7 @@ const WagonWheel = ({
           cy={centerY}
           r={maxRadius * 0.5}
           fill="none"
-          stroke="#e0e0e0"
+          stroke={designColors.neutral[200]}
           strokeWidth="1"
           strokeDasharray="4,4"
         />
@@ -275,8 +283,8 @@ const WagonWheel = ({
           y={centerY - (width * 0.075)}
           width={width * 0.025}
           height={width * 0.15}
-          fill="#d4a574"
-          stroke="#8d6e63"
+          fill={designColors.warning[50]}
+          stroke={designColors.warning[600]}
           strokeWidth="1"
         />
 
@@ -379,7 +387,7 @@ const WagonWheel = ({
         gap: 1,
         flexWrap: isMobile ? 'wrap' : 'nowrap'
       }}>
-        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
+        <Typography variant={isCompact ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
           Wagon Wheel
         </Typography>
         <Box sx={{ flexShrink: 1, minWidth: 0 }}>
@@ -387,38 +395,38 @@ const WagonWheel = ({
             filters={filterConfig}
             activeFilters={{ phase, bowlKind, line, length, shot }}
             onFilterChange={handleFilterChange}
-            isMobile={isMobile}
+            isMobile={isCompact}
             showActiveCount={false}
           />
         </Box>
       </Box>
 
       {/* Stats Summary */}
-      <Box sx={{ display: 'flex', gap: isMobile ? 0.5 : 1, mb: isMobile ? 1.5 : 2, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <Chip label={`${stats.totalBalls} balls`} size="small" sx={{ fontSize: isMobile ? '0.7rem' : undefined, height: isMobile ? 24 : undefined }} />
-        <Chip label={`${stats.totalRuns} runs`} size="small" color="primary" sx={{ fontSize: isMobile ? '0.7rem' : undefined, height: isMobile ? 24 : undefined }} />
-        <Chip label={`SR: ${stats.strikeRate}`} size="small" sx={{ fontSize: isMobile ? '0.7rem' : undefined, height: isMobile ? 24 : undefined }} />
-        <Chip label={`${stats.fours} x 4s`} size="small" sx={{ bgcolor: '#2196f3', color: 'white', fontSize: isMobile ? '0.7rem' : undefined, height: isMobile ? 24 : undefined }} />
-        <Chip label={`${stats.sixes} x 6s`} size="small" sx={{ bgcolor: '#e91e63', color: 'white', fontSize: isMobile ? '0.7rem' : undefined, height: isMobile ? 24 : undefined }} />
+      <Box sx={{ display: 'flex', gap: isCompact ? 0.5 : 1, mb: isCompact ? 1.5 : 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <Chip label={`${stats.totalBalls} balls`} size="small" sx={{ fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
+        <Chip label={`${stats.totalRuns} runs`} size="small" sx={{ bgcolor: designColors.chart.blue, color: 'white', fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
+        <Chip label={`SR: ${stats.strikeRate}`} size="small" sx={{ fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
+        <Chip label={`${stats.fours} x 4s`} size="small" sx={{ bgcolor: designColors.chart.blue, color: 'white', fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
+        <Chip label={`${stats.sixes} x 6s`} size="small" sx={{ bgcolor: designColors.chart.pink, color: 'white', fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
       </Box>
 
       {/* Legend */}
-      <Box sx={{ display: 'flex', gap: isMobile ? 1.5 : 2, mb: isMobile ? 1.5 : 2, flexWrap: 'wrap', justifyContent: 'center', fontSize: isMobile ? '0.7rem' : '0.875rem' }}>
+      <Box sx={{ display: 'flex', gap: isCompact ? 1.5 : 2, mb: isCompact ? 1.5 : 2, flexWrap: 'wrap', justifyContent: 'center', fontSize: isCompact ? '0.65rem' : '0.875rem' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Box sx={{ width: isMobile ? 10 : 12, height: isMobile ? 10 : 12, borderRadius: '50%', bgcolor: '#e91e63' }} />
-          <Typography variant="caption" sx={{ fontSize: isMobile ? '0.7rem' : undefined }}>Sixes</Typography>
+          <Box sx={{ width: isCompact ? 10 : 12, height: isCompact ? 10 : 12, borderRadius: '50%', bgcolor: designColors.chart.pink }} />
+          <Typography variant="caption" sx={{ fontSize: isCompact ? '0.65rem' : undefined }}>Sixes</Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Box sx={{ width: isMobile ? 8 : 10, height: isMobile ? 8 : 10, borderRadius: '50%', bgcolor: '#2196f3' }} />
-          <Typography variant="caption" sx={{ fontSize: isMobile ? '0.7rem' : undefined }}>Fours</Typography>
+          <Box sx={{ width: isCompact ? 8 : 10, height: isCompact ? 8 : 10, borderRadius: '50%', bgcolor: designColors.chart.blue }} />
+          <Typography variant="caption" sx={{ fontSize: isCompact ? '0.65rem' : undefined }}>Fours</Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Box sx={{ width: isMobile ? 7 : 8, height: isMobile ? 7 : 8, borderRadius: '50%', bgcolor: '#4caf50' }} />
-          <Typography variant="caption" sx={{ fontSize: isMobile ? '0.7rem' : undefined }}>Runs</Typography>
+          <Box sx={{ width: isCompact ? 7 : 8, height: isCompact ? 7 : 8, borderRadius: '50%', bgcolor: designColors.chart.green }} />
+          <Typography variant="caption" sx={{ fontSize: isCompact ? '0.65rem' : undefined }}>Runs</Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Box sx={{ width: isMobile ? 5 : 6, height: isMobile ? 5 : 6, borderRadius: '50%', bgcolor: '#9e9e9e' }} />
-          <Typography variant="caption" sx={{ fontSize: isMobile ? '0.7rem' : undefined }}>Dots</Typography>
+          <Box sx={{ width: isCompact ? 5 : 6, height: isCompact ? 5 : 6, borderRadius: '50%', bgcolor: designColors.neutral[400] }} />
+          <Typography variant="caption" sx={{ fontSize: isCompact ? '0.65rem' : undefined }}>Dots</Typography>
         </Box>
       </Box>
 

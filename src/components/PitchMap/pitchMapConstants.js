@@ -5,6 +5,8 @@
  * Mobile-first design with stumps centered in full toss row.
  */
 
+import { colors } from '../../theme/designSystem';
+
 // Line values from delivery_details (left to right from bowler's view for RHB)
 export const LINE_ORDER = [
   'WIDE_OUTSIDE_OFFSTUMP',
@@ -157,10 +159,10 @@ export const DEFAULT_COLOR_METRIC = 'strike_rate';
 
 // Heat map color scale (red=bad for batter, green=good for batter)
 export const HEAT_COLORS = {
-  bad: '#ef4444',
-  neutral: '#fbbf24',
-  good: '#22c55e',
-  noData: '#e5e7eb'
+  bad: colors.chart.red,
+  neutral: colors.chart.yellow,
+  good: colors.chart.green,
+  noData: colors.neutral[200]
 };
 
 // Minimum balls threshold options

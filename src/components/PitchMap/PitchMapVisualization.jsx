@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { Box, Typography, Tooltip } from '@mui/material';
+import { colors } from '../../theme/designSystem';
 import {
   PITCH_DIMENSIONS,
   LINE_ORDER,
@@ -34,7 +35,8 @@ const PitchMapVisualization = ({
   width: propWidth,
   svgRef,
   hideStumps = false,
-  hideLegend = false
+  hideLegend = false,
+  compactMode = false
 }) => {
   // Use ref to measure container if no width prop
   const [containerWidth, setContainerWidth] = React.useState(propWidth || PITCH_DIMENSIONS.width);
@@ -61,7 +63,7 @@ const PitchMapVisualization = ({
   
   const scaledDimensions = {
     width,
-    height: Math.max(550, PITCH_DIMENSIONS.height * scale),
+    height: Math.max(compactMode ? 480 : 550, PITCH_DIMENSIONS.height * scale),
     pitchWidth: (width - (PITCH_DIMENSIONS.padding.left + PITCH_DIMENSIONS.padding.right) * scale),
     pitchHeight: PITCH_DIMENSIONS.pitchHeight * scale,
     cellHeight,
@@ -127,12 +129,12 @@ const PitchMapVisualization = ({
     }
     
     // Take the minimum of width and height constraints, cap at reasonable max
-    const primaryFontSize = Math.min(maxPrimaryByWidth, maxPrimaryByHeight, 13);
-    const secondaryFontSize = Math.min(maxSecondaryByWidth, maxSecondaryByHeight, 11);
+    const primaryFontSize = Math.min(maxPrimaryByWidth, maxPrimaryByHeight, compactMode ? 11 : 13);
+    const secondaryFontSize = Math.min(maxSecondaryByWidth, maxSecondaryByHeight, compactMode ? 9 : 11);
     
     return {
-      primary: Math.max(7, primaryFontSize),
-      secondary: Math.max(6, secondaryFontSize)
+      primary: Math.max(compactMode ? 6 : 7, primaryFontSize),
+      secondary: Math.max(compactMode ? 5.5 : 6, secondaryFontSize)
     };
   };
   
@@ -166,8 +168,8 @@ const PitchMapVisualization = ({
           y={scaledDimensions.padding.top}
           width={scaledDimensions.pitchWidth}
           height={scaledDimensions.pitchHeight}
-          fill="#f0fdf4"
-          stroke="#86efac"
+          fill={colors.neutral[50]}
+          stroke={colors.chart.green}
           strokeWidth={2}
           rx={4}
         />
@@ -190,10 +192,10 @@ const PitchMapVisualization = ({
         ))}
         
         {/* Stumps centered within full toss row */}
-        {!hideStumps && <StumpsIndicator dimensions={scaledDimensions} scale={scale} mode={mode} />}
+        {!hideStumps && <StumpsIndicator dimensions={scaledDimensions} scale={scale} mode={mode} compactMode={compactMode} />}
         
         {/* Axis labels */}
-        <AxisLabels dimensions={scaledDimensions} mode={mode} scale={scale} />
+        <AxisLabels dimensions={scaledDimensions} mode={mode} scale={scale} compactMode={compactMode} />
       </svg>
 
       {/* Legend */}
@@ -202,6 +204,7 @@ const PitchMapVisualization = ({
           metric={colorMetric}
           dataRange={dataRange}
           width={scaledDimensions.pitchWidth}
+          compactMode={compactMode}
         />
       )}
     </Box>
@@ -344,7 +347,7 @@ const CellContent = ({ x, y, width, height, cell, displayMetrics, secondaryMetri
           dominantBaseline="middle"
           fontSize={fontSizes.primary}
           fontWeight="600"
-          fill="#1f2937"
+          fill={colors.neutral[800]}
         >
           {primaryLine}
         </text>
@@ -358,7 +361,7 @@ const CellContent = ({ x, y, width, height, cell, displayMetrics, secondaryMetri
           textAnchor="middle"
           dominantBaseline="middle"
           fontSize={fontSizes.secondary}
-          fill="#4b5563"
+          fill={colors.neutral[600]}
         >
           {secondaryLine}
         </text>
@@ -370,9 +373,9 @@ const CellContent = ({ x, y, width, height, cell, displayMetrics, secondaryMetri
 /**
  * Axis labels for line and length
  */
-const AxisLabels = ({ dimensions, mode, scale }) => {
+const AxisLabels = ({ dimensions, mode, scale, compactMode }) => {
   const { padding, pitchWidth, pitchHeight } = dimensions;
-  const fontSize = 11 * scale;
+  const fontSize = Math.min(compactMode ? 9 : 11, 11 * scale);
   
   // Reverse length order to match cell positions (full toss at top near stumps, short at bottom)
   const reversedLengthOrder = [...LENGTH_ORDER].reverse();
@@ -391,7 +394,7 @@ const AxisLabels = ({ dimensions, mode, scale }) => {
               y={padding.top + pitchHeight + 18}
               textAnchor="middle"
               fontSize={fontSize}
-              fill="#6b7280"
+              fill={colors.neutral[600]}
             >
               {LINE_SHORT_LABELS[line]}
             </text>
@@ -412,7 +415,7 @@ const AxisLabels = ({ dimensions, mode, scale }) => {
               textAnchor="start"
               dominantBaseline="middle"
               fontSize={fontSize}
-              fill="#6b7280"
+              fill={colors.neutral[600]}
             >
               {LENGTH_SHORT_LABELS[length]}
             </text>
@@ -426,7 +429,7 @@ const AxisLabels = ({ dimensions, mode, scale }) => {
 /**
  * Stumps indicator centered within the full toss row
  */
-const StumpsIndicator = ({ dimensions, scale, mode }) => {
+const StumpsIndicator = ({ dimensions, scale, mode, compactMode }) => {
   const { padding, pitchWidth, pitchHeight, cellHeight, stumpHeight, stumpWidth, stumpGap } = dimensions;
   const stumpX = padding.left + pitchWidth / 2;
   
@@ -446,52 +449,56 @@ const StumpsIndicator = ({ dimensions, scale, mode }) => {
           key={offset}
           x={stumpX + offset * stumpGap - stumpWidth / 2}
           y={stumpTopY}
-          width={stumpWidth}
-          height={stumpHeight}
-          fill="#78350f"
-          rx={1}
-        />
-      ))}
-      {/* Bails on top of stumps */}
-      <rect
-        x={stumpX - stumpGap - stumpWidth}
-        y={stumpTopY - 5}
-        width={stumpGap * 2 + stumpWidth * 2}
-        height={6}
-        fill="#92400e"
-        rx={2}
+        width={stumpWidth}
+        height={stumpHeight}
+        fill={colors.warning[700]}
+        rx={1}
       />
-      {/* Batter label above stumps */}
+    ))}
+    {/* Bails on top of stumps */}
+    <rect
+      x={stumpX - stumpGap - stumpWidth}
+      y={stumpTopY - 5}
+      width={stumpGap * 2 + stumpWidth * 2}
+      height={6}
+      fill={colors.warning[600]}
+      rx={2}
+    />
+    {/* Batter label above stumps */}
+    {!compactMode && (
       <text
         x={stumpX}
         y={stumpTopY - 14}
         textAnchor="middle"
         fontSize={11 * scale}
         fontWeight="600"
-        fill="#78350f"
+        fill={colors.warning[700]}
       >
         🏏 Batter
       </text>
-      
-      {/* Bowler label at bottom */}
+    )}
+    
+    {/* Bowler label at bottom */}
+    {!compactMode && (
       <text
         x={stumpX}
         y={padding.top + pitchHeight + 38}
         textAnchor="middle"
         fontSize={11 * scale}
         fontWeight="500"
-        fill="#6b7280"
+        fill={colors.neutral[600]}
       >
         ↑ Bowler
       </text>
-    </g>
-  );
+    )}
+  </g>
+);
 };
 
 /**
  * Color scale legend (red=bad for batter, green=good for batter)
  */
-const ColorLegend = ({ metric, dataRange, width }) => {
+const ColorLegend = ({ metric, dataRange, width, compactMode }) => {
   const metricConfig = METRICS[metric];
   if (!metricConfig || !dataRange) return null;
   
@@ -502,8 +509,8 @@ const ColorLegend = ({ metric, dataRange, width }) => {
   const isDescending = metricConfig.colorScale === 'descending';
   
   return (
-    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
+    <Box sx={{ mt: compactMode ? 1.5 : 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, fontSize: compactMode ? '0.65rem' : undefined }}>
         Color: {metricConfig.label} {isDescending ? '(lower = better)' : '(higher = better)'}
       </Typography>
       <svg width={legendWidth} height={28}>
@@ -522,10 +529,10 @@ const ColorLegend = ({ metric, dataRange, width }) => {
           fill={`url(#${gradientId})`}
           rx={3}
         />
-        <text x={0} y={26} fontSize={10} fill="#6b7280">
+        <text x={0} y={26} fontSize={compactMode ? 9 : 10} fill={colors.neutral[600]}>
           {metricConfig.format(dataRange.min)}
         </text>
-        <text x={legendWidth} y={26} fontSize={10} fill="#6b7280" textAnchor="end">
+        <text x={legendWidth} y={26} fontSize={compactMode ? 9 : 10} fill={colors.neutral[600]} textAnchor="end">
           {metricConfig.format(dataRange.max)}
         </text>
       </svg>
