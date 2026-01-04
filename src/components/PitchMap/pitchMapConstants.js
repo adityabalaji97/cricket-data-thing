@@ -61,8 +61,8 @@ export const LENGTH_SHORT_LABELS = {
 // SVG dimensions and layout - mobile-first
 export const PITCH_DIMENSIONS = {
   width: 360,
-  height: 580,
-  padding: { top: 70, right: 55, bottom: 60, left: 20 },
+  height: 520,
+  padding: { top: 50, right: 45, bottom: 40, left: 15 },
   pitchWidth: 280,
   pitchHeight: 420,
   stumpHeight: 40,

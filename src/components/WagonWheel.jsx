@@ -156,22 +156,21 @@ const WagonWheel = ({
   const renderWagonWheel = () => {
     if (!wagonData || !stats) return null;
 
-    // Responsive dimensions - vertical oval for cricket field
+    // Responsive dimensions - circular field
     const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - (isMobile ? 48 : 80), 400) : 400;
     const width = containerWidth;
-    const height = containerWidth * 1.3; // Vertical oval - taller than wide
+    const height = containerWidth; // Circular - same width and height
     const centerX = width / 2;
     const centerY = height / 2;
-    const maxRadiusX = width * 0.38; // Narrower width for vertical oval
-    const maxRadiusY = height * 0.42; // Taller height for vertical oval
+    const maxRadius = width * 0.45; // Single radius for circle
     const batterRadius = width * 0.02; // 2% of width (8/400)
 
     // Field zones (8 zones + center)
     const zoneLines = [];
     for (let i = 0; i < 8; i++) {
       const angle = (i * Math.PI / 4) - (Math.PI / 2); // Start from top
-      const x2 = centerX + maxRadiusX * Math.cos(angle);
-      const y2 = centerY + maxRadiusY * Math.sin(angle);
+      const x2 = centerX + maxRadius * Math.cos(angle);
+      const y2 = centerY + maxRadius * Math.sin(angle);
       zoneLines.push(
         <line
           key={`zone-${i}`}
@@ -191,21 +190,20 @@ const WagonWheel = ({
       .filter(d => d.wagon_x !== null && d.wagon_y !== null)
       .map((delivery, idx) => {
         // Scale coordinates to fit in our SVG (assuming wagon_x/y are in range 0-300)
-        const scaleX = maxRadiusX / 300;
-        const scaleY = maxRadiusY / 300;
-        let x = centerX + (delivery.wagon_x - 150) * scaleX;
-        let y = centerY + (delivery.wagon_y - 150) * scaleY;
+        const scale = maxRadius / 300;
+        let x = centerX + (delivery.wagon_x - 150) * scale;
+        let y = centerY + (delivery.wagon_y - 150) * scale;
 
-        // For boundaries (4s and 6s), extend to the ellipse edge
+        // For boundaries (4s and 6s), extend to the circle edge
         if (delivery.runs === 4 || delivery.runs === 6) {
           const dx = x - centerX;
           const dy = y - centerY;
           const distance = Math.sqrt(dx * dx + dy * dy);
           if (distance > 0) {
-            // Extend to ellipse boundary
+            // Extend to circle boundary
             const angle = Math.atan2(dy, dx);
-            x = centerX + maxRadiusX * Math.cos(angle);
-            y = centerY + maxRadiusY * Math.sin(angle);
+            x = centerX + maxRadius * Math.cos(angle);
+            y = centerY + maxRadius * Math.sin(angle);
           }
         }
 
@@ -244,12 +242,11 @@ const WagonWheel = ({
 
     return (
       <svg width={width} height={height} style={{ maxWidth: '100%', height: 'auto' }}>
-        {/* Field boundary - ellipse for cricket field */}
-        <ellipse
+        {/* Field boundary - circle for cricket field */}
+        <circle
           cx={centerX}
           cy={centerY}
-          rx={maxRadiusX}
-          ry={maxRadiusY}
+          r={maxRadius}
           fill="#f5f5f5"
           stroke="#bdbdbd"
           strokeWidth="2"
@@ -258,12 +255,11 @@ const WagonWheel = ({
         {/* Zone lines */}
         {zoneLines}
 
-        {/* Inner ellipse (30 yard circle) */}
-        <ellipse
+        {/* Inner circle (30 yard circle) */}
+        <circle
           cx={centerX}
           cy={centerY}
-          rx={maxRadiusX * 0.5}
-          ry={maxRadiusY * 0.5}
+          r={maxRadius * 0.5}
           fill="none"
           stroke="#e0e0e0"
           strokeWidth="1"
@@ -286,13 +282,6 @@ const WagonWheel = ({
 
         {/* Batter position (circle at center) */}
         <circle cx={centerX} cy={centerY} r={batterRadius} fill="#333" stroke="#000" strokeWidth="1" />
-
-        {/* Zone labels - Cricket orientation: batter faces down, bowler at bottom */}
-        {/* For right-handed batter: off side is LEFT (towards covers), leg side is RIGHT (towards square leg) */}
-        <text x={centerX} y={centerY + maxRadiusY + 20} textAnchor="middle" fontSize={Math.max(10, width * 0.028)} fill="#666" fontWeight="600">Straight</text>
-        <text x={centerX - maxRadiusX - 10} y={centerY + 5} textAnchor="end" fontSize={Math.max(10, width * 0.028)} fill="#666" fontWeight="600">Off</text>
-        <text x={centerX + maxRadiusX + 10} y={centerY + 5} textAnchor="start" fontSize={Math.max(10, width * 0.028)} fill="#666" fontWeight="600">Leg</text>
-        <text x={centerX} y={centerY - maxRadiusY - 10} textAnchor="middle" fontSize={Math.max(10, width * 0.028)} fill="#666" fontWeight="600">Behind</text>
       </svg>
     );
   };
