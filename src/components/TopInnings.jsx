@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
+import { spacing } from '../theme/designSystem';
 
 const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }) => {
   const [viewMode, setViewMode] = useState('topScoring');
@@ -79,8 +80,8 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        mb: isMobile ? 1.5 : 3,
-        gap: 1,
+        mb: isMobile ? `${spacing.md}px` : `${spacing.lg}px`,
+        gap: `${spacing.sm}px`,
         flexWrap: isMobile ? 'wrap' : 'nowrap'
       }}>
         <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
@@ -100,21 +101,46 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
         <Table size={isMobile ? "small" : "medium"} sx={{
           '& .MuiTableCell-root': {
             borderBottom: '1px solid rgba(224, 224, 224, 1)',
-            py: isMobile ? 0.75 : 1.5,
-            px: isMobile ? 0.5 : 2,
-            fontSize: isMobile ? '0.7rem' : undefined
+            py: isMobile ? `${spacing.xs}px` : `${spacing.md}px`,
+            px: isMobile ? `${spacing.xs}px` : `${spacing.base}px`
           }
         }}>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600 }}>{isMobile ? 'Date' : 'Date'}</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Score</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>{isMobile ? 'Opp' : 'Opposition'}</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>SR</TableCell>
-              {!isMobile && <TableCell align="right" sx={{ fontWeight: 600 }}>SR Diff</TableCell>}
-              {!isMobile && <TableCell align="right" sx={{ fontWeight: 600 }}>% Team</TableCell>}
-              {!isMobile && <TableCell sx={{ fontWeight: 600 }}>Context</TableCell>}
-              {!isMobile && <TableCell align="right" sx={{ fontWeight: 600 }}>Winner</TableCell>}
+              <TableCell sx={{ fontWeight: 600 }}>
+                <Typography variant={isMobile ? 'caption' : 'body2'}>Date</Typography>
+              </TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>
+                <Typography variant={isMobile ? 'caption' : 'body2'}>Score</Typography>
+              </TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>
+                <Typography variant={isMobile ? 'caption' : 'body2'}>
+                  {isMobile ? 'Opp' : 'Opposition'}
+                </Typography>
+              </TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>
+                <Typography variant={isMobile ? 'caption' : 'body2'}>SR</Typography>
+              </TableCell>
+              {!isMobile && (
+                <TableCell align="right" sx={{ fontWeight: 600 }}>
+                  <Typography variant="body2">SR Diff</Typography>
+                </TableCell>
+              )}
+              {!isMobile && (
+                <TableCell align="right" sx={{ fontWeight: 600 }}>
+                  <Typography variant="body2">% Team</Typography>
+                </TableCell>
+              )}
+              {!isMobile && (
+                <TableCell sx={{ fontWeight: 600 }}>
+                  <Typography variant="body2">Context</Typography>
+                </TableCell>
+              )}
+              {!isMobile && (
+                <TableCell align="right" sx={{ fontWeight: 600 }}>
+                  <Typography variant="body2">Winner</Typography>
+                </TableCell>
+              )}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -127,24 +153,50 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
                 }}
               >
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                  {isMobile
-                    ? inning.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
-                    : inning.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-                  }
+                  <Typography variant={isMobile ? 'caption' : 'body2'}>
+                    {isMobile
+                      ? inning.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                      : inning.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                    }
+                  </Typography>
                 </TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>{inning.runs}({inning.balls_faced})</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  <Typography variant={isMobile ? 'caption' : 'body2'}>
+                    {inning.runs}({inning.balls_faced})
+                  </Typography>
+                </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: isMobile ? 60 : 'auto' }}>
-                  {isMobile ? inning.bowling_team.substring(0, 3).toUpperCase() : inning.bowling_team}
+                  <Typography variant={isMobile ? 'caption' : 'body2'}>
+                    {isMobile ? inning.bowling_team.substring(0, 3).toUpperCase() : inning.bowling_team}
+                  </Typography>
                 </TableCell>
-                <TableCell align="right">{inning.strike_rate.toFixed(1)}</TableCell>
-                {!isMobile && <TableCell align="right">{inning.team_comparison.sr_diff.toFixed(1)}</TableCell>}
+                <TableCell align="right">
+                  <Typography variant={isMobile ? 'caption' : 'body2'}>
+                    {inning.strike_rate.toFixed(1)}
+                  </Typography>
+                </TableCell>
                 {!isMobile && (
                   <TableCell align="right">
-                    {inning.runPercentage.toFixed(1)}% ({inning.runs}/{inning.totalTeamRuns})
+                    <Typography variant="body2">{inning.team_comparison.sr_diff.toFixed(1)}</Typography>
                   </TableCell>
                 )}
-                {!isMobile && <TableCell>{inning.venue}, {inning.competition}</TableCell>}
-                {!isMobile && <TableCell align="right">{inning.winner}</TableCell>}
+                {!isMobile && (
+                  <TableCell align="right">
+                    <Typography variant="body2">
+                      {inning.runPercentage.toFixed(1)}% ({inning.runs}/{inning.totalTeamRuns})
+                    </Typography>
+                  </TableCell>
+                )}
+                {!isMobile && (
+                  <TableCell>
+                    <Typography variant="body2">{inning.venue}, {inning.competition}</Typography>
+                  </TableCell>
+                )}
+                {!isMobile && (
+                  <TableCell align="right">
+                    <Typography variant="body2">{inning.winner}</Typography>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
