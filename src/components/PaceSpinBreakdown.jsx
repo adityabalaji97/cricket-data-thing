@@ -127,11 +127,21 @@ const PaceSpinBreakdown = ({ stats, isMobile: isMobileProp, wrapInCard = true })
               type="number"
               domain={[0, maxValue * 1.1]}
               tickFormatter={(value) => Number(value.toFixed(2))}
-              tick={{ fontSize: isMobile ? 10 : 12 }}
+              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
             />
-            <YAxis type="category" dataKey="phase" axisLine={false} tick={{ fontSize: isMobile ? 10 : 12 }} />
+            <YAxis
+              type="category"
+              dataKey="phase"
+              axisLine={false}
+              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
+            />
             <Tooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }} />
+            <Legend
+              wrapperStyle={{
+                fontSize: isMobile ? '0.75rem' : '0.875rem',
+                color: designColors.neutral[800],
+              }}
+            />
             <Bar dataKey="pace" name="vs Pace" fill={designColors.chart.blue} barSize={20} />
             <Bar dataKey="spin" name="vs Spin" fill={designColors.chart.orange} barSize={20} />
             <Bar dataKey="overall" name="Overall" fill={designColors.chart.green} barSize={20} />

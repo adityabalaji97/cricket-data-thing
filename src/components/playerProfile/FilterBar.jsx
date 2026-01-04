@@ -16,6 +16,7 @@ const FilterBar = ({
 
   const inputStyles = {
     '& .MuiInputBase-root': {
+      minHeight: 44,
       borderRadius: `${borderRadius.base}px`,
       backgroundColor: colors.neutral[0],
     },
@@ -27,6 +28,7 @@ const FilterBar = ({
     },
     '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
       borderColor: colors.primary[600],
+      borderWidth: 2,
     },
   };
 
@@ -116,9 +118,14 @@ const FilterBar = ({
         fullWidth
         size="medium"
         sx={{
+          minHeight: 44,
           borderRadius: `${borderRadius.base}px`,
           textTransform: 'none',
           fontWeight: typography.fontWeight.semibold,
+          '&:focus-visible': {
+            outline: `2px solid ${colors.primary[600]}`,
+            outlineOffset: 2,
+          },
         }}
       >
         GO

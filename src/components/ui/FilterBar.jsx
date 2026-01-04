@@ -40,6 +40,7 @@ const FilterItem = ({ label, value, options, onChange, isMobile, fullWidth = fal
         label={label}
         onChange={onChange}
         sx={{
+          minHeight: 44,
           fontSize: isMobile ? typography.fontSize.sm : typography.fontSize.base,
           borderRadius: `${borderRadius.base}px`,
           backgroundColor: colors.neutral[0],
@@ -55,6 +56,12 @@ const FilterItem = ({ label, value, options, onChange, isMobile, fullWidth = fal
           },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
             borderColor: colors.primary[600],
+            borderWidth: 2,
+          },
+          '& .MuiSelect-select': {
+            display: 'flex',
+            alignItems: 'center',
+            minHeight: 44,
           },
         }}
       >
@@ -64,6 +71,7 @@ const FilterItem = ({ label, value, options, onChange, isMobile, fullWidth = fal
             value={option.value}
             sx={{
               fontSize: isMobile ? typography.fontSize.sm : typography.fontSize.base,
+              minHeight: 44,
             }}
           >
             {option.label}
@@ -124,6 +132,7 @@ const FilterBar = ({
             startIcon={<FilterListIcon />}
             onClick={() => setMobileDrawerOpen(true)}
             sx={{
+              minHeight: 44,
               borderRadius: `${borderRadius.base}px`,
               borderColor: colors.neutral[300],
               color: colors.neutral[700],
@@ -133,6 +142,10 @@ const FilterBar = ({
               '&:hover': {
                 borderColor: colors.primary[400],
                 backgroundColor: colors.primary[50],
+              },
+              '&:focus-visible': {
+                outline: `2px solid ${colors.primary[600]}`,
+                outlineOffset: 2,
               },
             }}
           >
@@ -180,7 +193,18 @@ const FilterBar = ({
               <Typography variant="h6" sx={{ fontWeight: typography.fontWeight.semibold }}>
                 Filters
               </Typography>
-              <IconButton onClick={() => setMobileDrawerOpen(false)} size="small">
+              <IconButton
+                onClick={() => setMobileDrawerOpen(false)}
+                size="medium"
+                sx={{
+                  minWidth: 44,
+                  minHeight: 44,
+                  '&:focus-visible': {
+                    outline: `2px solid ${colors.primary[600]}`,
+                    outlineOffset: 2,
+                  },
+                }}
+              >
                 <CloseIcon />
               </IconButton>
             </Box>
@@ -197,9 +221,14 @@ const FilterBar = ({
               onClick={() => setMobileDrawerOpen(false)}
               sx={{
                 mt: `${spacing.lg}px`,
+                minHeight: 44,
                 borderRadius: `${borderRadius.base}px`,
                 textTransform: 'none',
                 fontWeight: typography.fontWeight.semibold,
+                '&:focus-visible': {
+                  outline: `2px solid ${colors.primary[600]}`,
+                  outlineOffset: 2,
+                },
               }}
             >
               Apply Filters

@@ -1,16 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  TextField, 
-  Autocomplete, 
+import {
+  Box,
+  TextField,
+  Autocomplete,
   FormGroup,
   FormControlLabel,
   Checkbox,
   CircularProgress,
-  Alert 
+  Alert
 } from '@mui/material';
 import axios from 'axios';
 import config from '../config';
+import { colors } from '../theme/designSystem';
+
+const touchTargetStyles = {
+    '& .MuiInputBase-root': {
+        minHeight: 44,
+    },
+    '& .MuiOutlinedInput-notchedOutline': {
+        borderColor: colors.neutral[300],
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: colors.primary[400],
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: colors.primary[600],
+        borderWidth: 2,
+    },
+};
 
 const buildAllLeaguesOption = () => ({ label: 'All Leagues', value: 'all' });
 
@@ -110,6 +127,7 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
                     multiple
                     value={selectedLeagues}
                     onChange={handleAutocompleteChange}
+                    size="medium"
                     options={[
                         {
                             label: 'All Leagues',
@@ -120,11 +138,12 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
                     getOptionLabel={(option) => option.label}
                     isOptionEqualToValue={(option, value) => option.value === value.value}
                     renderInput={(params) => (
-                        <TextField {...params} label="Select Leagues" />
+                        <TextField {...params} label="Select Leagues" sx={touchTargetStyles} />
                     )}
                     sx={{ width: isMobile ? '100%' : 400, mb: isMobile ? 1 : 0, mr: isMobile ? 0 : 2 }}
                 />
                 <FormControlLabel
+                    sx={{ minHeight: 44 }}
                     control={
                         <Checkbox
                             checked={includeInternational}
@@ -132,6 +151,13 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
                                 const newValue = e.target.checked;
                                 setIncludeInternational(newValue);
                                 handleSelectionChange(selectedLeagues, newValue, topTeams);
+                            }}
+                            sx={{
+                                p: 1.5,
+                                '&:focus-visible': {
+                                    outline: `2px solid ${colors.primary[600]}`,
+                                    outlineOffset: 2,
+                                },
                             }}
                         />
                     }
@@ -149,8 +175,12 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
                                 handleSelectionChange(selectedLeagues, includeInternational, newValue);
                             }}
                             inputProps={{ min: 1, max: 20 }}
-                            sx={{ width: isMobile ? '100%' : 100 }}
+                            sx={{
+                                width: isMobile ? '100%' : 100,
+                                ...touchTargetStyles,
+                            }}
                             fullWidth={isMobile}
+                            size="medium"
                         />
                     </Box>
                 )}

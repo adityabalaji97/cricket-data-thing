@@ -69,6 +69,15 @@ const ContextualQueryPrompts = ({
               color="primary"
               sx={{ 
                 fontSize: '0.7rem',
+                minHeight: 44,
+                '& .MuiChip-label': {
+                  px: 1.5,
+                },
+                '&:focus-visible': {
+                  outline: '2px solid',
+                  outlineColor: 'primary.main',
+                  outlineOffset: 2,
+                },
                 '&:hover': { 
                   backgroundColor: 'primary.light',
                   color: 'white'
@@ -92,7 +101,19 @@ const ContextualQueryPrompts = ({
             {title}
           </Typography>
           {hasMore && (
-            <IconButton size="small" onClick={() => setExpanded(!expanded)}>
+            <IconButton
+              size="medium"
+              onClick={() => setExpanded(!expanded)}
+              sx={{
+                minWidth: 44,
+                minHeight: 44,
+                '&:focus-visible': {
+                  outline: '2px solid',
+                  outlineColor: 'primary.main',
+                  outlineOffset: 2,
+                },
+              }}
+            >
               {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             </IconButton>
           )}
@@ -115,6 +136,7 @@ const ContextualQueryPrompts = ({
                 alignItems: 'center',
                 gap: 1,
                 p: 1.5,
+                minHeight: 44,
                 borderRadius: 1,
                 backgroundColor: 'white',
                 textDecoration: 'none',
@@ -126,7 +148,12 @@ const ContextualQueryPrompts = ({
                   borderColor: 'primary.main',
                   backgroundColor: 'primary.50',
                   transform: 'translateX(4px)',
-                }
+                },
+                '&:focus-visible': {
+                  outline: '2px solid',
+                  outlineColor: 'primary.main',
+                  outlineOffset: 2,
+                },
               }}
             >
               <SearchIcon color="primary" sx={{ fontSize: 20 }} />
@@ -155,7 +182,15 @@ const ContextualQueryPrompts = ({
               fullWidth
               variant="text"
               onClick={() => setExpanded(true)}
-              sx={{ mt: 1 }}
+              sx={{
+                mt: 1,
+                minHeight: 44,
+                '&:focus-visible': {
+                  outline: '2px solid',
+                  outlineColor: 'primary.main',
+                  outlineOffset: 2,
+                },
+              }}
             >
               Show {sortedQueries.length - initialCount} more queries
             </Button>
