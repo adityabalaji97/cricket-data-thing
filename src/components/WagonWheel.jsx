@@ -156,13 +156,14 @@ const WagonWheel = ({
   const renderWagonWheel = () => {
     if (!wagonData || !stats) return null;
 
-    // Responsive dimensions - circular field
-    const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - (isMobile ? 48 : 80), 400) : 400;
+    // Responsive dimensions - circular field that fits in card
+    // Account for card padding (16px mobile, 24px desktop) on both sides, plus some buffer
+    const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - (isMobile ? 80 : 100), 400) : 400;
     const width = containerWidth;
     const height = containerWidth; // Circular - same width and height
     const centerX = width / 2;
     const centerY = height / 2;
-    const maxRadius = width * 0.45; // Single radius for circle
+    const maxRadius = width * 0.42; // Reduced from 0.45 to ensure it fits
     const batterRadius = width * 0.02; // 2% of width (8/400)
 
     // Field zones (8 zones + center)
