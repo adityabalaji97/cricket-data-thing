@@ -12,10 +12,12 @@ import {
 import axios from 'axios';
 import config from '../config';
 
-const CompetitionFilter = ({ onFilterChange, isMobile }) => {
-    const [includeInternational, setIncludeInternational] = useState(false);
-    const [topTeams, setTopTeams] = useState(10);
-    const [selectedLeagues, setSelectedLeagues] = useState([{ label: 'All Leagues', value: 'all' }]);
+const buildAllLeaguesOption = () => ({ label: 'All Leagues', value: 'all' });
+
+const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
+    const [includeInternational, setIncludeInternational] = useState(value?.international ?? false);
+    const [topTeams, setTopTeams] = useState(value?.topTeams ?? 10);
+    const [selectedLeagues, setSelectedLeagues] = useState([buildAllLeaguesOption()]);
     const [leagues, setLeagues] = useState([]); 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -26,12 +28,6 @@ const CompetitionFilter = ({ onFilterChange, isMobile }) => {
                 setLoading(true);
                 const response = await axios.get(`${config.API_URL}/competitions`);
                 setLeagues(response.data.leagues);
-                // Set initial state with all leagues
-                onFilterChange({
-                    leagues: response.data.leagues.map(league => league.value),
-                    international: false,
-                    topTeams: 10
-                });
             } catch (error) {
                 setError('Failed to load competitions');
             } finally {
@@ -40,6 +36,38 @@ const CompetitionFilter = ({ onFilterChange, isMobile }) => {
         };
         fetchCompetitions();
     }, []);
+
+    useEffect(() => {
+        if (!leagues.length) return;
+
+        const resolvedFilters = value?.leagues?.length
+            ? value
+            : {
+                leagues: leagues.map((league) => league.value),
+                international: value?.international ?? false,
+                topTeams: value?.topTeams ?? 10,
+            };
+
+        const allLeagueValues = leagues.map((league) => league.value);
+        const includesAll =
+            resolvedFilters.leagues.length === allLeagueValues.length &&
+            resolvedFilters.leagues.every((league) => allLeagueValues.includes(league));
+
+        const optionsByValue = new Map(leagues.map((league) => [league.value, league]));
+        const nextSelectedLeagues = includesAll
+            ? [buildAllLeaguesOption()]
+            : resolvedFilters.leagues
+                  .map((league) => optionsByValue.get(league))
+                  .filter(Boolean);
+
+        setSelectedLeagues(nextSelectedLeagues);
+        setIncludeInternational(resolvedFilters.international);
+        setTopTeams(resolvedFilters.topTeams);
+
+        if (!value?.leagues?.length) {
+            onFilterChange(resolvedFilters);
+        }
+    }, [leagues, value, onFilterChange]);
 
     // Handle selection changes including "All Leagues"
     const handleSelectionChange = (newLeagues, newInternational, newTopTeams) => {

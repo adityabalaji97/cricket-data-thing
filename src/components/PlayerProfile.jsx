@@ -4,10 +4,8 @@ import {
   Box,
   Button,
   Typography,
-  TextField,
   CircularProgress,
   Alert,
-  Autocomplete,
   useMediaQuery,
   useTheme,
   Chip,
@@ -20,7 +18,6 @@ import PaceSpinBreakdown from './PaceSpinBreakdown';
 import BowlingMatchupMatrix from './BowlingMatchupMatrix';
 import InningsScatter from './InningsScatter';
 import StrikeRateProgression from './StrikeRateProgression';
-import CompetitionFilter from './CompetitionFilter';
 import TopInnings from './TopInnings'
 import BallRunDistribution from './BallRunDistribution'
 import StrikeRateIntervals from './StrikeRateIntervals'
@@ -31,11 +28,11 @@ import config from '../config';
 import PlayerDNASummary from './PlayerDNASummary';
 import WagonWheel from './WagonWheel';
 import PlayerPitchMap from './PlayerPitchMap';
-import { FilterDrawer, MobileStickyHeader, Section, VisualizationCard } from './ui';
+import { MobileStickyHeader, Section, VisualizationCard } from './ui';
 import { colors, spacing, typography, borderRadius, zIndex } from '../theme/designSystem';
-
-const DEFAULT_START_DATE = "2020-01-01";
-const TODAY = new Date().toISOString().split('T')[0];
+import FilterBar from './playerProfile/FilterBar';
+import FilterSheet from './playerProfile/FilterSheet';
+import { buildPlayerProfileFilters, DEFAULT_START_DATE, TODAY } from './playerProfile/filterConfig';
 
 const PlayerProfile = () => {
   const location = useLocation();
@@ -215,6 +212,38 @@ const PlayerProfile = () => {
     setShouldFetch(true);
   };
 
+  const handleFilterChange = (key, value) => {
+    if (key === 'player') {
+      setSelectedPlayer(value);
+      return;
+    }
+
+    if (key === 'venue') {
+      setSelectedVenue(value);
+      return;
+    }
+
+    if (key === 'startDate') {
+      setDateRange((prev) => ({ ...prev, start: value }));
+      return;
+    }
+
+    if (key === 'endDate') {
+      setDateRange((prev) => ({ ...prev, end: value }));
+    }
+  };
+
+  const handleApplyFilters = (nextValues, nextCompetitionFilters) => {
+    setSelectedPlayer(nextValues.player);
+    setSelectedVenue(nextValues.venue);
+    setDateRange({ start: nextValues.startDate, end: nextValues.endDate });
+    setCompetitionFilters(nextCompetitionFilters);
+
+    if (nextValues.player) {
+      setShouldFetch(true);
+    }
+  };
+
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (selectedVenue !== 'All Venues') count += 1;
@@ -224,6 +253,21 @@ const PlayerProfile = () => {
     if (competitionFilters.international && competitionFilters.topTeams !== 10) count += 1;
     return count;
   }, [selectedVenue, dateRange, competitionFilters]);
+
+  const filterConfig = useMemo(
+    () => buildPlayerProfileFilters({ players, venues }),
+    [players, venues]
+  );
+
+  const filterValues = useMemo(
+    () => ({
+      player: selectedPlayer,
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+      venue: selectedVenue,
+    }),
+    [selectedPlayer, dateRange, selectedVenue]
+  );
 
   useEffect(() => {
     // Inside fetchPlayerStats function in useEffect
@@ -273,78 +317,6 @@ const PlayerProfile = () => {
 
     fetchPlayerStats();
   }, [shouldFetch, selectedPlayer, dateRange, selectedVenue, competitionFilters]);
-
-  const renderFilters = (isMobileView) => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${spacing.base}px` }}>
-      <Autocomplete
-        value={selectedPlayer}
-        onChange={(_, newValue) => setSelectedPlayer(newValue)}
-        options={players}
-        fullWidth
-        size={isMobileView ? "small" : "medium"}
-        getOptionLabel={(option) => {
-          if (typeof option === 'string') {
-            return option;
-          }
-          return option || '';
-        }}
-        isOptionEqualToValue={(option, value) => {
-          if (typeof value === 'string') {
-            return option === value;
-          }
-          return option === value;
-        }}
-        renderInput={(params) => <TextField {...params} label="Select Player" variant="outlined" required />}
-      />
-
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: isMobileView ? '1fr' : 'repeat(2, minmax(0, 1fr))',
-          gap: `${spacing.sm}px`,
-        }}
-      >
-        <TextField
-          label="Start Date"
-          type="date"
-          value={dateRange.start}
-          onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-          InputLabelProps={{ shrink: true }}
-          size={isMobileView ? "small" : "medium"}
-        />
-        <TextField
-          label="End Date"
-          type="date"
-          value={dateRange.end}
-          onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-          InputLabelProps={{ shrink: true }}
-          size={isMobileView ? "small" : "medium"}
-        />
-      </Box>
-
-      <Autocomplete
-        value={selectedVenue}
-        onChange={(_, newValue) => setSelectedVenue(newValue)}
-        options={venues}
-        fullWidth
-        size={isMobileView ? "small" : "medium"}
-        renderInput={(params) => <TextField {...params} label="Select Venue" />}
-      />
-
-      <Button
-        variant="contained"
-        onClick={handleFetch}
-        disabled={!selectedPlayer || loading}
-        id="go-button"
-        fullWidth
-        size={isMobileView ? "small" : "medium"}
-      >
-        GO
-      </Button>
-
-      <CompetitionFilter onFilterChange={setCompetitionFilters} isMobile={isMobileView} />
-    </Box>
-  );
 
   const mobileFilterButton = (
     <Button
@@ -448,7 +420,15 @@ const PlayerProfile = () => {
                 <Typography variant="h6" sx={{ mb: `${spacing.base}px` }}>
                   Filters
                 </Typography>
-                {renderFilters(false)}
+                <FilterBar
+                  filters={filterConfig}
+                  values={filterValues}
+                  onChange={handleFilterChange}
+                  onSubmit={handleFetch}
+                  loading={loading}
+                  competitionFilters={competitionFilters}
+                  onCompetitionChange={setCompetitionFilters}
+                />
               </Box>
             </Box>
           )}
@@ -581,13 +561,15 @@ const PlayerProfile = () => {
           </Box>
         </Box>
 
-        <FilterDrawer
+        <FilterSheet
           open={filterDrawerOpen}
           onClose={() => setFilterDrawerOpen(false)}
-          title="Filters"
-        >
-          {renderFilters(true)}
-        </FilterDrawer>
+          filters={filterConfig}
+          values={filterValues}
+          competitionFilters={competitionFilters}
+          onApply={handleApplyFilters}
+          loading={loading}
+        />
       </Box>
     </Container>
   );
