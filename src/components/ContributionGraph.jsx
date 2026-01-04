@@ -113,16 +113,16 @@ const ContributionGraph = ({ innings, playerName }) => {
       marginBottom: '20px'
     }}>
       <div style={{ marginBottom: '8px' }}>
-        <span style={{ fontWeight: 600, fontSize: '14px' }}>Performance Graph</span>
-        <span style={{ color: '#666', fontSize: '12px', marginLeft: '12px' }}>
-          {stats.total} innings
-        </span>
-        <span style={{ color: '#666', fontSize: '12px', marginLeft: '12px' }}>
-          Avg Fantasy: {stats.avgFantasy.toFixed(1)} pts
-        </span>
-        <span style={{ color: '#666', fontSize: '12px', marginLeft: '12px' }}>
-          🦆 {stats.ducks} ducks
-        </span>
+        <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>Performance Graph</div>
+        <div style={{ color: '#666', fontSize: '12px' }}>
+          <span>{stats.total} innings</span>
+          <span style={{ marginLeft: '12px' }}>
+            Avg Fantasy: {stats.avgFantasy.toFixed(1)} pts
+          </span>
+          <span style={{ marginLeft: '12px' }}>
+            🦆 {stats.ducks} ducks
+          </span>
+        </div>
       </div>
       
       <div style={{ overflowX: 'auto' }}>

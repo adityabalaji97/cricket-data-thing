@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import {
   Typography,
-  ButtonGroup,
-  Button,
   Box,
   useMediaQuery,
   useTheme
@@ -52,10 +50,10 @@ const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp }) => {
 
   const metrics = ['Strike Rate', 'Average', 'Boundary %', 'Dot %'];
   const colors = {
-    'Strike Rate': designColors.chart[0],
-    'Average': designColors.chart[2],
-    'Boundary %': designColors.chart[4],
-    'Dot %': designColors.chart[6]
+    'Strike Rate': designColors.chart.blue,
+    'Average': designColors.chart.green,
+    'Boundary %': designColors.chart.orange,
+    'Dot %': designColors.chart.purple
   };
 
   // Responsive height calculation - fits in mobile viewport for screenshots
@@ -83,44 +81,23 @@ const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp }) => {
     <Card isMobile={isMobile}>
       <Box sx={{
         display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'space-between',
-        alignItems: isMobile ? 'flex-start' : 'center',
+        alignItems: 'center',
         mb: 2,
-        gap: isMobile ? 1.5 : 0
+        gap: 1,
+        flexWrap: isMobile ? 'wrap' : 'nowrap'
       }}>
-        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
-          Phase-wise Performance
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
+          Phase Radar
         </Typography>
-        {isMobile ? (
+        <Box sx={{ flexShrink: 1, minWidth: 0 }}>
           <FilterBar
             filters={filterConfig}
             activeFilters={{ view: selectedView }}
             onFilterChange={handleFilterChange}
             isMobile={isMobile}
           />
-        ) : (
-          <ButtonGroup variant="outlined" size="small">
-            <Button
-              onClick={() => setSelectedView('overall')}
-              variant={selectedView === 'overall' ? 'contained' : 'outlined'}
-            >
-              Overall
-            </Button>
-            <Button
-              onClick={() => setSelectedView('pace')}
-              variant={selectedView === 'pace' ? 'contained' : 'outlined'}
-            >
-              vs Pace
-            </Button>
-            <Button
-              onClick={() => setSelectedView('spin')}
-              variant={selectedView === 'spin' ? 'contained' : 'outlined'}
-            >
-              vs Spin
-            </Button>
-          </ButtonGroup>
-        )}
+        </Box>
       </Box>
 
       <Box sx={{ width: '100%', height: chartHeight }}>

@@ -114,14 +114,14 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp }) => {
   return (
     <Card isMobile={isMobile}>
       <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
-        Innings Balls Faced vs Runs Distribution
+        Inning Distribution
       </Typography>
       <Box sx={{ width: '100%', height: chartHeight }}>
         <ResponsiveContainer>
           <BarChart
             data={data}
             layout="vertical"
-            margin={{ top: 20, right: isMobile ? 5 : 20, left: isMobile ? 10 : 40, bottom: isMobile ? 15 : 30 }}
+            margin={{ top: 20, right: isMobile ? 5 : 20, left: isMobile ? 20 : 60, bottom: isMobile ? 25 : 40 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
@@ -131,7 +131,7 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp }) => {
               <Label
                 value="Number of Innings"
                 position="bottom"
-                offset={10}
+                offset={isMobile ? 5 : 0}
                 style={{ fontSize: isMobile ? 11 : 12 }}
               />
             </XAxis>
@@ -141,10 +141,10 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp }) => {
               tick={{ fontSize: isMobile ? 10 : 12 }}
             >
               <Label
-                value="Balls"
+                value="Balls Faced"
                 angle={-90}
                 position="insideLeft"
-                offset={-10}
+                offset={isMobile ? 5 : 15}
                 style={{ textAnchor: 'middle', fontSize: isMobile ? 11 : 12 }}
               />
             </YAxis>

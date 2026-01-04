@@ -7,8 +7,6 @@ import {
   TableHead,
   TableRow,
   Typography,
-  ToggleButtonGroup,
-  ToggleButton,
   Box
 } from '@mui/material';
 import Card from './ui/Card';
@@ -77,37 +75,23 @@ const TopInnings = ({ innings, count = 10, isMobile = false }) => {
     <Card isMobile={isMobile}>
       <Box sx={{
         display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'space-between',
-        alignItems: isMobile ? 'flex-start' : 'center',
+        alignItems: 'center',
         mb: isMobile ? 1.5 : 3,
-        gap: isMobile ? 1.5 : 0
+        gap: 1,
+        flexWrap: isMobile ? 'wrap' : 'nowrap'
       }}>
-        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
-          {viewMode === 'topScoring' ? 'Top Scoring Innings' : 'Recent Form'}
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
+          {viewMode === 'topScoring' ? 'Top Innings' : 'Recent Form'}
         </Typography>
-        {isMobile ? (
+        <Box sx={{ flexShrink: 1, minWidth: 0 }}>
           <FilterBar
             filters={filterConfig}
             activeFilters={{ view: viewMode }}
             onFilterChange={handleFilterChange}
             isMobile={isMobile}
           />
-        ) : (
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={handleViewChange}
-            size="small"
-          >
-            <ToggleButton value="topScoring">
-              Top Scoring
-            </ToggleButton>
-            <ToggleButton value="recentForm">
-              Recent Form
-            </ToggleButton>
-          </ToggleButtonGroup>
-        )}
+        </Box>
       </Box>
 
       <TableContainer>

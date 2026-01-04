@@ -156,14 +156,14 @@ const WagonWheel = ({
   const renderWagonWheel = () => {
     if (!wagonData || !stats) return null;
 
-    // Responsive dimensions - reduce radius to fit within card, allow oval shape for cricket field
+    // Responsive dimensions - vertical oval for cricket field
     const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - (isMobile ? 48 : 80), 400) : 400;
     const width = containerWidth;
-    const height = containerWidth * (isMobile ? 1.0 : 1.05); // Slightly oval on mobile, more circular on desktop
+    const height = containerWidth * 1.3; // Vertical oval - taller than wide
     const centerX = width / 2;
     const centerY = height / 2;
-    const maxRadiusX = width * 0.40; // Reduced from 0.425 to fit better
-    const maxRadiusY = height * 0.38; // Oval shape
+    const maxRadiusX = width * 0.38; // Narrower width for vertical oval
+    const maxRadiusY = height * 0.42; // Taller height for vertical oval
     const batterRadius = width * 0.02; // 2% of width (8/400)
 
     // Field zones (8 zones + center)

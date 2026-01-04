@@ -33,7 +33,8 @@ const PitchMapVisualization = ({
   subtitle,
   width: propWidth,
   svgRef,
-  hideStumps = false
+  hideStumps = false,
+  hideLegend = false
 }) => {
   // Use ref to measure container if no width prop
   const [containerWidth, setContainerWidth] = React.useState(propWidth || PITCH_DIMENSIONS.width);
@@ -194,13 +195,15 @@ const PitchMapVisualization = ({
         {/* Axis labels */}
         <AxisLabels dimensions={scaledDimensions} mode={mode} scale={scale} />
       </svg>
-      
+
       {/* Legend */}
-      <ColorLegend 
-        metric={colorMetric} 
-        dataRange={dataRange}
-        width={scaledDimensions.pitchWidth}
-      />
+      {!hideLegend && (
+        <ColorLegend
+          metric={colorMetric}
+          dataRange={dataRange}
+          width={scaledDimensions.pitchWidth}
+        />
+      )}
     </Box>
   );
 };
