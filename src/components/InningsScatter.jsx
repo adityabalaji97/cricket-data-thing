@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, Typography, Box, FormControl, Select, MenuItem, InputLabel, useMediaQuery, useTheme } from '@mui/material';
+import { Typography, Box, useMediaQuery, useTheme } from '@mui/material';
 import {
   ScatterChart,
   Scatter,
@@ -10,6 +10,9 @@ import {
   ResponsiveContainer,
   ReferenceLine
 } from 'recharts';
+import Card from './ui/Card';
+import FilterBar from './ui/FilterBar';
+import { colors as designColors } from '../theme/designSystem';
 
 const InningsScatter = ({ innings }) => {
   const [xMetric, setXMetric] = useState('balls');
@@ -105,98 +108,79 @@ const InningsScatter = ({ innings }) => {
     Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.55 : 400, 450) :
     400;
 
+  const filterConfig = [
+    {
+      key: 'xAxis',
+      label: 'X-Axis',
+      options: Object.entries(xAxisMetrics).map(([key, { label }]) => ({ value: key, label }))
+    },
+    {
+      key: 'yAxis',
+      label: 'Y-Axis',
+      options: Object.entries(yAxisMetrics).map(([key, { label }]) => ({ value: key, label }))
+    }
+  ];
+
+  const handleFilterChange = (key, value) => {
+    if (key === 'xAxis') setXMetric(value);
+    else if (key === 'yAxis') setYMetric(value);
+  };
+
   return (
-    <Card sx={{
-      backgroundColor: isMobile ? 'transparent' : undefined,
-      boxShadow: isMobile ? 0 : undefined
-    }}>
-      <CardContent sx={{ p: isMobile ? 1.5 : 2 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: isMobile ? 1.5 : 3 }}>
-          <Typography variant={isMobile ? "body1" : "h6"} sx={{ fontWeight: 600 }}>
-            Innings Distribution
-          </Typography>
-        </Box>
+    <Card isMobile={isMobile}>
+      <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
+        Innings Distribution
+      </Typography>
 
-        <Box sx={{
-          display: 'flex',
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: isMobile ? 1.5 : 2,
-          mb: isMobile ? 2 : 3
-        }}>
-          <FormControl sx={{ flex: 1, minWidth: isMobile ? '100%' : 200 }} size={isMobile ? "small" : "medium"}>
-            <InputLabel sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>X-Axis</InputLabel>
-            <Select
-              value={xMetric}
-              label="X-Axis"
-              onChange={(e) => setXMetric(e.target.value)}
-              sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}
-            >
-              {Object.entries(xAxisMetrics).map(([key, { label }]) => (
-                <MenuItem key={key} value={key} sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>
-                  {label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+      <Box sx={{ mb: isMobile ? 2 : 3 }}>
+        <FilterBar
+          filters={filterConfig}
+          activeFilters={{ xAxis: xMetric, yAxis: yMetric }}
+          onFilterChange={handleFilterChange}
+          isMobile={isMobile}
+        />
+      </Box>
 
-          <FormControl sx={{ flex: 1, minWidth: isMobile ? '100%' : 200 }} size={isMobile ? "small" : "medium"}>
-            <InputLabel sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>Y-Axis</InputLabel>
-            <Select
-              value={yMetric}
-              label="Y-Axis"
-              onChange={(e) => setYMetric(e.target.value)}
-              sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}
-            >
-              {Object.entries(yAxisMetrics).map(([key, { label }]) => (
-                <MenuItem key={key} value={key} sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>
-                  {label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
-
-        <Box sx={{ height: chartHeight, width: '100%' }}>
-          <ResponsiveContainer>
-            <ScatterChart margin={{
-              top: 10,
-              right: isMobile ? 10 : 20,
-              bottom: isMobile ? 30 : 40,
-              left: isMobile ? 30 : 40
-            }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                {...getAxisProps(xMetric)}
-                dataKey={xAxisMetrics[xMetric].key}
-                name={xAxisMetrics[xMetric].label}
-                label={isMobile ? undefined : { value: xAxisMetrics[xMetric].label, position: 'bottom' }}
-                tick={{ fontSize: isMobile ? 9 : 12 }}
-              />
-              <YAxis
-                type="number"
-                dataKey={yAxisMetrics[yMetric].key}
-                name={yAxisMetrics[yMetric].label}
-                label={isMobile ? undefined : {
-                  value: yAxisMetrics[yMetric].label,
-                  angle: -90,
-                  position: 'left'
-                }}
-                tick={{ fontSize: isMobile ? 9 : 12 }}
-              />
-              {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke="#666" strokeDasharray="3 3" />}
-              {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />}
-              <Tooltip content={<CustomTooltip />} />
-              <Scatter
-                name="Innings"
-                data={data}
-                fill="#8884d8"
-                opacity={0.6}
-                r={isMobile ? 5 : 6}
-              />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </Box>
-      </CardContent>
+      <Box sx={{ height: chartHeight, width: '100%' }}>
+        <ResponsiveContainer>
+          <ScatterChart margin={{
+            top: 10,
+            right: isMobile ? 10 : 20,
+            bottom: isMobile ? 30 : 40,
+            left: isMobile ? 30 : 40
+          }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              {...getAxisProps(xMetric)}
+              dataKey={xAxisMetrics[xMetric].key}
+              name={xAxisMetrics[xMetric].label}
+              label={isMobile ? undefined : { value: xAxisMetrics[xMetric].label, position: 'bottom' }}
+              tick={{ fontSize: isMobile ? 9 : 12 }}
+            />
+            <YAxis
+              type="number"
+              dataKey={yAxisMetrics[yMetric].key}
+              name={yAxisMetrics[yMetric].label}
+              label={isMobile ? undefined : {
+                value: yAxisMetrics[yMetric].label,
+                angle: -90,
+                position: 'left'
+              }}
+              tick={{ fontSize: isMobile ? 9 : 12 }}
+            />
+            {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke="#666" strokeDasharray="3 3" />}
+            {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />}
+            <Tooltip content={<CustomTooltip />} />
+            <Scatter
+              name="Innings"
+              data={data}
+              fill={designColors.primary[500]}
+              opacity={0.6}
+              r={isMobile ? 5 : 6}
+            />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </Box>
     </Card>
   );
 };
