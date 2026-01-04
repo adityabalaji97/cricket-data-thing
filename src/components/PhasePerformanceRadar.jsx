@@ -1,17 +1,11 @@
 import React, { useState } from 'react';
 import {
-  Card,
-  CardContent,
   Typography,
   ButtonGroup,
   Button,
   Box,
   useMediaQuery,
-  useTheme,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem
+  useTheme
 } from '@mui/material';
 import {
   RadarChart,
@@ -23,16 +17,19 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
+import Card from './ui/Card';
+import FilterBar from './ui/FilterBar';
+import { colors as designColors } from '../theme/designSystem';
 
 const transformPhaseData = (stats, type = 'overall') => {
   const phases = ['powerplay', 'middle', 'death'];
   const phaseData = [];
-  
+
   phases.forEach(phase => {
-    const phaseStats = type === 'overall' 
+    const phaseStats = type === 'overall'
       ? stats.phase_stats.overall[phase]
       : stats.phase_stats[type][phase];
-    
+
     phaseData.push({
       phase: phase.charAt(0).toUpperCase() + phase.slice(1),
       'Strike Rate': phaseStats.strike_rate,
@@ -41,7 +38,7 @@ const transformPhaseData = (stats, type = 'overall') => {
       'Dot %': phaseStats.dot_percentage
     });
   });
-  
+
   return phaseData;
 };
 
@@ -55,10 +52,10 @@ const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp }) => {
 
   const metrics = ['Strike Rate', 'Average', 'Boundary %', 'Dot %'];
   const colors = {
-    'Strike Rate': '#8884d8',
-    'Average': '#82ca9d',
-    'Boundary %': '#ffc658',
-    'Dot %': '#ff7300'
+    'Strike Rate': designColors.chart[0],
+    'Average': designColors.chart[2],
+    'Boundary %': designColors.chart[4],
+    'Dot %': designColors.chart[6]
   };
 
   // Responsive height calculation - fits in mobile viewport for screenshots
@@ -66,100 +63,101 @@ const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp }) => {
     Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.5 : 350, 380) :
     400;
 
-  return (
-    <Card sx={{
-      backgroundColor: isMobile ? 'transparent' : undefined,
-      boxShadow: isMobile ? 0 : undefined
-    }}>
-      <CardContent sx={{ p: isMobile ? 1.5 : 2 }}>
-        <Box sx={{
-          display: 'flex',
-          flexDirection: isMobile ? 'column' : 'row',
-          justifyContent: 'space-between',
-          alignItems: isMobile ? 'flex-start' : 'center',
-          mb: 2,
-          gap: isMobile ? 1 : 0
-        }}>
-          <Typography variant={isMobile ? "body1" : "h6"} sx={{ fontWeight: 600, fontSize: isMobile ? '0.875rem' : undefined }}>
-            Phase-wise Performance
-          </Typography>
-          {isMobile ? (
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel sx={{ fontSize: '0.75rem' }}>View</InputLabel>
-              <Select
-                value={selectedView}
-                onChange={(e) => setSelectedView(e.target.value)}
-                label="View"
-                sx={{ fontSize: '0.75rem' }}
-              >
-                <MenuItem value="overall" sx={{ fontSize: '0.75rem' }}>Overall</MenuItem>
-                <MenuItem value="pace" sx={{ fontSize: '0.75rem' }}>vs Pace</MenuItem>
-                <MenuItem value="spin" sx={{ fontSize: '0.75rem' }}>vs Spin</MenuItem>
-              </Select>
-            </FormControl>
-          ) : (
-            <ButtonGroup
-              variant="outlined"
-              size="small"
-            >
-              <Button
-                onClick={() => setSelectedView('overall')}
-                variant={selectedView === 'overall' ? 'contained' : 'outlined'}
-              >
-                Overall
-              </Button>
-              <Button
-                onClick={() => setSelectedView('pace')}
-                variant={selectedView === 'pace' ? 'contained' : 'outlined'}
-              >
-                vs Pace
-              </Button>
-              <Button
-                onClick={() => setSelectedView('spin')}
-                variant={selectedView === 'spin' ? 'contained' : 'outlined'}
-              >
-                vs Spin
-              </Button>
-            </ButtonGroup>
-          )}
-        </Box>
+  const filterConfig = [
+    {
+      key: 'view',
+      label: 'View',
+      options: [
+        { value: 'overall', label: 'Overall' },
+        { value: 'pace', label: 'vs Pace' },
+        { value: 'spin', label: 'vs Spin' }
+      ]
+    }
+  ];
 
-        <Box sx={{ width: '100%', height: chartHeight }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart
-              outerRadius={isMobile ? "70%" : 150}
-              data={data}
-              margin={{ top: 10, right: isMobile ? 5 : 20, bottom: isMobile ? 5 : 20, left: isMobile ? 5 : 20 }}
+  const handleFilterChange = (key, value) => {
+    if (key === 'view') setSelectedView(value);
+  };
+
+  return (
+    <Card isMobile={isMobile}>
+      <Box sx={{
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        justifyContent: 'space-between',
+        alignItems: isMobile ? 'flex-start' : 'center',
+        mb: 2,
+        gap: isMobile ? 1.5 : 0
+      }}>
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
+          Phase-wise Performance
+        </Typography>
+        {isMobile ? (
+          <FilterBar
+            filters={filterConfig}
+            activeFilters={{ view: selectedView }}
+            onFilterChange={handleFilterChange}
+            isMobile={isMobile}
+          />
+        ) : (
+          <ButtonGroup variant="outlined" size="small">
+            <Button
+              onClick={() => setSelectedView('overall')}
+              variant={selectedView === 'overall' ? 'contained' : 'outlined'}
             >
-              <PolarGrid />
-              <PolarAngleAxis
-                dataKey="phase"
-                tick={{ fontSize: isMobile ? 10 : 12 }}
+              Overall
+            </Button>
+            <Button
+              onClick={() => setSelectedView('pace')}
+              variant={selectedView === 'pace' ? 'contained' : 'outlined'}
+            >
+              vs Pace
+            </Button>
+            <Button
+              onClick={() => setSelectedView('spin')}
+              variant={selectedView === 'spin' ? 'contained' : 'outlined'}
+            >
+              vs Spin
+            </Button>
+          </ButtonGroup>
+        )}
+      </Box>
+
+      <Box sx={{ width: '100%', height: chartHeight }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart
+            outerRadius={isMobile ? "70%" : 150}
+            data={data}
+            margin={{ top: 10, right: isMobile ? 5 : 20, bottom: isMobile ? 5 : 20, left: isMobile ? 5 : 20 }}
+          >
+            <PolarGrid />
+            <PolarAngleAxis
+              dataKey="phase"
+              tick={{ fontSize: isMobile ? 10 : 12 }}
+            />
+            <PolarRadiusAxis
+              tick={{ fontSize: isMobile ? 9 : 11 }}
+            />
+            {metrics.map((metric) => (
+              <Radar
+                key={metric}
+                name={metric}
+                dataKey={metric}
+                stroke={colors[metric]}
+                fill={colors[metric]}
+                fillOpacity={0.3}
               />
-              <PolarRadiusAxis
-                tick={{ fontSize: isMobile ? 9 : 11 }}
-              />
-              {metrics.map((metric) => (
-                <Radar
-                  key={metric}
-                  name={metric}
-                  dataKey={metric}
-                  stroke={colors[metric]}
-                  fill={colors[metric]}
-                  fillOpacity={0.3}
-                />
-              ))}
-              <Tooltip
-                contentStyle={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
-              />
-              <Legend
-                wrapperStyle={{ fontSize: isMobile ? '0.7rem' : '0.875rem' }}
-                iconSize={isMobile ? 8 : 14}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-        </Box>
-      </CardContent>
+            ))}
+            <Tooltip
+              contentStyle={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: isMobile ? '0.7rem' : '0.875rem' }}
+              iconSize={isMobile ? 8 : 14}
+            />
+          </RadarChart>
+        </ResponsiveContainer>
+      </Box>
     </Card>
   );
 };
