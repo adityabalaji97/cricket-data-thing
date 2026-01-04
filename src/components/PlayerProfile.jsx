@@ -1,7 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Box, Button, Typography, TextField, CircularProgress, Alert, Autocomplete, useMediaQuery, useTheme, Collapse, IconButton } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Container,
+  Box,
+  Button,
+  Typography,
+  TextField,
+  CircularProgress,
+  Alert,
+  Autocomplete,
+  useMediaQuery,
+  useTheme,
+  Chip,
+} from '@mui/material';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { useLocation, useNavigate } from 'react-router-dom';
 import CareerStatsCards from './CareerStatsCards';
 import PhasePerformanceRadar from './PhasePerformanceRadar';
@@ -20,6 +31,8 @@ import config from '../config';
 import PlayerDNASummary from './PlayerDNASummary';
 import WagonWheel from './WagonWheel';
 import PlayerPitchMap from './PlayerPitchMap';
+import { FilterDrawer, MobileStickyHeader } from './ui';
+import { colors, spacing, typography, borderRadius, zIndex } from '../theme/designSystem';
 
 const DEFAULT_START_DATE = "2020-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
@@ -52,7 +65,7 @@ const PlayerProfile = () => {
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [dnaFetchTrigger, setDnaFetchTrigger] = useState(0);
-  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   // Add a direct event listener to trigger analysis on page load if needed
   useEffect(() => {
@@ -202,12 +215,15 @@ const PlayerProfile = () => {
     setShouldFetch(true);
   };
 
-  // Auto-collapse filters on mobile when loading starts
-  useEffect(() => {
-    if (isMobile && loading && stats) {
-      setFiltersExpanded(false);
-    }
-  }, [isMobile, loading, stats]);
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedVenue !== 'All Venues') count += 1;
+    if (dateRange.start !== DEFAULT_START_DATE) count += 1;
+    if (dateRange.end !== TODAY) count += 1;
+    if (competitionFilters.international) count += 1;
+    if (competitionFilters.international && competitionFilters.topTeams !== 10) count += 1;
+    return count;
+  }, [selectedVenue, dateRange, competitionFilters]);
 
   useEffect(() => {
     // Inside fetchPlayerStats function in useEffect
@@ -258,177 +274,281 @@ const PlayerProfile = () => {
     fetchPlayerStats();
   }, [shouldFetch, selectedPlayer, dateRange, selectedVenue, competitionFilters]);
 
+  const renderFilters = (isMobileView) => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${spacing.base}px` }}>
+      <Autocomplete
+        value={selectedPlayer}
+        onChange={(_, newValue) => setSelectedPlayer(newValue)}
+        options={players}
+        fullWidth
+        size={isMobileView ? "small" : "medium"}
+        getOptionLabel={(option) => {
+          if (typeof option === 'string') {
+            return option;
+          }
+          return option || '';
+        }}
+        isOptionEqualToValue={(option, value) => {
+          if (typeof value === 'string') {
+            return option === value;
+          }
+          return option === value;
+        }}
+        renderInput={(params) => <TextField {...params} label="Select Player" variant="outlined" required />}
+      />
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: isMobileView ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+          gap: `${spacing.sm}px`,
+        }}
+      >
+        <TextField
+          label="Start Date"
+          type="date"
+          value={dateRange.start}
+          onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+          InputLabelProps={{ shrink: true }}
+          size={isMobileView ? "small" : "medium"}
+        />
+        <TextField
+          label="End Date"
+          type="date"
+          value={dateRange.end}
+          onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+          InputLabelProps={{ shrink: true }}
+          size={isMobileView ? "small" : "medium"}
+        />
+      </Box>
+
+      <Autocomplete
+        value={selectedVenue}
+        onChange={(_, newValue) => setSelectedVenue(newValue)}
+        options={venues}
+        fullWidth
+        size={isMobileView ? "small" : "medium"}
+        renderInput={(params) => <TextField {...params} label="Select Venue" />}
+      />
+
+      <Button
+        variant="contained"
+        onClick={handleFetch}
+        disabled={!selectedPlayer || loading}
+        id="go-button"
+        fullWidth
+        size={isMobileView ? "small" : "medium"}
+      >
+        GO
+      </Button>
+
+      <CompetitionFilter onFilterChange={setCompetitionFilters} isMobile={isMobileView} />
+    </Box>
+  );
+
+  const mobileFilterButton = (
+    <Button
+      variant="outlined"
+      startIcon={<FilterListIcon />}
+      onClick={() => setFilterDrawerOpen(true)}
+      sx={{
+        borderRadius: `${borderRadius.base}px`,
+        borderColor: colors.neutral[300],
+        color: colors.neutral[700],
+        textTransform: 'none',
+        fontWeight: typography.fontWeight.medium,
+        backgroundColor: colors.neutral[0],
+        '&:hover': {
+          borderColor: colors.primary[400],
+          backgroundColor: colors.primary[50],
+        },
+      }}
+    >
+      Filters
+      {activeFilterCount > 0 && (
+        <Chip
+          label={activeFilterCount}
+          size="small"
+          sx={{
+            ml: `${spacing.sm}px`,
+            height: 20,
+            minWidth: 20,
+            fontSize: typography.fontSize.xs,
+            backgroundColor: colors.primary[600],
+            color: colors.neutral[0],
+          }}
+        />
+      )}
+    </Button>
+  );
+
   return (
     <Container maxWidth="xl">
       <Box sx={{ py: isMobile ? 2 : 4 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         {isMobile && stats && (
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
-              {selectedPlayer}
+          <MobileStickyHeader
+            title={selectedPlayer || 'Player Profile'}
+            stats={[
+              { label: 'Matches', value: stats.overall.matches },
+              { label: 'Runs', value: stats.overall.runs, subLabel: `Avg ${stats.overall.average.toFixed(2)}` },
+              { label: 'Strike Rate', value: stats.overall.strike_rate.toFixed(1) },
+            ]}
+            action={mobileFilterButton}
+            enableCollapse
+          />
+        )}
+
+        {isMobile && !stats && (
+          <Box
+            sx={{
+              position: 'sticky',
+              top: 0,
+              zIndex: zIndex.sticky,
+              backgroundColor: colors.neutral[0],
+              borderBottom: `1px solid ${colors.neutral[200]}`,
+              px: `${spacing.base}px`,
+              py: `${spacing.base}px`,
+              mb: `${spacing.base}px`,
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: typography.fontWeight.semibold }}>
+              Player Profile
             </Typography>
-            <IconButton
-              size="small"
-              onClick={() => setFiltersExpanded(!filtersExpanded)}
-              sx={{ p: 0.5 }}
+            <Box sx={{ mt: `${spacing.sm}px` }}>{mobileFilterButton}</Box>
+          </Box>
+        )}
+
+        <Box
+          sx={{
+            display: { xs: 'block', md: 'flex' },
+            gap: { xs: 2, md: 4 },
+          }}
+        >
+          {!isMobile && (
+            <Box
+              sx={{
+                width: 280,
+                flexShrink: 0,
+                position: 'sticky',
+                top: `${spacing.xl}px`,
+                alignSelf: 'flex-start',
+              }}
             >
-              {filtersExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-            </IconButton>
-          </Box>
-        )}
-
-        <Collapse in={!isMobile || filtersExpanded} timeout="auto">
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: isMobile ? 2 : 4 }}>
-            <Autocomplete
-              value={selectedPlayer}
-              onChange={(_, newValue) => setSelectedPlayer(newValue)}
-              options={players}
-              sx={{ width: { xs: '100%', md: 300 } }}
-              size={isMobile ? "small" : "medium"}
-              getOptionLabel={(option) => {
-                // If option is a string, return it directly
-                if (typeof option === 'string') {
-                  return option;
-                }
-                // If option is an object, return option.name or default to empty string
-                return option || '';
-              }}
-              isOptionEqualToValue={(option, value) => {
-                // Handle string values (from URL) and object values
-                if (typeof value === 'string') {
-                  return option === value;
-                }
-                return option === value;
-              }}
-              renderInput={(params) => <TextField {...params} label="Select Player" variant="outlined" required />}
-            />
-
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <TextField
-                label="Start Date"
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
-                size={isMobile ? "small" : "medium"}
-              />
-              <TextField
-                label="End Date"
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
-                size={isMobile ? "small" : "medium"}
-              />
-              <Autocomplete
-                value={selectedVenue}
-                onChange={(_, newValue) => setSelectedVenue(newValue)}
-                options={venues}
-                sx={{ width: isMobile ? '100%' : 250 }}
-                size={isMobile ? "small" : "medium"}
-                renderInput={(params) => <TextField {...params} label="Select Venue" />}
-              />
-              <Button
-                variant="contained"
-                onClick={handleFetch}
-                disabled={!selectedPlayer || loading}
-                id="go-button"
-                size={isMobile ? "small" : "medium"}
+              <Box
+                sx={{
+                  borderRadius: `${borderRadius.lg}px`,
+                  border: `1px solid ${colors.neutral[200]}`,
+                  backgroundColor: colors.neutral[0],
+                  p: `${spacing.lg}px`,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                }}
               >
-                GO
-              </Button>
+                <Typography variant="h6" sx={{ mb: `${spacing.base}px` }}>
+                  Filters
+                </Typography>
+                {renderFilters(false)}
+              </Box>
             </Box>
+          )}
+
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            {loading && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            )}
+
+            {stats && !loading && (
+              <Box sx={{ mt: isMobile ? 2 : 0 }}>
+                <CareerStatsCards stats={stats} isMobile={isMobile} />
+
+                <PlayerDNASummary
+                  playerName={selectedPlayer}
+                  startDate={dateRange.start}
+                  endDate={dateRange.end}
+                  leagues={competitionFilters.leagues}
+                  includeInternational={competitionFilters.international}
+                  topTeams={competitionFilters.topTeams}
+                  venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                  fetchTrigger={dnaFetchTrigger}
+                  isMobile={isMobile}
+                />
+
+                <Box sx={{ mt: isMobile ? 2 : 3 }}>
+                  <ContributionGraph
+                    innings={stats.innings || []}
+                    mode="batter"
+                    dateRange={dateRange}
+                    isMobile={isMobile}
+                  />
+                </Box>
+
+                {/* Wagon Wheel and Pitch Map Visualizations */}
+                <Box sx={{ mt: isMobile ? 2 : 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: isMobile ? 2 : 3 }}>
+                  <WagonWheel
+                    playerName={selectedPlayer}
+                    startDate={dateRange.start}
+                    endDate={dateRange.end}
+                    venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                    leagues={competitionFilters.leagues}
+                    includeInternational={competitionFilters.international}
+                    topTeams={competitionFilters.topTeams}
+                    isMobile={isMobile}
+                  />
+                  <PlayerPitchMap
+                    playerName={selectedPlayer}
+                    startDate={dateRange.start}
+                    endDate={dateRange.end}
+                    venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                    leagues={competitionFilters.leagues}
+                    includeInternational={competitionFilters.international}
+                    topTeams={competitionFilters.topTeams}
+                    isMobile={isMobile}
+                  />
+                </Box>
+
+                <Box sx={{ mt: isMobile ? 2 : 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: isMobile ? 2 : 3 }}>
+                  <PhasePerformanceRadar stats={stats} isMobile={isMobile} />
+                  <PaceSpinBreakdown stats={stats} isMobile={isMobile} />
+                  <InningsScatter innings={stats.innings} isMobile={isMobile} />
+                  <StrikeRateProgression
+                    selectedPlayer={selectedPlayer}
+                    dateRange={dateRange}
+                    selectedVenue={selectedVenue}
+                    competitionFilters={competitionFilters}
+                    isMobile={isMobile}
+                  />
+                  <BallRunDistribution innings={stats.innings} isMobile={isMobile} />
+                  <StrikeRateIntervals ballStats={stats.ball_by_ball_stats} isMobile={isMobile} />
+                </Box>
+                <TopInnings innings={stats.innings} count={10} isMobile={isMobile} />
+                <BowlingMatchupMatrix stats={stats} isMobile={isMobile} />
+
+                {/* Contextual Query Prompts */}
+                <ContextualQueryPrompts
+                  queries={getBatterContextualQueries(selectedPlayer, {
+                    startDate: dateRange.start,
+                    endDate: dateRange.end,
+                    leagues: competitionFilters.leagues,
+                    venue: selectedVenue !== 'All Venues' ? selectedVenue : null,
+                  })}
+                  title={`🔍 Explore ${selectedPlayer.split(' ').pop()}'s Data`}
+                  isMobile={isMobile}
+                />
+              </Box>
+            )}
           </Box>
+        </Box>
 
-          <CompetitionFilter onFilterChange={setCompetitionFilters} isMobile={isMobile} />
-        </Collapse>
-
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        )}
-
-        {stats && !loading && (
-          <Box sx={{ mt: isMobile ? 2 : 4 }}>
-            <CareerStatsCards stats={stats} isMobile={isMobile} />
-
-            <PlayerDNASummary
-              playerName={selectedPlayer}
-              startDate={dateRange.start}
-              endDate={dateRange.end}
-              leagues={competitionFilters.leagues}
-              includeInternational={competitionFilters.international}
-              topTeams={competitionFilters.topTeams}
-              venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
-              fetchTrigger={dnaFetchTrigger}
-              isMobile={isMobile}
-            />
-
-            <Box sx={{ mt: isMobile ? 2 : 3 }}>
-              <ContributionGraph
-                innings={stats.innings || []}
-                mode="batter"
-                dateRange={dateRange}
-                isMobile={isMobile}
-              />
-            </Box>
-
-            {/* Wagon Wheel and Pitch Map Visualizations */}
-            <Box sx={{ mt: isMobile ? 2 : 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: isMobile ? 2 : 3 }}>
-              <WagonWheel
-                playerName={selectedPlayer}
-                startDate={dateRange.start}
-                endDate={dateRange.end}
-                venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
-                leagues={competitionFilters.leagues}
-                includeInternational={competitionFilters.international}
-                topTeams={competitionFilters.topTeams}
-                isMobile={isMobile}
-              />
-              <PlayerPitchMap
-                playerName={selectedPlayer}
-                startDate={dateRange.start}
-                endDate={dateRange.end}
-                venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
-                leagues={competitionFilters.leagues}
-                includeInternational={competitionFilters.international}
-                topTeams={competitionFilters.topTeams}
-                isMobile={isMobile}
-              />
-            </Box>
-
-            <Box sx={{ mt: isMobile ? 2 : 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: isMobile ? 2 : 3 }}>
-              <PhasePerformanceRadar stats={stats} isMobile={isMobile} />
-              <PaceSpinBreakdown stats={stats} isMobile={isMobile} />
-              <InningsScatter innings={stats.innings} isMobile={isMobile} />
-              <StrikeRateProgression
-                selectedPlayer={selectedPlayer}
-                dateRange={dateRange}
-                selectedVenue={selectedVenue}
-                competitionFilters={competitionFilters}
-                isMobile={isMobile}
-              />
-              <BallRunDistribution innings={stats.innings} isMobile={isMobile} />
-              <StrikeRateIntervals ballStats={stats.ball_by_ball_stats} isMobile={isMobile} />
-            </Box>
-            <TopInnings innings={stats.innings} count={10} isMobile={isMobile} />
-            <BowlingMatchupMatrix stats={stats} isMobile={isMobile} />
-
-            {/* Contextual Query Prompts */}
-            <ContextualQueryPrompts
-              queries={getBatterContextualQueries(selectedPlayer, {
-                startDate: dateRange.start,
-                endDate: dateRange.end,
-                leagues: competitionFilters.leagues,
-                venue: selectedVenue !== 'All Venues' ? selectedVenue : null,
-              })}
-              title={`🔍 Explore ${selectedPlayer.split(' ').pop()}'s Data`}
-              isMobile={isMobile}
-            />
-          </Box>
-        )}
+        <FilterDrawer
+          open={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          title="Filters"
+        >
+          {renderFilters(true)}
+        </FilterDrawer>
       </Box>
     </Container>
   );
