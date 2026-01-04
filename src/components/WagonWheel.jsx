@@ -178,7 +178,7 @@ const WagonWheel = ({
     const height = width; // Circular - same width and height
     const centerX = width / 2;
     const centerY = height / 2;
-    const maxRadius = width * 0.45; // Single radius for circle
+    const maxRadius = width * 0.4; // Single radius for circle
     const batterRadius = width * 0.02; // 2% of width (8/400)
 
     // Field zones (8 zones + center)
@@ -257,7 +257,13 @@ const WagonWheel = ({
       });
 
     return (
-      <svg width={width} height={height} style={{ maxWidth: '100%', height: 'auto' }}>
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
+      >
         {/* Field boundary - circle for cricket field */}
         <circle
           cx={centerX}
