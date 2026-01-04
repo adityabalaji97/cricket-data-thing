@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, Typography, Select, MenuItem, FormControl, InputLabel, Box } from '@mui/material';
+import { Typography, Box, useMediaQuery, useTheme } from '@mui/material';
 import {
   BarChart,
   Bar,
@@ -10,9 +10,15 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
+import Card from './ui/Card';
+import FilterBar from './ui/FilterBar';
+import { colors as designColors } from '../theme/designSystem';
 
-const StrikeRateIntervals = ({ ballStats = [] }) => {  // Add default empty array
+const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp }) => {  // Add default empty array
   const [interval, setInterval] = useState(5);
+  const theme = useTheme();
+  const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
 
   const processData = () => {
     // Return early if no data
@@ -44,11 +50,11 @@ const StrikeRateIntervals = ({ ballStats = [] }) => {  // Add default empty arra
   // If no data, show a message
   if (!ballStats || ballStats.length === 0) {
     return (
-      <Card>
-        <CardContent>
-          <Typography variant="h6">Strike Rate Progression by Intervals</Typography>
-          <Typography variant="body1" sx={{ mt: 2 }}>No data available</Typography>
-        </CardContent>
+      <Card isMobile={isMobile}>
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 1 }}>
+          Strike Rate Progression by Intervals
+        </Typography>
+        <Typography variant="body1" sx={{ mt: 2 }}>No data available</Typography>
       </Card>
     );
   }
@@ -56,15 +62,15 @@ const StrikeRateIntervals = ({ ballStats = [] }) => {  // Add default empty arra
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <Card sx={{ p: 1, bgcolor: 'background.paper' }}>
-          <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+        <Card noPadding sx={{ p: 1, bgcolor: 'background.paper' }}>
+          <Typography variant="body1" sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : undefined }}>
             {`Ball ${label}`}
           </Typography>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : undefined }}>
             {`${payload[0].payload.noBalls} innings`}
           </Typography>
           {payload.map((item) => (
-            <Typography key={item.dataKey} variant="body2" style={{ color: item.color }}>
+            <Typography key={item.dataKey} variant="body2" style={{ color: item.color, fontSize: isMobile ? '0.7rem' : undefined }}>
               {`${item.name}: ${item.value.toFixed(1)}${item.unit || ''}`}
             </Typography>
           ))}
@@ -74,87 +80,103 @@ const StrikeRateIntervals = ({ ballStats = [] }) => {  // Add default empty arra
     return null;
   };
 
+  const filterConfig = [
+    {
+      key: 'interval',
+      label: 'Interval',
+      options: [5, 10, 15, 20].map(value => ({ value, label: `${value}` }))
+    }
+  ];
+
+  const handleFilterChange = (key, value) => {
+    if (key === 'interval') setInterval(value);
+  };
+
+  const chartHeight = isMobile ? 350 : 400;
+
   return (
-    <Card>
-      <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">
-            Strike Rate Progression by Intervals
-          </Typography>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Interval</InputLabel>
-            <Select
-              value={interval}
-              label="Interval"
-              onChange={(e) => setInterval(e.target.value)}
-            >
-              {[5, 10, 15, 20].map((value) => (
-                <MenuItem key={value} value={value}>{value}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
-        <div style={{ width: '100%', height: 400 }}>
-          <ResponsiveContainer>
-            <BarChart
-              data={data}
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="ballNumber"
-                label={{ 
-                  value: 'Ball Number',
-                  position: 'bottom',
-                  offset: -5
-                }}
-              />
-              <YAxis 
-                yAxisId="left"
-                orientation="left"
-                domain={[0, 200]}
-                label={{ 
-                  value: 'Strike Rate',
-                  angle: -90,
-                  position: 'insideLeft',
-                  offset: 10
-                }}
-              />
-              <YAxis 
-                yAxisId="right"
-                orientation="right"
-                domain={[0, 100]}
-                label={{ 
-                  value: 'Percentage',
-                  angle: 90,
-                  position: 'insideRight',
-                  offset: 10
-                }}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              <Bar 
-                yAxisId="left"
-                dataKey="strikeRate" 
-                name="Strike Rate"
-                fill="#8884d8" 
-              />
-              <Bar 
-                yAxisId="right"
-                dataKey="boundaryPercentage" 
-                name="Boundary %" 
-                fill="#82ca9d" 
-              />
-              <Bar 
-                yAxisId="right"
-                dataKey="dotPercentage" 
-                name="Dot %" 
-                fill="#ffc658" 
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
+    <Card isMobile={isMobile}>
+      <Box sx={{
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        justifyContent: 'space-between',
+        alignItems: isMobile ? 'flex-start' : 'center',
+        mb: 2,
+        gap: isMobile ? 1.5 : 0
+      }}>
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
+          Strike Rate Progression by Intervals
+        </Typography>
+        <FilterBar
+          filters={filterConfig}
+          activeFilters={{ interval }}
+          onFilterChange={handleFilterChange}
+          isMobile={isMobile}
+        />
+      </Box>
+      <Box sx={{ width: '100%', height: chartHeight }}>
+        <ResponsiveContainer>
+          <BarChart
+            data={data}
+            margin={{ top: 20, right: isMobile ? 10 : 30, left: isMobile ? 15 : 20, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="ballNumber"
+              label={isMobile ? undefined : {
+                value: 'Ball Number',
+                position: 'bottom',
+                offset: -5
+              }}
+              tick={{ fontSize: isMobile ? 10 : 12 }}
+            />
+            <YAxis
+              yAxisId="left"
+              orientation="left"
+              domain={[0, 200]}
+              label={isMobile ? undefined : {
+                value: 'Strike Rate',
+                angle: -90,
+                position: 'insideLeft',
+                offset: 10
+              }}
+              tick={{ fontSize: isMobile ? 10 : 12 }}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              domain={[0, 100]}
+              label={isMobile ? undefined : {
+                value: 'Percentage',
+                angle: 90,
+                position: 'insideRight',
+                offset: 10
+              }}
+              tick={{ fontSize: isMobile ? 10 : 12 }}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend wrapperStyle={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }} />
+            <Bar
+              yAxisId="left"
+              dataKey="strikeRate"
+              name="Strike Rate"
+              fill={designColors.primary[500]}
+            />
+            <Bar
+              yAxisId="right"
+              dataKey="boundaryPercentage"
+              name="Boundary %"
+              fill={designColors.chart[2]}
+            />
+            <Bar
+              yAxisId="right"
+              dataKey="dotPercentage"
+              name="Dot %"
+              fill={designColors.chart[4]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </Box>
     </Card>
   );
 };

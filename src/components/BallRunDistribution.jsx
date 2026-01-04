@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, Typography } from '@mui/material';
+import { Typography, useMediaQuery, useTheme, Box } from '@mui/material';
 import {
   BarChart,
   Bar,
@@ -12,8 +12,13 @@ import {
   LabelList
 } from 'recharts';
 import _ from 'lodash';
+import Card from './ui/Card';
 
-const BallRunDistribution = ({ innings }) => {
+const BallRunDistribution = ({ innings, isMobile: isMobileProp }) => {
+  const theme = useTheme();
+  const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
+
   const processData = () => {
     const ballRanges = {};
     innings.forEach(inning => {
@@ -104,57 +109,59 @@ const BallRunDistribution = ({ innings }) => {
     </text>
   );
 
+  const chartHeight = isMobile ? 350 : 400;
+
   return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Innings Balls Faced vs Runs Distribution
-        </Typography>
-        <div style={{ width: '100%', height: 400 }}>
-          <ResponsiveContainer>
-            <BarChart
-              data={data}
-              layout="vertical"
-              margin={{ top: 20, right: 20, left: 40, bottom: 30 }}
+    <Card isMobile={isMobile}>
+      <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
+        Innings Balls Faced vs Runs Distribution
+      </Typography>
+      <Box sx={{ width: '100%', height: chartHeight }}>
+        <ResponsiveContainer>
+          <BarChart
+            data={data}
+            layout="vertical"
+            margin={{ top: 20, right: isMobile ? 10 : 20, left: isMobile ? 35 : 40, bottom: isMobile ? 20 : 30 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              type="number"
+              tick={{ fontSize: isMobile ? 10 : 12 }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                type="number"
-              >
-                <Label
-                  value="Number of Innings"
-                  position="bottom"
-                  offset={10}
-                />
-              </XAxis>
-              <YAxis 
-                dataKey="ballRange" 
-                type="category"
-                tick={{ fontSize: 12 }}
-              >
-                <Label
-                  value="Balls"
-                  angle={-90}
-                  position="insideLeft"
-                  offset={-10}
-                  style={{ textAnchor: 'middle' }}
-                />
-              </YAxis>
-              <Tooltip content={<CustomTooltip />} />
-              <Bar 
-                dataKey="count" 
-                minPointSize={2}
-                fillOpacity={0.8}
-              >
-                <LabelList 
-                  dataKey="label" 
-                  content={CustomLabel}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
+              <Label
+                value="Number of Innings"
+                position="bottom"
+                offset={10}
+                style={{ fontSize: isMobile ? 11 : 12 }}
+              />
+            </XAxis>
+            <YAxis
+              dataKey="ballRange"
+              type="category"
+              tick={{ fontSize: isMobile ? 10 : 12 }}
+            >
+              <Label
+                value="Balls"
+                angle={-90}
+                position="insideLeft"
+                offset={-10}
+                style={{ textAnchor: 'middle', fontSize: isMobile ? 11 : 12 }}
+              />
+            </YAxis>
+            <Tooltip content={<CustomTooltip />} />
+            <Bar
+              dataKey="count"
+              minPointSize={2}
+              fillOpacity={0.8}
+            >
+              <LabelList
+                dataKey="label"
+                content={CustomLabel}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </Box>
     </Card>
   );
 };
