@@ -47,7 +47,19 @@ const FilterDrawer = ({ open, onClose, title = 'Filters', children, footer }) =>
           <Typography variant="h6" sx={{ fontWeight: typography.fontWeight.semibold }}>
             {title}
           </Typography>
-          <IconButton onClick={onClose} size="small" sx={{ color: colors.neutral[600] }}>
+          <IconButton
+            onClick={onClose}
+            size="medium"
+            sx={{
+              color: colors.neutral[600],
+              minWidth: 44,
+              minHeight: 44,
+              '&:focus-visible': {
+                outline: `2px solid ${colors.primary[600]}`,
+                outlineOffset: 2,
+              },
+            }}
+          >
             <CloseIcon />
           </IconButton>
         </Box>

@@ -14,6 +14,7 @@ import {
 import _ from 'lodash';
 import Card from './ui/Card';
 import { EmptyState } from './ui';
+import { colors as designColors } from '../theme/designSystem';
 
 const BallRunDistribution = ({ innings, isMobile: isMobileProp, wrapInCard = true }) => {
   const theme = useTheme();
@@ -145,26 +146,26 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp, wrapInCard = tru
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               type="number"
-              tick={{ fontSize: isMobile ? 10 : 12 }}
+              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
             >
               <Label
                 value="Number of Innings"
                 position="bottom"
                 offset={isMobile ? 5 : 0}
-                style={{ fontSize: isMobile ? 11 : 12 }}
+                style={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
               />
             </XAxis>
             <YAxis
               dataKey="ballRange"
               type="category"
-              tick={{ fontSize: isMobile ? 10 : 12 }}
+              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
             >
               <Label
                 value="Balls Faced"
                 angle={-90}
                 position="insideLeft"
                 offset={isMobile ? 5 : 15}
-                style={{ textAnchor: 'middle', fontSize: isMobile ? 11 : 12 }}
+                style={{ textAnchor: 'middle', fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
               />
             </YAxis>
             <Tooltip content={<CustomTooltip />} />

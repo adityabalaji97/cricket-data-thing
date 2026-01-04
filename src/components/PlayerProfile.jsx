@@ -323,6 +323,7 @@ const PlayerProfile = () => {
       startIcon={<FilterListIcon />}
       onClick={() => setFilterDrawerOpen(true)}
       sx={{
+        minHeight: 44,
         borderRadius: `${borderRadius.base}px`,
         borderColor: colors.neutral[300],
         color: colors.neutral[700],
@@ -332,6 +333,10 @@ const PlayerProfile = () => {
         '&:hover': {
           borderColor: colors.primary[400],
           backgroundColor: colors.primary[50],
+        },
+        '&:focus-visible': {
+          outline: `2px solid ${colors.primary[600]}`,
+          outlineOffset: 2,
         },
       }}
     >
@@ -471,7 +476,7 @@ const PlayerProfile = () => {
                   isMobile={isMobile}
                   columns={{ xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }}
                 >
-                  <VisualizationCard isMobile={isMobile}>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Wagon wheel shot map">
                     <WagonWheel
                       playerName={selectedPlayer}
                       startDate={dateRange.start}
@@ -484,7 +489,7 @@ const PlayerProfile = () => {
                       wrapInCard={false}
                     />
                   </VisualizationCard>
-                  <VisualizationCard isMobile={isMobile}>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Pitch map distribution">
                     <PlayerPitchMap
                       playerName={selectedPlayer}
                       startDate={dateRange.start}
@@ -504,16 +509,16 @@ const PlayerProfile = () => {
                   isMobile={isMobile}
                   columns={{ xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }}
                 >
-                  <VisualizationCard isMobile={isMobile}>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Phase performance radar chart">
                     <PhasePerformanceRadar stats={stats} isMobile={isMobile} wrapInCard={false} />
                   </VisualizationCard>
-                  <VisualizationCard isMobile={isMobile}>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Pace versus spin breakdown chart">
                     <PaceSpinBreakdown stats={stats} isMobile={isMobile} wrapInCard={false} />
                   </VisualizationCard>
-                  <VisualizationCard isMobile={isMobile}>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Innings scatter plot">
                     <InningsScatter innings={stats.innings} isMobile={isMobile} wrapInCard={false} />
                   </VisualizationCard>
-                  <VisualizationCard isMobile={isMobile}>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Strike rate progression chart">
                     <StrikeRateProgression
                       selectedPlayer={selectedPlayer}
                       dateRange={dateRange}
@@ -523,10 +528,10 @@ const PlayerProfile = () => {
                       wrapInCard={false}
                     />
                   </VisualizationCard>
-                  <VisualizationCard isMobile={isMobile}>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Ball-by-ball run distribution">
                     <BallRunDistribution innings={stats.innings} isMobile={isMobile} wrapInCard={false} />
                   </VisualizationCard>
-                  <VisualizationCard isMobile={isMobile}>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Strike rate intervals chart">
                     <StrikeRateIntervals ballStats={stats.ball_by_ball_stats} isMobile={isMobile} wrapInCard={false} />
                   </VisualizationCard>
                 </Section>
@@ -536,10 +541,10 @@ const PlayerProfile = () => {
                   isMobile={isMobile}
                   columns={{ xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' }}
                 >
-                  <VisualizationCard isMobile={isMobile}>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Top innings table">
                     <TopInnings innings={stats.innings} count={10} isMobile={isMobile} wrapInCard={false} />
                   </VisualizationCard>
-                  <VisualizationCard isMobile={isMobile}>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Bowling type matchup matrix">
                     <BowlingMatchupMatrix stats={stats} isMobile={isMobile} wrapInCard={false} />
                   </VisualizationCard>
                 </Section>

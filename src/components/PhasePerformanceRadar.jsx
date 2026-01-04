@@ -113,10 +113,10 @@ const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp, wrapInCard = tru
             <PolarGrid />
             <PolarAngleAxis
               dataKey="phase"
-              tick={{ fontSize: isMobile ? 10 : 12 }}
+              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
             />
             <PolarRadiusAxis
-              tick={{ fontSize: isMobile ? 9 : 11 }}
+              tick={{ fontSize: isMobile ? 9 : 11, fill: designColors.neutral[800] }}
             />
             {metrics.map((metric) => (
               <Radar
@@ -132,7 +132,7 @@ const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp, wrapInCard = tru
               contentStyle={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
             />
             <Legend
-              wrapperStyle={{ fontSize: isMobile ? '0.7rem' : '0.875rem' }}
+              wrapperStyle={{ fontSize: isMobile ? '0.7rem' : '0.875rem', color: designColors.neutral[800] }}
               iconSize={isMobile ? 8 : 14}
             />
           </RadarChart>

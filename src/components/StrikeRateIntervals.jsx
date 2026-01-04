@@ -139,7 +139,7 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp, wrapInCar
                 position: 'bottom',
                 offset: -5
               }}
-              tick={{ fontSize: isMobile ? 10 : 12 }}
+              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
             />
             <YAxis
               yAxisId="left"
@@ -151,7 +151,7 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp, wrapInCar
                 position: 'insideLeft',
                 offset: 10
               }}
-              tick={{ fontSize: isMobile ? 10 : 12 }}
+              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
             />
             <YAxis
               yAxisId="right"
@@ -163,10 +163,15 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp, wrapInCar
                 position: 'insideRight',
                 offset: 10
               }}
-              tick={{ fontSize: isMobile ? 10 : 12 }}
+              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }} />
+            <Legend
+              wrapperStyle={{
+                fontSize: isMobile ? '0.75rem' : '0.875rem',
+                color: designColors.neutral[800],
+              }}
+            />
             <Bar
               yAxisId="left"
               dataKey="strikeRate"

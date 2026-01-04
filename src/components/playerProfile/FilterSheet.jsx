@@ -18,6 +18,7 @@ const touchTargetStyles = {
   },
   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
     borderColor: colors.primary[600],
+    borderWidth: 2,
   },
 };
 
@@ -113,9 +114,14 @@ const FilterSheet = ({
           onClick={handleApply}
           disabled={!draftValues.player || loading}
           sx={{
+            minHeight: 44,
             borderRadius: `${borderRadius.base}px`,
             textTransform: 'none',
             fontWeight: typography.fontWeight.semibold,
+            '&:focus-visible': {
+              outline: `2px solid ${colors.primary[600]}`,
+              outlineOffset: 2,
+            },
           }}
         >
           Apply Filters
