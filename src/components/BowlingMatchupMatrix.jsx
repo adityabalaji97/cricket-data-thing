@@ -1,8 +1,9 @@
 import React from 'react';
-import { Card, CardContent, Typography, Box, Tooltip } from '@mui/material';
+import { Typography, Box, Tooltip, useMediaQuery, useTheme } from '@mui/material';
 import { Info as InfoIcon } from 'lucide-react';
+import Card from './ui/Card';
 
-const MetricCell = ({ stats }) => {
+const MetricCell = ({ stats, isMobile }) => {
   if (!stats || !stats.runs) return <td style={{ textAlign: 'center', padding: '8px' }}>-</td>;
 
   const wickets = stats.average === 0 ? 0 : stats.runs / stats.average;
@@ -40,7 +41,11 @@ const MetricCell = ({ stats }) => {
   );
 };
 
-const BowlingMatchupMatrix = ({ stats }) => {
+const BowlingMatchupMatrix = ({ stats, isMobile: isMobileProp }) => {
+  const theme = useTheme();
+  const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
+
   // Dynamically get all bowling types from the stats data
   const bowlingTypes = stats?.phase_stats?.bowling_types
     ? Object.keys(stats.phase_stats.bowling_types).sort()
@@ -49,59 +54,60 @@ const BowlingMatchupMatrix = ({ stats }) => {
 
   if (!bowlingTypes.length) {
     return (
-      <Card>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-            <Typography variant="h6">Bowling Type Matchups</Typography>
-            <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
-              <InfoIcon size={16} />
-            </Tooltip>
-          </Box>
-          <Typography variant="body2" color="text.secondary">
-            Bowling matchup data not available
+      <Card isMobile={isMobile}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+          <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
+            Bowling Type Matchups
           </Typography>
-        </CardContent>
+          <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
+            <InfoIcon size={isMobile ? 14 : 16} />
+          </Tooltip>
+        </Box>
+        <Typography variant="body2" color="text.secondary">
+          Bowling matchup data not available
+        </Typography>
       </Card>
     );
   }
 
   return (
-    <Card>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-          <Typography variant="h6">Bowling Type Matchups</Typography>
-          <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
-            <InfoIcon size={16} />
-          </Tooltip>
-        </Box>
-        <Box sx={{ overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: 'left', padding: '8px' }}>Phase</th>
+    <Card isMobile={isMobile}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
+          Bowling Type Matchups
+        </Typography>
+        <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
+          <InfoIcon size={isMobile ? 14 : 16} />
+        </Tooltip>
+      </Box>
+      <Box sx={{ overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? '0.75rem' : undefined }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', padding: isMobile ? '6px' : '8px' }}>Phase</th>
+              {bowlingTypes.map(type => (
+                <th key={type} style={{ textAlign: 'center', padding: isMobile ? '6px' : '8px', minWidth: isMobile ? '100px' : '120px' }}>
+                  {type}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {phases.map(phase => (
+              <tr key={phase}>
+                <td style={{ padding: isMobile ? '6px' : '8px', textTransform: 'capitalize' }}>{phase}</td>
                 {bowlingTypes.map(type => (
-                  <th key={type} style={{ textAlign: 'center', padding: '8px', minWidth: '120px' }}>
-                    {type}
-                  </th>
+                  <MetricCell
+                    key={type}
+                    stats={stats?.phase_stats?.bowling_types?.[type]?.[phase]}
+                    isMobile={isMobile}
+                  />
                 ))}
               </tr>
-            </thead>
-            <tbody>
-              {phases.map(phase => (
-                <tr key={phase}>
-                  <td style={{ padding: '8px', textTransform: 'capitalize' }}>{phase}</td>
-                  {bowlingTypes.map(type => (
-                    <MetricCell 
-                      key={type} 
-                      stats={stats?.phase_stats?.bowling_types?.[type]?.[phase]}
-                    />
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Box>
-      </CardContent>
+            ))}
+          </tbody>
+        </table>
+      </Box>
     </Card>
   );
 };

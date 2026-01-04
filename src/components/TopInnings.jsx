@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Paper,
   Table,
   TableBody,
   TableCell,
@@ -10,12 +9,10 @@ import {
   Typography,
   ToggleButtonGroup,
   ToggleButton,
-  Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem
+  Box
 } from '@mui/material';
+import Card from './ui/Card';
+import FilterBar from './ui/FilterBar';
 
 const TopInnings = ({ innings, count = 10, isMobile = false }) => {
   const [viewMode, setViewMode] = useState('topScoring');
@@ -61,36 +58,41 @@ const TopInnings = ({ innings, count = 10, isMobile = false }) => {
     }
   };
 
+  const filterConfig = [
+    {
+      key: 'view',
+      label: 'View',
+      options: [
+        { value: 'topScoring', label: 'Top Scoring' },
+        { value: 'recentForm', label: 'Recent Form' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (key, value) => {
+    if (key === 'view') setViewMode(value);
+  };
+
   return (
-    <Paper elevation={2} sx={{
-      p: isMobile ? 1.5 : 3,
-      backgroundColor: isMobile ? 'transparent' : undefined,
-      boxShadow: isMobile ? 0 : undefined
-    }}>
+    <Card isMobile={isMobile}>
       <Box sx={{
         display: 'flex',
         flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'space-between',
         alignItems: isMobile ? 'flex-start' : 'center',
         mb: isMobile ? 1.5 : 3,
-        gap: isMobile ? 1 : 0
+        gap: isMobile ? 1.5 : 0
       }}>
-        <Typography variant={isMobile ? "body1" : "h5"} sx={{ fontWeight: isMobile ? 600 : 500, fontSize: isMobile ? '0.875rem' : undefined }}>
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
           {viewMode === 'topScoring' ? 'Top Scoring Innings' : 'Recent Form'}
         </Typography>
         {isMobile ? (
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel sx={{ fontSize: '0.75rem' }}>View</InputLabel>
-            <Select
-              value={viewMode}
-              onChange={(e) => setViewMode(e.target.value)}
-              label="View"
-              sx={{ fontSize: '0.75rem' }}
-            >
-              <MenuItem value="topScoring" sx={{ fontSize: '0.75rem' }}>Top Scoring</MenuItem>
-              <MenuItem value="recentForm" sx={{ fontSize: '0.75rem' }}>Recent Form</MenuItem>
-            </Select>
-          </FormControl>
+          <FilterBar
+            filters={filterConfig}
+            activeFilters={{ view: viewMode }}
+            onFilterChange={handleFilterChange}
+            isMobile={isMobile}
+          />
         ) : (
           <ToggleButtonGroup
             value={viewMode}
@@ -162,7 +164,7 @@ const TopInnings = ({ innings, count = 10, isMobile = false }) => {
           </TableBody>
         </Table>
       </TableContainer>
-    </Paper>
+    </Card>
   );
 };
 
