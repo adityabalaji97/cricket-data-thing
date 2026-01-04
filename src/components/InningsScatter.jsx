@@ -14,13 +14,19 @@ import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
 import { colors as designColors } from '../theme/designSystem';
 
-const InningsScatter = ({ innings, wrapInCard = true }) => {
+const InningsScatter = ({ innings, wrapInCard = true, shareView = false }) => {
   const [xMetric, setXMetric] = useState('balls');
   const [yMetric, setYMetric] = useState('strike_rate');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isCompact = shareView || isMobile;
   const Wrapper = wrapInCard ? Card : Box;
-  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
+  const frameSx = isMobile
+    ? { minHeight: 420, aspectRatio: '4 / 5' }
+    : {};
+  const wrapperProps = wrapInCard
+    ? { isMobile, shareFrame: shareView, sx: frameSx }
+    : { sx: { width: '100%', ...frameSx } };
 
   const getPhase = (over) => {
     if (over < 6) return 0;
@@ -106,7 +112,7 @@ const InningsScatter = ({ innings, wrapInCard = true }) => {
   };
 
   // Responsive height calculation - fits in mobile viewport for screenshots
-  const chartHeight = isMobile ?
+  const chartHeight = isCompact ?
     Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.55 : 400, 450) :
     400;
 
@@ -130,16 +136,16 @@ const InningsScatter = ({ innings, wrapInCard = true }) => {
 
   return (
     <Wrapper {...wrapperProps}>
-      <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
+      <Typography variant={isCompact ? "h6" : "h5"} sx={{ fontWeight: 600, mb: isCompact ? 1.5 : 2 }}>
         Balls Faced vs Runs
       </Typography>
 
-      <Box sx={{ mb: isMobile ? 2 : 3 }}>
+      <Box sx={{ mb: isCompact ? 1.5 : 3 }}>
         <FilterBar
           filters={filterConfig}
           activeFilters={{ xAxis: xMetric, yAxis: yMetric }}
           onFilterChange={handleFilterChange}
-          isMobile={isMobile}
+          isMobile={isCompact}
         />
       </Box>
 
@@ -157,7 +163,7 @@ const InningsScatter = ({ innings, wrapInCard = true }) => {
               dataKey={xAxisMetrics[xMetric].key}
               name={xAxisMetrics[xMetric].label}
               label={isMobile ? undefined : { value: xAxisMetrics[xMetric].label, position: 'bottom', offset: 0 }}
-              tick={{ fontSize: isMobile ? 9 : 12 }}
+              tick={{ fontSize: isCompact ? 8 : 12 }}
             />
             <YAxis
               type="number"
@@ -169,17 +175,17 @@ const InningsScatter = ({ innings, wrapInCard = true }) => {
                 position: 'insideLeft',
                 offset: 10
               }}
-              tick={{ fontSize: isMobile ? 9 : 12 }}
+              tick={{ fontSize: isCompact ? 8 : 12 }}
             />
-            {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke="#666" strokeDasharray="3 3" />}
-            {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />}
+            {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke={designColors.neutral[500]} strokeDasharray="3 3" />}
+            {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke={designColors.neutral[500]} strokeDasharray="3 3" />}
             <Tooltip content={<CustomTooltip />} />
             <Scatter
               name="Innings"
               data={data}
-              fill={designColors.primary[500]}
+              fill={designColors.chart.blue}
               opacity={0.6}
-              r={isMobile ? 5 : 6}
+              r={isCompact ? 4.5 : 6}
             />
           </ScatterChart>
         </ResponsiveContainer>

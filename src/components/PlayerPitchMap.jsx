@@ -17,6 +17,7 @@ import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
 import { PitchMapVisualization } from './PitchMap';
 import config from '../config';
+import { colors as designColors } from '../theme/designSystem';
 
 const PlayerPitchMap = ({
   playerName,
@@ -27,13 +28,20 @@ const PlayerPitchMap = ({
   includeInternational = false,
   topTeams = null,
   isMobile = false,
-  wrapInCard = true
+  wrapInCard = true,
+  shareView = false
 }) => {
   const [pitchData, setPitchData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const isCompact = shareView || isMobile;
   const Wrapper = wrapInCard ? Card : Box;
-  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
+  const frameSx = isMobile
+    ? { minHeight: 420, aspectRatio: '4 / 5' }
+    : {};
+  const wrapperProps = wrapInCard
+    ? { isMobile, shareFrame: shareView, sx: frameSx }
+    : { sx: { width: '100%', ...frameSx } };
 
   // Filters
   const [phase, setPhase] = useState('overall');
@@ -219,7 +227,7 @@ const PlayerPitchMap = ({
         gap: 1,
         flexWrap: isMobile ? 'wrap' : 'nowrap'
       }}>
-        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
+        <Typography variant={isCompact ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
           Pitch Map
         </Typography>
         <Box sx={{ flexShrink: 1, minWidth: 0 }}>
@@ -227,18 +235,18 @@ const PlayerPitchMap = ({
             filters={filterConfig}
             activeFilters={{ phase, bowlKind, line, length, shot }}
             onFilterChange={handleFilterChange}
-            isMobile={isMobile}
+            isMobile={isCompact}
           />
         </Box>
       </Box>
 
       {/* Stats Summary */}
-      <Box sx={{ display: 'flex', gap: isMobile ? 0.5 : 1, mb: isMobile ? 1.5 : 2, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <Chip label={`${pitchData.total_balls} balls`} size="small" color="primary" sx={{ fontSize: isMobile ? '0.7rem' : undefined, height: isMobile ? 24 : undefined }} />
+      <Box sx={{ display: 'flex', gap: isCompact ? 0.5 : 1, mb: isCompact ? 1.5 : 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <Chip label={`${pitchData.total_balls} balls`} size="small" sx={{ bgcolor: designColors.chart.blue, color: 'white', fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
       </Box>
 
       {/* Pitch Map Visualization */}
-      <Box sx={{ maxWidth: 420, mx: 'auto' }}>
+      <Box sx={{ maxWidth: isCompact ? 360 : 420, mx: 'auto', width: '100%' }}>
         <PitchMapVisualization
           cells={pitchData.cells}
           mode="grid"
@@ -250,6 +258,7 @@ const PlayerPitchMap = ({
           subtitle={`${phase === 'overall' ? 'All Phases' : phase} ${bowlKind !== 'all' ? `• ${bowlKind}` : ''}`}
           hideStumps={true}
           hideLegend={true}
+          compactMode={isCompact}
         />
       </Box>
     </Wrapper>
