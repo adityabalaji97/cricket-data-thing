@@ -2,6 +2,7 @@ import React from 'react';
 import { Typography, Box, Tooltip, useMediaQuery, useTheme } from '@mui/material';
 import { Info as InfoIcon } from 'lucide-react';
 import Card from './ui/Card';
+import { EmptyState } from './ui';
 
 const MetricCell = ({ stats, isMobile }) => {
   if (!stats || !stats.runs) return <td style={{ textAlign: 'center', padding: '8px' }}>-</td>;
@@ -65,9 +66,12 @@ const BowlingMatchupMatrix = ({ stats, isMobile: isMobileProp, wrapInCard = true
             <InfoIcon size={isMobile ? 14 : 16} />
           </Tooltip>
         </Box>
-        <Typography variant="body2" color="text.secondary">
-          Bowling matchup data not available
-        </Typography>
+        <EmptyState
+          title="No innings match these filters"
+          description="Bowling matchup data is unavailable for the selected filters."
+          isMobile={isMobile}
+          minHeight={isMobile ? 220 : 260}
+        />
       </Wrapper>
     );
   }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Typography, Box, useMediaQuery, useTheme } from '@mui/material';
 import Card from './ui/Card';
+import { EmptyState } from './ui';
 import { colors as designColors } from '../theme/designSystem';
 import config from '../config';
 
@@ -47,10 +48,26 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
     fetchData();
   }, [selectedPlayer, dateRange, selectedVenue, competitionFilters]); // Removed shouldFetch from dependencies
 
+  const chartHeight = isMobile ? 350 : 400;
+
+  if (!data.length) {
+    return (
+      <Wrapper {...wrapperProps}>
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
+          nth Ball SR
+        </Typography>
+        <EmptyState
+          title="No innings match these filters"
+          description="Try widening the date range or removing filters to see strike rate trends."
+          isMobile={isMobile}
+          minHeight={chartHeight}
+        />
+      </Wrapper>
+    );
+  }
+
   const minSR = Math.max(0, Math.floor(Math.min(...data.map(d => d.strike_rate || 0)) * 0.9));
   const maxSR = Math.ceil(Math.max(...data.map(d => d.strike_rate || 0)) * 1.1);
-
-  const chartHeight = isMobile ? 350 : 400;
 
   return (
     <Wrapper {...wrapperProps}>

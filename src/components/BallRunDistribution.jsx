@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import _ from 'lodash';
 import Card from './ui/Card';
+import { EmptyState } from './ui';
 
 const BallRunDistribution = ({ innings, isMobile: isMobileProp, wrapInCard = true }) => {
   const theme = useTheme();
@@ -20,6 +21,22 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp, wrapInCard = tru
   const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
   const Wrapper = wrapInCard ? Card : Box;
   const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
+
+  if (!innings?.length) {
+    return (
+      <Wrapper {...wrapperProps}>
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
+          Inning Distribution
+        </Typography>
+        <EmptyState
+          title="No innings match these filters"
+          description="Adjust the filters to populate the distribution."
+          isMobile={isMobile}
+          minHeight={isMobile ? 300 : 360}
+        />
+      </Wrapper>
+    );
+  }
 
   const processData = () => {
     const ballRanges = {};

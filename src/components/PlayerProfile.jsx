@@ -4,8 +4,6 @@ import {
   Box,
   Button,
   Typography,
-  CircularProgress,
-  Alert,
   useMediaQuery,
   useTheme,
   Chip,
@@ -28,11 +26,12 @@ import config from '../config';
 import PlayerDNASummary from './PlayerDNASummary';
 import WagonWheel from './WagonWheel';
 import PlayerPitchMap from './PlayerPitchMap';
-import { MobileStickyHeader, Section, VisualizationCard } from './ui';
+import { AlertBanner, MobileStickyHeader, Section, VisualizationCard } from './ui';
 import { colors, spacing, typography, borderRadius, zIndex } from '../theme/designSystem';
 import FilterBar from './playerProfile/FilterBar';
 import FilterSheet from './playerProfile/FilterSheet';
 import { buildPlayerProfileFilters, DEFAULT_START_DATE, TODAY } from './playerProfile/filterConfig';
+import PlayerProfileLoadingState from './playerProfile/PlayerProfileLoadingState';
 
 const PlayerProfile = () => {
   const location = useLocation();
@@ -357,7 +356,11 @@ const PlayerProfile = () => {
   return (
     <Container maxWidth="xl">
       <Box sx={{ py: isMobile ? 2 : 4 }}>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {error && (
+          <AlertBanner severity="error" sx={{ mb: 2 }}>
+            {error}
+          </AlertBanner>
+        )}
 
         {isMobile && stats && (
           <MobileStickyHeader
@@ -434,11 +437,7 @@ const PlayerProfile = () => {
           )}
 
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            {loading && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
-              </Box>
-            )}
+            {loading && <PlayerProfileLoadingState isMobile={isMobile} />}
 
             {stats && !loading && (
               <Box sx={{ mt: isMobile ? 2 : 0 }}>

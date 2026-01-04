@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Card, CardContent, Typography, CircularProgress, Alert } from '@mui/material';
+import { Box, Card, CardContent, Typography, CircularProgress } from '@mui/material';
 import { Bolt as BoltIcon } from '@mui/icons-material';
 import axios from 'axios';
 import { spacing } from '../theme/designSystem';
 import config from '../config';
+import { AlertBanner } from './ui';
 
 const PlayerDNASummary = ({ 
   playerName, 
@@ -103,9 +104,9 @@ const PlayerDNASummary = ({
 
           {/* Error State */}
           {error && !loading && (
-            <Alert severity="error" sx={{ py: `${spacing.xs}px` }}>
+            <AlertBanner severity="error" sx={{ py: `${spacing.xs}px` }}>
               <Typography variant="body2">{error}</Typography>
-            </Alert>
+            </AlertBanner>
           )}
 
           {/* Summary Items */}

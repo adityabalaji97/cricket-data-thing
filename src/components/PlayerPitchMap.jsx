@@ -10,11 +10,11 @@ import {
   Box,
   Typography,
   CircularProgress,
-  Alert,
   Chip
 } from '@mui/material';
 import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
+import { AlertBanner, EmptyState } from './ui';
 import { PitchMapVisualization } from './PitchMap';
 import config from '../config';
 import { colors as designColors } from '../theme/designSystem';
@@ -126,26 +126,33 @@ const PlayerPitchMap = ({
 
   if (loading) {
     return (
-      <Box sx={{ textAlign: 'center', py: 3 }}>
-        <CircularProgress />
-        <Typography sx={{ mt: 2 }}>Loading pitch map data...</Typography>
-      </Box>
+      <Wrapper {...wrapperProps}>
+        <Box sx={{ textAlign: 'center', py: 3 }}>
+          <CircularProgress />
+          <Typography sx={{ mt: 2 }}>Loading pitch map data...</Typography>
+        </Box>
+      </Wrapper>
     );
   }
 
   if (error) {
     return (
-      <Box sx={{ py: 2 }}>
-        <Alert severity="error">{error}</Alert>
-      </Box>
+      <Wrapper {...wrapperProps}>
+        <AlertBanner severity="error">{error}</AlertBanner>
+      </Wrapper>
     );
   }
 
   if (!pitchData || pitchData.total_balls === 0) {
     return (
-      <Box sx={{ py: 2 }}>
-        <Alert severity="info">No pitch map data available for the selected filters.</Alert>
-      </Box>
+      <Wrapper {...wrapperProps}>
+        <EmptyState
+          title="No innings match these filters"
+          description="No pitch map data is available for the selected filters."
+          isMobile={isCompact}
+          minHeight={isCompact ? 280 : 320}
+        />
+      </Wrapper>
     );
   }
 

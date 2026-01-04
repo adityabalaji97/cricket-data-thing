@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
+import { EmptyState } from './ui';
 import { colors as designColors } from '../theme/designSystem';
 
 const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp, wrapInCard = true }) => {  // Add default empty array
@@ -56,7 +57,13 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp, wrapInCar
         <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 1 }}>
           Strike Rate Progression by Intervals
         </Typography>
-        <Typography variant="body1" sx={{ mt: 2 }}>No data available</Typography>
+        <EmptyState
+          title="No innings match these filters"
+          description="Try adjusting the filters to see strike rate intervals."
+          isMobile={isMobile}
+          minHeight={isMobile ? 280 : 320}
+          sx={{ mt: 1 }}
+        />
       </Wrapper>
     );
   }
