@@ -1,7 +1,11 @@
 /**
  * Design System - Cricket Data Thing
  *
- * World-class design tokens inspired by Stripe, Linear, and Vercel
+ * Single source of truth for design tokens and theme configuration.
+ * - Import tokens from this module instead of hardcoding values.
+ * - Use the MUI theme from src/theme for consistent component styling.
+ *
+ * World-class design tokens inspired by Stripe, Linear, and Vercel.
  */
 
 // Spacing scale (4px base unit)
