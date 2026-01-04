@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Card, CardContent, Typography, CircularProgress, Alert } from '@mui/material';
 import { Bolt as BoltIcon } from '@mui/icons-material';
 import axios from 'axios';
+import { spacing } from '../theme/designSystem';
 import config from '../config';
 
 const PlayerDNASummary = ({ 
@@ -74,12 +75,12 @@ const PlayerDNASummary = ({
   if (!playerName || !fetchTrigger) return null;
 
   return (
-    <Box sx={{ mt: 3 }}>
+    <Box sx={{ mt: `${spacing.lg}px` }}>
       <Card>
-        <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+        <CardContent sx={{ py: `${spacing.base}px`, '&:last-child': { pb: `${spacing.base}px` } }}>
           {/* Header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-            <BoltIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: `${spacing.sm}px`, mb: `${spacing.md}px` }}>
+            <BoltIcon sx={{ color: 'primary.main', fontSize: spacing.lg }} />
             <Typography variant="subtitle1" fontWeight="bold">
               Player DNA
             </Typography>
@@ -92,7 +93,7 @@ const PlayerDNASummary = ({
 
           {/* Loading State */}
           {loading && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: `${spacing.md}px`, py: `${spacing.base}px` }}>
               <CircularProgress size={18} />
               <Typography variant="body2" color="text.secondary">
                 Analyzing {playerType === 'bowler' ? 'bowling' : 'batting'} patterns...
@@ -102,16 +103,16 @@ const PlayerDNASummary = ({
 
           {/* Error State */}
           {error && !loading && (
-            <Alert severity="error" sx={{ py: 0.5 }}>
+            <Alert severity="error" sx={{ py: `${spacing.xs}px` }}>
               <Typography variant="body2">{error}</Typography>
             </Alert>
           )}
 
           {/* Summary Items */}
           {summary?.success && summary.summary && !loading && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${spacing.xs}px` }}>
               {parseSummary(summary.summary).map((bullet, index) => (
-                <Box key={index} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                <Box key={index} sx={{ display: 'flex', gap: `${spacing.sm}px`, alignItems: 'flex-start' }}>
                   <Typography component="span" sx={{ flexShrink: 0 }}>
                     {bullet.emoji}
                   </Typography>

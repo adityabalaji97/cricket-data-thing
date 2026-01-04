@@ -1,4 +1,6 @@
 import React, { useMemo } from 'react';
+import { Box, Typography } from '@mui/material';
+import { borderRadius, colors, spacing, typography } from '../theme/designSystem';
 import { getBatterColor, getWeekStart } from './contributionGraphUtils';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -105,27 +107,31 @@ const ContributionGraph = ({ innings, playerName }) => {
   const svgHeight = TOP_PADDING + (7 * WEEK_WIDTH) + 10;
 
   return (
-    <div style={{ 
-      background: '#fff', 
-      borderRadius: '8px', 
-      padding: '16px',
-      border: '1px solid #e1e4e8',
-      marginBottom: '20px'
+    <Box sx={{
+      backgroundColor: colors.neutral[0],
+      borderRadius: `${borderRadius.base}px`,
+      p: `${spacing.base}px`,
+      border: `1px solid ${colors.neutral[200]}`,
+      mb: `${spacing.lg}px`
     }}>
-      <div style={{ marginBottom: '8px' }}>
-        <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>Performance Graph</div>
-        <div style={{ color: '#666', fontSize: '12px' }}>
-          <span>{stats.total} innings</span>
-          <span style={{ marginLeft: '12px' }}>
+      <Box sx={{ mb: `${spacing.sm}px` }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: `${spacing.xs}px` }}>
+          Performance Graph
+        </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: `${spacing.md}px`, color: 'text.secondary' }}>
+          <Typography variant="body2" component="span">
+            {stats.total} innings
+          </Typography>
+          <Typography variant="body2" component="span">
             Avg Fantasy: {stats.avgFantasy.toFixed(1)} pts
-          </span>
-          <span style={{ marginLeft: '12px' }}>
+          </Typography>
+          <Typography variant="body2" component="span">
             🦆 {stats.ducks} ducks
-          </span>
-        </div>
-      </div>
+          </Typography>
+        </Box>
+      </Box>
       
-      <div style={{ overflowX: 'auto' }}>
+      <Box sx={{ overflowX: 'auto' }}>
         <svg width={svgWidth} height={svgHeight} style={{ display: 'block' }}>
           {/* Month labels */}
           {monthLabels.map((label, idx) => {
@@ -147,8 +153,8 @@ const ContributionGraph = ({ innings, playerName }) => {
                 key={`${label.weekIndex}-${label.month}-${label.year}`}
                 x={LEFT_PADDING + (label.weekIndex * WEEK_WIDTH)}
                 y={10}
-                fontSize="9"
-                fill="#666"
+                fontSize={typography.fontSize.xs}
+                fill={colors.neutral[600]}
               >
                 {labelText}
               </text>
@@ -162,8 +168,8 @@ const ContributionGraph = ({ innings, playerName }) => {
                 key={day}
                 x={2}
                 y={TOP_PADDING + (idx * WEEK_WIDTH) + 8}
-                fontSize="9"
-                fill="#666"
+                fontSize={typography.fontSize.xs}
+                fill={colors.neutral[600]}
               >
                 {day}
               </text>
@@ -210,7 +216,7 @@ const ContributionGraph = ({ innings, playerName }) => {
                       <text
                         x={cellX + CELL_SIZE / 2}
                         y={cellY + CELL_SIZE / 2 + 1}
-                        fontSize="7"
+                        fontSize={typography.fontSize.xs}
                         textAnchor="middle"
                         dominantBaseline="middle"
                         style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -224,33 +230,35 @@ const ContributionGraph = ({ innings, playerName }) => {
             </g>
           ))}
         </svg>
-      </div>
+      </Box>
       
       {/* Legend */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '4px', 
-        marginTop: '8px',
-        fontSize: '11px',
-        color: '#666'
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: `${spacing.xs}px`,
+        mt: `${spacing.sm}px`,
+        color: 'text.secondary'
       }}>
-        <span>Less</span>
+        <Typography variant="caption" component="span">Less</Typography>
         {['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'].map((color, i) => (
-          <div
+          <Box
             key={i}
-            style={{
-              width: '10px',
-              height: '10px',
+            sx={{
+              width: `${spacing.sm}px`,
+              height: `${spacing.sm}px`,
               backgroundColor: color,
-              borderRadius: '2px'
+              borderRadius: `${borderRadius.sm}px`
             }}
           />
         ))}
-        <span>More</span>
-        <span style={{ marginLeft: '12px' }}>🦆 Duck</span>
-      </div>
-    </div>
+        <Typography variant="caption" component="span">More</Typography>
+        <Typography variant="caption" component="span" sx={{ ml: `${spacing.sm}px` }}>
+          🦆 Duck
+        </Typography>
+      </Box>
+    </Box>
   );
 };
 

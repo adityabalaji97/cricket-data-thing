@@ -123,6 +123,45 @@ export const typography = {
   },
 };
 
+// Typography usage guide mapped to MUI variants
+export const typographyUsage = {
+  h1: {
+    label: 'H1',
+    muiVariant: 'h1',
+    fontSize: typography.fontSize['4xl'],
+    fontWeight: typography.fontWeight.bold,
+    lineHeight: typography.lineHeight.tight,
+  },
+  h2: {
+    label: 'H2',
+    muiVariant: 'h2',
+    fontSize: typography.fontSize['3xl'],
+    fontWeight: typography.fontWeight.bold,
+    lineHeight: typography.lineHeight.tight,
+  },
+  h3: {
+    label: 'H3',
+    muiVariant: 'h3',
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.semibold,
+    lineHeight: typography.lineHeight.tight,
+  },
+  body: {
+    label: 'Body',
+    muiVariant: 'body1',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.normal,
+    lineHeight: typography.lineHeight.normal,
+  },
+  caption: {
+    label: 'Caption',
+    muiVariant: 'caption',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.normal,
+    lineHeight: typography.lineHeight.normal,
+  },
+};
+
 // Border radius scale
 export const borderRadius = {
   none: 0,
@@ -338,6 +377,7 @@ export default {
   spacing,
   colors,
   typography,
+  typographyUsage,
   borderRadius,
   shadows,
   transitions,
