@@ -126,9 +126,9 @@ const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp }) => {
       <Box sx={{ width: '100%', height: chartHeight }}>
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart
-            outerRadius={isMobile ? "70%" : 150}
+            outerRadius={isMobile ? "65%" : 150}
             data={data}
-            margin={{ top: 10, right: isMobile ? 5 : 20, bottom: isMobile ? 5 : 20, left: isMobile ? 5 : 20 }}
+            margin={{ top: 5, right: isMobile ? 5 : 20, bottom: isMobile ? 5 : 20, left: isMobile ? 5 : 20 }}
           >
             <PolarGrid />
             <PolarAngleAxis

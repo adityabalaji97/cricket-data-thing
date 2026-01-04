@@ -62,7 +62,7 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
         <ResponsiveContainer>
           <LineChart
             data={data}
-            margin={{ top: 20, right: isMobile ? 10 : 30, bottom: isMobile ? 30 : 40, left: isMobile ? 30 : 40 }}
+            margin={{ top: 20, right: isMobile ? 5 : 30, bottom: isMobile ? 25 : 40, left: isMobile ? 5 : 40 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis

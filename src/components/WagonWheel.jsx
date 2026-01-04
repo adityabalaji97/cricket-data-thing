@@ -156,21 +156,22 @@ const WagonWheel = ({
   const renderWagonWheel = () => {
     if (!wagonData || !stats) return null;
 
-    // Responsive dimensions based on container
-    const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - 32, 400) : 400;
+    // Responsive dimensions - reduce radius to fit within card, allow oval shape for cricket field
+    const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - (isMobile ? 48 : 80), 400) : 400;
     const width = containerWidth;
-    const height = containerWidth * 1.125; // Maintain aspect ratio (450/400)
+    const height = containerWidth * (isMobile ? 1.0 : 1.05); // Slightly oval on mobile, more circular on desktop
     const centerX = width / 2;
-    const centerY = (height / 2) - (height * 0.022); // Shifted up slightly (10/450)
-    const maxRadius = width * 0.425; // 42.5% of width (170/400)
+    const centerY = height / 2;
+    const maxRadiusX = width * 0.40; // Reduced from 0.425 to fit better
+    const maxRadiusY = height * 0.38; // Oval shape
     const batterRadius = width * 0.02; // 2% of width (8/400)
 
     // Field zones (8 zones + center)
     const zoneLines = [];
     for (let i = 0; i < 8; i++) {
       const angle = (i * Math.PI / 4) - (Math.PI / 2); // Start from top
-      const x2 = centerX + maxRadius * Math.cos(angle);
-      const y2 = centerY + maxRadius * Math.sin(angle);
+      const x2 = centerX + maxRadiusX * Math.cos(angle);
+      const y2 = centerY + maxRadiusY * Math.sin(angle);
       zoneLines.push(
         <line
           key={`zone-${i}`}
@@ -190,18 +191,21 @@ const WagonWheel = ({
       .filter(d => d.wagon_x !== null && d.wagon_y !== null)
       .map((delivery, idx) => {
         // Scale coordinates to fit in our SVG (assuming wagon_x/y are in range 0-300)
-        const scale = maxRadius / 300;
-        let x = centerX + (delivery.wagon_x - 150) * scale;
-        let y = centerY + (delivery.wagon_y - 150) * scale;
+        const scaleX = maxRadiusX / 300;
+        const scaleY = maxRadiusY / 300;
+        let x = centerX + (delivery.wagon_x - 150) * scaleX;
+        let y = centerY + (delivery.wagon_y - 150) * scaleY;
 
-        // For boundaries (4s and 6s), extend to the circumference
+        // For boundaries (4s and 6s), extend to the ellipse edge
         if (delivery.runs === 4 || delivery.runs === 6) {
           const dx = x - centerX;
           const dy = y - centerY;
           const distance = Math.sqrt(dx * dx + dy * dy);
           if (distance > 0) {
-            x = centerX + (dx / distance) * maxRadius;
-            y = centerY + (dy / distance) * maxRadius;
+            // Extend to ellipse boundary
+            const angle = Math.atan2(dy, dx);
+            x = centerX + maxRadiusX * Math.cos(angle);
+            y = centerY + maxRadiusY * Math.sin(angle);
           }
         }
 
@@ -240,11 +244,12 @@ const WagonWheel = ({
 
     return (
       <svg width={width} height={height} style={{ maxWidth: '100%', height: 'auto' }}>
-        {/* Field boundary */}
-        <circle
+        {/* Field boundary - ellipse for cricket field */}
+        <ellipse
           cx={centerX}
           cy={centerY}
-          r={maxRadius}
+          rx={maxRadiusX}
+          ry={maxRadiusY}
           fill="#f5f5f5"
           stroke="#bdbdbd"
           strokeWidth="2"
@@ -253,11 +258,12 @@ const WagonWheel = ({
         {/* Zone lines */}
         {zoneLines}
 
-        {/* Inner circle (30 yard circle) */}
-        <circle
+        {/* Inner ellipse (30 yard circle) */}
+        <ellipse
           cx={centerX}
           cy={centerY}
-          r={maxRadius * 0.5}
+          rx={maxRadiusX * 0.5}
+          ry={maxRadiusY * 0.5}
           fill="none"
           stroke="#e0e0e0"
           strokeWidth="1"
@@ -283,10 +289,10 @@ const WagonWheel = ({
 
         {/* Zone labels - Cricket orientation: batter faces down, bowler at bottom */}
         {/* For right-handed batter: off side is LEFT (towards covers), leg side is RIGHT (towards square leg) */}
-        <text x={centerX} y={centerY + maxRadius + 20} textAnchor="middle" fontSize={Math.max(11, width * 0.03)} fill="#666" fontWeight="600">Straight</text>
-        <text x={centerX - maxRadius - 10} y={centerY + 5} textAnchor="end" fontSize={Math.max(11, width * 0.03)} fill="#666" fontWeight="600">Off</text>
-        <text x={centerX + maxRadius + 10} y={centerY + 5} textAnchor="start" fontSize={Math.max(11, width * 0.03)} fill="#666" fontWeight="600">Leg</text>
-        <text x={centerX} y={centerY - maxRadius - 10} textAnchor="middle" fontSize={Math.max(11, width * 0.03)} fill="#666" fontWeight="600">Behind</text>
+        <text x={centerX} y={centerY + maxRadiusY + 20} textAnchor="middle" fontSize={Math.max(10, width * 0.028)} fill="#666" fontWeight="600">Straight</text>
+        <text x={centerX - maxRadiusX - 10} y={centerY + 5} textAnchor="end" fontSize={Math.max(10, width * 0.028)} fill="#666" fontWeight="600">Off</text>
+        <text x={centerX + maxRadiusX + 10} y={centerY + 5} textAnchor="start" fontSize={Math.max(10, width * 0.028)} fill="#666" fontWeight="600">Leg</text>
+        <text x={centerX} y={centerY - maxRadiusY - 10} textAnchor="middle" fontSize={Math.max(10, width * 0.028)} fill="#666" fontWeight="600">Behind</text>
       </svg>
     );
   };
@@ -372,19 +378,27 @@ const WagonWheel = ({
 
   return (
     <Card isMobile={isMobile}>
-      <Typography variant={isMobile ? "h6" : "h5"} gutterBottom sx={{ textAlign: 'center', fontWeight: 600, mb: 2 }}>
-        Wagon Wheel
-      </Typography>
-
-      {/* Filters */}
-      <Box sx={{ mb: 2 }}>
-        <FilterBar
-          filters={filterConfig}
-          activeFilters={{ phase, bowlKind, line, length, shot }}
-          onFilterChange={handleFilterChange}
-          isMobile={isMobile}
-          showActiveCount={false}
-        />
+      {/* Title and Filters in one row */}
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        mb: 2,
+        gap: 1,
+        flexWrap: isMobile ? 'wrap' : 'nowrap'
+      }}>
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
+          Wagon Wheel
+        </Typography>
+        <Box sx={{ flexShrink: 1, minWidth: 0 }}>
+          <FilterBar
+            filters={filterConfig}
+            activeFilters={{ phase, bowlKind, line, length, shot }}
+            onFilterChange={handleFilterChange}
+            isMobile={isMobile}
+            showActiveCount={false}
+          />
+        </Box>
       </Box>
 
       {/* Stats Summary */}

@@ -118,7 +118,7 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp }) => {  /
         <ResponsiveContainer>
           <BarChart
             data={data}
-            margin={{ top: 20, right: isMobile ? 10 : 30, left: isMobile ? 15 : 20, bottom: 5 }}
+            margin={{ top: 20, right: isMobile ? 5 : 30, left: isMobile ? 5 : 20, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis

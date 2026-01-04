@@ -116,7 +116,7 @@ const PaceSpinBreakdown = ({ stats, isMobile: isMobileProp }) => {
           <BarChart
             data={data}
             layout="vertical"
-            margin={{ top: 20, right: isMobile ? 10 : 30, left: isMobile ? 40 : 50, bottom: 5 }}
+            margin={{ top: 20, right: isMobile ? 5 : 30, left: isMobile ? 10 : 50, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis

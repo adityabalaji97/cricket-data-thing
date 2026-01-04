@@ -207,18 +207,26 @@ const PlayerPitchMap = ({
 
   return (
     <Card isMobile={isMobile}>
-      <Typography variant={isMobile ? "h6" : "h5"} sx={{ mb: isMobile ? 1.5 : 2, fontWeight: 600 }}>
-        Pitch Map
-      </Typography>
-
-      {/* Filters */}
-      <Box sx={{ mb: 2 }}>
-        <FilterBar
-          filters={filterConfig}
-          activeFilters={{ phase, bowlKind, line, length, shot }}
-          onFilterChange={handleFilterChange}
-          isMobile={isMobile}
-        />
+      {/* Title and Filters in one row */}
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        mb: 2,
+        gap: 1,
+        flexWrap: isMobile ? 'wrap' : 'nowrap'
+      }}>
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
+          Pitch Map
+        </Typography>
+        <Box sx={{ flexShrink: 1, minWidth: 0 }}>
+          <FilterBar
+            filters={filterConfig}
+            activeFilters={{ phase, bowlKind, line, length, shot }}
+            onFilterChange={handleFilterChange}
+            isMobile={isMobile}
+          />
+        </Box>
       </Box>
 
       {/* Stats Summary */}

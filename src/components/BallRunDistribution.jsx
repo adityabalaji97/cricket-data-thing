@@ -121,7 +121,7 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp }) => {
           <BarChart
             data={data}
             layout="vertical"
-            margin={{ top: 20, right: isMobile ? 10 : 20, left: isMobile ? 35 : 40, bottom: isMobile ? 20 : 30 }}
+            margin={{ top: 20, right: isMobile ? 5 : 20, left: isMobile ? 10 : 40, bottom: isMobile ? 15 : 30 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis

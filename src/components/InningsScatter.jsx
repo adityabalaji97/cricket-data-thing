@@ -145,9 +145,9 @@ const InningsScatter = ({ innings }) => {
         <ResponsiveContainer>
           <ScatterChart margin={{
             top: 10,
-            right: isMobile ? 10 : 20,
-            bottom: isMobile ? 30 : 40,
-            left: isMobile ? 30 : 40
+            right: isMobile ? 5 : 20,
+            bottom: isMobile ? 25 : 40,
+            left: isMobile ? 5 : 40
           }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
