@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
+import { EmptyState } from './ui';
 import { spacing } from '../theme/designSystem';
 
 const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }) => {
@@ -97,6 +98,14 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
         </Box>
       </Box>
 
+      {processedInnings.length === 0 ? (
+        <EmptyState
+          title="No innings match these filters"
+          description="Adjust filters or expand the date range to see innings."
+          isMobile={isMobile}
+          minHeight={isMobile ? 240 : 280}
+        />
+      ) : (
       <TableContainer>
         <Table size={isMobile ? "small" : "medium"} sx={{
           '& .MuiTableCell-root': {
@@ -202,6 +211,7 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
           </TableBody>
         </Table>
       </TableContainer>
+      )}
     </Wrapper>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
+import { EmptyState } from './ui';
 import { borderRadius, colors, spacing, typography } from '../theme/designSystem';
 import { getBatterColor, getWeekStart } from './contributionGraphUtils';
 
@@ -90,7 +91,12 @@ const ContributionGraph = ({ innings, playerName }) => {
   }, [innings]);
 
   if (!innings || innings.length === 0) {
-    return null;
+    return (
+      <EmptyState
+        title="No innings match these filters"
+        description="Try adjusting the date range or venue to see more innings."
+      />
+    );
   }
 
   // Determine label format based on time span

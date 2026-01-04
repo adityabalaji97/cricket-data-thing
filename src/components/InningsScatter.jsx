@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
+import { EmptyState } from './ui';
 import { colors as designColors } from '../theme/designSystem';
 
 const InningsScatter = ({ innings, wrapInCard = true, shareView = false }) => {
@@ -133,6 +134,22 @@ const InningsScatter = ({ innings, wrapInCard = true, shareView = false }) => {
     if (key === 'xAxis') setXMetric(value);
     else if (key === 'yAxis') setYMetric(value);
   };
+
+  if (!innings?.length) {
+    return (
+      <Wrapper {...wrapperProps}>
+        <Typography variant={isCompact ? "h6" : "h5"} sx={{ fontWeight: 600, mb: isCompact ? 1.5 : 2 }}>
+          Balls Faced vs Runs
+        </Typography>
+        <EmptyState
+          title="No innings match these filters"
+          description="Try adjusting the filters to explore other innings."
+          isMobile={isCompact}
+          minHeight={chartHeight}
+        />
+      </Wrapper>
+    );
+  }
 
   return (
     <Wrapper {...wrapperProps}>
