@@ -18,6 +18,7 @@ export const spacing = {
   xl: 32,
   xxl: 48,
   xxxl: 64,
+  section: 40,
 };
 
 // Color palette

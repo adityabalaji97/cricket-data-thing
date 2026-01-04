@@ -14,10 +14,12 @@ import {
 import _ from 'lodash';
 import Card from './ui/Card';
 
-const BallRunDistribution = ({ innings, isMobile: isMobileProp }) => {
+const BallRunDistribution = ({ innings, isMobile: isMobileProp, wrapInCard = true }) => {
   const theme = useTheme();
   const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
   const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
+  const Wrapper = wrapInCard ? Card : Box;
+  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
 
   const processData = () => {
     const ballRanges = {};
@@ -112,7 +114,7 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp }) => {
   const chartHeight = isMobile ? 350 : 400;
 
   return (
-    <Card isMobile={isMobile}>
+    <Wrapper {...wrapperProps}>
       <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
         Inning Distribution
       </Typography>
@@ -162,7 +164,7 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp }) => {
           </BarChart>
         </ResponsiveContainer>
       </Box>
-    </Card>
+    </Wrapper>
   );
 };
 

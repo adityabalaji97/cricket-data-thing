@@ -40,7 +40,7 @@ const transformPhaseData = (stats, type = 'overall') => {
   return phaseData;
 };
 
-const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp }) => {
+const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp, wrapInCard = true }) => {
   const [selectedView, setSelectedView] = useState('overall');
   const theme = useTheme();
   const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
@@ -77,8 +77,11 @@ const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp }) => {
     if (key === 'view') setSelectedView(value);
   };
 
+  const Wrapper = wrapInCard ? Card : Box;
+  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
+
   return (
-    <Card isMobile={isMobile}>
+    <Wrapper {...wrapperProps}>
       <Box sx={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -135,7 +138,7 @@ const PhasePerformanceRadar = ({ stats, isMobile: isMobileProp }) => {
           </RadarChart>
         </ResponsiveContainer>
       </Box>
-    </Card>
+    </Wrapper>
   );
 };
 

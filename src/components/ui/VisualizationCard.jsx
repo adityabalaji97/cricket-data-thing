@@ -1,38 +1,32 @@
 /**
- * Section Component - consistent section layout with header + grid
+ * VisualizationCard Component - consistent visualization container with slots
  */
 import React from 'react';
 import { Box, Typography } from '@mui/material';
+import Card from './Card';
 import { colors, spacing, typography } from '../../theme/designSystem';
 
-const Section = ({
+const VisualizationCard = ({
   title,
   subtitle,
   actions,
   children,
   isMobile = false,
-  columns = { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
-  gap,
-  disableTopSpacing = false,
   sx = {},
   headerSx = {},
   contentSx = {},
-  paddingX,
-  paddingY,
+  ...props
 }) => {
-  const contentGap = gap ?? (isMobile ? spacing.base : spacing.lg);
-
   return (
-    <Box
+    <Card
+      isMobile={isMobile}
       sx={{
-        mt: disableTopSpacing ? 0 : `${spacing.section}px`,
-        px: paddingX ?? 0,
-        py: paddingY ?? 0,
         display: 'flex',
         flexDirection: 'column',
         gap: `${spacing.base}px`,
         ...sx,
       }}
+      {...props}
     >
       {(title || subtitle || actions) && (
         <Box
@@ -60,7 +54,10 @@ const Section = ({
             {subtitle && (
               <Typography
                 variant="body2"
-                sx={{ mt: `${spacing.xs}px`, color: colors.neutral[600] }}
+                sx={{
+                  mt: `${spacing.xs}px`,
+                  color: colors.neutral[600],
+                }}
               >
                 {subtitle}
               </Typography>
@@ -70,18 +67,9 @@ const Section = ({
         </Box>
       )}
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: columns,
-          gap: `${contentGap}px`,
-          ...contentSx,
-        }}
-      >
-        {children}
-      </Box>
-    </Box>
+      <Box sx={{ width: '100%', ...contentSx }}>{children}</Box>
+    </Card>
   );
 };
 
-export default Section;
+export default VisualizationCard;

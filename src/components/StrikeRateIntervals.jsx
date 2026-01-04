@@ -14,11 +14,13 @@ import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
 import { colors as designColors } from '../theme/designSystem';
 
-const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp }) => {  // Add default empty array
+const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp, wrapInCard = true }) => {  // Add default empty array
   const [interval, setInterval] = useState(5);
   const theme = useTheme();
   const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
   const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
+  const Wrapper = wrapInCard ? Card : Box;
+  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
 
   const processData = () => {
     // Return early if no data
@@ -50,12 +52,12 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp }) => {  /
   // If no data, show a message
   if (!ballStats || ballStats.length === 0) {
     return (
-      <Card isMobile={isMobile}>
+      <Wrapper {...wrapperProps}>
         <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 1 }}>
           Strike Rate Progression by Intervals
         </Typography>
         <Typography variant="body1" sx={{ mt: 2 }}>No data available</Typography>
-      </Card>
+      </Wrapper>
     );
   }
 
@@ -95,7 +97,7 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp }) => {  /
   const chartHeight = isMobile ? 350 : 400;
 
   return (
-    <Card isMobile={isMobile}>
+    <Wrapper {...wrapperProps}>
       <Box sx={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -179,7 +181,7 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp }) => {  /
           </BarChart>
         </ResponsiveContainer>
       </Box>
-    </Card>
+    </Wrapper>
   );
 };
 

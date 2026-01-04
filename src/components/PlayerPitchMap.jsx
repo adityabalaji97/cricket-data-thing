@@ -26,11 +26,14 @@ const PlayerPitchMap = ({
   leagues = [],
   includeInternational = false,
   topTeams = null,
-  isMobile = false
+  isMobile = false,
+  wrapInCard = true
 }) => {
   const [pitchData, setPitchData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const Wrapper = wrapInCard ? Card : Box;
+  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
 
   // Filters
   const [phase, setPhase] = useState('overall');
@@ -206,7 +209,7 @@ const PlayerPitchMap = ({
   };
 
   return (
-    <Card isMobile={isMobile}>
+    <Wrapper {...wrapperProps}>
       {/* Title and Filters in one row */}
       <Box sx={{
         display: 'flex',
@@ -249,7 +252,7 @@ const PlayerPitchMap = ({
           hideLegend={true}
         />
       </Box>
-    </Card>
+    </Wrapper>
   );
 };
 

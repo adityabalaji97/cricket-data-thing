@@ -41,10 +41,12 @@ const MetricCell = ({ stats, isMobile }) => {
   );
 };
 
-const BowlingMatchupMatrix = ({ stats, isMobile: isMobileProp }) => {
+const BowlingMatchupMatrix = ({ stats, isMobile: isMobileProp, wrapInCard = true }) => {
   const theme = useTheme();
   const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
   const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
+  const Wrapper = wrapInCard ? Card : Box;
+  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
 
   // Dynamically get all bowling types from the stats data
   const bowlingTypes = stats?.phase_stats?.bowling_types
@@ -54,7 +56,7 @@ const BowlingMatchupMatrix = ({ stats, isMobile: isMobileProp }) => {
 
   if (!bowlingTypes.length) {
     return (
-      <Card isMobile={isMobile}>
+      <Wrapper {...wrapperProps}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
           <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
             Bowling Type Matchups
@@ -66,12 +68,12 @@ const BowlingMatchupMatrix = ({ stats, isMobile: isMobileProp }) => {
         <Typography variant="body2" color="text.secondary">
           Bowling matchup data not available
         </Typography>
-      </Card>
+      </Wrapper>
     );
   }
 
   return (
-    <Card isMobile={isMobile}>
+    <Wrapper {...wrapperProps}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
         <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
           Bowling Type Matchups
@@ -108,7 +110,7 @@ const BowlingMatchupMatrix = ({ stats, isMobile: isMobileProp }) => {
           </tbody>
         </table>
       </Box>
-    </Card>
+    </Wrapper>
   );
 };
 
