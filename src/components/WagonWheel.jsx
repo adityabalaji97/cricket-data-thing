@@ -5,7 +5,7 @@
  * Uses wagon_x and wagon_y coordinates from delivery_details table.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -37,7 +37,7 @@ const WagonWheel = ({
   const isCompact = shareView || isMobile;
   const Wrapper = wrapInCard ? Card : Box;
   const frameSx = isMobile
-    ? { minHeight: 420, aspectRatio: '4 / 5' }
+    ? { minHeight: 420 }
     : {};
   const wrapperProps = wrapInCard
     ? { isMobile, shareFrame: shareView, sx: frameSx }
@@ -57,13 +57,19 @@ const WagonWheel = ({
   const [availableLengths, setAvailableLengths] = useState([]);
   const [availableShots, setAvailableShots] = useState([]);
 
-  // Force re-render on window resize for responsive wagon wheel
-  const [, forceUpdate] = useState(0);
+  const chartContainerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState(360);
 
   useEffect(() => {
-    const handleResize = () => forceUpdate(prev => prev + 1);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    if (!chartContainerRef.current) return;
+    const resizeObserver = new ResizeObserver(entries => {
+      entries.forEach(entry => {
+        const nextWidth = Math.max(240, Math.floor(entry.contentRect.width));
+        setContainerSize(nextWidth);
+      });
+    });
+    resizeObserver.observe(chartContainerRef.current);
+    return () => resizeObserver.disconnect();
   }, []);
 
   useEffect(() => {
@@ -168,9 +174,8 @@ const WagonWheel = ({
     if (!wagonData || !stats) return null;
 
     // Responsive dimensions - circular field
-    const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - (isCompact ? 48 : 80), 400) : 400;
-    const width = containerWidth;
-    const height = containerWidth; // Circular - same width and height
+    const width = Math.min(containerSize, isCompact ? 360 : 420);
+    const height = width; // Circular - same width and height
     const centerX = width / 2;
     const centerY = height / 2;
     const maxRadius = width * 0.45; // Single radius for circle
@@ -438,7 +443,16 @@ const WagonWheel = ({
       </Box>
 
       {/* Wagon Wheel Visualization */}
-      <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+      <Box
+        ref={chartContainerRef}
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          width: '100%',
+          maxWidth: isCompact ? 360 : 420,
+          mx: 'auto'
+        }}
+      >
         {renderWagonWheel()}
       </Box>
     </Wrapper>
