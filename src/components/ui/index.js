@@ -6,3 +6,4 @@ export { default as MobileStickyHeader } from './MobileStickyHeader';
 export { default as Section } from './Section';
 export { default as Skeleton } from './Skeleton';
 export { default as StatCard } from './StatCard';
+export { default as VisualizationCard } from './VisualizationCard';

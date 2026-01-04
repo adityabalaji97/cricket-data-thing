@@ -12,8 +12,10 @@ import {
 import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
 
-const TopInnings = ({ innings, count = 10, isMobile = false }) => {
+const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }) => {
   const [viewMode, setViewMode] = useState('topScoring');
+  const Wrapper = wrapInCard ? Card : Box;
+  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
 
   const processedInnings = useMemo(() => {
     if (!innings?.length) return [];
@@ -72,7 +74,7 @@ const TopInnings = ({ innings, count = 10, isMobile = false }) => {
   };
 
   return (
-    <Card isMobile={isMobile}>
+    <Wrapper {...wrapperProps}>
       <Box sx={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -148,7 +150,7 @@ const TopInnings = ({ innings, count = 10, isMobile = false }) => {
           </TableBody>
         </Table>
       </TableContainer>
-    </Card>
+    </Wrapper>
   );
 };
 

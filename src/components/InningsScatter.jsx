@@ -14,11 +14,13 @@ import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
 import { colors as designColors } from '../theme/designSystem';
 
-const InningsScatter = ({ innings }) => {
+const InningsScatter = ({ innings, wrapInCard = true }) => {
   const [xMetric, setXMetric] = useState('balls');
   const [yMetric, setYMetric] = useState('strike_rate');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const Wrapper = wrapInCard ? Card : Box;
+  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
 
   const getPhase = (over) => {
     if (over < 6) return 0;
@@ -127,7 +129,7 @@ const InningsScatter = ({ innings }) => {
   };
 
   return (
-    <Card isMobile={isMobile}>
+    <Wrapper {...wrapperProps}>
       <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
         Balls Faced vs Runs
       </Typography>
@@ -182,7 +184,7 @@ const InningsScatter = ({ innings }) => {
           </ScatterChart>
         </ResponsiveContainer>
       </Box>
-    </Card>
+    </Wrapper>
   );
 };
 

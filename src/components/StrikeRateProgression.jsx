@@ -5,11 +5,13 @@ import Card from './ui/Card';
 import { colors as designColors } from '../theme/designSystem';
 import config from '../config';
 
-const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, competitionFilters, shouldFetch, isMobile: isMobileProp }) => {
+const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, competitionFilters, shouldFetch, isMobile: isMobileProp, wrapInCard = true }) => {
   const [data, setData] = useState([]);
   const theme = useTheme();
   const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
   const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
+  const Wrapper = wrapInCard ? Card : Box;
+  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,7 +53,7 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
   const chartHeight = isMobile ? 350 : 400;
 
   return (
-    <Card isMobile={isMobile}>
+    <Wrapper {...wrapperProps}>
       <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
         nth Ball SR
       </Typography>
@@ -123,7 +125,7 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
           </LineChart>
         </ResponsiveContainer>
       </Box>
-    </Card>
+    </Wrapper>
   );
 };
 

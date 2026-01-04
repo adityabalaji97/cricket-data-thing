@@ -50,23 +50,25 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-const PaceSpinBreakdown = ({ stats, isMobile: isMobileProp }) => {
+const PaceSpinBreakdown = ({ stats, isMobile: isMobileProp, wrapInCard = true }) => {
   const [selectedMetric, setSelectedMetric] = useState('strike_rate');
   const theme = useTheme();
   const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
   const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
+  const Wrapper = wrapInCard ? Card : Box;
+  const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
 
   // Null safety check
   if (!stats?.phase_stats?.pace?.overall || !stats?.phase_stats?.spin?.overall) {
     return (
-      <Card isMobile={isMobile}>
+      <Wrapper {...wrapperProps}>
         <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600, mb: 2 }}>
           Pace vs Spin Analysis
         </Typography>
         <Typography color="text.secondary">
           Pace/Spin breakdown data not available
         </Typography>
-      </Card>
+      </Wrapper>
     );
   }
 
@@ -91,7 +93,7 @@ const PaceSpinBreakdown = ({ stats, isMobile: isMobileProp }) => {
   const chartHeight = isMobile ? 350 : 400;
 
   return (
-    <Card isMobile={isMobile}>
+    <Wrapper {...wrapperProps}>
       <Box sx={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -136,7 +138,7 @@ const PaceSpinBreakdown = ({ stats, isMobile: isMobileProp }) => {
           </BarChart>
         </ResponsiveContainer>
       </Box>
-    </Card>
+    </Wrapper>
   );
 };
 

@@ -31,7 +31,7 @@ import config from '../config';
 import PlayerDNASummary from './PlayerDNASummary';
 import WagonWheel from './WagonWheel';
 import PlayerPitchMap from './PlayerPitchMap';
-import { FilterDrawer, MobileStickyHeader } from './ui';
+import { FilterDrawer, MobileStickyHeader, Section, VisualizationCard } from './ui';
 import { colors, spacing, typography, borderRadius, zIndex } from '../theme/designSystem';
 
 const DEFAULT_START_DATE = "2020-01-01";
@@ -462,69 +462,108 @@ const PlayerProfile = () => {
 
             {stats && !loading && (
               <Box sx={{ mt: isMobile ? 2 : 0 }}>
-                <CareerStatsCards stats={stats} isMobile={isMobile} />
+                <Section title="Career Overview" isMobile={isMobile} columns="1fr" disableTopSpacing>
+                  <CareerStatsCards stats={stats} isMobile={isMobile} />
 
-                <PlayerDNASummary
-                  playerName={selectedPlayer}
-                  startDate={dateRange.start}
-                  endDate={dateRange.end}
-                  leagues={competitionFilters.leagues}
-                  includeInternational={competitionFilters.international}
-                  topTeams={competitionFilters.topTeams}
-                  venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
-                  fetchTrigger={dnaFetchTrigger}
+                  <PlayerDNASummary
+                    playerName={selectedPlayer}
+                    startDate={dateRange.start}
+                    endDate={dateRange.end}
+                    leagues={competitionFilters.leagues}
+                    includeInternational={competitionFilters.international}
+                    topTeams={competitionFilters.topTeams}
+                    venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                    fetchTrigger={dnaFetchTrigger}
+                    isMobile={isMobile}
+                  />
+
+                  <VisualizationCard title="Contribution Timeline" isMobile={isMobile}>
+                    <ContributionGraph
+                      innings={stats.innings || []}
+                      mode="batter"
+                      dateRange={dateRange}
+                      isMobile={isMobile}
+                    />
+                  </VisualizationCard>
+                </Section>
+
+                <Section
+                  title="Shot Analysis"
                   isMobile={isMobile}
-                />
+                  columns={{ xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }}
+                >
+                  <VisualizationCard isMobile={isMobile}>
+                    <WagonWheel
+                      playerName={selectedPlayer}
+                      startDate={dateRange.start}
+                      endDate={dateRange.end}
+                      venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                      leagues={competitionFilters.leagues}
+                      includeInternational={competitionFilters.international}
+                      topTeams={competitionFilters.topTeams}
+                      isMobile={isMobile}
+                      wrapInCard={false}
+                    />
+                  </VisualizationCard>
+                  <VisualizationCard isMobile={isMobile}>
+                    <PlayerPitchMap
+                      playerName={selectedPlayer}
+                      startDate={dateRange.start}
+                      endDate={dateRange.end}
+                      venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                      leagues={competitionFilters.leagues}
+                      includeInternational={competitionFilters.international}
+                      topTeams={competitionFilters.topTeams}
+                      isMobile={isMobile}
+                      wrapInCard={false}
+                    />
+                  </VisualizationCard>
+                </Section>
 
-                <Box sx={{ mt: isMobile ? 2 : 3 }}>
-                  <ContributionGraph
-                    innings={stats.innings || []}
-                    mode="batter"
-                    dateRange={dateRange}
-                    isMobile={isMobile}
-                  />
-                </Box>
+                <Section
+                  title="Performance Breakdown"
+                  isMobile={isMobile}
+                  columns={{ xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }}
+                >
+                  <VisualizationCard isMobile={isMobile}>
+                    <PhasePerformanceRadar stats={stats} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+                  <VisualizationCard isMobile={isMobile}>
+                    <PaceSpinBreakdown stats={stats} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+                  <VisualizationCard isMobile={isMobile}>
+                    <InningsScatter innings={stats.innings} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+                  <VisualizationCard isMobile={isMobile}>
+                    <StrikeRateProgression
+                      selectedPlayer={selectedPlayer}
+                      dateRange={dateRange}
+                      selectedVenue={selectedVenue}
+                      competitionFilters={competitionFilters}
+                      isMobile={isMobile}
+                      wrapInCard={false}
+                    />
+                  </VisualizationCard>
+                  <VisualizationCard isMobile={isMobile}>
+                    <BallRunDistribution innings={stats.innings} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+                  <VisualizationCard isMobile={isMobile}>
+                    <StrikeRateIntervals ballStats={stats.ball_by_ball_stats} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+                </Section>
 
-                {/* Wagon Wheel and Pitch Map Visualizations */}
-                <Box sx={{ mt: isMobile ? 2 : 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: isMobile ? 2 : 3 }}>
-                  <WagonWheel
-                    playerName={selectedPlayer}
-                    startDate={dateRange.start}
-                    endDate={dateRange.end}
-                    venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
-                    leagues={competitionFilters.leagues}
-                    includeInternational={competitionFilters.international}
-                    topTeams={competitionFilters.topTeams}
-                    isMobile={isMobile}
-                  />
-                  <PlayerPitchMap
-                    playerName={selectedPlayer}
-                    startDate={dateRange.start}
-                    endDate={dateRange.end}
-                    venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
-                    leagues={competitionFilters.leagues}
-                    includeInternational={competitionFilters.international}
-                    topTeams={competitionFilters.topTeams}
-                    isMobile={isMobile}
-                  />
-                </Box>
-
-                <Box sx={{ mt: isMobile ? 2 : 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: isMobile ? 2 : 3 }}>
-                  <PhasePerformanceRadar stats={stats} isMobile={isMobile} />
-                  <PaceSpinBreakdown stats={stats} isMobile={isMobile} />
-                  <InningsScatter innings={stats.innings} isMobile={isMobile} />
-                  <StrikeRateProgression
-                    selectedPlayer={selectedPlayer}
-                    dateRange={dateRange}
-                    selectedVenue={selectedVenue}
-                    competitionFilters={competitionFilters}
-                    isMobile={isMobile}
-                  />
-                  <BallRunDistribution innings={stats.innings} isMobile={isMobile} />
-                  <StrikeRateIntervals ballStats={stats.ball_by_ball_stats} isMobile={isMobile} />
-                </Box>
-                <TopInnings innings={stats.innings} count={10} isMobile={isMobile} />
-                <BowlingMatchupMatrix stats={stats} isMobile={isMobile} />
+                <Section
+                  title="Performance Highlights"
+                  isMobile={isMobile}
+                  columns={{ xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' }}
+                >
+                  <VisualizationCard isMobile={isMobile}>
+                    <TopInnings innings={stats.innings} count={10} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+                  <VisualizationCard isMobile={isMobile}>
+                    <BowlingMatchupMatrix stats={stats} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+                </Section>
 
                 {/* Contextual Query Prompts */}
                 <ContextualQueryPrompts
