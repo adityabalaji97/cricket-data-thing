@@ -48,39 +48,41 @@ const MobileStickyHeader = ({
         {action && <Box sx={{ display: 'flex', alignItems: 'center' }}>{action}</Box>}
       </Box>
 
-      <Box
-        sx={{
-          display: collapsed ? 'none' : 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          gap: `${spacing.sm}px`,
-          mt: `${spacing.sm}px`,
-          transition: `all ${transitions.base}`,
-        }}
-      >
-        {stats.map((stat) => (
-          <Box
-            key={stat.label}
-            sx={{
-              backgroundColor: colors.neutral[50],
-              borderRadius: `${borderRadius.base}px`,
-              px: `${spacing.sm}px`,
-              py: `${spacing.xs}px`,
-            }}
-          >
-            <Typography variant="caption" sx={{ color: colors.neutral[600], fontWeight: typography.fontWeight.medium }}>
-              {stat.label}
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: typography.fontWeight.semibold }}>
-              {stat.value}
-            </Typography>
-            {stat.subLabel && (
-              <Typography variant="caption" sx={{ color: colors.neutral[500] }}>
-                {stat.subLabel}
+      {stats.length > 0 && (
+        <Box
+          sx={{
+            display: collapsed ? 'none' : 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gap: `${spacing.sm}px`,
+            mt: `${spacing.sm}px`,
+            transition: `all ${transitions.base}`,
+          }}
+        >
+          {stats.map((stat) => (
+            <Box
+              key={stat.label}
+              sx={{
+                backgroundColor: colors.neutral[50],
+                borderRadius: `${borderRadius.base}px`,
+                px: `${spacing.sm}px`,
+                py: `${spacing.xs}px`,
+              }}
+            >
+              <Typography variant="caption" sx={{ color: colors.neutral[600], fontWeight: typography.fontWeight.medium }}>
+                {stat.label}
               </Typography>
-            )}
-          </Box>
-        ))}
-      </Box>
+              <Typography variant="body1" sx={{ fontWeight: typography.fontWeight.semibold }}>
+                {stat.value}
+              </Typography>
+              {stat.subLabel && (
+                <Typography variant="caption" sx={{ color: colors.neutral[500] }}>
+                  {stat.subLabel}
+                </Typography>
+              )}
+            </Box>
+          ))}
+        </Box>
+      )}
     </Box>
   );
 };
