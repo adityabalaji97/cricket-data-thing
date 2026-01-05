@@ -7,17 +7,11 @@ const CareerStatsCards = ({ stats, isMobile = false }) => {
   const { overall } = stats;
 
   return (
-    <Box sx={{
-      display: 'grid',
-      gap: `${spacing.lg}px`,
-      gridTemplateColumns: '1fr',
-      mb: `${spacing.xl}px`
-    }}>
-      {/* Primary Stats Card */}
+    <Box sx={{ mb: `${spacing.xl}px` }}>
       <Card isMobile={isMobile}>
         <Box sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(6, 1fr)' },
           gap: { xs: `${spacing.base}px`, md: `${spacing.lg}px` }
         }}>
           <Box>
@@ -55,16 +49,6 @@ const CareerStatsCards = ({ stats, isMobile = false }) => {
               {overall.fifties}/{overall.hundreds}
             </Typography>
           </Box>
-        </Box>
-      </Card>
-
-      {/* Secondary Stats Card */}
-      <Card isMobile={isMobile}>
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(2, 1fr)' },
-          gap: { xs: `${spacing.base}px`, md: `${spacing.lg}px` }
-        }}>
           <Box>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
               DOT %

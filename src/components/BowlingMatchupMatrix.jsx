@@ -79,7 +79,7 @@ const BowlingMatchupMatrix = ({ stats, isMobile: isMobileProp, wrapInCard = true
       <Wrapper {...wrapperProps}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
           <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
-            Bowling Type Matchups
+            Matchups
           </Typography>
           <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
             <InfoIcon size={isMobile ? 14 : 16} />
@@ -104,18 +104,18 @@ const BowlingMatchupMatrix = ({ stats, isMobile: isMobileProp, wrapInCard = true
           justifyContent: 'space-between',
           mb: 2,
           gap: 1,
-          flexWrap: isMobile ? 'wrap' : 'nowrap',
+          flexWrap: 'nowrap',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
-            Bowling Type Matchups
+            Matchups
           </Typography>
           <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
             <InfoIcon size={isMobile ? 14 : 16} />
           </Tooltip>
         </Box>
-        <Box sx={{ minWidth: isMobile ? '100%' : 160 }}>
+        <Box sx={{ minWidth: isMobile ? 140 : 160, flexShrink: 0 }}>
           <FilterBar
             filters={filterConfig}
             activeFilters={{ phase: selectedPhase }}

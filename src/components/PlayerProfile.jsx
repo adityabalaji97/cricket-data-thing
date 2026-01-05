@@ -114,7 +114,6 @@ const PlayerProfile = () => {
         
         // Get player name and other parameters from URL if present
         const playerNameFromURL = getQueryParam('name');
-        const autoload = getQueryParam('autoload') === 'true';
         const startDateFromURL = getQueryParam('start_date');
         const endDateFromURL = getQueryParam('end_date');
         const venueFromURL = getQueryParam('venue');
@@ -137,13 +136,10 @@ const PlayerProfile = () => {
         if (playerNameFromURL && playersList.includes(playerNameFromURL)) {
           console.log('Setting player from URL:', playerNameFromURL);
           setSelectedPlayer(playerNameFromURL);
-          
-          // Auto-trigger data fetch if autoload parameter is true
-          if (autoload) {
-            setTimeout(() => {
-              setShouldFetch(true);
-            }, 500); // Small delay to ensure state is updated
-          }
+
+          setTimeout(() => {
+            setShouldFetch(true);
+          }, 300);
         } else if (playerNameFromURL) {
           console.warn('Player name in URL not found in player list:', playerNameFromURL);
         }
@@ -370,11 +366,6 @@ const PlayerProfile = () => {
         {isMobile && stats && (
           <MobileStickyHeader
             title={selectedPlayer || 'Player Profile'}
-            stats={[
-              { label: 'Matches', value: stats.overall.matches },
-              { label: 'Runs', value: stats.overall.runs, subLabel: `Avg ${stats.overall.average.toFixed(2)}` },
-              { label: 'Strike Rate', value: stats.overall.strike_rate.toFixed(1) },
-            ]}
             action={mobileFilterButton}
             enableCollapse
           />
@@ -446,7 +437,7 @@ const PlayerProfile = () => {
 
             {stats && !loading && (
               <Box sx={{ mt: isMobile ? 2 : 0 }}>
-                <Section title="Career Overview" isMobile={isMobile} columns="1fr" disableTopSpacing>
+                <Section title="Overview" isMobile={isMobile} columns="1fr" disableTopSpacing>
                   <CareerStatsCards stats={stats} isMobile={isMobile} />
 
                   <PlayerDNASummary
@@ -544,7 +535,7 @@ const PlayerProfile = () => {
                   <VisualizationCard isMobile={isMobile} ariaLabel="Top innings table">
                     <TopInnings innings={stats.innings} count={10} isMobile={isMobile} wrapInCard={false} />
                   </VisualizationCard>
-                  <VisualizationCard isMobile={isMobile} ariaLabel="Bowling type matchup matrix">
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Matchups table">
                     <BowlingMatchupMatrix stats={stats} isMobile={isMobile} wrapInCard={false} />
                   </VisualizationCard>
                 </Section>
