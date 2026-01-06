@@ -13,8 +13,9 @@ import {
   ComposedChart,
   Label
 } from 'recharts';
+import { spacing, colors, typography, borderRadius } from '../theme/designSystem';
 
-const OverEconomyChart = ({ stats }) => {
+const OverEconomyChart = ({ stats, isMobile = false, wrapInCard = true }) => {
   const [selectedMetrics, setSelectedMetrics] = useState(['economy', 'wickets']);
 
   // Early return if no data is provided
@@ -60,42 +61,42 @@ const OverEconomyChart = ({ stats }) => {
       return (
         <Box
           sx={{
-            backgroundColor: '#fff',
-            padding: 1.5,
-            border: '1px solid #ccc',
-            borderRadius: 1,
-            boxShadow: 2
+            backgroundColor: colors.neutral[0],
+            padding: `${spacing.base}px`,
+            border: `1px solid ${colors.neutral[300]}`,
+            borderRadius: `${borderRadius.base}px`,
+            boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
           }}
         >
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: typography.fontWeight.semibold }}>
             Over {label}
           </Typography>
-          
+
           {selectedMetrics.includes('economy') && (
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ fontSize: typography.fontSize.xs }}>
               Economy: <strong>{overData.economy}</strong>
             </Typography>
           )}
-          
+
           {selectedMetrics.includes('wickets') && (
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ fontSize: typography.fontSize.xs }}>
               Wickets: <strong>{overData.wickets}</strong>
             </Typography>
           )}
-          
+
           {selectedMetrics.includes('dot_percentage') && (
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ fontSize: typography.fontSize.xs }}>
               Dot %: <strong>{overData.dot_percentage}%</strong>
             </Typography>
           )}
-          
-          <Typography variant="body2">
-            Bowled in <strong>{overData.instances}</strong> innings 
+
+          <Typography variant="body2" sx={{ fontSize: typography.fontSize.xs }}>
+            Bowled in <strong>{overData.instances}</strong> innings
             ({overData.matches_percentage}% of matches)
           </Typography>
-          
+
           {overData.bowling_strike_rate > 0 && (
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ fontSize: typography.fontSize.xs }}>
               Strike Rate: <strong>{overData.bowling_strike_rate}</strong>
             </Typography>
           )}
@@ -105,146 +106,153 @@ const OverEconomyChart = ({ stats }) => {
     return null;
   };
 
-  // Define colors for each metric
   const metricColors = {
     economy: '#8884d8',
     wickets: '#82ca9d',
     dot_percentage: '#ffc658'
   };
 
-  // Define labels for each metric
   const metricLabels = {
     economy: 'Economy Rate',
     wickets: 'Wickets',
     dot_percentage: 'Dot %'
   };
 
-  return (
-    <Card>
-      <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">
-            Over-by-Over Performance Analysis
-          </Typography>
+  const chartHeight = isMobile ? 220 : 280;
+
+  const content = (
+    <>
+      {!isMobile && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: `${spacing.base}px` }}>
           <ButtonGroup variant="outlined" size="small">
             <Button
               onClick={() => toggleMetric('economy')}
               variant={selectedMetrics.includes('economy') ? 'contained' : 'outlined'}
+              sx={{ fontSize: typography.fontSize.xs }}
             >
               Economy
             </Button>
             <Button
               onClick={() => toggleMetric('wickets')}
               variant={selectedMetrics.includes('wickets') ? 'contained' : 'outlined'}
+              sx={{ fontSize: typography.fontSize.xs }}
             >
               Wickets
             </Button>
             <Button
               onClick={() => toggleMetric('dot_percentage')}
               variant={selectedMetrics.includes('dot_percentage') ? 'contained' : 'outlined'}
+              sx={{ fontSize: typography.fontSize.xs }}
             >
               Dot %
             </Button>
           </ButtonGroup>
         </Box>
-        
-        <Box sx={{ width: '100%', height: 400 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart
-              data={chartData}
-              margin={{
-                top: 5,
-                right: 30,
-                left: 20,
-                bottom: 30,
-              }}
+      )}
+
+      <Box sx={{ width: '100%', height: chartHeight }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={chartData}
+            margin={{
+              top: 5,
+              right: isMobile ? 15 : 30,
+              left: isMobile ? 10 : 20,
+              bottom: isMobile ? 5 : 30,
+            }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="over"
+              scale="point"
+              tick={{ fontSize: isMobile ? 10 : 12 }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="over"
-                scale="point"
+              {!isMobile && <Label value="Over Number" position="bottom" offset={10} />}
+            </XAxis>
+
+            {selectedMetrics.includes('economy') && (
+              <YAxis
+                yAxisId="economy"
+                domain={[minEconomy, maxEconomy]}
+                orientation="left"
+                tick={{ fontSize: isMobile ? 9 : 11 }}
               >
-                <Label value="Over Number" position="bottom" offset={10} />
-              </XAxis>
-              
-              {/* Economy Rate Y-Axis */}
-              {selectedMetrics.includes('economy') && (
-                <YAxis 
-                  yAxisId="economy"
-                  domain={[minEconomy, maxEconomy]}
-                  orientation="left"
-                >
-                  <Label value="Economy Rate" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />
-                </YAxis>
-              )}
-              
-              {/* Wickets Y-Axis */}
-              {selectedMetrics.includes('wickets') && (
-                <YAxis 
-                  yAxisId="wickets" 
-                  orientation="right" 
-                  domain={[0, maxWickets]}
-                >
-                  <Label value="Wickets" angle={90} position="insideRight" style={{ textAnchor: 'middle' }} />
-                </YAxis>
-              )}
-              
-              {/* Dot Percentage Y-Axis */}
-              {selectedMetrics.includes('dot_percentage') && !selectedMetrics.includes('economy') && (
-                <YAxis 
-                  yAxisId="dot_percentage" 
-                  orientation="left" 
-                  domain={[0, maxDotPercentage]}
-                >
-                  <Label value="Dot %" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />
-                </YAxis>
-              )}
-              
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              
-              {/* Economy Rate Line */}
-              {selectedMetrics.includes('economy') && (
-                <Line
-                  yAxisId="economy"
-                  type="monotone"
-                  dataKey="economy"
-                  stroke={metricColors.economy}
-                  strokeWidth={3}
-                  name={metricLabels.economy}
-                />
-              )}
-              
-              {/* Wickets Bar */}
-              {selectedMetrics.includes('wickets') && (
-                <Bar
-                  yAxisId="wickets"
-                  dataKey="wickets"
-                  fill={metricColors.wickets}
-                  name={metricLabels.wickets}
-                  barSize={20}
-                />
-              )}
-              
-              {/* Dot Percentage Line */}
-              {selectedMetrics.includes('dot_percentage') && (
-                <Line
-                  yAxisId={selectedMetrics.includes('economy') ? 'economy' : 'dot_percentage'}
-                  type="monotone"
-                  dataKey="dot_percentage"
-                  stroke={metricColors.dot_percentage}
-                  strokeWidth={3}
-                  name={metricLabels.dot_percentage}
-                />
-              )}
-            </ComposedChart>
-          </ResponsiveContainer>
-        </Box>
-        
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-          This chart shows your bowling performance across different overs.
-          Toggle metrics to focus on specific aspects of your performance.
-        </Typography>
+                {!isMobile && <Label value="Economy Rate" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
+              </YAxis>
+            )}
+
+            {selectedMetrics.includes('wickets') && (
+              <YAxis
+                yAxisId="wickets"
+                orientation="right"
+                domain={[0, maxWickets]}
+                tick={{ fontSize: isMobile ? 9 : 11 }}
+              >
+                {!isMobile && <Label value="Wickets" angle={90} position="insideRight" style={{ textAnchor: 'middle' }} />}
+              </YAxis>
+            )}
+
+            {selectedMetrics.includes('dot_percentage') && !selectedMetrics.includes('economy') && (
+              <YAxis
+                yAxisId="dot_percentage"
+                orientation="left"
+                domain={[0, maxDotPercentage]}
+                tick={{ fontSize: isMobile ? 9 : 11 }}
+              >
+                {!isMobile && <Label value="Dot %" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
+              </YAxis>
+            )}
+
+            <Tooltip content={<CustomTooltip />} />
+            <Legend wrapperStyle={{ fontSize: typography.fontSize.xs }} iconSize={isMobile ? 8 : 14} />
+
+            {selectedMetrics.includes('economy') && (
+              <Line
+                yAxisId="economy"
+                type="monotone"
+                dataKey="economy"
+                stroke={metricColors.economy}
+                strokeWidth={isMobile ? 2 : 3}
+                name={metricLabels.economy}
+              />
+            )}
+
+            {selectedMetrics.includes('wickets') && (
+              <Bar
+                yAxisId="wickets"
+                dataKey="wickets"
+                fill={metricColors.wickets}
+                name={metricLabels.wickets}
+                barSize={isMobile ? 15 : 20}
+              />
+            )}
+
+            {selectedMetrics.includes('dot_percentage') && (
+              <Line
+                yAxisId={selectedMetrics.includes('economy') ? 'economy' : 'dot_percentage'}
+                type="monotone"
+                dataKey="dot_percentage"
+                stroke={metricColors.dot_percentage}
+                strokeWidth={isMobile ? 2 : 3}
+                name={metricLabels.dot_percentage}
+              />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </Box>
+    </>
+  );
+
+  if (!wrapInCard) return content;
+
+  return (
+    <Card sx={{
+      borderRadius: `${borderRadius.base}px`,
+      border: `1px solid ${colors.neutral[200]}`,
+      backgroundColor: colors.neutral[0]
+    }}>
+      <CardContent sx={{ p: `${isMobile ? spacing.base : spacing.lg}px` }}>
+        {content}
       </CardContent>
     </Card>
   );

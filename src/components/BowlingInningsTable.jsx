@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  Typography, 
-  Box, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Paper, 
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
   TableSortLabel,
   Button,
   ButtonGroup
 } from '@mui/material';
+import { spacing, colors, borderRadius } from '../theme/designSystem';
 
-const BowlingInningsTable = ({ stats }) => {
+const BowlingInningsTable = ({ stats, isMobile = false, wrapInCard = true }) => {
   const [displayMode, setDisplayMode] = useState('topWickets');
   const [sortConfig, setSortConfig] = useState({
     key: displayMode === 'topWickets' ? 'wickets' : 'date',
@@ -99,9 +100,13 @@ const BowlingInningsTable = ({ stats }) => {
     });
   };
 
-  return (
-    <Card>
-      <CardContent>
+  const content = (
+    <Card sx={{
+      borderRadius: `${borderRadius.base}px`,
+      border: `1px solid ${colors.neutral[200]}`,
+      backgroundColor: colors.neutral[0]
+    }}>
+      <CardContent sx={{ p: `${isMobile ? spacing.base : spacing.lg}px` }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6">
             {displayMode === 'topWickets' ? 'Top Wicket-Taking Innings' : 'Recent Form'}
@@ -225,6 +230,12 @@ const BowlingInningsTable = ({ stats }) => {
       </CardContent>
     </Card>
   );
+
+  if (!wrapInCard) {
+    return <Box>{content}</Box>;
+  }
+
+  return content;
 };
 
 export default BowlingInningsTable;

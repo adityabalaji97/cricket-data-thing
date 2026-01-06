@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { Card, CardContent, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TableSortLabel, TablePagination } from '@mui/material';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as RechartsTooltip, 
-  Legend, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
   ResponsiveContainer,
   Label
 } from 'recharts';
+import { spacing, colors, borderRadius } from '../theme/designSystem';
 
-const FrequentOversChart = ({ stats }) => {
+const FrequentOversChart = ({ stats, isMobile = false, wrapInCard = true }) => {
   const [orderBy, setOrderBy] = useState('instances_bowled');
   const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(0);
@@ -92,45 +93,40 @@ const FrequentOversChart = ({ stats }) => {
     setPage(0);
   };
 
-  return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Most Frequently Bowled Overs
-        </Typography>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
-          Analysis of performance in specific overs of the innings
-        </Typography>
-        
-        <Box sx={{ width: '100%', height: 300, mb: 4 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={top5Data}
-              margin={{
-                top: 20,
-                right: 30,
-                left: 20,
-                bottom: 50,
-              }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="over" angle={0} textAnchor="middle" height={50}>
-                <Label value="Over Number" position="bottom" offset={20} />
-              </XAxis>
-              <YAxis yAxisId="left">
-                <Label value="Wickets" angle={-90} position="insideLeft" />
-              </YAxis>
-              <YAxis yAxisId="right" orientation="right">
-                <Label value="Economy Rate" angle={90} position="insideRight" />
-              </YAxis>
-              <RechartsTooltip content={<CustomTooltip />} />
-              <Legend />
-              <Bar yAxisId="left" dataKey="wickets" name="Wickets" fill="#8884d8" />
-              <Bar yAxisId="right" dataKey="economy" name="Economy Rate" fill="#82ca9d" />
-            </BarChart>
-          </ResponsiveContainer>
-        </Box>
-        
+  const chartHeight = isMobile ? 220 : 280;
+
+  const content = (
+    <>
+      <Box sx={{ width: '100%', height: chartHeight, mb: `${spacing.lg}px` }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={top5Data}
+            margin={{
+              top: 10,
+              right: isMobile ? 15 : 30,
+              left: isMobile ? 10 : 20,
+              bottom: isMobile ? 5 : 30,
+            }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="over" tick={{ fontSize: isMobile ? 10 : 12 }}>
+              {!isMobile && <Label value="Over Number" position="bottom" offset={10} />}
+            </XAxis>
+            <YAxis yAxisId="left" tick={{ fontSize: isMobile ? 9 : 11 }}>
+              {!isMobile && <Label value="Wickets" angle={-90} position="insideLeft" />}
+            </YAxis>
+            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: isMobile ? 9 : 11 }}>
+              {!isMobile && <Label value="Economy Rate" angle={90} position="insideRight" />}
+            </YAxis>
+            <RechartsTooltip content={<CustomTooltip />} />
+            <Legend iconSize={isMobile ? 8 : 14} />
+            <Bar yAxisId="left" dataKey="wickets" name="Wickets" fill="#8884d8" />
+            <Bar yAxisId="right" dataKey="economy" name="Economy Rate" fill="#82ca9d" />
+          </BarChart>
+        </ResponsiveContainer>
+      </Box>
+
+      {!isMobile && (
         <TableContainer component={Paper}>
           <Table size="small" stickyHeader>
             <TableHead>
@@ -214,6 +210,20 @@ const FrequentOversChart = ({ stats }) => {
             onRowsPerPageChange={handleChangeRowsPerPage}
           />
         </TableContainer>
+      )}
+    </>
+  );
+
+  if (!wrapInCard) return content;
+
+  return (
+    <Card sx={{
+      borderRadius: `${borderRadius.base}px`,
+      border: `1px solid ${colors.neutral[200]}`,
+      backgroundColor: colors.neutral[0]
+    }}>
+      <CardContent sx={{ p: `${isMobile ? spacing.base : spacing.lg}px` }}>
+        {content}
       </CardContent>
     </Card>
   );

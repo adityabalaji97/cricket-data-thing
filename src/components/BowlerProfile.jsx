@@ -1,7 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Box, Button, Typography, TextField, CircularProgress, Alert, Autocomplete } from '@mui/material';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Container, Box, Button, Typography, Chip, useMediaQuery, useTheme } from '@mui/material';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { useLocation, useNavigate } from 'react-router-dom';
-import CompetitionFilter from './CompetitionFilter';
+
+// Design System
+import { AlertBanner, MobileStickyHeader, Section, VisualizationCard } from './ui';
+import { colors, spacing, typography, borderRadius, zIndex } from '../theme/designSystem';
+
+// Filter Architecture
+import FilterBar from './playerProfile/FilterBar';
+import FilterSheet from './playerProfile/FilterSheet';
+import { buildBowlerProfileFilters, DEFAULT_START_DATE, TODAY } from './bowlerProfile/filterConfig';
+import BowlerProfileLoadingState from './bowlerProfile/BowlerProfileLoadingState';
+
+// Bowling Components
 import BowlingCareerStatsCards from './BowlingCareerStatsCards';
 import WicketDistribution from './WicketDistribution';
 import OverEconomyChart from './OverEconomyChart';
@@ -13,12 +25,11 @@ import { getBowlerContextualQueries } from '../utils/queryBuilderLinks';
 import config from '../config';
 import PlayerDNASummary from './PlayerDNASummary';
 
-const DEFAULT_START_DATE = "2020-01-01";
-const TODAY = new Date().toISOString().split('T')[0];
-
-const BowlerProfile = ({ isMobile }) => {
+const BowlerProfile = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
   // Helper function to get URL parameters
   const getQueryParam = (param) => {
@@ -42,6 +53,7 @@ const BowlerProfile = ({ isMobile }) => {
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [dnaFetchTrigger, setDnaFetchTrigger] = useState(0);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   // Add a direct event listener to trigger analysis on page load if needed
   useEffect(() => {
@@ -191,6 +203,106 @@ const BowlerProfile = ({ isMobile }) => {
     setShouldFetch(true);
   };
 
+  const handleFilterChange = (key, value) => {
+    if (key === 'player') {
+      setSelectedPlayer(value);
+      return;
+    }
+
+    if (key === 'venue') {
+      setSelectedVenue(value);
+      return;
+    }
+
+    if (key === 'startDate') {
+      setDateRange((prev) => ({ ...prev, start: value }));
+      return;
+    }
+
+    if (key === 'endDate') {
+      setDateRange((prev) => ({ ...prev, end: value }));
+    }
+  };
+
+  const handleApplyFilters = (nextValues, nextCompetitionFilters) => {
+    setSelectedPlayer(nextValues.player);
+    setSelectedVenue(nextValues.venue);
+    setDateRange({ start: nextValues.startDate, end: nextValues.endDate });
+    setCompetitionFilters(nextCompetitionFilters);
+
+    if (nextValues.player) {
+      setShouldFetch(true);
+    }
+
+    setFilterDrawerOpen(false);
+  };
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedVenue !== 'All Venues') count += 1;
+    if (dateRange.start !== DEFAULT_START_DATE) count += 1;
+    if (dateRange.end !== TODAY) count += 1;
+    if (competitionFilters.international) count += 1;
+    if (competitionFilters.international && competitionFilters.topTeams !== 10) count += 1;
+    return count;
+  }, [selectedVenue, dateRange, competitionFilters]);
+
+  const filterConfig = useMemo(
+    () => buildBowlerProfileFilters({ players, venues }),
+    [players, venues]
+  );
+
+  const filterValues = useMemo(
+    () => ({
+      player: selectedPlayer,
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+      venue: selectedVenue,
+    }),
+    [selectedPlayer, dateRange, selectedVenue]
+  );
+
+  const mobileFilterButton = (
+    <Button
+      variant="outlined"
+      startIcon={<FilterListIcon />}
+      onClick={() => setFilterDrawerOpen(true)}
+      sx={{
+        minHeight: 44,
+        borderRadius: `${borderRadius.base}px`,
+        borderColor: colors.neutral[300],
+        color: colors.neutral[700],
+        textTransform: 'none',
+        fontWeight: typography.fontWeight.medium,
+        backgroundColor: colors.neutral[0],
+        '&:hover': {
+          borderColor: colors.primary[400],
+          backgroundColor: colors.primary[50],
+        },
+        '&:focus-visible': {
+          outline: `2px solid ${colors.primary[600]}`,
+          outlineOffset: 2,
+        },
+      }}
+    >
+      Filters
+      {activeFilterCount > 0 && (
+        <Chip
+          label={activeFilterCount}
+          size="small"
+          sx={{
+            ml: `${spacing.sm}px`,
+            height: 20,
+            minWidth: 20,
+            fontSize: typography.fontSize.xs,
+            backgroundColor: colors.primary[600],
+            color: colors.neutral[0],
+          }}
+        />
+      )}
+    </Button>
+  );
+
   useEffect(() => {
     // Fetch bowling stats when shouldFetch is triggered
     const fetchBowlingStats = async () => {
@@ -243,118 +355,178 @@ const BowlerProfile = ({ isMobile }) => {
 
   return (
     <Container maxWidth="xl">
-      <Box sx={{ py: 4 }}>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Box sx={{ py: isMobile ? 2 : 4 }}>
+        {error && (
+          <AlertBanner severity="error" sx={{ mb: 2 }}>
+            {error}
+          </AlertBanner>
+        )}
 
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 4 }}>
-          <Autocomplete
-            value={selectedPlayer}
-            onChange={(_, newValue) => setSelectedPlayer(newValue)}
-            options={players}
-            sx={{ width: { xs: '100%', md: 300 } }}
-            getOptionLabel={(option) => {
-              // If option is a string, return it directly
-              if (typeof option === 'string') {
-                return option;
-              }
-              // If option is an object, return option.name or default to empty string
-              return option || '';
-            }}
-            isOptionEqualToValue={(option, value) => {
-              // Handle string values (from URL) and object values
-              if (typeof value === 'string') {
-                return option === value;
-              }
-              return option === value;
-            }}
-            renderInput={(params) => <TextField {...params} label="Select Player" variant="outlined" required />}
+        {isMobile && stats && (
+          <MobileStickyHeader
+            title={selectedPlayer || 'Bowler Profile'}
+            action={mobileFilterButton}
+            enableCollapse
           />
+        )}
 
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <TextField
-              label="Start Date"
-              type="date"
-              value={dateRange.start}
-              onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="End Date"
-              type="date"
-              value={dateRange.end}
-              onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-            />
-            <Autocomplete
-              value={selectedVenue}
-              onChange={(_, newValue) => setSelectedVenue(newValue)}
-              options={venues}
-              sx={{ width: 250 }}
-              renderInput={(params) => <TextField {...params} label="Select Venue" />}
-            />
-            <Button 
-              variant="contained"
-              onClick={handleFetch}
-              disabled={!selectedPlayer || loading}
-              id="go-button"
+        {isMobile && !stats && (
+          <Box
+            sx={{
+              position: 'sticky',
+              top: 0,
+              zIndex: zIndex.sticky,
+              backgroundColor: colors.neutral[0],
+              borderBottom: `1px solid ${colors.neutral[200]}`,
+              px: `${spacing.base}px`,
+              py: `${spacing.base}px`,
+              mb: `${spacing.base}px`,
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: typography.fontWeight.semibold }}>
+              Bowler Profile
+            </Typography>
+            <Box sx={{ mt: `${spacing.sm}px` }}>{mobileFilterButton}</Box>
+          </Box>
+        )}
+
+        <Box
+          sx={{
+            display: { xs: 'block', md: 'flex' },
+            gap: { xs: 2, md: 4 },
+          }}
+        >
+          {!isMobile && (
+            <Box
+              sx={{
+                width: 280,
+                flexShrink: 0,
+                position: 'sticky',
+                top: `${spacing.xl}px`,
+                alignSelf: 'flex-start',
+              }}
             >
-              GO
-            </Button>
+              <Box
+                sx={{
+                  borderRadius: `${borderRadius.lg}px`,
+                  border: `1px solid ${colors.neutral[200]}`,
+                  backgroundColor: colors.neutral[0],
+                  p: `${spacing.lg}px`,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                }}
+              >
+                <Typography variant="h6" sx={{ mb: `${spacing.base}px` }}>
+                  Filters
+                </Typography>
+                <FilterBar
+                  filters={filterConfig}
+                  values={filterValues}
+                  onChange={handleFilterChange}
+                  onSubmit={handleFetch}
+                  loading={loading}
+                  competitionFilters={competitionFilters}
+                  onCompetitionChange={setCompetitionFilters}
+                />
+              </Box>
+            </Box>
+          )}
+
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            {loading && <BowlerProfileLoadingState isMobile={isMobile} />}
+
+            {stats && !loading && (
+              <Box sx={{ mt: isMobile ? 2 : 0 }}>
+                <Section title="Overview" isMobile={isMobile} columns="1fr" disableTopSpacing>
+                  <BowlingCareerStatsCards stats={stats} isMobile={isMobile} />
+
+                  <PlayerDNASummary
+                    playerName={selectedPlayer}
+                    playerType="bowler"
+                    startDate={dateRange.start}
+                    endDate={dateRange.end}
+                    leagues={competitionFilters.leagues}
+                    includeInternational={competitionFilters.international}
+                    topTeams={competitionFilters.topTeams}
+                    venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                    fetchTrigger={dnaFetchTrigger}
+                    isMobile={isMobile}
+                  />
+
+                  <ContextualQueryPrompts
+                    queries={getBowlerContextualQueries(selectedPlayer, {
+                      startDate: dateRange.start,
+                      endDate: dateRange.end,
+                      leagues: competitionFilters.leagues,
+                      venue: selectedVenue !== 'All Venues' ? selectedVenue : null,
+                    })}
+                    title={`🔍 Explore ${selectedPlayer.split(' ').pop()}'s Bowling Data`}
+                    isMobile={isMobile}
+                  />
+                </Section>
+
+                <Section
+                  title="Bowling Performance"
+                  subtitle="Phase-wise wickets, economy rates, and over-by-over analysis"
+                  isMobile={isMobile}
+                  columns={{ xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }}
+                >
+                  <VisualizationCard
+                    title="Wicket Distribution"
+                    ariaLabel="Wicket distribution by phase"
+                    isMobile={isMobile}
+                  >
+                    <WicketDistribution stats={stats} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+
+                  <VisualizationCard
+                    title="Over Economy"
+                    ariaLabel="Over-by-over economy analysis"
+                    isMobile={isMobile}
+                  >
+                    <OverEconomyChart stats={stats} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+
+                  <VisualizationCard
+                    title="Frequent Overs"
+                    ariaLabel="Frequent overs bowled"
+                    isMobile={isMobile}
+                  >
+                    <FrequentOversChart stats={stats} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+
+                  <VisualizationCard
+                    title="Over Combinations"
+                    ariaLabel="Over combination patterns"
+                    isMobile={isMobile}
+                  >
+                    <OverCombinationsChart stats={stats} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+                </Section>
+
+                <Section
+                  title="Innings Details"
+                  subtitle="Complete breakdown of individual bowling performances"
+                  isMobile={isMobile}
+                  columns="1fr"
+                >
+                  <VisualizationCard title="Bowling Innings" isMobile={isMobile}>
+                    <BowlingInningsTable stats={stats} isMobile={isMobile} wrapInCard={false} />
+                  </VisualizationCard>
+                </Section>
+              </Box>
+            )}
           </Box>
         </Box>
 
-        <CompetitionFilter onFilterChange={setCompetitionFilters} />
-
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        )}
-
-        {stats && !loading && (
-          <Box sx={{ mt: 4 }}>
-            {/* Career Stats Cards */}
-            <BowlingCareerStatsCards stats={stats} />
-            
-            {/* Player DNA Summary */}
-            <PlayerDNASummary
-              playerName={selectedPlayer}
-              playerType="bowler"
-              startDate={dateRange.start}
-              endDate={dateRange.end}
-              leagues={competitionFilters.leagues}
-              includeInternational={competitionFilters.international}
-              topTeams={competitionFilters.topTeams}
-              venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
-              fetchTrigger={dnaFetchTrigger}
-            />
-            
-            {/* Contextual Query Prompts */}
-            <ContextualQueryPrompts 
-              queries={getBowlerContextualQueries(selectedPlayer, {
-                startDate: dateRange.start,
-                endDate: dateRange.end,
-                leagues: competitionFilters.leagues,
-                venue: selectedVenue !== 'All Venues' ? selectedVenue : null,
-              })}
-              title={`🔍 Explore ${selectedPlayer.split(' ').pop()}'s Bowling Data`}
-            />
-            
-            {/* Main 2x2 Grid Layout */}
-            <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
-              {/* Replacing BowlingPhasePerformanceRadar with WicketDistribution */}
-              <WicketDistribution stats={stats} />
-              <OverEconomyChart stats={stats} />
-              <FrequentOversChart stats={stats} />
-              <OverCombinationsChart stats={stats} />
-            </Box>
-            
-            {/* Innings Performance Table */}
-            <Box sx={{ mt: 4 }}>
-              <BowlingInningsTable stats={stats} />
-            </Box>
-          </Box>
-        )}
+        <FilterSheet
+          open={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          filters={filterConfig}
+          values={filterValues}
+          competitionFilters={competitionFilters}
+          onApply={handleApplyFilters}
+          loading={loading}
+        />
       </Box>
     </Container>
   );

@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { Card, CardContent, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TableSortLabel, Tooltip, TablePagination } from '@mui/material';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as RechartsTooltip, 
-  Legend, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
   ResponsiveContainer,
   Label
 } from 'recharts';
+import { spacing, colors, borderRadius } from '../theme/designSystem';
 
-const OverCombinationsChart = ({ stats }) => {
+const OverCombinationsChart = ({ stats, isMobile = false, wrapInCard = true }) => {
   const [orderBy, setOrderBy] = useState('percentage');
   const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(0);
@@ -87,9 +88,15 @@ const OverCombinationsChart = ({ stats }) => {
     setPage(0);
   };
 
-  return (
-    <Card>
-      <CardContent>
+  const chartHeight = isMobile ? 220 : 280;
+
+  const content = (
+    <Card sx={{
+      borderRadius: `${borderRadius.base}px`,
+      border: `1px solid ${colors.neutral[200]}`,
+      backgroundColor: colors.neutral[0]
+    }}>
+      <CardContent sx={{ p: `${isMobile ? spacing.base : spacing.lg}px` }}>
         <Typography variant="h6" gutterBottom>
           Over Combination Performance
         </Typography>
@@ -212,6 +219,12 @@ const OverCombinationsChart = ({ stats }) => {
       </CardContent>
     </Card>
   );
+
+  if (!wrapInCard) {
+    return <Box>{content}</Box>;
+  }
+
+  return content;
 };
 
 export default OverCombinationsChart;
