@@ -49,17 +49,26 @@ const BowlerProfileLoadingState = ({ isMobile = false }) => {
         {renderVisualizationSkeleton('Over Combinations')}
       </Section>
 
-      {/* Innings Details Section */}
+      {/* Shot Analysis Section */}
       <Section
-        title="Innings Details"
-        subtitle="Complete breakdown of individual bowling performances"
+        title="Shot Analysis"
+        subtitle="Where the bowler was hit and pitch map distribution"
+        isMobile={isMobile}
+        columns={{ xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }}
+      >
+        {renderVisualizationSkeleton()}
+        {renderVisualizationSkeleton()}
+      </Section>
+
+      {/* Performance Timeline Section */}
+      <Section
+        title="Performance Timeline"
+        subtitle="Fantasy points contribution over time"
         isMobile={isMobile}
         columns="1fr"
       >
-        <VisualizationCard title="Bowling Innings" isMobile={isMobile}>
-          <Box sx={{ pt: `${spacing.base}px` }}>
-            <MuiSkeleton variant="rectangular" height={400} sx={{ borderRadius: `${borderRadius.base}px` }} />
-          </Box>
+        <VisualizationCard title="Contribution Timeline" isMobile={isMobile}>
+          {renderChartSkeleton()}
         </VisualizationCard>
       </Section>
     </Box>

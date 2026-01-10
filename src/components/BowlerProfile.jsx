@@ -19,7 +19,9 @@ import WicketDistribution from './WicketDistribution';
 import OverEconomyChart from './OverEconomyChart';
 import OverCombinationsChart from './OverCombinationsChart';
 import FrequentOversChart from './FrequentOversChart';
-import BowlingInningsTable from './BowlingInningsTable';
+import ContributionGraph from './ContributionGraph';
+import BowlerWagonWheel from './BowlerWagonWheel';
+import BowlerPitchMap from './BowlerPitchMap';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
 import { getBowlerContextualQueries } from '../utils/queryBuilderLinks';
 import config from '../config';
@@ -504,13 +506,52 @@ const BowlerProfile = () => {
                 </Section>
 
                 <Section
-                  title="Innings Details"
-                  subtitle="Complete breakdown of individual bowling performances"
+                  title="Shot Analysis"
+                  subtitle="Where the bowler was hit and pitch map distribution"
+                  isMobile={isMobile}
+                  columns={{ xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }}
+                >
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Wagon wheel showing where bowler was hit">
+                    <BowlerWagonWheel
+                      playerName={selectedPlayer}
+                      startDate={dateRange.start}
+                      endDate={dateRange.end}
+                      venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                      leagues={competitionFilters.leagues}
+                      includeInternational={competitionFilters.international}
+                      topTeams={competitionFilters.topTeams}
+                      isMobile={isMobile}
+                      wrapInCard={false}
+                    />
+                  </VisualizationCard>
+                  <VisualizationCard isMobile={isMobile} ariaLabel="Pitch map distribution for bowler">
+                    <BowlerPitchMap
+                      playerName={selectedPlayer}
+                      startDate={dateRange.start}
+                      endDate={dateRange.end}
+                      venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                      leagues={competitionFilters.leagues}
+                      includeInternational={competitionFilters.international}
+                      topTeams={competitionFilters.topTeams}
+                      isMobile={isMobile}
+                      wrapInCard={false}
+                    />
+                  </VisualizationCard>
+                </Section>
+
+                <Section
+                  title="Performance Timeline"
+                  subtitle="Fantasy points contribution over time"
                   isMobile={isMobile}
                   columns="1fr"
                 >
-                  <VisualizationCard title="Bowling Innings" isMobile={isMobile}>
-                    <BowlingInningsTable stats={stats} isMobile={isMobile} wrapInCard={false} />
+                  <VisualizationCard title="Contribution Timeline" isMobile={isMobile}>
+                    <ContributionGraph
+                      innings={stats.innings || []}
+                      mode="bowler"
+                      dateRange={dateRange}
+                      isMobile={isMobile}
+                    />
                   </VisualizationCard>
                 </Section>
               </Box>
