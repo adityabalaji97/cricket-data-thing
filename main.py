@@ -726,7 +726,7 @@ def get_venue_stats(
             # Expand league abbreviations to include full names
             params["leagues"] = expand_league_abbreviations(leagues)
             competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
-            
+
         if include_international:
             if top_teams:
                 params["top_team_list"] = INTERNATIONAL_TEAMS_RANKED[:top_teams]
@@ -735,8 +735,15 @@ def get_venue_stats(
                 )
             else:
                 competition_conditions.append("(m.match_type = 'international')")
-                
-        competition_filter = " AND (" + " OR ".join(competition_conditions) + ")" if competition_conditions else " AND false"
+
+        # If no leagues selected and no international, include all leagues (empty filter = all data)
+        if competition_conditions:
+            competition_filter = " AND (" + " OR ".join(competition_conditions) + ")"
+        elif not leagues and not include_international:
+            # No filters = include all leagues
+            competition_filter = ""
+        else:
+            competition_filter = " AND false"
         venue_filter = "AND m.venue = :venue" if venue != "All Venues" else ""
 
         # Modified team mapping part of the query

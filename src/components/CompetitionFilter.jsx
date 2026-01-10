@@ -57,21 +57,21 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
     useEffect(() => {
         if (!leagues.length) return;
 
-        const resolvedFilters = value?.leagues?.length
-            ? value
-            : {
-                leagues: leagues.map((league) => league.value),
-                international: value?.international ?? false,
-                topTeams: value?.topTeams ?? 10,
-            };
-
+        // When "All Leagues" is selected (empty array or all leagues), send empty array to backend
+        // This prevents the URL from becoming too long with 50+ league parameters
         const allLeagueValues = leagues.map((league) => league.value);
-        const includesAll =
-            resolvedFilters.leagues.length === allLeagueValues.length &&
-            resolvedFilters.leagues.every((league) => allLeagueValues.includes(league));
+        const isAllLeagues = !value?.leagues?.length ||
+            (value.leagues.length === allLeagueValues.length &&
+             value.leagues.every((league) => allLeagueValues.includes(league)));
+
+        const resolvedFilters = {
+            leagues: isAllLeagues ? [] : value.leagues,
+            international: value?.international ?? false,
+            topTeams: value?.topTeams ?? 10,
+        };
 
         const optionsByValue = new Map(leagues.map((league) => [league.value, league]));
-        const nextSelectedLeagues = includesAll
+        const nextSelectedLeagues = isAllLeagues
             ? [buildAllLeaguesOption()]
             : resolvedFilters.leagues
                   .map((league) => optionsByValue.get(league))
@@ -90,10 +90,11 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
     const handleSelectionChange = (newLeagues, newInternational, newTopTeams) => {
         // Check if "All Leagues" is selected
         const hasAllLeagues = newLeagues?.some(league => league.value === 'all');
-        
-        // If "All Leagues" is selected, include all available leagues
-        const leaguesToSend = hasAllLeagues 
-            ? leagues.map(league => league.value)
+
+        // If "All Leagues" is selected, send empty array (backend interprets as all leagues)
+        // This prevents the URL from becoming too long with 50+ league parameters
+        const leaguesToSend = hasAllLeagues
+            ? []
             : (newLeagues?.map(league => league.value) || []);
 
         onFilterChange({

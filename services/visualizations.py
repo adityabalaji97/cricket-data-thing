@@ -433,3 +433,300 @@ def get_pitch_map_data(
     except Exception as e:
         logger.error(f"Error fetching pitch map data: {str(e)}")
         raise Exception(f"Failed to fetch pitch map data: {str(e)}")
+
+
+def get_bowler_wagon_wheel_data(
+    db: Session,
+    bowler: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    venue: Optional[str] = None,
+    leagues: List[str] = None,
+    include_international: bool = False,
+    top_teams: Optional[int] = None,
+    phase: Optional[str] = None,
+    line: Optional[str] = None,
+    length: Optional[str] = None,
+    shot: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Get wagon wheel data for a bowler - shows where the bowler was hit.
+
+    Args:
+        db: Database session
+        bowler: Name of the bowler
+        Other args same as batter version
+
+    Returns:
+        List of deliveries with wagon coordinates and metadata
+    """
+    try:
+        logger.info(f"Fetching bowler wagon wheel data for {bowler}")
+
+        # Resolve player name variations
+        bowler_names = get_player_name_for_delivery_details(db, bowler)
+        logger.info(f"Resolved bowler names: {bowler_names}")
+
+        # Build WHERE conditions - query by bowler (dd.bowl)
+        conditions = ["dd.bowl = ANY(:bowler_names)", "dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"]
+        params = {"bowler_names": bowler_names}
+
+        if start_date:
+            conditions.append("dd.match_date >= :start_date")
+            params["start_date"] = str(start_date)
+
+        if end_date:
+            conditions.append("dd.match_date <= :end_date")
+            params["end_date"] = str(end_date)
+
+        if venue:
+            conditions.append("dd.ground = :venue")
+            params["venue"] = venue
+
+        # League/competition filters
+        if leagues or include_international:
+            comp_conditions = []
+            if leagues:
+                expanded_leagues = expand_league_abbreviations(leagues)
+                comp_conditions.append("dd.competition = ANY(:leagues)")
+                params["leagues"] = expanded_leagues
+
+            if include_international:
+                if top_teams:
+                    from models import INTERNATIONAL_TEAMS_RANKED
+                    top_team_names = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+                    team_placeholders = ", ".join([f":team_{i}" for i in range(len(top_team_names))])
+                    comp_conditions.append(f"""(
+                        dd.competition LIKE '%International%'
+                        AND (dd.team_bat IN ({team_placeholders}) OR dd.team_bowl IN ({team_placeholders}))
+                    )""")
+                    for i, team in enumerate(top_team_names):
+                        params[f"team_{i}"] = team
+                else:
+                    comp_conditions.append("dd.competition LIKE '%International%'")
+
+            if comp_conditions:
+                conditions.append(f"({' OR '.join(comp_conditions)})")
+
+        # Phase filter
+        if phase and phase != "overall":
+            if phase == "powerplay":
+                conditions.append("dd.over BETWEEN 0 AND 5")
+            elif phase == "middle":
+                conditions.append("dd.over BETWEEN 6 AND 14")
+            elif phase == "death":
+                conditions.append("dd.over >= 15")
+
+        # Ball delivery filters
+        if line:
+            conditions.append("dd.line = :line")
+            params["line"] = line
+
+        if length:
+            conditions.append("dd.length = :length")
+            params["length"] = length
+
+        if shot:
+            conditions.append("dd.shot = :shot")
+            params["shot"] = shot
+
+        where_clause = " AND ".join(conditions)
+
+        query = text(f"""
+            SELECT
+                dd.wagon_x,
+                dd.wagon_y,
+                dd.wagon_zone,
+                dd.score as runs,
+                dd.shot,
+                dd.line,
+                dd.length,
+                dd.bowl_kind,
+                dd.bowl_style,
+                dd.bat as batter,
+                dd.over,
+                dd.p_match as match_id,
+                dd.match_date as date,
+                dd.ground as venue,
+                dd.competition,
+                CASE
+                    WHEN dd.over BETWEEN 0 AND 5 THEN 'powerplay'
+                    WHEN dd.over BETWEEN 6 AND 14 THEN 'middle'
+                    ELSE 'death'
+                END as phase
+            FROM delivery_details dd
+            WHERE {where_clause}
+            ORDER BY dd.date, dd.match_id, dd.over, dd.ball
+        """)
+
+        result = db.execute(query, params).fetchall()
+
+        deliveries = [
+            {
+                "wagon_x": row.wagon_x,
+                "wagon_y": row.wagon_y,
+                "wagon_zone": row.wagon_zone,
+                "runs": row.runs,
+                "shot": row.shot,
+                "line": row.line,
+                "length": row.length,
+                "bowl_kind": row.bowl_kind,
+                "bowl_style": row.bowl_style,
+                "batter": row.batter,
+                "over": row.over,
+                "phase": row.phase,
+                "match_id": row.match_id,
+                "date": str(row.date) if row.date else None,
+                "venue": row.venue,
+                "competition": row.competition,
+            }
+            for row in result
+        ]
+
+        logger.info(f"Found {len(deliveries)} deliveries with wagon wheel data for bowler {bowler}")
+        return deliveries
+
+    except Exception as e:
+        logger.error(f"Error fetching bowler wagon wheel data: {str(e)}")
+        raise Exception(f"Failed to fetch bowler wagon wheel data: {str(e)}")
+
+
+def get_bowler_pitch_map_data(
+    db: Session,
+    bowler: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    venue: Optional[str] = None,
+    leagues: List[str] = None,
+    include_international: bool = False,
+    top_teams: Optional[int] = None,
+    phase: Optional[str] = None,
+    line: Optional[str] = None,
+    length: Optional[str] = None,
+    shot: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Get pitch map data for a bowler - shows where they bowled and results.
+
+    Args:
+        Same as get_bowler_wagon_wheel_data
+
+    Returns:
+        List of pitch map cells with aggregated statistics (economy-focused)
+    """
+    try:
+        logger.info(f"Fetching bowler pitch map data for {bowler}")
+
+        # Resolve player name variations
+        bowler_names = get_player_name_for_delivery_details(db, bowler)
+        logger.info(f"Resolved bowler names: {bowler_names}")
+
+        # Build WHERE conditions
+        conditions = ["dd.bowl = ANY(:bowler_names)", "dd.line IS NOT NULL", "dd.length IS NOT NULL"]
+        params = {"bowler_names": bowler_names}
+
+        if start_date:
+            conditions.append("dd.match_date >= :start_date")
+            params["start_date"] = str(start_date)
+
+        if end_date:
+            conditions.append("dd.match_date <= :end_date")
+            params["end_date"] = str(end_date)
+
+        if venue:
+            conditions.append("dd.ground = :venue")
+            params["venue"] = venue
+
+        # League/competition filters
+        if leagues or include_international:
+            comp_conditions = []
+            if leagues:
+                expanded_leagues = expand_league_abbreviations(leagues)
+                comp_conditions.append("dd.competition = ANY(:leagues)")
+                params["leagues"] = expanded_leagues
+
+            if include_international:
+                if top_teams:
+                    from models import INTERNATIONAL_TEAMS_RANKED
+                    top_team_names = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+                    team_placeholders = ", ".join([f":team_{i}" for i in range(len(top_team_names))])
+                    comp_conditions.append(f"""(
+                        dd.competition LIKE '%International%'
+                        AND (dd.team_bat IN ({team_placeholders}) OR dd.team_bowl IN ({team_placeholders}))
+                    )""")
+                    for i, team in enumerate(top_team_names):
+                        params[f"team_{i}"] = team
+                else:
+                    comp_conditions.append("dd.competition LIKE '%International%'")
+
+            if comp_conditions:
+                conditions.append(f"({' OR '.join(comp_conditions)})")
+
+        # Phase filter
+        if phase and phase != "overall":
+            if phase == "powerplay":
+                conditions.append("dd.over BETWEEN 0 AND 5")
+            elif phase == "middle":
+                conditions.append("dd.over BETWEEN 6 AND 14")
+            elif phase == "death":
+                conditions.append("dd.over >= 15")
+
+        # Ball delivery filters
+        if line:
+            conditions.append("dd.line = :line")
+            params["line"] = line
+
+        if length:
+            conditions.append("dd.length = :length")
+            params["length"] = length
+
+        if shot:
+            conditions.append("dd.shot = :shot")
+            params["shot"] = shot
+
+        where_clause = " AND ".join(conditions)
+
+        query = text(f"""
+            SELECT
+                dd.line,
+                dd.length,
+                COUNT(*) as balls,
+                SUM(dd.score) as runs,
+                SUM(CASE WHEN dd.out = 'True' THEN 1 ELSE 0 END) as wickets,
+                SUM(CASE WHEN dd.score = 0 THEN 1 ELSE 0 END) as dots,
+                SUM(CASE WHEN dd.score = 4 THEN 1 ELSE 0 END) as fours,
+                SUM(CASE WHEN dd.score = 6 THEN 1 ELSE 0 END) as sixes,
+                CAST(SUM(dd.score) AS FLOAT) * 6.0 / COUNT(*) as economy,
+                CAST(SUM(CASE WHEN dd.score = 0 THEN 1 ELSE 0 END) AS FLOAT) * 100.0 / COUNT(*) as dot_percentage,
+                CAST(SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) AS FLOAT) * 100.0 / COUNT(*) as boundary_percentage
+            FROM delivery_details dd
+            WHERE {where_clause}
+            GROUP BY dd.line, dd.length
+            ORDER BY dd.line, dd.length
+        """)
+
+        result = db.execute(query, params).fetchall()
+
+        cells = [
+            {
+                "line": row.line,
+                "length": row.length,
+                "balls": row.balls,
+                "runs": row.runs,
+                "wickets": row.wickets,
+                "dots": row.dots,
+                "fours": row.fours,
+                "sixes": row.sixes,
+                "economy": float(row.economy) if row.economy else 0,
+                "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0,
+                "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0,
+            }
+            for row in result
+        ]
+
+        logger.info(f"Found {len(cells)} pitch map cells for bowler {bowler}")
+        return cells
+
+    except Exception as e:
+        logger.error(f"Error fetching bowler pitch map data: {str(e)}")
+        raise Exception(f"Failed to fetch bowler pitch map data: {str(e)}")
