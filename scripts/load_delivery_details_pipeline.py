@@ -166,19 +166,36 @@ def step_update_players(db_url, dry_run=False):
 def step_refresh_metadata(db_url, dry_run=False):
     """Step 5: Refresh query builder metadata."""
     print_header("STEP 5: REFRESH METADATA")
-    
+
     if dry_run:
         print("[DRY RUN] Would refresh query_builder_metadata table")
         return
-    
+
     from sqlalchemy import create_engine
     from refresh_query_builder_metadata import refresh_metadata, show_metadata
-    
+
     engine = create_engine(db_url)
     refresh_metadata(engine)
     show_metadata(engine)
-    
+
     print(f"\n✓ Metadata refresh complete")
+
+
+def step_sync_stats(dry_run=False, skip_elo=False):
+    """Step 6: Sync matches and batting/bowling stats from delivery_details."""
+    print_header("STEP 6: SYNC MATCHES & STATS")
+
+    from run_full_dd_sync import run_sync_pipeline
+
+    results = run_sync_pipeline(
+        confirm=True,  # Don't prompt, just run
+        limit=None,
+        skip_elo=skip_elo,
+        dry_run=dry_run
+    )
+
+    print(f"\n✓ Sync complete")
+    return results
 
 
 def main():
@@ -192,6 +209,7 @@ Steps:
   3. Populate non_striker and crease_combo columns
   4. Update players table with bat_hand/bowl_style
   5. Refresh query builder metadata
+  6. Sync matches & batting/bowling stats from delivery_details
 
 Examples:
   # Dry run (no changes)
@@ -199,6 +217,9 @@ Examples:
 
   # Full execution
   python scripts/load_delivery_details_pipeline.py --csv data.csv --db-url "postgres://..."
+
+  # Skip ELO calculation (faster)
+  python scripts/load_delivery_details_pipeline.py --csv data.csv --db-url "postgres://..." --skip-elo
         """
     )
     parser.add_argument('--csv', required=True, help='Path to t20_bbb.csv')
@@ -209,6 +230,8 @@ Examples:
     parser.add_argument('--skip-columns', action='store_true', help='Skip the column population step')
     parser.add_argument('--skip-players', action='store_true', help='Skip the players update step')
     parser.add_argument('--skip-metadata', action='store_true', help='Skip the metadata refresh step')
+    parser.add_argument('--skip-sync', action='store_true', help='Skip the matches/stats sync step')
+    parser.add_argument('--skip-elo', action='store_true', help='Skip ELO calculation in sync step')
     args = parser.parse_args()
     
     # Validate inputs
@@ -264,7 +287,13 @@ Examples:
             step_refresh_metadata(db_url, dry_run=args.dry_run)
         else:
             print("\n[SKIPPED] Step 5: Refresh Metadata")
-        
+
+        # Step 6: Sync matches & stats
+        if not args.skip_sync:
+            step_sync_stats(dry_run=args.dry_run, skip_elo=args.skip_elo)
+        else:
+            print("\n[SKIPPED] Step 6: Sync Matches & Stats")
+
         # Final summary
         elapsed = (datetime.now() - start_time).total_seconds()
         print("\n" + "=" * 70)

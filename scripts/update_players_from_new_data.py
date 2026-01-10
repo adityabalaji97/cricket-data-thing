@@ -148,71 +148,130 @@ def build_player_mapping(engine):
 
 
 def update_players(engine, batters, bowlers, dry_run=False):
-    """Update players table."""
-    
+    """Update players table using batch operations for speed."""
+
     print("\n" + "="*60)
     print("UPDATING PLAYERS TABLE")
     print("="*60)
-    
-    updates = []
-    
+
+    # Build update data
+    batter_updates = []  # [(name, batter_type), ...]
+    bowler_updates = []  # [(name, bowler_type), ...]
+    alias_inserts = []   # [(player_name, alias_name), ...]
+
     all_players = set(batters.keys()) | set(bowlers.keys())
-    
+
     for name in all_players:
-        update = {'name': name, 'aliases': set()}
-        
         if name in batters:
-            update['aliases'] |= batters[name]['aliases']
             hands = batters[name]['bat_hands']
             if hands:
-                update['batter_type'] = list(hands)[0]
-        
+                batter_updates.append({'name': name, 'batter_type': list(hands)[0]})
+            for alias in batters[name]['aliases']:
+                if alias != name:
+                    alias_inserts.append({'player_name': name, 'alias_name': alias})
+
         if name in bowlers:
-            update['aliases'] |= bowlers[name]['aliases']
             styles = bowlers[name]['bowl_styles']
             if styles:
-                update['bowler_type'] = list(styles)[0]
-        
-        updates.append(update)
-    
-    print(f"Prepared {len(updates):,} player updates")
-    
+                bowler_updates.append({'name': name, 'bowler_type': list(styles)[0]})
+            for alias in bowlers[name]['aliases']:
+                if alias != name:
+                    alias_inserts.append({'player_name': name, 'alias_name': alias})
+
+    # Dedupe aliases
+    seen_aliases = set()
+    unique_aliases = []
+    for a in alias_inserts:
+        key = (a['player_name'], a['alias_name'])
+        if key not in seen_aliases:
+            seen_aliases.add(key)
+            unique_aliases.append(a)
+    alias_inserts = unique_aliases
+
+    print(f"Prepared {len(batter_updates):,} batter updates, {len(bowler_updates):,} bowler updates, {len(alias_inserts):,} aliases")
+
     if dry_run:
-        print("\n[DRY RUN] Sample updates:")
-        for u in updates[:15]:
-            print(f"  {u['name']}: bat={u.get('batter_type')}, bowl={u.get('bowler_type')}, aliases={list(u['aliases'])[:2]}")
+        print("\n[DRY RUN] Sample batter updates:")
+        for u in batter_updates[:5]:
+            print(f"  {u['name']}: {u['batter_type']}")
+        print("\n[DRY RUN] Sample bowler updates:")
+        for u in bowler_updates[:5]:
+            print(f"  {u['name']}: {u['bowler_type']}")
+        print("\n[DRY RUN] Sample aliases:")
+        for a in alias_inserts[:5]:
+            print(f"  {a['player_name']} → {a['alias_name']}")
         return
-    
-    updated = 0
-    aliases_added = 0
-    
+
     with engine.begin() as conn:
-        for u in updates:
-            if u.get('batter_type'):
-                conn.execute(text(
-                    "UPDATE players SET batter_type = :bt WHERE name = :name"
-                ), {'bt': u['batter_type'], 'name': u['name']})
-            
-            if u.get('bowler_type'):
-                conn.execute(text(
-                    "UPDATE players SET bowler_type = :bs WHERE name = :name"
-                ), {'bs': u['bowler_type'], 'name': u['name']})
-            
-            updated += 1
-            
-            for alias in u['aliases']:
-                if alias != u['name']:
-                    conn.execute(text("""
-                        INSERT INTO player_aliases (player_name, alias_name)
-                        VALUES (:pn, :an)
-                        ON CONFLICT (player_name, alias_name) DO NOTHING
-                    """), {'pn': u['name'], 'an': alias})
-                    aliases_added += 1
-            
-            if updated % 500 == 0:
-                print(f"  Updated {updated:,}...", end='\r')
-    
-    print(f"\n✓ Updated {updated:,} players, added {aliases_added:,} aliases")
+        # Batch update batter_type using temp table
+        if batter_updates:
+            print(f"  Updating {len(batter_updates):,} batter types...")
+            conn.execute(text("CREATE TEMP TABLE tmp_batter_updates (name VARCHAR, batter_type VARCHAR)"))
+
+            # Insert in batches of 1000
+            batch_size = 1000
+            for i in range(0, len(batter_updates), batch_size):
+                batch = batter_updates[i:i+batch_size]
+                values = ", ".join([f"(:n{j}, :bt{j})" for j in range(len(batch))])
+                params = {}
+                for j, u in enumerate(batch):
+                    params[f'n{j}'] = u['name']
+                    params[f'bt{j}'] = u['batter_type']
+                conn.execute(text(f"INSERT INTO tmp_batter_updates VALUES {values}"), params)
+
+            result = conn.execute(text("""
+                UPDATE players p
+                SET batter_type = t.batter_type
+                FROM tmp_batter_updates t
+                WHERE p.name = t.name
+            """))
+            print(f"    ✓ Updated {result.rowcount:,} batter types")
+            conn.execute(text("DROP TABLE tmp_batter_updates"))
+
+        # Batch update bowler_type using temp table
+        if bowler_updates:
+            print(f"  Updating {len(bowler_updates):,} bowler types...")
+            conn.execute(text("CREATE TEMP TABLE tmp_bowler_updates (name VARCHAR, bowler_type VARCHAR)"))
+
+            for i in range(0, len(bowler_updates), batch_size):
+                batch = bowler_updates[i:i+batch_size]
+                values = ", ".join([f"(:n{j}, :bs{j})" for j in range(len(batch))])
+                params = {}
+                for j, u in enumerate(batch):
+                    params[f'n{j}'] = u['name']
+                    params[f'bs{j}'] = u['bowler_type']
+                conn.execute(text(f"INSERT INTO tmp_bowler_updates VALUES {values}"), params)
+
+            result = conn.execute(text("""
+                UPDATE players p
+                SET bowler_type = t.bowler_type
+                FROM tmp_bowler_updates t
+                WHERE p.name = t.name
+            """))
+            print(f"    ✓ Updated {result.rowcount:,} bowler types")
+            conn.execute(text("DROP TABLE tmp_bowler_updates"))
+
+        # Batch insert aliases
+        if alias_inserts:
+            print(f"  Inserting {len(alias_inserts):,} aliases...")
+            inserted = 0
+            for i in range(0, len(alias_inserts), batch_size):
+                batch = alias_inserts[i:i+batch_size]
+                values = ", ".join([f"(:pn{j}, :an{j})" for j in range(len(batch))])
+                params = {}
+                for j, a in enumerate(batch):
+                    params[f'pn{j}'] = a['player_name']
+                    params[f'an{j}'] = a['alias_name']
+                conn.execute(text(f"""
+                    INSERT INTO player_aliases (player_name, alias_name)
+                    VALUES {values}
+                    ON CONFLICT (player_name, alias_name) DO NOTHING
+                """), params)
+                inserted += len(batch)
+                print(f"    Inserted {inserted:,}/{len(alias_inserts):,}...", end='\r')
+            print(f"\n    ✓ Inserted aliases")
+
+    print(f"\n✓ Batch updates complete")
 
 
 def print_summary(engine):

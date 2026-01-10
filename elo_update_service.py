@@ -185,97 +185,134 @@ class ELOUpdateService:
     
     def _load_existing_team_ratings(self, session: Session, before_date: datetime) -> None:
         """
-        Load existing team ratings from matches before a specific date
-        
+        Load existing team ratings from matches before a specific date.
+        Optimized to use a single query with window functions.
+
         Args:
             session: Database session
             before_date: Date before which to load ratings
         """
         logger.info(f"Loading existing team ratings before {before_date}...")
-        
-        # Simplified approach: Get the latest ELO ratings for each team
-        # This gets the most recent match before our cutoff date for each team
-        team_ratings = {}
-        
-        # Get all teams that have matches before the cutoff date with ELO data
-        teams_query = session.execute(text("""
-            SELECT DISTINCT team1 as team FROM matches 
-            WHERE date < :before_date AND team1_elo IS NOT NULL
-            UNION 
-            SELECT DISTINCT team2 as team FROM matches 
-            WHERE date < :before_date AND team2_elo IS NOT NULL
-        """), {'before_date': before_date}).fetchall()
-        
-        teams = [row.team for row in teams_query]
-        logger.info(f"Found {len(teams)} teams with ELO history before {before_date}")
-        
-        loaded_count = 0
-        for team in teams:
-            # Get the most recent match for this team before cutoff
-            latest_match = session.execute(text("""
-                SELECT date, team1, team2, team1_elo, team2_elo, winner, match_type
-                FROM matches 
-                WHERE (team1 = :team OR team2 = :team) 
-                AND date < :before_date 
+
+        # Single query to get the latest match for each team with ELO data
+        # Uses window functions to find the most recent match per team
+        latest_matches_query = text("""
+            WITH team_matches AS (
+                -- Get all team appearances with their ELO data
+                SELECT
+                    team1 as team,
+                    date,
+                    team1_elo as team_elo,
+                    team2_elo as opponent_elo,
+                    winner,
+                    ROW_NUMBER() OVER (PARTITION BY team1 ORDER BY date DESC, id DESC) as rn
+                FROM matches
+                WHERE date < :before_date
                 AND team1_elo IS NOT NULL AND team2_elo IS NOT NULL
-                ORDER BY date DESC, id DESC
-                LIMIT 1
-            """), {'team': team, 'before_date': before_date}).fetchone()
-            
-            if latest_match:
-                # Calculate what the team's ELO would be AFTER this match
-                if latest_match.team1 == team:
-                    pre_match_elo = latest_match.team1_elo
-                    opponent_elo = latest_match.team2_elo
-                else:
-                    pre_match_elo = latest_match.team2_elo
-                    opponent_elo = latest_match.team1_elo
-                
-                # Calculate the post-match ELO (what we want to start with)
-                expected_score = 1 / (1 + 10**((opponent_elo - pre_match_elo) / 400))
-                
-                if latest_match.winner == team:
-                    actual_score = 1.0
-                elif latest_match.winner is None:
-                    actual_score = 0.5
-                else:
-                    actual_score = 0.0
-                
-                elo_change = round(32 * (actual_score - expected_score))
-                post_match_elo = pre_match_elo + elo_change
-                
-                # Store in calculator using normalized name
-                normalized_name = normalize_team_name(team)
-                self.elo_calculator.team_ratings[normalized_name] = post_match_elo
-                loaded_count += 1
-                
-                if loaded_count <= 10:
-                    logger.info(f"Loaded: {team} -> {post_match_elo} (from {latest_match.date})")
-        
+
+                UNION ALL
+
+                SELECT
+                    team2 as team,
+                    date,
+                    team2_elo as team_elo,
+                    team1_elo as opponent_elo,
+                    winner,
+                    ROW_NUMBER() OVER (PARTITION BY team2 ORDER BY date DESC, id DESC) as rn
+                FROM matches
+                WHERE date < :before_date
+                AND team1_elo IS NOT NULL AND team2_elo IS NOT NULL
+            ),
+            latest_per_team AS (
+                SELECT team, date, team_elo, opponent_elo, winner,
+                       ROW_NUMBER() OVER (PARTITION BY team ORDER BY date DESC) as final_rn
+                FROM team_matches
+                WHERE rn = 1
+            )
+            SELECT team, date, team_elo, opponent_elo, winner
+            FROM latest_per_team
+            WHERE final_rn = 1
+        """)
+
+        results = session.execute(latest_matches_query, {'before_date': before_date}).fetchall()
+        logger.info(f"Found {len(results)} teams with ELO history before {before_date}")
+
+        loaded_count = 0
+        for row in results:
+            team, match_date, pre_match_elo, opponent_elo, winner = row
+
+            # Calculate the post-match ELO (what we want to start with)
+            expected_score = 1 / (1 + 10**((opponent_elo - pre_match_elo) / 400))
+
+            if winner == team:
+                actual_score = 1.0
+            elif winner is None or winner == '-':
+                actual_score = 0.5
+            else:
+                actual_score = 0.0
+
+            elo_change = round(32 * (actual_score - expected_score))
+            post_match_elo = pre_match_elo + elo_change
+
+            # Store in calculator using normalized name
+            normalized_name = normalize_team_name(team)
+            self.elo_calculator.team_ratings[normalized_name] = post_match_elo
+            loaded_count += 1
+
+            if loaded_count <= 10:
+                logger.info(f"Loaded: {team} -> {post_match_elo} (from {match_date})")
+
         logger.info(f"Successfully loaded {loaded_count} existing team ratings")
         if loaded_count > 10:
             logger.info("... (showing first 10 for brevity)")
         
     def _commit_elo_updates(self, session: Session, updates: List[Dict]) -> int:
         """
-        Commit ELO updates to database using bulk update
-        
+        Commit ELO updates to database using batch update with temp table.
+
         Args:
             session: Database session
             updates: List of update dictionaries
-            
+
         Returns:
             Number of rows updated
         """
+        if not updates:
+            return 0
+
         try:
-            # Use bulk update for performance
-            for update in updates:
-                session.execute(
-                    text("UPDATE matches SET team1_elo = :team1_elo, team2_elo = :team2_elo WHERE id = :match_id"),
-                    update
+            # Create temp table for batch update
+            session.execute(text("""
+                CREATE TEMP TABLE IF NOT EXISTS tmp_elo_updates (
+                    match_id VARCHAR PRIMARY KEY,
+                    team1_elo INTEGER,
+                    team2_elo INTEGER
                 )
+            """))
+            session.execute(text("TRUNCATE tmp_elo_updates"))
+
+            # Batch insert into temp table (chunks of 500)
+            batch_size = 500
+            for i in range(0, len(updates), batch_size):
+                batch = updates[i:i+batch_size]
+                values = ", ".join([f"(:mid{j}, :t1e{j}, :t2e{j})" for j in range(len(batch))])
+                params = {}
+                for j, u in enumerate(batch):
+                    params[f'mid{j}'] = u['match_id']
+                    params[f't1e{j}'] = u['team1_elo']
+                    params[f't2e{j}'] = u['team2_elo']
+                session.execute(text(f"INSERT INTO tmp_elo_updates VALUES {values}"), params)
+
+            # Single UPDATE using JOIN
+            result = session.execute(text("""
+                UPDATE matches m
+                SET team1_elo = t.team1_elo, team2_elo = t.team2_elo
+                FROM tmp_elo_updates t
+                WHERE m.id = t.match_id
+            """))
+
             session.commit()
-            return len(updates)
+            return result.rowcount
         except Exception as e:
             session.rollback()
             logger.error(f"Error committing ELO updates: {e}")
