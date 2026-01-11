@@ -145,6 +145,22 @@ export const METRICS = {
     format: (v) => v != null ? v.toFixed(1) + '%' : '-',
     colorScale: 'ascending',
     range: [50, 95]
+  },
+  economy: {
+    key: 'economy',
+    label: 'Economy',
+    shortLabel: 'Econ',
+    format: (v) => v?.toFixed(2) ?? '-',
+    colorScale: 'descending',
+    range: [4, 12]
+  },
+  bowling_average: {
+    key: 'bowling_average',
+    label: 'Bowling Average',
+    shortLabel: 'Avg',
+    format: (v) => v?.toFixed(1) ?? '-',
+    colorScale: 'descending',
+    range: [10, 60]
   }
 };
 

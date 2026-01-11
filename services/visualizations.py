@@ -717,6 +717,7 @@ def get_bowler_pitch_map_data(
                 "dots": row.dots,
                 "fours": row.fours,
                 "sixes": row.sixes,
+                "bowling_average": float(row.runs) / float(row.wickets) if row.wickets else None,
                 "economy": float(row.economy) if row.economy else 0,
                 "dot_percentage": float(row.dot_percentage) if row.dot_percentage else 0,
                 "boundary_percentage": float(row.boundary_percentage) if row.boundary_percentage else 0,

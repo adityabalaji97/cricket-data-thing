@@ -449,9 +449,9 @@ def detect_bowler_patterns(stats: Dict[str, Any], db=None, filters: dict = None)
             "matches": overall.get("matches", 0),
             "total_wickets": overall.get("wickets", 0),
             "total_overs": overall.get("overs", 0),
-            "overall_economy": overall.get("economy", 0),
-            "overall_average": overall.get("average", 0),
-            "overall_strike_rate": overall.get("strike_rate", 0),
+            "overall_economy": overall.get("economy", overall.get("economy_rate", 0)),
+            "overall_average": overall.get("average", overall.get("bowling_average", 0)),
+            "overall_strike_rate": overall.get("strike_rate", overall.get("bowling_strike_rate", 0)),
             "overall_dot_percentage": overall.get("dot_percentage", 0),
         }
         

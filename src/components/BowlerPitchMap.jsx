@@ -49,6 +49,7 @@ const BowlerPitchMap = ({
   const [line, setLine] = useState('all');
   const [length, setLength] = useState('all');
   const [shot, setShot] = useState('all');
+  const [colorMetric, setColorMetric] = useState('bowling_average');
 
   // Available options from data
   const [availableLines, setAvailableLines] = useState([]);
@@ -161,6 +162,15 @@ const BowlerPitchMap = ({
         { value: 'middle', label: 'Middle' },
         { value: 'death', label: 'Death' }
       ]
+    },
+    {
+      key: 'colorMetric',
+      label: 'Color',
+      defaultValue: 'bowling_average',
+      options: [
+        { value: 'bowling_average', label: 'Avg (lower better)' },
+        { value: 'economy', label: 'Econ (lower better)' }
+      ]
     }
   ];
 
@@ -205,6 +215,7 @@ const BowlerPitchMap = ({
     else if (key === 'line') setLine(value);
     else if (key === 'length') setLength(value);
     else if (key === 'shot') setShot(value);
+    else if (key === 'colorMetric') setColorMetric(value);
   };
 
   return (
@@ -224,7 +235,7 @@ const BowlerPitchMap = ({
         <Box sx={{ flexShrink: 1, minWidth: 0 }}>
           <FilterBar
             filters={filterConfig}
-            activeFilters={{ phase, line, length, shot }}
+            activeFilters={{ phase, line, length, shot, colorMetric }}
             onFilterChange={handleFilterChange}
             isMobile={isCompact}
           />
@@ -248,14 +259,14 @@ const BowlerPitchMap = ({
         <PitchMapVisualization
           cells={pitchData.cells}
           mode="grid"
-          colorMetric="economy"
-          displayMetrics={['economy', 'wickets']}
+          colorMetric={colorMetric}
+          displayMetrics={['bowling_average', 'economy']}
           secondaryMetrics={['dot_percentage', 'boundary_percentage']}
           minBalls={5}
           title={playerName}
           subtitle={`${phase === 'overall' ? 'All Phases' : phase}${line !== 'all' ? ` • ${line}` : ''}${length !== 'all' ? ` • ${length}` : ''}`}
           hideStumps={true}
-          hideLegend={true}
+          hideLegend={false}
           compactMode={isCompact}
         />
       </Box>

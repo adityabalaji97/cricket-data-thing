@@ -81,7 +81,13 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
         setIncludeInternational(resolvedFilters.international);
         setTopTeams(resolvedFilters.topTeams);
 
-        if (!value?.leagues?.length) {
+        const leaguesEqual = Array.isArray(value?.leagues)
+            && value.leagues.length === resolvedFilters.leagues.length
+            && value.leagues.every((league) => resolvedFilters.leagues.includes(league));
+        const internationalEqual = value?.international === resolvedFilters.international;
+        const topTeamsEqual = value?.topTeams === resolvedFilters.topTeams;
+
+        if (!leaguesEqual || !internationalEqual || !topTeamsEqual) {
             onFilterChange(resolvedFilters);
         }
     }, [leagues, value, onFilterChange]);
