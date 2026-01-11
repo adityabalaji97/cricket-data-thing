@@ -373,7 +373,8 @@ const AppContent = () => {
     };
 
     fetchMatchHistory();
-  }, [selectedVenue, selectedTeam1, selectedTeam2, startDate, endDate, showVisualizations, competitions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVenue, selectedTeam1, selectedTeam2, startDate, endDate, showVisualizations]);
 
   // Collapse filters after data has loaded
   useEffect(() => {
