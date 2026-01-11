@@ -345,7 +345,7 @@ class DeliveryDetails(Base):
     
     # Innings state
     inns_runs = Column(Integer)
-    inns_wkts = Column(Integer)
+    inns_wkts = Column(Integer) 
     inns_balls = Column(Integer)
     inns_runs_rem = Column(Integer)
     inns_balls_rem = Column(Integer)
