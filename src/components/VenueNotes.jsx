@@ -619,13 +619,16 @@ const WinPercentagesPie = ({ data }) => {
       );
     };
 
+    // Calculate explicit height for the chart container (chartHeight minus title ~35px and legend ~50px)
+    const chartContainerHeight = chartHeight - 85;
+
     return (
         <Box sx={{ width: '100%', height: chartHeight, display: 'flex', flexDirection: 'column' }}>
             <Typography variant={isMobile ? "body1" : "subtitle1"} align="center" gutterBottom sx={{ fontWeight: 600 }}>
                 Match Results Distribution
             </Typography>
-            <Box sx={{ flex: 1, position: 'relative' }}>
-                <ResponsiveContainer>
+            <Box sx={{ width: '100%', height: chartContainerHeight }}>
+                <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
                             data={pieData}
@@ -747,12 +750,15 @@ const ScoresBarChart = ({ data }) => {
         );
     };
 
+    // Calculate explicit height for the chart container (chartHeight minus title ~35px)
+    const chartContainerHeight = chartHeight - 35;
+
     return (
         <Box sx={{ width: '100%', height: chartHeight, display: 'flex', flexDirection: 'column' }}>
             <Typography variant={isMobile ? "body1" : "subtitle1"} align="center" gutterBottom sx={{ fontWeight: 600 }}>
                 Innings Scores Analysis
             </Typography>
-            <Box sx={{ flex: 1 }}>
+            <Box sx={{ width: '100%', height: chartContainerHeight }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                         data={filteredScoreData}
