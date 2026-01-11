@@ -30,6 +30,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SearchIcon from '@mui/icons-material/Search';
+import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 import config from '../../config';
 import { colors as designColors } from '../../theme/designSystem';
 
@@ -82,6 +83,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
   const [guess, setGuess] = useState('');
   const [guessResult, setGuessResult] = useState(null); // 'correct', 'incorrect', null
   const [revealAnswer, setRevealAnswer] = useState(false);
+  const [showHint, setShowHint] = useState(false);
   const [containerSize, setContainerSize] = useState(320);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -104,10 +106,10 @@ const GuessInningsGame = ({ isMobile = false }) => {
 
   useEffect(() => {
     if (!isPlaying || !data) return;
+    const totalDeliveries = data?.deliveries?.length || 0;
     playTimerRef.current = setInterval(() => {
       setVisibleCount((prev) => {
-        if (!data?.deliveries) return prev;
-        if (prev >= data.deliveries.length) {
+        if (prev >= totalDeliveries) {
           setIsPlaying(false);
           return prev;
         }
@@ -156,13 +158,15 @@ const GuessInningsGame = ({ isMobile = false }) => {
   }, [guess]);
 
   const deliveries = useMemo(() => data?.deliveries || [], [data]);
-  const validDeliveries = useMemo(() =>
-    deliveries.filter(d => d.wagon_x !== null && d.wagon_y !== null && d.wagon_x !== 0 && d.wagon_y !== 0),
-    [deliveries]
-  );
+  // All deliveries up to visibleCount
   const visibleDeliveries = useMemo(() =>
-    validDeliveries.slice(0, visibleCount),
-    [validDeliveries, visibleCount]
+    deliveries.slice(0, visibleCount),
+    [deliveries, visibleCount]
+  );
+  // Only those with valid wagon coordinates for drawing
+  const drawableDeliveries = useMemo(() =>
+    visibleDeliveries.filter(d => d.wagon_x !== null && d.wagon_y !== null && d.wagon_x !== 0 && d.wagon_y !== 0),
+    [visibleDeliveries]
   );
   const answer = data?.answer?.batter || '';
 
@@ -192,6 +196,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
     setLoading(true);
     setError(null);
     setRevealAnswer(false);
+    setShowHint(false);
     setGuess('');
     setGuessResult(null);
     setVisibleCount(0);
@@ -258,7 +263,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
     }
 
     // Find max distance among non-boundary shots for normalization
-    const nonBoundaryDeliveries = validDeliveries.filter(d => d.runs < 4);
+    const nonBoundaryDeliveries = drawableDeliveries.filter(d => d.runs < 4);
     const maxNonBoundaryDistance = Math.max(
       ...nonBoundaryDeliveries.map(d => {
         const dx = d.wagon_x - 150;
@@ -269,7 +274,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
     );
 
     // Delivery lines
-    const deliveryLines = visibleDeliveries.map((delivery, index) => {
+    const deliveryLines = drawableDeliveries.map((delivery, index) => {
       const dx = delivery.wagon_x - 150;
       const dy = delivery.wagon_y - 150;
       const distance = Math.sqrt(dx * dx + dy * dy);
@@ -288,7 +293,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
       const normalizedX = centerX + (dx / distance) * scaledRadius;
       const normalizedY = centerY + (dy / distance) * scaledRadius;
 
-      const isLatest = index === visibleDeliveries.length - 1;
+      const isLatest = index === drawableDeliveries.length - 1;
 
       return (
         <g key={`delivery-${index}`}>
@@ -507,19 +512,19 @@ const GuessInningsGame = ({ isMobile = false }) => {
           {/* Ball counter and Playback Controls */}
           <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
             <Typography variant="caption" sx={{ color: designColors.neutral[500], minWidth: 60 }}>
-              {visibleCount}/{validDeliveries.length}
+              {visibleCount}/{deliveries.length}
             </Typography>
             <IconButton
               onClick={() => setIsPlaying(!isPlaying)}
-              disabled={visibleCount >= validDeliveries.length}
+              disabled={visibleCount >= deliveries.length}
               size="small"
               sx={{ bgcolor: designColors.primary[50] }}
             >
               {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
             </IconButton>
             <IconButton
-              onClick={() => setVisibleCount(prev => Math.min(prev + 1, validDeliveries.length))}
-              disabled={visibleCount >= validDeliveries.length}
+              onClick={() => setVisibleCount(prev => Math.min(prev + 1, deliveries.length))}
+              disabled={visibleCount >= deliveries.length}
               size="small"
             >
               <SkipNextIcon />
@@ -604,6 +609,13 @@ const GuessInningsGame = ({ isMobile = false }) => {
             </Box>
           </ClickAwayListener>
 
+          {/* Hint */}
+          {showHint && data.innings?.bat_team && data.innings?.bowl_team && (
+            <Typography variant="body2" sx={{ textAlign: 'center', color: designColors.neutral[600] }}>
+              <strong>{data.innings.bat_team}</strong> vs {data.innings.bowl_team}
+            </Typography>
+          )}
+
           {/* Result messages */}
           {guessResult === 'correct' && (
             <Typography variant="body2" sx={{ color: designColors.success[600], textAlign: 'center', fontWeight: 600 }}>
@@ -625,13 +637,23 @@ const GuessInningsGame = ({ isMobile = false }) => {
 
           {/* Bottom buttons */}
           <Stack direction="row" spacing={1} justifyContent="center" sx={{ pt: 1 }}>
+            {!showHint && !revealAnswer && guessResult !== 'correct' && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setShowHint(true)}
+                startIcon={<LightbulbOutlinedIcon />}
+              >
+                Hint
+              </Button>
+            )}
             {!revealAnswer && guessResult !== 'correct' && (
               <Button
                 variant="outlined"
                 size="small"
                 onClick={() => setRevealAnswer(true)}
               >
-                Reveal Answer
+                Reveal
               </Button>
             )}
             <Button

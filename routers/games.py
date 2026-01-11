@@ -120,7 +120,9 @@ def get_guess_innings(
             dd.wagon_x,
             dd.wagon_y,
             dd.wagon_zone,
-            dd.bat_hand
+            dd.bat_hand,
+            dd.bat_team,
+            dd.bowl_team
         FROM delivery_details dd
         WHERE dd.p_match = :match_id
           AND dd.inns = :innings
@@ -143,8 +145,11 @@ def get_guess_innings(
     if not deliveries:
         raise HTTPException(status_code=404, detail="No wagon wheel deliveries found for this innings")
 
-    # Extract bat_hand from first delivery
-    bat_hand = deliveries[0].bat_hand if deliveries else None
+    # Extract bat_hand and teams from first delivery
+    first_delivery = deliveries[0] if deliveries else None
+    bat_hand = first_delivery.bat_hand if first_delivery else None
+    bat_team = first_delivery.bat_team if first_delivery else None
+    bowl_team = first_delivery.bowl_team if first_delivery else None
 
     payload = {
         "innings": {
@@ -157,6 +162,8 @@ def get_guess_innings(
             "balls": int(result.balls) if result.balls is not None else 0,
             "strike_rate": float(result.strike_rate) if result.strike_rate is not None else 0.0,
             "bat_hand": bat_hand,
+            "bat_team": bat_team,
+            "bowl_team": bowl_team,
         },
         "deliveries": [
             {
