@@ -1800,6 +1800,7 @@ def get_player_stats(
                         (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
                     )
                 )
+                OR (NOT :has_leagues AND NOT :include_international)
             )
         """
 
@@ -2212,6 +2213,7 @@ def get_player_ball_stats(
                         (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
                     )
                 )
+                OR (NOT :has_leagues AND NOT :include_international)
             )
         """
 
@@ -3198,6 +3200,7 @@ def get_player_bowling_stats(
                         (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
                     )
                 )
+                OR (NOT :has_leagues AND NOT :include_international)
             )
         """
 
