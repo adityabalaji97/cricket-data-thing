@@ -395,10 +395,6 @@ const AppContent = () => {
 
   const handleFilterChange = (filters) => {
     setCompetitions(filters);
-    if (showVisualizations) {
-      setShowVisualizations(false);
-      setTimeout(() => setShowVisualizations(true), 0);
-    }
   };
 
   const handleTabChange = (event, newValue) => {
