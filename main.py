@@ -206,10 +206,8 @@ async def db_error_middleware(request, call_next):
 
 @app.on_event("startup")
 def startup():
-    from database import init_db
-    # Initialize database tables
-    init_db()
-    logging.info("Database tables initialized")
+    # Database tables are initialized via get_database_connection() when needed
+    logging.info("Application startup complete")
 
 
 
