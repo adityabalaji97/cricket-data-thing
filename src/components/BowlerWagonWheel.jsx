@@ -389,7 +389,7 @@ const BowlerWagonWheel = ({
         flexWrap: isMobile ? 'wrap' : 'nowrap'
       }}>
         <Typography variant={isCompact ? "h6" : "h5"} sx={{ fontWeight: 600, flexShrink: 0 }}>
-          Where Hit
+          Wagon Wheel
         </Typography>
         <Box sx={{ flexShrink: 1, minWidth: 0 }}>
           <FilterBar
