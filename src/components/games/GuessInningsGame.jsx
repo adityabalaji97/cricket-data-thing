@@ -1,7 +1,7 @@
 /**
  * Guess the Innings Game
  *
- * Fetches a random innings with wagon wheel data and animates shots chronologically.
+ * Mobile-first wagon wheel game - guess the batter from their shot pattern.
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -10,12 +10,17 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
+  Collapse,
+  IconButton,
   Stack,
   TextField,
   Typography
 } from '@mui/material';
-import Card from '../ui/Card';
+import SettingsIcon from '@mui/icons-material/Settings';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import SkipNextIcon from '@mui/icons-material/SkipNext';
+import ReplayIcon from '@mui/icons-material/Replay';
 import config from '../../config';
 import { colors as designColors } from '../../theme/designSystem';
 
@@ -26,8 +31,8 @@ const DEFAULT_FILTERS = {
   endDate: '',
   poolLimit: 1000,
   minRuns: 0,
-  minBalls: 0,
-  minStrikeRate: 0,
+  minBalls: 30,
+  minStrikeRate: 150,
 };
 
 const runColor = (runs) => {
@@ -36,11 +41,21 @@ const runColor = (runs) => {
   if (runs === 3) return designColors.primary[500];
   if (runs === 2) return designColors.primary[400];
   if (runs === 1) return designColors.primary[300];
-  return designColors.neutral[300];
+  return designColors.neutral[400];
 };
+
+const LEGEND_ITEMS = [
+  { label: '6', runs: 6 },
+  { label: '4', runs: 4 },
+  { label: '3', runs: 3 },
+  { label: '2', runs: 2 },
+  { label: '1', runs: 1 },
+  { label: '0', runs: 0 },
+];
 
 const GuessInningsGame = ({ isMobile = false }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -48,7 +63,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [guess, setGuess] = useState('');
   const [revealAnswer, setRevealAnswer] = useState(false);
-  const [containerSize, setContainerSize] = useState(360);
+  const [containerSize, setContainerSize] = useState(320);
   const chartContainerRef = useRef(null);
   const playTimerRef = useRef(null);
 
@@ -56,7 +71,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
     if (!chartContainerRef.current) return;
     const resizeObserver = new ResizeObserver(entries => {
       entries.forEach(entry => {
-        const nextWidth = Math.max(240, Math.floor(entry.contentRect.width));
+        const nextWidth = Math.max(280, Math.floor(entry.contentRect.width));
         setContainerSize(nextWidth);
       });
     });
@@ -75,20 +90,22 @@ const GuessInningsGame = ({ isMobile = false }) => {
         }
         return prev + 1;
       });
-    }, 350);
+    }, 300);
     return () => clearInterval(playTimerRef.current);
   }, [isPlaying, data]);
 
   const deliveries = useMemo(() => data?.deliveries || [], [data]);
-  const visibleDeliveries = useMemo(() => deliveries.slice(0, visibleCount), [deliveries, visibleCount]);
+  const validDeliveries = useMemo(() =>
+    deliveries.filter(d => d.wagon_x !== null && d.wagon_y !== null && d.wagon_x !== 0 && d.wagon_y !== 0),
+    [deliveries]
+  );
+  const visibleDeliveries = useMemo(() =>
+    validDeliveries.slice(0, visibleCount),
+    [validDeliveries, visibleCount]
+  );
   const answer = data?.answer?.batter || '';
   const normalizedGuess = guess.trim().toLowerCase();
   const isCorrect = answer && normalizedGuess && answer.trim().toLowerCase() === normalizedGuess;
-
-  const resetPlayback = () => {
-    setVisibleCount(0);
-    setIsPlaying(false);
-  };
 
   const fetchGame = async () => {
     setLoading(true);
@@ -114,10 +131,13 @@ const GuessInningsGame = ({ isMobile = false }) => {
     try {
       const response = await fetch(`${config.API_URL}/games/guess-innings?${params.toString()}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch innings');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to fetch innings');
       }
       const payload = await response.json();
       setData(payload);
+      // Auto-start playback
+      setIsPlaying(true);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -127,12 +147,15 @@ const GuessInningsGame = ({ isMobile = false }) => {
 
   const renderWagonWheel = () => {
     if (!data) return null;
-    const width = Math.min(containerSize, isMobile ? 320 : 420);
-    const height = width;
+    const size = Math.min(containerSize, 360);
+    const width = size;
+    const height = size;
     const centerX = width / 2;
     const centerY = height / 2;
-    const maxRadius = width * 0.4;
-    const batterRadius = width * 0.02;
+    const maxRadius = width * 0.42;
+    const batterRadius = width * 0.025;
+
+    // Zone divider lines
     const zoneLines = [];
     for (let i = 0; i < 8; i++) {
       const angle = (i * Math.PI / 4) - (Math.PI / 2);
@@ -147,45 +170,53 @@ const GuessInningsGame = ({ isMobile = false }) => {
           y2={y2}
           stroke={designColors.neutral[200]}
           strokeWidth="1"
-          strokeDasharray="4,4"
+          strokeDasharray="3,3"
         />
       );
     }
 
-    const deliveryLines = visibleDeliveries
-      .filter(d => d.wagon_x !== null && d.wagon_y !== null && d.wagon_x !== 0 && d.wagon_y !== 0)
-      .map((delivery, index) => {
-        const scale = maxRadius / 150;
-        const x = centerX + (delivery.wagon_x - 150) * scale;
-        const y = centerY + (delivery.wagon_y - 150) * scale;
-        const isLatest = index === visibleDeliveries.filter(d => d.wagon_x !== null && d.wagon_y !== null && d.wagon_x !== 0 && d.wagon_y !== 0).length - 1;
-        return (
-          <g key={`delivery-${index}`}>
-            <line
-              x1={centerX}
-              y1={centerY}
-              x2={x}
-              y2={y}
-              stroke={runColor(delivery.runs)}
-              strokeWidth={isLatest ? 3 : 2}
-              opacity={isLatest ? 1 : 0.6}
-              strokeLinecap="round"
-            />
-            <circle
-              cx={x}
-              cy={y}
-              r={isLatest ? 5 : 3}
-              fill={runColor(delivery.runs)}
-              stroke={isLatest ? designColors.neutral[900] : 'none'}
-              strokeWidth={isLatest ? 1.5 : 0}
-            />
-          </g>
-        );
-      });
+    // Delivery lines - normalized to circle radius
+    const deliveryLines = visibleDeliveries.map((delivery, index) => {
+      // Calculate direction from center
+      const dx = delivery.wagon_x - 150;
+      const dy = delivery.wagon_y - 150;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance === 0) return null;
+
+      // Normalize to maxRadius (all lines extend to the edge)
+      const normalizedX = centerX + (dx / distance) * maxRadius;
+      const normalizedY = centerY + (dy / distance) * maxRadius;
+
+      const isLatest = index === visibleDeliveries.length - 1;
+
+      return (
+        <g key={`delivery-${index}`}>
+          <line
+            x1={centerX}
+            y1={centerY}
+            x2={normalizedX}
+            y2={normalizedY}
+            stroke={runColor(delivery.runs)}
+            strokeWidth={isLatest ? 3 : 2}
+            opacity={isLatest ? 1 : 0.55}
+            strokeLinecap="round"
+          />
+          <circle
+            cx={normalizedX}
+            cy={normalizedY}
+            r={isLatest ? 6 : 4}
+            fill={runColor(delivery.runs)}
+            stroke={isLatest ? designColors.neutral[900] : 'none'}
+            strokeWidth={isLatest ? 2 : 0}
+          />
+        </g>
+      );
+    });
 
     return (
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <circle cx={centerX} cy={centerY} r={maxRadius} fill={designColors.neutral[50]} stroke={designColors.neutral[200]} />
+        <circle cx={centerX} cy={centerY} r={maxRadius} fill={designColors.neutral[100]} stroke={designColors.neutral[300]} strokeWidth="2" />
         {zoneLines}
         {deliveryLines}
         <circle cx={centerX} cy={centerY} r={batterRadius} fill={designColors.neutral[800]} />
@@ -193,150 +224,216 @@ const GuessInningsGame = ({ isMobile = false }) => {
     );
   };
 
-  return (
-    <Box sx={{ my: 3 }}>
-      <Typography variant="h4" sx={{ mb: 2 }}>
-        Guess the Innings (MVP)
-      </Typography>
-      <Typography variant="body1" sx={{ mb: 3 }}>
-        Watch the wagon wheel animation and guess the batter. Filters are configurable for league and innings pool selection.
-      </Typography>
-
-      <Card sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Game Filters</Typography>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
-          <TextField
-            label="Leagues (comma-separated)"
-            value={filters.leagues}
-            onChange={(event) => setFilters(prev => ({ ...prev, leagues: event.target.value }))}
-            fullWidth
-          />
-          <TextField
-            label="Competitions (override leagues)"
-            value={filters.competitions}
-            onChange={(event) => setFilters(prev => ({ ...prev, competitions: event.target.value }))}
-            fullWidth
-          />
-        </Stack>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
-          <TextField
-            label="Start Date"
-            type="date"
-            value={filters.startDate}
-            onChange={(event) => setFilters(prev => ({ ...prev, startDate: event.target.value }))}
-            InputLabelProps={{ shrink: true }}
-            fullWidth
-          />
-          <TextField
-            label="End Date"
-            type="date"
-            value={filters.endDate}
-            onChange={(event) => setFilters(prev => ({ ...prev, endDate: event.target.value }))}
-            InputLabelProps={{ shrink: true }}
-            fullWidth
-          />
-        </Stack>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
-          <TextField
-            label="Pool Limit (top N by runs/balls/SR)"
-            type="number"
-            value={filters.poolLimit}
-            onChange={(event) => setFilters(prev => ({ ...prev, poolLimit: Number(event.target.value) }))}
-            fullWidth
-          />
-          <TextField
-            label="Min Runs"
-            type="number"
-            value={filters.minRuns}
-            onChange={(event) => setFilters(prev => ({ ...prev, minRuns: Number(event.target.value) }))}
-            fullWidth
-          />
-          <TextField
-            label="Min Balls"
-            type="number"
-            value={filters.minBalls}
-            onChange={(event) => setFilters(prev => ({ ...prev, minBalls: Number(event.target.value) }))}
-            fullWidth
-          />
-          <TextField
-            label="Min Strike Rate"
-            type="number"
-            value={filters.minStrikeRate}
-            onChange={(event) => setFilters(prev => ({ ...prev, minStrikeRate: Number(event.target.value) }))}
-            fullWidth
-          />
-        </Stack>
-        <Button variant="contained" onClick={fetchGame} disabled={loading}>
-          {loading ? 'Loading...' : 'Start New Game'}
-        </Button>
-        {error && (
-          <Typography variant="body2" color="error" sx={{ mt: 2 }}>
-            {error}
+  const renderLegend = () => (
+    <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+      {LEGEND_ITEMS.map(item => (
+        <Box key={item.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Box sx={{
+            width: 12,
+            height: 12,
+            borderRadius: '50%',
+            bgcolor: runColor(item.runs),
+          }} />
+          <Typography variant="caption" sx={{ fontSize: '0.7rem', color: designColors.neutral[600] }}>
+            {item.label}
           </Typography>
-        )}
-      </Card>
+        </Box>
+      ))}
+    </Stack>
+  );
+
+  // Mobile-optimized compact layout
+  return (
+    <Box sx={{ py: 1, px: isMobile ? 1 : 2 }}>
+      {/* Header with New Game button */}
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
+          Guess the Innings
+        </Typography>
+        <Stack direction="row" spacing={1}>
+          <IconButton size="small" onClick={() => setShowFilters(!showFilters)}>
+            <SettingsIcon fontSize="small" />
+          </IconButton>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={fetchGame}
+            disabled={loading}
+            sx={{ minWidth: 100 }}
+          >
+            {loading ? 'Loading...' : data ? 'New Game' : 'Start'}
+          </Button>
+        </Stack>
+      </Stack>
+
+      {/* Collapsible Filters */}
+      <Collapse in={showFilters}>
+        <Box sx={{ mb: 2, p: 1.5, bgcolor: designColors.neutral[50], borderRadius: 1 }}>
+          <Stack spacing={1.5}>
+            <Stack direction="row" spacing={1}>
+              <TextField
+                label="Leagues"
+                value={filters.leagues}
+                onChange={(e) => setFilters(prev => ({ ...prev, leagues: e.target.value }))}
+                size="small"
+                fullWidth
+              />
+              <TextField
+                label="Min SR"
+                type="number"
+                value={filters.minStrikeRate}
+                onChange={(e) => setFilters(prev => ({ ...prev, minStrikeRate: Number(e.target.value) }))}
+                size="small"
+                sx={{ width: 100 }}
+              />
+            </Stack>
+            <Stack direction="row" spacing={1}>
+              <TextField
+                label="Min Balls"
+                type="number"
+                value={filters.minBalls}
+                onChange={(e) => setFilters(prev => ({ ...prev, minBalls: Number(e.target.value) }))}
+                size="small"
+                sx={{ width: 100 }}
+              />
+              <TextField
+                label="Start Date"
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+                size="small"
+                fullWidth
+              />
+            </Stack>
+          </Stack>
+        </Box>
+      </Collapse>
+
+      {error && (
+        <Typography variant="body2" color="error" sx={{ mb: 1, textAlign: 'center' }}>
+          {error}
+        </Typography>
+      )}
 
       {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-          <CircularProgress />
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={32} />
         </Box>
       )}
 
       {data && !loading && (
-        <Card>
-          <Stack spacing={2}>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              <Chip label={`Balls shown: ${visibleCount}/${deliveries.length}`} />
-              <Chip label={`Runs: ${data.innings?.runs}`} />
-              <Chip label={`SR: ${data.innings?.strike_rate?.toFixed?.(1) ?? data.innings?.strike_rate}`} />
-              <Chip label={`Competition: ${data.innings?.competition}`} />
-              <Chip label={`Date: ${data.innings?.match_date}`} />
-              <Chip label={`Venue: ${data.innings?.venue}`} />
-            </Box>
-
-            <Divider />
-
-            <Box ref={chartContainerRef} sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-              {renderWagonWheel()}
-            </Box>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-              <Button variant="outlined" onClick={() => setIsPlaying((prev) => !prev)} disabled={visibleCount >= deliveries.length}>
-                {isPlaying ? 'Pause' : 'Play'}
-              </Button>
-              <Button variant="outlined" onClick={() => setVisibleCount((prev) => Math.min(prev + 1, deliveries.length))}>
-                Next Shot
-              </Button>
-              <Button variant="outlined" onClick={resetPlayback}>
-                Reset
-              </Button>
-            </Stack>
-
-            <Divider />
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-              <TextField
-                label="Your Guess (Batter)"
-                value={guess}
-                onChange={(event) => setGuess(event.target.value)}
-                fullWidth
-              />
-              <Button variant="contained" onClick={() => setRevealAnswer(true)}>
-                Reveal Answer
-              </Button>
-            </Stack>
-            {guess && (
-              <Typography variant="body2" color={isCorrect ? 'success.main' : 'text.secondary'}>
-                {isCorrect ? 'Correct!' : 'Keep guessing...'}
-              </Typography>
-            )}
-            {revealAnswer && (
-              <Typography variant="body1">
-                Answer: <strong>{answer}</strong>
-              </Typography>
-            )}
+        <Stack spacing={1.5}>
+          {/* Info Pills */}
+          <Stack direction="row" spacing={0.5} flexWrap="wrap" justifyContent="center" sx={{ gap: 0.5 }}>
+            <Chip
+              label={`${visibleCount}/${validDeliveries.length} balls`}
+              size="small"
+              variant="outlined"
+            />
+            <Chip
+              label={`${data.innings?.runs} runs`}
+              size="small"
+              sx={{ bgcolor: designColors.primary[50] }}
+            />
+            <Chip
+              label={`SR ${data.innings?.strike_rate?.toFixed?.(0) ?? data.innings?.strike_rate}`}
+              size="small"
+              sx={{ bgcolor: designColors.chart.green + '20' }}
+            />
+            <Chip
+              label={data.innings?.competition}
+              size="small"
+              variant="outlined"
+            />
           </Stack>
-        </Card>
+
+          {/* Wagon Wheel */}
+          <Box
+            ref={chartContainerRef}
+            sx={{
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              py: 1
+            }}
+          >
+            {renderWagonWheel()}
+          </Box>
+
+          {/* Legend */}
+          {renderLegend()}
+
+          {/* Playback Controls */}
+          <Stack direction="row" spacing={1} justifyContent="center">
+            <IconButton
+              onClick={() => setIsPlaying(!isPlaying)}
+              disabled={visibleCount >= validDeliveries.length}
+              sx={{ bgcolor: designColors.primary[50] }}
+            >
+              {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+            </IconButton>
+            <IconButton
+              onClick={() => setVisibleCount(prev => Math.min(prev + 1, validDeliveries.length))}
+              disabled={visibleCount >= validDeliveries.length}
+            >
+              <SkipNextIcon />
+            </IconButton>
+            <IconButton onClick={() => { setVisibleCount(0); setIsPlaying(false); }}>
+              <ReplayIcon />
+            </IconButton>
+          </Stack>
+
+          {/* Guess Input */}
+          <Stack direction="row" spacing={1} alignItems="center">
+            <TextField
+              placeholder="Who is this batter?"
+              value={guess}
+              onChange={(e) => setGuess(e.target.value)}
+              size="small"
+              fullWidth
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: isCorrect ? designColors.success[50] : 'white'
+                }
+              }}
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setRevealAnswer(true)}
+              sx={{ minWidth: 80 }}
+            >
+              Reveal
+            </Button>
+          </Stack>
+
+          {isCorrect && (
+            <Typography variant="body2" sx={{ color: designColors.success[600], textAlign: 'center', fontWeight: 600 }}>
+              Correct!
+            </Typography>
+          )}
+
+          {revealAnswer && (
+            <Typography variant="body1" sx={{ textAlign: 'center' }}>
+              Answer: <strong>{answer}</strong>
+            </Typography>
+          )}
+
+          {/* Match Info (smaller) */}
+          <Typography variant="caption" sx={{ textAlign: 'center', color: designColors.neutral[500] }}>
+            {data.innings?.venue} • {data.innings?.match_date}
+          </Typography>
+        </Stack>
+      )}
+
+      {/* Initial state prompt */}
+      {!data && !loading && !error && (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <Typography variant="body2" color="text.secondary">
+            Click Start to begin!
+          </Typography>
+        </Box>
       )}
     </Box>
   );
