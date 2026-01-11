@@ -1,7 +1,7 @@
 export const DEFAULT_START_DATE = '2020-01-01';
 export const TODAY = new Date().toISOString().split('T')[0];
 
-export const buildPlayerProfileFilters = ({ players, venues }) => [
+export const buildPlayerProfileFilters = ({ players, venues, playerSearch = {} }) => [
   {
     key: 'player',
     label: 'Select Player',
@@ -9,6 +9,7 @@ export const buildPlayerProfileFilters = ({ players, venues }) => [
     options: players,
     defaultValue: null,
     required: true,
+    ...playerSearch,
   },
   {
     key: 'startDate',
