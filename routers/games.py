@@ -148,8 +148,8 @@ def get_guess_innings(
     # Extract bat_hand and teams from first delivery
     first_delivery = deliveries[0] if deliveries else None
     bat_hand = first_delivery.bat_hand if first_delivery else None
-    bat_team = first_delivery.batting_team if first_delivery else None
-    bowl_team = first_delivery.bowling_team if first_delivery else None
+    batting_team = first_delivery.batting_team if first_delivery else None
+    bowling_team = first_delivery.bowling_team if first_delivery else None
 
     payload = {
         "innings": {
@@ -162,8 +162,8 @@ def get_guess_innings(
             "balls": int(result.balls) if result.balls is not None else 0,
             "strike_rate": float(result.strike_rate) if result.strike_rate is not None else 0.0,
             "bat_hand": bat_hand,
-            "bat_team": batting_team,
-            "bowl_team": bowling_team,
+            "batting_team": batting_team,
+            "bowling_team": bowling_team,
         },
         "deliveries": [
             {
