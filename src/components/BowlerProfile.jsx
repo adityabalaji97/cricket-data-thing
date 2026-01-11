@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Container, Box, Button, Typography, Chip, useMediaQuery, useTheme } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -42,7 +42,9 @@ const BowlerProfile = () => {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [dateRange, setDateRange] = useState({ start: DEFAULT_START_DATE, end: TODAY });
   const [selectedVenue, setSelectedVenue] = useState("All Venues");
-  const [players, setPlayers] = useState([]);
+  const [playerOptions, setPlayerOptions] = useState([]);
+  const [playerSearchInput, setPlayerSearchInput] = useState('');
+  const [playerSearchLoading, setPlayerSearchLoading] = useState(false);
   const [venues, setVenues] = useState([]);
   const [competitionFilters, setCompetitionFilters] = useState({
     leagues: [],
@@ -57,49 +59,12 @@ const BowlerProfile = () => {
   const [dnaFetchTrigger, setDnaFetchTrigger] = useState(0);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
-  // Add a direct event listener to trigger analysis on page load if needed
-  useEffect(() => {
-    // This function will run once when component mounts
-    const urlParams = new URLSearchParams(window.location.search);
-    const playerName = urlParams.get('name');
-    const autoload = urlParams.get('autoload') === 'true';
-    
-    if (playerName && autoload) {
-      console.log('Adding window load event for autoloading');
-      
-      // Add a one-time event listener for when everything is loaded
-      const handleLoad = () => {
-        setTimeout(() => {
-          // Try to find and click the GO button
-          const goButton = document.getElementById('go-button');
-          if (goButton && !goButton.disabled) {
-            console.log('Auto-clicking GO button from window load event');
-            goButton.click();
-          }
-        }, 1000); // Longer delay to ensure everything is ready
-      };
-      
-      window.addEventListener('load', handleLoad, { once: true });
-      
-      // Cleanup
-      return () => {
-        window.removeEventListener('load', handleLoad);
-      };
-    }
-  }, []);
-
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [playersRes, venuesRes] = await Promise.all([
-          fetch(`${config.API_URL}/players`),
-          fetch(`${config.API_URL}/venues`)
-        ]);
-        const playersList = await playersRes.json();
-        setPlayers(playersList);
+        const venuesRes = await fetch(`${config.API_URL}/venues`);
         setVenues(['All Venues', ...await venuesRes.json()]);
         
-        console.log('Players loaded:', playersList);
         console.log('URL parameters:', { 
           name: getQueryParam('name'), 
           autoload: getQueryParam('autoload'),
@@ -128,18 +93,37 @@ const BowlerProfile = () => {
           setSelectedVenue(venueFromURL);
         }
         
-        if (playerNameFromURL && playersList.includes(playerNameFromURL)) {
-          console.log('Setting player from URL:', playerNameFromURL);
-          setSelectedPlayer(playerNameFromURL);
-          
-          // Auto-trigger data fetch if autoload parameter is true
-          if (autoload) {
-            setTimeout(() => {
-              setShouldFetch(true);
-            }, 500); // Small delay to ensure state is updated
+        if (playerNameFromURL) {
+          try {
+            const response = await fetch(
+              `${config.API_URL}/search/player/${encodeURIComponent(playerNameFromURL)}`
+            );
+            if (response.ok) {
+              const playerData = await response.json();
+              if (playerData?.found) {
+                const resolvedPlayer = {
+                  name: playerData.player_name,
+                  display_name: playerData.display_name || playerData.player_name,
+                };
+                console.log('Setting player from URL:', resolvedPlayer);
+                setSelectedPlayer(resolvedPlayer);
+                setPlayerSearchInput(resolvedPlayer.display_name);
+                setPlayerOptions((prev) => {
+                  if (prev.some((option) => option.name === resolvedPlayer.name)) {
+                    return prev;
+                  }
+                  return [resolvedPlayer, ...prev];
+                });
+                if (autoload) {
+                  setShouldFetch(true);
+                }
+              }
+            } else {
+              console.warn('Player name in URL not found:', playerNameFromURL);
+            }
+          } catch (resolveError) {
+            console.error('Error resolving player name:', resolveError);
           }
-        } else if (playerNameFromURL) {
-          console.warn('Player name in URL not found in player list:', playerNameFromURL);
         }
         
         setInitialLoadComplete(true);
@@ -152,30 +136,15 @@ const BowlerProfile = () => {
     fetchInitialData();
   }, []);
 
-  // Function to programmatically click the GO button when needed
-  useEffect(() => {
-    if (initialLoadComplete && selectedPlayer && getQueryParam('autoload') === 'true' && !stats && !loading && !shouldFetch) {
-      // Find and click the GO button after a small delay to ensure DOM is ready
-      const timer = setTimeout(() => {
-        const goButton = document.getElementById('go-button');
-        if (goButton) {
-          goButton.click();
-          console.log('Auto-clicking GO button');
-        }
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [initialLoadComplete, selectedPlayer, stats, loading, shouldFetch]);
-
   // Update URL when user changes filters
   useEffect(() => {
     if (!initialLoadComplete) return; // Skip on initial load
     
     const searchParams = new URLSearchParams();
     
-    if (selectedPlayer) {
-      searchParams.set('name', selectedPlayer);
+    const selectedPlayerName = typeof selectedPlayer === 'string' ? selectedPlayer : selectedPlayer?.name;
+    if (selectedPlayerName) {
+      searchParams.set('name', selectedPlayerName);
     }
     
     if (selectedVenue !== 'All Venues') {
@@ -200,14 +169,19 @@ const BowlerProfile = () => {
   }, [selectedPlayer, selectedVenue, dateRange, stats, initialLoadComplete, navigate]);
 
   const handleFetch = () => {
-    if (!selectedPlayer) return;
-    console.log('Manually triggered fetch for player:', selectedPlayer);
+    const selectedPlayerName = typeof selectedPlayer === 'string' ? selectedPlayer : selectedPlayer?.name;
+    if (!selectedPlayerName) return;
+    console.log('Manually triggered fetch for player:', selectedPlayerName);
     setShouldFetch(true);
   };
 
   const handleFilterChange = (key, value) => {
     if (key === 'player') {
       setSelectedPlayer(value);
+      if (value) {
+        const label = typeof value === 'string' ? value : (value.display_name || value.name);
+        setPlayerSearchInput(label);
+      }
       return;
     }
 
@@ -228,6 +202,12 @@ const BowlerProfile = () => {
 
   const handleApplyFilters = (nextValues, nextCompetitionFilters) => {
     setSelectedPlayer(nextValues.player);
+    if (nextValues.player) {
+      const label = typeof nextValues.player === 'string'
+        ? nextValues.player
+        : (nextValues.player.display_name || nextValues.player.name);
+      setPlayerSearchInput(label);
+    }
     setSelectedVenue(nextValues.venue);
     setDateRange({ start: nextValues.startDate, end: nextValues.endDate });
     setCompetitionFilters(nextCompetitionFilters);
@@ -250,8 +230,22 @@ const BowlerProfile = () => {
   }, [selectedVenue, dateRange, competitionFilters]);
 
   const filterConfig = useMemo(
-    () => buildBowlerProfileFilters({ players, venues }),
-    [players, venues]
+    () => buildBowlerProfileFilters({
+      players: playerOptions,
+      venues,
+      playerSearch: {
+        inputValue: playerSearchInput,
+        onInputChange: (_, nextInput, reason) => {
+          setPlayerSearchInput(nextInput);
+          if (reason === 'input') {
+            setSelectedPlayer(null);
+          }
+        },
+        loading: playerSearchLoading,
+        filterOptions: (options) => options,
+      },
+    }),
+    [playerOptions, playerSearchInput, playerSearchLoading, venues]
   );
 
   const filterValues = useMemo(
@@ -263,6 +257,53 @@ const BowlerProfile = () => {
     }),
     [selectedPlayer, dateRange, selectedVenue]
   );
+
+  const selectedPlayerName = useMemo(() => {
+    if (!selectedPlayer) return null;
+    return typeof selectedPlayer === 'string' ? selectedPlayer : selectedPlayer.name;
+  }, [selectedPlayer]);
+
+  const selectedPlayerLabel = useMemo(() => {
+    if (!selectedPlayer) return null;
+    return typeof selectedPlayer === 'string' ? selectedPlayer : (selectedPlayer.display_name || selectedPlayer.name);
+  }, [selectedPlayer]);
+
+  const searchDebounceRef = useRef(null);
+
+  useEffect(() => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    if (!playerSearchInput || playerSearchInput.trim().length < 2) {
+      setPlayerOptions([]);
+      setPlayerSearchLoading(false);
+      return;
+    }
+
+    searchDebounceRef.current = setTimeout(async () => {
+      setPlayerSearchLoading(true);
+      try {
+        const response = await fetch(
+          `${config.API_URL}/search/suggestions?q=${encodeURIComponent(playerSearchInput.trim())}&limit=10`
+        );
+        const data = await response.json();
+        const players = (data.suggestions || []).filter((item) => item.type === 'player');
+        setPlayerOptions(players);
+      } catch (searchError) {
+        console.error('Error fetching player suggestions:', searchError);
+        setPlayerOptions([]);
+      } finally {
+        setPlayerSearchLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [playerSearchInput]);
 
   const mobileFilterButton = (
     <Button
@@ -308,9 +349,9 @@ const BowlerProfile = () => {
   useEffect(() => {
     // Fetch bowling stats when shouldFetch is triggered
     const fetchBowlingStats = async () => {
-      if (!shouldFetch || !selectedPlayer) return;
+      if (!shouldFetch || !selectedPlayerName) return;
       
-      console.log('Fetching bowling stats for player:', selectedPlayer);
+      console.log('Fetching bowling stats for player:', selectedPlayerName);
       setLoading(true);
       const params = new URLSearchParams();
       
@@ -327,8 +368,8 @@ const BowlerProfile = () => {
       try {
         // Fetch both bowling stats endpoints in parallel
         const [statsResponse, ballStatsResponse] = await Promise.all([
-          fetch(`${config.API_URL}/player/${encodeURIComponent(selectedPlayer)}/bowling_stats?${params}`),
-          fetch(`${config.API_URL}/player/${encodeURIComponent(selectedPlayer)}/bowling_ball_stats?${params}`)
+          fetch(`${config.API_URL}/player/${encodeURIComponent(selectedPlayerName)}/bowling_stats?${params}`),
+          fetch(`${config.API_URL}/player/${encodeURIComponent(selectedPlayerName)}/bowling_ball_stats?${params}`)
         ]);
     
         const [statsData, ballStatsData] = await Promise.all([
@@ -353,7 +394,7 @@ const BowlerProfile = () => {
     };
 
     fetchBowlingStats();
-  }, [shouldFetch, selectedPlayer, dateRange, selectedVenue, competitionFilters]);
+  }, [shouldFetch, selectedPlayerName, dateRange, selectedVenue, competitionFilters]);
 
   return (
     <Container maxWidth="xl">
@@ -366,7 +407,7 @@ const BowlerProfile = () => {
 
         {isMobile && stats && (
           <MobileStickyHeader
-            title={selectedPlayer || 'Bowler Profile'}
+            title={selectedPlayerLabel || 'Bowler Profile'}
             action={mobileFilterButton}
             enableCollapse
           />
@@ -442,7 +483,7 @@ const BowlerProfile = () => {
                   <BowlingCareerStatsCards stats={stats} isMobile={isMobile} />
 
                   <PlayerDNASummary
-                    playerName={selectedPlayer}
+                    playerName={selectedPlayerName}
                     playerType="bowler"
                     startDate={dateRange.start}
                     endDate={dateRange.end}
@@ -455,13 +496,13 @@ const BowlerProfile = () => {
                   />
 
                   <ContextualQueryPrompts
-                    queries={getBowlerContextualQueries(selectedPlayer, {
+                    queries={getBowlerContextualQueries(selectedPlayerName, {
                       startDate: dateRange.start,
                       endDate: dateRange.end,
                       leagues: competitionFilters.leagues,
                       venue: selectedVenue !== 'All Venues' ? selectedVenue : null,
                     })}
-                    title={`🔍 Explore ${selectedPlayer.split(' ').pop()}'s Bowling Data`}
+                    title={`🔍 Explore ${(selectedPlayerLabel || 'Bowler').split(' ').pop()}'s Bowling Data`}
                     isMobile={isMobile}
                   />
                 </Section>
@@ -513,7 +554,7 @@ const BowlerProfile = () => {
                 >
                   <VisualizationCard isMobile={isMobile} ariaLabel="Wagon wheel showing where bowler was hit">
                     <BowlerWagonWheel
-                      playerName={selectedPlayer}
+                      playerName={selectedPlayerName}
                       startDate={dateRange.start}
                       endDate={dateRange.end}
                       venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
@@ -526,7 +567,7 @@ const BowlerProfile = () => {
                   </VisualizationCard>
                   <VisualizationCard isMobile={isMobile} ariaLabel="Pitch map distribution for bowler">
                     <BowlerPitchMap
-                      playerName={selectedPlayer}
+                      playerName={selectedPlayerName}
                       startDate={dateRange.start}
                       endDate={dateRange.end}
                       venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
