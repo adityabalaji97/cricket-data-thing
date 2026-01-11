@@ -191,8 +191,9 @@ const AppContent = () => {
             }
           }
           
-          // If all required params are present, trigger the analysis
-          if (venueParam && team1Param && team2Param) {
+          // If venue is present with autoload, or all params present, trigger the analysis
+          const autoloadParam = getQueryParam('autoload') === 'true';
+          if ((venueParam && autoloadParam) || (venueParam && team1Param && team2Param)) {
             setShowVisualizations(true);
           }
         }
