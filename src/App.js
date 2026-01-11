@@ -37,6 +37,7 @@ import TeamProfile from './components/TeamProfile';
 import TeamComparison from './components/TeamComparison';
 import WrappedPage from './components/wrapped/WrappedPage';
 import { GoogleSearchLanding, SearchBar } from './components/search';
+import GuessInningsGame from './components/games/GuessInningsGame';
 import axios from 'axios';
 
 import config from './config';
@@ -118,10 +119,11 @@ const AppContent = () => {
     path === '/matchups' ? 6 : 
     path === '/query' ? 7 : 
     path === '/team' ? 8 : 
-    path === '/team-comparison' ? 9 :
-    path === '/wrapped/2025' ? 10 : 0
-      );
-            }
+    path === '/team-comparison' ? 9 : 
+    path === '/games/guess-innings' ? 10 :
+    path === '/wrapped/2025' ? 11 : 0
+    );
+    }
   };
 
   useEffect(() => {
@@ -140,7 +142,8 @@ const AppContent = () => {
         path === '/query' ? 7 : 
         path === '/team' ? 8 : 
         path === '/team-comparison' ? 9 :
-        path === '/wrapped/2025' || path.startsWith('/wrapped') ? 10 : 0
+        path === '/games/guess-innings' ? 10 :
+        path === '/wrapped/2025' || path.startsWith('/wrapped') ? 11 : 0
       );
     }
   }, [location]);
@@ -420,7 +423,8 @@ const AppContent = () => {
            currentTab === 7 ? 'Query Builder' : 
            currentTab === 8 ? 'Team Profile' : 
            currentTab === 9 ? 'Team Comparison' :
-           currentTab === 10 ? '2025 Wrapped' : 'Home';
+           currentTab === 10 ? 'Guess the Innings' :
+           currentTab === 11 ? '2025 Wrapped' : 'Home';
   };
 
   return (
@@ -513,6 +517,9 @@ const AppContent = () => {
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/team-comparison')}>                Team Comparison
               </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/games/guess-innings')}>
+                🎯 Guess the Innings
+              </MenuItem>
               <MenuItem onClick={() => handleNavigate('/wrapped/2025')} sx={{ color: '#1DB954', fontWeight: 600 }}>
                 🎁 2025 Wrapped
               </MenuItem>
@@ -549,6 +556,7 @@ const AppContent = () => {
               <Tab label="Query Builder" component={Link} to="/query" />
               <Tab label="Team Profile" component={Link} to="/team" />
               <Tab label="Team Comparison" component={Link} to="/team-comparison" />
+              <Tab label="🎯 Guess the Innings" component={Link} to="/games/guess-innings" />
               <Tab label="🎁 2025 Wrapped" component={Link} to="/wrapped/2025" sx={{ color: '#1DB954' }} />
             </Tabs>
             <IconButton
@@ -572,6 +580,7 @@ const AppContent = () => {
         <Route path="/query" element={<QueryBuilder isMobile={isMobile} />} />
         <Route path="/team" element={<TeamProfile isMobile={isMobile} />} />
         <Route path="/team-comparison" element={<TeamComparison />} />
+        <Route path="/games/guess-innings" element={<GuessInningsGame isMobile={isMobile} />} />
         <Route path="/wrapped/2025" element={<WrappedPage />} />
         <Route path="/search" element={<GoogleSearchLanding />} />
         <Route path="/venue" element={
