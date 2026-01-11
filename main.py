@@ -202,7 +202,9 @@ async def db_error_middleware(request, call_next):
         return JSONResponse(
             status_code=status_code,
             content={"detail": error_detail}
-        )@app.on_event("startup")
+        )
+
+@app.on_event("startup")
 def startup():
     from database import init_db
     # Initialize database tables
