@@ -48,7 +48,7 @@ def get_guess_innings(
         WITH innings AS (
             SELECT
                 dd.p_match AS match_id,
-                dd.innings,
+                dd.inns AS innings,
                 dd.bat AS batter,
                 dd.ground AS venue,
                 dd.competition AS competition,
@@ -61,7 +61,7 @@ def get_guess_innings(
               AND dd.competition = ANY(:competitions)
               AND dd.match_date >= :start_date
               AND (:end_date IS NULL OR dd.match_date <= :end_date)
-            GROUP BY dd.p_match, dd.innings, dd.bat, dd.ground, dd.competition, dd.match_date
+            GROUP BY dd.p_match, dd.inns, dd.bat, dd.ground, dd.competition, dd.match_date
         ),
         ranked AS (
             SELECT
@@ -122,7 +122,7 @@ def get_guess_innings(
             dd.wagon_zone
         FROM delivery_details dd
         WHERE dd.p_match = :match_id
-          AND dd.innings = :innings
+          AND dd.inns = :innings
           AND dd.bat = :batter
           AND dd.wagon_x IS NOT NULL
           AND dd.wagon_y IS NOT NULL
