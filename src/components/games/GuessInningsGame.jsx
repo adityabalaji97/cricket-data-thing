@@ -175,18 +175,28 @@ const GuessInningsGame = ({ isMobile = false }) => {
       );
     }
 
-    // Delivery lines - normalized to circle radius
+    // Find max distance for normalization (longest shot = radius)
+    const maxDistance = Math.max(
+      ...validDeliveries.map(d => {
+        const dx = d.wagon_x - 150;
+        const dy = d.wagon_y - 150;
+        return Math.sqrt(dx * dx + dy * dy);
+      }),
+      1 // Prevent division by zero
+    );
+
+    // Delivery lines - normalized so longest shot = radius
     const deliveryLines = visibleDeliveries.map((delivery, index) => {
-      // Calculate direction from center
       const dx = delivery.wagon_x - 150;
       const dy = delivery.wagon_y - 150;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       if (distance === 0) return null;
 
-      // Normalize to maxRadius (all lines extend to the edge)
-      const normalizedX = centerX + (dx / distance) * maxRadius;
-      const normalizedY = centerY + (dy / distance) * maxRadius;
+      // Scale proportionally: longest shot reaches edge, others proportionally shorter
+      const scaledRadius = (distance / maxDistance) * maxRadius;
+      const normalizedX = centerX + (dx / distance) * scaledRadius;
+      const normalizedY = centerY + (dy / distance) * scaledRadius;
 
       const isLatest = index === visibleDeliveries.length - 1;
 
@@ -341,6 +351,13 @@ const GuessInningsGame = ({ isMobile = false }) => {
               size="small"
               sx={{ bgcolor: designColors.chart.green + '20' }}
             />
+            {data.innings?.bat_hand && (
+              <Chip
+                label={data.innings.bat_hand === 'LHB' ? 'Left-handed' : 'Right-handed'}
+                size="small"
+                sx={{ bgcolor: designColors.chart.orange + '20' }}
+              />
+            )}
             <Chip
               label={data.innings?.competition}
               size="small"
