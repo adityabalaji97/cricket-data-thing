@@ -5,8 +5,9 @@ This script identifies and removes aliases created due to data mismatches betwee
 the deliveries and delivery_details tables.
 
 Usage:
-    python scripts/cleanup_bad_aliases.py --db-url "postgres://..." --dry-run
-    python scripts/cleanup_bad_aliases.py --db-url "postgres://..."
+    # Ensure DATABASE_URL is set (for example via a local .env)
+    python scripts/cleanup_bad_aliases.py --db-url "$DATABASE_URL" --dry-run
+    python scripts/cleanup_bad_aliases.py --db-url "$DATABASE_URL"
 """
 
 import os
@@ -162,10 +163,10 @@ def main():
         epilog="""
 Examples:
   # Dry run (show what would be deleted)
-  python scripts/cleanup_bad_aliases.py --db-url "postgres://..." --dry-run
+  python scripts/cleanup_bad_aliases.py --db-url "$DATABASE_URL" --dry-run
 
   # Actually delete invalid aliases
-  python scripts/cleanup_bad_aliases.py --db-url "postgres://..."
+  python scripts/cleanup_bad_aliases.py --db-url "$DATABASE_URL"
         """
     )
     parser.add_argument('--db-url', help='Database URL (or set DATABASE_URL env var)')

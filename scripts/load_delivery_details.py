@@ -2,8 +2,8 @@
 Load enhanced ball-by-ball data into delivery_details table.
 
 Usage:
-    python scripts/load_delivery_details.py --csv /path/to/t20_bbb.csv --db-url "postgres://..."
-    python scripts/load_delivery_details.py --csv /path/to/t20_bbb.csv --db-url "postgres://..." --only-overlap
+    python scripts/load_delivery_details.py --csv /path/to/t20_bbb.csv --db-url "$DATABASE_URL"
+    python scripts/load_delivery_details.py --csv /path/to/t20_bbb.csv --db-url "$DATABASE_URL" --only-overlap
 """
 
 import os

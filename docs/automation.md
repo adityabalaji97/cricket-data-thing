@@ -1,6 +1,6 @@
 # Automation for Delivery Details Sync
 
-This project’s delivery details refresh is driven by the entrypoint script `run_full_dd_sync.py`. It expects a `DATABASE_URL` environment variable that points at the target PostgreSQL database.
+This project’s delivery details refresh is driven by the entrypoint script `run_full_dd_sync.py`. It expects a `DATABASE_URL` environment variable that points at the target PostgreSQL database. Store the value in a local `.env` (for on-host jobs) or a secret manager (for scheduled workflows) instead of hard-coding it in command lines.
 
 ## Cron (weekly)
 
@@ -9,8 +9,8 @@ Example cron entry to run every Sunday at 03:00. Adjust paths to your checkout a
 ```cron
 0 3 * * 0 cd /path/to/cricket-data-thing \
   && source /path/to/venv/bin/activate \
-  && DATABASE_URL="postgresql://user:pass@host:5432/dbname" \
-  python run_full_dd_sync.py --confirm
+  && set -a && source /path/to/.env && set +a \
+  && python run_full_dd_sync.py --confirm
 ```
 
 ## systemd timer (optional)
@@ -25,7 +25,7 @@ Description=Weekly delivery_details sync
 [Service]
 Type=oneshot
 WorkingDirectory=/path/to/cricket-data-thing
-Environment=DATABASE_URL=postgresql://user:pass@host:5432/dbname
+EnvironmentFile=/path/to/.env
 ExecStart=/path/to/venv/bin/python run_full_dd_sync.py --confirm
 ```
 

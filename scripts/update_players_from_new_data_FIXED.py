@@ -4,11 +4,11 @@ Update players table with bat_hand/bowl_style from delivery_details.
 FIXED VERSION: Adds last name validation to prevent incorrect alias mappings.
 
 Usage:
-    python scripts/update_players_from_new_data_FIXED.py --db-url "postgres://..." --dry-run
-    python scripts/update_players_from_new_data_FIXED.py --db-url "postgres://..."
+    python scripts/update_players_from_new_data_FIXED.py --db-url "$DATABASE_URL" --dry-run
+    python scripts/update_players_from_new_data_FIXED.py --db-url "$DATABASE_URL"
 
     # Using environment variable:
-    DATABASE_URL="postgres://..." python scripts/update_players_from_new_data_FIXED.py
+    python scripts/update_players_from_new_data_FIXED.py
 """
 
 import os

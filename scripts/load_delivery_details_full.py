@@ -3,11 +3,11 @@ Load ALL columns from t20_bbb.csv into delivery_details table.
 Handles duplicates by only inserting new rows based on (p_match, inns, over, ball).
 
 Usage:
-    python scripts/load_delivery_details_full.py --csv /path/to/t20_bbb.csv --db-url "postgres://..."
+    python scripts/load_delivery_details_full.py --csv /path/to/t20_bbb.csv --db-url "$DATABASE_URL"
     python scripts/load_delivery_details_full.py --csv /path/to/t20_bbb.csv --dry-run
     
     # Using environment variable:
-    DATABASE_URL="postgres://..." python scripts/load_delivery_details_full.py --csv /path/to/t20_bbb.csv
+    python scripts/load_delivery_details_full.py --csv /path/to/t20_bbb.csv
 """
 
 import os

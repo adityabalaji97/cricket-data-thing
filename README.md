@@ -191,8 +191,7 @@ pip install -r requirements.txt
 
 # Set up environment variables
 cp .env.example .env
-# Edit .env with your database credentials
-#for quickly getting things done locally, change the DATABASE_URL in database.py file
+# Edit .env with your database credentials (set DATABASE_URL here)
 
 # Start the API server
 uvicorn main:app --reload

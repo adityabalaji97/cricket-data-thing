@@ -3,7 +3,8 @@ Enhance delivery_details table with additional columns from CSV
 and left-right batter analysis columns.
 
 Usage:
-    DATABASE_URL="postgresql://..." python scripts/enhance_delivery_details.py
+    # Ensure DATABASE_URL is set (for example via a local .env)
+    python scripts/enhance_delivery_details.py
 """
 
 import os
@@ -22,7 +23,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if not DATABASE_URL:
     print("ERROR: DATABASE_URL environment variable is required")
-    print('Usage: DATABASE_URL="postgresql://..." python scripts/enhance_delivery_details.py')
+    print("Usage: set DATABASE_URL in your environment (e.g., via .env) and run:")
+    print("  python scripts/enhance_delivery_details.py")
     sys.exit(1)
 
 # =============================================================================

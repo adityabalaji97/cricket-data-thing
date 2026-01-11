@@ -2,11 +2,11 @@
 Update players table with bat_hand/bowl_style from delivery_details.
 
 Usage:
-    python scripts/update_players_from_new_data.py --db-url "postgres://..." --dry-run
-    python scripts/update_players_from_new_data.py --db-url "postgres://..."
+    python scripts/update_players_from_new_data.py --db-url "$DATABASE_URL" --dry-run
+    python scripts/update_players_from_new_data.py --db-url "$DATABASE_URL"
     
     # Using environment variable:
-    DATABASE_URL="postgres://..." python scripts/update_players_from_new_data.py
+    python scripts/update_players_from_new_data.py
 """
 
 import os

@@ -81,7 +81,7 @@
 - Push to Heroku using git or CLI
 
 ### Environment Variables
-- `DATABASE_URL`: PostgreSQL connection string (automatically set by Heroku)
+- `DATABASE_URL`: PostgreSQL connection string (automatically set by Heroku). For local development, keep it in a `.env` file loaded by your shell; for scheduled jobs, store it in a secret manager and inject it as an environment variable.
 
 ## Project Structure
 - `cricket-data-thing/`: FastAPI backend
