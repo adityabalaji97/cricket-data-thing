@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Container,
   TextField,
@@ -81,6 +81,7 @@ const AppContent = () => {
 
   const [venueFantasyStats, setVenueFantasyStats] = useState({ team1_players: [], team2_players: [] });
   const [venuePlayerHistory, setVenuePlayerHistory] = useState({ players: [] });
+  const hasFetchedRef = useRef(false);
 
   const handleMenuClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -236,7 +237,13 @@ const AppContent = () => {
       if (!showVisualizations) {
         return;
       }
-    
+
+      // Prevent duplicate fetches
+      if (hasFetchedRef.current) {
+        return;
+      }
+      hasFetchedRef.current = true;
+
       try {
         setLoading(true);
         setError(null);
@@ -709,6 +716,7 @@ const AppContent = () => {
                       <Button
                         variant="contained"
                         onClick={() => {
+                          hasFetchedRef.current = false;
                           setShowVisualizations(true);
                         }}
                         disabled={loading || error}
