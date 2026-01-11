@@ -121,8 +121,8 @@ def get_guess_innings(
             dd.wagon_y,
             dd.wagon_zone,
             dd.bat_hand,
-            dd.bat_team,
-            dd.bowl_team
+            dd.batting_team,
+            dd.bowling_team
         FROM delivery_details dd
         WHERE dd.p_match = :match_id
           AND dd.inns = :innings
@@ -148,8 +148,8 @@ def get_guess_innings(
     # Extract bat_hand and teams from first delivery
     first_delivery = deliveries[0] if deliveries else None
     bat_hand = first_delivery.bat_hand if first_delivery else None
-    bat_team = first_delivery.bat_team if first_delivery else None
-    bowl_team = first_delivery.bowl_team if first_delivery else None
+    bat_team = first_delivery.batting_team if first_delivery else None
+    bowl_team = first_delivery.bowling_team if first_delivery else None
 
     payload = {
         "innings": {
@@ -162,8 +162,8 @@ def get_guess_innings(
             "balls": int(result.balls) if result.balls is not None else 0,
             "strike_rate": float(result.strike_rate) if result.strike_rate is not None else 0.0,
             "bat_hand": bat_hand,
-            "bat_team": bat_team,
-            "bowl_team": bowl_team,
+            "bat_team": batting_team,
+            "bowl_team": bowling_team,
         },
         "deliveries": [
             {
