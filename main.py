@@ -1800,6 +1800,7 @@ def get_player_stats(
                         (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
                     )
                 )
+                OR (NOT :has_leagues AND NOT :include_international)
             )
         """
 
@@ -2212,6 +2213,7 @@ def get_player_ball_stats(
                         (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
                     )
                 )
+                OR (NOT :has_leagues AND NOT :include_international)
             )
         """
 
@@ -3198,6 +3200,7 @@ def get_player_bowling_stats(
                         (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
                     )
                 )
+                OR (NOT :has_leagues AND NOT :include_international)
             )
         """
 
@@ -3545,6 +3548,7 @@ def get_player_bowling_stats(
                 "dot_percentage": round((inning.dots * 100) / legal_deliveries, 2) if legal_deliveries else 0,
                 "boundaries": inning.boundaries or 0,
                 "boundary_percentage": round((inning.boundaries * 100) / legal_deliveries, 2) if legal_deliveries else 0,
+                "fantasy_points": float(inning.fantasy_points) if hasattr(inning, "fantasy_points") and inning.fantasy_points is not None else 0,
 
                 # Phase details using pre-calculated stats + legal balls
                 "phase_details": {

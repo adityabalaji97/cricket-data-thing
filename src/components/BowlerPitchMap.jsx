@@ -248,8 +248,8 @@ const BowlerPitchMap = ({
         <PitchMapVisualization
           cells={pitchData.cells}
           mode="grid"
-          colorMetric="economy"
-          displayMetrics={['economy', 'wickets']}
+          colorMetric="bowling_average"
+          displayMetrics={['bowling_average', 'economy']}
           secondaryMetrics={['dot_percentage', 'boundary_percentage']}
           minBalls={5}
           title={playerName}
