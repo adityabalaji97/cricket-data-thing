@@ -31,11 +31,11 @@ const DEFAULT_FILTERS = {
 };
 
 const runColor = (runs) => {
-  if (runs === 6) return designColors.orange[500];
-  if (runs === 4) return designColors.green[500];
-  if (runs === 3) return designColors.blue[400];
-  if (runs === 2) return designColors.blue[300];
-  if (runs === 1) return designColors.blue[200];
+  if (runs === 6) return designColors.chart.orange;
+  if (runs === 4) return designColors.chart.green;
+  if (runs === 3) return designColors.primary[500];
+  if (runs === 2) return designColors.primary[400];
+  if (runs === 1) return designColors.primary[300];
   return designColors.neutral[300];
 };
 
