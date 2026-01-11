@@ -34,7 +34,7 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # Maps for league standardization
-LEAGUES_MAPPING = {
+LEAGUES_MAPPING = { 
     "Indian Premier League": "IPL",
     "Big Bash League": "BBL", 
     "Pakistan Super League": "PSL",
