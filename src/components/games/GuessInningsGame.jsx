@@ -8,19 +8,28 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Button,
-  Chip,
   CircularProgress,
   Collapse,
+  ClickAwayListener,
   IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  Paper,
   Stack,
   TextField,
-  Typography
+  Typography,
+  InputAdornment
 } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import ReplayIcon from '@mui/icons-material/Replay';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import SearchIcon from '@mui/icons-material/Search';
 import config from '../../config';
 import { colors as designColors } from '../../theme/designSystem';
 
@@ -53,19 +62,33 @@ const LEGEND_ITEMS = [
   { label: '0', runs: 0 },
 ];
 
+const GAME_INSTRUCTIONS = [
+  "Watch the wagon wheel animate ball-by-ball",
+  "Lines show where shots were hit - longer = further",
+  "4s and 6s always reach the edge of the circle",
+  "Use the search to guess the batter's name",
+  "Reveal the answer anytime if you're stuck!"
+];
+
 const GuessInningsGame = ({ isMobile = false }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [visibleCount, setVisibleCount] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [guess, setGuess] = useState('');
+  const [guessResult, setGuessResult] = useState(null); // 'correct', 'incorrect', null
   const [revealAnswer, setRevealAnswer] = useState(false);
   const [containerSize, setContainerSize] = useState(320);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const chartContainerRef = useRef(null);
   const playTimerRef = useRef(null);
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -94,6 +117,44 @@ const GuessInningsGame = ({ isMobile = false }) => {
     return () => clearInterval(playTimerRef.current);
   }, [isPlaying, data]);
 
+  // Search suggestions effect
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    if (guess.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const response = await fetch(`${config.API_URL}/search/suggestions?q=${encodeURIComponent(guess)}&limit=8`);
+        if (response.ok) {
+          const data = await response.json();
+          // Filter to only show players
+          const playerSuggestions = (data.suggestions || []).filter(s => s.type === 'player');
+          setSuggestions(playerSuggestions);
+          setShowSuggestions(playerSuggestions.length > 0);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        setSuggestions([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [guess]);
+
   const deliveries = useMemo(() => data?.deliveries || [], [data]);
   const validDeliveries = useMemo(() =>
     deliveries.filter(d => d.wagon_x !== null && d.wagon_y !== null && d.wagon_x !== 0 && d.wagon_y !== 0),
@@ -104,14 +165,35 @@ const GuessInningsGame = ({ isMobile = false }) => {
     [validDeliveries, visibleCount]
   );
   const answer = data?.answer?.batter || '';
-  const normalizedGuess = guess.trim().toLowerCase();
-  const isCorrect = answer && normalizedGuess && answer.trim().toLowerCase() === normalizedGuess;
+
+  const checkGuess = (selectedName) => {
+    if (!answer) return;
+    const normalizedAnswer = answer.trim().toLowerCase();
+    const normalizedGuess = selectedName.trim().toLowerCase();
+
+    // Check if it's a match (exact or contains the key part)
+    if (normalizedAnswer === normalizedGuess ||
+        normalizedAnswer.includes(normalizedGuess) ||
+        normalizedGuess.includes(normalizedAnswer)) {
+      setGuessResult('correct');
+    } else {
+      setGuessResult('incorrect');
+    }
+  };
+
+  const handleSelectSuggestion = (item) => {
+    const name = item.display_name || item.name;
+    setGuess(name);
+    setShowSuggestions(false);
+    checkGuess(name);
+  };
 
   const fetchGame = async () => {
     setLoading(true);
     setError(null);
     setRevealAnswer(false);
     setGuess('');
+    setGuessResult(null);
     setVisibleCount(0);
     setIsPlaying(false);
 
@@ -147,7 +229,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
 
   const renderWagonWheel = () => {
     if (!data) return null;
-    const size = Math.min(containerSize, 360);
+    const size = Math.min(containerSize, 340);
     const width = size;
     const height = size;
     const centerX = width / 2;
@@ -175,17 +257,18 @@ const GuessInningsGame = ({ isMobile = false }) => {
       );
     }
 
-    // Find max distance for normalization (longest shot = radius)
-    const maxDistance = Math.max(
-      ...validDeliveries.map(d => {
+    // Find max distance among non-boundary shots for normalization
+    const nonBoundaryDeliveries = validDeliveries.filter(d => d.runs < 4);
+    const maxNonBoundaryDistance = Math.max(
+      ...nonBoundaryDeliveries.map(d => {
         const dx = d.wagon_x - 150;
         const dy = d.wagon_y - 150;
         return Math.sqrt(dx * dx + dy * dy);
       }),
-      1 // Prevent division by zero
+      1
     );
 
-    // Delivery lines - normalized so longest shot = radius
+    // Delivery lines
     const deliveryLines = visibleDeliveries.map((delivery, index) => {
       const dx = delivery.wagon_x - 150;
       const dy = delivery.wagon_y - 150;
@@ -193,8 +276,15 @@ const GuessInningsGame = ({ isMobile = false }) => {
 
       if (distance === 0) return null;
 
-      // Scale proportionally: longest shot reaches edge, others proportionally shorter
-      const scaledRadius = (distance / maxDistance) * maxRadius;
+      // 4s and 6s always reach the edge, others proportionally scaled
+      let scaledRadius;
+      if (delivery.runs >= 4) {
+        scaledRadius = maxRadius;
+      } else {
+        // Scale non-boundaries: longest non-boundary = 70% of radius, others proportional
+        scaledRadius = (distance / maxNonBoundaryDistance) * maxRadius * 0.7;
+      }
+
       const normalizedX = centerX + (dx / distance) * scaledRadius;
       const normalizedY = centerY + (dy / distance) * scaledRadius;
 
@@ -252,27 +342,44 @@ const GuessInningsGame = ({ isMobile = false }) => {
     </Stack>
   );
 
+  const renderInstructions = () => (
+    <Box sx={{ mb: 2, p: 2, bgcolor: designColors.neutral[50], borderRadius: 2 }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+        How to Play
+      </Typography>
+      <Stack spacing={0.5}>
+        {GAME_INSTRUCTIONS.map((instruction, i) => (
+          <Typography key={i} variant="body2" sx={{ color: designColors.neutral[600], fontSize: '0.85rem' }}>
+            • {instruction}
+          </Typography>
+        ))}
+      </Stack>
+    </Box>
+  );
+
   // Mobile-optimized compact layout
   return (
-    <Box sx={{ py: 1, px: isMobile ? 1 : 2 }}>
-      {/* Header with New Game button */}
+    <Box sx={{
+      py: 1,
+      px: isMobile ? 1 : 2,
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '100%'
+    }}>
+      {/* Header */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
         <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
           Guess the Innings
         </Typography>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={0.5}>
+          {data && (
+            <IconButton size="small" onClick={() => setShowInfo(!showInfo)}>
+              <InfoOutlinedIcon fontSize="small" />
+            </IconButton>
+          )}
           <IconButton size="small" onClick={() => setShowFilters(!showFilters)}>
             <SettingsIcon fontSize="small" />
           </IconButton>
-          <Button
-            variant="contained"
-            size="small"
-            onClick={fetchGame}
-            disabled={loading}
-            sx={{ minWidth: 100 }}
-          >
-            {loading ? 'Loading...' : data ? 'New Game' : 'Start'}
-          </Button>
         </Stack>
       </Stack>
 
@@ -320,6 +427,11 @@ const GuessInningsGame = ({ isMobile = false }) => {
         </Box>
       </Collapse>
 
+      {/* Info panel (when game is active) */}
+      <Collapse in={showInfo && data}>
+        {renderInstructions()}
+      </Collapse>
+
       {error && (
         <Typography variant="body2" color="error" sx={{ mb: 1, textAlign: 'center' }}>
           {error}
@@ -332,38 +444,49 @@ const GuessInningsGame = ({ isMobile = false }) => {
         </Box>
       )}
 
+      {/* Initial state - instructions and start button */}
+      {!data && !loading && !error && (
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {renderInstructions()}
+          <Box sx={{ flex: 1 }} />
+          <Box sx={{ textAlign: 'center', pb: 3 }}>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={fetchGame}
+              sx={{
+                minWidth: 200,
+                py: 1.5,
+                fontSize: '1.1rem',
+                fontWeight: 600
+              }}
+            >
+              Start Game
+            </Button>
+          </Box>
+        </Box>
+      )}
+
       {data && !loading && (
-        <Stack spacing={1.5}>
-          {/* Info Pills */}
-          <Stack direction="row" spacing={0.5} flexWrap="wrap" justifyContent="center" sx={{ gap: 0.5 }}>
-            <Chip
-              label={`${visibleCount}/${validDeliveries.length} balls`}
-              size="small"
-              variant="outlined"
-            />
-            <Chip
-              label={`${data.innings?.runs} runs`}
-              size="small"
-              sx={{ bgcolor: designColors.primary[50] }}
-            />
-            <Chip
-              label={`SR ${data.innings?.strike_rate?.toFixed?.(0) ?? data.innings?.strike_rate}`}
-              size="small"
-              sx={{ bgcolor: designColors.chart.green + '20' }}
-            />
-            {data.innings?.bat_hand && (
-              <Chip
-                label={data.innings.bat_hand === 'LHB' ? 'Left-handed' : 'Right-handed'}
-                size="small"
-                sx={{ bgcolor: designColors.chart.orange + '20' }}
-              />
-            )}
-            <Chip
-              label={data.innings?.competition}
-              size="small"
-              variant="outlined"
-            />
-          </Stack>
+        <Stack spacing={1.5} sx={{ flex: 1 }}>
+          {/* Compact Metrics: runs (balls) SR | Hand | Competition */}
+          <Typography
+            variant="body2"
+            sx={{
+              textAlign: 'center',
+              color: designColors.neutral[700],
+              fontWeight: 500
+            }}
+          >
+            {data.innings?.runs} ({data.innings?.balls}) SR {data.innings?.strike_rate?.toFixed?.(0) ?? data.innings?.strike_rate}
+            {data.innings?.bat_hand && ` • ${data.innings.bat_hand === 'LHB' ? 'Left-hand' : 'Right-hand'}`}
+            {' • '}{data.innings?.competition}
+          </Typography>
+
+          {/* Date and Venue */}
+          <Typography variant="caption" sx={{ textAlign: 'center', color: designColors.neutral[500] }}>
+            {data.innings?.match_date} • {data.innings?.venue}
+          </Typography>
 
           {/* Wagon Wheel */}
           <Box
@@ -372,7 +495,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
               width: '100%',
               display: 'flex',
               justifyContent: 'center',
-              py: 1
+              py: 0.5
             }}
           >
             {renderWagonWheel()}
@@ -381,11 +504,15 @@ const GuessInningsGame = ({ isMobile = false }) => {
           {/* Legend */}
           {renderLegend()}
 
-          {/* Playback Controls */}
-          <Stack direction="row" spacing={1} justifyContent="center">
+          {/* Ball counter and Playback Controls */}
+          <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+            <Typography variant="caption" sx={{ color: designColors.neutral[500], minWidth: 60 }}>
+              {visibleCount}/{validDeliveries.length}
+            </Typography>
             <IconButton
               onClick={() => setIsPlaying(!isPlaying)}
               disabled={visibleCount >= validDeliveries.length}
+              size="small"
               sx={{ bgcolor: designColors.primary[50] }}
             >
               {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
@@ -393,41 +520,100 @@ const GuessInningsGame = ({ isMobile = false }) => {
             <IconButton
               onClick={() => setVisibleCount(prev => Math.min(prev + 1, validDeliveries.length))}
               disabled={visibleCount >= validDeliveries.length}
+              size="small"
             >
               <SkipNextIcon />
             </IconButton>
-            <IconButton onClick={() => { setVisibleCount(0); setIsPlaying(false); }}>
+            <IconButton onClick={() => { setVisibleCount(0); setIsPlaying(false); }} size="small">
               <ReplayIcon />
             </IconButton>
           </Stack>
 
-          {/* Guess Input */}
-          <Stack direction="row" spacing={1} alignItems="center">
-            <TextField
-              placeholder="Who is this batter?"
-              value={guess}
-              onChange={(e) => setGuess(e.target.value)}
-              size="small"
-              fullWidth
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: isCorrect ? designColors.success[50] : 'white'
-                }
-              }}
-            />
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setRevealAnswer(true)}
-              sx={{ minWidth: 80 }}
-            >
-              Reveal
-            </Button>
-          </Stack>
+          {/* Guess Input with Autocomplete */}
+          <ClickAwayListener onClickAway={() => setShowSuggestions(false)}>
+            <Box sx={{ position: 'relative' }}>
+              <TextField
+                placeholder="Search for the batter..."
+                value={guess}
+                onChange={(e) => {
+                  setGuess(e.target.value);
+                  setGuessResult(null);
+                }}
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                size="small"
+                fullWidth
+                disabled={guessResult === 'correct' || revealAnswer}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" color="action" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      {searchLoading && <CircularProgress size={16} />}
+                      {guessResult === 'correct' && <CheckCircleIcon color="success" />}
+                      {guessResult === 'incorrect' && <CancelIcon color="error" />}
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    bgcolor: guessResult === 'correct' ? designColors.success[50] :
+                             guessResult === 'incorrect' ? designColors.error[50] : 'white'
+                  }
+                }}
+              />
 
-          {isCorrect && (
+              {/* Suggestions dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <Paper
+                  elevation={3}
+                  sx={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    mt: 0.5,
+                    maxHeight: 200,
+                    overflow: 'auto',
+                    zIndex: 1000,
+                    borderRadius: 1
+                  }}
+                >
+                  <List dense disablePadding>
+                    {suggestions.map((item, index) => (
+                      <ListItem
+                        key={`${item.name}-${index}`}
+                        button
+                        onClick={() => handleSelectSuggestion(item)}
+                        sx={{
+                          '&:hover': { bgcolor: 'action.hover' },
+                          py: 0.75
+                        }}
+                      >
+                        <ListItemText
+                          primary={item.display_name || item.name}
+                          primaryTypographyProps={{ variant: 'body2' }}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Paper>
+              )}
+            </Box>
+          </ClickAwayListener>
+
+          {/* Result messages */}
+          {guessResult === 'correct' && (
             <Typography variant="body2" sx={{ color: designColors.success[600], textAlign: 'center', fontWeight: 600 }}>
-              Correct!
+              Correct! It's {answer}
+            </Typography>
+          )}
+
+          {guessResult === 'incorrect' && !revealAnswer && (
+            <Typography variant="body2" sx={{ color: designColors.error[600], textAlign: 'center' }}>
+              Not quite - try again or reveal the answer
             </Typography>
           )}
 
@@ -437,20 +623,26 @@ const GuessInningsGame = ({ isMobile = false }) => {
             </Typography>
           )}
 
-          {/* Match Info (smaller) */}
-          <Typography variant="caption" sx={{ textAlign: 'center', color: designColors.neutral[500] }}>
-            {data.innings?.venue} • {data.innings?.match_date}
-          </Typography>
+          {/* Bottom buttons */}
+          <Stack direction="row" spacing={1} justifyContent="center" sx={{ pt: 1 }}>
+            {!revealAnswer && guessResult !== 'correct' && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setRevealAnswer(true)}
+              >
+                Reveal Answer
+              </Button>
+            )}
+            <Button
+              variant="contained"
+              size="small"
+              onClick={fetchGame}
+            >
+              New Game
+            </Button>
+          </Stack>
         </Stack>
-      )}
-
-      {/* Initial state prompt */}
-      {!data && !loading && !error && (
-        <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography variant="body2" color="text.secondary">
-            Click Start to begin!
-          </Typography>
-        </Box>
       )}
     </Box>
   );
