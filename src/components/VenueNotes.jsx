@@ -552,22 +552,7 @@ const BowlingLeaders = ({ data, isMobile }) => {
     );
 };
 
-const VenueNotes = ({ 
-    venue, 
-    startDate, 
-    endDate, 
-    venueStats, 
-    statsData, 
-    selectedTeam1, 
-    selectedTeam2, 
-    venueFantasyStats, 
-    venuePlayerHistory,
-    matchHistory,
-    isMobile 
-  }) => {
-
-    const [fantasyTabValue, setFantasyTabValue] = useState(0);
-
+// Moved outside VenueNotes to prevent recreation on every render
 const WinPercentagesPie = ({ data }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -619,16 +604,13 @@ const WinPercentagesPie = ({ data }) => {
       );
     };
 
-    // Calculate explicit height for the chart container (chartHeight minus title ~35px and legend ~50px)
-    const chartContainerHeight = chartHeight - 85;
-
     return (
         <Box sx={{ width: '100%', height: chartHeight, display: 'flex', flexDirection: 'column' }}>
             <Typography variant={isMobile ? "body1" : "subtitle1"} align="center" gutterBottom sx={{ fontWeight: 600 }}>
                 Match Results Distribution
             </Typography>
-            <Box sx={{ width: '100%' }}>
-                <ResponsiveContainer width="100%" height={chartContainerHeight}>
+            <Box sx={{ flex: 1, position: 'relative' }}>
+                <ResponsiveContainer>
                     <PieChart>
                         <Pie
                             data={pieData}
@@ -750,16 +732,13 @@ const ScoresBarChart = ({ data }) => {
         );
     };
 
-    // Calculate explicit height for the chart container (chartHeight minus title ~35px)
-    const chartContainerHeight = chartHeight - 35;
-
     return (
         <Box sx={{ width: '100%', height: chartHeight, display: 'flex', flexDirection: 'column' }}>
             <Typography variant={isMobile ? "body1" : "subtitle1"} align="center" gutterBottom sx={{ fontWeight: 600 }}>
                 Innings Scores Analysis
             </Typography>
-            <Box sx={{ width: '100%' }}>
-                <ResponsiveContainer width="100%" height={chartContainerHeight}>
+            <Box sx={{ flex: 1 }}>
+                <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                         data={filteredScoreData}
                         layout="vertical"
@@ -898,6 +877,22 @@ const PhaseWiseStrategy = ({ data, isMobile }) => {
         </Box>
     );
 };
+
+const VenueNotes = ({
+    venue,
+    startDate,
+    endDate,
+    venueStats,
+    statsData,
+    selectedTeam1,
+    selectedTeam2,
+    venueFantasyStats,
+    venuePlayerHistory,
+    matchHistory,
+    isMobile
+  }) => {
+
+    const [fantasyTabValue, setFantasyTabValue] = useState(0);
 
 if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
 
@@ -1072,18 +1067,13 @@ return (
             )}
             {statsData?.batting_scatter && statsData.batting_scatter.length > 0 && (
                 <Grid item xs={12} md={12}>
-                    <Card sx={{
-                        p: { xs: 1, sm: 2 },
-                        width: '100%',
-                        backgroundColor: isMobile ? 'transparent' : undefined,
-                        boxShadow: isMobile ? 0 : undefined
-                    }}>
-                        <Typography variant={isMobile ? "body1" : "h6"} gutterBottom sx={{ fontWeight: 600 }}>
+                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
+                        <Typography variant="h6" gutterBottom>
                             Bowling Type Analysis
                         </Typography>
                         {/* Wrap BowlingAnalysis in error boundary */}
                         <Box sx={{ position: 'relative' }}>
-                            <BowlingAnalysis
+                            <BowlingAnalysis 
                             venue={venue}
                             startDate={startDate}
                             endDate={endDate}
