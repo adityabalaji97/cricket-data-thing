@@ -59,8 +59,8 @@ def get_guess_innings(
             FROM delivery_details dd
             WHERE dd.bat IS NOT NULL
               AND dd.competition = ANY(:competitions)
-              AND dd.match_date >= :start_date
-              AND (:end_date IS NULL OR dd.match_date <= :end_date)
+              AND dd.match_date::date >= :start_date
+              AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
             GROUP BY dd.p_match, dd.inns, dd.bat, dd.ground, dd.competition, dd.match_date
         ),
         ranked AS (
