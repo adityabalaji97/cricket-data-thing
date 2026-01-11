@@ -9,11 +9,11 @@ database to identify:
 4. Coverage analysis
 
 Usage:
-    python scripts/validate_new_dataset.py --csv /path/to/t20_bbb.csv --db-url "postgres://..."
+    python scripts/validate_new_dataset.py --csv /path/to/t20_bbb.csv --db-url "$DATABASE_URL"
     python scripts/validate_new_dataset.py --csv /path/to/t20_bbb.csv --sample 100000
     
     # Using environment variable:
-    DATABASE_URL="postgres://..." python scripts/validate_new_dataset.py --csv /path/to/t20_bbb.csv
+    python scripts/validate_new_dataset.py --csv /path/to/t20_bbb.csv
 """
 
 import os

@@ -14,10 +14,11 @@ Requirements:
   - DATABASE_URL must be set in the environment.
 
 Examples:
-  DATABASE_URL="postgresql://..." scripts/run_delivery_details_refresh.sh \
+  # Ensure DATABASE_URL is set (for example: source /path/to/.env)
+  scripts/run_delivery_details_refresh.sh \
     --dropbox-url "https://www.dropbox.com/s/<id>/t20_bbb.csv?dl=0"
 
-  DATABASE_URL="postgresql://..." scripts/run_delivery_details_refresh.sh \
+  scripts/run_delivery_details_refresh.sh \
     --dropbox-url "https://www.dropbox.com/s/<id>/t20_bbb.csv" \
     --csv-path data/t20_bbb.csv --skip-elo --dry-run
 USAGE

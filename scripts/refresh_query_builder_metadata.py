@@ -2,11 +2,11 @@
 Refresh query_builder_metadata table with precomputed values.
 
 Run after data loads or periodically:
-    python scripts/refresh_query_builder_metadata.py --db-url "postgres://..."
+    python scripts/refresh_query_builder_metadata.py --db-url "$DATABASE_URL"
     python scripts/refresh_query_builder_metadata.py --show-only
     
     # Using environment variable:
-    DATABASE_URL="postgres://..." python scripts/refresh_query_builder_metadata.py
+    python scripts/refresh_query_builder_metadata.py
 """
 
 import os

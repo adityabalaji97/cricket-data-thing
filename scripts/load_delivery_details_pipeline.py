@@ -10,16 +10,16 @@ This script orchestrates the full data loading pipeline:
 
 Usage:
     # Full pipeline with dry run
-    python scripts/load_delivery_details_pipeline.py --csv /path/to/t20_bbb.csv --db-url "postgres://..." --dry-run
+    python scripts/load_delivery_details_pipeline.py --csv /path/to/t20_bbb.csv --db-url "$DATABASE_URL" --dry-run
     
     # Full pipeline (actual execution)
-    python scripts/load_delivery_details_pipeline.py --csv /path/to/t20_bbb.csv --db-url "postgres://..."
+    python scripts/load_delivery_details_pipeline.py --csv /path/to/t20_bbb.csv --db-url "$DATABASE_URL"
     
     # Skip validation step
-    python scripts/load_delivery_details_pipeline.py --csv /path/to/t20_bbb.csv --db-url "postgres://..." --skip-validation
+    python scripts/load_delivery_details_pipeline.py --csv /path/to/t20_bbb.csv --db-url "$DATABASE_URL" --skip-validation
     
     # Using environment variable
-    DATABASE_URL="postgres://..." python scripts/load_delivery_details_pipeline.py --csv /path/to/t20_bbb.csv
+    python scripts/load_delivery_details_pipeline.py --csv /path/to/t20_bbb.csv
 """
 
 import os
@@ -213,13 +213,13 @@ Steps:
 
 Examples:
   # Dry run (no changes)
-  python scripts/load_delivery_details_pipeline.py --csv data.csv --db-url "postgres://..." --dry-run
+  python scripts/load_delivery_details_pipeline.py --csv data.csv --db-url "$DATABASE_URL" --dry-run
 
   # Full execution
-  python scripts/load_delivery_details_pipeline.py --csv data.csv --db-url "postgres://..."
+  python scripts/load_delivery_details_pipeline.py --csv data.csv --db-url "$DATABASE_URL"
 
   # Skip ELO calculation (faster)
-  python scripts/load_delivery_details_pipeline.py --csv data.csv --db-url "postgres://..." --skip-elo
+  python scripts/load_delivery_details_pipeline.py --csv data.csv --db-url "$DATABASE_URL" --skip-elo
         """
     )
     parser.add_argument('--csv', required=True, help='Path to t20_bbb.csv')

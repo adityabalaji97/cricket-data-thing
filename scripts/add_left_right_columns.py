@@ -3,11 +3,11 @@ Add left-right analysis columns to delivery_details.
 Data is already loaded - just need to add and populate columns.
 
 Usage:
-    python scripts/add_left_right_columns.py --db-url "postgres://..."
+    python scripts/add_left_right_columns.py --db-url "$DATABASE_URL"
     python scripts/add_left_right_columns.py --dry-run
     
     # Using environment variable:
-    DATABASE_URL="postgresql://..." python scripts/add_left_right_columns.py
+    python scripts/add_left_right_columns.py
 """
 
 import os
