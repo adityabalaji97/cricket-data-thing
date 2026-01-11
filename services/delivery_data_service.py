@@ -201,8 +201,8 @@ def get_match_totals_from_deliveries(
         )
         SELECT
             COUNT(DISTINCT fm.id) as total_matches,
-            SUM(CASE WHEN fm.won_batting_first THEN 1 ELSE 0 END) as batting_first_wins,
-            SUM(CASE WHEN fm.won_fielding_first THEN 1 ELSE 0 END) as batting_second_wins,
+            COUNT(DISTINCT CASE WHEN fm.won_batting_first THEN fm.id END) as batting_first_wins,
+            COUNT(DISTINCT CASE WHEN fm.won_fielding_first THEN fm.id END) as batting_second_wins,
             MAX(CASE WHEN mt.innings = 1 THEN mt.total_runs END) as highest_total,
             MIN(CASE WHEN mt.innings = 1 THEN mt.total_runs END) as lowest_total,
             ROUND(AVG(CASE WHEN mt.innings = 1 THEN mt.total_runs END)::numeric, 2) as average_first_innings,
@@ -287,8 +287,8 @@ def get_match_totals_from_delivery_details(
         )
         SELECT
             COUNT(DISTINCT fm.id) as total_matches,
-            SUM(CASE WHEN fm.won_batting_first THEN 1 ELSE 0 END) as batting_first_wins,
-            SUM(CASE WHEN fm.won_fielding_first THEN 1 ELSE 0 END) as batting_second_wins,
+            COUNT(DISTINCT CASE WHEN fm.won_batting_first THEN fm.id END) as batting_first_wins,
+            COUNT(DISTINCT CASE WHEN fm.won_fielding_first THEN fm.id END) as batting_second_wins,
             MAX(CASE WHEN mt.innings = 1 THEN mt.total_runs END) as highest_total,
             MIN(CASE WHEN mt.innings = 1 THEN mt.total_runs END) as lowest_total,
             ROUND(AVG(CASE WHEN mt.innings = 1 THEN mt.total_runs END)::numeric, 2) as average_first_innings,
