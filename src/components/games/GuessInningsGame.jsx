@@ -152,24 +152,34 @@ const GuessInningsGame = ({ isMobile = false }) => {
       );
     }
 
-    const deliveryDots = visibleDeliveries
-      .filter(d => d.wagon_x !== null && d.wagon_y !== null)
+    const deliveryLines = visibleDeliveries
+      .filter(d => d.wagon_x !== null && d.wagon_y !== null && d.wagon_x !== 0 && d.wagon_y !== 0)
       .map((delivery, index) => {
         const scale = maxRadius / 150;
         const x = centerX + (delivery.wagon_x - 150) * scale;
         const y = centerY + (delivery.wagon_y - 150) * scale;
-        const isLatest = index === visibleDeliveries.length - 1;
+        const isLatest = index === visibleDeliveries.filter(d => d.wagon_x !== null && d.wagon_y !== null && d.wagon_x !== 0 && d.wagon_y !== 0).length - 1;
         return (
-          <circle
-            key={`delivery-${index}`}
-            cx={x}
-            cy={y}
-            r={isLatest ? 5 : 3.5}
-            fill={runColor(delivery.runs)}
-            stroke={isLatest ? designColors.neutral[900] : designColors.neutral[50]}
-            strokeWidth={isLatest ? 2 : 1}
-            opacity={isLatest ? 1 : 0.75}
-          />
+          <g key={`delivery-${index}`}>
+            <line
+              x1={centerX}
+              y1={centerY}
+              x2={x}
+              y2={y}
+              stroke={runColor(delivery.runs)}
+              strokeWidth={isLatest ? 3 : 2}
+              opacity={isLatest ? 1 : 0.6}
+              strokeLinecap="round"
+            />
+            <circle
+              cx={x}
+              cy={y}
+              r={isLatest ? 5 : 3}
+              fill={runColor(delivery.runs)}
+              stroke={isLatest ? designColors.neutral[900] : 'none'}
+              strokeWidth={isLatest ? 1.5 : 0}
+            />
+          </g>
         );
       });
 
@@ -177,8 +187,8 @@ const GuessInningsGame = ({ isMobile = false }) => {
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
         <circle cx={centerX} cy={centerY} r={maxRadius} fill={designColors.neutral[50]} stroke={designColors.neutral[200]} />
         {zoneLines}
+        {deliveryLines}
         <circle cx={centerX} cy={centerY} r={batterRadius} fill={designColors.neutral[800]} />
-        {deliveryDots}
       </svg>
     );
   };
