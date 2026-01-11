@@ -627,8 +627,8 @@ const WinPercentagesPie = ({ data }) => {
             <Typography variant={isMobile ? "body1" : "subtitle1"} align="center" gutterBottom sx={{ fontWeight: 600 }}>
                 Match Results Distribution
             </Typography>
-            <Box sx={{ width: '100%', height: chartContainerHeight }}>
-                <ResponsiveContainer width="100%" height="100%">
+            <Box sx={{ width: '100%' }}>
+                <ResponsiveContainer width="100%" height={chartContainerHeight}>
                     <PieChart>
                         <Pie
                             data={pieData}
@@ -758,8 +758,8 @@ const ScoresBarChart = ({ data }) => {
             <Typography variant={isMobile ? "body1" : "subtitle1"} align="center" gutterBottom sx={{ fontWeight: 600 }}>
                 Innings Scores Analysis
             </Typography>
-            <Box sx={{ width: '100%', height: chartContainerHeight }}>
-                <ResponsiveContainer width="100%" height="100%">
+            <Box sx={{ width: '100%' }}>
+                <ResponsiveContainer width="100%" height={chartContainerHeight}>
                     <BarChart
                         data={filteredScoreData}
                         layout="vertical"
