@@ -54,26 +54,33 @@ const FilterSheet = ({
 
   const renderFilterField = (filter) => {
     if (filter.type === 'autocomplete') {
+      const getOptionLabel = filter.getOptionLabel || ((option) => {
+        if (typeof option === 'string') {
+          return option;
+        }
+        return option?.display_name || option?.name || '';
+      });
+      const isOptionEqualToValue = filter.isOptionEqualToValue || ((option, value) => {
+        if (!value) return false;
+        if (typeof option === 'string' || typeof value === 'string') {
+          return option === value;
+        }
+        return option?.name === value?.name;
+      });
       return (
         <Autocomplete
           key={filter.key}
           value={draftValues[filter.key]}
           onChange={(_, newValue) => handleChange(filter.key, newValue)}
           options={filter.options}
+          inputValue={filter.inputValue}
+          onInputChange={filter.onInputChange}
+          loading={filter.loading}
+          filterOptions={filter.filterOptions}
           fullWidth
           size="medium"
-          getOptionLabel={(option) => {
-            if (typeof option === 'string') {
-              return option;
-            }
-            return option || '';
-          }}
-          isOptionEqualToValue={(option, value) => {
-            if (typeof value === 'string') {
-              return option === value;
-            }
-            return option === value;
-          }}
+          getOptionLabel={getOptionLabel}
+          isOptionEqualToValue={isOptionEqualToValue}
           renderInput={(params) => (
             <TextField
               {...params}
