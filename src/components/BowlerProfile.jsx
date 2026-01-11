@@ -350,6 +350,7 @@ const BowlerProfile = () => {
     // Fetch bowling stats when shouldFetch is triggered
     const fetchBowlingStats = async () => {
       if (!shouldFetch || !selectedPlayerName) return;
+      setShouldFetch(false);
       
       console.log('Fetching bowling stats for player:', selectedPlayerName);
       setLoading(true);
@@ -389,7 +390,6 @@ const BowlerProfile = () => {
         setError('Failed to load player bowling statistics');
       } finally {
         setLoading(false);
-        setShouldFetch(false);
       }
     };
 

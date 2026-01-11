@@ -79,6 +79,7 @@ const PlayerProfile = () => {
         
         // Get player name and other parameters from URL if present
         const playerNameFromURL = getQueryParam('name');
+        const autoload = getQueryParam('autoload') === 'true';
         const startDateFromURL = getQueryParam('start_date');
         const endDateFromURL = getQueryParam('end_date');
         const venueFromURL = getQueryParam('venue');
@@ -119,7 +120,9 @@ const PlayerProfile = () => {
                   }
                   return [resolvedPlayer, ...prev];
                 });
-                setShouldFetch(true);
+                if (autoload) {
+                  setShouldFetch(true);
+                }
               }
             } else {
               console.warn('Player name in URL not found:', playerNameFromURL);
@@ -310,6 +313,7 @@ const PlayerProfile = () => {
     // Inside fetchPlayerStats function in useEffect
     const fetchPlayerStats = async () => {
         if (!shouldFetch || !selectedPlayerName) return;
+        setShouldFetch(false);
 
         console.log('Fetching stats for player:', selectedPlayerName);
         setLoading(true);
@@ -348,7 +352,6 @@ const PlayerProfile = () => {
           setError('Failed to load player statistics');
         } finally {
           setLoading(false);
-          setShouldFetch(false);
         }
     };
 
