@@ -43,31 +43,29 @@ def get_guess_innings(
     if not competition_filter:
         raise HTTPException(status_code=400, detail="At least one competition or league must be provided")
 
-    # Simplified query - no CTEs or window functions for speed
+    # Use pre-computed materialized view for speed (no GROUP BY needed)
     innings_query = text(
         """
         SELECT
-            dd.p_match AS match_id,
-            dd.inns AS innings,
-            dd.bat AS batter,
-            dd.ground AS venue,
-            dd.competition AS competition,
-            dd.match_date AS match_date,
-            COUNT(*) AS balls,
-            SUM(dd.score) AS runs,
-            ROUND(SUM(dd.score)::numeric * 100.0 / NULLIF(COUNT(*), 0), 2) AS strike_rate
-        FROM delivery_details dd
-        WHERE dd.bat IS NOT NULL
-          AND dd.competition = ANY(:competitions)
-          AND dd.match_date::date >= :start_date
-          AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
-          AND dd.wagon_x IS NOT NULL
-          AND dd.wagon_y IS NOT NULL
-        GROUP BY dd.p_match, dd.inns, dd.bat, dd.ground, dd.competition, dd.match_date
-        HAVING COUNT(*) >= :min_balls
-          AND SUM(dd.score) >= :min_runs
-          AND SUM(dd.score)::float * 100.0 / NULLIF(COUNT(*), 0) >= :min_strike_rate
-          AND SUM(CASE WHEN dd.wagon_x != 0 OR dd.wagon_y != 0 THEN 1 ELSE 0 END) >= 5
+            match_id,
+            innings,
+            batter,
+            venue,
+            competition,
+            match_date,
+            balls,
+            runs,
+            strike_rate,
+            bat_hand,
+            batting_team,
+            bowling_team
+        FROM guess_innings_pool
+        WHERE competition = ANY(:competitions)
+          AND match_date::date >= :start_date
+          AND (:end_date IS NULL OR match_date::date <= :end_date)
+          AND balls >= :min_balls
+          AND runs >= :min_runs
+          AND strike_rate >= :min_strike_rate
         ORDER BY RANDOM()
         LIMIT 1
         """
@@ -126,17 +124,18 @@ def get_guess_innings(
     if not deliveries:
         raise HTTPException(status_code=404, detail="No wagon wheel deliveries found for this innings")
 
-    # Extract bat_hand and teams from first delivery
-    first_delivery = deliveries[0] if deliveries else None
+    # Use pre-computed values from materialized view, fall back to deliveries if needed
     last_delivery = deliveries[-1] if deliveries else None
-    bat_hand = first_delivery.bat_hand if first_delivery else None
-    batting_team = first_delivery.batting_team if first_delivery else None
-    bowling_team = first_delivery.bowling_team if first_delivery else None
 
     # Use cur_bat_runs and cur_bat_bf from last delivery for accurate batter stats
     batter_runs = int(last_delivery.cur_bat_runs) if last_delivery and last_delivery.cur_bat_runs is not None else int(result.runs) if result.runs else 0
     batter_balls = int(last_delivery.cur_bat_bf) if last_delivery and last_delivery.cur_bat_bf is not None else int(result.balls) if result.balls else 0
     batter_sr = round((batter_runs * 100.0 / batter_balls), 2) if batter_balls > 0 else 0.0
+
+    # Use pre-computed fields from view
+    bat_hand = result.bat_hand if hasattr(result, 'bat_hand') else (deliveries[0].bat_hand if deliveries else None)
+    batting_team = result.batting_team if hasattr(result, 'batting_team') else (deliveries[0].batting_team if deliveries else None)
+    bowling_team = result.bowling_team if hasattr(result, 'bowling_team') else (deliveries[0].bowling_team if deliveries else None)
 
     payload = {
         "innings": {
