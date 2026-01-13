@@ -193,3 +193,155 @@ def get_guess_innings(
         }
 
     return payload
+
+
+# IPL team name normalization for franchise renames
+IPL_TEAM_NAMES = {
+    'Delhi Daredevils': 'Delhi Capitals',
+    'Deccan Chargers': 'Sunrisers Hyderabad',
+    'Rising Pune Supergiants': 'Rising Pune Supergiant',
+    'Kings XI Punjab': 'Punjab Kings',
+}
+
+
+def normalize_ipl_team(team_name: str) -> str:
+    """Normalize IPL team names for franchise renames."""
+    return IPL_TEAM_NAMES.get(team_name, team_name)
+
+
+def collapse_year_ranges(team_years: list) -> list:
+    """
+    Collapse consecutive years into ranges.
+    Input: [('CSK', 2008), ('CSK', 2009), ('CSK', 2010), ('PWI', 2011), ...]
+    Output: [{'team': 'Chennai Super Kings', 'years': '2008-2010'}, ...]
+    """
+    if not team_years:
+        return []
+
+    result = []
+    current_team = team_years[0][0]
+    start_year = team_years[0][1]
+    end_year = team_years[0][1]
+
+    for i in range(1, len(team_years)):
+        team, year = team_years[i]
+        if team == current_team and year == end_year + 1:
+            # Consecutive year, same team
+            end_year = year
+        else:
+            # New team or gap in years
+            years_str = str(start_year) if start_year == end_year else f"{start_year}-{end_year}"
+            result.append({"team": current_team, "years": years_str})
+            current_team = team
+            start_year = year
+            end_year = year
+
+    # Don't forget the last range
+    years_str = str(start_year) if start_year == end_year else f"{start_year}-{end_year}"
+    result.append({"team": current_team, "years": years_str})
+
+    return result
+
+
+@router.get("/player-journey")
+def get_player_journey(
+    include_answer: bool = Query(default=False),
+    min_seasons: int = Query(default=3, ge=1),
+    db: Session = Depends(get_session),
+):
+    """
+    Fetch a random player's IPL team journey for the guessing game.
+    Returns chronological list of teams the player has played for.
+    """
+
+    # First, get all players with their team/year combinations
+    journey_query = text(
+        """
+        WITH player_team_years AS (
+            SELECT
+                bs.striker AS player_name,
+                bs.batting_team AS team,
+                EXTRACT(YEAR FROM m.date)::int AS year,
+                SUM(bs.runs) AS total_runs,
+                SUM(bs.balls_faced) AS total_balls
+            FROM batting_stats bs
+            JOIN matches m ON bs.match_id = m.id
+            WHERE m.competition = 'Indian Premier League'
+              AND bs.striker IS NOT NULL
+              AND bs.batting_team IS NOT NULL
+            GROUP BY bs.striker, bs.batting_team, EXTRACT(YEAR FROM m.date)
+        ),
+        player_stats AS (
+            SELECT
+                player_name,
+                COUNT(DISTINCT year) AS seasons,
+                SUM(total_runs) AS career_runs,
+                SUM(total_balls) AS career_balls,
+                COUNT(DISTINCT team) AS num_teams
+            FROM player_team_years
+            GROUP BY player_name
+            HAVING COUNT(DISTINCT year) >= :min_seasons
+        )
+        SELECT
+            pty.player_name,
+            pty.team,
+            pty.year,
+            ps.career_runs,
+            ps.career_balls,
+            ps.seasons,
+            ps.num_teams
+        FROM player_team_years pty
+        JOIN player_stats ps ON pty.player_name = ps.player_name
+        WHERE pty.player_name = (
+            SELECT player_name FROM player_stats ORDER BY RANDOM() LIMIT 1
+        )
+        ORDER BY pty.year, pty.team
+        """
+    )
+
+    results = db.execute(
+        journey_query,
+        {"min_seasons": min_seasons}
+    ).fetchall()
+
+    if not results:
+        raise HTTPException(status_code=404, detail="No player journey found")
+
+    player_name = results[0].player_name
+    career_runs = int(results[0].career_runs) if results[0].career_runs else 0
+    career_balls = int(results[0].career_balls) if results[0].career_balls else 0
+    seasons = int(results[0].seasons) if results[0].seasons else 0
+    num_teams = int(results[0].num_teams) if results[0].num_teams else 0
+
+    # Normalize team names and build team-year list
+    team_years = []
+    for row in results:
+        normalized_team = normalize_ipl_team(row.team)
+        team_years.append((normalized_team, row.year))
+
+    # Remove duplicates (same team, same year) and sort
+    team_years = sorted(set(team_years), key=lambda x: (x[1], x[0]))
+
+    # Collapse into ranges
+    journey = collapse_year_ranges(team_years)
+
+    payload = {
+        "journey": journey,
+        "stats": {
+            "total_runs": career_runs,
+            "total_balls": career_balls,
+            "total_seasons": seasons,
+            "total_teams": num_teams,
+            "strike_rate": round(career_runs * 100.0 / career_balls, 2) if career_balls > 0 else 0,
+        },
+        "filters": {
+            "min_seasons": min_seasons,
+        },
+    }
+
+    if include_answer:
+        payload["answer"] = {
+            "player": player_name,
+        }
+
+    return payload
