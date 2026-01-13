@@ -183,9 +183,34 @@ const GuessInningsGame = ({ isMobile = false }) => {
     if (firstLettersRevealed && answer && guess) {
       // Clear guess when hint revealed - slots will show first letters automatically
       setGuess('');
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
     }
   }, [firstLettersRevealed]);
+
+  // Auto-evaluate when all slots are filled
+  useEffect(() => {
+    if (!gameEnded && slots.length > 0 && filledSlots.every(char => char)) {
+      // All slots filled - auto-check after brief delay for visual feedback
+      const timer = setTimeout(() => {
+        const answerChars = slots.map(s => s.char);
+        const isCorrect = filledSlots.every((char, idx) => char === answerChars[idx]);
+
+        if (isCorrect) {
+          setGuessResult('correct');
+          endGame('correct');
+        } else {
+          setGuessResult('incorrect');
+          setShakeInput(true);
+          setTimeout(() => {
+            setShakeInput(false);
+            setGuess(''); // Clear for retry
+            setGuessResult(null);
+          }, 500);
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [filledSlots, slots, gameEnded]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -414,7 +439,7 @@ Play: ${GAME_URL}`;
             '50%': { opacity: 0 },
           }
         }}
-        onClick={() => !gameEnded && inputRef.current?.focus()}
+        onClick={() => !gameEnded && inputRef.current?.focus({ preventScroll: true })}
       >
         <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap" sx={{ rowGap: 1 }}>
           {words.map((word, wordIdx) => (
@@ -478,7 +503,7 @@ Play: ${GAME_URL}`;
           ))}
         </Stack>
 
-        {/* Hidden input - completely offscreen to hide cursor */}
+        {/* Hidden input - visually hidden but accessible, no scroll on focus */}
         {!gameEnded && (
           <input
             ref={inputRef}
@@ -491,11 +516,20 @@ Play: ${GAME_URL}`;
               if (guessResult === 'incorrect') setGuessResult(null);
             }}
             onKeyDown={handleKeyDown}
+            onFocus={(e) => {
+              // Prevent any scroll behavior on focus
+              e.target.scrollIntoView = () => {};
+            }}
             style={{
               position: 'absolute',
-              left: '-9999px',
-              top: '-9999px',
-              opacity: 0,
+              width: '1px',
+              height: '1px',
+              padding: 0,
+              margin: '-1px',
+              overflow: 'hidden',
+              clip: 'rect(0, 0, 0, 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
             }}
             autoComplete="off"
             autoCapitalize="off"
