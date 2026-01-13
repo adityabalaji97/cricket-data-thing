@@ -98,8 +98,8 @@ def get_guess_innings(
             dd.wagon_y,
             dd.wagon_zone,
             dd.bat_hand,
-            dd.batting_team,
-            dd.bowling_team,
+            dd.team_bat AS batting_team,
+            dd.team_bowl AS bowling_team,
             dd.cur_bat_runs,
             dd.cur_bat_bf
         FROM delivery_details dd
