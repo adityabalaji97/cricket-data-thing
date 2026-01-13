@@ -252,24 +252,70 @@ def get_player_journey(
     """
     Fetch a random player's IPL team journey for the guessing game.
     Returns chronological list of teams the player has played for.
+    Combines batting and bowling appearances from delivery_details,
+    using player_aliases for canonical names.
     """
 
-    # First, get all players with their team/year combinations
+    # Combine batting and bowling appearances, use canonical names from player_aliases
     journey_query = text(
         """
-        WITH player_team_years AS (
+        WITH all_appearances AS (
+            -- Batting appearances
             SELECT
-                bs.striker AS player_name,
-                bs.batting_team AS team,
+                dd.bat AS raw_name,
+                dd.team_bat AS team,
                 EXTRACT(YEAR FROM m.date)::int AS year,
-                SUM(bs.runs) AS total_runs,
-                SUM(bs.balls_faced) AS total_balls
-            FROM batting_stats bs
-            JOIN matches m ON bs.match_id = m.id
+                SUM(dd.score) AS runs,
+                COUNT(*) AS balls,
+                0 AS wickets
+            FROM delivery_details dd
+            JOIN matches m ON dd.p_match = m.id
             WHERE m.competition = 'Indian Premier League'
-              AND bs.striker IS NOT NULL
-              AND bs.batting_team IS NOT NULL
-            GROUP BY bs.striker, bs.batting_team, EXTRACT(YEAR FROM m.date)
+              AND dd.bat IS NOT NULL
+              AND dd.team_bat IS NOT NULL
+            GROUP BY dd.bat, dd.team_bat, EXTRACT(YEAR FROM m.date)
+
+            UNION ALL
+
+            -- Bowling appearances
+            SELECT
+                dd.bowl AS raw_name,
+                dd.team_bowl AS team,
+                EXTRACT(YEAR FROM m.date)::int AS year,
+                0 AS runs,
+                0 AS balls,
+                SUM(CASE WHEN dd.out = true THEN 1 ELSE 0 END) AS wickets
+            FROM delivery_details dd
+            JOIN matches m ON dd.p_match = m.id
+            WHERE m.competition = 'Indian Premier League'
+              AND dd.bowl IS NOT NULL
+              AND dd.team_bowl IS NOT NULL
+            GROUP BY dd.bowl, dd.team_bowl, EXTRACT(YEAR FROM m.date)
+        ),
+        -- Map to canonical names using player_aliases
+        appearances_with_canonical AS (
+            SELECT
+                COALESCE(pa.alias_name, aa.raw_name) AS player_name,
+                aa.raw_name,
+                aa.team,
+                aa.year,
+                aa.runs,
+                aa.balls,
+                aa.wickets
+            FROM all_appearances aa
+            LEFT JOIN player_aliases pa ON aa.raw_name = pa.player_name
+        ),
+        -- Aggregate by canonical name, team, year
+        player_team_years AS (
+            SELECT
+                player_name,
+                team,
+                year,
+                SUM(runs) AS total_runs,
+                SUM(balls) AS total_balls,
+                SUM(wickets) AS total_wickets
+            FROM appearances_with_canonical
+            GROUP BY player_name, team, year
         ),
         player_stats AS (
             SELECT
@@ -277,6 +323,7 @@ def get_player_journey(
                 COUNT(DISTINCT year) AS seasons,
                 SUM(total_runs) AS career_runs,
                 SUM(total_balls) AS career_balls,
+                SUM(total_wickets) AS career_wickets,
                 COUNT(DISTINCT team) AS num_teams
             FROM player_team_years
             GROUP BY player_name
@@ -288,6 +335,7 @@ def get_player_journey(
             pty.year,
             ps.career_runs,
             ps.career_balls,
+            ps.career_wickets,
             ps.seasons,
             ps.num_teams
         FROM player_team_years pty
@@ -310,6 +358,7 @@ def get_player_journey(
     player_name = results[0].player_name
     career_runs = int(results[0].career_runs) if results[0].career_runs else 0
     career_balls = int(results[0].career_balls) if results[0].career_balls else 0
+    career_wickets = int(results[0].career_wickets) if results[0].career_wickets else 0
     seasons = int(results[0].seasons) if results[0].seasons else 0
     num_teams = int(results[0].num_teams) if results[0].num_teams else 0
 
@@ -330,6 +379,7 @@ def get_player_journey(
         "stats": {
             "total_runs": career_runs,
             "total_balls": career_balls,
+            "total_wickets": career_wickets,
             "total_seasons": seasons,
             "total_teams": num_teams,
             "strike_rate": round(career_runs * 100.0 / career_balls, 2) if career_balls > 0 else 0,

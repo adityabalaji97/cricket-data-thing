@@ -54,7 +54,17 @@ const GAME_URL = 'https://hindsight2020.vercel.app/games/player-journeys';
 // Hint definitions in reveal order
 const HINT_CONFIG = [
   { key: 'years', label: 'Years', icon: '📅', getValue: (d) => 'Year ranges revealed' },
-  { key: 'stats', label: 'Stats', icon: '📊', getValue: (d) => `${d.stats?.total_runs} runs @ SR ${d.stats?.strike_rate?.toFixed(1)}` },
+  { key: 'stats', label: 'Stats', icon: '📊', getValue: (d) => {
+    const runs = d.stats?.total_runs || 0;
+    const wickets = d.stats?.total_wickets || 0;
+    const sr = d.stats?.strike_rate?.toFixed(1) || 0;
+    if (wickets > 0 && runs > 0) {
+      return `${runs} runs, ${wickets} wkts`;
+    } else if (wickets > 0) {
+      return `${wickets} wickets`;
+    }
+    return `${runs} runs @ SR ${sr}`;
+  }},
   { key: 'first_letters', label: 'Initials', icon: '🔤', getValue: (d) => getFirstLetters(d.answer?.player) },
 ];
 
