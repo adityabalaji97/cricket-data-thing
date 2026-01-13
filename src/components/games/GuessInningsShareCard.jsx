@@ -142,14 +142,14 @@ const GuessInningsShareCard = forwardRef(({ data, score, hintsUsed, streak }, re
         {answer}
       </text>
 
-      {/* Stats */}
+      {/* Stats - only default info: runs (balls), SR, date, hand */}
       <text x={width / 2} y="365" textAnchor="middle" fontSize="14" fill="#666666">
-        {innings.runs} ({innings.balls}) • SR {innings.strike_rate?.toFixed?.(0) ?? innings.strike_rate}
+        {innings.runs} ({innings.balls}) • SR {innings.strike_rate?.toFixed?.(0) ?? innings.strike_rate} • {innings.bat_hand}
       </text>
 
-      {/* Match info */}
+      {/* Date */}
       <text x={width / 2} y="385" textAnchor="middle" fontSize="12" fill="#888888">
-        {innings.competition} • {innings.batting_team} vs {innings.bowling_team}
+        {innings.match_date ? new Date(innings.match_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
       </text>
 
       {/* Hints used indicator */}
@@ -189,7 +189,7 @@ const GuessInningsShareCard = forwardRef(({ data, score, hintsUsed, streak }, re
 
       {/* Footer */}
       <text x={width / 2} y="505" textAnchor="middle" fontSize="11" fill="#AAAAAA">
-        hindsight2020.vercel.app/games/guess-innings
+        https://hindsight2020.vercel.app/games/guess-innings
       </text>
     </svg>
   );

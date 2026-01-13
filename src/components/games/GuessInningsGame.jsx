@@ -73,8 +73,8 @@ const formatDate = (dateStr) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-// Game URL for sharing
-const GAME_URL = 'hindsight2020.vercel.app/games/guess-innings';
+// Game URL for sharing (include https:// for clickable links)
+const GAME_URL = 'https://hindsight2020.vercel.app/games/guess-innings';
 
 // Hint definitions in reveal order
 const HINT_CONFIG = [
