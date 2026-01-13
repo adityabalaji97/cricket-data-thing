@@ -136,6 +136,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
 
   const hintsUsed = revealedHints.length;
   const score = gameEnded ? (guessResult === 'correct' ? 5 - hintsUsed : 0) : null;
+  const answer = data?.answer?.batter || '';
 
   // Check if first_letters hint is revealed (5th hint, index 4)
   const firstLettersRevealed = revealedHints.includes(4);
@@ -180,7 +181,6 @@ const GuessInningsGame = ({ isMobile = false }) => {
     visibleDeliveries.filter(d => d.wagon_x !== null && d.wagon_y !== null),
     [visibleDeliveries]
   );
-  const answer = data?.answer?.batter || '';
 
   const endGame = (result) => {
     if (gameEnded) return;
