@@ -610,9 +610,9 @@ const GuessInningsGame = ({ isMobile = false }) => {
           </ClickAwayListener>
 
           {/* Hint */}
-          {showHint && data.innings?.bat_team && data.innings?.bowl_team && (
+          {showHint && data.innings?.batting_team && data.innings?.bowling_team && (
             <Typography variant="body2" sx={{ textAlign: 'center', color: designColors.neutral[600] }}>
-              <strong>{data.innings.bat_team}</strong> vs {data.innings.bowl_team}
+              <strong>{data.innings.batting_team}</strong> vs {data.innings.bowling_team}
             </Typography>
           )}
 
