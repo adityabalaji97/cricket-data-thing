@@ -368,6 +368,9 @@ Play: ${GAME_URL}`;
     // Track slot index as we render words
     let slotIdx = 0;
 
+    // Find the next empty slot index for cursor
+    const nextEmptySlot = filledSlots.findIndex(char => !char);
+
     return (
       <Box
         sx={{
@@ -379,6 +382,10 @@ Play: ${GAME_URL}`;
             '0%, 100%': { transform: 'translateX(0)' },
             '20%, 60%': { transform: 'translateX(-5px)' },
             '40%, 80%': { transform: 'translateX(5px)' },
+          },
+          '@keyframes blink': {
+            '0%, 100%': { opacity: 1 },
+            '50%': { opacity: 0 },
           }
         }}
         onClick={() => !gameEnded && inputRef.current?.focus()}
@@ -392,6 +399,7 @@ Play: ${GAME_URL}`;
                 const filledChar = filledSlots[currentSlotIdx] || '';
                 const isFirstLetter = slot?.isFirstLetter && firstLettersRevealed;
                 const displayChar = showAnswer ? char.toUpperCase() : filledChar;
+                const isNextEmpty = !showAnswer && !gameEnded && currentSlotIdx === nextEmptySlot;
 
                 return (
                   <Box
@@ -404,10 +412,12 @@ Play: ${GAME_URL}`;
                       justifyContent: 'center',
                       borderBottom: `2px solid ${
                         showAnswer ? designColors.success[500] :
+                        isNextEmpty ? designColors.primary[500] :
                         filledChar ? designColors.primary[400] :
                         designColors.neutral[400]
                       }`,
                       mx: 0.2,
+                      position: 'relative',
                     }}
                   >
                     <Typography
@@ -422,6 +432,19 @@ Play: ${GAME_URL}`;
                     >
                       {displayChar}
                     </Typography>
+                    {/* Blinking cursor for next empty slot */}
+                    {isNextEmpty && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          bottom: 4,
+                          width: 12,
+                          height: 2,
+                          bgcolor: designColors.primary[500],
+                          animation: 'blink 1s ease-in-out infinite',
+                        }}
+                      />
+                    )}
                   </Box>
                 );
               })}
@@ -803,20 +826,6 @@ Play: ${GAME_URL}`;
           {/* Hangman display with integrated input */}
           {renderHangmanDisplay()}
 
-          {/* Guess button */}
-          {!gameEnded && (
-            <Box sx={{ textAlign: 'center' }}>
-              <Button
-                variant="contained"
-                size="small"
-                onClick={checkGuess}
-                disabled={!guess.trim()}
-              >
-                Guess
-              </Button>
-            </Box>
-          )}
-
           {/* Wrong guess message */}
           {guessResult === 'incorrect' && !gameEnded && (
             <Typography variant="body2" sx={{ color: designColors.error[600], textAlign: 'center', fontWeight: 500 }}>
@@ -824,27 +833,9 @@ Play: ${GAME_URL}`;
             </Typography>
           )}
 
-          {/* Score display when game ended */}
-          {gameEnded && (
+          {/* Give Up button (during game) or Score + actions (after game) */}
+          {!gameEnded ? (
             <Box sx={{ textAlign: 'center' }}>
-              <Chip
-                label={`Score: ${score}/5`}
-                sx={{
-                  fontWeight: 700,
-                  fontSize: '1rem',
-                  py: 2,
-                  bgcolor: score === 5 ? designColors.chart.orange + '40' :
-                           score >= 3 ? designColors.chart.green + '40' :
-                           score > 0 ? designColors.primary[100] :
-                           designColors.neutral[100],
-                }}
-              />
-            </Box>
-          )}
-
-          {/* Action buttons */}
-          <Stack direction="row" spacing={1} justifyContent="center">
-            {!gameEnded && (
               <Button
                 variant="outlined"
                 size="small"
@@ -853,9 +844,24 @@ Play: ${GAME_URL}`;
               >
                 Give Up
               </Button>
-            )}
-            {gameEnded && (
-              <>
+            </Box>
+          ) : (
+            <>
+              <Box sx={{ textAlign: 'center' }}>
+                <Chip
+                  label={`Score: ${score}/5`}
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '1rem',
+                    py: 2,
+                    bgcolor: score === 5 ? designColors.chart.orange + '40' :
+                             score >= 3 ? designColors.chart.green + '40' :
+                             score > 0 ? designColors.primary[100] :
+                             designColors.neutral[100],
+                  }}
+                />
+              </Box>
+              <Stack direction="row" spacing={1} justifyContent="center">
                 <Button
                   variant="outlined"
                   size="small"
@@ -871,9 +877,9 @@ Play: ${GAME_URL}`;
                 >
                   Next
                 </Button>
-              </>
-            )}
-          </Stack>
+              </Stack>
+            </>
+          )}
         </Stack>
       )}
 
