@@ -68,9 +68,23 @@ def expand_league_abbreviations(abbrevs: List[str]) -> List[str]:
     if not abbrevs:
         return []
 
+    # Additional aliases for T20 Blast variations
+    t20_blast_names = ["T20 Blast", "Vitality Blast", "NatWest T20 Blast"]
+    t20i_names = ["T20I", "International Twenty20"]
+
     expanded = []
     for abbrev in abbrevs:
         expanded.append(abbrev)
+
+        # Handle T20 Blast specially - add all variations
+        if abbrev in t20_blast_names or abbrev.lower() in ["t20 blast", "vitality blast"]:
+            expanded.extend(t20_blast_names)
+            continue
+
+        # Handle T20I specially - add all variations
+        if abbrev in t20i_names or abbrev.lower() == "t20i":
+            expanded.extend(t20i_names)
+            continue
 
         # If input is a full name, add the abbreviation
         if abbrev in leagues_mapping:

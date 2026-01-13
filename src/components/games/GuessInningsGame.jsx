@@ -12,33 +12,19 @@ import {
   Chip,
   CircularProgress,
   Collapse,
-  ClickAwayListener,
   IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  Paper,
   Stack,
   TextField,
   Typography,
-  InputAdornment,
   Snackbar
 } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import SkipNextIcon from '@mui/icons-material/SkipNext';
-import ReplayIcon from '@mui/icons-material/Replay';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
-import SearchIcon from '@mui/icons-material/Search';
 import ShareIcon from '@mui/icons-material/Share';
 import config from '../../config';
 import { colors as designColors } from '../../theme/designSystem';
 
 const DEFAULT_FILTERS = {
-  leagues: 'IPL',
+  leagues: 'IPL,BBL,PSL,CPL,SA20,T20 Blast,T20I',
   competitions: '',
   startDate: '2015-01-01',
   endDate: '',
@@ -67,11 +53,16 @@ const LEGEND_ITEMS = [
 ];
 
 const GAME_INSTRUCTIONS = [
-  "Watch the wagon wheel animate ball-by-ball",
-  "Guess the batter from their scoring pattern",
-  "Use hints if stuck (but they cost points!)",
-  "Score: 4 points - hints used",
+  "Guess the batter from their wagon wheel pattern",
+  "Use hints if stuck (each costs 1 point)",
+  "Score: 5 points - hints used",
 ];
+
+// Helper to get first letters of name
+const getFirstLetters = (name) => {
+  if (!name) return '';
+  return name.split(' ').map(word => word[0]).join('. ') + '.';
+};
 
 // Hint definitions in reveal order
 const HINT_CONFIG = [
@@ -79,6 +70,7 @@ const HINT_CONFIG = [
   { key: 'competition', label: 'League', icon: '🏆', getValue: (d) => d.innings?.competition },
   { key: 'bowling_team', label: 'vs', icon: '🎯', getValue: (d) => d.innings?.bowling_team },
   { key: 'batting_team', label: 'For', icon: '🏏', getValue: (d) => d.innings?.batting_team },
+  { key: 'first_letters', label: 'Initials', icon: '🔤', getValue: (d) => getFirstLetters(d.answer?.batter) },
 ];
 
 // localStorage key
@@ -115,12 +107,10 @@ const saveStats = (stats) => {
 const GuessInningsGame = ({ isMobile = false }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [visibleCount, setVisibleCount] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [guess, setGuess] = useState('');
   const [guessResult, setGuessResult] = useState(null); // 'correct', 'incorrect', null
   const [revealAnswer, setRevealAnswer] = useState(false);
@@ -129,15 +119,15 @@ const GuessInningsGame = ({ isMobile = false }) => {
   const [stats, setStats] = useState(loadStats);
   const [showCopied, setShowCopied] = useState(false);
   const [containerSize, setContainerSize] = useState(320);
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [shakeInput, setShakeInput] = useState(false);
   const chartContainerRef = useRef(null);
-  const playTimerRef = useRef(null);
-  const debounceRef = useRef(null);
+  const inputRef = useRef(null);
 
   const hintsUsed = revealedHints.length;
-  const score = gameEnded ? (guessResult === 'correct' ? 4 - hintsUsed : 0) : null;
+  const score = gameEnded ? (guessResult === 'correct' ? 5 - hintsUsed : 0) : null;
+
+  // Check if first_letters hint is revealed (5th hint, index 4)
+  const firstLettersRevealed = revealedHints.includes(4);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -151,57 +141,13 @@ const GuessInningsGame = ({ isMobile = false }) => {
     return () => resizeObserver.disconnect();
   }, []);
 
+  // Auto-play all deliveries when game loads
   useEffect(() => {
-    if (!isPlaying || !data) return;
+    if (!data) return;
     const totalDeliveries = data?.deliveries?.length || 0;
-    playTimerRef.current = setInterval(() => {
-      setVisibleCount((prev) => {
-        if (prev >= totalDeliveries) {
-          setIsPlaying(false);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 300);
-    return () => clearInterval(playTimerRef.current);
-  }, [isPlaying, data]);
-
-  // Search suggestions effect
-  useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    if (guess.length < 2) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    debounceRef.current = setTimeout(async () => {
-      setSearchLoading(true);
-      try {
-        const response = await fetch(`${config.API_URL}/search/suggestions?q=${encodeURIComponent(guess)}&limit=8`);
-        if (response.ok) {
-          const responseData = await response.json();
-          const playerSuggestions = (responseData.suggestions || []).filter(s => s.type === 'player');
-          setSuggestions(playerSuggestions);
-          setShowSuggestions(playerSuggestions.length > 0);
-        }
-      } catch (err) {
-        console.error('Search error:', err);
-        setSuggestions([]);
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 300);
-
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, [guess]);
+    // Instantly show all deliveries (no animation)
+    setVisibleCount(totalDeliveries);
+  }, [data]);
 
   const deliveries = useMemo(() => data?.deliveries || [], [data]);
   const visibleDeliveries = useMemo(() =>
@@ -239,26 +185,26 @@ const GuessInningsGame = ({ isMobile = false }) => {
     saveStats(newStats);
   };
 
-  const checkGuess = (selectedName) => {
-    if (!answer || gameEnded) return;
+  const checkGuess = () => {
+    if (!answer || gameEnded || !guess.trim()) return;
     const normalizedAnswer = answer.trim().toLowerCase();
-    const normalizedGuess = selectedName.trim().toLowerCase();
+    const normalizedGuess = guess.trim().toLowerCase();
 
-    if (normalizedAnswer === normalizedGuess ||
-        normalizedAnswer.includes(normalizedGuess) ||
-        normalizedGuess.includes(normalizedAnswer)) {
+    if (normalizedAnswer === normalizedGuess) {
       setGuessResult('correct');
       endGame('correct');
     } else {
       setGuessResult('incorrect');
+      // Shake animation
+      setShakeInput(true);
+      setTimeout(() => setShakeInput(false), 500);
     }
   };
 
-  const handleSelectSuggestion = (item) => {
-    const name = item.display_name || item.name;
-    setGuess(name);
-    setShowSuggestions(false);
-    checkGuess(name);
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      checkGuess();
+    }
   };
 
   const handleRevealAnswer = () => {
@@ -283,17 +229,16 @@ const GuessInningsGame = ({ isMobile = false }) => {
     const hintLines = HINT_CONFIG.map((hint, idx) => {
       const revealed = revealedHints.includes(idx);
       const checkmark = revealed ? '✓' : '✗';
-      return `${hint.icon} ${checkmark}`;
+      return `${hint.icon}${checkmark}`;
     }).join(' ');
 
     return `Guess the Innings 🏏
 
 ${innings.runs} (${innings.balls}) • SR ${innings.strike_rate?.toFixed?.(0) ?? innings.strike_rate}
-${innings.match_date}
 
 ${hintLines}
 
-${resultEmoji} Score: ${score}/4${streakText}
+${resultEmoji} Score: ${score}/5${streakText}
 
 Play: cricketdata.com/guess`;
   };
@@ -327,7 +272,6 @@ Play: cricketdata.com/guess`;
     setGuess('');
     setGuessResult(null);
     setVisibleCount(0);
-    setIsPlaying(false);
 
     const params = new URLSearchParams();
     const leagues = filters.leagues.split(',').map(item => item.trim()).filter(Boolean);
@@ -350,12 +294,59 @@ Play: cricketdata.com/guess`;
       }
       const payload = await response.json();
       setData(payload);
-      setIsPlaying(true);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Render Hangman-style underscore display
+  const renderHangmanDisplay = () => {
+    if (!answer) return null;
+
+    const words = answer.split(' ');
+    const showAnswer = revealAnswer || guessResult === 'correct';
+
+    return (
+      <Box sx={{ textAlign: 'center', py: 1 }}>
+        <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap">
+          {words.map((word, wordIdx) => (
+            <Stack key={wordIdx} direction="row" spacing={0.5}>
+              {word.split('').map((char, charIdx) => {
+                const isFirstLetter = charIdx === 0 && firstLettersRevealed;
+                const showChar = showAnswer || isFirstLetter;
+                return (
+                  <Box
+                    key={charIdx}
+                    sx={{
+                      width: 24,
+                      height: 32,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderBottom: `2px solid ${designColors.neutral[400]}`,
+                      mx: 0.25,
+                    }}
+                  >
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 700,
+                        color: showAnswer ? designColors.success[600] : designColors.neutral[800],
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {showChar ? char.toUpperCase() : ''}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Stack>
+          ))}
+        </Stack>
+      </Box>
+    );
   };
 
   const renderWagonWheel = () => {
@@ -468,40 +459,106 @@ Play: cricketdata.com/guess`;
   );
 
   const renderInstructions = () => (
-    <Box sx={{ mb: 2, p: 2, bgcolor: designColors.neutral[50], borderRadius: 2 }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-        How to Play
-      </Typography>
+    <Box sx={{ mb: 2, p: 1.5, bgcolor: designColors.neutral[50], borderRadius: 2 }}>
       <Stack spacing={0.5}>
         {GAME_INSTRUCTIONS.map((instruction, i) => (
-          <Typography key={i} variant="body2" sx={{ color: designColors.neutral[600], fontSize: '0.85rem' }}>
+          <Typography key={i} variant="body2" sx={{ color: designColors.neutral[600], fontSize: '0.8rem' }}>
             • {instruction}
           </Typography>
         ))}
       </Stack>
-      {stats.played > 0 && (
-        <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${designColors.neutral[200]}` }}>
-          <Typography variant="caption" sx={{ color: designColors.neutral[500] }}>
-            Stats: {stats.solved}/{stats.played} solved • {stats.perfectGames} perfect • Best streak: {stats.maxStreak}
-          </Typography>
-        </Box>
-      )}
     </Box>
   );
 
-  const renderHints = () => (
-    <Stack spacing={0.5} sx={{ mb: 1 }}>
-      {/* Revealed hints */}
-      {revealedHints.map((hintIdx) => {
-        const hint = HINT_CONFIG[hintIdx];
-        const value = hint.getValue(data);
-        return (
-          <Typography key={hint.key} variant="body2" sx={{ textAlign: 'center', color: designColors.neutral[600] }}>
-            {hint.icon} {hint.label}: <strong>{value}</strong>
-          </Typography>
-        );
-      })}
+  const renderStatsBar = () => (
+    <Stack
+      direction="row"
+      spacing={1}
+      justifyContent="center"
+      sx={{ mb: 1, flexWrap: 'wrap', gap: 0.5 }}
+    >
+      <Chip
+        label={`${stats.solved}/${stats.played}`}
+        size="small"
+        sx={{ fontSize: '0.7rem', height: 22 }}
+      />
+      {stats.perfectGames > 0 && (
+        <Chip
+          label={`${stats.perfectGames} perfect`}
+          size="small"
+          sx={{ fontSize: '0.7rem', height: 22, bgcolor: designColors.chart.orange + '30' }}
+        />
+      )}
+      {stats.currentStreak > 0 && (
+        <Chip
+          label={`🔥 ${stats.currentStreak}`}
+          size="small"
+          sx={{ fontSize: '0.7rem', height: 22 }}
+        />
+      )}
     </Stack>
+  );
+
+  const renderHints = () => (
+    <Box sx={{ mb: 1 }}>
+      {/* Hint buttons row */}
+      <Stack direction="row" spacing={0.5} justifyContent="center" sx={{ mb: 0.5 }}>
+        {HINT_CONFIG.map((hint, idx) => {
+          const isRevealed = revealedHints.includes(idx);
+          const isNextHint = idx === revealedHints.length;
+          return (
+            <Button
+              key={hint.key}
+              size="small"
+              variant={isRevealed ? "contained" : "outlined"}
+              disabled={!isNextHint || gameEnded}
+              onClick={revealNextHint}
+              sx={{
+                minWidth: 40,
+                px: 1,
+                py: 0.25,
+                fontSize: '0.9rem',
+                bgcolor: isRevealed ? designColors.primary[100] : undefined,
+                borderColor: isRevealed ? designColors.primary[300] : designColors.neutral[300],
+                color: isRevealed ? designColors.primary[700] : designColors.neutral[600],
+                '&.Mui-disabled': {
+                  bgcolor: isRevealed ? designColors.primary[100] : undefined,
+                  color: isRevealed ? designColors.primary[700] : undefined,
+                }
+              }}
+            >
+              {hint.icon}
+            </Button>
+          );
+        })}
+      </Stack>
+
+      {/* Revealed hint values */}
+      {revealedHints.length > 0 && (
+        <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+          {revealedHints.filter(idx => idx < 4).map((hintIdx) => {
+            const hint = HINT_CONFIG[hintIdx];
+            const value = hint.getValue(data);
+            return (
+              <Typography
+                key={hint.key}
+                variant="caption"
+                sx={{
+                  color: designColors.neutral[600],
+                  bgcolor: designColors.neutral[100],
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: 1,
+                  fontSize: '0.75rem',
+                }}
+              >
+                {hint.label === 'vs' ? 'vs ' : hint.label === 'For' ? '' : ''}{value}
+              </Typography>
+            );
+          })}
+        </Stack>
+      )}
+    </Box>
   );
 
   return (
@@ -512,44 +569,26 @@ Play: cricketdata.com/guess`;
       flexDirection: 'column',
       minHeight: '100%'
     }}>
-      {/* Header */}
+      {/* Compact header with stats and settings */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-        <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 600 }}>
-          Guess the Innings
-        </Typography>
-        <Stack direction="row" spacing={0.5}>
-          {data && (
-            <IconButton size="small" onClick={() => setShowInfo(!showInfo)}>
-              <InfoOutlinedIcon fontSize="small" />
-            </IconButton>
-          )}
-          <IconButton size="small" onClick={() => setShowFilters(!showFilters)}>
-            <SettingsIcon fontSize="small" />
-          </IconButton>
-        </Stack>
+        {stats.played > 0 ? renderStatsBar() : <Box />}
+        <IconButton size="small" onClick={() => setShowFilters(!showFilters)}>
+          <SettingsIcon fontSize="small" />
+        </IconButton>
       </Stack>
 
       {/* Collapsible Filters */}
       <Collapse in={showFilters}>
         <Box sx={{ mb: 2, p: 1.5, bgcolor: designColors.neutral[50], borderRadius: 1 }}>
           <Stack spacing={1.5}>
-            <Stack direction="row" spacing={1}>
-              <TextField
-                label="Leagues"
-                value={filters.leagues}
-                onChange={(e) => setFilters(prev => ({ ...prev, leagues: e.target.value }))}
-                size="small"
-                fullWidth
-              />
-              <TextField
-                label="Min SR"
-                type="number"
-                value={filters.minStrikeRate}
-                onChange={(e) => setFilters(prev => ({ ...prev, minStrikeRate: Number(e.target.value) }))}
-                size="small"
-                sx={{ width: 100 }}
-              />
-            </Stack>
+            <TextField
+              label="Leagues"
+              value={filters.leagues}
+              onChange={(e) => setFilters(prev => ({ ...prev, leagues: e.target.value }))}
+              size="small"
+              fullWidth
+              helperText="IPL, BBL, PSL, CPL, SA20, T20 Blast, T20I"
+            />
             <Stack direction="row" spacing={1}>
               <TextField
                 label="Min Balls"
@@ -560,22 +599,16 @@ Play: cricketdata.com/guess`;
                 sx={{ width: 100 }}
               />
               <TextField
-                label="Start Date"
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
+                label="Min SR"
+                type="number"
+                value={filters.minStrikeRate}
+                onChange={(e) => setFilters(prev => ({ ...prev, minStrikeRate: Number(e.target.value) }))}
                 size="small"
-                fullWidth
+                sx={{ width: 100 }}
               />
             </Stack>
           </Stack>
         </Box>
-      </Collapse>
-
-      {/* Info panel */}
-      <Collapse in={showInfo && data}>
-        {renderInstructions()}
       </Collapse>
 
       {error && (
@@ -592,48 +625,54 @@ Play: cricketdata.com/guess`;
 
       {/* Initial state */}
       {!data && !loading && !error && (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, textAlign: 'center' }}>
+            Guess the Innings
+          </Typography>
           {renderInstructions()}
-          <Box sx={{ flex: 1 }} />
-          <Box sx={{ textAlign: 'center', pb: 3 }}>
-            <Button
-              variant="contained"
-              size="large"
-              onClick={fetchGame}
-              sx={{
-                minWidth: 200,
-                py: 1.5,
-                fontSize: '1.1rem',
-                fontWeight: 600
-              }}
-            >
-              Start Game
-            </Button>
-          </Box>
+          <Button
+            variant="contained"
+            size="large"
+            onClick={fetchGame}
+            sx={{
+              minWidth: 200,
+              py: 1.5,
+              fontSize: '1.1rem',
+              fontWeight: 600
+            }}
+          >
+            Start Game
+          </Button>
         </Box>
       )}
 
       {data && !loading && (
-        <Stack spacing={1.5} sx={{ flex: 1 }}>
-          {/* Always visible: runs (balls), SR, date, hand */}
-          <Typography
-            variant="body2"
-            sx={{
-              textAlign: 'center',
-              color: designColors.neutral[700],
-              fontWeight: 500
-            }}
-          >
-            {data.innings?.runs} ({data.innings?.balls}) SR {data.innings?.strike_rate?.toFixed?.(0) ?? data.innings?.strike_rate}
-            {data.innings?.bat_hand && ` • ${data.innings.bat_hand === 'LHB' ? 'Left-hand' : 'Right-hand'}`}
-          </Typography>
-
-          <Typography variant="caption" sx={{ textAlign: 'center', color: designColors.neutral[500] }}>
-            {data.innings?.match_date}
-          </Typography>
-
-          {/* Revealed hints */}
-          {renderHints()}
+        <Stack spacing={1} sx={{ flex: 1 }}>
+          {/* Stats pills: runs (balls), SR, date, hand */}
+          <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+            <Chip
+              label={`${data.innings?.runs} (${data.innings?.balls})`}
+              size="small"
+              sx={{ fontWeight: 600 }}
+            />
+            <Chip
+              label={`SR ${data.innings?.strike_rate?.toFixed?.(0) ?? data.innings?.strike_rate}`}
+              size="small"
+              variant="outlined"
+            />
+            <Chip
+              label={data.innings?.match_date?.split('-')[0]}
+              size="small"
+              variant="outlined"
+            />
+            {data.innings?.bat_hand && (
+              <Chip
+                label={data.innings.bat_hand}
+                size="small"
+                variant="outlined"
+              />
+            )}
+          </Stack>
 
           {/* Wagon Wheel */}
           <Box
@@ -642,7 +681,6 @@ Play: cricketdata.com/guess`;
               width: '100%',
               display: 'flex',
               justifyContent: 'center',
-              py: 0.5
             }}
           >
             {renderWagonWheel()}
@@ -651,185 +689,105 @@ Play: cricketdata.com/guess`;
           {/* Legend */}
           {renderLegend()}
 
-          {/* Playback Controls */}
-          <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
-            <Typography variant="caption" sx={{ color: designColors.neutral[500], minWidth: 60 }}>
-              {visibleCount}/{deliveries.length}
-            </Typography>
-            <IconButton
-              onClick={() => setIsPlaying(!isPlaying)}
-              disabled={visibleCount >= deliveries.length}
-              size="small"
-              sx={{ bgcolor: designColors.primary[50] }}
-            >
-              {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-            </IconButton>
-            <IconButton
-              onClick={() => setVisibleCount(prev => Math.min(prev + 1, deliveries.length))}
-              disabled={visibleCount >= deliveries.length}
-              size="small"
-            >
-              <SkipNextIcon />
-            </IconButton>
-            <IconButton onClick={() => { setVisibleCount(0); setIsPlaying(false); }} size="small">
-              <ReplayIcon />
-            </IconButton>
-          </Stack>
+          {/* Hint buttons */}
+          {renderHints()}
 
-          {/* Guess Input */}
-          <ClickAwayListener onClickAway={() => setShowSuggestions(false)}>
-            <Box sx={{ position: 'relative' }}>
+          {/* Hangman display */}
+          {renderHangmanDisplay()}
+
+          {/* Guess Input - only show if game not ended */}
+          {!gameEnded && (
+            <Stack direction="row" spacing={1} justifyContent="center">
               <TextField
-                placeholder="Search for the batter..."
+                ref={inputRef}
+                placeholder="Type your guess..."
                 value={guess}
                 onChange={(e) => {
                   setGuess(e.target.value);
-                  setGuessResult(null);
+                  if (guessResult === 'incorrect') setGuessResult(null);
                 }}
-                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                onKeyDown={handleKeyDown}
                 size="small"
-                fullWidth
-                disabled={gameEnded}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" color="action" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      {searchLoading && <CircularProgress size={16} />}
-                      {guessResult === 'correct' && <CheckCircleIcon color="success" />}
-                      {guessResult === 'incorrect' && <CancelIcon color="error" />}
-                    </InputAdornment>
-                  ),
-                }}
                 sx={{
+                  flex: 1,
+                  maxWidth: 280,
                   '& .MuiOutlinedInput-root': {
-                    bgcolor: guessResult === 'correct' ? designColors.success[50] :
-                             guessResult === 'incorrect' ? designColors.error[50] : 'white'
+                    animation: shakeInput ? 'shake 0.5s ease-in-out' : 'none',
+                  },
+                  '@keyframes shake': {
+                    '0%, 100%': { transform: 'translateX(0)' },
+                    '20%, 60%': { transform: 'translateX(-5px)' },
+                    '40%, 80%': { transform: 'translateX(5px)' },
                   }
                 }}
               />
-
-              {showSuggestions && suggestions.length > 0 && (
-                <Paper
-                  elevation={3}
-                  sx={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    mt: 0.5,
-                    maxHeight: 200,
-                    overflow: 'auto',
-                    zIndex: 1000,
-                    borderRadius: 1
-                  }}
-                >
-                  <List dense disablePadding>
-                    {suggestions.map((item, index) => (
-                      <ListItem
-                        key={`${item.name}-${index}`}
-                        button
-                        onClick={() => handleSelectSuggestion(item)}
-                        sx={{
-                          '&:hover': { bgcolor: 'action.hover' },
-                          py: 0.75
-                        }}
-                      >
-                        <ListItemText
-                          primary={item.display_name || item.name}
-                          primaryTypographyProps={{ variant: 'body2' }}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Paper>
-              )}
-            </Box>
-          </ClickAwayListener>
-
-          {/* Result messages */}
-          {guessResult === 'correct' && (
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ color: designColors.success[600], fontWeight: 600 }}>
-                Correct! It's {answer}
-              </Typography>
-              <Chip
-                label={`Score: ${score}/4`}
-                size="small"
-                sx={{
-                  mt: 0.5,
-                  bgcolor: score === 4 ? designColors.chart.orange + '30' :
-                           score >= 2 ? designColors.chart.green + '30' :
-                           designColors.neutral[100],
-                  fontWeight: 600
-                }}
-              />
-            </Box>
+              <Button
+                variant="contained"
+                onClick={checkGuess}
+                disabled={!guess.trim()}
+              >
+                Guess
+              </Button>
+            </Stack>
           )}
 
+          {/* Wrong guess message */}
           {guessResult === 'incorrect' && !gameEnded && (
-            <Typography variant="body2" sx={{ color: designColors.error[600], textAlign: 'center' }}>
-              Not quite - try again!
+            <Typography variant="body2" sx={{ color: designColors.error[600], textAlign: 'center', fontWeight: 500 }}>
+              Try again!
             </Typography>
           )}
 
-          {revealAnswer && (
+          {/* Score display when game ended */}
+          {gameEnded && (
             <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body1">
-                Answer: <strong>{answer}</strong>
-              </Typography>
-              <Chip label="Score: 0/4" size="small" sx={{ mt: 0.5, bgcolor: designColors.neutral[100] }} />
+              <Chip
+                label={`Score: ${score}/5`}
+                sx={{
+                  fontWeight: 700,
+                  fontSize: '1rem',
+                  py: 2,
+                  bgcolor: score === 5 ? designColors.chart.orange + '40' :
+                           score >= 3 ? designColors.chart.green + '40' :
+                           score > 0 ? designColors.primary[100] :
+                           designColors.neutral[100],
+                }}
+              />
             </Box>
           )}
 
           {/* Action buttons */}
-          <Stack direction="row" spacing={1} justifyContent="center" sx={{ pt: 1 }}>
-            {!gameEnded && hintsUsed < HINT_CONFIG.length && (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={revealNextHint}
-              >
-                Hint ({hintsUsed}/4)
-              </Button>
-            )}
+          <Stack direction="row" spacing={1} justifyContent="center">
             {!gameEnded && (
               <Button
                 variant="outlined"
                 size="small"
+                color="error"
                 onClick={handleRevealAnswer}
               >
                 Give Up
               </Button>
             )}
             {gameEnded && (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={handleShare}
-                startIcon={<ShareIcon />}
-              >
-                Share
-              </Button>
+              <>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleShare}
+                  startIcon={<ShareIcon />}
+                >
+                  Share
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={fetchGame}
+                >
+                  Next
+                </Button>
+              </>
             )}
-            <Button
-              variant="contained"
-              size="small"
-              onClick={fetchGame}
-            >
-              {gameEnded ? 'Play Again' : 'New Game'}
-            </Button>
           </Stack>
-
-          {/* Current streak indicator */}
-          {stats.currentStreak > 0 && (
-            <Typography variant="caption" sx={{ textAlign: 'center', color: designColors.neutral[500] }}>
-              Current streak: {stats.currentStreak} 🔥
-            </Typography>
-          )}
         </Stack>
       )}
 

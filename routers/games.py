@@ -17,7 +17,7 @@ router = APIRouter(prefix="/games", tags=["games"])
 
 @router.get("/guess-innings")
 def get_guess_innings(
-    leagues: List[str] = Query(default=["IPL"]),
+    leagues: List[str] = Query(default=["IPL", "BBL", "PSL", "CPL", "SA20", "T20 Blast", "T20I"]),
     competitions: List[str] = Query(default=[]),
     start_date: Optional[date] = Query(default=date(2015, 1, 1)),
     end_date: Optional[date] = Query(default=None),

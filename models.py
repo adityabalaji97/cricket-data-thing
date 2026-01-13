@@ -42,20 +42,24 @@ teams_mapping = {
 
 leagues_mapping = {
     "Indian Premier League": "IPL",
-    "Big Bash League": "BBL", 
+    "Big Bash League": "BBL",
     "Pakistan Super League": "PSL",
     "Caribbean Premier League": "CPL",
     "SA20": "SA20",
     "International League T20": "ILT20",
     "Bangladesh Premier League": "BPL",
-    "Lanka Premier League": "LPL"
+    "Lanka Premier League": "LPL",
+    "Vitality Blast": "T20 Blast",
+    "NatWest T20 Blast": "T20 Blast",
+    "International Twenty20": "T20I",
 }
 
 # Additional mapping for leagues with name changes over time
 league_aliases = {
     "HRV Cup": "Super Smash",
     "HRV Twenty20": "Super Smash",
-    "NatWest T20 Blast": "Vitality Blast"
+    "NatWest T20 Blast": "Vitality Blast",
+    "T20 Blast": "Vitality Blast",
 }
 
 INTERNATIONAL_TEAMS_RANKED = [
