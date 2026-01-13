@@ -140,6 +140,17 @@ const GuessInningsGame = ({ isMobile = false }) => {
   // Check if first_letters hint is revealed (5th hint, index 4)
   const firstLettersRevealed = revealedHints.includes(4);
 
+  // When first letters hint is revealed, pre-fill guess with skeleton
+  useEffect(() => {
+    if (firstLettersRevealed && answer && !guess) {
+      // Pre-fill with first letters and spaces: "Mayank Agarwal" -> "M A"
+      const skeleton = answer.split(' ').map(word => word[0]).join(' ');
+      setGuess(skeleton);
+      // Focus the input
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [firstLettersRevealed, answer]);
+
   useEffect(() => {
     if (!chartContainerRef.current) return;
     const resizeObserver = new ResizeObserver(entries => {
@@ -761,16 +772,9 @@ Play: ${GAME_URL}`;
           {/* Hangman display with integrated input */}
           {renderHangmanDisplay()}
 
-          {/* Typing hint and Guess button */}
+          {/* Guess button */}
           {!gameEnded && (
-            <Stack spacing={1} alignItems="center">
-              <Typography
-                variant="caption"
-                sx={{ color: designColors.neutral[500], cursor: 'pointer' }}
-                onClick={() => inputRef.current?.focus()}
-              >
-                {guess ? 'Press Enter or click Guess' : 'Click here and start typing'}
-              </Typography>
+            <Box sx={{ textAlign: 'center' }}>
               <Button
                 variant="contained"
                 size="small"
@@ -779,7 +783,7 @@ Play: ${GAME_URL}`;
               >
                 Guess
               </Button>
-            </Stack>
+            </Box>
           )}
 
           {/* Wrong guess message */}

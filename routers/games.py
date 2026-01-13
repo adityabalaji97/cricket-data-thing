@@ -43,54 +43,31 @@ def get_guess_innings(
     if not competition_filter:
         raise HTTPException(status_code=400, detail="At least one competition or league must be provided")
 
+    # Simplified query - no CTEs or window functions for speed
     innings_query = text(
         """
-        WITH innings AS (
-            SELECT
-                dd.p_match AS match_id,
-                dd.inns AS innings,
-                dd.bat AS batter,
-                dd.ground AS venue,
-                dd.competition AS competition,
-                dd.match_date AS match_date,
-                COUNT(*) AS balls,
-                SUM(dd.score) AS runs,
-                SUM(CASE WHEN dd.wagon_x IS NOT NULL AND dd.wagon_y IS NOT NULL THEN 1 ELSE 0 END) AS wagon_balls,
-                SUM(CASE WHEN dd.wagon_x IS NOT NULL AND dd.wagon_y IS NOT NULL
-                         AND (dd.wagon_x != 0 OR dd.wagon_y != 0) THEN 1 ELSE 0 END) AS wagon_balls_nonzero
-            FROM delivery_details dd
-            WHERE dd.bat IS NOT NULL
-              AND dd.competition = ANY(:competitions)
-              AND dd.match_date::date >= :start_date
-              AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
-            GROUP BY dd.p_match, dd.inns, dd.bat, dd.ground, dd.competition, dd.match_date
-        ),
-        ranked AS (
-            SELECT
-                *,
-                CASE WHEN balls > 0 THEN (runs::float * 100.0 / balls) ELSE 0 END AS strike_rate,
-                DENSE_RANK() OVER (ORDER BY runs DESC) AS rank_runs,
-                DENSE_RANK() OVER (ORDER BY balls DESC) AS rank_balls,
-                DENSE_RANK() OVER (ORDER BY (CASE WHEN balls > 0 THEN (runs::float * 100.0 / balls) ELSE 0 END) DESC) AS rank_sr
-            FROM innings
-            WHERE wagon_balls > 0
-              AND wagon_balls_nonzero >= 5
-              AND runs >= :min_runs
-              AND balls >= :min_balls
-        )
         SELECT
-            match_id,
-            innings,
-            batter,
-            venue,
-            competition,
-            match_date,
-            balls,
-            runs,
-            strike_rate
-        FROM ranked
-        WHERE (rank_runs <= :pool_limit OR rank_balls <= :pool_limit OR rank_sr <= :pool_limit)
-          AND strike_rate >= :min_strike_rate
+            dd.p_match AS match_id,
+            dd.inns AS innings,
+            dd.bat AS batter,
+            dd.ground AS venue,
+            dd.competition AS competition,
+            dd.match_date AS match_date,
+            COUNT(*) AS balls,
+            SUM(dd.score) AS runs,
+            ROUND(SUM(dd.score)::numeric * 100.0 / NULLIF(COUNT(*), 0), 2) AS strike_rate
+        FROM delivery_details dd
+        WHERE dd.bat IS NOT NULL
+          AND dd.competition = ANY(:competitions)
+          AND dd.match_date::date >= :start_date
+          AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+          AND dd.wagon_x IS NOT NULL
+          AND dd.wagon_y IS NOT NULL
+        GROUP BY dd.p_match, dd.inns, dd.bat, dd.ground, dd.competition, dd.match_date
+        HAVING COUNT(*) >= :min_balls
+          AND SUM(dd.score) >= :min_runs
+          AND SUM(dd.score)::float * 100.0 / NULLIF(COUNT(*), 0) >= :min_strike_rate
+          AND SUM(CASE WHEN dd.wagon_x != 0 OR dd.wagon_y != 0 THEN 1 ELSE 0 END) >= 5
         ORDER BY RANDOM()
         LIMIT 1
         """
@@ -102,7 +79,6 @@ def get_guess_innings(
             "competitions": competition_filter,
             "start_date": start_date,
             "end_date": end_date,
-            "pool_limit": pool_limit,
             "min_runs": min_runs,
             "min_balls": min_balls,
             "min_strike_rate": min_strike_rate,
