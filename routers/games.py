@@ -14,10 +14,16 @@ from services.visualizations import expand_league_abbreviations
 
 router = APIRouter(prefix="/games", tags=["games"])
 
+# Top 10 international teams for T20I filtering
+TOP_10_TEAMS = [
+    'India', 'Australia', 'England', 'West Indies', 'New Zealand',
+    'South Africa', 'Pakistan', 'Sri Lanka', 'Bangladesh', 'Afghanistan'
+]
+
 
 @router.get("/guess-innings")
 def get_guess_innings(
-    leagues: List[str] = Query(default=["IPL", "BBL", "PSL", "CPL", "SA20", "T20 Blast", "T20I"]),
+    leagues: List[str] = Query(default=["IPL", "T20I"]),
     competitions: List[str] = Query(default=[]),
     start_date: Optional[date] = Query(default=date(2015, 1, 1)),
     end_date: Optional[date] = Query(default=None),
@@ -44,6 +50,7 @@ def get_guess_innings(
         raise HTTPException(status_code=400, detail="At least one competition or league must be provided")
 
     # Use pre-computed materialized view for speed (no GROUP BY needed)
+    # For T20I, filter to only top 10 international teams
     innings_query = text(
         """
         SELECT
@@ -66,6 +73,10 @@ def get_guess_innings(
           AND balls >= :min_balls
           AND runs >= :min_runs
           AND strike_rate >= :min_strike_rate
+          AND (
+            competition != 'International Twenty20'
+            OR (batting_team = ANY(:top_teams) AND bowling_team = ANY(:top_teams))
+          )
         ORDER BY RANDOM()
         LIMIT 1
         """
@@ -80,6 +91,7 @@ def get_guess_innings(
             "min_runs": min_runs,
             "min_balls": min_balls,
             "min_strike_rate": min_strike_rate,
+            "top_teams": TOP_10_TEAMS,
         },
     ).fetchone()
 

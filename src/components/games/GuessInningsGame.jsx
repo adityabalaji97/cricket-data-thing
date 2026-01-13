@@ -26,7 +26,7 @@ import { colors as designColors } from '../../theme/designSystem';
 import GuessInningsShareCard, { svgToPng } from './GuessInningsShareCard';
 
 const DEFAULT_FILTERS = {
-  leagues: 'IPL,BBL,PSL,CPL,SA20,T20 Blast,T20I',
+  leagues: 'IPL,T20I',
   competitions: '',
   startDate: '2015-01-01',
   endDate: '',
