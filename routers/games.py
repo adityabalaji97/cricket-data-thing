@@ -284,7 +284,7 @@ def get_player_journey(
                 EXTRACT(YEAR FROM m.date)::int AS year,
                 0 AS runs,
                 0 AS balls,
-                SUM(CASE WHEN dd.out = true THEN 1 ELSE 0 END) AS wickets
+                SUM(CASE WHEN dd.out::boolean = true THEN 1 ELSE 0 END) AS wickets
             FROM delivery_details dd
             JOIN matches m ON dd.p_match = m.id
             WHERE m.competition = 'Indian Premier League'
