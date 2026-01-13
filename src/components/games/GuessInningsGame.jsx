@@ -18,6 +18,7 @@ import {
   Typography,
   Snackbar
 } from '@mui/material';
+// Note: TextField still used in filters section
 import SettingsIcon from '@mui/icons-material/Settings';
 import ShareIcon from '@mui/icons-material/Share';
 import config from '../../config';
@@ -63,6 +64,16 @@ const getFirstLetters = (name) => {
   if (!name) return '';
   return name.split(' ').map(word => word[0]).join('. ') + '.';
 };
+
+// Format date as "Jan 15, 2023"
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+// Game URL for sharing
+const GAME_URL = 'hindsight2020.vercel.app/games/guess-innings';
 
 // Hint definitions in reveal order
 const HINT_CONFIG = [
@@ -240,7 +251,7 @@ ${hintLines}
 
 ${resultEmoji} Score: ${score}/5${streakText}
 
-Play: cricketdata.com/guess`;
+Play: ${GAME_URL}`;
   };
 
   const handleShare = async () => {
@@ -301,43 +312,78 @@ Play: cricketdata.com/guess`;
     }
   };
 
-  // Render Hangman-style underscore display
+  // Render Hangman-style underscore display with integrated input
   const renderHangmanDisplay = () => {
     if (!answer) return null;
 
     const words = answer.split(' ');
+    const guessWords = guess.split(' ');
     const showAnswer = revealAnswer || guessResult === 'correct';
+    const displayAnswer = showAnswer ? answer : guess;
+
+    // Build flat index mapping for guess characters
+    let charIndex = 0;
+    const getGuessChar = (wordIdx, charIdx) => {
+      // Calculate position in guess string (accounting for spaces)
+      let pos = 0;
+      for (let w = 0; w < wordIdx; w++) {
+        pos += words[w].length + 1; // +1 for space
+      }
+      pos += charIdx;
+      return guess[pos]?.toUpperCase() || '';
+    };
 
     return (
-      <Box sx={{ textAlign: 'center', py: 1 }}>
-        <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap">
+      <Box
+        sx={{
+          textAlign: 'center',
+          py: 1,
+          cursor: gameEnded ? 'default' : 'text',
+          animation: shakeInput ? 'shake 0.5s ease-in-out' : 'none',
+          '@keyframes shake': {
+            '0%, 100%': { transform: 'translateX(0)' },
+            '20%, 60%': { transform: 'translateX(-5px)' },
+            '40%, 80%': { transform: 'translateX(5px)' },
+          }
+        }}
+        onClick={() => !gameEnded && inputRef.current?.focus()}
+      >
+        <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap" sx={{ rowGap: 1 }}>
           {words.map((word, wordIdx) => (
             <Stack key={wordIdx} direction="row" spacing={0.5}>
               {word.split('').map((char, charIdx) => {
                 const isFirstLetter = charIdx === 0 && firstLettersRevealed;
-                const showChar = showAnswer || isFirstLetter;
+                const guessChar = getGuessChar(wordIdx, charIdx);
+                const displayChar = showAnswer ? char.toUpperCase() : (isFirstLetter ? char.toUpperCase() : guessChar);
+
                 return (
                   <Box
                     key={charIdx}
                     sx={{
-                      width: 24,
-                      height: 32,
+                      width: 22,
+                      height: 30,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      borderBottom: `2px solid ${designColors.neutral[400]}`,
-                      mx: 0.25,
+                      borderBottom: `2px solid ${
+                        showAnswer ? designColors.success[500] :
+                        guessChar ? designColors.primary[400] :
+                        designColors.neutral[400]
+                      }`,
+                      mx: 0.2,
                     }}
                   >
                     <Typography
-                      variant="h6"
                       sx={{
+                        fontSize: '1.1rem',
                         fontWeight: 700,
-                        color: showAnswer ? designColors.success[600] : designColors.neutral[800],
+                        color: showAnswer ? designColors.success[600] :
+                               isFirstLetter ? designColors.primary[600] :
+                               designColors.neutral[800],
                         fontFamily: 'monospace',
                       }}
                     >
-                      {showChar ? char.toUpperCase() : ''}
+                      {displayChar}
                     </Typography>
                   </Box>
                 );
@@ -345,6 +391,26 @@ Play: cricketdata.com/guess`;
             </Stack>
           ))}
         </Stack>
+
+        {/* Hidden input for typing */}
+        {!gameEnded && (
+          <input
+            ref={inputRef}
+            type="text"
+            value={guess}
+            onChange={(e) => {
+              setGuess(e.target.value);
+              if (guessResult === 'incorrect') setGuessResult(null);
+            }}
+            onKeyDown={handleKeyDown}
+            style={{
+              position: 'absolute',
+              opacity: 0,
+              pointerEvents: 'none',
+            }}
+            autoComplete="off"
+          />
+        )}
       </Box>
     );
   };
@@ -661,7 +727,7 @@ Play: cricketdata.com/guess`;
               variant="outlined"
             />
             <Chip
-              label={data.innings?.match_date?.split('-')[0]}
+              label={formatDate(data.innings?.match_date)}
               size="small"
               variant="outlined"
             />
@@ -692,37 +758,22 @@ Play: cricketdata.com/guess`;
           {/* Hint buttons */}
           {renderHints()}
 
-          {/* Hangman display */}
+          {/* Hangman display with integrated input */}
           {renderHangmanDisplay()}
 
-          {/* Guess Input - only show if game not ended */}
+          {/* Typing hint and Guess button */}
           {!gameEnded && (
-            <Stack direction="row" spacing={1} justifyContent="center">
-              <TextField
-                ref={inputRef}
-                placeholder="Type your guess..."
-                value={guess}
-                onChange={(e) => {
-                  setGuess(e.target.value);
-                  if (guessResult === 'incorrect') setGuessResult(null);
-                }}
-                onKeyDown={handleKeyDown}
-                size="small"
-                sx={{
-                  flex: 1,
-                  maxWidth: 280,
-                  '& .MuiOutlinedInput-root': {
-                    animation: shakeInput ? 'shake 0.5s ease-in-out' : 'none',
-                  },
-                  '@keyframes shake': {
-                    '0%, 100%': { transform: 'translateX(0)' },
-                    '20%, 60%': { transform: 'translateX(-5px)' },
-                    '40%, 80%': { transform: 'translateX(5px)' },
-                  }
-                }}
-              />
+            <Stack spacing={1} alignItems="center">
+              <Typography
+                variant="caption"
+                sx={{ color: designColors.neutral[500], cursor: 'pointer' }}
+                onClick={() => inputRef.current?.focus()}
+              >
+                {guess ? 'Press Enter or click Guess' : 'Click here and start typing'}
+              </Typography>
               <Button
                 variant="contained"
+                size="small"
                 onClick={checkGuess}
                 disabled={!guess.trim()}
               >
