@@ -17,7 +17,7 @@ const runColor = (runs) => {
 
 const GuessInningsShareCard = forwardRef(({ data, score, hintsUsed, streak }, ref) => {
   const width = 400;
-  const height = 520;
+  const height = 500;
   const wheelSize = 280;
   const wheelCenterX = width / 2;
   const wheelCenterY = 180;
@@ -137,23 +137,18 @@ const GuessInningsShareCard = forwardRef(({ data, score, hintsUsed, streak }, re
       {/* Batter dot */}
       <circle cx={wheelCenterX} cy={wheelCenterY} r="4" fill="#1a1a1a" />
 
-      {/* Player name */}
-      <text x={width / 2} y="340" textAnchor="middle" fontSize="22" fontWeight="700" fill="#1a1a1a">
-        {answer}
-      </text>
-
-      {/* Stats - only default info: runs (balls), SR, date, hand */}
-      <text x={width / 2} y="365" textAnchor="middle" fontSize="14" fill="#666666">
+      {/* Stats - only default info: runs (balls), SR, date, hand - NO player name */}
+      <text x={width / 2} y="340" textAnchor="middle" fontSize="14" fill="#666666">
         {innings.runs} ({innings.balls}) • SR {innings.strike_rate?.toFixed?.(0) ?? innings.strike_rate} • {innings.bat_hand}
       </text>
 
       {/* Date */}
-      <text x={width / 2} y="385" textAnchor="middle" fontSize="12" fill="#888888">
+      <text x={width / 2} y="360" textAnchor="middle" fontSize="12" fill="#888888">
         {innings.match_date ? new Date(innings.match_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
       </text>
 
       {/* Hints used indicator */}
-      <g transform={`translate(${width / 2 - 60}, 405)`}>
+      <g transform={`translate(${width / 2 - 60}, 390)`}>
         {hintIcons.map((icon, i) => (
           <text
             key={i}
@@ -170,25 +165,25 @@ const GuessInningsShareCard = forwardRef(({ data, score, hintsUsed, streak }, re
       {/* Score badge */}
       <rect
         x={width / 2 - 50}
-        y="430"
+        y="410"
         width="100"
         height="30"
         rx="15"
         fill={score === 5 ? '#FFF3E0' : score >= 3 ? '#E8F5E9' : '#F5F5F5'}
       />
-      <text x={width / 2} y="450" textAnchor="middle" fontSize="14" fontWeight="600" fill="#1a1a1a">
+      <text x={width / 2} y="430" textAnchor="middle" fontSize="14" fontWeight="600" fill="#1a1a1a">
         Score: {score}/5
       </text>
 
       {/* Streak if any */}
       {streak > 1 && (
-        <text x={width / 2} y="475" textAnchor="middle" fontSize="12" fill="#666666">
+        <text x={width / 2} y="455" textAnchor="middle" fontSize="12" fill="#666666">
           🔥 {streak} streak
         </text>
       )}
 
       {/* Footer */}
-      <text x={width / 2} y="505" textAnchor="middle" fontSize="11" fill="#AAAAAA">
+      <text x={width / 2} y="485" textAnchor="middle" fontSize="11" fill="#AAAAAA">
         https://hindsight2020.vercel.app/games/guess-innings
       </text>
     </svg>

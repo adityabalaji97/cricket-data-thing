@@ -692,8 +692,18 @@ Play: ${GAME_URL}`;
 
   const renderHints = () => (
     <Box sx={{ mb: 1 }}>
-      {/* Hint buttons row */}
-      <Stack direction="row" spacing={0.5} justifyContent="center" sx={{ mb: 0.5 }}>
+      {/* Hint buttons row with label */}
+      <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ mb: 0.5 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            color: designColors.neutral[400],
+            fontSize: '0.7rem',
+            fontWeight: 500,
+          }}
+        >
+          Hints
+        </Typography>
         {HINT_CONFIG.map((hint, idx) => {
           const isRevealed = revealedHints.includes(idx);
           const isNextHint = idx === revealedHints.length;
