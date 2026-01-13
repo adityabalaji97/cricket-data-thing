@@ -141,16 +141,48 @@ const GuessInningsGame = ({ isMobile = false }) => {
   // Check if first_letters hint is revealed (5th hint, index 4)
   const firstLettersRevealed = revealedHints.includes(4);
 
-  // When first letters hint is revealed, pre-fill guess with skeleton
+  // Build slots from answer (excluding spaces) for slot-based typing
+  const slots = useMemo(() => {
+    if (!answer) return [];
+    const result = [];
+    answer.split(' ').forEach((word, wordIdx) => {
+      word.split('').forEach((char, charIdx) => {
+        result.push({
+          char: char.toUpperCase(),
+          wordIdx,
+          charIdx,
+          isFirstLetter: charIdx === 0,
+        });
+      });
+    });
+    return result;
+  }, [answer]);
+
+  // Map user input to slots (auto-skip first letters when hint revealed)
+  const filledSlots = useMemo(() => {
+    const userChars = guess.toUpperCase().split('');
+    let userIdx = 0;
+    return slots.map(slot => {
+      // If first letters revealed and this is first letter, use answer char
+      if (firstLettersRevealed && slot.isFirstLetter) {
+        return slot.char;
+      }
+      // Otherwise fill from user input
+      if (userIdx < userChars.length) {
+        return userChars[userIdx++];
+      }
+      return '';
+    });
+  }, [guess, slots, firstLettersRevealed]);
+
+  // When first letters hint is revealed, clear guess so user types remaining chars
   useEffect(() => {
-    if (firstLettersRevealed && answer && !guess) {
-      // Pre-fill with first letters and spaces: "Mayank Agarwal" -> "M A"
-      const skeleton = answer.split(' ').map(word => word[0]).join(' ');
-      setGuess(skeleton);
-      // Focus the input
+    if (firstLettersRevealed && answer && guess) {
+      // Clear guess when hint revealed - slots will show first letters automatically
+      setGuess('');
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [firstLettersRevealed, answer]);
+  }, [firstLettersRevealed]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -208,11 +240,14 @@ const GuessInningsGame = ({ isMobile = false }) => {
   };
 
   const checkGuess = () => {
-    if (!answer || gameEnded || !guess.trim()) return;
-    const normalizedAnswer = answer.trim().toLowerCase();
-    const normalizedGuess = guess.trim().toLowerCase();
+    if (!answer || gameEnded) return;
 
-    if (normalizedAnswer === normalizedGuess) {
+    // Compare filled slots against answer slots (slot-based comparison)
+    const answerChars = slots.map(s => s.char);
+    const isCorrect = filledSlots.length === answerChars.length &&
+      filledSlots.every((char, idx) => char === answerChars[idx]);
+
+    if (isCorrect) {
       setGuessResult('correct');
       endGame('correct');
     } else {
@@ -323,26 +358,15 @@ Play: ${GAME_URL}`;
     }
   };
 
-  // Render Hangman-style underscore display with integrated input
+  // Render Hangman-style underscore display with slot-based typing
   const renderHangmanDisplay = () => {
     if (!answer) return null;
 
     const words = answer.split(' ');
-    const guessWords = guess.split(' ');
     const showAnswer = revealAnswer || guessResult === 'correct';
-    const displayAnswer = showAnswer ? answer : guess;
 
-    // Build flat index mapping for guess characters
-    let charIndex = 0;
-    const getGuessChar = (wordIdx, charIdx) => {
-      // Calculate position in guess string (accounting for spaces)
-      let pos = 0;
-      for (let w = 0; w < wordIdx; w++) {
-        pos += words[w].length + 1; // +1 for space
-      }
-      pos += charIdx;
-      return guess[pos]?.toUpperCase() || '';
-    };
+    // Track slot index as we render words
+    let slotIdx = 0;
 
     return (
       <Box
@@ -363,9 +387,11 @@ Play: ${GAME_URL}`;
           {words.map((word, wordIdx) => (
             <Stack key={wordIdx} direction="row" spacing={0.5}>
               {word.split('').map((char, charIdx) => {
-                const isFirstLetter = charIdx === 0 && firstLettersRevealed;
-                const guessChar = getGuessChar(wordIdx, charIdx);
-                const displayChar = showAnswer ? char.toUpperCase() : (isFirstLetter ? char.toUpperCase() : guessChar);
+                const currentSlotIdx = slotIdx++;
+                const slot = slots[currentSlotIdx];
+                const filledChar = filledSlots[currentSlotIdx] || '';
+                const isFirstLetter = slot?.isFirstLetter && firstLettersRevealed;
+                const displayChar = showAnswer ? char.toUpperCase() : filledChar;
 
                 return (
                   <Box
@@ -378,7 +404,7 @@ Play: ${GAME_URL}`;
                       justifyContent: 'center',
                       borderBottom: `2px solid ${
                         showAnswer ? designColors.success[500] :
-                        guessChar ? designColors.primary[400] :
+                        filledChar ? designColors.primary[400] :
                         designColors.neutral[400]
                       }`,
                       mx: 0.2,
@@ -403,23 +429,28 @@ Play: ${GAME_URL}`;
           ))}
         </Stack>
 
-        {/* Hidden input for typing */}
+        {/* Hidden input - completely offscreen to hide cursor */}
         {!gameEnded && (
           <input
             ref={inputRef}
             type="text"
             value={guess}
             onChange={(e) => {
-              setGuess(e.target.value);
+              // Only allow letters (no spaces needed!)
+              const filtered = e.target.value.replace(/[^a-zA-Z]/g, '');
+              setGuess(filtered);
               if (guessResult === 'incorrect') setGuessResult(null);
             }}
             onKeyDown={handleKeyDown}
             style={{
               position: 'absolute',
+              left: '-9999px',
+              top: '-9999px',
               opacity: 0,
-              pointerEvents: 'none',
             }}
             autoComplete="off"
+            autoCapitalize="off"
+            spellCheck="false"
           />
         )}
       </Box>
