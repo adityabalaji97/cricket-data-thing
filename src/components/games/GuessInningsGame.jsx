@@ -23,6 +23,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import ShareIcon from '@mui/icons-material/Share';
 import config from '../../config';
 import { colors as designColors } from '../../theme/designSystem';
+import GuessInningsShareCard, { svgToPng } from './GuessInningsShareCard';
 
 const DEFAULT_FILTERS = {
   leagues: 'IPL,BBL,PSL,CPL,SA20,T20 Blast,T20I',
@@ -131,8 +132,10 @@ const GuessInningsGame = ({ isMobile = false }) => {
   const [showCopied, setShowCopied] = useState(false);
   const [containerSize, setContainerSize] = useState(320);
   const [shakeInput, setShakeInput] = useState(false);
+  const [showShareCard, setShowShareCard] = useState(false);
   const chartContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const shareCardRef = useRef(null);
 
   const hintsUsed = revealedHints.length;
   const score = gameEnded ? (guessResult === 'correct' ? 5 - hintsUsed : 0) : null;
@@ -301,22 +304,45 @@ Play: ${GAME_URL}`;
   };
 
   const handleShare = async () => {
-    const text = generateShareText();
+    // Show share card temporarily for capture
+    setShowShareCard(true);
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ text });
-        return;
-      } catch (e) {
-        // Fall through to clipboard
-      }
-    }
+    // Wait for render
+    await new Promise(r => setTimeout(r, 100));
 
     try {
-      await navigator.clipboard.writeText(text);
-      setShowCopied(true);
+      if (shareCardRef.current) {
+        const dataUrl = await svgToPng(shareCardRef.current);
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], 'guess-innings.png', { type: 'image/png' });
+
+        // Try native share with image
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Guess the Innings',
+            text: generateShareText(),
+          });
+        } else {
+          // Fallback: download image
+          const link = document.createElement('a');
+          link.download = 'guess-innings.png';
+          link.href = dataUrl;
+          link.click();
+          setShowCopied(true);
+        }
+      }
     } catch (e) {
-      console.error('Failed to copy:', e);
+      // Final fallback: copy text
+      console.error('Share failed:', e);
+      try {
+        await navigator.clipboard.writeText(generateShareText());
+        setShowCopied(true);
+      } catch (clipErr) {
+        console.error('Clipboard failed:', clipErr);
+      }
+    } finally {
+      setShowShareCard(false);
     }
   };
 
@@ -881,6 +907,19 @@ Play: ${GAME_URL}`;
             </>
           )}
         </Stack>
+      )}
+
+      {/* Hidden share card for screenshot capture */}
+      {showShareCard && (
+        <Box sx={{ position: 'fixed', left: '-9999px', top: 0 }}>
+          <GuessInningsShareCard
+            ref={shareCardRef}
+            data={data}
+            score={score}
+            hintsUsed={hintsUsed}
+            streak={stats.currentStreak}
+          />
+        </Box>
       )}
 
       <Snackbar
