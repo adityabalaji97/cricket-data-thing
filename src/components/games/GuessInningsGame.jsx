@@ -2,12 +2,14 @@
  * Guess the Innings Game
  *
  * Mobile-first wagon wheel game - guess the batter from their shot pattern.
+ * Features: Staggered hints, scoring, shareable results.
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Button,
+  Chip,
   CircularProgress,
   Collapse,
   ClickAwayListener,
@@ -19,7 +21,8 @@ import {
   Stack,
   TextField,
   Typography,
-  InputAdornment
+  InputAdornment,
+  Snackbar
 } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -30,7 +33,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SearchIcon from '@mui/icons-material/Search';
-import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
+import ShareIcon from '@mui/icons-material/Share';
 import config from '../../config';
 import { colors as designColors } from '../../theme/designSystem';
 
@@ -65,11 +68,49 @@ const LEGEND_ITEMS = [
 
 const GAME_INSTRUCTIONS = [
   "Watch the wagon wheel animate ball-by-ball",
-  "Lines show where shots were hit - longer = further",
-  "4s and 6s always reach the edge of the circle",
-  "Use the search to guess the batter's name",
-  "Reveal the answer anytime if you're stuck!"
+  "Guess the batter from their scoring pattern",
+  "Use hints if stuck (but they cost points!)",
+  "Score: 4 points - hints used",
 ];
+
+// Hint definitions in reveal order
+const HINT_CONFIG = [
+  { key: 'venue', label: 'Venue', icon: '📍', getValue: (d) => d.innings?.venue },
+  { key: 'competition', label: 'League', icon: '🏆', getValue: (d) => d.innings?.competition },
+  { key: 'bowling_team', label: 'vs', icon: '🎯', getValue: (d) => d.innings?.bowling_team },
+  { key: 'batting_team', label: 'For', icon: '🏏', getValue: (d) => d.innings?.batting_team },
+];
+
+// localStorage key
+const STATS_KEY = 'guess_innings_stats';
+
+// Load stats from localStorage
+const loadStats = () => {
+  try {
+    const saved = localStorage.getItem(STATS_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.error('Failed to load stats:', e);
+  }
+  return {
+    played: 0,
+    solved: 0,
+    revealed: 0,
+    perfectGames: 0,
+    totalHints: 0,
+    currentStreak: 0,
+    maxStreak: 0,
+  };
+};
+
+// Save stats to localStorage
+const saveStats = (stats) => {
+  try {
+    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+  } catch (e) {
+    console.error('Failed to save stats:', e);
+  }
+};
 
 const GuessInningsGame = ({ isMobile = false }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -83,7 +124,10 @@ const GuessInningsGame = ({ isMobile = false }) => {
   const [guess, setGuess] = useState('');
   const [guessResult, setGuessResult] = useState(null); // 'correct', 'incorrect', null
   const [revealAnswer, setRevealAnswer] = useState(false);
-  const [showHint, setShowHint] = useState(false);
+  const [revealedHints, setRevealedHints] = useState([]); // indices of revealed hints
+  const [gameEnded, setGameEnded] = useState(false);
+  const [stats, setStats] = useState(loadStats);
+  const [showCopied, setShowCopied] = useState(false);
   const [containerSize, setContainerSize] = useState(320);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -91,6 +135,9 @@ const GuessInningsGame = ({ isMobile = false }) => {
   const chartContainerRef = useRef(null);
   const playTimerRef = useRef(null);
   const debounceRef = useRef(null);
+
+  const hintsUsed = revealedHints.length;
+  const score = gameEnded ? (guessResult === 'correct' ? 4 - hintsUsed : 0) : null;
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -136,14 +183,13 @@ const GuessInningsGame = ({ isMobile = false }) => {
       try {
         const response = await fetch(`${config.API_URL}/search/suggestions?q=${encodeURIComponent(guess)}&limit=8`);
         if (response.ok) {
-          const data = await response.json();
-          // Filter to only show players
-          const playerSuggestions = (data.suggestions || []).filter(s => s.type === 'player');
+          const responseData = await response.json();
+          const playerSuggestions = (responseData.suggestions || []).filter(s => s.type === 'player');
           setSuggestions(playerSuggestions);
           setShowSuggestions(playerSuggestions.length > 0);
         }
-      } catch (error) {
-        console.error('Search error:', error);
+      } catch (err) {
+        console.error('Search error:', err);
         setSuggestions([]);
       } finally {
         setSearchLoading(false);
@@ -158,28 +204,51 @@ const GuessInningsGame = ({ isMobile = false }) => {
   }, [guess]);
 
   const deliveries = useMemo(() => data?.deliveries || [], [data]);
-  // All deliveries up to visibleCount
   const visibleDeliveries = useMemo(() =>
     deliveries.slice(0, visibleCount),
     [deliveries, visibleCount]
   );
-  // Only those with valid wagon coordinates for drawing
   const drawableDeliveries = useMemo(() =>
     visibleDeliveries.filter(d => d.wagon_x !== null && d.wagon_y !== null && d.wagon_x !== 0 && d.wagon_y !== 0),
     [visibleDeliveries]
   );
   const answer = data?.answer?.batter || '';
 
+  const endGame = (result) => {
+    if (gameEnded) return;
+    setGameEnded(true);
+
+    // Update stats
+    const newStats = { ...stats };
+    newStats.played += 1;
+
+    if (result === 'correct') {
+      newStats.solved += 1;
+      newStats.currentStreak += 1;
+      newStats.maxStreak = Math.max(newStats.maxStreak, newStats.currentStreak);
+      if (hintsUsed === 0) {
+        newStats.perfectGames += 1;
+      }
+    } else {
+      newStats.revealed += 1;
+      newStats.currentStreak = 0;
+    }
+
+    newStats.totalHints += hintsUsed;
+    setStats(newStats);
+    saveStats(newStats);
+  };
+
   const checkGuess = (selectedName) => {
-    if (!answer) return;
+    if (!answer || gameEnded) return;
     const normalizedAnswer = answer.trim().toLowerCase();
     const normalizedGuess = selectedName.trim().toLowerCase();
 
-    // Check if it's a match (exact or contains the key part)
     if (normalizedAnswer === normalizedGuess ||
         normalizedAnswer.includes(normalizedGuess) ||
         normalizedGuess.includes(normalizedAnswer)) {
       setGuessResult('correct');
+      endGame('correct');
     } else {
       setGuessResult('incorrect');
     }
@@ -192,11 +261,69 @@ const GuessInningsGame = ({ isMobile = false }) => {
     checkGuess(name);
   };
 
+  const handleRevealAnswer = () => {
+    setRevealAnswer(true);
+    endGame('revealed');
+  };
+
+  const revealNextHint = () => {
+    if (revealedHints.length < HINT_CONFIG.length && !gameEnded) {
+      setRevealedHints([...revealedHints, revealedHints.length]);
+    }
+  };
+
+  const generateShareText = () => {
+    if (!data || !gameEnded) return '';
+
+    const innings = data.innings;
+    const resultEmoji = guessResult === 'correct' ? '✅' : '❌';
+    const streakText = stats.currentStreak > 1 ? ` | Streak: ${stats.currentStreak} 🔥` : '';
+
+    // Build hint status
+    const hintLines = HINT_CONFIG.map((hint, idx) => {
+      const revealed = revealedHints.includes(idx);
+      const checkmark = revealed ? '✓' : '✗';
+      return `${hint.icon} ${checkmark}`;
+    }).join(' ');
+
+    return `Guess the Innings 🏏
+
+${innings.runs} (${innings.balls}) • SR ${innings.strike_rate?.toFixed?.(0) ?? innings.strike_rate}
+${innings.match_date}
+
+${hintLines}
+
+${resultEmoji} Score: ${score}/4${streakText}
+
+Play: cricketdata.com/guess`;
+  };
+
+  const handleShare = async () => {
+    const text = generateShareText();
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch (e) {
+        // Fall through to clipboard
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setShowCopied(true);
+    } catch (e) {
+      console.error('Failed to copy:', e);
+    }
+  };
+
   const fetchGame = async () => {
     setLoading(true);
     setError(null);
     setRevealAnswer(false);
-    setShowHint(false);
+    setRevealedHints([]);
+    setGameEnded(false);
     setGuess('');
     setGuessResult(null);
     setVisibleCount(0);
@@ -223,7 +350,6 @@ const GuessInningsGame = ({ isMobile = false }) => {
       }
       const payload = await response.json();
       setData(payload);
-      // Auto-start playback
       setIsPlaying(true);
     } catch (err) {
       setError(err.message);
@@ -242,7 +368,6 @@ const GuessInningsGame = ({ isMobile = false }) => {
     const maxRadius = width * 0.42;
     const batterRadius = width * 0.025;
 
-    // Zone divider lines
     const zoneLines = [];
     for (let i = 0; i < 8; i++) {
       const angle = (i * Math.PI / 4) - (Math.PI / 2);
@@ -262,7 +387,6 @@ const GuessInningsGame = ({ isMobile = false }) => {
       );
     }
 
-    // Find max distance among non-boundary shots for normalization
     const nonBoundaryDeliveries = drawableDeliveries.filter(d => d.runs < 4);
     const maxNonBoundaryDistance = Math.max(
       ...nonBoundaryDeliveries.map(d => {
@@ -273,7 +397,6 @@ const GuessInningsGame = ({ isMobile = false }) => {
       1
     );
 
-    // Delivery lines
     const deliveryLines = drawableDeliveries.map((delivery, index) => {
       const dx = delivery.wagon_x - 150;
       const dy = delivery.wagon_y - 150;
@@ -281,18 +404,15 @@ const GuessInningsGame = ({ isMobile = false }) => {
 
       if (distance === 0) return null;
 
-      // 4s and 6s always reach the edge, others proportionally scaled
       let scaledRadius;
       if (delivery.runs >= 4) {
         scaledRadius = maxRadius;
       } else {
-        // Scale non-boundaries: longest non-boundary = 70% of radius, others proportional
         scaledRadius = (distance / maxNonBoundaryDistance) * maxRadius * 0.7;
       }
 
       const normalizedX = centerX + (dx / distance) * scaledRadius;
       const normalizedY = centerY + (dy / distance) * scaledRadius;
-
       const isLatest = index === drawableDeliveries.length - 1;
 
       return (
@@ -359,10 +479,31 @@ const GuessInningsGame = ({ isMobile = false }) => {
           </Typography>
         ))}
       </Stack>
+      {stats.played > 0 && (
+        <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${designColors.neutral[200]}` }}>
+          <Typography variant="caption" sx={{ color: designColors.neutral[500] }}>
+            Stats: {stats.solved}/{stats.played} solved • {stats.perfectGames} perfect • Best streak: {stats.maxStreak}
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 
-  // Mobile-optimized compact layout
+  const renderHints = () => (
+    <Stack spacing={0.5} sx={{ mb: 1 }}>
+      {/* Revealed hints */}
+      {revealedHints.map((hintIdx) => {
+        const hint = HINT_CONFIG[hintIdx];
+        const value = hint.getValue(data);
+        return (
+          <Typography key={hint.key} variant="body2" sx={{ textAlign: 'center', color: designColors.neutral[600] }}>
+            {hint.icon} {hint.label}: <strong>{value}</strong>
+          </Typography>
+        );
+      })}
+    </Stack>
+  );
+
   return (
     <Box sx={{
       py: 1,
@@ -432,7 +573,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
         </Box>
       </Collapse>
 
-      {/* Info panel (when game is active) */}
+      {/* Info panel */}
       <Collapse in={showInfo && data}>
         {renderInstructions()}
       </Collapse>
@@ -449,7 +590,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
         </Box>
       )}
 
-      {/* Initial state - instructions and start button */}
+      {/* Initial state */}
       {!data && !loading && !error && (
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           {renderInstructions()}
@@ -474,7 +615,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
 
       {data && !loading && (
         <Stack spacing={1.5} sx={{ flex: 1 }}>
-          {/* Compact Metrics: runs (balls) SR | Hand | Competition */}
+          {/* Always visible: runs (balls), SR, date, hand */}
           <Typography
             variant="body2"
             sx={{
@@ -485,13 +626,14 @@ const GuessInningsGame = ({ isMobile = false }) => {
           >
             {data.innings?.runs} ({data.innings?.balls}) SR {data.innings?.strike_rate?.toFixed?.(0) ?? data.innings?.strike_rate}
             {data.innings?.bat_hand && ` • ${data.innings.bat_hand === 'LHB' ? 'Left-hand' : 'Right-hand'}`}
-            {' • '}{data.innings?.competition}
           </Typography>
 
-          {/* Date and Venue */}
           <Typography variant="caption" sx={{ textAlign: 'center', color: designColors.neutral[500] }}>
-            {data.innings?.match_date} • {data.innings?.venue}
+            {data.innings?.match_date}
           </Typography>
+
+          {/* Revealed hints */}
+          {renderHints()}
 
           {/* Wagon Wheel */}
           <Box
@@ -509,7 +651,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
           {/* Legend */}
           {renderLegend()}
 
-          {/* Ball counter and Playback Controls */}
+          {/* Playback Controls */}
           <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
             <Typography variant="caption" sx={{ color: designColors.neutral[500], minWidth: 60 }}>
               {visibleCount}/{deliveries.length}
@@ -534,7 +676,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
             </IconButton>
           </Stack>
 
-          {/* Guess Input with Autocomplete */}
+          {/* Guess Input */}
           <ClickAwayListener onClickAway={() => setShowSuggestions(false)}>
             <Box sx={{ position: 'relative' }}>
               <TextField
@@ -547,7 +689,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
                 onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
                 size="small"
                 fullWidth
-                disabled={guessResult === 'correct' || revealAnswer}
+                disabled={gameEnded}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -570,7 +712,6 @@ const GuessInningsGame = ({ isMobile = false }) => {
                 }}
               />
 
-              {/* Suggestions dropdown */}
               {showSuggestions && suggestions.length > 0 && (
                 <Paper
                   elevation={3}
@@ -609,51 +750,69 @@ const GuessInningsGame = ({ isMobile = false }) => {
             </Box>
           </ClickAwayListener>
 
-          {/* Hint */}
-          {showHint && data.innings?.batting_team && data.innings?.bowling_team && (
-            <Typography variant="body2" sx={{ textAlign: 'center', color: designColors.neutral[600] }}>
-              <strong>{data.innings.batting_team}</strong> vs {data.innings.bowling_team}
-            </Typography>
-          )}
-
           {/* Result messages */}
           {guessResult === 'correct' && (
-            <Typography variant="body2" sx={{ color: designColors.success[600], textAlign: 'center', fontWeight: 600 }}>
-              Correct! It's {answer}
-            </Typography>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="body2" sx={{ color: designColors.success[600], fontWeight: 600 }}>
+                Correct! It's {answer}
+              </Typography>
+              <Chip
+                label={`Score: ${score}/4`}
+                size="small"
+                sx={{
+                  mt: 0.5,
+                  bgcolor: score === 4 ? designColors.chart.orange + '30' :
+                           score >= 2 ? designColors.chart.green + '30' :
+                           designColors.neutral[100],
+                  fontWeight: 600
+                }}
+              />
+            </Box>
           )}
 
-          {guessResult === 'incorrect' && !revealAnswer && (
+          {guessResult === 'incorrect' && !gameEnded && (
             <Typography variant="body2" sx={{ color: designColors.error[600], textAlign: 'center' }}>
-              Not quite - try again or reveal the answer
+              Not quite - try again!
             </Typography>
           )}
 
           {revealAnswer && (
-            <Typography variant="body1" sx={{ textAlign: 'center' }}>
-              Answer: <strong>{answer}</strong>
-            </Typography>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="body1">
+                Answer: <strong>{answer}</strong>
+              </Typography>
+              <Chip label="Score: 0/4" size="small" sx={{ mt: 0.5, bgcolor: designColors.neutral[100] }} />
+            </Box>
           )}
 
-          {/* Bottom buttons */}
+          {/* Action buttons */}
           <Stack direction="row" spacing={1} justifyContent="center" sx={{ pt: 1 }}>
-            {!showHint && !revealAnswer && guessResult !== 'correct' && (
+            {!gameEnded && hintsUsed < HINT_CONFIG.length && (
               <Button
                 variant="outlined"
                 size="small"
-                onClick={() => setShowHint(true)}
-                startIcon={<LightbulbOutlinedIcon />}
+                onClick={revealNextHint}
               >
-                Hint
+                Hint ({hintsUsed}/4)
               </Button>
             )}
-            {!revealAnswer && guessResult !== 'correct' && (
+            {!gameEnded && (
               <Button
                 variant="outlined"
                 size="small"
-                onClick={() => setRevealAnswer(true)}
+                onClick={handleRevealAnswer}
               >
-                Reveal
+                Give Up
+              </Button>
+            )}
+            {gameEnded && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleShare}
+                startIcon={<ShareIcon />}
+              >
+                Share
               </Button>
             )}
             <Button
@@ -661,11 +820,26 @@ const GuessInningsGame = ({ isMobile = false }) => {
               size="small"
               onClick={fetchGame}
             >
-              New Game
+              {gameEnded ? 'Play Again' : 'New Game'}
             </Button>
           </Stack>
+
+          {/* Current streak indicator */}
+          {stats.currentStreak > 0 && (
+            <Typography variant="caption" sx={{ textAlign: 'center', color: designColors.neutral[500] }}>
+              Current streak: {stats.currentStreak} 🔥
+            </Typography>
+          )}
         </Stack>
       )}
+
+      <Snackbar
+        open={showCopied}
+        autoHideDuration={2000}
+        onClose={() => setShowCopied(false)}
+        message="Copied to clipboard!"
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Box>
   );
 };
