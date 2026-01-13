@@ -155,7 +155,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
     [deliveries, visibleCount]
   );
   const drawableDeliveries = useMemo(() =>
-    visibleDeliveries.filter(d => d.wagon_x !== null && d.wagon_y !== null && d.wagon_x !== 0 && d.wagon_y !== 0),
+    visibleDeliveries.filter(d => d.wagon_x !== null && d.wagon_y !== null),
     [visibleDeliveries]
   );
   const answer = data?.answer?.batter || '';

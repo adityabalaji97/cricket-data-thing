@@ -55,8 +55,9 @@ def get_guess_innings(
                 dd.match_date AS match_date,
                 COUNT(*) AS balls,
                 SUM(dd.score) AS runs,
+                SUM(CASE WHEN dd.wagon_x IS NOT NULL AND dd.wagon_y IS NOT NULL THEN 1 ELSE 0 END) AS wagon_balls,
                 SUM(CASE WHEN dd.wagon_x IS NOT NULL AND dd.wagon_y IS NOT NULL
-                         AND dd.wagon_x != 0 AND dd.wagon_y != 0 THEN 1 ELSE 0 END) AS wagon_balls
+                         AND (dd.wagon_x != 0 OR dd.wagon_y != 0) THEN 1 ELSE 0 END) AS wagon_balls_nonzero
             FROM delivery_details dd
             WHERE dd.bat IS NOT NULL
               AND dd.competition = ANY(:competitions)
@@ -72,7 +73,8 @@ def get_guess_innings(
                 DENSE_RANK() OVER (ORDER BY balls DESC) AS rank_balls,
                 DENSE_RANK() OVER (ORDER BY (CASE WHEN balls > 0 THEN (runs::float * 100.0 / balls) ELSE 0 END) DESC) AS rank_sr
             FROM innings
-            WHERE wagon_balls >= 10
+            WHERE wagon_balls > 0
+              AND wagon_balls_nonzero >= 5
               AND runs >= :min_runs
               AND balls >= :min_balls
         )
@@ -132,8 +134,6 @@ def get_guess_innings(
           AND dd.bat = :batter
           AND dd.wagon_x IS NOT NULL
           AND dd.wagon_y IS NOT NULL
-          AND dd.wagon_x != 0
-          AND dd.wagon_y != 0
         ORDER BY dd.over, dd.ball
         """
     )
