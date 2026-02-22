@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 from datetime import date, timedelta
 import logging
 import random
+import math
 
 from services.player_aliases import (
     resolve_to_legacy_name,
@@ -380,3 +381,152 @@ def get_player_profile(
     except Exception as e:
         logger.error(f"Error in get_player_profile: {str(e)}")
         raise
+
+
+def get_player_doppelgangers(
+    player_name: str,
+    db: Session,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    min_matches: int = 10,
+    top_n: int = 5
+) -> Dict:
+    """
+    Find most similar and dissimilar players using normalized player-level metrics.
+    Similarity is based on Euclidean distance over z-scored batting/bowling features.
+    """
+    defaults = get_default_params()
+    start = start_date or defaults["start_date"]
+    end = end_date or defaults["end_date"]
+
+    names = get_player_names(player_name, db)
+    resolved_name = names["legacy_name"]
+
+    aggregate_query = text("""
+        WITH batting AS (
+            SELECT
+                bs.striker AS player_name,
+                COUNT(DISTINCT bs.match_id) AS batting_matches,
+                COALESCE(SUM(bs.runs), 0) AS batting_runs,
+                COALESCE(SUM(bs.balls_faced), 0) AS batting_balls,
+                COALESCE(SUM(bs.dots), 0) AS batting_dots,
+                COUNT(CASE WHEN bs.wickets > 0 THEN 1 END) AS dismissals
+            FROM batting_stats bs
+            JOIN matches m ON bs.match_id = m.id
+            WHERE m.date >= :start_date AND m.date <= :end_date
+            GROUP BY bs.striker
+        ),
+        bowling AS (
+            SELECT
+                bw.bowler AS player_name,
+                COUNT(DISTINCT bw.match_id) AS bowling_matches,
+                COALESCE(SUM(bw.runs_conceded), 0) AS runs_conceded,
+                COALESCE(SUM(bw.wickets), 0) AS wickets,
+                COALESCE(SUM(bw.dots), 0) AS bowling_dots,
+                COALESCE(SUM(d.legal_balls), 0) AS legal_balls
+            FROM bowling_stats bw
+            JOIN matches m ON bw.match_id = m.id
+            LEFT JOIN (
+                SELECT match_id, bowler, COUNT(*) AS legal_balls
+                FROM deliveries
+                WHERE wides = 0 AND noballs = 0
+                GROUP BY match_id, bowler
+            ) d ON d.match_id = bw.match_id AND d.bowler = bw.bowler
+            WHERE m.date >= :start_date AND m.date <= :end_date
+            GROUP BY bw.bowler
+        )
+        SELECT
+            COALESCE(b.player_name, bo.player_name) AS player_name,
+            COALESCE(b.batting_matches, 0) AS batting_matches,
+            COALESCE(bo.bowling_matches, 0) AS bowling_matches,
+            COALESCE(b.batting_runs, 0) AS batting_runs,
+            COALESCE(b.batting_balls, 0) AS batting_balls,
+            COALESCE(b.batting_dots, 0) AS batting_dots,
+            COALESCE(b.dismissals, 0) AS dismissals,
+            COALESCE(bo.runs_conceded, 0) AS runs_conceded,
+            COALESCE(bo.wickets, 0) AS wickets,
+            COALESCE(bo.bowling_dots, 0) AS bowling_dots,
+            COALESCE(bo.legal_balls, 0) AS legal_balls
+        FROM batting b
+        FULL OUTER JOIN bowling bo ON b.player_name = bo.player_name
+    """)
+
+    rows = db.execute(aggregate_query, {"start_date": start, "end_date": end}).fetchall()
+    players = []
+    for r in rows:
+        total_matches = max(r.batting_matches, r.bowling_matches)
+        if total_matches < min_matches:
+            continue
+
+        batting_sr = (r.batting_runs * 100 / r.batting_balls) if r.batting_balls else 0.0
+        batting_avg = (r.batting_runs / r.dismissals) if r.dismissals else 0.0
+        batting_dot_pct = (r.batting_dots * 100 / r.batting_balls) if r.batting_balls else 0.0
+        bowling_econ = (r.runs_conceded * 6 / r.legal_balls) if r.legal_balls else 0.0
+        bowling_sr = (r.legal_balls / r.wickets) if r.wickets else 0.0
+        bowling_dot_pct = (r.bowling_dots * 100 / r.legal_balls) if r.legal_balls else 0.0
+
+        players.append({
+            "player_name": r.player_name,
+            "matches": total_matches,
+            "metrics": {
+                "batting_average": round(batting_avg, 3),
+                "batting_strike_rate": round(batting_sr, 3),
+                "batting_dot_percentage": round(batting_dot_pct, 3),
+                "bowling_economy": round(bowling_econ, 3),
+                "bowling_strike_rate": round(bowling_sr, 3),
+                "bowling_dot_percentage": round(bowling_dot_pct, 3)
+            }
+        })
+
+    target = next((p for p in players if p["player_name"] == resolved_name), None)
+    if not target:
+        return {
+            "found": False,
+            "error": f"Player '{player_name}' not found in qualified player pool",
+            "qualified_players": len(players)
+        }
+
+    feature_names = list(target["metrics"].keys())
+    stats = {}
+    for feature in feature_names:
+        vals = [p["metrics"][feature] for p in players]
+        mean = sum(vals) / len(vals)
+        variance = sum((v - mean) ** 2 for v in vals) / len(vals)
+        std = math.sqrt(variance)
+        stats[feature] = {"mean": mean, "std": std if std > 0 else 1.0}
+
+    def zscore(player: Dict) -> List[float]:
+        return [
+            (player["metrics"][f] - stats[f]["mean"]) / stats[f]["std"]
+            for f in feature_names
+        ]
+
+    target_vec = zscore(target)
+    scored = []
+    for p in players:
+        if p["player_name"] == resolved_name:
+            continue
+        vec = zscore(p)
+        distance = math.sqrt(sum((a - b) ** 2 for a, b in zip(target_vec, vec)))
+        scored.append({
+            "player_name": p["player_name"],
+            "distance": round(distance, 4),
+            "matches": p["matches"],
+            "metrics": p["metrics"]
+        })
+
+    scored.sort(key=lambda x: x["distance"])
+    similar = scored[:top_n]
+    dissimilar = list(reversed(scored[-top_n:]))
+
+    return {
+        "found": True,
+        "player_name": resolved_name,
+        "display_name": names["details_name"],
+        "date_range": {"start_date": start.isoformat(), "end_date": end.isoformat()},
+        "min_matches": min_matches,
+        "feature_space": feature_names,
+        "target_metrics": target["metrics"],
+        "most_similar": similar,
+        "most_dissimilar": dissimilar
+    }
