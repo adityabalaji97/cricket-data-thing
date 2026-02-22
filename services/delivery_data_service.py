@@ -102,8 +102,11 @@ def build_competition_filter_deliveries(
     competition_conditions = []
 
     if leagues and len(leagues) > 0:
-        # For deliveries table, use m.competition
+        # Specific leagues selected
         competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
+    else:
+        # All leagues selected — include all league/franchise matches
+        competition_conditions.append("m.match_type = 'league'")
 
     if include_international:
         if top_teams:
@@ -117,7 +120,7 @@ def build_competition_filter_deliveries(
 
     if competition_conditions:
         return "AND (" + " OR ".join(competition_conditions) + ")"
-    return "AND 1=1"  # Return neutral filter instead of "AND false"
+    return "AND 1=1"
 
 
 def build_competition_filter_delivery_details(
@@ -132,8 +135,11 @@ def build_competition_filter_delivery_details(
     competition_conditions = []
 
     if leagues and len(leagues) > 0:
-        # For delivery_details table, use dd.competition
+        # Specific leagues selected
         competition_conditions.append("dd.competition = ANY(:leagues)")
+    else:
+        # All leagues selected — include all non-T20I (franchise/league) matches
+        competition_conditions.append("dd.competition != 'T20I'")
 
     if include_international:
         if top_teams:
@@ -147,7 +153,7 @@ def build_competition_filter_delivery_details(
 
     if competition_conditions:
         return "AND (" + " OR ".join(competition_conditions) + ")"
-    return "AND 1=1"  # Return neutral filter instead of "AND false"
+    return "AND 1=1"
 
 
 def get_match_totals_from_deliveries(
