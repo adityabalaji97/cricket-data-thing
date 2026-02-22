@@ -2,7 +2,7 @@ name: Refresh delivery details
 
 on:
   schedule:
-    - cron: "0 3 * * 0"  # Weekly, Sunday 3am UTC
+    - cron: "0 3 * * *"  # Daily, 3am UTC
   workflow_dispatch:
 
 jobs:
