@@ -382,11 +382,11 @@ def get_team_matchups_service(
 
         for row in matchups:
             matchup_data = {
-                "balls": row[2],
-                "runs": row[3],
-                "wickets": row[4],
-                "boundaries": row[5],
-                "dots": row[6],
+                "balls": int(row[2]),
+                "runs": int(row[3]),
+                "wickets": int(row[4]),
+                "boundaries": int(row[5]),
+                "dots": int(row[6]),
                 "average": float(row[7]) if row[7] is not None else None,
                 "strike_rate": float(row[8]) if row[8] is not None else 0.0,
                 "dot_percentage": float(row[9]) if row[9] is not None else 0.0,
