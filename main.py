@@ -1291,7 +1291,7 @@ def get_team_recent_matches(
         return matches
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-'''
+
 @app.get("/teams/{team1}/{team2}/matchups")
 def get_team_matchups(
     team1: str,
@@ -1519,7 +1519,7 @@ def get_team_matchups(
         logging.error(f"Error getting matchups: {str(e)}")
         logging.error("Traceback:", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-'''
+
 @app.get("/venue-bowling-stats")
 async def get_venue_bowling_stats(
     venue: str,
