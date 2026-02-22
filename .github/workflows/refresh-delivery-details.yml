@@ -33,5 +33,4 @@ jobs:
         run: |
           python scripts/load_delivery_details_pipeline.py \
             --csv t20_bbb.csv \
-            --skip-validation \
-            --skip-elo
+            --skip-validation
