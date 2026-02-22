@@ -242,7 +242,17 @@ def get_team_matchups_service(
                     SELECT DISTINCT bowler
                     FROM deliveries d
                     JOIN recent_matches rm ON d.match_id = rm.id
-                    WHERE bowling_team = :team1
+                    WHERE bowling_team = ANY(:team1_names)
+                    UNION
+                    SELECT DISTINCT bat as player
+                    FROM delivery_details dd
+                    JOIN recent_matches rm ON dd.p_match = rm.id
+                    WHERE team_bat = ANY(:team1_names)
+                    UNION
+                    SELECT DISTINCT bowl
+                    FROM delivery_details dd
+                    JOIN recent_matches rm ON dd.p_match = rm.id
+                    WHERE team_bowl = ANY(:team1_names)
                 ),
                 team2_players AS (
                     SELECT DISTINCT batter as player
@@ -253,7 +263,17 @@ def get_team_matchups_service(
                     SELECT DISTINCT bowler
                     FROM deliveries d
                     JOIN recent_matches rm ON d.match_id = rm.id
-                    WHERE bowling_team = :team2
+                    WHERE bowling_team = ANY(:team2_names)
+                    UNION
+                    SELECT DISTINCT bat as player
+                    FROM delivery_details dd
+                    JOIN recent_matches rm ON dd.p_match = rm.id
+                    WHERE team_bat = ANY(:team2_names)
+                    UNION
+                    SELECT DISTINCT bowl
+                    FROM delivery_details dd
+                    JOIN recent_matches rm ON dd.p_match = rm.id
+                    WHERE team_bowl = ANY(:team2_names)
                 )
                 SELECT player, :team1 as team FROM team1_players
                 UNION ALL
@@ -271,8 +291,8 @@ def get_team_matchups_service(
             team2_players = [row[0] for row in recent_players if row[1] == team2]
 
         matchup_query = text("""
-            WITH player_stats AS (
-                SELECT 
+            WITH raw_stats AS (
+                SELECT
                     d.batter,
                     d.bowler,
                     COUNT(*) as balls,
@@ -282,13 +302,43 @@ def get_team_matchups_service(
                     SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots
                 FROM deliveries d
                 JOIN matches m ON d.match_id = m.id
-                WHERE 
+                WHERE
                     (d.batter = ANY(:team1_players) AND d.bowler = ANY(:team2_players)
                     OR d.batter = ANY(:team2_players) AND d.bowler = ANY(:team1_players))
                     AND (:start_date IS NULL OR m.date >= :start_date)
                     AND (:end_date IS NULL OR m.date <= :end_date)
                 GROUP BY d.batter, d.bowler
-                HAVING COUNT(*) >= 6
+
+                UNION ALL
+
+                SELECT
+                    dd.bat as batter,
+                    dd.bowl as bowler,
+                    COUNT(*) as balls,
+                    SUM(dd.score) as runs,
+                    SUM(CASE WHEN dd.out::boolean = true THEN 1 ELSE 0 END) as wickets,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                    SUM(CASE WHEN dd.score = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots
+                FROM delivery_details dd
+                WHERE
+                    (dd.bat = ANY(:team1_players) AND dd.bowl = ANY(:team2_players)
+                    OR dd.bat = ANY(:team2_players) AND dd.bowl = ANY(:team1_players))
+                    AND (:start_date IS NULL OR dd.match_date::date >= :start_date)
+                    AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+                GROUP BY dd.bat, dd.bowl
+            ),
+            player_stats AS (
+                SELECT
+                    batter,
+                    bowler,
+                    SUM(balls) as balls,
+                    SUM(runs) as runs,
+                    SUM(wickets) as wickets,
+                    SUM(boundaries) as boundaries,
+                    SUM(dots) as dots
+                FROM raw_stats
+                GROUP BY batter, bowler
+                HAVING SUM(balls) >= 6
             )
             SELECT 
                 batter,
