@@ -673,7 +673,7 @@ const AppContent = () => {
                     />
                   </Box>
 
-                  <CompetitionFilter onFilterChange={handleFilterChange} isMobile={isMobile} />
+                  <CompetitionFilter onFilterChange={handleFilterChange} isMobile={isMobile} value={competitions} />
 
                   {startDate && endDate && !error && (
                     <Box sx={{
