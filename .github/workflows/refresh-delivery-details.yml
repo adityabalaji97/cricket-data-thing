@@ -2,7 +2,7 @@ name: Refresh delivery details
 
 on:
   schedule:
-    - cron: "0 3 * * 0"
+    - cron: "0 3 * * 0"  # Weekly, Sunday 3am UTC
   workflow_dispatch:
 
 jobs:
@@ -24,6 +24,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run delivery details sync
+      - name: Download latest CSV from Dropbox
         run: |
-          python run_full_dd_sync.py --confirm
+          curl -L -o t20_bbb.csv "${{ secrets.DROPBOX_CSV_URL }}"
+          echo "Downloaded $(du -sh t20_bbb.csv | cut -f1) CSV"
+
+      - name: Run delivery details pipeline
+        run: |
+          python scripts/load_delivery_details_pipeline.py \
+            --csv t20_bbb.csv \
+            --skip-validation \
+            --skip-elo

@@ -10,3 +10,5 @@ aiohttp>=3.8.4
 typing-extensions>=4.5.0
 python-multipart>=0.0.6
 openai>=1.0.0
+pandas>=2.0.0
+tqdm>=4.65.0
