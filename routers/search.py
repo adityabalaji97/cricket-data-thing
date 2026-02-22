@@ -97,6 +97,7 @@ def get_player_doppelganger_profile(
     player_name: str,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    role: Optional[str] = Query(default=None, description="Override role: batter, bowler, or all_rounder"),
     min_matches: int = Query(default=10, ge=1, le=200, description="Minimum matches for candidate pool"),
     top_n: int = Query(default=5, ge=1, le=20, description="How many similar/dissimilar players to return"),
     db: Session = Depends(get_session)
@@ -111,6 +112,7 @@ def get_player_doppelganger_profile(
             db=db,
             start_date=start_date,
             end_date=end_date,
+            role=role,
             min_matches=min_matches,
             top_n=top_n
         )

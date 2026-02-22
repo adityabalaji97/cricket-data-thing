@@ -26,6 +26,7 @@ import ContextualQueryPrompts from './ContextualQueryPrompts';
 import { getBowlerContextualQueries } from '../utils/queryBuilderLinks';
 import config from '../config';
 import PlayerDNASummary from './PlayerDNASummary';
+import PlayerDoppelgangers from './PlayerDoppelgangers';
 
 const BowlerProfile = () => {
   const location = useLocation();
@@ -491,6 +492,15 @@ const BowlerProfile = () => {
                     includeInternational={competitionFilters.international}
                     topTeams={competitionFilters.topTeams}
                     venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                    fetchTrigger={dnaFetchTrigger}
+                    isMobile={isMobile}
+                  />
+
+                  <PlayerDoppelgangers
+                    playerName={selectedPlayerName}
+                    playerType="bowler"
+                    startDate={dateRange.start}
+                    endDate={dateRange.end}
                     fetchTrigger={dnaFetchTrigger}
                     isMobile={isMobile}
                   />

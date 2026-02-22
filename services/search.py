@@ -1,6 +1,6 @@
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Session
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from datetime import date, timedelta
 import logging
 import random
@@ -389,11 +389,12 @@ def get_player_doppelgangers(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     min_matches: int = 10,
-    top_n: int = 5
+    top_n: int = 5,
+    role: Optional[str] = None
 ) -> Dict:
     """
-    Find most similar and dissimilar players using normalized player-level metrics.
-    Similarity is based on Euclidean distance over z-scored batting/bowling features.
+    Find most similar and dissimilar players using role-aware, normalized player-level metrics.
+    Similarity is based on Euclidean distance over z-scored batting/bowling feature vectors.
     """
     defaults = get_default_params()
     start = start_date or defaults["start_date"]
@@ -401,123 +402,371 @@ def get_player_doppelgangers(
 
     names = get_player_names(player_name, db)
     resolved_name = names["legacy_name"]
+    requested_role = role.lower().strip() if role else None
+    valid_roles = {"batter", "bowler", "all_rounder"}
+    if requested_role and requested_role not in valid_roles:
+        return {
+            "found": False,
+            "error": f"Invalid role '{role}'. Expected one of: batter, bowler, all_rounder"
+        }
 
-    aggregate_query = text("""
-        WITH batting AS (
-            SELECT
-                bs.striker AS player_name,
-                COUNT(DISTINCT bs.match_id) AS batting_matches,
-                COALESCE(SUM(bs.runs), 0) AS batting_runs,
-                COALESCE(SUM(bs.balls_faced), 0) AS batting_balls,
-                COALESCE(SUM(bs.dots), 0) AS batting_dots,
-                COUNT(CASE WHEN bs.wickets > 0 THEN 1 END) AS dismissals
-            FROM batting_stats bs
-            JOIN matches m ON bs.match_id = m.id
-            WHERE m.date >= :start_date AND m.date <= :end_date
-            GROUP BY bs.striker
-        ),
-        bowling AS (
-            SELECT
-                bw.bowler AS player_name,
-                COUNT(DISTINCT bw.match_id) AS bowling_matches,
-                COALESCE(SUM(bw.runs_conceded), 0) AS runs_conceded,
-                COALESCE(SUM(bw.wickets), 0) AS wickets,
-                COALESCE(SUM(bw.dots), 0) AS bowling_dots,
-                COALESCE(SUM(d.legal_balls), 0) AS legal_balls
-            FROM bowling_stats bw
-            JOIN matches m ON bw.match_id = m.id
-            LEFT JOIN (
-                SELECT match_id, bowler, COUNT(*) AS legal_balls
-                FROM deliveries
-                WHERE wides = 0 AND noballs = 0
-                GROUP BY match_id, bowler
-            ) d ON d.match_id = bw.match_id AND d.bowler = bw.bowler
-            WHERE m.date >= :start_date AND m.date <= :end_date
-            GROUP BY bw.bowler
-        )
+    params = {"start_date": start, "end_date": end}
+
+    batting_query = text("""
         SELECT
-            COALESCE(b.player_name, bo.player_name) AS player_name,
-            COALESCE(b.batting_matches, 0) AS batting_matches,
-            COALESCE(bo.bowling_matches, 0) AS bowling_matches,
-            COALESCE(b.batting_runs, 0) AS batting_runs,
-            COALESCE(b.batting_balls, 0) AS batting_balls,
-            COALESCE(b.batting_dots, 0) AS batting_dots,
-            COALESCE(b.dismissals, 0) AS dismissals,
-            COALESCE(bo.runs_conceded, 0) AS runs_conceded,
-            COALESCE(bo.wickets, 0) AS wickets,
-            COALESCE(bo.bowling_dots, 0) AS bowling_dots,
-            COALESCE(bo.legal_balls, 0) AS legal_balls
-        FROM batting b
-        FULL OUTER JOIN bowling bo ON b.player_name = bo.player_name
+            bs.striker AS player_name,
+            COUNT(DISTINCT bs.match_id) AS batting_matches,
+            COALESCE(SUM(bs.runs), 0) AS batting_runs,
+            COALESCE(SUM(bs.balls_faced), 0) AS batting_balls,
+            COALESCE(SUM(bs.dots), 0) AS batting_dots,
+            COALESCE(SUM(bs.fours), 0) AS fours,
+            COALESCE(SUM(bs.sixes), 0) AS sixes,
+            COALESCE(SUM(bs.wickets), 0) AS dismissals,
+            COALESCE(SUM(bs.pp_runs), 0) AS pp_runs,
+            COALESCE(SUM(bs.pp_balls), 0) AS pp_balls,
+            COALESCE(SUM(bs.pp_dots), 0) AS pp_dots,
+            COALESCE(SUM(bs.pp_boundaries), 0) AS pp_boundaries,
+            COALESCE(SUM(bs.middle_runs), 0) AS middle_runs,
+            COALESCE(SUM(bs.middle_balls), 0) AS middle_balls,
+            COALESCE(SUM(bs.middle_dots), 0) AS middle_dots,
+            COALESCE(SUM(bs.middle_boundaries), 0) AS middle_boundaries,
+            COALESCE(SUM(bs.death_runs), 0) AS death_runs,
+            COALESCE(SUM(bs.death_balls), 0) AS death_balls,
+            COALESCE(SUM(bs.death_dots), 0) AS death_dots,
+            COALESCE(SUM(bs.death_boundaries), 0) AS death_boundaries
+        FROM batting_stats bs
+        JOIN matches m ON bs.match_id = m.id
+        WHERE m.date >= :start_date AND m.date <= :end_date
+        GROUP BY bs.striker
     """)
 
-    rows = db.execute(aggregate_query, {"start_date": start, "end_date": end}).fetchall()
+    bowling_query = text("""
+        SELECT
+            bw.bowler AS player_name,
+            COUNT(DISTINCT bw.match_id) AS bowling_matches,
+            COALESCE(SUM(bw.runs_conceded), 0) AS runs_conceded,
+            COALESCE(SUM(bw.wickets), 0) AS wickets,
+            COALESCE(SUM(bw.dots), 0) AS bowling_dots,
+            COALESCE(SUM(
+                CAST(
+                    FLOOR(COALESCE(bw.overs, 0)) * 6 +
+                    ROUND((COALESCE(bw.overs, 0) - FLOOR(COALESCE(bw.overs, 0))) * 10)
+                AS INTEGER)
+            ), 0) AS bowling_balls,
+            COALESCE(SUM(bw.pp_runs), 0) AS pp_runs,
+            COALESCE(SUM(bw.pp_dots), 0) AS pp_dots,
+            COALESCE(SUM(
+                CAST(
+                    FLOOR(COALESCE(bw.pp_overs, 0)) * 6 +
+                    ROUND((COALESCE(bw.pp_overs, 0) - FLOOR(COALESCE(bw.pp_overs, 0))) * 10)
+                AS INTEGER)
+            ), 0) AS pp_balls,
+            COALESCE(SUM(bw.middle_runs), 0) AS middle_runs,
+            COALESCE(SUM(bw.middle_dots), 0) AS middle_dots,
+            COALESCE(SUM(
+                CAST(
+                    FLOOR(COALESCE(bw.middle_overs, 0)) * 6 +
+                    ROUND((COALESCE(bw.middle_overs, 0) - FLOOR(COALESCE(bw.middle_overs, 0))) * 10)
+                AS INTEGER)
+            ), 0) AS middle_balls,
+            COALESCE(SUM(bw.death_runs), 0) AS death_runs,
+            COALESCE(SUM(bw.death_dots), 0) AS death_dots,
+            COALESCE(SUM(
+                CAST(
+                    FLOOR(COALESCE(bw.death_overs, 0)) * 6 +
+                    ROUND((COALESCE(bw.death_overs, 0) - FLOOR(COALESCE(bw.death_overs, 0))) * 10)
+                AS INTEGER)
+            ), 0) AS death_balls
+        FROM bowling_stats bw
+        JOIN matches m ON bw.match_id = m.id
+        WHERE m.date >= :start_date AND m.date <= :end_date
+        GROUP BY bw.bowler
+    """)
+
+    batting_rows = db.execute(batting_query, params).fetchall()
+    bowling_rows = db.execute(bowling_query, params).fetchall()
+
+    player_map: Dict[str, Dict[str, Any]] = {}
+
+    def _get_player_record(name: str) -> Dict[str, Any]:
+        if name not in player_map:
+            player_map[name] = {
+                "player_name": name,
+                "batting": {},
+                "bowling": {}
+            }
+        return player_map[name]
+
+    for row in batting_rows:
+        rec = _get_player_record(row.player_name)
+        rec["batting"] = dict(row._mapping)
+
+    for row in bowling_rows:
+        rec = _get_player_record(row.player_name)
+        rec["bowling"] = dict(row._mapping)
+
+    batting_metric_defs = [
+        {"key": "batting_average", "label": "Bat Avg", "higher_is_better": True},
+        {"key": "batting_strike_rate", "label": "Bat SR", "higher_is_better": True},
+        {"key": "batting_dot_percentage", "label": "Bat Dot%", "higher_is_better": False},
+        {"key": "batting_boundary_percentage", "label": "Bat Bnd%", "higher_is_better": True},
+        {"key": "pp_strike_rate", "label": "PP SR", "higher_is_better": True},
+        {"key": "middle_strike_rate", "label": "Mid SR", "higher_is_better": True},
+        {"key": "death_strike_rate", "label": "Death SR", "higher_is_better": True},
+        {"key": "pp_boundary_percentage", "label": "PP Bnd%", "higher_is_better": True},
+        {"key": "middle_boundary_percentage", "label": "Mid Bnd%", "higher_is_better": True},
+        {"key": "death_boundary_percentage", "label": "Death Bnd%", "higher_is_better": True},
+    ]
+    bowling_metric_defs = [
+        {"key": "bowling_economy", "label": "Econ", "higher_is_better": False},
+        {"key": "bowling_strike_rate", "label": "Bowl SR", "higher_is_better": False},
+        {"key": "bowling_dot_percentage", "label": "Bowl Dot%", "higher_is_better": True},
+        {"key": "pp_economy", "label": "PP Econ", "higher_is_better": False},
+        {"key": "middle_economy", "label": "Mid Econ", "higher_is_better": False},
+        {"key": "death_economy", "label": "Death Econ", "higher_is_better": False},
+        {"key": "pp_dot_percentage", "label": "PP Dot%", "higher_is_better": True},
+        {"key": "middle_dot_percentage", "label": "Mid Dot%", "higher_is_better": True},
+        {"key": "death_dot_percentage", "label": "Death Dot%", "higher_is_better": True},
+    ]
+
+    def _pct(num: float, den: float) -> float:
+        return (num * 100.0 / den) if den else 0.0
+
+    def _rate_per_100(num: float, den: float) -> float:
+        return (num * 100.0 / den) if den else 0.0
+
+    def _economy(runs: float, balls: float) -> float:
+        return (runs * 6.0 / balls) if balls else 0.0
+
+    def _strike_rate_bowling(balls: float, wickets: float) -> float:
+        return (balls / wickets) if wickets else 0.0
+
+    def _batting_metrics(b: Dict[str, Any]) -> Dict[str, float]:
+        runs = float(b.get("batting_runs") or 0)
+        balls = float(b.get("batting_balls") or 0)
+        dots = float(b.get("batting_dots") or 0)
+        boundaries = float((b.get("fours") or 0) + (b.get("sixes") or 0))
+        dismissals = float(b.get("dismissals") or 0)
+        pp_runs = float(b.get("pp_runs") or 0)
+        pp_balls = float(b.get("pp_balls") or 0)
+        pp_boundaries = float(b.get("pp_boundaries") or 0)
+        middle_runs = float(b.get("middle_runs") or 0)
+        middle_balls = float(b.get("middle_balls") or 0)
+        middle_boundaries = float(b.get("middle_boundaries") or 0)
+        death_runs = float(b.get("death_runs") or 0)
+        death_balls = float(b.get("death_balls") or 0)
+        death_boundaries = float(b.get("death_boundaries") or 0)
+
+        return {
+            "batting_average": round((runs / dismissals) if dismissals else 0.0, 3),
+            "batting_strike_rate": round(_rate_per_100(runs, balls), 3),
+            "batting_dot_percentage": round(_pct(dots, balls), 3),
+            "batting_boundary_percentage": round(_pct(boundaries, balls), 3),
+            "pp_strike_rate": round(_rate_per_100(pp_runs, pp_balls), 3),
+            "middle_strike_rate": round(_rate_per_100(middle_runs, middle_balls), 3),
+            "death_strike_rate": round(_rate_per_100(death_runs, death_balls), 3),
+            "pp_boundary_percentage": round(_pct(pp_boundaries, pp_balls), 3),
+            "middle_boundary_percentage": round(_pct(middle_boundaries, middle_balls), 3),
+            "death_boundary_percentage": round(_pct(death_boundaries, death_balls), 3),
+        }
+
+    def _bowling_metrics(bw: Dict[str, Any]) -> Dict[str, float]:
+        runs = float(bw.get("runs_conceded") or 0)
+        wickets = float(bw.get("wickets") or 0)
+        balls = float(bw.get("bowling_balls") or 0)
+        dots = float(bw.get("bowling_dots") or 0)
+        pp_runs = float(bw.get("pp_runs") or 0)
+        pp_balls = float(bw.get("pp_balls") or 0)
+        pp_dots = float(bw.get("pp_dots") or 0)
+        middle_runs = float(bw.get("middle_runs") or 0)
+        middle_balls = float(bw.get("middle_balls") or 0)
+        middle_dots = float(bw.get("middle_dots") or 0)
+        death_runs = float(bw.get("death_runs") or 0)
+        death_balls = float(bw.get("death_balls") or 0)
+        death_dots = float(bw.get("death_dots") or 0)
+
+        return {
+            "bowling_economy": round(_economy(runs, balls), 3),
+            "bowling_strike_rate": round(_strike_rate_bowling(balls, wickets), 3),
+            "bowling_dot_percentage": round(_pct(dots, balls), 3),
+            "pp_economy": round(_economy(pp_runs, pp_balls), 3),
+            "middle_economy": round(_economy(middle_runs, middle_balls), 3),
+            "death_economy": round(_economy(death_runs, death_balls), 3),
+            "pp_dot_percentage": round(_pct(pp_dots, pp_balls), 3),
+            "middle_dot_percentage": round(_pct(middle_dots, middle_balls), 3),
+            "death_dot_percentage": round(_pct(death_dots, death_balls), 3),
+        }
+
+    def _classify_role(batting_matches: int, bowling_matches: int) -> str:
+        total_matches = max(batting_matches, bowling_matches)
+        if total_matches > 0 and bowling_matches >= 8:
+            if batting_matches >= 0.4 * total_matches and bowling_matches >= 0.4 * total_matches:
+                return "all_rounder"
+        if bowling_matches >= batting_matches and bowling_matches >= 8:
+            return "bowler"
+        if batting_matches >= (2 * bowling_matches) or bowling_matches < 8:
+            return "batter"
+        return "all_rounder"
+
     players = []
-    for r in rows:
-        total_matches = max(r.batting_matches, r.bowling_matches)
-        if total_matches < min_matches:
+    for name, rec in player_map.items():
+        batting = rec.get("batting") or {}
+        bowling = rec.get("bowling") or {}
+        batting_matches = int(batting.get("batting_matches") or 0)
+        bowling_matches = int(bowling.get("bowling_matches") or 0)
+        total_matches = max(batting_matches, bowling_matches)
+        if total_matches == 0:
             continue
 
-        batting_sr = (r.batting_runs * 100 / r.batting_balls) if r.batting_balls else 0.0
-        batting_avg = (r.batting_runs / r.dismissals) if r.dismissals else 0.0
-        batting_dot_pct = (r.batting_dots * 100 / r.batting_balls) if r.batting_balls else 0.0
-        bowling_econ = (r.runs_conceded * 6 / r.legal_balls) if r.legal_balls else 0.0
-        bowling_sr = (r.legal_balls / r.wickets) if r.wickets else 0.0
-        bowling_dot_pct = (r.bowling_dots * 100 / r.legal_balls) if r.legal_balls else 0.0
+        player_role = _classify_role(batting_matches, bowling_matches)
+        batting_metrics = _batting_metrics(batting)
+        bowling_metrics = _bowling_metrics(bowling)
+        combined_metrics = {**batting_metrics, **bowling_metrics}
 
         players.append({
-            "player_name": r.player_name,
+            "player_name": name,
+            "batting_matches": batting_matches,
+            "bowling_matches": bowling_matches,
             "matches": total_matches,
-            "metrics": {
-                "batting_average": round(batting_avg, 3),
-                "batting_strike_rate": round(batting_sr, 3),
-                "batting_dot_percentage": round(batting_dot_pct, 3),
-                "bowling_economy": round(bowling_econ, 3),
-                "bowling_strike_rate": round(bowling_sr, 3),
-                "bowling_dot_percentage": round(bowling_dot_pct, 3)
-            }
+            "player_role": player_role,
+            "batting_metrics": batting_metrics,
+            "bowling_metrics": bowling_metrics,
+            "all_rounder_metrics": combined_metrics,
         })
 
-    target = next((p for p in players if p["player_name"] == resolved_name), None)
+    target_any = next((p for p in players if p["player_name"] == resolved_name), None)
+    if not target_any:
+        return {
+            "found": False,
+            "error": f"Player '{player_name}' not found in player pool for selected date range",
+            "player_pool_size": len(players)
+        }
+
+    comparison_role = requested_role or target_any["player_role"]
+
+    def _qualifies_for_pool(p: Dict[str, Any], pool_role: str) -> bool:
+        if p["player_role"] != pool_role:
+            return False
+        if pool_role == "batter":
+            return p["batting_matches"] >= min_matches
+        if pool_role == "bowler":
+            return p["bowling_matches"] >= min_matches
+        # all-rounders need reasonable volume on both sides plus min overall matches
+        return p["matches"] >= min_matches and p["bowling_matches"] >= 8 and p["batting_matches"] >= max(1, int(math.ceil(0.4 * p["matches"])))
+
+    role_metric_defs = {
+        "batter": batting_metric_defs,
+        "bowler": bowling_metric_defs,
+        "all_rounder": batting_metric_defs + bowling_metric_defs,
+    }
+    metric_key_to_def = {m["key"]: m for m in role_metric_defs[comparison_role]}
+
+    role_metric_field = {
+        "batter": "batting_metrics",
+        "bowler": "bowling_metrics",
+        "all_rounder": "all_rounder_metrics",
+    }[comparison_role]
+
+    candidate_pool = [p for p in players if _qualifies_for_pool(p, comparison_role)]
+    target = next((p for p in candidate_pool if p["player_name"] == resolved_name), None)
     if not target:
         return {
             "found": False,
-            "error": f"Player '{player_name}' not found in qualified player pool",
-            "qualified_players": len(players)
+            "error": f"Player '{player_name}' not found in qualified {comparison_role} pool",
+            "player_role": target_any["player_role"],
+            "comparison_role": comparison_role,
+            "qualified_players": len(candidate_pool)
         }
 
-    feature_names = list(target["metrics"].keys())
-    stats = {}
+    feature_names = [m["key"] for m in role_metric_defs[comparison_role]]
+    zscore_stats = {}
+    percentile_stats = {}
     for feature in feature_names:
-        vals = [p["metrics"][feature] for p in players]
+        vals = [float(p[role_metric_field][feature]) for p in candidate_pool]
         mean = sum(vals) / len(vals)
         variance = sum((v - mean) ** 2 for v in vals) / len(vals)
         std = math.sqrt(variance)
-        stats[feature] = {"mean": mean, "std": std if std > 0 else 1.0}
+        zscore_stats[feature] = {"mean": mean, "std": std if std > 0 else 1.0}
+        percentile_stats[feature] = {
+            "values": vals,
+            "mean": round(mean, 3)
+        }
 
-    def zscore(player: Dict) -> List[float]:
+    all_rounder_weight = math.sqrt(0.5)
+
+    def _zscore_vector(player_record: Dict[str, Any]) -> List[float]:
+        vec = []
+        for f in feature_names:
+            raw = float(player_record[role_metric_field][f])
+            z = (raw - zscore_stats[f]["mean"]) / zscore_stats[f]["std"]
+            if comparison_role == "all_rounder":
+                z *= all_rounder_weight
+            vec.append(z)
+        return vec
+
+    def _percentile(feature: str, raw_value: float) -> float:
+        vals = percentile_stats[feature]["values"]
+        metric_def = metric_key_to_def[feature]
+        better_count = 0
+        equal_count = 0
+        for v in vals:
+            if metric_def["higher_is_better"]:
+                if v < raw_value:
+                    better_count += 1
+                elif v == raw_value:
+                    equal_count += 1
+            else:
+                if v > raw_value:
+                    better_count += 1
+                elif v == raw_value:
+                    equal_count += 1
+        # Mid-rank percentile where higher is always better after direction adjustment
+        return round(((better_count + (equal_count * 0.5)) * 100.0) / max(len(vals), 1), 1)
+
+    def _build_radar_metrics(player_record: Dict[str, Any]) -> List[Dict[str, Any]]:
+        metrics = player_record[role_metric_field]
         return [
-            (player["metrics"][f] - stats[f]["mean"]) / stats[f]["std"]
-            for f in feature_names
+            {
+                "metric": metric_def["label"],
+                "key": metric_def["key"],
+                "percentile": _percentile(metric_def["key"], float(metrics[metric_def["key"]])),
+                "raw_value": round(float(metrics[metric_def["key"]]), 3),
+                "league_avg": percentile_stats[metric_def["key"]]["mean"],
+                "higher_is_better": metric_def["higher_is_better"],
+            }
+            for metric_def in role_metric_defs[comparison_role]
         ]
 
-    target_vec = zscore(target)
+    target_vec = _zscore_vector(target)
     scored = []
-    for p in players:
+    for p in candidate_pool:
         if p["player_name"] == resolved_name:
             continue
-        vec = zscore(p)
+        vec = _zscore_vector(p)
         distance = math.sqrt(sum((a - b) ** 2 for a, b in zip(target_vec, vec)))
         scored.append({
             "player_name": p["player_name"],
             "distance": round(distance, 4),
             "matches": p["matches"],
-            "metrics": p["metrics"]
+            "batting_matches": p["batting_matches"],
+            "bowling_matches": p["bowling_matches"],
+            "player_role": p["player_role"],
+            "metrics": p[role_metric_field],
+            "radar_metrics": _build_radar_metrics(p),
         })
 
     scored.sort(key=lambda x: x["distance"])
     similar = scored[:top_n]
-    dissimilar = list(reversed(scored[-top_n:]))
+    dissimilar = list(reversed(scored[-top_n:])) if scored else []
+
+    league_averages = {
+        metric_def["key"]: {
+            "label": metric_def["label"],
+            "value": percentile_stats[metric_def["key"]]["mean"],
+            "higher_is_better": metric_def["higher_is_better"],
+        }
+        for metric_def in role_metric_defs[comparison_role]
+    }
 
     return {
         "found": True,
@@ -525,8 +774,14 @@ def get_player_doppelgangers(
         "display_name": names["details_name"],
         "date_range": {"start_date": start.isoformat(), "end_date": end.isoformat()},
         "min_matches": min_matches,
+        "player_role": target_any["player_role"],
+        "comparison_role": comparison_role,
+        "role_overridden": bool(requested_role),
         "feature_space": feature_names,
-        "target_metrics": target["metrics"],
+        "qualified_players": len(candidate_pool),
+        "target_metrics": target[role_metric_field],
+        "target_radar_metrics": _build_radar_metrics(target),
+        "league_averages": league_averages,
         "most_similar": similar,
         "most_dissimilar": dissimilar
     }

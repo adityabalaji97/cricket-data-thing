@@ -24,6 +24,7 @@ import ContextualQueryPrompts from './ContextualQueryPrompts'
 import { getBatterContextualQueries } from '../utils/queryBuilderLinks'
 import config from '../config';
 import PlayerDNASummary from './PlayerDNASummary';
+import PlayerDoppelgangers from './PlayerDoppelgangers';
 import WagonWheel from './WagonWheel';
 import PlayerPitchMap from './PlayerPitchMap';
 import { AlertBanner, MobileStickyHeader, Section, VisualizationCard } from './ui';
@@ -493,6 +494,15 @@ const PlayerProfile = () => {
                     includeInternational={competitionFilters.international}
                     topTeams={competitionFilters.topTeams}
                     venue={selectedVenue !== 'All Venues' ? selectedVenue : null}
+                    fetchTrigger={dnaFetchTrigger}
+                    isMobile={isMobile}
+                  />
+
+                  <PlayerDoppelgangers
+                    playerName={selectedPlayerName}
+                    playerType="batter"
+                    startDate={dateRange.start}
+                    endDate={dateRange.end}
                     fetchTrigger={dnaFetchTrigger}
                     isMobile={isMobile}
                   />
