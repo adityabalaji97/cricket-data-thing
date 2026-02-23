@@ -197,6 +197,54 @@ def get_default_params():
     }
 
 
+def _build_matches_competition_filter(
+    params: Dict[str, Any],
+    *,
+    leagues: Optional[List[str]] = None,
+    include_international: bool = True,
+    top_teams: Optional[int] = None,
+    match_alias: str = "m",
+) -> str:
+    """
+    Build a competition filter clause for queries joined to `matches`.
+
+    Semantics:
+    - `leagues is None`: no league filter condition emitted unless international condition exists
+    - `leagues == []`: include all league matches
+    - `leagues` non-empty: include only those leagues
+    - `include_international`: include T20Is, optionally restricted to top N teams
+    """
+    from models import INTERNATIONAL_TEAMS_RANKED
+
+    conditions: List[str] = []
+
+    if leagues is not None:
+        if len(leagues) == 0:
+            conditions.append(f"{match_alias}.match_type = 'league'")
+        else:
+            league_param = f"{match_alias}_doppel_leagues"
+            params[league_param] = leagues
+            conditions.append(
+                f"({match_alias}.match_type = 'league' AND {match_alias}.competition = ANY(:{league_param}))"
+            )
+
+    if include_international:
+        if top_teams:
+            top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+            top_param = f"{match_alias}_doppel_top_teams"
+            params[top_param] = top_team_list
+            conditions.append(
+                f"({match_alias}.match_type = 'international' AND {match_alias}.team1 = ANY(:{top_param}) AND {match_alias}.team2 = ANY(:{top_param}))"
+            )
+        else:
+            conditions.append(f"{match_alias}.match_type = 'international'")
+
+    if not conditions:
+        return ""
+
+    return "\n        AND (" + "\n            OR ".join(conditions) + "\n        )"
+
+
 def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
     """
     Unified search across players, teams, and venues.
@@ -561,7 +609,10 @@ def get_player_doppelgangers(
     end_date: Optional[date] = None,
     min_matches: int = 10,
     top_n: int = 5,
-    role: Optional[str] = None
+    role: Optional[str] = None,
+    leagues: Optional[List[str]] = None,
+    include_international: Optional[bool] = None,
+    top_teams: Optional[int] = None,
 ) -> Dict:
     """
     Find most similar and dissimilar players using role-aware, normalized player-level metrics.
@@ -582,8 +633,18 @@ def get_player_doppelgangers(
         }
 
     params = {"start_date": start, "end_date": end}
+    apply_competition_filter = (
+        leagues is not None or include_international is not None or top_teams is not None
+    )
+    competition_filter = _build_matches_competition_filter(
+        params,
+        leagues=leagues if apply_competition_filter else None,
+        include_international=(include_international if include_international is not None else False) if apply_competition_filter else False,
+        top_teams=top_teams,
+        match_alias="m",
+    )
 
-    batting_query = text("""
+    batting_query = text(f"""
         SELECT
             bs.striker AS player_name,
             COUNT(DISTINCT bs.match_id) AS batting_matches,
@@ -608,10 +669,11 @@ def get_player_doppelgangers(
         FROM batting_stats bs
         JOIN matches m ON bs.match_id = m.id
         WHERE m.date >= :start_date AND m.date <= :end_date
+        {competition_filter}
         GROUP BY bs.striker
     """)
 
-    bowling_query = text("""
+    bowling_query = text(f"""
         SELECT
             bw.bowler AS player_name,
             COUNT(DISTINCT bw.match_id) AS bowling_matches,
@@ -651,6 +713,7 @@ def get_player_doppelgangers(
         FROM bowling_stats bw
         JOIN matches m ON bw.match_id = m.id
         WHERE m.date >= :start_date AND m.date <= :end_date
+        {competition_filter}
         GROUP BY bw.bowler
     """)
 
@@ -667,6 +730,7 @@ def get_player_doppelgangers(
         FROM deliveries d
         JOIN matches m ON d.match_id = m.id
         WHERE m.date >= :start_date AND m.date <= :end_date
+          {competition_filter}
           AND d.batter IS NOT NULL
           AND d.bowler_type IS NOT NULL
           AND {BOWLER_CATEGORY_SQL.replace("bowler_type", "d.bowler_type")} IS NOT NULL
@@ -684,6 +748,7 @@ def get_player_doppelgangers(
         FROM deliveries d
         JOIN matches m ON d.match_id = m.id
         WHERE m.date >= :start_date AND m.date <= :end_date
+          {competition_filter}
           AND d.batter IS NOT NULL
           AND d.bowler_type IS NOT NULL
         GROUP BY d.batter, d.bowler_type
@@ -1043,6 +1108,9 @@ def get_doppelganger_leaderboard(
     top_n_pairs: int = 10,
     max_players_per_role: int = 300,
     batter_metric_level: str = "bowling_type",
+    leagues: Optional[List[str]] = None,
+    include_international: Optional[bool] = None,
+    top_teams: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Global doppelganger leaderboard across qualified batters and bowlers.
@@ -1051,31 +1119,38 @@ def get_doppelganger_leaderboard(
     - top 5 franchise leagues
     - internationals involving top 10 ranked teams (both teams in top-10)
     """
-    from models import INTERNATIONAL_TEAMS_RANKED
-
     defaults = get_default_params()
     start = start_date or defaults["start_date"]
     end = end_date or defaults["end_date"]
 
-    top_leagues = ["IPL", "BBL", "PSL", "CPL", "SA20"]
-    top_teams = INTERNATIONAL_TEAMS_RANKED[:10]
+    default_top_leagues = ["IPL", "BBL", "PSL", "CPL", "SA20"]
+    default_top_teams_count = 10
     if batter_metric_level not in {"basic", "pace_spin", "bowling_type"}:
         raise ValueError("batter_metric_level must be one of: basic, pace_spin, bowling_type")
+
+    has_competition_override = any(v is not None for v in (leagues, include_international, top_teams))
+    effective_leagues = (leagues if leagues is not None else []) if has_competition_override else default_top_leagues
+    effective_include_international = (
+        include_international if include_international is not None else True
+    ) if has_competition_override else True
+    effective_top_teams = (
+        top_teams if top_teams is not None else default_top_teams_count
+    ) if effective_include_international else None
 
     params = {
         "start_date": start,
         "end_date": end,
-        "top_leagues": top_leagues,
-        "top_teams": top_teams,
     }
+    competition_filter = _build_matches_competition_filter(
+        params,
+        leagues=effective_leagues,
+        include_international=effective_include_international,
+        top_teams=effective_top_teams,
+        match_alias="m",
+    )
 
-    competition_filter = """
-        AND (
-            (m.match_type = 'league' AND m.competition = ANY(:top_leagues))
-            OR
-            (m.match_type = 'international' AND m.team1 = ANY(:top_teams) AND m.team2 = ANY(:top_teams))
-        )
-    """
+    if not competition_filter:
+        raise ValueError("At least one competition source must be selected (league and/or international)")
 
     batting_query = text(f"""
         SELECT
@@ -1502,8 +1577,10 @@ def get_doppelganger_leaderboard(
         "success": True,
         "date_range": {"start_date": start.isoformat(), "end_date": end.isoformat()},
         "filters": {
-            "top_leagues": top_leagues,
-            "top_international_teams": top_teams,
+            "leagues": effective_leagues,
+            "include_international": effective_include_international,
+            "top_teams": effective_top_teams,
+            "default_leaderboard_preset_applied": not has_competition_override,
             "min_batting_innings": min_batting_innings,
             "min_bowling_balls": min_bowling_balls,
             "top_n_pairs": top_n_pairs,

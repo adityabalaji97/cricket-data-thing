@@ -503,6 +503,9 @@ const PlayerProfile = () => {
                     playerType="batter"
                     startDate={dateRange.start}
                     endDate={dateRange.end}
+                    leagues={competitionFilters.leagues}
+                    includeInternational={competitionFilters.international}
+                    topTeams={competitionFilters.topTeams}
                     fetchTrigger={dnaFetchTrigger}
                     isMobile={isMobile}
                   />

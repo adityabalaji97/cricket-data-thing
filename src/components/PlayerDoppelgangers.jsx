@@ -71,6 +71,9 @@ const PlayerDoppelgangers = ({
   playerType = null,
   startDate,
   endDate,
+  leagues = [],
+  includeInternational = false,
+  topTeams = 10,
   fetchTrigger,
   isMobile = false,
 }) => {
@@ -92,6 +95,11 @@ const PlayerDoppelgangers = ({
         const params = new URLSearchParams();
         if (startDate) params.append('start_date', startDate);
         if (endDate) params.append('end_date', endDate);
+        leagues.forEach((league) => params.append('leagues', league));
+        params.append('include_international', String(includeInternational));
+        if (includeInternational && topTeams) {
+          params.append('top_teams', String(topTeams));
+        }
         params.append('top_n', '5');
         params.append('min_matches', '10');
 
@@ -123,7 +131,7 @@ const PlayerDoppelgangers = ({
     return () => {
       cancelled = true;
     };
-  }, [playerName, playerType, startDate, endDate, fetchTrigger]);
+  }, [playerName, playerType, startDate, endDate, leagues, includeInternational, topTeams, fetchTrigger]);
 
   const selectedDoppelganger = data?.most_similar?.[selectedSimilarIndex] || null;
 

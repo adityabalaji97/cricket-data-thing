@@ -31,6 +31,7 @@ import {
   Tooltip,
 } from 'recharts';
 import config from '../config';
+import CompetitionFilter from './CompetitionFilter';
 
 const TODAY = new Date().toISOString().split('T')[0];
 const DEFAULT_START = `${new Date().getFullYear() - 1}-01-01`;
@@ -193,14 +194,41 @@ const DoppelgangerLeaderboard = () => {
   const [minBowlingBalls, setMinBowlingBalls] = useState(240);
   const [topPairs, setTopPairs] = useState(10);
   const [batterMetricLevel, setBatterMetricLevel] = useState('bowling_type');
+  const [competitionFilters, setCompetitionFilters] = useState({
+    leagues: ['IPL', 'BBL', 'PSL', 'CPL', 'SA20'],
+    international: true,
+    topTeams: 10,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
 
-  const filterSummary = useMemo(() => ([
-    'Top 5 leagues: IPL, BBL, PSL, CPL, SA20',
-    'Top 10 international teams only',
-  ]), []);
+  const filterSummary = useMemo(() => {
+    const filters = data?.filters || null;
+    const summary = [];
+    const leagues = filters?.leagues ?? competitionFilters.leagues;
+    const includeInternational = filters?.include_international ?? competitionFilters.international;
+    const topTeams = filters?.top_teams ?? (competitionFilters.international ? competitionFilters.topTeams : null);
+    const usedDefaultPreset = filters?.default_leaderboard_preset_applied;
+
+    if (usedDefaultPreset) {
+      summary.push('Default preset applied (Top 5 leagues + Top 10 internationals)');
+    }
+
+    if (Array.isArray(leagues) && leagues.length > 0) {
+      summary.push(`Leagues: ${leagues.join(', ')}`);
+    } else {
+      summary.push('Leagues: All leagues');
+    }
+
+    if (includeInternational) {
+      summary.push(`Internationals: Included${topTeams ? ` (Top ${topTeams} teams)` : ' (All teams)'}`);
+    } else {
+      summary.push('Internationals: Excluded');
+    }
+
+    return summary;
+  }, [competitionFilters, data]);
 
   const fetchLeaderboard = async () => {
     setLoading(true);
@@ -214,6 +242,11 @@ const DoppelgangerLeaderboard = () => {
         top_n_pairs: String(topPairs),
         batter_metric_level: batterMetricLevel,
       });
+      (competitionFilters.leagues || []).forEach((league) => params.append('leagues', league));
+      params.append('include_international', String(Boolean(competitionFilters.international)));
+      if (competitionFilters.international && competitionFilters.topTeams) {
+        params.append('top_teams', String(competitionFilters.topTeams));
+      }
       const res = await axios.get(`${config.API_URL}/search/doppelgangers/leaderboard?${params.toString()}`);
       setData(res.data);
     } catch (err) {
@@ -236,7 +269,7 @@ const DoppelgangerLeaderboard = () => {
         Click a pair row to open a radar chart. Distance is computed as Euclidean distance on z-score normalized feature vectors, so lower values mean closer profiles.
       </Alert>
       <Alert severity="info" sx={{ mb: 2 }}>
-        Batter metric level controls how granular batter doppelganger matching is. For each selected level, only batters with all required data for that level are included.
+        Batter metric level controls how granular batter doppelganger matching is. For each selected level, only batters with all required data for that level are included. Competition filters also reduce the qualified pool before distances are computed.
       </Alert>
 
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
@@ -306,6 +339,12 @@ const DoppelgangerLeaderboard = () => {
                 value={topPairs}
                 onChange={(e) => setTopPairs(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
                 fullWidth
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <CompetitionFilter
+                value={competitionFilters}
+                onFilterChange={setCompetitionFilters}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', alignItems: 'center' }}>

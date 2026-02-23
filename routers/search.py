@@ -8,7 +8,7 @@ from services.search import (
     get_player_doppelgangers,
     get_doppelganger_leaderboard,
 )
-from typing import Optional
+from typing import Optional, List
 from datetime import date
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -103,6 +103,9 @@ def get_player_doppelganger_profile(
     player_name: str,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    leagues: List[str] = Query(default=None, description="League competitions to include; omit to leave unfiltered"),
+    include_international: Optional[bool] = Query(default=None, description="Include international matches"),
+    top_teams: Optional[int] = Query(default=None, ge=1, le=30, description="Limit internationals to top N teams"),
     role: Optional[str] = Query(default=None, description="Override role: batter, bowler, or all_rounder"),
     min_matches: int = Query(default=10, ge=1, le=200, description="Minimum matches for candidate pool"),
     top_n: int = Query(default=5, ge=1, le=20, description="How many similar/dissimilar players to return"),
@@ -118,6 +121,9 @@ def get_player_doppelganger_profile(
             db=db,
             start_date=start_date,
             end_date=end_date,
+            leagues=leagues,
+            include_international=include_international,
+            top_teams=top_teams,
             role=role,
             min_matches=min_matches,
             top_n=top_n
@@ -137,6 +143,9 @@ def get_player_doppelganger_profile(
 def get_doppelganger_leaderboard_route(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    leagues: List[str] = Query(default=None, description="League competitions to include (omit to use default top-5 preset, empty with other filters => all leagues)"),
+    include_international: Optional[bool] = Query(default=None, description="Include international matches"),
+    top_teams: Optional[int] = Query(default=None, ge=1, le=30, description="Limit internationals to top N teams"),
     min_batting_innings: int = Query(default=25, ge=1, le=500, description="Minimum batting innings"),
     min_bowling_balls: int = Query(default=240, ge=1, le=10000, description="Minimum bowling balls"),
     top_n_pairs: int = Query(default=10, ge=1, le=50, description="Pairs to return"),
@@ -152,6 +161,9 @@ def get_doppelganger_leaderboard_route(
             db=db,
             start_date=start_date,
             end_date=end_date,
+            leagues=leagues,
+            include_international=include_international,
+            top_teams=top_teams,
             min_batting_innings=min_batting_innings,
             min_bowling_balls=min_bowling_balls,
             top_n_pairs=top_n_pairs,

@@ -501,6 +501,9 @@ const BowlerProfile = () => {
                     playerType="bowler"
                     startDate={dateRange.start}
                     endDate={dateRange.end}
+                    leagues={competitionFilters.leagues}
+                    includeInternational={competitionFilters.international}
+                    topTeams={competitionFilters.topTeams}
                     fetchTrigger={dnaFetchTrigger}
                     isMobile={isMobile}
                   />
