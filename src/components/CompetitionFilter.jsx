@@ -30,6 +30,15 @@ const touchTargetStyles = {
 };
 
 const buildAllLeaguesOption = () => ({ label: 'All Leagues', value: 'all' });
+const LEAGUE_LABEL_ALIASES = {
+    IPL: 'Indian Premier League',
+    BBL: 'Big Bash League',
+    PSL: 'Pakistan Super League',
+    CPL: 'Caribbean Premier League',
+    SA20: 'SA20',
+};
+
+const normalizeLeagueToken = (value) => String(value || '').trim().toLowerCase();
 
 const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
     const [includeInternational, setIncludeInternational] = useState(value?.international ?? false);
@@ -71,10 +80,24 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
         };
 
         const optionsByValue = new Map(leagues.map((league) => [league.value, league]));
+        const optionsByLabel = new Map(leagues.map((league) => [normalizeLeagueToken(league.label), league]));
+        const optionsByNormalizedValue = new Map(leagues.map((league) => [normalizeLeagueToken(league.value), league]));
+        const resolveLeagueOption = (leagueKey) => {
+            if (!leagueKey) return null;
+            if (optionsByValue.has(leagueKey)) return optionsByValue.get(leagueKey);
+            const normalized = normalizeLeagueToken(leagueKey);
+            if (optionsByNormalizedValue.has(normalized)) return optionsByNormalizedValue.get(normalized);
+            if (optionsByLabel.has(normalized)) return optionsByLabel.get(normalized);
+            const aliasLabel = LEAGUE_LABEL_ALIASES[leagueKey];
+            if (aliasLabel && optionsByLabel.has(normalizeLeagueToken(aliasLabel))) {
+                return optionsByLabel.get(normalizeLeagueToken(aliasLabel));
+            }
+            return null;
+        };
         const nextSelectedLeagues = isAllLeagues
             ? [buildAllLeaguesOption()]
             : resolvedFilters.leagues
-                  .map((league) => optionsByValue.get(league))
+                  .map((league) => resolveLeagueOption(league))
                   .filter(Boolean);
 
         setSelectedLeagues(nextSelectedLeagues);
