@@ -122,9 +122,10 @@ const AppContent = () => {
     path === '/query' ? 7 : 
     path === '/team' ? 8 : 
     path === '/team-comparison' ? 9 : 
-    path === '/games/guess-innings' ? 10 :
-    path === '/games/player-journeys' ? 11 :
-    path === '/wrapped/2025' ? 12 : 0
+    path === '/doppelgangers' ? 10 :
+    path === '/games/guess-innings' ? 11 :
+    path === '/games/player-journeys' ? 12 :
+    path === '/wrapped/2025' ? 13 : 0
     );
     }
   };
@@ -145,9 +146,10 @@ const AppContent = () => {
         path === '/query' ? 7 : 
         path === '/team' ? 8 : 
         path === '/team-comparison' ? 9 :
-        path === '/games/guess-innings' ? 10 :
-        path === '/games/player-journeys' ? 11 :
-        path === '/wrapped/2025' || path.startsWith('/wrapped') ? 12 : 0
+        path === '/doppelgangers' ? 10 :
+        path === '/games/guess-innings' ? 11 :
+        path === '/games/player-journeys' ? 12 :
+        path === '/wrapped/2025' || path.startsWith('/wrapped') ? 13 : 0
       );
     }
   }, [location]);
@@ -427,8 +429,10 @@ const AppContent = () => {
            currentTab === 7 ? 'Query Builder' : 
            currentTab === 8 ? 'Team Profile' : 
            currentTab === 9 ? 'Team Comparison' :
-           currentTab === 10 ? 'Guess the Innings' :
-           currentTab === 11 ? '2025 Wrapped' : 'Home';
+           currentTab === 10 ? 'Doppelgangers' :
+           currentTab === 11 ? 'Guess the Innings' :
+           currentTab === 12 ? 'Player Journeys' :
+           currentTab === 13 ? '2025 Wrapped' : 'Home';
   };
 
   return (
@@ -520,6 +524,9 @@ const AppContent = () => {
                 Team Profile
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/team-comparison')}>                Team Comparison
+              </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/doppelgangers')}>
+                Doppelgangers
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/games/guess-innings')}>
                 🎯 Guess the Innings
