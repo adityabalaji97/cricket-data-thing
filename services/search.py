@@ -789,3 +789,295 @@ def get_player_doppelgangers(
         "most_similar": similar,
         "most_dissimilar": dissimilar
     }
+
+
+def get_doppelganger_leaderboard(
+    db: Session,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    min_batting_innings: int = 25,
+    min_bowling_balls: int = 240,
+    top_n_pairs: int = 10,
+    max_players_per_role: int = 300
+) -> Dict[str, Any]:
+    """
+    Global doppelganger leaderboard across qualified batters and bowlers.
+
+    Filters are restricted to:
+    - top 5 franchise leagues
+    - internationals involving top 10 ranked teams (both teams in top-10)
+    """
+    from models import INTERNATIONAL_TEAMS_RANKED
+
+    defaults = get_default_params()
+    start = start_date or defaults["start_date"]
+    end = end_date or defaults["end_date"]
+
+    top_leagues = ["IPL", "BBL", "PSL", "CPL", "SA20"]
+    top_teams = INTERNATIONAL_TEAMS_RANKED[:10]
+
+    params = {
+        "start_date": start,
+        "end_date": end,
+        "top_leagues": top_leagues,
+        "top_teams": top_teams,
+    }
+
+    competition_filter = """
+        AND (
+            (m.match_type = 'league' AND m.competition = ANY(:top_leagues))
+            OR
+            (m.match_type = 'international' AND m.team1 = ANY(:top_teams) AND m.team2 = ANY(:top_teams))
+        )
+    """
+
+    batting_query = text(f"""
+        SELECT
+            bs.striker AS player_name,
+            COUNT(*) AS batting_innings,
+            COUNT(DISTINCT bs.match_id) AS batting_matches,
+            COALESCE(SUM(bs.runs), 0) AS batting_runs,
+            COALESCE(SUM(bs.balls_faced), 0) AS batting_balls,
+            COALESCE(SUM(bs.dots), 0) AS batting_dots,
+            COALESCE(SUM(bs.fours), 0) AS fours,
+            COALESCE(SUM(bs.sixes), 0) AS sixes,
+            COALESCE(SUM(bs.wickets), 0) AS dismissals,
+            COALESCE(SUM(bs.pp_runs), 0) AS pp_runs,
+            COALESCE(SUM(bs.pp_balls), 0) AS pp_balls,
+            COALESCE(SUM(bs.pp_dots), 0) AS pp_dots,
+            COALESCE(SUM(bs.pp_boundaries), 0) AS pp_boundaries,
+            COALESCE(SUM(bs.middle_runs), 0) AS middle_runs,
+            COALESCE(SUM(bs.middle_balls), 0) AS middle_balls,
+            COALESCE(SUM(bs.middle_dots), 0) AS middle_dots,
+            COALESCE(SUM(bs.middle_boundaries), 0) AS middle_boundaries,
+            COALESCE(SUM(bs.death_runs), 0) AS death_runs,
+            COALESCE(SUM(bs.death_balls), 0) AS death_balls,
+            COALESCE(SUM(bs.death_dots), 0) AS death_dots,
+            COALESCE(SUM(bs.death_boundaries), 0) AS death_boundaries
+        FROM batting_stats bs
+        JOIN matches m ON bs.match_id = m.id
+        WHERE m.date >= :start_date AND m.date <= :end_date
+        {competition_filter}
+        GROUP BY bs.striker
+    """)
+
+    bowling_query = text(f"""
+        SELECT
+            bw.bowler AS player_name,
+            COUNT(*) AS bowling_innings,
+            COUNT(DISTINCT bw.match_id) AS bowling_matches,
+            COALESCE(SUM(bw.runs_conceded), 0) AS runs_conceded,
+            COALESCE(SUM(bw.wickets), 0) AS wickets,
+            COALESCE(SUM(bw.dots), 0) AS bowling_dots,
+            COALESCE(SUM(
+                CAST(
+                    FLOOR(COALESCE(bw.overs, 0)) * 6 +
+                    ROUND((COALESCE(bw.overs, 0) - FLOOR(COALESCE(bw.overs, 0))) * 10)
+                AS INTEGER)
+            ), 0) AS bowling_balls,
+            COALESCE(SUM(bw.pp_runs), 0) AS pp_runs,
+            COALESCE(SUM(bw.pp_dots), 0) AS pp_dots,
+            COALESCE(SUM(
+                CAST(
+                    FLOOR(COALESCE(bw.pp_overs, 0)) * 6 +
+                    ROUND((COALESCE(bw.pp_overs, 0) - FLOOR(COALESCE(bw.pp_overs, 0))) * 10)
+                AS INTEGER)
+            ), 0) AS pp_balls,
+            COALESCE(SUM(bw.middle_runs), 0) AS middle_runs,
+            COALESCE(SUM(bw.middle_dots), 0) AS middle_dots,
+            COALESCE(SUM(
+                CAST(
+                    FLOOR(COALESCE(bw.middle_overs, 0)) * 6 +
+                    ROUND((COALESCE(bw.middle_overs, 0) - FLOOR(COALESCE(bw.middle_overs, 0))) * 10)
+                AS INTEGER)
+            ), 0) AS middle_balls,
+            COALESCE(SUM(bw.death_runs), 0) AS death_runs,
+            COALESCE(SUM(bw.death_dots), 0) AS death_dots,
+            COALESCE(SUM(
+                CAST(
+                    FLOOR(COALESCE(bw.death_overs, 0)) * 6 +
+                    ROUND((COALESCE(bw.death_overs, 0) - FLOOR(COALESCE(bw.death_overs, 0))) * 10)
+                AS INTEGER)
+            ), 0) AS death_balls
+        FROM bowling_stats bw
+        JOIN matches m ON bw.match_id = m.id
+        WHERE m.date >= :start_date AND m.date <= :end_date
+        {competition_filter}
+        GROUP BY bw.bowler
+    """)
+
+    batting_rows = db.execute(batting_query, params).fetchall()
+    bowling_rows = db.execute(bowling_query, params).fetchall()
+
+    def _pct(num: float, den: float) -> float:
+        return (num * 100.0 / den) if den else 0.0
+
+    def _rate_per_100(num: float, den: float) -> float:
+        return (num * 100.0 / den) if den else 0.0
+
+    def _economy(runs: float, balls: float) -> float:
+        return (runs * 6.0 / balls) if balls else 0.0
+
+    def _bowling_sr(balls: float, wickets: float) -> float:
+        return (balls / wickets) if wickets else 0.0
+
+    batting_metric_defs = [
+        "batting_average",
+        "batting_strike_rate",
+        "batting_dot_percentage",
+        "batting_boundary_percentage",
+        "pp_strike_rate",
+        "middle_strike_rate",
+        "death_strike_rate",
+        "pp_boundary_percentage",
+        "middle_boundary_percentage",
+        "death_boundary_percentage",
+    ]
+    bowling_metric_defs = [
+        "bowling_economy",
+        "bowling_strike_rate",
+        "bowling_dot_percentage",
+        "pp_economy",
+        "middle_economy",
+        "death_economy",
+        "pp_dot_percentage",
+        "middle_dot_percentage",
+        "death_dot_percentage",
+    ]
+
+    batters: List[Dict[str, Any]] = []
+    for row in batting_rows:
+        innings = int(row.batting_innings or 0)
+        if innings < min_batting_innings:
+            continue
+        runs = float(row.batting_runs or 0)
+        balls = float(row.batting_balls or 0)
+        dots = float(row.batting_dots or 0)
+        boundaries = float((row.fours or 0) + (row.sixes or 0))
+        dismissals = float(row.dismissals or 0)
+        metrics = {
+            "batting_average": round((runs / dismissals) if dismissals else 0.0, 3),
+            "batting_strike_rate": round(_rate_per_100(runs, balls), 3),
+            "batting_dot_percentage": round(_pct(dots, balls), 3),
+            "batting_boundary_percentage": round(_pct(boundaries, balls), 3),
+            "pp_strike_rate": round(_rate_per_100(float(row.pp_runs or 0), float(row.pp_balls or 0)), 3),
+            "middle_strike_rate": round(_rate_per_100(float(row.middle_runs or 0), float(row.middle_balls or 0)), 3),
+            "death_strike_rate": round(_rate_per_100(float(row.death_runs or 0), float(row.death_balls or 0)), 3),
+            "pp_boundary_percentage": round(_pct(float(row.pp_boundaries or 0), float(row.pp_balls or 0)), 3),
+            "middle_boundary_percentage": round(_pct(float(row.middle_boundaries or 0), float(row.middle_balls or 0)), 3),
+            "death_boundary_percentage": round(_pct(float(row.death_boundaries or 0), float(row.death_balls or 0)), 3),
+        }
+        batters.append({
+            "player_name": row.player_name,
+            "innings": innings,
+            "matches": int(row.batting_matches or 0),
+            "balls": int(row.batting_balls or 0),
+            "metrics": metrics,
+        })
+
+    bowlers: List[Dict[str, Any]] = []
+    for row in bowling_rows:
+        balls = int(row.bowling_balls or 0)
+        if balls < min_bowling_balls:
+            continue
+        wickets = float(row.wickets or 0)
+        metrics = {
+            "bowling_economy": round(_economy(float(row.runs_conceded or 0), float(balls)), 3),
+            "bowling_strike_rate": round(_bowling_sr(float(balls), wickets), 3),
+            "bowling_dot_percentage": round(_pct(float(row.bowling_dots or 0), float(balls)), 3),
+            "pp_economy": round(_economy(float(row.pp_runs or 0), float(row.pp_balls or 0)), 3),
+            "middle_economy": round(_economy(float(row.middle_runs or 0), float(row.middle_balls or 0)), 3),
+            "death_economy": round(_economy(float(row.death_runs or 0), float(row.death_balls or 0)), 3),
+            "pp_dot_percentage": round(_pct(float(row.pp_dots or 0), float(row.pp_balls or 0)), 3),
+            "middle_dot_percentage": round(_pct(float(row.middle_dots or 0), float(row.middle_balls or 0)), 3),
+            "death_dot_percentage": round(_pct(float(row.death_dots or 0), float(row.death_balls or 0)), 3),
+        }
+        bowlers.append({
+            "player_name": row.player_name,
+            "innings": int(row.bowling_innings or 0),
+            "matches": int(row.bowling_matches or 0),
+            "balls": balls,
+            "wickets": int(row.wickets or 0),
+            "metrics": metrics,
+        })
+
+    def _build_pair_leaderboard(pool: List[Dict[str, Any]], feature_names: List[str], role_label: str) -> Dict[str, Any]:
+        if len(pool) < 2:
+            return {
+                "role": role_label,
+                "qualified_players": len(pool),
+                "most_similar": [],
+                "most_dissimilar": [],
+                "feature_space": feature_names,
+                "warning": "Not enough qualified players"
+            }
+
+        # Keep computation bounded on very broad ranges/cutoffs.
+        if len(pool) > max_players_per_role:
+            pool = sorted(pool, key=lambda p: (p["matches"], p["balls"]), reverse=True)[:max_players_per_role]
+            warning = f"Capped pool to top {max_players_per_role} players by volume for performance"
+        else:
+            warning = None
+
+        stats = {}
+        for feature in feature_names:
+            vals = [float(p["metrics"][feature]) for p in pool]
+            mean = sum(vals) / len(vals)
+            variance = sum((v - mean) ** 2 for v in vals) / len(vals)
+            std = math.sqrt(variance)
+            stats[feature] = {"mean": mean, "std": std if std > 0 else 1.0}
+
+        vectors = {}
+        for p in pool:
+            vectors[p["player_name"]] = [
+                (float(p["metrics"][f]) - stats[f]["mean"]) / stats[f]["std"]
+                for f in feature_names
+            ]
+
+        indexed = {p["player_name"]: p for p in pool}
+        pairs = []
+        for i in range(len(pool)):
+            p1 = pool[i]
+            v1 = vectors[p1["player_name"]]
+            for j in range(i + 1, len(pool)):
+                p2 = pool[j]
+                v2 = vectors[p2["player_name"]]
+                dist = math.sqrt(sum((a - b) ** 2 for a, b in zip(v1, v2)))
+                pairs.append({
+                    "player1": p1["player_name"],
+                    "player2": p2["player_name"],
+                    "distance": round(dist, 4),
+                    "player1_matches": p1["matches"],
+                    "player2_matches": p2["matches"],
+                    "player1_innings": p1["innings"],
+                    "player2_innings": p2["innings"],
+                    "player1_balls": p1["balls"],
+                    "player2_balls": p2["balls"],
+                })
+
+        pairs.sort(key=lambda x: x["distance"])
+        return {
+            "role": role_label,
+            "qualified_players": len(pool),
+            "feature_space": feature_names,
+            "most_similar": pairs[:top_n_pairs],
+            "most_dissimilar": list(reversed(pairs[-top_n_pairs:])),
+            "warning": warning,
+        }
+
+    batter_board = _build_pair_leaderboard(batters, batting_metric_defs, "batter")
+    bowler_board = _build_pair_leaderboard(bowlers, bowling_metric_defs, "bowler")
+
+    return {
+        "success": True,
+        "date_range": {"start_date": start.isoformat(), "end_date": end.isoformat()},
+        "filters": {
+            "top_leagues": top_leagues,
+            "top_international_teams": top_teams,
+            "min_batting_innings": min_batting_innings,
+            "min_bowling_balls": min_bowling_balls,
+            "top_n_pairs": top_n_pairs,
+        },
+        "batters": batter_board,
+        "bowlers": bowler_board,
+    }

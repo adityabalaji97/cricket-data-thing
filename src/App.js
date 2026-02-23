@@ -35,6 +35,7 @@ import BatterComparison from './components/BatterComparison';
 import QueryBuilder from './components/QueryBuilder'; // Import the new QueryBuilder component
 import TeamProfile from './components/TeamProfile';
 import TeamComparison from './components/TeamComparison';
+import DoppelgangerLeaderboard from './components/DoppelgangerLeaderboard';
 import WrappedPage from './components/wrapped/WrappedPage';
 import { GoogleSearchLanding, SearchBar } from './components/search';
 import GuessInningsGame from './components/games/GuessInningsGame';
@@ -562,6 +563,7 @@ const AppContent = () => {
               <Tab label="Query Builder" component={Link} to="/query" />
               <Tab label="Team Profile" component={Link} to="/team" />
               <Tab label="Team Comparison" component={Link} to="/team-comparison" />
+              <Tab label="Doppelgangers" component={Link} to="/doppelgangers" />
               <Tab label="🎯 Guess the Innings" component={Link} to="/games/guess-innings" />
               <Tab label="🛤️ Player Journeys" component={Link} to="/games/player-journeys" />
               <Tab label="🎁 2025 Wrapped" component={Link} to="/wrapped/2025" sx={{ color: '#1DB954' }} />
@@ -587,6 +589,7 @@ const AppContent = () => {
         <Route path="/query" element={<QueryBuilder isMobile={isMobile} />} />
         <Route path="/team" element={<TeamProfile isMobile={isMobile} />} />
         <Route path="/team-comparison" element={<TeamComparison />} />
+        <Route path="/doppelgangers" element={<DoppelgangerLeaderboard />} />
         <Route path="/games/guess-innings" element={<GuessInningsGame isMobile={isMobile} />} />
         <Route path="/games/player-journeys" element={<PlayerJourneysGame isMobile={isMobile} />} />
         <Route path="/wrapped/2025" element={<WrappedPage />} />

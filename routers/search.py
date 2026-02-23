@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_session
-from services.search import search_entities, get_random_entity, get_player_profile, get_player_doppelgangers
+from services.search import (
+    search_entities,
+    get_random_entity,
+    get_player_profile,
+    get_player_doppelgangers,
+    get_doppelganger_leaderboard,
+)
 from typing import Optional
 from datetime import date
 
@@ -125,3 +131,29 @@ def get_player_doppelganger_profile(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get doppelgänger search results: {str(e)}")
+
+
+@router.get("/doppelgangers/leaderboard")
+def get_doppelganger_leaderboard_route(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    min_batting_innings: int = Query(default=25, ge=1, le=500, description="Minimum batting innings"),
+    min_bowling_balls: int = Query(default=240, ge=1, le=10000, description="Minimum bowling balls"),
+    top_n_pairs: int = Query(default=10, ge=1, le=50, description="Pairs to return"),
+    db: Session = Depends(get_session)
+):
+    """
+    Global similarity leaderboard for batters and bowlers, restricted to
+    top franchise leagues and top international teams.
+    """
+    try:
+        return get_doppelganger_leaderboard(
+            db=db,
+            start_date=start_date,
+            end_date=end_date,
+            min_batting_innings=min_batting_innings,
+            min_bowling_balls=min_bowling_balls,
+            top_n_pairs=top_n_pairs,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get doppelganger leaderboard: {str(e)}")
