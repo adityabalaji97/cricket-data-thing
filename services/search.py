@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 # Batter doppelganger feature expansion settings
 DOPPELGANGER_STYLE_FEATURE_COUNT = 4
 DOPPELGANGER_STYLE_MIN_BALLS = 120
+DOPPELGANGER_KIND_MIN_BALLS_PER_PLAYER = 30
+DOPPELGANGER_STYLE_MIN_BALLS_PER_PLAYER = 25
 
 
 def _safe_pct(num: float, den: float) -> float:
@@ -121,18 +123,26 @@ def _build_batter_split_metrics(
                     "higher_is_better": higher_is_better,
                 })
 
-    def _metrics_from_agg(agg: Optional[Dict[str, float]]) -> Dict[str, float]:
+    def _metrics_from_agg(agg: Optional[Dict[str, float]], min_balls_for_metrics: int = 1) -> Dict[str, Any]:
         if not agg:
             return {
-                "average": 0.0,
-                "strike_rate": 0.0,
-                "boundary_percentage": 0.0,
-                "dot_percentage": 0.0,
+                "average": None,
+                "strike_rate": None,
+                "boundary_percentage": None,
+                "dot_percentage": None,
                 "balls": 0.0,
             }
         balls = float(agg.get("balls") or 0)
         runs = float(agg.get("runs") or 0)
         dismissals = float(agg.get("dismissals") or 0)
+        if balls < min_balls_for_metrics:
+            return {
+                "average": None,
+                "strike_rate": None,
+                "boundary_percentage": None,
+                "dot_percentage": None,
+                "balls": balls,
+            }
         return {
             "average": round((runs / dismissals) if dismissals else 0.0, 3),
             "strike_rate": round(_safe_rate_per_100(runs, balls), 3),
@@ -148,7 +158,10 @@ def _build_batter_split_metrics(
         split_volume: Dict[str, Any] = {"kind": {}, "style": {}}
 
         for kind in ["pace", "spin"]:
-            m = _metrics_from_agg(player_splits.get(f"kind:{kind}"))
+            m = _metrics_from_agg(
+                player_splits.get(f"kind:{kind}"),
+                min_balls_for_metrics=DOPPELGANGER_KIND_MIN_BALLS_PER_PLAYER,
+            )
             split_volume["kind"][kind] = int(m["balls"])
             additions[f"vs_{kind}_average"] = m["average"]
             additions[f"vs_{kind}_strike_rate"] = m["strike_rate"]
@@ -156,7 +169,10 @@ def _build_batter_split_metrics(
             additions[f"vs_{kind}_dot_percentage"] = m["dot_percentage"]
 
         for style in top_styles:
-            m = _metrics_from_agg(player_splits.get(f"style:{style}"))
+            m = _metrics_from_agg(
+                player_splits.get(f"style:{style}"),
+                min_balls_for_metrics=DOPPELGANGER_STYLE_MIN_BALLS_PER_PLAYER,
+            )
             style_key = _sanitize_style_key(style)
             split_volume["style"][style] = int(m["balls"])
             additions[f"vs_style_{style_key}_average"] = m["average"]
@@ -576,7 +592,7 @@ def get_player_doppelgangers(
             COALESCE(SUM(bs.dots), 0) AS batting_dots,
             COALESCE(SUM(bs.fours), 0) AS fours,
             COALESCE(SUM(bs.sixes), 0) AS sixes,
-            COALESCE(SUM(bs.wickets), 0) AS dismissals,
+            COUNT(CASE WHEN COALESCE(bs.wickets, 0) > 0 THEN 1 END) AS dismissals,
             COALESCE(SUM(bs.pp_runs), 0) AS pp_runs,
             COALESCE(SUM(bs.pp_balls), 0) AS pp_balls,
             COALESCE(SUM(bs.pp_dots), 0) AS pp_dots,
@@ -887,7 +903,15 @@ def get_player_doppelgangers(
     zscore_stats = {}
     percentile_stats = {}
     for feature in feature_names:
-        vals = [float(p[role_metric_field][feature]) for p in candidate_pool]
+        vals = [
+            float(p[role_metric_field][feature])
+            for p in candidate_pool
+            if p[role_metric_field].get(feature) is not None
+        ]
+        if not vals:
+            zscore_stats[feature] = {"mean": 0.0, "std": 1.0}
+            percentile_stats[feature] = {"values": [], "mean": 0.0}
+            continue
         mean = sum(vals) / len(vals)
         variance = sum((v - mean) ** 2 for v in vals) / len(vals)
         std = math.sqrt(variance)
@@ -902,8 +926,13 @@ def get_player_doppelgangers(
     def _zscore_vector(player_record: Dict[str, Any]) -> List[float]:
         vec = []
         for f in feature_names:
-            raw = float(player_record[role_metric_field][f])
-            z = (raw - zscore_stats[f]["mean"]) / zscore_stats[f]["std"]
+            raw_val = player_record[role_metric_field].get(f)
+            if raw_val is None:
+                # Missing split metrics are treated as neutral (mean) instead of zero.
+                z = 0.0
+            else:
+                raw = float(raw_val)
+                z = (raw - zscore_stats[f]["mean"]) / zscore_stats[f]["std"]
             if comparison_role == "all_rounder":
                 z *= all_rounder_weight
             vec.append(z)
@@ -911,6 +940,8 @@ def get_player_doppelgangers(
 
     def _percentile(feature: str, raw_value: float) -> float:
         vals = percentile_stats[feature]["values"]
+        if not vals:
+            return 50.0
         metric_def = metric_key_to_def[feature]
         better_count = 0
         equal_count = 0
@@ -930,17 +961,22 @@ def get_player_doppelgangers(
 
     def _build_radar_metrics(player_record: Dict[str, Any]) -> List[Dict[str, Any]]:
         metrics = player_record[role_metric_field]
-        return [
-            {
-                "metric": metric_def["label"],
-                "key": metric_def["key"],
-                "percentile": _percentile(metric_def["key"], float(metrics[metric_def["key"]])),
-                "raw_value": round(float(metrics[metric_def["key"]]), 3),
-                "league_avg": percentile_stats[metric_def["key"]]["mean"],
-                "higher_is_better": metric_def["higher_is_better"],
-            }
-            for metric_def in radar_metric_defs_by_role[comparison_role]
-        ]
+        radar_items = []
+        for metric_def in radar_metric_defs_by_role[comparison_role]:
+            raw_val = metrics.get(metric_def["key"])
+            if raw_val is None:
+                continue
+            radar_items.append(
+                {
+                    "metric": metric_def["label"],
+                    "key": metric_def["key"],
+                    "percentile": _percentile(metric_def["key"], float(raw_val)),
+                    "raw_value": round(float(raw_val), 3),
+                    "league_avg": percentile_stats[metric_def["key"]]["mean"],
+                    "higher_is_better": metric_def["higher_is_better"],
+                }
+            )
+        return radar_items
 
     target_vec = _zscore_vector(target)
     scored = []
@@ -1048,7 +1084,7 @@ def get_doppelganger_leaderboard(
             COALESCE(SUM(bs.dots), 0) AS batting_dots,
             COALESCE(SUM(bs.fours), 0) AS fours,
             COALESCE(SUM(bs.sixes), 0) AS sixes,
-            COALESCE(SUM(bs.wickets), 0) AS dismissals,
+            COUNT(CASE WHEN COALESCE(bs.wickets, 0) > 0 THEN 1 END) AS dismissals,
             COALESCE(SUM(bs.pp_runs), 0) AS pp_runs,
             COALESCE(SUM(bs.pp_balls), 0) AS pp_balls,
             COALESCE(SUM(bs.pp_dots), 0) AS pp_dots,
@@ -1318,7 +1354,14 @@ def get_doppelganger_leaderboard(
 
         stats = {}
         for feature in feature_names:
-            vals = [float(p["metrics"][feature]) for p in pool]
+            vals = [
+                float(p["metrics"][feature])
+                for p in pool
+                if p["metrics"].get(feature) is not None
+            ]
+            if not vals:
+                stats[feature] = {"mean": 0.0, "std": 1.0}
+                continue
             mean = sum(vals) / len(vals)
             variance = sum((v - mean) ** 2 for v in vals) / len(vals)
             std = math.sqrt(variance)
@@ -1327,17 +1370,19 @@ def get_doppelganger_leaderboard(
         vectors = {}
         for p in pool:
             vectors[p["player_name"]] = [
-                (float(p["metrics"][f]) - stats[f]["mean"]) / stats[f]["std"]
+                0.0 if p["metrics"].get(f) is None else ((float(p["metrics"][f]) - stats[f]["mean"]) / stats[f]["std"])
                 for f in feature_names
             ]
 
         percentile_stats = {
-            f: [float(p["metrics"][f]) for p in pool]
+            f: [float(p["metrics"][f]) for p in pool if p["metrics"].get(f) is not None]
             for f in feature_names
         }
 
         def _percentile(feature: str, raw_value: float) -> float:
             vals = percentile_stats[feature]
+            if not vals:
+                return 50.0
             metric_def = metric_def_map[feature]
             better_count = 0
             equal_count = 0
@@ -1365,7 +1410,7 @@ def get_doppelganger_leaderboard(
                     "higher_is_better": d["higher_is_better"],
                 }
                 for d in radar_metric_defs
-                if d["key"] in player_record["metrics"]
+                if d["key"] in player_record["metrics"] and player_record["metrics"].get(d["key"]) is not None
             ]
 
         indexed = {p["player_name"]: p for p in pool}
