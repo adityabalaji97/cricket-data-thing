@@ -1041,7 +1041,8 @@ def get_doppelganger_leaderboard(
     min_batting_innings: int = 25,
     min_bowling_balls: int = 240,
     top_n_pairs: int = 10,
-    max_players_per_role: int = 300
+    max_players_per_role: int = 300,
+    batter_metric_level: str = "bowling_type",
 ) -> Dict[str, Any]:
     """
     Global doppelganger leaderboard across qualified batters and bowlers.
@@ -1058,6 +1059,8 @@ def get_doppelganger_leaderboard(
 
     top_leagues = ["IPL", "BBL", "PSL", "CPL", "SA20"]
     top_teams = INTERNATIONAL_TEAMS_RANKED[:10]
+    if batter_metric_level not in {"basic", "pace_spin", "bowling_type"}:
+        raise ValueError("batter_metric_level must be one of: basic, pace_spin, bowling_type")
 
     params = {
         "start_date": start,
@@ -1190,7 +1193,7 @@ def get_doppelganger_leaderboard(
     bowling_rows = db.execute(bowling_query, params).fetchall()
     batter_split_rows = db.execute(batter_split_query, params).fetchall()
 
-    batting_metric_defs = [
+    base_batting_metric_defs = [
         "batting_average",
         "batting_strike_rate",
         "batting_dot_percentage",
@@ -1277,7 +1280,7 @@ def get_doppelganger_leaderboard(
         include_style_metrics=True,
     )
     if split_metric_defs:
-        batting_metric_defs = batting_metric_defs + [m["key"] for m in split_metric_defs]
+        all_batting_feature_names = base_batting_metric_defs + [m["key"] for m in split_metric_defs]
         batter_metric_def_map = {m["key"]: m for m in (
             [{"key": "batting_average", "label": "Bat Avg", "higher_is_better": True},
              {"key": "batting_strike_rate", "label": "Bat SR", "higher_is_better": True},
@@ -1300,6 +1303,7 @@ def get_doppelganger_leaderboard(
             p["metrics"].update(split_additions.get(p["player_name"], {}))
             p["batting_split_volume"] = split_volume.get(p["player_name"], {"kind": {}, "style": {}})
     else:
+        all_batting_feature_names = list(base_batting_metric_defs)
         batter_metric_def_map = {
             "batting_average": {"key": "batting_average", "label": "Bat Avg", "higher_is_better": True},
             "batting_strike_rate": {"key": "batting_strike_rate", "label": "Bat SR", "higher_is_better": True},
@@ -1315,6 +1319,29 @@ def get_doppelganger_leaderboard(
         batter_radar_metric_defs = list(batter_metric_def_map.values())
         for p in batters:
             p["batting_split_volume"] = {"kind": {}, "style": {}}
+
+    pace_spin_feature_keys = [
+        "vs_pace_average", "vs_pace_strike_rate", "vs_pace_boundary_percentage", "vs_pace_dot_percentage",
+        "vs_spin_average", "vs_spin_strike_rate", "vs_spin_boundary_percentage", "vs_spin_dot_percentage",
+    ]
+    style_feature_keys = [k for k in all_batting_feature_names if k.startswith("vs_style_")]
+
+    if batter_metric_level == "basic":
+        batting_metric_defs = list(base_batting_metric_defs)
+        required_batter_keys = []
+    elif batter_metric_level == "pace_spin":
+        batting_metric_defs = list(base_batting_metric_defs) + [k for k in pace_spin_feature_keys if k in all_batting_feature_names]
+        required_batter_keys = [k for k in pace_spin_feature_keys if k in all_batting_feature_names]
+    else:
+        batting_metric_defs = list(base_batting_metric_defs) + [k for k in pace_spin_feature_keys if k in all_batting_feature_names] + style_feature_keys
+        required_batter_keys = [k for k in pace_spin_feature_keys if k in all_batting_feature_names] + style_feature_keys
+
+    if required_batter_keys:
+        filtered_batters = []
+        for p in batters:
+            if all(p["metrics"].get(k) is not None for k in required_batter_keys):
+                filtered_batters.append(p)
+        batters = filtered_batters
 
     bowler_metric_def_map = {
         "bowling_economy": {"key": "bowling_economy", "label": "Econ", "higher_is_better": False},
@@ -1480,10 +1507,20 @@ def get_doppelganger_leaderboard(
             "min_batting_innings": min_batting_innings,
             "min_bowling_balls": min_bowling_balls,
             "top_n_pairs": top_n_pairs,
+            "batter_metric_level": batter_metric_level,
         },
         "distance_explanation": {
             "method": "euclidean_distance_on_z_scores",
             "summary": "Distances are computed separately for batters and bowlers using z-score normalized feature vectors; lower is more similar.",
+        },
+        "batter_metric_levels": {
+            "selected": batter_metric_level,
+            "options": {
+                "basic": "Core + phase batting metrics only",
+                "pace_spin": "Core + phase + vs pace/spin batting metrics",
+                "bowling_type": "Core + phase + vs pace/spin + vs bowling style batting metrics",
+            },
+            "availability_rule": "For batter comparisons, only players with data available for all metrics required by the selected level are included.",
         },
         "batters": batter_board,
         "bowlers": bowler_board,

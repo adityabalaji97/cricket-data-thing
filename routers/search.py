@@ -140,6 +140,7 @@ def get_doppelganger_leaderboard_route(
     min_batting_innings: int = Query(default=25, ge=1, le=500, description="Minimum batting innings"),
     min_bowling_balls: int = Query(default=240, ge=1, le=10000, description="Minimum bowling balls"),
     top_n_pairs: int = Query(default=10, ge=1, le=50, description="Pairs to return"),
+    batter_metric_level: str = Query(default="bowling_type", description="Batter metric level: basic, pace_spin, bowling_type"),
     db: Session = Depends(get_session)
 ):
     """
@@ -154,6 +155,7 @@ def get_doppelganger_leaderboard_route(
             min_batting_innings=min_batting_innings,
             min_bowling_balls=min_bowling_balls,
             top_n_pairs=top_n_pairs,
+            batter_metric_level=batter_metric_level,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get doppelganger leaderboard: {str(e)}")

@@ -9,6 +9,7 @@ import {
   Chip,
   Container,
   Grid,
+  MenuItem,
   Paper,
   Table,
   TableBody,
@@ -136,7 +137,7 @@ const PairTable = ({ title, rows = [], role, selectedKey, onSelect }) => (
   </Box>
 );
 
-const RoleSection = ({ title, board }) => {
+const RoleSection = ({ title, board, batterMetricHelp }) => {
   const [selectedPair, setSelectedPair] = useState(null);
   if (!board) return null;
   const selectedKey = selectedPair ? `${selectedPair.player1}|${selectedPair.player2}|${selectedPair.distance}` : null;
@@ -152,6 +153,11 @@ const RoleSection = ({ title, board }) => {
           <Alert severity="info" sx={{ mb: 2 }}>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>Distance Meaning</Typography>
             <Typography variant="body2">{board.distance_explanation.summary}</Typography>
+            {board.role === 'batter' && batterMetricHelp && (
+              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                {batterMetricHelp}
+              </Typography>
+            )}
           </Alert>
         )}
         <Grid container spacing={2}>
@@ -186,6 +192,7 @@ const DoppelgangerLeaderboard = () => {
   const [minBattingInnings, setMinBattingInnings] = useState(25);
   const [minBowlingBalls, setMinBowlingBalls] = useState(240);
   const [topPairs, setTopPairs] = useState(10);
+  const [batterMetricLevel, setBatterMetricLevel] = useState('bowling_type');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
@@ -205,6 +212,7 @@ const DoppelgangerLeaderboard = () => {
         min_batting_innings: String(minBattingInnings),
         min_bowling_balls: String(minBowlingBalls),
         top_n_pairs: String(topPairs),
+        batter_metric_level: batterMetricLevel,
       });
       const res = await axios.get(`${config.API_URL}/search/doppelgangers/leaderboard?${params.toString()}`);
       setData(res.data);
@@ -226,6 +234,9 @@ const DoppelgangerLeaderboard = () => {
       </Typography>
       <Alert severity="info" sx={{ mb: 2 }}>
         Click a pair row to open a radar chart. Distance is computed as Euclidean distance on z-score normalized feature vectors, so lower values mean closer profiles.
+      </Alert>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Batter metric level controls how granular batter doppelganger matching is. For each selected level, only batters with all required data for that level are included.
       </Alert>
 
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
@@ -277,6 +288,19 @@ const DoppelgangerLeaderboard = () => {
             </Grid>
             <Grid item xs={12} sm={6} md={2}>
               <TextField
+                label="Batter Metric Level"
+                select
+                value={batterMetricLevel}
+                onChange={(e) => setBatterMetricLevel(e.target.value)}
+                fullWidth
+              >
+                <MenuItem value="basic">Basic (core + phase)</MenuItem>
+                <MenuItem value="pace_spin">Intermediate (core + phase + pace/spin)</MenuItem>
+                <MenuItem value="bowling_type">Advanced (core + phase + pace/spin + bowling type)</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <TextField
                 label="Pairs"
                 type="number"
                 value={topPairs}
@@ -305,7 +329,7 @@ const DoppelgangerLeaderboard = () => {
 
       {data && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <RoleSection title="Batters" board={data.batters} />
+          <RoleSection title="Batters" board={data.batters} batterMetricHelp={data?.batter_metric_levels?.availability_rule} />
           <RoleSection title="Bowlers" board={data.bowlers} />
         </Box>
       )}
