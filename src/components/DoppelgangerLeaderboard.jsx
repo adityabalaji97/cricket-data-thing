@@ -19,12 +19,79 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import {
+  Legend,
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+  Tooltip,
+} from 'recharts';
 import config from '../config';
 
 const TODAY = new Date().toISOString().split('T')[0];
 const DEFAULT_START = `${new Date().getFullYear() - 1}-01-01`;
 
-const PairTable = ({ title, rows = [], role }) => (
+const PairRadar = ({ pair, radarMap }) => {
+  if (!pair || !radarMap) return null;
+  const p1 = radarMap[pair.player1];
+  const p2 = radarMap[pair.player2];
+  if (!p1 || !p2) return null;
+
+  const p2ByKey = new Map(p2.map((m) => [m.key, m]));
+  const chartData = p1
+    .map((m1) => {
+      const m2 = p2ByKey.get(m1.key);
+      if (!m2) return null;
+      return {
+        metric: m1.metric,
+        p1Pct: m1.percentile,
+        p2Pct: m2.percentile,
+        p1Raw: m1.raw_value,
+        p2Raw: m2.raw_value,
+        avg: m1.league_avg,
+      };
+    })
+    .filter(Boolean);
+
+  if (!chartData.length) return null;
+
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+        Radar: {pair.player1} vs {pair.player2}
+      </Typography>
+      <Box sx={{ width: '100%', height: 380 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart data={chartData} outerRadius="68%">
+            <PolarGrid />
+            <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
+            <PolarRadiusAxis domain={[0, 100]} tickCount={6} tick={{ fontSize: 10 }} />
+            <Radar name={pair.player1} dataKey="p1Pct" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
+            <Radar name={pair.player2} dataKey="p2Pct" stroke="#f97316" fill="#f97316" fillOpacity={0.2} />
+            <Tooltip
+              labelFormatter={(label, payload) => {
+                const row = payload?.[0]?.payload;
+                return row ? `${label} (league avg ${row.avg})` : label;
+              }}
+              formatter={(value, name, ctx) => {
+                const row = ctx?.payload || {};
+                if (name === pair.player1) return [`${value}% (raw ${row.p1Raw})`, pair.player1];
+                if (name === pair.player2) return [`${value}% (raw ${row.p2Raw})`, pair.player2];
+                return [value, name];
+              }}
+            />
+            <Legend />
+          </RadarChart>
+        </ResponsiveContainer>
+      </Box>
+    </Box>
+  );
+};
+
+const PairTable = ({ title, rows = [], role, selectedKey, onSelect }) => (
   <Box>
     <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
     <TableContainer component={Paper} variant="outlined">
@@ -40,8 +107,16 @@ const PairTable = ({ title, rows = [], role }) => (
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((row, idx) => (
-            <TableRow key={`${row.player1}-${row.player2}-${idx}`}>
+          {rows.map((row, idx) => {
+            const rowKey = `${row.player1}|${row.player2}|${row.distance}`;
+            return (
+            <TableRow
+              key={`${row.player1}-${row.player2}-${idx}`}
+              hover
+              selected={rowKey === selectedKey}
+              onClick={() => onSelect?.(row)}
+              sx={{ cursor: onSelect ? 'pointer' : 'default' }}
+            >
               <TableCell>{idx + 1}</TableCell>
               <TableCell>{row.player1}</TableCell>
               <TableCell>{row.player2}</TableCell>
@@ -49,7 +124,7 @@ const PairTable = ({ title, rows = [], role }) => (
               <TableCell align="right">{role === 'batter' ? row.player1_innings : row.player1_balls}</TableCell>
               <TableCell align="right">{role === 'batter' ? row.player2_innings : row.player2_balls}</TableCell>
             </TableRow>
-          ))}
+          )})}
           {rows.length === 0 && (
             <TableRow>
               <TableCell colSpan={6} align="center">No results</TableCell>
@@ -62,7 +137,9 @@ const PairTable = ({ title, rows = [], role }) => (
 );
 
 const RoleSection = ({ title, board }) => {
+  const [selectedPair, setSelectedPair] = useState(null);
   if (!board) return null;
+  const selectedKey = selectedPair ? `${selectedPair.player1}|${selectedPair.player2}|${selectedPair.distance}` : null;
   return (
     <Card variant="outlined">
       <CardContent>
@@ -71,14 +148,33 @@ const RoleSection = ({ title, board }) => {
           <Chip size="small" label={`${board.qualified_players || 0} qualified`} />
           {board.warning && <Chip size="small" color="warning" variant="outlined" label={board.warning} />}
         </Box>
+        {board.distance_explanation && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Distance Meaning</Typography>
+            <Typography variant="body2">{board.distance_explanation.summary}</Typography>
+          </Alert>
+        )}
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
-            <PairTable title="Most Similar" rows={board.most_similar} role={board.role} />
+            <PairTable
+              title="Most Similar"
+              rows={board.most_similar}
+              role={board.role}
+              selectedKey={selectedKey}
+              onSelect={setSelectedPair}
+            />
           </Grid>
           <Grid item xs={12} md={6}>
-            <PairTable title="Most Dissimilar" rows={board.most_dissimilar} role={board.role} />
+            <PairTable
+              title="Most Dissimilar"
+              rows={board.most_dissimilar}
+              role={board.role}
+              selectedKey={selectedKey}
+              onSelect={setSelectedPair}
+            />
           </Grid>
         </Grid>
+        <PairRadar pair={selectedPair} radarMap={board.player_radar_metrics} />
       </CardContent>
     </Card>
   );
@@ -128,6 +224,9 @@ const DoppelgangerLeaderboard = () => {
       <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
         Global most similar and most dissimilar batter/bowler pairs for a selected timeframe.
       </Typography>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Click a pair row to open a radar chart. Distance is computed as Euclidean distance on z-score normalized feature vectors, so lower values mean closer profiles.
+      </Alert>
 
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
         {filterSummary.map((label) => (

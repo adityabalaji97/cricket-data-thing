@@ -11,8 +11,163 @@ from services.player_aliases import (
     get_player_names,
     search_players_with_aliases
 )
+from services.bowler_types import BOWLER_CATEGORY_SQL
 
 logger = logging.getLogger(__name__)
+
+
+# Batter doppelganger feature expansion settings
+DOPPELGANGER_STYLE_FEATURE_COUNT = 4
+DOPPELGANGER_STYLE_MIN_BALLS = 120
+
+
+def _safe_pct(num: float, den: float) -> float:
+    return (num * 100.0 / den) if den else 0.0
+
+
+def _safe_rate_per_100(num: float, den: float) -> float:
+    return (num * 100.0 / den) if den else 0.0
+
+
+def _safe_economy(runs: float, balls: float) -> float:
+    return (runs * 6.0 / balls) if balls else 0.0
+
+
+def _safe_bowling_sr(balls: float, wickets: float) -> float:
+    return (balls / wickets) if wickets else 0.0
+
+
+def _sanitize_style_key(style: str) -> str:
+    cleaned = "".join(ch if ch.isalnum() else "_" for ch in (style or "").strip())
+    while "__" in cleaned:
+        cleaned = cleaned.replace("__", "_")
+    return cleaned.strip("_").lower() or "unknown"
+
+
+def _build_batter_split_metrics(
+    split_rows: List[Any],
+    player_pool_names: set[str],
+    include_style_metrics: bool = True
+) -> tuple[Dict[str, Dict[str, float]], List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    """
+    Build batter split metrics (pace/spin + top bowler styles) from delivery-level rows.
+
+    Returns:
+    - per_player_metrics additions
+    - distance metric defs (extra features)
+    - radar metric defs (subset, excludes style metrics to keep radar readable)
+    - per_player_split_volume metadata
+    """
+    by_player: Dict[str, Dict[str, Dict[str, float]]] = {}
+    style_totals: Dict[str, float] = {}
+    player_split_volume: Dict[str, Dict[str, Any]] = {}
+
+    for row in split_rows:
+        player_name = row.player_name
+        if player_pool_names and player_name not in player_pool_names:
+            continue
+
+        split_key = row.split_key
+        split_type = row.split_type  # 'kind' or 'style'
+        balls = float(row.balls or 0)
+        runs = float(row.runs or 0)
+        dots = float(row.dots or 0)
+        boundaries = float(row.boundaries or 0)
+        dismissals = float(row.dismissals or 0)
+
+        by_player.setdefault(player_name, {})
+        by_player[player_name][f"{split_type}:{split_key}"] = {
+            "balls": balls,
+            "runs": runs,
+            "dots": dots,
+            "boundaries": boundaries,
+            "dismissals": dismissals,
+        }
+
+        if split_type == "style":
+            style_totals[split_key] = style_totals.get(split_key, 0.0) + balls
+
+    top_styles = [
+        style for style, total_balls in sorted(style_totals.items(), key=lambda x: x[1], reverse=True)
+        if total_balls >= DOPPELGANGER_STYLE_MIN_BALLS
+    ][:DOPPELGANGER_STYLE_FEATURE_COUNT]
+
+    extra_metric_defs: List[Dict[str, Any]] = []
+    radar_metric_defs: List[Dict[str, Any]] = []
+
+    split_def_templates = [
+        ("average", "Avg", True),
+        ("strike_rate", "SR", True),
+        ("boundary_percentage", "Bnd%", True),
+        ("dot_percentage", "Dot%", False),
+    ]
+
+    for kind in ["pace", "spin"]:
+        for metric_key, metric_label, higher_is_better in split_def_templates:
+            extra_metric_defs.append({
+                "key": f"vs_{kind}_{metric_key}",
+                "label": f"vs {kind.title()} {metric_label}",
+                "higher_is_better": higher_is_better,
+            })
+            radar_metric_defs.append(extra_metric_defs[-1])
+
+    if include_style_metrics:
+        for style in top_styles:
+            style_key = _sanitize_style_key(style)
+            for metric_key, metric_label, higher_is_better in split_def_templates:
+                extra_metric_defs.append({
+                    "key": f"vs_style_{style_key}_{metric_key}",
+                    "label": f"{style} {metric_label}",
+                    "higher_is_better": higher_is_better,
+                })
+
+    def _metrics_from_agg(agg: Optional[Dict[str, float]]) -> Dict[str, float]:
+        if not agg:
+            return {
+                "average": 0.0,
+                "strike_rate": 0.0,
+                "boundary_percentage": 0.0,
+                "dot_percentage": 0.0,
+                "balls": 0.0,
+            }
+        balls = float(agg.get("balls") or 0)
+        runs = float(agg.get("runs") or 0)
+        dismissals = float(agg.get("dismissals") or 0)
+        return {
+            "average": round((runs / dismissals) if dismissals else 0.0, 3),
+            "strike_rate": round(_safe_rate_per_100(runs, balls), 3),
+            "boundary_percentage": round(_safe_pct(float(agg.get("boundaries") or 0), balls), 3),
+            "dot_percentage": round(_safe_pct(float(agg.get("dots") or 0), balls), 3),
+            "balls": balls,
+        }
+
+    per_player_metrics: Dict[str, Dict[str, float]] = {}
+    for player_name in player_pool_names:
+        player_splits = by_player.get(player_name, {})
+        additions: Dict[str, float] = {}
+        split_volume: Dict[str, Any] = {"kind": {}, "style": {}}
+
+        for kind in ["pace", "spin"]:
+            m = _metrics_from_agg(player_splits.get(f"kind:{kind}"))
+            split_volume["kind"][kind] = int(m["balls"])
+            additions[f"vs_{kind}_average"] = m["average"]
+            additions[f"vs_{kind}_strike_rate"] = m["strike_rate"]
+            additions[f"vs_{kind}_boundary_percentage"] = m["boundary_percentage"]
+            additions[f"vs_{kind}_dot_percentage"] = m["dot_percentage"]
+
+        for style in top_styles:
+            m = _metrics_from_agg(player_splits.get(f"style:{style}"))
+            style_key = _sanitize_style_key(style)
+            split_volume["style"][style] = int(m["balls"])
+            additions[f"vs_style_{style_key}_average"] = m["average"]
+            additions[f"vs_style_{style_key}_strike_rate"] = m["strike_rate"]
+            additions[f"vs_style_{style_key}_boundary_percentage"] = m["boundary_percentage"]
+            additions[f"vs_style_{style_key}_dot_percentage"] = m["dot_percentage"]
+
+        per_player_metrics[player_name] = additions
+        player_split_volume[player_name] = split_volume
+
+    return per_player_metrics, extra_metric_defs, radar_metric_defs, player_split_volume
 
 # Default parameters for searches
 def get_default_params():
@@ -483,8 +638,44 @@ def get_player_doppelgangers(
         GROUP BY bw.bowler
     """)
 
+    batter_split_query = text(f"""
+        SELECT
+            d.batter AS player_name,
+            'kind' AS split_type,
+            {BOWLER_CATEGORY_SQL.replace("bowler_type", "d.bowler_type")} AS split_key,
+            COUNT(*) AS balls,
+            COALESCE(SUM(d.runs_off_bat), 0) AS runs,
+            COALESCE(SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) = 0 AND COALESCE(d.extras, 0) = 0 THEN 1 ELSE 0 END), 0) AS dots,
+            COALESCE(SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) IN (4, 6) THEN 1 ELSE 0 END), 0) AS boundaries,
+            COALESCE(SUM(CASE WHEN d.player_dismissed = d.batter THEN 1 ELSE 0 END), 0) AS dismissals
+        FROM deliveries d
+        JOIN matches m ON d.match_id = m.id
+        WHERE m.date >= :start_date AND m.date <= :end_date
+          AND d.batter IS NOT NULL
+          AND d.bowler_type IS NOT NULL
+          AND {BOWLER_CATEGORY_SQL.replace("bowler_type", "d.bowler_type")} IS NOT NULL
+        GROUP BY d.batter, split_key
+        UNION ALL
+        SELECT
+            d.batter AS player_name,
+            'style' AS split_type,
+            d.bowler_type AS split_key,
+            COUNT(*) AS balls,
+            COALESCE(SUM(d.runs_off_bat), 0) AS runs,
+            COALESCE(SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) = 0 AND COALESCE(d.extras, 0) = 0 THEN 1 ELSE 0 END), 0) AS dots,
+            COALESCE(SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) IN (4, 6) THEN 1 ELSE 0 END), 0) AS boundaries,
+            COALESCE(SUM(CASE WHEN d.player_dismissed = d.batter THEN 1 ELSE 0 END), 0) AS dismissals
+        FROM deliveries d
+        JOIN matches m ON d.match_id = m.id
+        WHERE m.date >= :start_date AND m.date <= :end_date
+          AND d.batter IS NOT NULL
+          AND d.bowler_type IS NOT NULL
+        GROUP BY d.batter, d.bowler_type
+    """)
+
     batting_rows = db.execute(batting_query, params).fetchall()
     bowling_rows = db.execute(bowling_query, params).fetchall()
+    batter_split_rows = db.execute(batter_split_query, params).fetchall()
 
     player_map: Dict[str, Dict[str, Any]] = {}
 
@@ -529,18 +720,6 @@ def get_player_doppelgangers(
         {"key": "death_dot_percentage", "label": "Death Dot%", "higher_is_better": True},
     ]
 
-    def _pct(num: float, den: float) -> float:
-        return (num * 100.0 / den) if den else 0.0
-
-    def _rate_per_100(num: float, den: float) -> float:
-        return (num * 100.0 / den) if den else 0.0
-
-    def _economy(runs: float, balls: float) -> float:
-        return (runs * 6.0 / balls) if balls else 0.0
-
-    def _strike_rate_bowling(balls: float, wickets: float) -> float:
-        return (balls / wickets) if wickets else 0.0
-
     def _batting_metrics(b: Dict[str, Any]) -> Dict[str, float]:
         runs = float(b.get("batting_runs") or 0)
         balls = float(b.get("batting_balls") or 0)
@@ -559,15 +738,15 @@ def get_player_doppelgangers(
 
         return {
             "batting_average": round((runs / dismissals) if dismissals else 0.0, 3),
-            "batting_strike_rate": round(_rate_per_100(runs, balls), 3),
-            "batting_dot_percentage": round(_pct(dots, balls), 3),
-            "batting_boundary_percentage": round(_pct(boundaries, balls), 3),
-            "pp_strike_rate": round(_rate_per_100(pp_runs, pp_balls), 3),
-            "middle_strike_rate": round(_rate_per_100(middle_runs, middle_balls), 3),
-            "death_strike_rate": round(_rate_per_100(death_runs, death_balls), 3),
-            "pp_boundary_percentage": round(_pct(pp_boundaries, pp_balls), 3),
-            "middle_boundary_percentage": round(_pct(middle_boundaries, middle_balls), 3),
-            "death_boundary_percentage": round(_pct(death_boundaries, death_balls), 3),
+            "batting_strike_rate": round(_safe_rate_per_100(runs, balls), 3),
+            "batting_dot_percentage": round(_safe_pct(dots, balls), 3),
+            "batting_boundary_percentage": round(_safe_pct(boundaries, balls), 3),
+            "pp_strike_rate": round(_safe_rate_per_100(pp_runs, pp_balls), 3),
+            "middle_strike_rate": round(_safe_rate_per_100(middle_runs, middle_balls), 3),
+            "death_strike_rate": round(_safe_rate_per_100(death_runs, death_balls), 3),
+            "pp_boundary_percentage": round(_safe_pct(pp_boundaries, pp_balls), 3),
+            "middle_boundary_percentage": round(_safe_pct(middle_boundaries, middle_balls), 3),
+            "death_boundary_percentage": round(_safe_pct(death_boundaries, death_balls), 3),
         }
 
     def _bowling_metrics(bw: Dict[str, Any]) -> Dict[str, float]:
@@ -586,15 +765,15 @@ def get_player_doppelgangers(
         death_dots = float(bw.get("death_dots") or 0)
 
         return {
-            "bowling_economy": round(_economy(runs, balls), 3),
-            "bowling_strike_rate": round(_strike_rate_bowling(balls, wickets), 3),
-            "bowling_dot_percentage": round(_pct(dots, balls), 3),
-            "pp_economy": round(_economy(pp_runs, pp_balls), 3),
-            "middle_economy": round(_economy(middle_runs, middle_balls), 3),
-            "death_economy": round(_economy(death_runs, death_balls), 3),
-            "pp_dot_percentage": round(_pct(pp_dots, pp_balls), 3),
-            "middle_dot_percentage": round(_pct(middle_dots, middle_balls), 3),
-            "death_dot_percentage": round(_pct(death_dots, death_balls), 3),
+            "bowling_economy": round(_safe_economy(runs, balls), 3),
+            "bowling_strike_rate": round(_safe_bowling_sr(balls, wickets), 3),
+            "bowling_dot_percentage": round(_safe_pct(dots, balls), 3),
+            "pp_economy": round(_safe_economy(pp_runs, pp_balls), 3),
+            "middle_economy": round(_safe_economy(middle_runs, middle_balls), 3),
+            "death_economy": round(_safe_economy(death_runs, death_balls), 3),
+            "pp_dot_percentage": round(_safe_pct(pp_dots, pp_balls), 3),
+            "middle_dot_percentage": round(_safe_pct(middle_dots, middle_balls), 3),
+            "death_dot_percentage": round(_safe_pct(death_dots, death_balls), 3),
         }
 
     def _classify_role(batting_matches: int, bowling_matches: int) -> str:
@@ -644,6 +823,23 @@ def get_player_doppelgangers(
 
     comparison_role = requested_role or target_any["player_role"]
 
+    # Enrich batter metrics with delivery-level pace/spin + bowler-style splits.
+    batter_player_names = {p["player_name"] for p in players}
+    split_metric_additions, split_metric_defs, split_radar_metric_defs, split_volume = _build_batter_split_metrics(
+        batter_split_rows,
+        batter_player_names,
+        include_style_metrics=True,
+    )
+    if split_metric_defs:
+        batting_metric_defs = batting_metric_defs + split_metric_defs
+        for p in players:
+            p["batting_metrics"].update(split_metric_additions.get(p["player_name"], {}))
+            p["all_rounder_metrics"].update(split_metric_additions.get(p["player_name"], {}))
+            p["batting_split_volume"] = split_volume.get(p["player_name"], {"kind": {}, "style": {}})
+    else:
+        for p in players:
+            p["batting_split_volume"] = {"kind": {}, "style": {}}
+
     def _qualifies_for_pool(p: Dict[str, Any], pool_role: str) -> bool:
         if pool_role == "batter":
             # Batter-mode comparisons should include pure batters and all-rounders
@@ -664,6 +860,11 @@ def get_player_doppelgangers(
         "all_rounder": batting_metric_defs + bowling_metric_defs,
     }
     metric_key_to_def = {m["key"]: m for m in role_metric_defs[comparison_role]}
+    radar_metric_defs_by_role = {
+        "batter": [m for m in batting_metric_defs if not m["key"].startswith("vs_style_")] ,
+        "bowler": bowling_metric_defs,
+        "all_rounder": ([m for m in batting_metric_defs if not m["key"].startswith("vs_style_")] + bowling_metric_defs),
+    }
 
     role_metric_field = {
         "batter": "batting_metrics",
@@ -738,7 +939,7 @@ def get_player_doppelgangers(
                 "league_avg": percentile_stats[metric_def["key"]]["mean"],
                 "higher_is_better": metric_def["higher_is_better"],
             }
-            for metric_def in role_metric_defs[comparison_role]
+            for metric_def in radar_metric_defs_by_role[comparison_role]
         ]
 
     target_vec = _zscore_vector(target)
@@ -757,6 +958,7 @@ def get_player_doppelgangers(
             "player_role": p["player_role"],
             "metrics": p[role_metric_field],
             "radar_metrics": _build_radar_metrics(p),
+            "batting_split_volume": p.get("batting_split_volume"),
         })
 
     scored.sort(key=lambda x: x["distance"])
@@ -782,6 +984,11 @@ def get_player_doppelgangers(
         "comparison_role": comparison_role,
         "role_overridden": bool(requested_role),
         "feature_space": feature_names,
+        "distance_explanation": {
+            "method": "euclidean_distance_on_z_scores",
+            "summary": "Lower distance means more similar. Each feature is z-score normalized within the qualified comparison pool before Euclidean distance is computed.",
+            "uses_expanded_batter_splits": comparison_role in {"batter", "all_rounder"},
+        },
         "qualified_players": len(candidate_pool),
         "target_metrics": target[role_metric_field],
         "target_radar_metrics": _build_radar_metrics(target),
@@ -906,20 +1113,46 @@ def get_doppelganger_leaderboard(
         GROUP BY bw.bowler
     """)
 
+    batter_split_query = text(f"""
+        SELECT
+            d.batter AS player_name,
+            'kind' AS split_type,
+            {BOWLER_CATEGORY_SQL.replace("bowler_type", "d.bowler_type")} AS split_key,
+            COUNT(*) AS balls,
+            COALESCE(SUM(d.runs_off_bat), 0) AS runs,
+            COALESCE(SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) = 0 AND COALESCE(d.extras, 0) = 0 THEN 1 ELSE 0 END), 0) AS dots,
+            COALESCE(SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) IN (4, 6) THEN 1 ELSE 0 END), 0) AS boundaries,
+            COALESCE(SUM(CASE WHEN d.player_dismissed = d.batter THEN 1 ELSE 0 END), 0) AS dismissals
+        FROM deliveries d
+        JOIN matches m ON d.match_id = m.id
+        WHERE m.date >= :start_date AND m.date <= :end_date
+          {competition_filter}
+          AND d.batter IS NOT NULL
+          AND d.bowler_type IS NOT NULL
+          AND {BOWLER_CATEGORY_SQL.replace("bowler_type", "d.bowler_type")} IS NOT NULL
+        GROUP BY d.batter, split_key
+        UNION ALL
+        SELECT
+            d.batter AS player_name,
+            'style' AS split_type,
+            d.bowler_type AS split_key,
+            COUNT(*) AS balls,
+            COALESCE(SUM(d.runs_off_bat), 0) AS runs,
+            COALESCE(SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) = 0 AND COALESCE(d.extras, 0) = 0 THEN 1 ELSE 0 END), 0) AS dots,
+            COALESCE(SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) IN (4, 6) THEN 1 ELSE 0 END), 0) AS boundaries,
+            COALESCE(SUM(CASE WHEN d.player_dismissed = d.batter THEN 1 ELSE 0 END), 0) AS dismissals
+        FROM deliveries d
+        JOIN matches m ON d.match_id = m.id
+        WHERE m.date >= :start_date AND m.date <= :end_date
+          {competition_filter}
+          AND d.batter IS NOT NULL
+          AND d.bowler_type IS NOT NULL
+        GROUP BY d.batter, d.bowler_type
+    """)
+
     batting_rows = db.execute(batting_query, params).fetchall()
     bowling_rows = db.execute(bowling_query, params).fetchall()
-
-    def _pct(num: float, den: float) -> float:
-        return (num * 100.0 / den) if den else 0.0
-
-    def _rate_per_100(num: float, den: float) -> float:
-        return (num * 100.0 / den) if den else 0.0
-
-    def _economy(runs: float, balls: float) -> float:
-        return (runs * 6.0 / balls) if balls else 0.0
-
-    def _bowling_sr(balls: float, wickets: float) -> float:
-        return (balls / wickets) if wickets else 0.0
+    batter_split_rows = db.execute(batter_split_query, params).fetchall()
 
     batting_metric_defs = [
         "batting_average",
@@ -957,15 +1190,15 @@ def get_doppelganger_leaderboard(
         dismissals = float(row.dismissals or 0)
         metrics = {
             "batting_average": round((runs / dismissals) if dismissals else 0.0, 3),
-            "batting_strike_rate": round(_rate_per_100(runs, balls), 3),
-            "batting_dot_percentage": round(_pct(dots, balls), 3),
-            "batting_boundary_percentage": round(_pct(boundaries, balls), 3),
-            "pp_strike_rate": round(_rate_per_100(float(row.pp_runs or 0), float(row.pp_balls or 0)), 3),
-            "middle_strike_rate": round(_rate_per_100(float(row.middle_runs or 0), float(row.middle_balls or 0)), 3),
-            "death_strike_rate": round(_rate_per_100(float(row.death_runs or 0), float(row.death_balls or 0)), 3),
-            "pp_boundary_percentage": round(_pct(float(row.pp_boundaries or 0), float(row.pp_balls or 0)), 3),
-            "middle_boundary_percentage": round(_pct(float(row.middle_boundaries or 0), float(row.middle_balls or 0)), 3),
-            "death_boundary_percentage": round(_pct(float(row.death_boundaries or 0), float(row.death_balls or 0)), 3),
+            "batting_strike_rate": round(_safe_rate_per_100(runs, balls), 3),
+            "batting_dot_percentage": round(_safe_pct(dots, balls), 3),
+            "batting_boundary_percentage": round(_safe_pct(boundaries, balls), 3),
+            "pp_strike_rate": round(_safe_rate_per_100(float(row.pp_runs or 0), float(row.pp_balls or 0)), 3),
+            "middle_strike_rate": round(_safe_rate_per_100(float(row.middle_runs or 0), float(row.middle_balls or 0)), 3),
+            "death_strike_rate": round(_safe_rate_per_100(float(row.death_runs or 0), float(row.death_balls or 0)), 3),
+            "pp_boundary_percentage": round(_safe_pct(float(row.pp_boundaries or 0), float(row.pp_balls or 0)), 3),
+            "middle_boundary_percentage": round(_safe_pct(float(row.middle_boundaries or 0), float(row.middle_balls or 0)), 3),
+            "death_boundary_percentage": round(_safe_pct(float(row.death_boundaries or 0), float(row.death_balls or 0)), 3),
         }
         batters.append({
             "player_name": row.player_name,
@@ -982,15 +1215,15 @@ def get_doppelganger_leaderboard(
             continue
         wickets = float(row.wickets or 0)
         metrics = {
-            "bowling_economy": round(_economy(float(row.runs_conceded or 0), float(balls)), 3),
-            "bowling_strike_rate": round(_bowling_sr(float(balls), wickets), 3),
-            "bowling_dot_percentage": round(_pct(float(row.bowling_dots or 0), float(balls)), 3),
-            "pp_economy": round(_economy(float(row.pp_runs or 0), float(row.pp_balls or 0)), 3),
-            "middle_economy": round(_economy(float(row.middle_runs or 0), float(row.middle_balls or 0)), 3),
-            "death_economy": round(_economy(float(row.death_runs or 0), float(row.death_balls or 0)), 3),
-            "pp_dot_percentage": round(_pct(float(row.pp_dots or 0), float(row.pp_balls or 0)), 3),
-            "middle_dot_percentage": round(_pct(float(row.middle_dots or 0), float(row.middle_balls or 0)), 3),
-            "death_dot_percentage": round(_pct(float(row.death_dots or 0), float(row.death_balls or 0)), 3),
+            "bowling_economy": round(_safe_economy(float(row.runs_conceded or 0), float(balls)), 3),
+            "bowling_strike_rate": round(_safe_bowling_sr(float(balls), wickets), 3),
+            "bowling_dot_percentage": round(_safe_pct(float(row.bowling_dots or 0), float(balls)), 3),
+            "pp_economy": round(_safe_economy(float(row.pp_runs or 0), float(row.pp_balls or 0)), 3),
+            "middle_economy": round(_safe_economy(float(row.middle_runs or 0), float(row.middle_balls or 0)), 3),
+            "death_economy": round(_safe_economy(float(row.death_runs or 0), float(row.death_balls or 0)), 3),
+            "pp_dot_percentage": round(_safe_pct(float(row.pp_dots or 0), float(row.pp_balls or 0)), 3),
+            "middle_dot_percentage": round(_safe_pct(float(row.middle_dots or 0), float(row.middle_balls or 0)), 3),
+            "death_dot_percentage": round(_safe_pct(float(row.death_dots or 0), float(row.death_balls or 0)), 3),
         }
         bowlers.append({
             "player_name": row.player_name,
@@ -1001,7 +1234,71 @@ def get_doppelganger_leaderboard(
             "metrics": metrics,
         })
 
-    def _build_pair_leaderboard(pool: List[Dict[str, Any]], feature_names: List[str], role_label: str) -> Dict[str, Any]:
+    batter_names = {p["player_name"] for p in batters}
+    split_additions, split_metric_defs, split_radar_metric_defs, split_volume = _build_batter_split_metrics(
+        batter_split_rows,
+        batter_names,
+        include_style_metrics=True,
+    )
+    if split_metric_defs:
+        batting_metric_defs = batting_metric_defs + [m["key"] for m in split_metric_defs]
+        batter_metric_def_map = {m["key"]: m for m in (
+            [{"key": "batting_average", "label": "Bat Avg", "higher_is_better": True},
+             {"key": "batting_strike_rate", "label": "Bat SR", "higher_is_better": True},
+             {"key": "batting_dot_percentage", "label": "Bat Dot%", "higher_is_better": False},
+             {"key": "batting_boundary_percentage", "label": "Bat Bnd%", "higher_is_better": True},
+             {"key": "pp_strike_rate", "label": "PP SR", "higher_is_better": True},
+             {"key": "middle_strike_rate", "label": "Mid SR", "higher_is_better": True},
+             {"key": "death_strike_rate", "label": "Death SR", "higher_is_better": True},
+             {"key": "pp_boundary_percentage", "label": "PP Bnd%", "higher_is_better": True},
+             {"key": "middle_boundary_percentage", "label": "Mid Bnd%", "higher_is_better": True},
+             {"key": "death_boundary_percentage", "label": "Death Bnd%", "higher_is_better": True}] + split_metric_defs
+        )}
+        batter_radar_metric_defs = [
+            {"key": "batting_average", "label": "Bat Avg", "higher_is_better": True},
+            {"key": "batting_strike_rate", "label": "Bat SR", "higher_is_better": True},
+            {"key": "batting_dot_percentage", "label": "Bat Dot%", "higher_is_better": False},
+            {"key": "batting_boundary_percentage", "label": "Bat Bnd%", "higher_is_better": True},
+        ] + split_radar_metric_defs
+        for p in batters:
+            p["metrics"].update(split_additions.get(p["player_name"], {}))
+            p["batting_split_volume"] = split_volume.get(p["player_name"], {"kind": {}, "style": {}})
+    else:
+        batter_metric_def_map = {
+            "batting_average": {"key": "batting_average", "label": "Bat Avg", "higher_is_better": True},
+            "batting_strike_rate": {"key": "batting_strike_rate", "label": "Bat SR", "higher_is_better": True},
+            "batting_dot_percentage": {"key": "batting_dot_percentage", "label": "Bat Dot%", "higher_is_better": False},
+            "batting_boundary_percentage": {"key": "batting_boundary_percentage", "label": "Bat Bnd%", "higher_is_better": True},
+            "pp_strike_rate": {"key": "pp_strike_rate", "label": "PP SR", "higher_is_better": True},
+            "middle_strike_rate": {"key": "middle_strike_rate", "label": "Mid SR", "higher_is_better": True},
+            "death_strike_rate": {"key": "death_strike_rate", "label": "Death SR", "higher_is_better": True},
+            "pp_boundary_percentage": {"key": "pp_boundary_percentage", "label": "PP Bnd%", "higher_is_better": True},
+            "middle_boundary_percentage": {"key": "middle_boundary_percentage", "label": "Mid Bnd%", "higher_is_better": True},
+            "death_boundary_percentage": {"key": "death_boundary_percentage", "label": "Death Bnd%", "higher_is_better": True},
+        }
+        batter_radar_metric_defs = list(batter_metric_def_map.values())
+        for p in batters:
+            p["batting_split_volume"] = {"kind": {}, "style": {}}
+
+    bowler_metric_def_map = {
+        "bowling_economy": {"key": "bowling_economy", "label": "Econ", "higher_is_better": False},
+        "bowling_strike_rate": {"key": "bowling_strike_rate", "label": "Bowl SR", "higher_is_better": False},
+        "bowling_dot_percentage": {"key": "bowling_dot_percentage", "label": "Bowl Dot%", "higher_is_better": True},
+        "pp_economy": {"key": "pp_economy", "label": "PP Econ", "higher_is_better": False},
+        "middle_economy": {"key": "middle_economy", "label": "Mid Econ", "higher_is_better": False},
+        "death_economy": {"key": "death_economy", "label": "Death Econ", "higher_is_better": False},
+        "pp_dot_percentage": {"key": "pp_dot_percentage", "label": "PP Dot%", "higher_is_better": True},
+        "middle_dot_percentage": {"key": "middle_dot_percentage", "label": "Mid Dot%", "higher_is_better": True},
+        "death_dot_percentage": {"key": "death_dot_percentage", "label": "Death Dot%", "higher_is_better": True},
+    }
+
+    def _build_pair_leaderboard(
+        pool: List[Dict[str, Any]],
+        feature_names: List[str],
+        role_label: str,
+        metric_def_map: Dict[str, Dict[str, Any]],
+        radar_metric_defs: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         if len(pool) < 2:
             return {
                 "role": role_label,
@@ -1034,6 +1331,43 @@ def get_doppelganger_leaderboard(
                 for f in feature_names
             ]
 
+        percentile_stats = {
+            f: [float(p["metrics"][f]) for p in pool]
+            for f in feature_names
+        }
+
+        def _percentile(feature: str, raw_value: float) -> float:
+            vals = percentile_stats[feature]
+            metric_def = metric_def_map[feature]
+            better_count = 0
+            equal_count = 0
+            for v in vals:
+                if metric_def["higher_is_better"]:
+                    if v < raw_value:
+                        better_count += 1
+                    elif v == raw_value:
+                        equal_count += 1
+                else:
+                    if v > raw_value:
+                        better_count += 1
+                    elif v == raw_value:
+                        equal_count += 1
+            return round(((better_count + equal_count * 0.5) * 100.0) / max(len(vals), 1), 1)
+
+        def _radar_for_player(player_record: Dict[str, Any]) -> List[Dict[str, Any]]:
+            return [
+                {
+                    "metric": d["label"],
+                    "key": d["key"],
+                    "percentile": _percentile(d["key"], float(player_record["metrics"][d["key"]])),
+                    "raw_value": round(float(player_record["metrics"][d["key"]]), 3),
+                    "league_avg": round(sum(percentile_stats[d["key"]]) / len(percentile_stats[d["key"]]), 3),
+                    "higher_is_better": d["higher_is_better"],
+                }
+                for d in radar_metric_defs
+                if d["key"] in player_record["metrics"]
+            ]
+
         indexed = {p["player_name"]: p for p in pool}
         pairs = []
         for i in range(len(pool)):
@@ -1056,17 +1390,41 @@ def get_doppelganger_leaderboard(
                 })
 
         pairs.sort(key=lambda x: x["distance"])
+        displayed_pairs = pairs[:top_n_pairs] + list(reversed(pairs[-top_n_pairs:]))
+        displayed_names = {pair["player1"] for pair in displayed_pairs} | {pair["player2"] for pair in displayed_pairs}
+        player_radar_metrics = {
+            name: _radar_for_player(indexed[name])
+            for name in displayed_names
+            if name in indexed
+        }
         return {
             "role": role_label,
             "qualified_players": len(pool),
             "feature_space": feature_names,
+            "distance_explanation": {
+                "method": "euclidean_distance_on_z_scores",
+                "summary": "Lower distance means more similar. Features are z-score normalized within the qualified pool, then Euclidean distance is computed.",
+            },
             "most_similar": pairs[:top_n_pairs],
             "most_dissimilar": list(reversed(pairs[-top_n_pairs:])),
+            "player_radar_metrics": player_radar_metrics,
             "warning": warning,
         }
 
-    batter_board = _build_pair_leaderboard(batters, batting_metric_defs, "batter")
-    bowler_board = _build_pair_leaderboard(bowlers, bowling_metric_defs, "bowler")
+    batter_board = _build_pair_leaderboard(
+        batters,
+        batting_metric_defs,
+        "batter",
+        batter_metric_def_map,
+        batter_radar_metric_defs,
+    )
+    bowler_board = _build_pair_leaderboard(
+        bowlers,
+        bowling_metric_defs,
+        "bowler",
+        bowler_metric_def_map,
+        list(bowler_metric_def_map.values()),
+    )
 
     return {
         "success": True,
@@ -1077,6 +1435,10 @@ def get_doppelganger_leaderboard(
             "min_batting_innings": min_batting_innings,
             "min_bowling_balls": min_bowling_balls,
             "top_n_pairs": top_n_pairs,
+        },
+        "distance_explanation": {
+            "method": "euclidean_distance_on_z_scores",
+            "summary": "Distances are computed separately for batters and bowlers using z-score normalized feature vectors; lower is more similar.",
         },
         "batters": batter_board,
         "bowlers": bowler_board,
