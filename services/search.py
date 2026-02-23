@@ -645,13 +645,17 @@ def get_player_doppelgangers(
     comparison_role = requested_role or target_any["player_role"]
 
     def _qualifies_for_pool(p: Dict[str, Any], pool_role: str) -> bool:
-        if p["player_role"] != pool_role:
-            return False
         if pool_role == "batter":
+            # Batter-mode comparisons should include pure batters and all-rounders
+            # if they have enough batting sample size.
             return p["batting_matches"] >= min_matches
         if pool_role == "bowler":
+            # Bowler-mode comparisons should include pure bowlers and all-rounders
+            # if they have enough bowling sample size.
             return p["bowling_matches"] >= min_matches
-        # all-rounders need reasonable volume on both sides plus min overall matches
+        # All-rounder-mode remains role-strict and requires volume on both sides.
+        if p["player_role"] != "all_rounder":
+            return False
         return p["matches"] >= min_matches and p["bowling_matches"] >= 8 and p["batting_matches"] >= max(1, int(math.ceil(0.4 * p["matches"])))
 
     role_metric_defs = {
