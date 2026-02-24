@@ -93,8 +93,12 @@ def _extract_events(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _event_is_upcoming(event: Dict[str, Any], now_utc: datetime) -> bool:
-    status = event.get("status") or {}
-    status_type = status.get("type") or {}
+    status_type: Dict[str, Any] = {}
+    status = event.get("status")
+    if isinstance(status, dict):
+        status_type = status.get("type") or {}
+    elif isinstance(event.get("fullStatus"), dict):
+        status_type = (event.get("fullStatus") or {}).get("type") or {}
 
     # Prefer explicit status fields when present
     if status_type.get("completed") is True:
@@ -113,7 +117,7 @@ def _event_is_upcoming(event: Dict[str, Any], now_utc: datetime) -> bool:
 def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     competitions = event.get("competitions") or []
     comp = competitions[0] if competitions else {}
-    competitors = comp.get("competitors") or []
+    competitors = comp.get("competitors") or event.get("competitors") or []
     if len(competitors) < 2:
         return None
 
@@ -124,11 +128,11 @@ def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     competitors_sorted = sorted(competitors, key=competitor_sort_key)
     c1, c2 = competitors_sorted[0], competitors_sorted[1]
-    t1 = c1.get("team") or {}
-    t2 = c2.get("team") or {}
+    t1 = c1.get("team") or c1
+    t2 = c2.get("team") or c2
 
-    team1 = t1.get("displayName") or t1.get("shortDisplayName")
-    team2 = t2.get("displayName") or t2.get("shortDisplayName")
+    team1 = t1.get("displayName") or t1.get("shortDisplayName") or t1.get("location")
+    team2 = t2.get("displayName") or t2.get("shortDisplayName") or t2.get("location")
     if not team1 or not team2:
         return None
 
@@ -137,7 +141,7 @@ def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     time_str = event_dt.strftime("%H:%M") if event_dt else None
 
     venue_obj = comp.get("venue") or {}
-    venue_name = venue_obj.get("fullName") or venue_obj.get("name")
+    venue_name = venue_obj.get("fullName") or venue_obj.get("name") or event.get("location")
     if venue_obj.get("address") and venue_obj["address"].get("city"):
         city = venue_obj["address"]["city"]
         if venue_name and city and city not in venue_name:
@@ -146,6 +150,7 @@ def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     series_name = (
         comp.get("series", {}).get("shortName")
         or comp.get("series", {}).get("name")
+        or (event.get("group") or {}).get("shortName")
         or event.get("shortName")
         or event.get("name")
     )
