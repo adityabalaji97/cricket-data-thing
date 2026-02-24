@@ -34,14 +34,30 @@ _fixture_cache: Dict[str, Any] = {
     "timestamp": None,
     "fixtures": [],
 }
-_CACHE_TTL = timedelta(hours=1)
+_CACHE_TTL_DEFAULT = timedelta(hours=1)
+_CACHE_TTL_LIVE = timedelta(minutes=3)
+
+TOP_T20_LEAGUE_KEYWORDS = [
+    "indian premier league",
+    "ipl",
+    "pakistan super league",
+    "psl",
+    "big bash league",
+    "bbl",
+    "sa20",
+    "international league t20",
+    "ilt20",
+]
 
 
 def _cached_fixtures_valid() -> bool:
     ts = _fixture_cache.get("timestamp")
     if not isinstance(ts, datetime):
         return False
-    return datetime.now(timezone.utc) - ts < _CACHE_TTL
+    fixtures = _fixture_cache.get("fixtures") or []
+    has_live = any(bool(f.get("is_live")) for f in fixtures if isinstance(f, dict))
+    ttl = _CACHE_TTL_LIVE if has_live else _CACHE_TTL_DEFAULT
+    return datetime.now(timezone.utc) - ts < ttl
 
 
 def _normalize_venue(raw_venue: Optional[str]) -> Optional[str]:
@@ -92,7 +108,7 @@ def _extract_events(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
     return events
 
 
-def _event_is_upcoming(event: Dict[str, Any], now_utc: datetime) -> bool:
+def _event_is_upcoming_or_live(event: Dict[str, Any], now_utc: datetime) -> bool:
     status_type: Dict[str, Any] = {}
     status = event.get("status")
     if isinstance(status, dict):
@@ -104,7 +120,7 @@ def _event_is_upcoming(event: Dict[str, Any], now_utc: datetime) -> bool:
     if status_type.get("completed") is True:
         return False
     state = str(status_type.get("state") or "").lower()
-    if state and state not in {"pre", "scheduled"}:
+    if state and state not in {"pre", "scheduled", "in"}:
         return False
 
     event_dt = _parse_event_datetime(event.get("date"))
@@ -112,6 +128,30 @@ def _event_is_upcoming(event: Dict[str, Any], now_utc: datetime) -> bool:
         return False
 
     return True
+
+
+def _is_t20i_event(event: Dict[str, Any], competitors: List[Dict[str, Any]]) -> bool:
+    event_class = event.get("class") or {}
+    class_card = str(event_class.get("generalClassCard") or "").upper()
+    if class_card == "T20I":
+        return True
+    intl_class_id = str(event_class.get("internationalClassId") or "")
+    if intl_class_id == "3":
+        return True
+    return all(bool(c.get("isNational")) for c in competitors if isinstance(c, dict)) and str(event.get("eventType") or "").upper() == "T20"
+
+
+def _is_top_t20_league_event(series_name: str, event: Dict[str, Any], competitors: List[Dict[str, Any]]) -> bool:
+    if any(bool(c.get("isNational")) for c in competitors if isinstance(c, dict)):
+        return False
+    if str(event.get("eventType") or "").upper() != "T20":
+        return False
+    hay = (series_name or "").lower()
+    return any(keyword in hay for keyword in TOP_T20_LEAGUE_KEYWORDS)
+
+
+def _is_allowed_event(event: Dict[str, Any], competitors: List[Dict[str, Any]], series_name: str) -> bool:
+    return _is_t20i_event(event, competitors) or _is_top_t20_league_event(series_name, event, competitors)
 
 
 def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -155,6 +195,14 @@ def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         or event.get("name")
     )
 
+    status_obj = event.get("fullStatus") or {}
+    status_type = (status_obj.get("type") or {}) if isinstance(status_obj, dict) else {}
+    state = str(status_type.get("state") or event.get("status") or "").lower()
+    is_live = state == "in"
+
+    if not _is_allowed_event(event, competitors_sorted, str(series_name or "")):
+        return None
+
     return {
         "date": date_str,
         "time": time_str,
@@ -164,6 +212,10 @@ def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "team1_abbr": _team_abbreviation(t1, team1),
         "team2_abbr": _team_abbreviation(t2, team2),
         "series": series_name,
+        "event_type": event.get("eventType"),
+        "is_live": is_live,
+        "status": state or "pre",
+        "status_text": (status_obj.get("summary") or event.get("summary") or ("Live" if is_live else "Scheduled")),
         "match_id": event.get("id"),
     }
 
@@ -186,13 +238,19 @@ def _fetch_from_espn() -> List[Dict[str, Any]]:
     for event in events:
         if not isinstance(event, dict):
             continue
-        if not _event_is_upcoming(event, now_utc):
+        if not _event_is_upcoming_or_live(event, now_utc):
             continue
         fixture = _extract_fixture(event)
         if fixture and fixture.get("date") and fixture.get("team1") and fixture.get("team2"):
             fixtures.append(fixture)
 
-    fixtures.sort(key=lambda item: (item.get("date") or "9999-12-31", item.get("time") or "99:99"))
+    fixtures.sort(
+        key=lambda item: (
+            0 if item.get("is_live") else 1,
+            item.get("date") or "9999-12-31",
+            item.get("time") or "99:99",
+        )
+    )
     return fixtures
 
 

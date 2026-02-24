@@ -108,7 +108,7 @@ const LandingPage = () => {
     return (
       <Box sx={{ mt: 4 }}>
         <Typography variant="subtitle1" sx={{ mb: 2 }}>
-          Upcoming Matches Analysis
+          Live / Upcoming T20I + Top Leagues
         </Typography>
         
         <Grid container spacing={3} sx={{ mt: 1 }}>
@@ -123,18 +123,36 @@ const LandingPage = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
                     <CalendarTodayIcon color="primary" fontSize="small" />
                     <Typography variant="subtitle1">
-                      {formatDate(match.date)}
+                      {match.isLive ? (match.statusText || 'Live') : formatDate(match.date)}
                     </Typography>
+                    {match.isLive && (
+                      <Chip
+                        label="LIVE"
+                        size="small"
+                        color="error"
+                        sx={{ height: 22, fontWeight: 700 }}
+                      />
+                    )}
                   </Box>
                   
                   <Typography variant="h6" sx={{ mb: 1 }}>
                     {match.team1Abbr} vs {match.team2Abbr}
                   </Typography>
                   
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                     {formatVenue(match.venue)}
                   </Typography>
-                  
+
+                  {match.series && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                      {match.series}
+                    </Typography>
+                  )}
+
+                  {!match.series && (
+                    <Box sx={{ mb: 2 }} />
+                  )}
+
                   <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
                     <Button
                       variant="outlined"
