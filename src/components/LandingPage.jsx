@@ -68,7 +68,7 @@ const LandingPage = () => {
       try {
         setLoading(true);
 
-        const nextMatches = await fetchUpcomingMatches(3);
+        const nextMatches = await fetchUpcomingMatches(6);
         setUpcomingMatches(nextMatches);
       } catch (error) {
         console.error('Error fetching upcoming matches:', error);
@@ -123,7 +123,7 @@ const LandingPage = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
                     <CalendarTodayIcon color="primary" fontSize="small" />
                     <Typography variant="subtitle1">
-                      {match.isLive ? (match.statusText || 'Live') : formatDate(match.date)}
+                      {formatDate(match.date)}
                     </Typography>
                     {match.isLive && (
                       <Chip

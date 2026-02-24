@@ -22,6 +22,7 @@ ESPN_CRICKET_SCOREBOARD_URL = (
     "https://site.api.espn.com/apis/personalized/v2/scoreboard/header"
     "?sport=cricket&region=in&lang=en"
 )
+ESPN_LOOKAHEAD_DAYS = 4  # today + next 3 days
 
 # Translate common ESPN venue strings to the DB venue names used in this app.
 VENUE_NAME_MAP = {
@@ -106,6 +107,10 @@ def _extract_events(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
                 if isinstance(event, dict):
                     events.append(event)
     return events
+
+
+def _scoreboard_url_for_date(target_date: datetime) -> str:
+    return f"{ESPN_CRICKET_SCOREBOARD_URL}&dates={target_date.strftime('%Y%m%d')}"
 
 
 def _event_is_upcoming_or_live(event: Dict[str, Any], now_utc: datetime) -> bool:
@@ -221,19 +226,37 @@ def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def _fetch_from_espn() -> List[Dict[str, Any]]:
-    req = Request(
-        ESPN_CRICKET_SCOREBOARD_URL,
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; CricketDataThing/1.0)",
-            "Accept": "application/json",
-        },
-    )
-    with urlopen(req, timeout=15) as resp:
-        body = resp.read()
-    payload = json.loads(body.decode("utf-8"))
-    events = _extract_events(payload)
-    now_utc = datetime.now(timezone.utc)
+    def _fetch_payload(url: str) -> Dict[str, Any]:
+        req = Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; CricketDataThing/1.0)",
+                "Accept": "application/json",
+            },
+        )
+        with urlopen(req, timeout=15) as resp:
+            body = resp.read()
+        return json.loads(body.decode("utf-8"))
 
+    now_utc = datetime.now(timezone.utc)
+    all_events: List[Dict[str, Any]] = []
+    seen_event_ids = set()
+
+    # Fetch today + next few days so we don't drop to only the single live match.
+    for day_offset in range(ESPN_LOOKAHEAD_DAYS):
+        target_dt = now_utc + timedelta(days=day_offset)
+        payload = _fetch_payload(_scoreboard_url_for_date(target_dt))
+        for event in _extract_events(payload):
+            if not isinstance(event, dict):
+                continue
+            event_id = event.get("id")
+            if event_id and event_id in seen_event_ids:
+                continue
+            if event_id:
+                seen_event_ids.add(event_id)
+            all_events.append(event)
+
+    events = all_events
     fixtures: List[Dict[str, Any]] = []
     for event in events:
         if not isinstance(event, dict):
