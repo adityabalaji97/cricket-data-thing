@@ -62,8 +62,8 @@ const VenueDeliveryStats = ({
                 const params = new URLSearchParams();
                 if (startDate) params.append('start_date', startDate);
                 if (endDate) params.append('end_date', endDate);
-                if (team1) params.append('team1', team1);
-                if (team2) params.append('team2', team2);
+                // Venue delivery card is venue-level context; team pairing can easily produce zero-match samples.
+                // Keep props for future use, but do not constrain the query by matchup here.
                 if (includeInternational) params.append('include_international', 'true');
                 (Array.isArray(leagues) ? leagues : []).forEach((league) => params.append('leagues', league));
 
@@ -90,7 +90,7 @@ const VenueDeliveryStats = ({
         return () => {
             cancelled = true;
         };
-    }, [venue, startDate, endDate, team1, team2, includeInternational, leaguesKey]);
+    }, [venue, startDate, endDate, includeInternational, leaguesKey]);
 
     if (loading) {
         return (
