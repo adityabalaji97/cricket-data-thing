@@ -29,7 +29,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import SearchIcon from '@mui/icons-material/Search';
 import InfoIcon from '@mui/icons-material/Info';
-import { getUpcomingMatches, formatDate, formatVenue } from '../data/iplSchedule';
+import { fetchUpcomingMatches, formatDate, formatVenue } from '../data/iplSchedule';
 import EloLeaderboard from './EloLeaderboard';
 import EloRacerChart from './EloRacerChart';
 import RecentMatchesSummaryCard from './RecentMatchesSummaryCard';
@@ -59,16 +59,11 @@ const LandingPage = () => {
   // This avoids the need for a separate createAnalysisUrl function
 
   useEffect(() => {
-    const fetchUpcomingMatches = async () => {
+    const loadUpcomingMatches = async () => {
       try {
         setLoading(true);
-        
-        // Get today's date
-        const today = new Date();
-        const todayString = today.toISOString().split('T')[0];
-        
-        // Get upcoming matches starting from today
-        const nextMatches = getUpcomingMatches(3, todayString);
+
+        const nextMatches = await fetchUpcomingMatches(3);
         setUpcomingMatches(nextMatches);
       } catch (error) {
         console.error('Error fetching upcoming matches:', error);
@@ -79,7 +74,7 @@ const LandingPage = () => {
       }
     };
 
-    fetchUpcomingMatches();
+    loadUpcomingMatches();
   }, []);
 
   // Component to display upcoming match links
