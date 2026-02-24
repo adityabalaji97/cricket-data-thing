@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   CircularProgress,
+  Chip,
+  Stack,
   Typography,
 } from '@mui/material';
 import axios from 'axios';
@@ -35,6 +37,13 @@ const MatchPreviewCard = ({
   );
 
   const parsedPreview = useMemo(() => {
+    if (Array.isArray(data?.sections) && data.sections.length > 0) {
+      return data.sections.map((s) => ({
+        title: s.title,
+        bullets: Array.isArray(s.bullets) ? s.bullets : [],
+        paragraphs: [],
+      }));
+    }
     if (!data?.preview) return [];
     const lines = String(data.preview).split('\n');
     const sections = [];
@@ -60,7 +69,7 @@ const MatchPreviewCard = ({
 
     if (current) sections.push(current);
     return sections;
-  }, [data?.preview]);
+  }, [data?.preview, data?.sections]);
 
   useEffect(() => {
     if (!venue || !team1Identifier || !team2Identifier) return;
@@ -123,13 +132,18 @@ const MatchPreviewCard = ({
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.08)' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', mb: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
         <Typography variant={isMobile ? 'subtitle1' : 'h6'}>
           AI Match Preview
         </Typography>
-        {data.cached && (
-          <Typography variant="caption" color="text.secondary">cached</Typography>
-        )}
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          {data?.preview_mode && (
+            <Chip size="small" label={data.preview_mode} variant="outlined" />
+          )}
+          {data.cached && (
+            <Chip size="small" label="cached" variant="outlined" />
+          )}
+        </Stack>
       </Box>
       <Box>
         {(parsedPreview.length ? parsedPreview : [{ title: 'Preview', bullets: [], paragraphs: [String(data.preview)] }]).map((section) => (

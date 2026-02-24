@@ -9,7 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_session
-from services.match_preview import gather_preview_context, generate_match_preview_fallback
+from services.match_preview import (
+    build_deterministic_preview_sections,
+    gather_preview_context,
+    generate_match_preview_fallback,
+    score_preview_lean,
+    serialize_sections_to_markdown,
+    validate_llm_rewrite,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,40 +25,31 @@ router = APIRouter(prefix="/match-preview", tags=["Match Preview"])
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = "gpt-4o-mini"
 MAX_TOKENS = 800
-TEMPERATURE = 0.4
+TEMPERATURE = 0.2
+PREVIEW_ENGINE_VERSION = "v2-screen-story"
+DEFAULT_PREVIEW_MODE = "hybrid"
 
 preview_cache: Dict[str, Dict] = {}
 
 
-MATCH_PREVIEW_PROMPT = """You are a cricket analyst writing a compact, data-first pre-match preview for a UI that already shows multiple charts/tables.
+MATCH_PREVIEW_REWRITE_PROMPT = """Rewrite the provided cricket pre-match preview bullets for readability only.
 
-Use the JSON context below to produce exactly 5 markdown sections with these headings in this order:
+You must preserve:
+- all 5 section headings and their order exactly
+- 1-2 bullets per section
+- all numbers, player names, and factual claims
+- the meaning of phase-wise strategy bullets as winning templates
 
-## Venue Profile
-## Form Guide
-## Head-to-Head
-## Key Matchup Factor
-## Preview Take
+Do not:
+- add new facts
+- add sections
+- remove numeric details
+- add prose before or after the sections
 
-Rules:
-- Write 1-2 bullet points per section (prefix bullets with "- ").
-- Every section must include at least one number from the context when data exists.
-- Prefer the selected date window and sample sizes explicitly.
-- Keep bullets tight (roughly 8-22 words each). No filler adjectives.
-- Use phase stats (powerplay/middle/death) when making the "Key Matchup Factor".
-- Anchor the story to the `screen_story` object first (it mirrors the on-screen components).
-- When discussing toss/result bias, combine venue result distribution with each team's recent wins batting first vs chasing.
-- When discussing innings score analysis, use rounded thresholds and mention how often each team recently cleared/chased them.
-- If teams look close on thresholds, use highest chased / lowest defended (recent or aggregate) to break ties.
-- H2H recency matters: newest match first; same venue/country H2H gets extra weight.
-- Use `recent_matches_at_venue` as an override signal when venue sample is clustered in the selected period.
-- Use `expected_fantasy_points` + matchup edges to name likely upside/risks (especially higher-confidence entries).
-- Do not invent player availability or team news.
-- If data is missing, say so briefly and move on.
-- Preview Take should be a lean with reasons tied to venue/form/H2H/phase data, not certainty.
+Return markdown only.
 
-Context JSON:
-{context_json}
+Canonical preview markdown:
+{canonical_markdown}
 """
 
 
@@ -63,6 +61,7 @@ def _cache_key(
     end_date: Optional[date],
     include_international: bool,
     top_teams: int,
+    preview_mode: str,
 ) -> str:
     payload = json.dumps(
         {
@@ -73,21 +72,23 @@ def _cache_key(
             "end_date": str(end_date) if end_date else None,
             "include_international": include_international,
             "top_teams": top_teams,
+            "preview_version": PREVIEW_ENGINE_VERSION,
+            "preview_mode": preview_mode,
         },
         sort_keys=True,
     )
     return hashlib.md5(payload.encode()).hexdigest()
 
 
-def _generate_with_llm(context: Dict) -> str:
+def _rewrite_with_llm(canonical_markdown: str, original_sections) -> tuple[str, bool]:
     if not OPENAI_API_KEY:
-        return generate_match_preview_fallback(context)
+        return canonical_markdown, False
 
     try:
         import openai
 
         client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        prompt = MATCH_PREVIEW_PROMPT.format(context_json=json.dumps(context, indent=2))
+        prompt = MATCH_PREVIEW_REWRITE_PROMPT.format(canonical_markdown=canonical_markdown)
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
@@ -95,10 +96,15 @@ def _generate_with_llm(context: Dict) -> str:
             temperature=TEMPERATURE,
         )
         content = response.choices[0].message.content.strip()
-        return content or generate_match_preview_fallback(context)
+        if not content:
+            return canonical_markdown, False
+        if not validate_llm_rewrite(original_sections, content):
+            logger.warning("Match preview LLM rewrite failed validation; using deterministic sections")
+            return canonical_markdown, False
+        return content, True
     except Exception as e:
-        logger.error(f"Match preview OpenAI call failed: {e}", exc_info=True)
-        return generate_match_preview_fallback(context)
+        logger.error(f"Match preview OpenAI rewrite failed: {e}", exc_info=True)
+        return canonical_markdown, False
 
 
 @router.get("/{venue}/{team1_id}/{team2_id}")
@@ -110,10 +116,12 @@ def get_match_preview(
     end_date: Optional[date] = Query(None),
     include_international: bool = Query(True),
     top_teams: int = Query(20, ge=1, le=50),
+    debug: bool = Query(False),
     db: Session = Depends(get_session),
 ):
     try:
-        key = _cache_key(venue, team1_id, team2_id, start_date, end_date, include_international, top_teams)
+        preview_mode = DEFAULT_PREVIEW_MODE
+        key = _cache_key(venue, team1_id, team2_id, start_date, end_date, include_international, top_teams, preview_mode)
         if key in preview_cache:
             cached = preview_cache[key]
             return {**cached, "cached": True}
@@ -128,17 +136,35 @@ def get_match_preview(
             include_international=include_international,
             top_teams=top_teams,
         )
-        preview_text = _generate_with_llm(context)
+        sections = build_deterministic_preview_sections(context)
+        canonical_markdown = serialize_sections_to_markdown(sections)
+        llm_used = False
+        preview_text = canonical_markdown
+        if preview_mode == "hybrid":
+            preview_text, llm_used = _rewrite_with_llm(canonical_markdown, sections)
+        if not preview_text:
+            preview_text = generate_match_preview_fallback(context)
+        decision_scores = score_preview_lean(context)
+        phase_check = (((context.get("screen_story") or {}).get("phase_wise_strategy") or {}).get("consistency_check")) or {}
 
         result = {
             "success": True,
             "venue": venue,
             "team1": context["team1"],
             "team2": context["team2"],
+            "sections": sections,
             "preview": preview_text,
+            "preview_mode": preview_mode,
+            "preview_version": PREVIEW_ENGINE_VERSION,
+            "llm_used": llm_used,
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "cached": False,
         }
+        if debug:
+            result["debug"] = {
+                "decision_scores": decision_scores,
+                "phase_template_consistency_check": phase_check,
+            }
         preview_cache[key] = result
         return result
     except Exception as e:

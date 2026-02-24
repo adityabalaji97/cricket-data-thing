@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import re
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -32,6 +33,14 @@ INTERNATIONAL_ABBR_TO_NAME = {
     "WI": "West Indies",
     "ZIM": "Zimbabwe",
 }
+
+PREVIEW_SECTION_ORDER = [
+    ("venue_profile", "Venue Profile"),
+    ("form_guide", "Form Guide"),
+    ("head_to_head", "Head-to-Head"),
+    ("key_matchup_factor", "Key Matchup Factor"),
+    ("preview_take", "Preview Take"),
+]
 
 
 def _reverse_team_mapping() -> Dict[str, str]:
@@ -561,6 +570,473 @@ def _build_story_signals(context: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _classify_toss_bias(batting_first_wins: int, total_matches: int) -> Dict[str, Any]:
+    if not total_matches:
+        return {"label": "no_sample", "bat_first_pct": None}
+    bat_first_pct = batting_first_wins * 100.0 / total_matches
+    if bat_first_pct >= 58:
+        label = "bat_first_edge"
+    elif bat_first_pct <= 42:
+        label = "chasing_edge"
+    else:
+        label = "balanced"
+    return {"label": label, "bat_first_pct": round(bat_first_pct, 1)}
+
+
+def build_phase_wise_strategy_templates(context: Dict[str, Any], tolerance_runs: int = 8) -> Dict[str, Any]:
+    phase_stats = context.get("phase_stats", {}) or {}
+    venue_stats = context.get("venue_stats", {}) or {}
+    phase_order = ["powerplay", "middle1", "middle2", "death"]
+
+    def _template_for(key: str, target_key: str) -> Dict[str, Any]:
+        raw = (phase_stats.get(key) or {})
+        template: Dict[str, Any] = {}
+        total_runs = 0.0
+        for phase in phase_order:
+            s = raw.get(phase) or {}
+            runs = float(s.get("runs_per_innings", 0) or 0)
+            balls = float(s.get("balls_per_innings", 0) or 0)
+            wickets = float(s.get("wickets_per_innings", 0) or 0)
+            strike_rate = (runs * 100.0 / balls) if balls else float(s.get("strike_rate", 0) or 0)
+            template[phase] = {
+                "runs_per_innings": round(runs, 2),
+                "wickets_per_innings": round(wickets, 2),
+                "balls_per_innings": round(balls, 2),
+                "strike_rate": round(strike_rate, 2),
+            }
+            total_runs += runs
+        rounded_total = int(round(total_runs))
+        target_val = venue_stats.get(target_key)
+        aligns = None
+        delta = None
+        if target_val is not None:
+            delta = round(total_runs - float(target_val), 2)
+            aligns = abs(delta) <= tolerance_runs
+        return {
+            **template,
+            "template_total_runs": rounded_total,
+            "aligns_with_target": aligns,
+            "target_total": round(float(target_val), 2) if target_val is not None else None,
+            "target_delta_runs": delta,
+        }
+
+    bf = _template_for("batting_first_wins", "average_winning_score")
+    ch = _template_for("chasing_wins", "average_chasing_score")
+
+    deltas = {}
+    for phase in phase_order:
+        deltas[f"{phase}_run_delta_bf_minus_chase"] = round(
+            float((bf.get(phase) or {}).get("runs_per_innings", 0))
+            - float((ch.get(phase) or {}).get("runs_per_innings", 0)),
+            2,
+        )
+
+    dominant_phase = None
+    if deltas:
+        dominant_phase = max(
+            phase_order,
+            key=lambda p: abs(deltas.get(f"{p}_run_delta_bf_minus_chase", 0)),
+        )
+
+    consistency = {
+        "valid": bool((bf.get("aligns_with_target") is not False) and (ch.get("aligns_with_target") is not False)),
+        "tolerance_runs": tolerance_runs,
+        "batting_first_template_total": bf.get("template_total_runs"),
+        "average_winning_score": int(round(float(venue_stats.get("average_winning_score", 0) or 0))) if venue_stats.get("average_winning_score") else None,
+        "batting_first_delta_runs": bf.get("target_delta_runs"),
+        "chasing_template_total": ch.get("template_total_runs"),
+        "average_chasing_score": int(round(float(venue_stats.get("average_chasing_score", 0) or 0))) if venue_stats.get("average_chasing_score") else None,
+        "chasing_delta_runs": ch.get("target_delta_runs"),
+    }
+
+    return {
+        "batting_first_wins_template": {
+            phase: bf.get(phase) for phase in phase_order
+        } | {
+            "template_total_runs": bf.get("template_total_runs"),
+            "aligns_with_avg_winning_score": bf.get("aligns_with_target"),
+        },
+        "chasing_wins_template": {
+            phase: ch.get(phase) for phase in phase_order
+        } | {
+            "template_total_runs": ch.get("template_total_runs"),
+            "aligns_with_avg_chasing_score": ch.get("aligns_with_target"),
+        },
+        "template_deltas": deltas,
+        "dominant_phase": dominant_phase,
+        "consistency_check": consistency,
+    }
+
+
+def _phase_label(phase: Optional[str]) -> str:
+    return {
+        "powerplay": "powerplay",
+        "middle1": "first middle phase",
+        "middle2": "second middle phase",
+        "death": "death overs",
+    }.get(phase or "", "key phase")
+
+
+def _phase_runs(template: Dict[str, Any], phase: str) -> Optional[int]:
+    v = ((template or {}).get(phase) or {}).get("runs_per_innings")
+    return int(round(float(v))) if v is not None else None
+
+
+def _top_fantasy_pick(screen_story: Dict[str, Any], team_name: str, min_confidence: float = 0.55) -> Optional[Dict[str, Any]]:
+    fantasy = (((screen_story.get("expected_fantasy_points") or {}).get("fantasy_top") or {}).get(team_name)) or []
+    if not fantasy:
+        return None
+    best = sorted(fantasy, key=lambda x: (float(x.get("expected_points", 0) or 0), float(x.get("confidence", 0) or 0)), reverse=True)[0]
+    best["high_confidence"] = float(best.get("confidence", 0) or 0) >= min_confidence
+    return best
+
+
+def _best_edge(screen_story: Dict[str, Any], team_name: str) -> Optional[Dict[str, Any]]:
+    edges = (((screen_story.get("expected_fantasy_points") or {}).get("batting_edges") or {}).get(team_name)) or []
+    return edges[0] if edges else None
+
+
+def _best_bowling_threat(screen_story: Dict[str, Any], team_name: str) -> Optional[Dict[str, Any]]:
+    threats = (((screen_story.get("expected_fantasy_points") or {}).get("bowling_threats") or {}).get(team_name)) or []
+    return threats[0] if threats else None
+
+
+def _phase_template_fit_score(team_summary: Dict[str, Any], venue_bias_label: str) -> int:
+    if venue_bias_label == "bat_first_edge":
+        return int(team_summary.get("wins_batting_first", 0) or 0)
+    if venue_bias_label == "chasing_edge":
+        return int(team_summary.get("wins_chasing", 0) or 0)
+    return int((team_summary.get("wins_batting_first", 0) or 0) + (team_summary.get("wins_chasing", 0) or 0))
+
+
+def score_preview_lean(context: Dict[str, Any]) -> Dict[str, Any]:
+    team1 = context.get("team1")
+    team2 = context.get("team2")
+    if not team1 or not team2:
+        return {"winner": None, "score_total": 0, "components": {}, "label": "Too close to call", "top_reasons": []}
+
+    screen_story = context.get("screen_story", {}) or {}
+    match_history = context.get("match_history", {}) or {}
+    h2h_rows = (match_history.get("h2h_recent_rows") or [])[:3]
+    elo = context.get("elo", {}) or {}
+
+    t1_recent = match_history.get("team1_recent") or {}
+    t2_recent = match_history.get("team2_recent") or {}
+    venue_toss = ((screen_story.get("match_results_distribution") or {}).get("venue_toss_signal")) or {}
+    recent_venue = (screen_story.get("recent_matches_at_venue") or {})
+    innings_story = (screen_story.get("innings_scores_analysis") or {})
+    phase_strategy = (screen_story.get("phase_wise_strategy") or {})
+    phase_dom = phase_strategy.get("dominant_phase")
+
+    agg_bias = _classify_toss_bias(int(venue_toss.get("batting_first_wins", 0) or 0), int(venue_toss.get("total_matches", 0) or 0))
+    recent_bias = _classify_toss_bias(int(recent_venue.get("batting_first_wins", 0) or 0), int(recent_venue.get("sample_size", 0) or 0))
+
+    c: Dict[str, int] = {}
+    reasons: List[Dict[str, Any]] = []
+
+    # Recent form
+    t1_form_w = (t1_recent.get("record") or "").count("W")
+    t2_form_w = (t2_recent.get("record") or "").count("W")
+    c["recent_form"] = max(-2, min(2, t1_form_w - t2_form_w))
+    if c["recent_form"]:
+        reasons.append({"component": "recent_form", "score": c["recent_form"], "detail": f"Last-5 wins {team1} {t1_form_w}-{t2_form_w} {team2}"})
+
+    # H2H recency weighted
+    h2h_score = 0
+    for i, row in enumerate(h2h_rows):
+        winner = row.get("winner")
+        weight = max(1, 3 - i)
+        if winner == team1:
+            h2h_score += weight
+        elif winner == team2:
+            h2h_score -= weight
+    c["h2h_recent"] = 2 if h2h_score >= 2 else (-2 if h2h_score <= -2 else (1 if h2h_score > 0 else (-1 if h2h_score < 0 else 0)))
+    if c["h2h_recent"]:
+        reasons.append({"component": "h2h_recent", "score": c["h2h_recent"], "detail": "Recent H2H edge"})
+
+    # ELO
+    elo_delta = elo.get("delta_team1_minus_team2")
+    if elo_delta is None:
+        c["elo_delta"] = 0
+    elif elo_delta >= 20:
+        c["elo_delta"] = 1
+    elif elo_delta <= -20:
+        c["elo_delta"] = -1
+    else:
+        c["elo_delta"] = 0
+    if c["elo_delta"]:
+        reasons.append({"component": "elo_delta", "score": c["elo_delta"], "detail": f"ELO delta {elo_delta:+.0f}"})
+
+    # Toss-fit vs venue bias
+    bias_label = agg_bias.get("label")
+    if bias_label == "bat_first_edge":
+        c["toss_fit_vs_venue_bias"] = (
+            2 if (t1_recent.get("wins_batting_first", 0) or 0) > (t2_recent.get("wins_batting_first", 0) or 0)
+            else -2 if (t2_recent.get("wins_batting_first", 0) or 0) > (t1_recent.get("wins_batting_first", 0) or 0)
+            else 0
+        )
+    elif bias_label == "chasing_edge":
+        c["toss_fit_vs_venue_bias"] = (
+            2 if (t1_recent.get("wins_chasing", 0) or 0) > (t2_recent.get("wins_chasing", 0) or 0)
+            else -2 if (t2_recent.get("wins_chasing", 0) or 0) > (t1_recent.get("wins_chasing", 0) or 0)
+            else 0
+        )
+    else:
+        c["toss_fit_vs_venue_bias"] = 0
+    if c["toss_fit_vs_venue_bias"]:
+        reasons.append({"component": "toss_fit_vs_venue_bias", "score": c["toss_fit_vs_venue_bias"], "detail": f"Venue bias: {bias_label}"})
+
+    # Threshold fit
+    t1_thresh = (t1_recent.get("reached_avg_winning_score_batting_first", 0) or 0) + (t1_recent.get("chased_avg_chasing_score", 0) or 0)
+    t2_thresh = (t2_recent.get("reached_avg_winning_score_batting_first", 0) or 0) + (t2_recent.get("chased_avg_chasing_score", 0) or 0)
+    delta_thresh = t1_thresh - t2_thresh
+    c["threshold_fit"] = 2 if delta_thresh >= 2 else (-2 if delta_thresh <= -2 else (1 if delta_thresh > 0 else (-1 if delta_thresh < 0 else 0)))
+    if c["threshold_fit"]:
+        reasons.append({"component": "threshold_fit", "score": c["threshold_fit"], "detail": f"Threshold clears {team1} {t1_thresh}-{t2_thresh} {team2}"})
+
+    # Recent venue override alignment
+    if (recent_venue.get("sample_size") or 0) >= 4 and recent_bias.get("label") != agg_bias.get("label"):
+        # advantage to better fit with recent bias
+        if recent_bias.get("label") == "bat_first_edge":
+            c["recent_venue_override_alignment"] = 1 if (t1_recent.get("wins_batting_first", 0) or 0) > (t2_recent.get("wins_batting_first", 0) or 0) else (-1 if (t2_recent.get("wins_batting_first", 0) or 0) > (t1_recent.get("wins_batting_first", 0) or 0) else 0)
+        elif recent_bias.get("label") == "chasing_edge":
+            c["recent_venue_override_alignment"] = 1 if (t1_recent.get("wins_chasing", 0) or 0) > (t2_recent.get("wins_chasing", 0) or 0) else (-1 if (t2_recent.get("wins_chasing", 0) or 0) > (t1_recent.get("wins_chasing", 0) or 0) else 0)
+        else:
+            c["recent_venue_override_alignment"] = 0
+    else:
+        c["recent_venue_override_alignment"] = 0
+    if c["recent_venue_override_alignment"]:
+        reasons.append({"component": "recent_venue_override_alignment", "score": c["recent_venue_override_alignment"], "detail": "Recent venue trend override"})
+
+    # Phase-template fit (proxy by bias fit and dominant phase)
+    c["phase_template_fit"] = 0
+    if phase_strategy and phase_strategy.get("consistency_check", {}).get("valid", True):
+        fit1 = _phase_template_fit_score(t1_recent, bias_label)
+        fit2 = _phase_template_fit_score(t2_recent, bias_label)
+        c["phase_template_fit"] = 2 if fit1 - fit2 >= 2 else (-2 if fit2 - fit1 >= 2 else (1 if fit1 > fit2 else (-1 if fit2 > fit1 else 0)))
+        if c["phase_template_fit"]:
+            reasons.append({"component": "phase_template_fit", "score": c["phase_template_fit"], "detail": f"Winning-template fit via {_phase_label(phase_dom)}"})
+
+    # Fantasy / matchup edge
+    t1_f = _top_fantasy_pick(screen_story, team1)
+    t2_f = _top_fantasy_pick(screen_story, team2)
+    t1_f_score = float((t1_f or {}).get("expected_points", 0) or 0)
+    t2_f_score = float((t2_f or {}).get("expected_points", 0) or 0)
+    c["fantasy_matchup_edge"] = 2 if t1_f_score - t2_f_score >= 8 else (-2 if t2_f_score - t1_f_score >= 8 else (1 if t1_f_score > t2_f_score else (-1 if t2_f_score > t1_f_score else 0)))
+    if c["fantasy_matchup_edge"]:
+        reasons.append({"component": "fantasy_matchup_edge", "score": c["fantasy_matchup_edge"], "detail": "Fantasy/matchup edge"})
+
+    total = int(sum(c.values()))
+    if total >= 5:
+        label = f"Lean {team1}"
+        winner = team1
+    elif total <= -5:
+        label = f"Lean {team2}"
+        winner = team2
+    elif total >= 3:
+        label = f"Slight lean {team1}"
+        winner = team1
+    elif total <= -3:
+        label = f"Slight lean {team2}"
+        winner = team2
+    else:
+        label = "Too close to call"
+        winner = None
+
+    reasons_sorted = sorted(reasons, key=lambda x: abs(int(x["score"])), reverse=True)[:3]
+    return {"winner": winner, "score_total": total, "components": c, "label": label, "top_reasons": reasons_sorted}
+
+
+def _add_section(sections: List[Dict[str, Any]], section_id: str, title: str, bullets: List[str], evidence_tags: List[str]) -> None:
+    cleaned = [b.strip() for b in bullets if isinstance(b, str) and b.strip()][:2]
+    sections.append({"id": section_id, "title": title, "bullets": cleaned or ["Data sample is thin for this section."], "evidence_tags": evidence_tags})
+
+
+def build_deterministic_preview_sections(context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    team1 = context.get("team1")
+    team2 = context.get("team2")
+    venue = context.get("venue")
+    venue_stats = context.get("venue_stats", {}) or {}
+    filters = context.get("filters", {}) or {}
+    screen_story = context.get("screen_story", {}) or {}
+    match_history = context.get("match_history", {}) or {}
+    h2h_story = (screen_story.get("head_to_head_stats") or {})
+    innings_story = (screen_story.get("innings_scores_analysis") or {})
+    phase_story = (screen_story.get("phase_wise_strategy") or {})
+    recent_venue = (screen_story.get("recent_matches_at_venue") or {})
+    matchup_story = (screen_story.get("expected_fantasy_points") or {})
+    team1_recent = match_history.get("team1_recent") or {}
+    team2_recent = match_history.get("team2_recent") or {}
+
+    venue_toss = ((screen_story.get("match_results_distribution") or {}).get("venue_toss_signal")) or {}
+    agg_bias = _classify_toss_bias(int(venue_toss.get("batting_first_wins", 0) or 0), int(venue_toss.get("total_matches", 0) or 0))
+    recent_bias = _classify_toss_bias(int(recent_venue.get("batting_first_wins", 0) or 0), int(recent_venue.get("sample_size", 0) or 0))
+
+    phase_consistency = (phase_story.get("consistency_check") or {})
+    bf_template = phase_story.get("batting_first_wins_template") or {}
+    ch_template = phase_story.get("chasing_wins_template") or {}
+    dominant_phase = phase_story.get("dominant_phase")
+
+    window_label = f"{filters.get('start_date') or 'all-time'} to {filters.get('end_date') or 'latest'}"
+    avg_win = innings_story.get("avg_winning_score_rounded")
+    avg_chase = innings_story.get("avg_chasing_score_rounded")
+
+    # Venue Profile
+    venue_bullets = [
+        f"Window {window_label}: {venue_toss.get('total_matches', 0)} matches at {venue}; {int(venue_toss.get('batting_first_wins', 0) or 0)} bat-first wins vs {int(venue_toss.get('chasing_wins', 0) or 0)} chases ({(agg_bias.get('bat_first_pct') or 0):.0f}% bat-first)."
+    ]
+    recent_override = (
+        (recent_venue.get("sample_size") or 0) >= 4 and agg_bias.get("label") != "no_sample" and recent_bias.get("label") != "no_sample"
+        and recent_bias.get("label") != agg_bias.get("label")
+    )
+    threshold_part = f"Winning/chasing score baselines are {avg_win or 'N/A'} and {avg_chase or 'N/A'}"
+    range_part = f"range {int(venue_stats.get('lowest_total', 0) or 0)}-{int(venue_stats.get('highest_total', 0) or 0)}"
+    if recent_override:
+        venue_bullets.append(
+            f"{threshold_part} ({range_part}); recent venue sample ({recent_venue.get('sample_size')}) trends {int(recent_venue.get('batting_first_wins', 0) or 0)}-{int(recent_venue.get('chasing_wins', 0) or 0)} and differs from the long-window split."
+        )
+    elif phase_consistency.get("valid", True):
+        template_key = "chasing_wins_template" if agg_bias.get("label") == "chasing_edge" else "batting_first_wins_template"
+        template = ch_template if template_key == "chasing_wins_template" else bf_template
+        pp_runs = _phase_runs(template, "powerplay")
+        death_runs = _phase_runs(template, "death")
+        venue_bullets.append(
+            f"{threshold_part} ({range_part}); winning-template shape is {_phase_label(dominant_phase)} driven with roughly {pp_runs or 'N/A'} in PP and {death_runs or 'N/A'} at death."
+        )
+    else:
+        venue_bullets.append(f"{threshold_part} ({range_part}); phase-template sums are off tolerance, so preview leans on score and result splits.")
+
+    # Form Guide
+    team1_thresh = (team1_recent.get("reached_avg_winning_score_batting_first", 0) or 0) + (team1_recent.get("chased_avg_chasing_score", 0) or 0)
+    team2_thresh = (team2_recent.get("reached_avg_winning_score_batting_first", 0) or 0) + (team2_recent.get("chased_avg_chasing_score", 0) or 0)
+    form_bullets = [
+        f"Last 5: {team1} {team1_recent.get('record', 'N/A')} ({team1_recent.get('wins_batting_first', 0)} bat-first wins, {team1_recent.get('wins_chasing', 0)} chases) vs {team2} {team2_recent.get('record', 'N/A')} ({team2_recent.get('wins_batting_first', 0)} bat-first wins, {team2_recent.get('wins_chasing', 0)} chases)."
+    ]
+    form_bullets.append(
+        f"Threshold checks vs venue baselines ({avg_win or 'N/A'}/{avg_chase or 'N/A'}): {team1} clears {team1_thresh} recent wins/chases, {team2} clears {team2_thresh}; bowling-first winning restrictions avg {(team1_recent.get('avg_restriction_when_bowling_first') or 'N/A')}/{(team2_recent.get('avg_restriction_when_bowling_first') or 'N/A')}."
+    )
+
+    # Head-to-Head
+    h2h_recent_matches = (h2h_story.get("recent_matches") or [])
+    h2h_relevance = (h2h_story.get("relevance") or {})
+    h2h_overall = (h2h_story.get("overall_window_summary") or {})
+    if h2h_recent_matches:
+        latest = h2h_recent_matches[0]
+        latest_date = latest.get("date") or "unknown date"
+        latest_winner = latest.get("winner_display") or latest.get("winner") or "No result"
+        h2h_bullets = [
+            f"Most recent H2H ({latest_date}) went to {latest_winner}; window sample is {h2h_overall.get('sample_size', 0)} matches with {team1} {h2h_overall.get('team1_wins', 0)}-{h2h_overall.get('team2_wins', 0)} {team2}."
+        ]
+    else:
+        h2h_bullets = [f"No H2H sample in the selected window for {team1} vs {team2}."]
+    if h2h_relevance.get("same_venue_matches", 0):
+        h2h_bullets.append(f"H2H relevance is stronger here: {h2h_relevance.get('same_venue_matches')} recent H2H match(es) at {venue}.")
+    elif h2h_relevance.get("same_country_like_matches", 0):
+        h2h_bullets.append(f"No same-venue H2H, but {h2h_relevance.get('same_country_like_matches')} recent H2H match(es) in the same country-like venue context.")
+    else:
+        h2h_bullets.append("No same-venue H2H in the selected window, so recent form and venue trends carry more weight.")
+
+    # Key Matchup Factor
+    team1_f = _top_fantasy_pick(screen_story, team1)
+    team2_f = _top_fantasy_pick(screen_story, team2)
+    team1_edge = _best_edge(screen_story, team1)
+    team2_threat = _best_bowling_threat(screen_story, team2)
+    template_focus = "chasing_wins_template" if agg_bias.get("label") == "chasing_edge" else "batting_first_wins_template"
+    template = ch_template if template_focus == "chasing_wins_template" else bf_template
+    focus_phase = dominant_phase or "powerplay"
+    focus_phase_runs = _phase_runs(template, focus_phase)
+    key_bullets = [
+        f"Winning-template pressure point is {_phase_label(focus_phase)} ({focus_phase_runs or 'N/A'} runs on average in {('successful chases' if template_focus == 'chasing_wins_template' else 'bat-first wins')})."
+    ]
+    matchup_parts: List[str] = []
+    if team1_f:
+        conf = f", conf {team1_f.get('confidence')}" if team1_f.get("high_confidence") else ""
+        matchup_parts.append(f"{team1} upside: {team1_f.get('player')} ({int(round(float(team1_f.get('expected_points', 0) or 0)))} exp pts{conf})")
+    if team2_f:
+        conf = f", conf {team2_f.get('confidence')}" if team2_f.get("high_confidence") else ""
+        matchup_parts.append(f"{team2} upside: {team2_f.get('player')} ({int(round(float(team2_f.get('expected_points', 0) or 0)))} exp pts{conf})")
+    if team1_edge:
+        matchup_parts.append(f"{team1_edge.get('batter')} vs {team1_edge.get('bowler')} ({team1_edge.get('balls')}b, SR {int(round(float(team1_edge.get('strike_rate', 0) or 0)))})")
+    if team2_threat:
+        matchup_parts.append(f"{team2_threat.get('bowler')} threat ({team2_threat.get('balls')}b, {team2_threat.get('wickets')} wkts, econ {team2_threat.get('economy')})")
+    key_bullets.append("; ".join(matchup_parts) + "." if matchup_parts else "Fantasy and matchup samples are thin, so phase-template execution matters more than individual edges.")
+
+    # Preview Take
+    lean = score_preview_lean(context)
+    reason_text = ", ".join(r.get("detail", "") for r in lean.get("top_reasons", []) if r.get("detail"))
+    take_bullets = [f"{lean.get('label')} based on {reason_text or 'a balanced mix of venue, form and matchup signals'}."]
+    threshold_gap_close = abs(team1_thresh - team2_thresh) <= 1
+    if threshold_gap_close:
+        take_bullets.append(
+            f"If scores stay close to venue thresholds, tie-breakers are chase ceiling ({innings_story.get('highest_total_chased', 'N/A')}) and lowest defended ({innings_story.get('lowest_total_defended', 'N/A')}) with recent venue trend as context."
+        )
+    else:
+        take_bullets.append(
+            f"Toss/innings path still matters: recent venue split is {recent_venue.get('batting_first_wins', 0)} bat-first wins vs {recent_venue.get('chasing_wins', 0)} chases in the last {recent_venue.get('sample_size', 0)}."
+        )
+
+    sections: List[Dict[str, Any]] = []
+    _add_section(sections, "venue_profile", "Venue Profile", venue_bullets, ["match_results_distribution", "innings_scores_analysis", "phase_wise_strategy"])
+    _add_section(sections, "form_guide", "Form Guide", form_bullets, ["match_results_distribution", "innings_scores_analysis"])
+    _add_section(sections, "head_to_head", "Head-to-Head", h2h_bullets, ["head_to_head_stats"])
+    _add_section(sections, "key_matchup_factor", "Key Matchup Factor", key_bullets, ["phase_wise_strategy", "expected_fantasy_points"])
+    _add_section(sections, "preview_take", "Preview Take", take_bullets, ["match_results_distribution", "innings_scores_analysis", "recent_matches_at_venue", "phase_wise_strategy", "expected_fantasy_points"])
+    return sections
+
+
+def serialize_sections_to_markdown(sections: List[Dict[str, Any]]) -> str:
+    lines: List[str] = []
+    for section in sections:
+        lines.append(f"## {section.get('title', 'Preview')}")
+        for bullet in section.get("bullets", []) or []:
+            lines.append(f"- {bullet}")
+        lines.append("")
+    return "\n".join(lines).strip()
+
+
+def _parse_markdown_sections(markdown_text: str) -> List[Dict[str, Any]]:
+    lines = (markdown_text or "").splitlines()
+    sections: List[Dict[str, Any]] = []
+    current: Optional[Dict[str, Any]] = None
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("## "):
+            if current:
+                sections.append(current)
+            current = {"title": line[3:].strip(), "bullets": []}
+            continue
+        if line.startswith("- "):
+            if current is None:
+                continue
+            current["bullets"].append(line[2:].strip())
+    if current:
+        sections.append(current)
+    return sections
+
+
+def validate_llm_rewrite(original_sections: List[Dict[str, Any]], candidate_markdown: str) -> bool:
+    parsed = _parse_markdown_sections(candidate_markdown)
+    if len(parsed) != len(PREVIEW_SECTION_ORDER):
+        return False
+
+    expected_titles = [title for _, title in PREVIEW_SECTION_ORDER]
+    if [s.get("title") for s in parsed] != expected_titles:
+        return False
+
+    original_numbers = set(re.findall(r"\b\d+(?:\.\d+)?\b", serialize_sections_to_markdown(original_sections)))
+    candidate_numbers = set(re.findall(r"\b\d+(?:\.\d+)?\b", candidate_markdown or ""))
+    if not original_numbers.issubset(candidate_numbers):
+        return False
+
+    for s in parsed:
+        bullets = s.get("bullets") or []
+        if not (1 <= len(bullets) <= 2):
+            return False
+    return True
+
+
 def gather_preview_context(
     venue: str,
     team1_identifier: str,
@@ -613,6 +1089,7 @@ def gather_preview_context(
     venue_trend = _summarize_recent_venue_trend(match_history_bundle["venue_results"])
     h2h_relevance = _same_country_hint(venue, match_history_bundle["h2h_recent"])
     matchup_fantasy = _summarize_matchups_and_fantasy(db, team1, team2, start_date, end_date)
+    serialized_phase_stats = _serialize_phase_stats(phase_stats)
 
     h2h_team1_wins = sum(1 for m in h2h if m["winner"] == team1)
     h2h_team2_wins = sum(1 for m in h2h if m["winner"] == team2)
@@ -629,7 +1106,7 @@ def gather_preview_context(
             "top_teams": top_teams,
         },
         "venue_stats": venue_stats or {},
-        "phase_stats": _serialize_phase_stats(phase_stats),
+        "phase_stats": serialized_phase_stats,
         "head_to_head": {
             "matches": h2h,
             "summary": {
@@ -681,7 +1158,9 @@ def gather_preview_context(
                 "avg_winning_score_rounded": int(round(float(avg_winning_score))) if avg_winning_score else None,
                 "avg_chasing_score_rounded": int(round(float(avg_chasing_score))) if avg_chasing_score else None,
                 "highest_total": int((venue_stats or {}).get("highest_total", 0) or 0),
+                "lowest_total": int((venue_stats or {}).get("lowest_total", 0) or 0),
                 "highest_total_chased": int((venue_stats or {}).get("highest_total_chased", 0) or 0),
+                "lowest_total_defended": int((venue_stats or {}).get("lowest_total_defended", 0) or 0),
                 "lowest_defended_recent": venue_trend.get("lowest_defended_recent"),
                 "team_threshold_checks": {
                     team1: team1_recent_summary,
@@ -702,83 +1181,11 @@ def gather_preview_context(
             "expected_fantasy_points": matchup_fantasy,
         },
     }
+    context["screen_story"]["phase_wise_strategy"] = build_phase_wise_strategy_templates(context)
     context["story_signals"] = _build_story_signals(context)
     return context
 
 
 def generate_match_preview_fallback(context: Dict[str, Any]) -> str:
-    team1 = context["team1"]
-    team2 = context["team2"]
-    venue = context["venue"]
-    venue_stats = context.get("venue_stats", {}) or {}
-    h2h = context.get("head_to_head", {}).get("summary", {}) or {}
-    forms = context.get("recent_form", {}) or {}
-    elo = context.get("elo", {}) or {}
-    phase_stats = context.get("phase_stats", {}) or {}
-    filters = context.get("filters", {}) or {}
-    venue_h2h = ((context.get("venue_head_to_head") or {}).get("summary")) or {}
-
-    form1 = forms.get(team1, {})
-    form2 = forms.get(team2, {})
-    record1 = form1.get("record", "N/A")
-    record2 = form2.get("record", "N/A")
-
-    avg_1st = venue_stats.get("average_first_innings")
-    avg_2nd = venue_stats.get("average_second_innings")
-    bat_first_wins = venue_stats.get("batting_first_wins", 0)
-    bat_second_wins = venue_stats.get("batting_second_wins", 0)
-    total_matches = venue_stats.get("total_matches", 0)
-
-    toss_bias = "balanced split"
-    if total_matches:
-        bat_first_pct = (bat_first_wins * 100.0 / total_matches) if total_matches else 0
-        if bat_first_pct >= 58:
-            toss_bias = f"bat-first edge ({bat_first_pct:.0f}% wins)"
-        elif bat_first_pct <= 42:
-            toss_bias = f"chasing edge ({100 - bat_first_pct:.0f}% wins)"
-        else:
-            toss_bias = f"balanced ({bat_first_pct:.0f}% bat-first wins)"
-
-    h2h_sample = h2h.get("sample_size", 0)
-    h2h_line = (
-        f"{team1} {h2h.get('team1_wins', 0)}-{h2h.get('team2_wins', 0)} {team2}"
-        if h2h_sample
-        else "No H2H sample in selected window"
-    )
-
-    elo1 = elo.get(team1)
-    elo2 = elo.get(team2)
-    if elo1 is not None and elo2 is not None:
-        favorite = team1 if elo1 >= elo2 else team2
-        favorite_reason = f"ELO edge ({elo1} vs {elo2})"
-    else:
-        favorite = None
-        favorite_reason = "recent form + venue fit"
-
-    preview_take = f"Lean {favorite}" if favorite else "Too close to call"
-
-    pp_bf = ((phase_stats.get("batting_first_wins") or {}).get("powerplay")) or {}
-    death_chase = ((phase_stats.get("chasing_wins") or {}).get("death")) or {}
-    pp_sr = pp_bf.get("strike_rate")
-    death_sr = death_chase.get("strike_rate")
-    date_window = f"{filters.get('start_date') or 'all-time'} to {filters.get('end_date') or 'latest'}"
-
-    return "\n".join(
-        [
-            "## Venue Profile",
-            f"- Window: {date_window}; sample {total_matches or 0} matches at {venue}.",
-            f"- Avg 1st/2nd inns: {round(avg_1st) if avg_1st else 'N/A'}/{round(avg_2nd) if avg_2nd else 'N/A'}; result split: {toss_bias}.",
-            "## Form Guide",
-            f"- Last 5: {team1} {record1} vs {team2} {record2}.",
-            f"- ELO: {team1} {elo1 if elo1 is not None else 'N/A'} vs {team2} {elo2 if elo2 is not None else 'N/A'}.",
-            "## Head-to-Head",
-            f"- Overall (window): {h2h_line} across {h2h_sample} matches.",
-            f"- At {venue}: {team1} {venue_h2h.get('team1_wins', 0)}-{venue_h2h.get('team2_wins', 0)} {team2} (sample {venue_h2h.get('sample_size', 0)}).",
-            "## Key Matchup Factor",
-            f"- Powerplay batting-first SR: {pp_sr if pp_sr is not None else 'N/A'}; chasing death SR: {death_sr if death_sr is not None else 'N/A'}.",
-            "- Use venue phase tempo with each side's current form; middle/death execution is the swing factor.",
-            "## Preview Take",
-            f"- {preview_take} based on {favorite_reason}.",
-            "- Keep confidence moderate; venue result split is close enough for toss + phase execution to decide it.",
-        ]
-    )
+    sections = build_deterministic_preview_sections(context)
+    return serialize_sections_to_markdown(sections)
