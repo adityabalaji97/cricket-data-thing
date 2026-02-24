@@ -961,6 +961,10 @@ return (
                             venue={venue}
                             team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
                             team2Identifier={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
+                            startDate={startDate}
+                            endDate={endDate}
+                            includeInternational
+                            topTeams={20}
                             isMobile={isMobile}
                         />
                     </Grid>

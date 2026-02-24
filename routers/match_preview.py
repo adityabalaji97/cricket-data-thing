@@ -1,11 +1,11 @@
-from datetime import datetime
+from datetime import date, datetime
 import hashlib
 import json
 import logging
 import os
-from typing import Dict
+from typing import Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_session
@@ -23,7 +23,7 @@ TEMPERATURE = 0.4
 preview_cache: Dict[str, Dict] = {}
 
 
-MATCH_PREVIEW_PROMPT = """You are a cricket analyst writing a concise, data-grounded pre-match preview.
+MATCH_PREVIEW_PROMPT = """You are a cricket analyst writing a compact, data-first pre-match preview.
 
 Use the JSON context below to produce exactly 5 markdown sections with these headings in this order:
 
@@ -34,19 +34,41 @@ Use the JSON context below to produce exactly 5 markdown sections with these hea
 ## Preview Take
 
 Rules:
-- Be concrete and use numbers from the context where possible.
-- Keep each section to 2-4 sentences.
+- Write 1-2 bullet points per section (prefix bullets with "- ").
+- Every section must include at least one number from the context when data exists.
+- Prefer the selected date window and sample sizes explicitly.
+- Keep bullets tight (roughly 8-22 words each). No filler adjectives.
+- Use phase stats (powerplay/middle/death) when making the "Key Matchup Factor".
 - Do not invent player availability or team news.
-- If data is missing, say so briefly.
-- Preview Take should be a lean/prediction with reasoning, not certainty.
+- If data is missing, say so briefly and move on.
+- Preview Take should be a lean with reasons tied to venue/form/H2H/phase data, not certainty.
 
 Context JSON:
 {context_json}
 """
 
 
-def _cache_key(venue: str, team1: str, team2: str) -> str:
-    payload = json.dumps({"venue": venue, "team1": team1, "team2": team2}, sort_keys=True)
+def _cache_key(
+    venue: str,
+    team1: str,
+    team2: str,
+    start_date: Optional[date],
+    end_date: Optional[date],
+    include_international: bool,
+    top_teams: int,
+) -> str:
+    payload = json.dumps(
+        {
+            "venue": venue,
+            "team1": team1,
+            "team2": team2,
+            "start_date": str(start_date) if start_date else None,
+            "end_date": str(end_date) if end_date else None,
+            "include_international": include_international,
+            "top_teams": top_teams,
+        },
+        sort_keys=True,
+    )
     return hashlib.md5(payload.encode()).hexdigest()
 
 
@@ -77,15 +99,28 @@ def get_match_preview(
     venue: str,
     team1_id: str,
     team2_id: str,
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    include_international: bool = Query(True),
+    top_teams: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_session),
 ):
     try:
-        key = _cache_key(venue, team1_id, team2_id)
+        key = _cache_key(venue, team1_id, team2_id, start_date, end_date, include_international, top_teams)
         if key in preview_cache:
             cached = preview_cache[key]
             return {**cached, "cached": True}
 
-        context = gather_preview_context(venue=venue, team1_identifier=team1_id, team2_identifier=team2_id, db=db)
+        context = gather_preview_context(
+            venue=venue,
+            team1_identifier=team1_id,
+            team2_identifier=team2_id,
+            db=db,
+            start_date=start_date,
+            end_date=end_date,
+            include_international=include_international,
+            top_teams=top_teams,
+        )
         preview_text = _generate_with_llm(context)
 
         result = {

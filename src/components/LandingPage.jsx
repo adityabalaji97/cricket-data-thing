@@ -43,6 +43,8 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isMedium = useMediaQuery(theme.breakpoints.down('md'));
+  const defaultAnalysisStartDate = '2024-01-01';
+  const defaultAnalysisEndDate = new Date().toISOString().slice(0, 10);
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [previewOpen, setPreviewOpen] = useState({});
@@ -180,6 +182,10 @@ const LandingPage = () => {
                         venue={match.venue}
                         team1Identifier={match.team1}
                         team2Identifier={match.team2}
+                        startDate={defaultAnalysisStartDate}
+                        endDate={defaultAnalysisEndDate}
+                        includeInternational
+                        topTeams={20}
                         isMobile={isMobile}
                       />
                     </Box>

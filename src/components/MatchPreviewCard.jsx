@@ -11,6 +11,10 @@ const MatchPreviewCard = ({
   venue,
   team1Identifier,
   team2Identifier,
+  startDate,
+  endDate,
+  includeInternational = true,
+  topTeams = 20,
   isMobile = false,
 }) => {
   const [data, setData] = useState(null);
@@ -18,9 +22,45 @@ const MatchPreviewCard = ({
   const [error, setError] = useState(null);
 
   const requestKey = useMemo(
-    () => [venue, team1Identifier, team2Identifier].filter(Boolean).join('|'),
-    [venue, team1Identifier, team2Identifier]
+    () => JSON.stringify({
+      venue,
+      team1Identifier,
+      team2Identifier,
+      startDate: startDate || null,
+      endDate: endDate || null,
+      includeInternational,
+      topTeams,
+    }),
+    [venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams]
   );
+
+  const parsedPreview = useMemo(() => {
+    if (!data?.preview) return [];
+    const lines = String(data.preview).split('\n');
+    const sections = [];
+    let current = null;
+
+    lines.forEach((rawLine) => {
+      const line = rawLine.trim();
+      if (!line) return;
+      if (line.startsWith('## ')) {
+        if (current) sections.push(current);
+        current = { title: line.replace(/^##\s+/, ''), bullets: [], paragraphs: [] };
+        return;
+      }
+      if (!current) {
+        current = { title: 'Preview', bullets: [], paragraphs: [] };
+      }
+      if (line.startsWith('- ')) {
+        current.bullets.push(line.replace(/^- /, ''));
+      } else {
+        current.paragraphs.push(line);
+      }
+    });
+
+    if (current) sections.push(current);
+    return sections;
+  }, [data?.preview]);
 
   useEffect(() => {
     if (!venue || !team1Identifier || !team2Identifier) return;
@@ -31,7 +71,15 @@ const MatchPreviewCard = ({
       setError(null);
       try {
         const response = await axios.get(
-          `${config.API_URL}/match-preview/${encodeURIComponent(venue)}/${encodeURIComponent(team1Identifier)}/${encodeURIComponent(team2Identifier)}`
+          `${config.API_URL}/match-preview/${encodeURIComponent(venue)}/${encodeURIComponent(team1Identifier)}/${encodeURIComponent(team2Identifier)}`,
+          {
+            params: {
+              ...(startDate ? { start_date: startDate } : {}),
+              ...(endDate ? { end_date: endDate } : {}),
+              include_international: includeInternational,
+              top_teams: topTeams,
+            }
+          }
         );
         if (!cancelled) {
           setData(response.data);
@@ -48,7 +96,7 @@ const MatchPreviewCard = ({
     return () => {
       cancelled = true;
     };
-  }, [requestKey, venue, team1Identifier, team2Identifier]);
+  }, [requestKey, venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams]);
 
   if (!venue || !team1Identifier || !team2Identifier) return null;
 
@@ -83,17 +131,25 @@ const MatchPreviewCard = ({
           <Typography variant="caption" color="text.secondary">cached</Typography>
         )}
       </Box>
-      <Typography
-        component="div"
-        variant="body2"
-        sx={{
-          whiteSpace: 'pre-wrap',
-          '& h2': { fontSize: isMobile ? '0.95rem' : '1rem', mt: 1.2, mb: 0.4 },
-          '& p': { m: 0 },
-        }}
-      >
-        {data.preview}
-      </Typography>
+      <Box>
+        {(parsedPreview.length ? parsedPreview : [{ title: 'Preview', bullets: [], paragraphs: [String(data.preview)] }]).map((section) => (
+          <Box key={section.title} sx={{ mb: 1.2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.4 }}>
+              {section.title}
+            </Typography>
+            {section.bullets.map((bullet, idx) => (
+              <Typography key={`${section.title}-b-${idx}`} variant="body2" sx={{ lineHeight: 1.35, mb: 0.2 }}>
+                • {bullet}
+              </Typography>
+            ))}
+            {section.paragraphs.map((paragraph, idx) => (
+              <Typography key={`${section.title}-p-${idx}`} variant="body2" sx={{ lineHeight: 1.35, mb: 0.2 }}>
+                {paragraph}
+              </Typography>
+            ))}
+          </Box>
+        ))}
+      </Box>
     </Box>
   );
 };
