@@ -10,6 +10,7 @@ from typing import List, Dict, Optional, Any
 from datetime import date
 import logging
 from models import leagues_mapping
+from services.delivery_data_service import get_venue_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -771,8 +772,8 @@ def get_venue_wagon_wheel_data(
         params: Dict[str, Any] = {}
 
         if venue and venue != "All Venues":
-            conditions.append("dd.ground = :venue")
-            params["venue"] = venue
+            conditions.append("dd.ground = ANY(:venue_aliases)")
+            params["venue_aliases"] = get_venue_aliases(venue)
 
         if start_date:
             conditions.append("dd.match_date >= :start_date")
@@ -916,8 +917,8 @@ def get_venue_pitch_map_data(
         params: Dict[str, Any] = {}
 
         if venue and venue != "All Venues":
-            conditions.append("dd.ground = :venue")
-            params["venue"] = venue
+            conditions.append("dd.ground = ANY(:venue_aliases)")
+            params["venue_aliases"] = get_venue_aliases(venue)
 
         if start_date:
             conditions.append("dd.match_date >= :start_date")
