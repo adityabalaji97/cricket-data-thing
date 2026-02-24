@@ -355,6 +355,7 @@ def get_venue_wagon_wheel(
     phase: Optional[str] = Query(default="overall"),
     bowl_kind: Optional[str] = Query(default=None),
     bowl_style: Optional[str] = Query(default=None),
+    bat_hand: Optional[str] = Query(default=None),
     line: Optional[str] = Query(default=None),
     length: Optional[str] = Query(default=None),
     shot: Optional[str] = Query(default=None),
@@ -372,6 +373,7 @@ def get_venue_wagon_wheel(
             phase=phase,
             bowl_kind=bowl_kind,
             bowl_style=bowl_style,
+            bat_hand=bat_hand,
             line=line,
             length=length,
             shot=shot
@@ -383,6 +385,7 @@ def get_venue_wagon_wheel(
                 "phase": phase,
                 "bowl_kind": bowl_kind,
                 "bowl_style": bowl_style,
+                "bat_hand": bat_hand,
                 "line": line,
                 "length": length,
                 "shot": shot
@@ -403,6 +406,7 @@ def get_venue_pitch_map(
     phase: Optional[str] = Query(default="overall"),
     bowl_kind: Optional[str] = Query(default=None),
     bowl_style: Optional[str] = Query(default=None),
+    bat_hand: Optional[str] = Query(default=None),
     line: Optional[str] = Query(default=None),
     length: Optional[str] = Query(default=None),
     shot: Optional[str] = Query(default=None),
@@ -420,6 +424,7 @@ def get_venue_pitch_map(
             phase=phase,
             bowl_kind=bowl_kind,
             bowl_style=bowl_style,
+            bat_hand=bat_hand,
             line=line,
             length=length,
             shot=shot
@@ -431,6 +436,7 @@ def get_venue_pitch_map(
                 "phase": phase,
                 "bowl_kind": bowl_kind,
                 "bowl_style": bowl_style,
+                "bat_hand": bat_hand,
                 "line": line,
                 "length": length,
                 "shot": shot

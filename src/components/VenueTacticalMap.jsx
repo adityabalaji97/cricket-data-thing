@@ -38,10 +38,14 @@ const VenueTacticalMap = ({
   const [phase, setPhase] = useState('overall');
   const [bowlKind, setBowlKind] = useState('all');
   const [bowlStyle, setBowlStyle] = useState('all');
+  const [batHand, setBatHand] = useState('all');
   const [line, setLine] = useState('all');
   const [length, setLength] = useState('all');
   const [shot, setShot] = useState('all');
-  const [pitchMetric, setPitchMetric] = useState('runs');
+  const [pitchMetric, setPitchMetric] = useState('strike_rate');
+  const [wagonView, setWagonView] = useState('zones');
+  const [wagonMetric, setWagonMetric] = useState('runs');
+  const [selectedZone, setSelectedZone] = useState('all');
   const [groupBy, setGroupBy] = useState('line');
   const [sortMetric, setSortMetric] = useState('runs');
 
@@ -74,6 +78,7 @@ const VenueTacticalMap = ({
         if (phase !== 'overall') params.append('phase', phase);
         if (bowlKind !== 'all') params.append('bowl_kind', bowlKind);
         if (bowlStyle !== 'all') params.append('bowl_style', bowlStyle);
+        if (batHand !== 'all') params.append('bat_hand', batHand);
         if (line !== 'all') params.append('line', line);
         if (length !== 'all') params.append('length', length);
         if (shot !== 'all') params.append('shot', shot);
@@ -119,6 +124,7 @@ const VenueTacticalMap = ({
     phase,
     bowlKind,
     bowlStyle,
+    batHand,
     line,
     length,
     shot,
@@ -135,6 +141,7 @@ const VenueTacticalMap = ({
     return {
       bowlKinds: uniq('bowl_kind'),
       bowlStyles: uniq('bowl_style'),
+      batHands: uniq('bat_hand'),
       lines: uniq('line'),
       lengths: uniq('length'),
       shots: uniq('shot'),
@@ -179,6 +186,29 @@ const VenueTacticalMap = ({
     return zones;
   }, [deliveries]);
 
+  const zoneStatsWithDerived = useMemo(() => {
+    const out = {};
+    Object.entries(zoneStats).forEach(([zone, z]) => {
+      out[zone] = {
+        ...z,
+        strike_rate: z.balls ? (z.runs * 100) / z.balls : 0,
+      };
+    });
+    return out;
+  }, [zoneStats]);
+
+  const visibleWagonDeliveries = useMemo(() => {
+    if (selectedZone === 'all') return deliveries;
+    return deliveries.filter((d) => String(d.wagon_zone) === String(selectedZone));
+  }, [deliveries, selectedZone]);
+
+  useEffect(() => {
+    if (selectedZone !== 'all' && !zoneStatsWithDerived[selectedZone]) {
+      setSelectedZone('all');
+      if (wagonView === 'rays') setWagonView('zones');
+    }
+  }, [selectedZone, zoneStatsWithDerived, wagonView]);
+
   const filterConfig = [
     {
       key: 'phase',
@@ -199,6 +229,11 @@ const VenueTacticalMap = ({
       key: 'bowlStyle',
       label: 'Bowler Type',
       options: [{ value: 'all', label: 'All' }, ...options.bowlStyles.map((v) => ({ value: v, label: v }))],
+    },
+    {
+      key: 'batHand',
+      label: 'Bat Hand',
+      options: [{ value: 'all', label: 'All' }, ...options.batHands.map((v) => ({ value: v, label: v }))],
     },
     {
       key: 'line',
@@ -255,6 +290,27 @@ const VenueTacticalMap = ({
     },
   ];
 
+  const wagonTabFilters = [
+    {
+      key: 'wagonView',
+      label: 'Wagon View',
+      options: [
+        { value: 'zones', label: 'Zones' },
+        { value: 'rays', label: 'Rays' },
+      ],
+    },
+    {
+      key: 'wagonMetric',
+      label: 'Zone Metric',
+      options: [
+        { value: 'runs', label: 'Runs' },
+        { value: 'wickets', label: 'Wkts' },
+        { value: 'balls', label: 'Balls' },
+        { value: 'strike_rate', label: 'SR' },
+      ],
+    },
+  ];
+
   const handleFilterChange = (key, value) => {
     if (key === 'phase') setPhase(value);
     if (key === 'bowlKind') {
@@ -262,12 +318,15 @@ const VenueTacticalMap = ({
       setBowlStyle('all');
     }
     if (key === 'bowlStyle') setBowlStyle(value);
+    if (key === 'batHand') setBatHand(value);
     if (key === 'line') setLine(value);
     if (key === 'length') setLength(value);
     if (key === 'shot') setShot(value);
     if (key === 'pitchMetric') setPitchMetric(value);
     if (key === 'groupBy') setGroupBy(value);
     if (key === 'sortMetric') setSortMetric(value);
+    if (key === 'wagonView') setWagonView(value);
+    if (key === 'wagonMetric') setWagonMetric(value);
   };
 
   const renderWagonWheel = () => {
@@ -286,8 +345,8 @@ const VenueTacticalMap = ({
       return <line key={i} x1={centerX} y1={centerY} x2={x2} y2={y2} stroke="#ddd" strokeDasharray="4,4" />;
     });
 
-    const linesSvg = deliveries
-      .filter((d) => d.wagon_x != null && d.wagon_y != null)
+    const linesSvg = visibleWagonDeliveries
+      .filter((d) => d.wagon_x != null && d.wagon_y != null && Number(d.wagon_zone) !== 0)
       .slice(-1200)
       .map((d, idx) => {
         let x = centerX + (d.wagon_x - 150) * scale;
@@ -325,8 +384,51 @@ const VenueTacticalMap = ({
         );
       });
 
-    const zoneLabels = Object.entries(zoneStats).map(([zone, z]) => {
-      if (!z.balls) return null;
+    const zoneMetricMax = Math.max(
+      1,
+      ...Object.values(zoneStatsWithDerived).map((z) => Number(z[wagonMetric] || 0))
+    );
+
+    const zoneWedges = Array.from({ length: 8 }).map((_, idx) => {
+      const zoneNum = idx + 1;
+      const stat = zoneStatsWithDerived[String(zoneNum)] || { runs: 0, wickets: 0, balls: 0, strike_rate: 0 };
+      const value = Number(stat[wagonMetric] || 0);
+      const intensity = value / zoneMetricMax;
+      const isActive = selectedZone !== 'all' ? String(selectedZone) === String(zoneNum) : true;
+      const startAngle = -Math.PI / 2 + idx * (Math.PI / 4);
+      const endAngle = startAngle + Math.PI / 4;
+      const x1 = centerX + maxRadius * Math.cos(startAngle);
+      const y1 = centerY + maxRadius * Math.sin(startAngle);
+      const x2 = centerX + maxRadius * Math.cos(endAngle);
+      const y2 = centerY + maxRadius * Math.sin(endAngle);
+      const fill =
+        wagonMetric === 'wickets'
+          ? `rgba(211,47,47,${0.12 + intensity * 0.6})`
+          : wagonMetric === 'balls'
+          ? `rgba(30,136,229,${0.10 + intensity * 0.55})`
+          : wagonMetric === 'strike_rate'
+          ? `rgba(76,175,80,${0.10 + intensity * 0.55})`
+          : `rgba(46,125,50,${0.10 + intensity * 0.6})`;
+
+      return (
+        <path
+          key={`wedge-${zoneNum}`}
+          d={`M ${centerX} ${centerY} L ${x1} ${y1} A ${maxRadius} ${maxRadius} 0 0 1 ${x2} ${y2} Z`}
+          fill={fill}
+          stroke={selectedZone === String(zoneNum) ? '#333' : '#ddd'}
+          strokeWidth={selectedZone === String(zoneNum) ? 2 : 1}
+          opacity={isActive ? 1 : 0.35}
+          style={{ cursor: 'pointer' }}
+          onClick={() => {
+            setSelectedZone(String(zoneNum));
+            setWagonView('rays');
+          }}
+        />
+      );
+    });
+
+    const zoneLabels = Object.entries(zoneStatsWithDerived).map(([zone, z]) => {
+      if (!z.balls || Number(zone) === 0) return null;
       const angle = ((Number(zone) - 1) * Math.PI / 4) - Math.PI / 2 + Math.PI / 8;
       const r = maxRadius * 0.72;
       return (
@@ -338,7 +440,7 @@ const VenueTacticalMap = ({
           fontSize={isMobile ? 10 : 11}
           fill="#444"
         >
-          {z.runs}
+          {wagonMetric === 'strike_rate' ? Math.round(z.strike_rate) : z[wagonMetric]}
         </text>
       );
     });
@@ -346,8 +448,9 @@ const VenueTacticalMap = ({
     return (
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ maxWidth: '100%' }}>
         <circle cx={centerX} cy={centerY} r={maxRadius} fill="#fafafa" stroke="#ddd" strokeWidth="2" />
+        {wagonView === 'zones' && zoneWedges}
         {zoneLines}
-        {linesSvg}
+        {wagonView === 'rays' && linesSvg}
         <circle cx={centerX} cy={centerY} r={6} fill="#333" />
         {zoneLabels}
       </svg>
@@ -403,7 +506,7 @@ const VenueTacticalMap = ({
 
       <FilterBar
         filters={filterConfig}
-        activeFilters={{ phase, bowlKind, bowlStyle, line, length, shot, pitchMetric }}
+        activeFilters={{ phase, bowlKind, bowlStyle, batHand, line, length, shot, pitchMetric }}
         onFilterChange={handleFilterChange}
         isMobile={isMobile}
       />
@@ -427,12 +530,13 @@ const VenueTacticalMap = ({
               cells={pitchData.cells}
               mode="grid"
               colorMetric={pitchMetric}
-              displayMetrics={['runs', 'wickets']}
-              secondaryMetrics={['balls', 'strike_rate']}
+              displayMetrics={['average', 'strike_rate']}
+              secondaryMetrics={['boundary_percentage', 'dot_percentage', 'control_percentage']}
               minBalls={3}
               title={venue}
               subtitle={`${phase === 'overall' ? 'All phases' : phase}${bowlKind !== 'all' ? ` • ${bowlKind}` : ''}${bowlStyle !== 'all' ? ` • ${bowlStyle}` : ''}`}
               hideStumps={true}
+              hideLegend={true}
               compactMode={isMobile}
             />
           ) : (
@@ -443,8 +547,31 @@ const VenueTacticalMap = ({
 
       {tab === 1 && (
         <Box>
+          <FilterBar
+            filters={wagonTabFilters}
+            activeFilters={{ wagonView, wagonMetric }}
+            onFilterChange={handleFilterChange}
+            isMobile={isMobile}
+          />
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1, mb: 1 }}>
+            <Chip size="small" label={batHand === 'all' ? 'All batters' : batHand} />
+            {selectedZone !== 'all' && (
+              <Chip
+                size="small"
+                color="primary"
+                label={`Zone ${selectedZone}`}
+                onDelete={() => setSelectedZone('all')}
+              />
+            )}
+            {wagonView === 'zones' && (
+              <Chip size="small" variant="outlined" label="Click a zone to drill into rays" />
+            )}
+            {wagonView === 'rays' && (
+              <Chip size="small" variant="outlined" label={`${visibleWagonDeliveries.length} rays shown`} />
+            )}
+          </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Colors: wickets (red), sixes (pink), fours (blue), singles/twos/threes (green), dots (gray). Zone labels show total runs.
+            Zone view highlights where outcomes cluster. Switch to rays for individual shots; click a zone in zone view to drill down.
           </Typography>
           <Box ref={chartContainerRef} sx={{ display: 'flex', justifyContent: 'center', minHeight: 280 }}>
             {wagonData?.total_deliveries ? renderWagonWheel() : (

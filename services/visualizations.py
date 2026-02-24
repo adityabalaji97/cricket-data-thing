@@ -758,6 +758,7 @@ def get_venue_wagon_wheel_data(
     phase: Optional[str] = None,
     bowl_kind: Optional[str] = None,
     bowl_style: Optional[str] = None,
+    bat_hand: Optional[str] = None,
     line: Optional[str] = None,
     length: Optional[str] = None,
     shot: Optional[str] = None,
@@ -816,6 +817,9 @@ def get_venue_wagon_wheel_data(
         if bowl_style:
             conditions.append("dd.bowl_style = :bowl_style")
             params["bowl_style"] = bowl_style
+        if bat_hand:
+            conditions.append("dd.bat_hand = :bat_hand")
+            params["bat_hand"] = bat_hand
         if line:
             conditions.append("dd.line = :line")
             params["line"] = line
@@ -840,6 +844,7 @@ def get_venue_wagon_wheel_data(
                 dd.bowl_kind,
                 dd.bowl_style,
                 dd.bat as batter,
+                dd.bat_hand,
                 dd.bowl as bowler,
                 dd.over,
                 dd.p_match as match_id,
@@ -870,6 +875,7 @@ def get_venue_wagon_wheel_data(
                 "bowl_kind": row.bowl_kind,
                 "bowl_style": row.bowl_style,
                 "batter": row.batter,
+                "bat_hand": row.bat_hand,
                 "bowler": row.bowler,
                 "over": row.over,
                 "phase": row.phase,
@@ -897,6 +903,7 @@ def get_venue_pitch_map_data(
     phase: Optional[str] = None,
     bowl_kind: Optional[str] = None,
     bowl_style: Optional[str] = None,
+    bat_hand: Optional[str] = None,
     line: Optional[str] = None,
     length: Optional[str] = None,
     shot: Optional[str] = None,
@@ -955,6 +962,9 @@ def get_venue_pitch_map_data(
         if bowl_style:
             conditions.append("dd.bowl_style = :bowl_style")
             params["bowl_style"] = bowl_style
+        if bat_hand:
+            conditions.append("dd.bat_hand = :bat_hand")
+            params["bat_hand"] = bat_hand
         if line:
             conditions.append("dd.line = :line")
             params["line"] = line
