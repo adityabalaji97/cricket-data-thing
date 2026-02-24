@@ -179,6 +179,21 @@ const AppContent = () => {
           const venueParam = getQueryParam('venue');
           const team1Param = getQueryParam('team1');
           const team2Param = getQueryParam('team2');
+          const includeInternationalParam = getQueryParam('includeInternational');
+          const topTeamsParam = getQueryParam('topTeams');
+
+          if (includeInternationalParam !== null || topTeamsParam !== null) {
+            const parsedTopTeams = Number.parseInt(topTeamsParam, 10);
+            setCompetitions(prev => ({
+              ...prev,
+              international: includeInternationalParam !== null
+                ? includeInternationalParam === 'true'
+                : prev.international,
+              topTeams: Number.isFinite(parsedTopTeams) && parsedTopTeams > 0
+                ? parsedTopTeams
+                : prev.topTeams
+            }));
+          }
           
           // Set venue if it's in the URL parameters
           if (venueParam) {
@@ -187,7 +202,9 @@ const AppContent = () => {
           
           // Set team1 if found
           if (team1Param) {
-            const team1 = sortedTeams.find(team => team.abbreviated_name === team1Param);
+            const team1 = sortedTeams.find(team =>
+              team.abbreviated_name === team1Param || team.full_name === team1Param
+            );
             if (team1) {
               setSelectedTeam1(team1);
             }
@@ -195,7 +212,9 @@ const AppContent = () => {
           
           // Set team2 if found
           if (team2Param) {
-            const team2 = sortedTeams.find(team => team.abbreviated_name === team2Param);
+            const team2 = sortedTeams.find(team =>
+              team.abbreviated_name === team2Param || team.full_name === team2Param
+            );
             if (team2) {
               setSelectedTeam2(team2);
             }

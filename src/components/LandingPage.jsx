@@ -134,7 +134,7 @@ const LandingPage = () => {
                       component={Link}
                       startIcon={<StadiumIcon />}
                       fullWidth
-                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
+                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1)}&team2=${encodeURIComponent(match.team2)}&includeInternational=true&topTeams=20&autoload=true`}
                     >
                       Venue Analysis
                     </Button>
