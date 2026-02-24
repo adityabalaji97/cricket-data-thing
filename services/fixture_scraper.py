@@ -245,7 +245,11 @@ def _fetch_from_espn() -> List[Dict[str, Any]]:
     # Fetch today + next few days so we don't drop to only the single live match.
     for day_offset in range(ESPN_LOOKAHEAD_DAYS):
         target_dt = now_utc + timedelta(days=day_offset)
-        payload = _fetch_payload(_scoreboard_url_for_date(target_dt))
+        try:
+            payload = _fetch_payload(_scoreboard_url_for_date(target_dt))
+        except Exception as e:
+            logger.warning(f"Skipping ESPN fixtures date fetch for {target_dt.date()}: {e}")
+            continue
         for event in _extract_events(payload):
             if not isinstance(event, dict):
                 continue
@@ -255,6 +259,22 @@ def _fetch_from_espn() -> List[Dict[str, Any]]:
             if event_id:
                 seen_event_ids.add(event_id)
             all_events.append(event)
+
+    # Fallback to the original header feed if the date-based fetch returns nothing.
+    if not all_events:
+        try:
+            payload = _fetch_payload(ESPN_CRICKET_SCOREBOARD_URL)
+            for event in _extract_events(payload):
+                if not isinstance(event, dict):
+                    continue
+                event_id = event.get("id")
+                if event_id and event_id in seen_event_ids:
+                    continue
+                if event_id:
+                    seen_event_ids.add(event_id)
+                all_events.append(event)
+        except Exception as e:
+            logger.warning(f"ESPN header fallback fetch failed: {e}")
 
     events = all_events
     fixtures: List[Dict[str, Any]] = []
