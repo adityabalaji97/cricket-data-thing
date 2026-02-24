@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
 from models import teams_mapping
-from services.delivery_data_service import get_venue_match_stats, get_venue_phase_stats
+from services.delivery_data_service import get_match_scores, get_venue_match_stats, get_venue_phase_stats
+from services.matchups import get_all_team_name_variations, get_team_matchups_service
 
 
 INTERNATIONAL_ABBR_TO_NAME = {
@@ -180,6 +181,319 @@ def _get_latest_elo(db: Session, team: str) -> Optional[int]:
     return None
 
 
+def _parse_score_total(score: Optional[str]) -> Optional[int]:
+    if not score:
+        return None
+    try:
+        token = str(score).split("/")[0].strip()
+        return int(token) if token.isdigit() else None
+    except Exception:
+        return None
+
+
+def _winner_is_team(match: Dict[str, Any], team_names: List[str]) -> bool:
+    return bool(match.get("winner")) and match.get("winner") in set(team_names)
+
+
+def _format_match_row(match: Any, scores: Dict[int, Dict[int, str]]) -> Dict[str, Any]:
+    match_scores = scores.get(match.id, {})
+    inns1_score = match_scores.get(1, "0/0")
+    inns2_score = match_scores.get(2, "0/0")
+    return {
+        "id": match.id,
+        "date": match.date.isoformat() if getattr(match, "date", None) else None,
+        "team1": match.team1,
+        "team2": match.team2,
+        "team1_display": teams_mapping.get(match.team1, match.team1),
+        "team2_display": teams_mapping.get(match.team2, match.team2),
+        "venue": match.venue,
+        "winner": match.winner,
+        "winner_display": teams_mapping.get(match.winner, match.winner) if match.winner else None,
+        "won_batting_first": bool(match.won_batting_first) if match.won_batting_first is not None else None,
+        "won_fielding_first": bool(match.won_fielding_first) if match.won_fielding_first is not None else None,
+        "score1": inns1_score,
+        "score2": inns2_score,
+        "innings1_total": _parse_score_total(inns1_score),
+        "innings2_total": _parse_score_total(inns2_score),
+    }
+
+
+def _get_match_history_bundle(
+    db: Session,
+    venue: str,
+    team1: str,
+    team2: str,
+    start_date: Optional[date],
+    end_date: Optional[date],
+) -> Dict[str, Any]:
+    team1_names = get_all_team_name_variations(team1)
+    team2_names = get_all_team_name_variations(team2)
+
+    venue_matches = db.execute(
+        text(
+            """
+            SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
+            FROM matches m
+            WHERE (:start_date IS NULL OR m.date >= :start_date)
+              AND (:end_date IS NULL OR m.date <= :end_date)
+              AND (:venue IS NULL OR m.venue = :venue)
+            ORDER BY m.date DESC
+            LIMIT 7
+            """
+        ),
+        {"venue": None if venue == "All Venues" else venue, "start_date": start_date, "end_date": end_date},
+    ).fetchall()
+
+    team1_matches = db.execute(
+        text(
+            """
+            SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
+            FROM matches m
+            WHERE (:start_date IS NULL OR m.date >= :start_date)
+              AND (:end_date IS NULL OR m.date <= :end_date)
+              AND (m.team1 = ANY(:team_names) OR m.team2 = ANY(:team_names))
+            ORDER BY m.date DESC
+            LIMIT 5
+            """
+        ),
+        {"team_names": team1_names, "start_date": start_date, "end_date": end_date},
+    ).fetchall()
+
+    team2_matches = db.execute(
+        text(
+            """
+            SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
+            FROM matches m
+            WHERE (:start_date IS NULL OR m.date >= :start_date)
+              AND (:end_date IS NULL OR m.date <= :end_date)
+              AND (m.team1 = ANY(:team_names) OR m.team2 = ANY(:team_names))
+            ORDER BY m.date DESC
+            LIMIT 5
+            """
+        ),
+        {"team_names": team2_names, "start_date": start_date, "end_date": end_date},
+    ).fetchall()
+
+    h2h_matches = db.execute(
+        text(
+            """
+            SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
+            FROM matches m
+            WHERE (:start_date IS NULL OR m.date >= :start_date)
+              AND (:end_date IS NULL OR m.date <= :end_date)
+              AND (
+                (m.team1 = ANY(:team1_names) AND m.team2 = ANY(:team2_names))
+                OR (m.team1 = ANY(:team2_names) AND m.team2 = ANY(:team1_names))
+              )
+            ORDER BY m.date DESC
+            LIMIT 10
+            """
+        ),
+        {"team1_names": team1_names, "team2_names": team2_names, "start_date": start_date, "end_date": end_date},
+    ).fetchall()
+
+    all_match_ids = list({m.id for m in [*venue_matches, *team1_matches, *team2_matches, *h2h_matches]})
+    scores = get_match_scores(all_match_ids, start_date, end_date, db) if all_match_ids else {}
+
+    return {
+        "team1_names": team1_names,
+        "team2_names": team2_names,
+        "venue_results": [_format_match_row(m, scores) for m in venue_matches],
+        "team1_results": [_format_match_row(m, scores) for m in team1_matches],
+        "team2_results": [_format_match_row(m, scores) for m in team2_matches],
+        "h2h_recent": [_format_match_row(m, scores) for m in h2h_matches],
+    }
+
+
+def _summarize_team_recent_matches(
+    team: str,
+    team_names: List[str],
+    matches: List[Dict[str, Any]],
+    avg_winning_score: Optional[float],
+    avg_chasing_score: Optional[float],
+) -> Dict[str, Any]:
+    win_batting_first = 0
+    win_chasing = 0
+    restrictions_when_bowling_first: List[int] = []
+    reached_avg_winning_batting_first = 0
+    chased_avg_chasing = 0
+    batting_first_opportunities = 0
+    chasing_opportunities = 0
+
+    for m in matches:
+        winner = m.get("winner")
+        team_won = winner in team_names if winner else False
+        won_batting_first = m.get("won_batting_first")
+        won_fielding_first = m.get("won_fielding_first")
+        inns1_total = m.get("innings1_total")
+        inns2_total = m.get("innings2_total")
+
+        is_team1 = m.get("team1") in team_names
+        is_team2 = m.get("team2") in team_names
+        if not (is_team1 or is_team2):
+            continue
+
+        # Infer innings role when possible from winner + toss-result flags.
+        if team_won and won_batting_first is True:
+            win_batting_first += 1
+            batting_first_opportunities += 1
+            if avg_winning_score and inns1_total is not None and inns1_total >= avg_winning_score:
+                reached_avg_winning_batting_first += 1
+        elif team_won and won_fielding_first is True:
+            win_chasing += 1
+            chasing_opportunities += 1
+            if avg_chasing_score and inns2_total is not None and inns2_total >= avg_chasing_score:
+                chased_avg_chasing += 1
+            if inns1_total is not None:
+                restrictions_when_bowling_first.append(inns1_total)
+        else:
+            # Count role opportunities for losses too using winner toss mode.
+            if won_batting_first is not None and won_fielding_first is not None:
+                if (won_batting_first is True and not team_won) or (won_fielding_first is True and not team_won):
+                    # Without innings-order-by-team in each match row, keep opportunity counts conservative.
+                    pass
+
+    return {
+        "team": team,
+        "sample_size": len(matches),
+        "wins_batting_first": win_batting_first,
+        "wins_chasing": win_chasing,
+        "restrictions_when_bowling_first": restrictions_when_bowling_first,
+        "avg_restriction_when_bowling_first": round(sum(restrictions_when_bowling_first) / len(restrictions_when_bowling_first), 1)
+        if restrictions_when_bowling_first else None,
+        "reached_avg_winning_score_batting_first": reached_avg_winning_batting_first,
+        "chased_avg_chasing_score": chased_avg_chasing,
+        "record": "".join(
+            ["W" if _winner_is_team(m, team_names) else ("NR" if not m.get("winner") else "L") for m in matches]
+        ),
+    }
+
+
+def _summarize_recent_venue_trend(venue_matches: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not venue_matches:
+        return {"sample_size": 0}
+    bat_first_wins = sum(1 for m in venue_matches if m.get("won_batting_first") is True)
+    chase_wins = sum(1 for m in venue_matches if m.get("won_fielding_first") is True)
+    inns1_scores = [m["innings1_total"] for m in venue_matches if m.get("innings1_total") is not None]
+    chased_success_scores = [m["innings1_total"] for m in venue_matches if m.get("won_fielding_first") is True and m.get("innings1_total") is not None]
+    defended_scores = [m["innings1_total"] for m in venue_matches if m.get("won_batting_first") is True and m.get("innings1_total") is not None]
+    return {
+        "sample_size": len(venue_matches),
+        "batting_first_wins": bat_first_wins,
+        "chasing_wins": chase_wins,
+        "avg_first_innings": round(sum(inns1_scores) / len(inns1_scores), 1) if inns1_scores else None,
+        "highest_chased_recent": max(chased_success_scores) if chased_success_scores else None,
+        "lowest_defended_recent": min(defended_scores) if defended_scores else None,
+        "matches": venue_matches,
+    }
+
+
+def _same_country_hint(venue: Optional[str], h2h_matches: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not venue or venue == "All Venues":
+        return {"same_venue_matches": 0, "same_country_like_matches": 0}
+    venue_suffix = venue.split(",")[-1].strip().lower() if "," in venue else None
+    same_venue = sum(1 for m in h2h_matches if (m.get("venue") or "") == venue)
+    same_country_like = 0
+    if venue_suffix:
+        same_country_like = sum(1 for m in h2h_matches if venue_suffix in str(m.get("venue") or "").lower())
+    return {"same_venue_matches": same_venue, "same_country_like_matches": same_country_like}
+
+
+def _summarize_matchups_and_fantasy(
+    db: Session,
+    team1: str,
+    team2: str,
+    start_date: Optional[date],
+    end_date: Optional[date],
+) -> Dict[str, Any]:
+    try:
+        matchup_data = get_team_matchups_service(
+            team1=team1,
+            team2=team2,
+            start_date=start_date,
+            end_date=end_date,
+            team1_players=[],
+            team2_players=[],
+            db=db,
+        )
+    except Exception:
+        return {"available": False}
+
+    fantasy = (matchup_data or {}).get("fantasy_analysis") or {}
+    t1_name = ((matchup_data or {}).get("team1") or {}).get("name", team1)
+    t2_name = ((matchup_data or {}).get("team2") or {}).get("name", team2)
+
+    def _top_fantasy(team_key: str, limit: int = 4) -> List[Dict[str, Any]]:
+        rows = []
+        for stats in (fantasy.get("top_fantasy_picks") or []):
+            if stats.get("team") != team_key:
+                continue
+            rows.append({
+                "player": stats.get("player_name"),
+                "expected_points": round(float(stats.get("expected_points", 0) or 0), 1),
+                "confidence": round(float(stats.get("confidence", 0) or 0), 2),
+                "role": stats.get("role"),
+            })
+        rows.sort(key=lambda x: (x["expected_points"], x["confidence"]), reverse=True)
+        return rows[:limit]
+
+    def _top_batting_edges(team_obj: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]]:
+        edges = []
+        batting = (team_obj or {}).get("batting_matchups") or {}
+        for batter, bowlers in batting.items():
+            for bowler, s in bowlers.items():
+                if bowler == "Overall":
+                    continue
+                balls = int(s.get("balls", 0) or 0)
+                if balls < 6:
+                    continue
+                edges.append({
+                    "batter": batter,
+                    "bowler": bowler,
+                    "balls": balls,
+                    "runs": int(s.get("runs", 0) or 0),
+                    "wickets": int(s.get("wickets", 0) or 0),
+                    "strike_rate": round(float(s.get("strike_rate", 0) or 0), 1),
+                    "dot_percentage": round(float(s.get("dot_percentage", 0) or 0), 1),
+                    "boundary_percentage": round(float(s.get("boundary_percentage", 0) or 0), 1),
+                })
+        edges.sort(key=lambda x: (x["strike_rate"], -x["dot_percentage"], x["balls"]), reverse=True)
+        return edges[:limit]
+
+    def _top_bowling_threats(team_obj: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]]:
+        rows = []
+        for bowler, s in (((team_obj or {}).get("bowling_consolidated") or {}).items()):
+            balls = int(s.get("balls", 0) or 0)
+            if balls < 6:
+                continue
+            rows.append({
+                "bowler": bowler,
+                "balls": balls,
+                "wickets": int(s.get("wickets", 0) or 0),
+                "economy": round(float(s.get("economy", 0) or 0), 2),
+                "dot_percentage": round(float(s.get("dot_percentage", 0) or 0), 1),
+                "boundary_percentage": round(float(s.get("boundary_percentage", 0) or 0), 1),
+            })
+        rows.sort(key=lambda x: (x["wickets"], -x["economy"], x["dot_percentage"]), reverse=True)
+        return rows[:limit]
+
+    return {
+        "available": True,
+        "fantasy_top": {
+            t1_name: _top_fantasy("team1"),
+            t2_name: _top_fantasy("team2"),
+        },
+        "batting_edges": {
+            t1_name: _top_batting_edges((matchup_data or {}).get("team1")),
+            t2_name: _top_batting_edges((matchup_data or {}).get("team2")),
+        },
+        "bowling_threats": {
+            t1_name: _top_bowling_threats((matchup_data or {}).get("team1")),
+            t2_name: _top_bowling_threats((matchup_data or {}).get("team2")),
+        },
+    }
+
+
 def _phase_entry(stats: Dict[str, Any], innings_key: str, phase: str) -> Optional[Dict[str, Any]]:
     return ((stats.get(innings_key) or {}).get(phase)) if stats else None
 
@@ -190,6 +504,8 @@ def _build_story_signals(context: Dict[str, Any]) -> Dict[str, Any]:
     h2h_summary = ((context.get("head_to_head") or {}).get("summary")) or {}
     recent_form = context.get("recent_form", {}) or {}
     elo = context.get("elo", {}) or {}
+    match_history = context.get("match_history", {}) or {}
+    screen_story = context.get("screen_story", {}) or {}
     team1 = context.get("team1")
     team2 = context.get("team2")
 
@@ -240,6 +556,8 @@ def _build_story_signals(context: Dict[str, Any]) -> Dict[str, Any]:
             "recent_form_team2": form2.get("record"),
             "elo_delta_team1_minus_team2": elo1 - elo2 if elo1 is not None and elo2 is not None else None,
         },
+        "screen_story_available": bool(screen_story),
+        "recent_venue_sample": int(((match_history.get("venue_trend") or {}).get("sample_size")) or 0),
     }
 
 
@@ -282,6 +600,19 @@ def gather_preview_context(
     form2 = _get_recent_form(db, team2, 5, end_date=end_date)
     elo1 = _get_latest_elo(db, team1)
     elo2 = _get_latest_elo(db, team2)
+    match_history_bundle = _get_match_history_bundle(db, venue, team1, team2, start_date, end_date)
+
+    avg_winning_score = (venue_stats or {}).get("average_winning_score")
+    avg_chasing_score = (venue_stats or {}).get("average_chasing_score")
+    team1_recent_summary = _summarize_team_recent_matches(
+        team1, match_history_bundle["team1_names"], match_history_bundle["team1_results"], avg_winning_score, avg_chasing_score
+    )
+    team2_recent_summary = _summarize_team_recent_matches(
+        team2, match_history_bundle["team2_names"], match_history_bundle["team2_results"], avg_winning_score, avg_chasing_score
+    )
+    venue_trend = _summarize_recent_venue_trend(match_history_bundle["venue_results"])
+    h2h_relevance = _same_country_hint(venue, match_history_bundle["h2h_recent"])
+    matchup_fantasy = _summarize_matchups_and_fantasy(db, team1, team2, start_date, end_date)
 
     h2h_team1_wins = sum(1 for m in h2h if m["winner"] == team1)
     h2h_team2_wins = sum(1 for m in h2h if m["winner"] == team2)
@@ -317,6 +648,13 @@ def gather_preview_context(
                 "no_results": sum(1 for m in venue_h2h if not m["winner"]),
             },
         },
+        "match_history": {
+            "venue_trend": venue_trend,
+            "team1_recent": team1_recent_summary,
+            "team2_recent": team2_recent_summary,
+            "h2h_recent_rows": match_history_bundle["h2h_recent"],
+            "h2h_relevance": h2h_relevance,
+        },
         "recent_form": {
             team1: form1,
             team2: form2,
@@ -325,6 +663,43 @@ def gather_preview_context(
             team1: elo1,
             team2: elo2,
             "delta_team1_minus_team2": (elo1 - elo2) if elo1 is not None and elo2 is not None else None,
+        },
+        "screen_story": {
+            "match_results_distribution": {
+                "venue_toss_signal": {
+                    "batting_first_wins": int((venue_stats or {}).get("batting_first_wins", 0) or 0),
+                    "chasing_wins": int((venue_stats or {}).get("batting_second_wins", 0) or 0),
+                    "total_matches": int((venue_stats or {}).get("total_matches", 0) or 0),
+                },
+                "team_recent_toss_fit": {
+                    team1: team1_recent_summary,
+                    team2: team2_recent_summary,
+                },
+                "recent_venue_override_signal": venue_trend,
+            },
+            "innings_scores_analysis": {
+                "avg_winning_score_rounded": int(round(float(avg_winning_score))) if avg_winning_score else None,
+                "avg_chasing_score_rounded": int(round(float(avg_chasing_score))) if avg_chasing_score else None,
+                "highest_total": int((venue_stats or {}).get("highest_total", 0) or 0),
+                "highest_total_chased": int((venue_stats or {}).get("highest_total_chased", 0) or 0),
+                "lowest_defended_recent": venue_trend.get("lowest_defended_recent"),
+                "team_threshold_checks": {
+                    team1: team1_recent_summary,
+                    team2: team2_recent_summary,
+                },
+            },
+            "head_to_head_stats": {
+                "overall_window_summary": {
+                    "sample_size": len(h2h),
+                    "team1_wins": h2h_team1_wins,
+                    "team2_wins": h2h_team2_wins,
+                    "no_results": h2h_nr,
+                },
+                "recent_matches": match_history_bundle["h2h_recent"][:5],
+                "relevance": h2h_relevance,
+            },
+            "recent_matches_at_venue": venue_trend,
+            "expected_fantasy_points": matchup_fantasy,
         },
     }
     context["story_signals"] = _build_story_signals(context)

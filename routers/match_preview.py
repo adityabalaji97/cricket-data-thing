@@ -23,7 +23,7 @@ TEMPERATURE = 0.4
 preview_cache: Dict[str, Dict] = {}
 
 
-MATCH_PREVIEW_PROMPT = """You are a cricket analyst writing a compact, data-first pre-match preview.
+MATCH_PREVIEW_PROMPT = """You are a cricket analyst writing a compact, data-first pre-match preview for a UI that already shows multiple charts/tables.
 
 Use the JSON context below to produce exactly 5 markdown sections with these headings in this order:
 
@@ -39,6 +39,13 @@ Rules:
 - Prefer the selected date window and sample sizes explicitly.
 - Keep bullets tight (roughly 8-22 words each). No filler adjectives.
 - Use phase stats (powerplay/middle/death) when making the "Key Matchup Factor".
+- Anchor the story to the `screen_story` object first (it mirrors the on-screen components).
+- When discussing toss/result bias, combine venue result distribution with each team's recent wins batting first vs chasing.
+- When discussing innings score analysis, use rounded thresholds and mention how often each team recently cleared/chased them.
+- If teams look close on thresholds, use highest chased / lowest defended (recent or aggregate) to break ties.
+- H2H recency matters: newest match first; same venue/country H2H gets extra weight.
+- Use `recent_matches_at_venue` as an override signal when venue sample is clustered in the selected period.
+- Use `expected_fantasy_points` + matchup edges to name likely upside/risks (especially higher-confidence entries).
 - Do not invent player availability or team news.
 - If data is missing, say so briefly and move on.
 - Preview Take should be a lean with reasons tied to venue/form/H2H/phase data, not certainty.
