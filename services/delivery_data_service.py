@@ -15,6 +15,11 @@ from typing import List, Optional, Dict, Any
 from datetime import date
 import logging
 
+try:
+    from venue_standardization import VENUE_STANDARDIZATION
+except Exception:  # pragma: no cover - defensive import fallback
+    VENUE_STANDARDIZATION = {}
+
 logger = logging.getLogger(__name__)
 
 # Date boundary: delivery_details is most reliable from 2015+
@@ -22,6 +27,26 @@ DELIVERY_DETAILS_START_DATE = date(2015, 1, 1)
 
 # Latest date in deliveries table (update this if the table gets refreshed)
 DELIVERIES_LAST_DATE = date(2025, 11, 27)
+
+
+_CANONICAL_TO_VENUE_ALIASES: Dict[str, set] = {}
+for _alias, _canonical in (VENUE_STANDARDIZATION or {}).items():
+    if not _canonical:
+        continue
+    _CANONICAL_TO_VENUE_ALIASES.setdefault(_canonical, set()).add(_alias)
+    _CANONICAL_TO_VENUE_ALIASES[_canonical].add(_canonical)
+
+
+def get_venue_aliases(venue: Optional[str]) -> List[str]:
+    """Return canonical venue plus known aliases for cross-table matching."""
+    if not venue or venue == "All Venues":
+        return []
+
+    canonical = VENUE_STANDARDIZATION.get(venue, venue)
+    aliases = set(_CANONICAL_TO_VENUE_ALIASES.get(canonical, set()))
+    aliases.add(canonical)
+    aliases.add(venue)
+    return sorted(a for a in aliases if a)
 
 
 def should_use_delivery_details(start_date: Optional[date], end_date: Optional[date]) -> Dict[str, bool]:
@@ -79,14 +104,16 @@ def should_use_delivery_details(start_date: Optional[date], end_date: Optional[d
 def build_venue_filter_deliveries(venue: str, params: Dict[str, Any]) -> str:
     """Build venue filter for deliveries table."""
     if venue and venue != "All Venues":
-        return "AND m.venue = :venue"
+        params["venue_aliases"] = get_venue_aliases(venue)
+        return "AND m.venue = ANY(:venue_aliases)"
     return ""
 
 
 def build_venue_filter_delivery_details(venue: str, params: Dict[str, Any]) -> str:
     """Build venue filter for delivery_details table."""
     if venue and venue != "All Venues":
-        return "AND dd.ground = :venue"
+        params["venue_aliases"] = get_venue_aliases(venue)
+        return "AND dd.ground = ANY(:venue_aliases)"
     return ""
 
 
