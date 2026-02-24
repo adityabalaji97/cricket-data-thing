@@ -36,7 +36,12 @@ from routers.wrapped import router as wrapped_router
 from routers.search import router as search_router
 from routers.visualizations import router as visualizations_router
 from routers.games import router as games_router
-from services.delivery_data_service import get_venue_match_stats, get_match_scores, get_venue_phase_stats
+from routers.venue_delivery_stats import router as venue_delivery_stats_router
+from services.delivery_data_service import (
+    get_venue_match_stats,
+    get_match_scores,
+    get_venue_phase_stats,
+)
 from services.bowler_types import BOWLER_CATEGORY_SQL
 import math
 
@@ -170,6 +175,7 @@ app.include_router(wrapped_router)
 app.include_router(search_router)
 app.include_router(visualizations_router)
 app.include_router(games_router)
+app.include_router(venue_delivery_stats_router)
 
 # Add CORS middleware
 app.add_middleware(
@@ -370,6 +376,7 @@ INTERNATIONAL_TEAMS_RANKED = [
     'Ireland', 'Zimbabwe', 'Scotland', 'Netherlands', 'Namibia',
     'UAE', 'Nepal', 'USA', 'Oman', 'Papua New Guinea'
 ]
+
 
 @app.get("/venue_notes/{venue}")
 def get_venue_notes(

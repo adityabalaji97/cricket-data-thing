@@ -49,6 +49,7 @@ import MatchHistory from './MatchHistory';
 import Matchups from './Matchups';
 import BattingScatterChart from './BattingScatterChart';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
+import VenueDeliveryStats from './VenueDeliveryStats';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 
 const BattingScatter = ({ data, isMobile }) => {
@@ -922,6 +923,16 @@ return (
                 <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
                     <PhaseWiseStrategy data={venueStats} isMobile={isMobile} />
                 </Card>
+            </Grid>
+            <Grid item xs={12}>
+                <VenueDeliveryStats
+                    venue={venue}
+                    startDate={startDate}
+                    endDate={endDate}
+                    team1={selectedTeam1?.full_name}
+                    team2={selectedTeam2?.full_name}
+                    isMobile={isMobile}
+                />
             </Grid>
             
             {/* Contextual Query Prompts */}
