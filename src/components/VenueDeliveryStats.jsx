@@ -41,16 +41,18 @@ const VenueDeliveryStats = ({
     team1,
     team2,
     isMobile,
-    leagues = [],
+    leagues,
     includeInternational = false
 }) => {
     const [tab, setTab] = useState(0);
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const leaguesKey = Array.isArray(leagues) ? leagues.join('|') : '';
 
     useEffect(() => {
         if (!venue) return;
+        let cancelled = false;
 
         const fetchData = async () => {
             setLoading(true);
@@ -63,22 +65,32 @@ const VenueDeliveryStats = ({
                 if (team1) params.append('team1', team1);
                 if (team2) params.append('team2', team2);
                 if (includeInternational) params.append('include_international', 'true');
-                leagues.forEach((league) => params.append('leagues', league));
+                (Array.isArray(leagues) ? leagues : []).forEach((league) => params.append('leagues', league));
 
                 const response = await axios.get(
                     `${config.API_URL}/venues/${encodeURIComponent(venue)}/delivery-stats?${params.toString()}`
                 );
-                setData(response.data);
+                if (!cancelled) {
+                    setData(response.data);
+                }
             } catch (err) {
                 console.error('Error fetching venue delivery stats:', err);
-                setError('Failed to load delivery stats');
+                if (!cancelled) {
+                    setError('Failed to load delivery stats');
+                }
             } finally {
-                setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchData();
-    }, [venue, startDate, endDate, team1, team2, includeInternational, leagues]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [venue, startDate, endDate, team1, team2, includeInternational, leaguesKey]);
 
     if (loading) {
         return (
