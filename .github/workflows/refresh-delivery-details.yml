@@ -34,3 +34,7 @@ jobs:
           python scripts/load_delivery_details_pipeline.py \
             --csv t20_bbb.csv \
             --skip-validation
+
+      - name: Update ELO ratings
+        run: |
+          python elo_update_service.py --calculate-missing
