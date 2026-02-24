@@ -15,7 +15,8 @@ import {
   Stack,
   CircularProgress,
   IconButton,
-  Tooltip
+  Tooltip,
+  Collapse
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import SportsCricketIcon from '@mui/icons-material/SportsCricket';
@@ -34,6 +35,7 @@ import EloLeaderboard from './EloLeaderboard';
 import EloRacerChart from './EloRacerChart';
 import RecentMatchesSummaryCard from './RecentMatchesSummaryCard';
 import SearchBar from './search/SearchBar';
+import MatchPreviewCard from './MatchPreviewCard';
 
 // This will be a new component that serves as a landing page
 const LandingPage = () => {
@@ -43,6 +45,7 @@ const LandingPage = () => {
   const isMedium = useMediaQuery(theme.breakpoints.down('md'));
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [previewOpen, setPreviewOpen] = useState({});
 
   // Handle search selection - navigate to appropriate page
   const handleSearchSelect = (item) => {
@@ -111,6 +114,10 @@ const LandingPage = () => {
             <Grid item xs={12} md={4} key={match.matchNumber}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
+                  {(() => {
+                    const previewKey = `${match.team1Abbr}-${match.team2Abbr}-${match.venue}`;
+                    return (
+                      <>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
                     <CalendarTodayIcon color="primary" fontSize="small" />
                     <Typography variant="subtitle1">
@@ -150,7 +157,36 @@ const LandingPage = () => {
                     >
                       Team Matchups
                     </Button>
+
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<InfoIcon />}
+                      fullWidth
+                      onClick={() =>
+                        setPreviewOpen((prev) => ({
+                          ...prev,
+                          [previewKey]: !prev[previewKey]
+                        }))
+                      }
+                    >
+                      {previewOpen[previewKey] ? 'Hide AI Preview' : 'AI Preview'}
+                    </Button>
                   </Box>
+
+                  <Collapse in={Boolean(previewOpen[previewKey])} unmountOnExit>
+                    <Box sx={{ mt: 1.5 }}>
+                      <MatchPreviewCard
+                        venue={match.venue}
+                        team1Identifier={match.team1}
+                        team2Identifier={match.team2}
+                        isMobile={isMobile}
+                      />
+                    </Box>
+                  </Collapse>
+                      </>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </Grid>

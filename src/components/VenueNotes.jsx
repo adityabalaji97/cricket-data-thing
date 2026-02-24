@@ -50,6 +50,7 @@ import Matchups from './Matchups';
 import BattingScatterChart from './BattingScatterChart';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
 import VenueTacticalMap from './VenueTacticalMap';
+import MatchPreviewCard from './MatchPreviewCard';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 
 const BattingScatter = ({ data, isMobile }) => {
@@ -953,6 +954,15 @@ return (
                         <Typography variant="h5" gutterBottom sx={{ mt: 2, mb: 1 }}>
                             Team Performance Analysis
                         </Typography>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                        <MatchPreviewCard
+                            venue={venue}
+                            team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
+                            team2Identifier={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
+                            isMobile={isMobile}
+                        />
                     </Grid>
                     
                     <Grid item xs={12}>

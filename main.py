@@ -38,6 +38,7 @@ from routers.visualizations import router as visualizations_router
 from routers.games import router as games_router
 from routers.venue_delivery_stats import router as venue_delivery_stats_router
 from routers.fixtures import router as fixtures_router
+from routers.match_preview import router as match_preview_router
 from services.delivery_data_service import (
     get_venue_match_stats,
     get_match_scores,
@@ -178,6 +179,7 @@ app.include_router(visualizations_router)
 app.include_router(games_router)
 app.include_router(venue_delivery_stats_router)
 app.include_router(fixtures_router)
+app.include_router(match_preview_router)
 
 # Add CORS middleware
 app.add_middleware(
