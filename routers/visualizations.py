@@ -11,7 +11,9 @@ from services.visualizations import (
     get_wagon_wheel_data,
     get_pitch_map_data,
     get_bowler_wagon_wheel_data,
-    get_bowler_pitch_map_data
+    get_bowler_pitch_map_data,
+    get_venue_wagon_wheel_data,
+    get_venue_pitch_map_data,
 )
 
 router = APIRouter(prefix="/visualizations", tags=["visualizations"])
@@ -340,3 +342,99 @@ def get_bowler_pitch_map(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch bowler pitch map data: {str(e)}")
+
+
+@router.get("/venue/{venue}/wagon-wheel")
+def get_venue_wagon_wheel(
+    venue: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    leagues: List[str] = Query(default=[]),
+    include_international: bool = Query(default=False),
+    top_teams: Optional[int] = Query(default=None),
+    phase: Optional[str] = Query(default="overall"),
+    bowl_kind: Optional[str] = Query(default=None),
+    bowl_style: Optional[str] = Query(default=None),
+    line: Optional[str] = Query(default=None),
+    length: Optional[str] = Query(default=None),
+    shot: Optional[str] = Query(default=None),
+    db: Session = Depends(get_session)
+):
+    try:
+        deliveries = get_venue_wagon_wheel_data(
+            db=db,
+            venue=venue,
+            start_date=start_date,
+            end_date=end_date,
+            leagues=leagues,
+            include_international=include_international,
+            top_teams=top_teams,
+            phase=phase,
+            bowl_kind=bowl_kind,
+            bowl_style=bowl_style,
+            line=line,
+            length=length,
+            shot=shot
+        )
+        return {
+            "deliveries": deliveries,
+            "total_deliveries": len(deliveries),
+            "filters": {
+                "phase": phase,
+                "bowl_kind": bowl_kind,
+                "bowl_style": bowl_style,
+                "line": line,
+                "length": length,
+                "shot": shot
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch venue wagon wheel data: {str(e)}")
+
+
+@router.get("/venue/{venue}/pitch-map")
+def get_venue_pitch_map(
+    venue: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    leagues: List[str] = Query(default=[]),
+    include_international: bool = Query(default=False),
+    top_teams: Optional[int] = Query(default=None),
+    phase: Optional[str] = Query(default="overall"),
+    bowl_kind: Optional[str] = Query(default=None),
+    bowl_style: Optional[str] = Query(default=None),
+    line: Optional[str] = Query(default=None),
+    length: Optional[str] = Query(default=None),
+    shot: Optional[str] = Query(default=None),
+    db: Session = Depends(get_session)
+):
+    try:
+        cells = get_venue_pitch_map_data(
+            db=db,
+            venue=venue,
+            start_date=start_date,
+            end_date=end_date,
+            leagues=leagues,
+            include_international=include_international,
+            top_teams=top_teams,
+            phase=phase,
+            bowl_kind=bowl_kind,
+            bowl_style=bowl_style,
+            line=line,
+            length=length,
+            shot=shot
+        )
+        return {
+            "cells": cells,
+            "total_balls": sum(cell["balls"] for cell in cells),
+            "filters": {
+                "phase": phase,
+                "bowl_kind": bowl_kind,
+                "bowl_style": bowl_style,
+                "line": line,
+                "length": length,
+                "shot": shot
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch venue pitch map data: {str(e)}")
