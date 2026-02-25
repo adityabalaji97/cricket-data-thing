@@ -50,7 +50,7 @@ TOP_T20_LEAGUE_KEYWORDS = [
     "ilt20",
 ]
 
-TOP_T20I_TEAMS = set(INTERNATIONAL_TEAMS_RANKED[:10])
+TOP_T20I_TEAMS = set(INTERNATIONAL_TEAMS_RANKED[:20])
 _TEAM_ABBR_TO_NAME = {abbr: name for name, abbr in teams_mapping.items()}
 _ESPN_TEAM_NAME_ALIASES = {
     "United Arab Emirates": "UAE",
