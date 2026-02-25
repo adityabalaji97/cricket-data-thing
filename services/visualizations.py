@@ -182,13 +182,13 @@ def get_wagon_wheel_data(
                     top_team_names = INTERNATIONAL_TEAMS_RANKED[:top_teams]
                     team_placeholders = ", ".join([f":team_{i}" for i in range(len(top_team_names))])
                     comp_conditions.append(f"""(
-                        dd.competition LIKE '%International%'
+                        (dd.competition = 'T20I' OR dd.competition LIKE '%International%')
                         AND (dd.team_bat IN ({team_placeholders}) OR dd.team_bowl IN ({team_placeholders}))
                     )""")
                     for i, team in enumerate(top_team_names):
                         params[f"team_{i}"] = team
                 else:
-                    comp_conditions.append("dd.competition LIKE '%International%'")
+                    comp_conditions.append("(dd.competition = 'T20I' OR dd.competition LIKE '%International%')")
 
             if comp_conditions:
                 conditions.append(f"({' OR '.join(comp_conditions)})")
@@ -350,13 +350,13 @@ def get_pitch_map_data(
                     top_team_names = INTERNATIONAL_TEAMS_RANKED[:top_teams]
                     team_placeholders = ", ".join([f":team_{i}" for i in range(len(top_team_names))])
                     comp_conditions.append(f"""(
-                        dd.competition LIKE '%International%'
+                        (dd.competition = 'T20I' OR dd.competition LIKE '%International%')
                         AND (dd.team_bat IN ({team_placeholders}) OR dd.team_bowl IN ({team_placeholders}))
                     )""")
                     for i, team in enumerate(top_team_names):
                         params[f"team_{i}"] = team
                 else:
-                    comp_conditions.append("dd.competition LIKE '%International%'")
+                    comp_conditions.append("(dd.competition = 'T20I' OR dd.competition LIKE '%International%')")
 
             if comp_conditions:
                 conditions.append(f"({' OR '.join(comp_conditions)})")
