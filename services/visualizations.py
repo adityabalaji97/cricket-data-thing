@@ -788,6 +788,9 @@ def get_venue_wagon_wheel_data(
                 expanded_leagues = expand_league_abbreviations(leagues)
                 comp_conditions.append("dd.competition = ANY(:leagues)")
                 params["leagues"] = expanded_leagues
+            else:
+                # Match venue-notes semantics: "All Leagues" includes non-T20I competitions
+                comp_conditions.append("dd.competition != 'T20I'")
             if include_international:
                 if top_teams:
                     from models import INTERNATIONAL_TEAMS_RANKED
@@ -933,6 +936,9 @@ def get_venue_pitch_map_data(
                 expanded_leagues = expand_league_abbreviations(leagues)
                 comp_conditions.append("dd.competition = ANY(:leagues)")
                 params["leagues"] = expanded_leagues
+            else:
+                # Match venue-notes semantics: "All Leagues" includes non-T20I competitions
+                comp_conditions.append("dd.competition != 'T20I'")
             if include_international:
                 if top_teams:
                     from models import INTERNATIONAL_TEAMS_RANKED
