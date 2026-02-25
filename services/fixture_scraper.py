@@ -14,7 +14,7 @@ import logging
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-from models import teams_mapping
+from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,14 @@ TOP_T20_LEAGUE_KEYWORDS = [
     "ilt20",
 ]
 
+TOP_T20I_TEAMS = set(INTERNATIONAL_TEAMS_RANKED[:10])
+_TEAM_ABBR_TO_NAME = {abbr: name for name, abbr in teams_mapping.items()}
+_ESPN_TEAM_NAME_ALIASES = {
+    "United Arab Emirates": "UAE",
+    "United States": "USA",
+    "Papua New Guinea": "Papua New Guinea",
+}
+
 
 def _cached_fixtures_valid() -> bool:
     ts = _fixture_cache.get("timestamp")
@@ -76,6 +84,21 @@ def _team_abbreviation(team_obj: Dict[str, Any], display_name: str) -> str:
     short_name = (team_obj or {}).get("shortDisplayName")
     if short_name:
         return short_name.upper()
+    return display_name
+
+
+def _normalize_team_name_for_ranking(team_obj: Dict[str, Any], display_name: str) -> str:
+    if display_name in TOP_T20I_TEAMS:
+        return display_name
+    if display_name in _ESPN_TEAM_NAME_ALIASES:
+        return _ESPN_TEAM_NAME_ALIASES[display_name]
+
+    abbr = (team_obj or {}).get("abbreviation")
+    if abbr:
+        mapped = _TEAM_ABBR_TO_NAME.get(str(abbr).upper())
+        if mapped:
+            return mapped
+
     return display_name
 
 
@@ -138,12 +161,34 @@ def _event_is_upcoming_or_live(event: Dict[str, Any], now_utc: datetime) -> bool
 def _is_t20i_event(event: Dict[str, Any], competitors: List[Dict[str, Any]]) -> bool:
     event_class = event.get("class") or {}
     class_card = str(event_class.get("generalClassCard") or "").upper()
+    is_t20i = False
     if class_card == "T20I":
-        return True
+        is_t20i = True
     intl_class_id = str(event_class.get("internationalClassId") or "")
     if intl_class_id == "3":
-        return True
-    return all(bool(c.get("isNational")) for c in competitors if isinstance(c, dict)) and str(event.get("eventType") or "").upper() == "T20"
+        is_t20i = True
+    if not is_t20i:
+        is_t20i = (
+            all(bool(c.get("isNational")) for c in competitors if isinstance(c, dict))
+            and str(event.get("eventType") or "").upper() == "T20"
+        )
+    if not is_t20i:
+        return False
+
+    team_names: List[str] = []
+    for c in competitors:
+        if not isinstance(c, dict):
+            continue
+        t = c.get("team") or c
+        raw_name = t.get("displayName") or t.get("shortDisplayName") or t.get("location")
+        if not raw_name:
+            continue
+        team_names.append(_normalize_team_name_for_ranking(t, raw_name))
+
+    if len(team_names) < 2:
+        return False
+
+    return all(name in TOP_T20I_TEAMS for name in team_names[:2])
 
 
 def _is_top_t20_league_event(series_name: str, event: Dict[str, Any], competitors: List[Dict[str, Any]]) -> bool:
