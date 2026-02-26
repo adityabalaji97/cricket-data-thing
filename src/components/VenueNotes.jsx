@@ -1,6 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import config from '../config';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
     Box, 
     Card, 
@@ -23,8 +21,7 @@ import {
     Tabs,
     Tab,
     useMediaQuery,
-    useTheme,
-    Divider
+    useTheme
 } from '@mui/material';
 import { 
     PieChart, 
@@ -40,7 +37,6 @@ import {
     Scatter,
     ReferenceLine,
     ReferenceArea,
-    Legend
 } from 'recharts';
 import BowlingAnalysis from './BowlingAnalysis';
 import FantasyPointsTable from './FantasyPointsTable';
@@ -52,6 +48,8 @@ import ContextualQueryPrompts from './ContextualQueryPrompts';
 import VenueTacticalMap from './VenueTacticalMap';
 import MatchPreviewCard from './MatchPreviewCard';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
+import VenueCarousel from './VenueCarousel';
+import SlideChipBar from './SlideChipBar';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -895,68 +893,85 @@ const VenueNotes = ({
   }) => {
 
     const [fantasyTabValue, setFantasyTabValue] = useState(0);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const swiperRef = useRef(null);
 
-if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
+    const handleChipClick = useCallback((index) => {
+        if (swiperRef.current) {
+            swiperRef.current.slideTo(index);
+        }
+        setActiveIndex(index);
+    }, []);
 
-return (
-    <Box sx={{ p: { xs: 1, sm: 2 } }}>
-        <Typography variant={isMobile ? "h5" : "h4"} gutterBottom>
-            {venue === "All Venues" ? 
-                `All Venues - ${venueStats.total_matches} T20s` : 
-                `${venue} - ${venueStats.total_matches} T20s`
-            }
-            <Typography variant="subtitle1" color="text.secondary">
-                {startDate} to {endDate}
-            </Typography>
-        </Typography>
-        <Grid container spacing={isMobile ? 2 : 3}>
-            <Grid item xs={12} md={6}>
-                <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
-                    <WinPercentagesPie data={venueStats} />
-                </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-                <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
-                    <ScoresBarChart data={venueStats} />
-                </Card>
-            </Grid>
-            <Grid item xs={12} md={12}>
-                <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
-                    <PhaseWiseStrategy data={venueStats} isMobile={isMobile} />
-                </Card>
-            </Grid>
-            <Grid item xs={12}>
-                <VenueTacticalMap
-                    venue={venue}
-                    startDate={startDate}
-                    endDate={endDate}
-                    isMobile={isMobile}
-                />
-            </Grid>
-            
-            {/* Contextual Query Prompts */}
-            <Grid item xs={12}>
-                <ContextualQueryPrompts 
-                    queries={getVenueContextualQueries(venue, {
-                        startDate,
-                        endDate,
-                        leagues: [],
-                        team1: selectedTeam1,
-                        team2: selectedTeam2,
-                    })}
-                    title={`🔍 Explore ${venue.split(',')[0]} Data`}
-                />
-            </Grid>
-            
-            {selectedTeam1 && selectedTeam2 && matchHistory && (
-                <>
-                    <Grid item xs={12}>
-                        <Typography variant="h5" gutterBottom sx={{ mt: 2, mb: 1 }}>
-                            Team Performance Analysis
-                        </Typography>
+    const handleSlideChange = useCallback((index) => {
+        setActiveIndex(index);
+    }, []);
+
+    const slides = useMemo(() => {
+        const allSlides = [
+            {
+                id: 'results',
+                chipLabel: 'Results',
+                content: (
+                    <Grid container spacing={isMobile ? 2 : 3}>
+                        <Grid item xs={12} md={6}>
+                            <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
+                                <WinPercentagesPie data={venueStats} />
+                            </Card>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
+                                <ScoresBarChart data={venueStats} />
+                            </Card>
+                        </Grid>
                     </Grid>
+                ),
+            },
+            {
+                id: 'phases',
+                chipLabel: 'Phases',
+                content: (
+                    <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
+                        <PhaseWiseStrategy data={venueStats} isMobile={isMobile} />
+                    </Card>
+                ),
+            },
+            {
+                id: 'tactical',
+                chipLabel: 'Tactical',
+                content: (
+                    <VenueTacticalMap
+                        venue={venue}
+                        startDate={startDate}
+                        endDate={endDate}
+                        isMobile={isMobile}
+                    />
+                ),
+            },
+            {
+                id: 'queries',
+                chipLabel: 'Queries',
+                content: (
+                    <ContextualQueryPrompts
+                        queries={getVenueContextualQueries(venue, {
+                            startDate,
+                            endDate,
+                            leagues: [],
+                            team1: selectedTeam1,
+                            team2: selectedTeam2,
+                        })}
+                        title={`Explore ${venue.split(',')[0]} Data`}
+                    />
+                ),
+            },
+        ];
 
-                    <Grid item xs={12}>
+        if (selectedTeam1 && selectedTeam2) {
+            allSlides.push(
+                {
+                    id: 'preview',
+                    chipLabel: 'Preview',
+                    content: (
                         <MatchPreviewCard
                             venue={venue}
                             team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
@@ -967,10 +982,13 @@ return (
                             topTeams={20}
                             isMobile={isMobile}
                         />
-                    </Grid>
-                    
-                    <Grid item xs={12}>
-                        <MatchHistory 
+                    ),
+                },
+                {
+                    id: 'history',
+                    chipLabel: 'History',
+                    content: matchHistory ? (
+                        <MatchHistory
                             venue={venue}
                             team1={selectedTeam1.abbreviated_name}
                             team2={selectedTeam2.abbreviated_name}
@@ -980,198 +998,252 @@ return (
                             h2hStats={matchHistory.h2h_stats}
                             isMobile={isMobile}
                         />
-                    </Grid>
-                </>
-            )}
-            
-            {selectedTeam1 && selectedTeam2 && (
-                <>
-                    <Grid item xs={12}>
-                        <Divider sx={{ my: 3 }} />
-                        <Typography variant="h5" gutterBottom>
-                            Player Matchups
-                        </Typography>
-                        <Matchups
-                            team1={selectedTeam1.full_name}
-                            team2={selectedTeam2.full_name}
-                            startDate={startDate}
-                            endDate={endDate}
-                            isMobile={isMobile}
-                        />
-                    </Grid>
-
-                    <Grid item xs={12} md={12}>
-                        <Card sx={{ p: 2, width: '100%', mt: 3 }}>
-                            <Typography variant="h6" gutterBottom>
-                                Fantasy Points Analysis
-                            </Typography>
-                            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-                                <Tabs value={fantasyTabValue} onChange={(e, newValue) => setFantasyTabValue(newValue)}>
-                                    <Tab label="Team Comparison" />
-                                    <Tab label="Venue History" />
-                                </Tabs>
+                    ) : (
+                        <Box sx={{ p: 2, textAlign: 'center' }}>
+                            <CircularProgress size={24} />
+                        </Box>
+                    ),
+                },
+                {
+                    id: 'matchups',
+                    chipLabel: 'Matchups',
+                    content: (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <Box>
+                                <Typography variant="h5" gutterBottom>
+                                    Player Matchups
+                                </Typography>
+                                <Matchups
+                                    team1={selectedTeam1.full_name}
+                                    team2={selectedTeam2.full_name}
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    isMobile={isMobile}
+                                />
                             </Box>
-                            <Box sx={{ mt: 2 }}>
-                                {fantasyTabValue === 0 && (
-                                    <>
-                                        <Grid container spacing={isMobile ? 1 : 2}>
-                                            <Grid item xs={12} md={6}>
-                                                <FantasyPointsTable 
-                                                    players={venueFantasyStats?.team1_players || []} 
-                                                    title={`${selectedTeam1.abbreviated_name} Fantasy Points at ${venue}`} 
-                                                    isMobile={isMobile}
-                                                />
+                            <Card sx={{ p: 2, width: '100%' }}>
+                                <Typography variant="h6" gutterBottom>
+                                    Fantasy Points Analysis
+                                </Typography>
+                                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                                    <Tabs value={fantasyTabValue} onChange={(e, newValue) => setFantasyTabValue(newValue)}>
+                                        <Tab label="Team Comparison" />
+                                        <Tab label="Venue History" />
+                                    </Tabs>
+                                </Box>
+                                <Box sx={{ mt: 2 }}>
+                                    {fantasyTabValue === 0 && (
+                                        <>
+                                            <Grid container spacing={isMobile ? 1 : 2}>
+                                                <Grid item xs={12} md={6}>
+                                                    <FantasyPointsTable
+                                                        players={venueFantasyStats?.team1_players || []}
+                                                        title={`${selectedTeam1.abbreviated_name} Fantasy Points at ${venue}`}
+                                                        isMobile={isMobile}
+                                                    />
+                                                </Grid>
+                                                <Grid item xs={12} md={6}>
+                                                    <FantasyPointsTable
+                                                        players={venueFantasyStats?.team2_players || []}
+                                                        title={`${selectedTeam2.abbreviated_name} Fantasy Points at ${venue}`}
+                                                        isMobile={isMobile}
+                                                    />
+                                                </Grid>
                                             </Grid>
-                                            <Grid item xs={12} md={6}>
-                                                <FantasyPointsTable 
-                                                    players={venueFantasyStats?.team2_players || []} 
-                                                    title={`${selectedTeam2.abbreviated_name} Fantasy Points at ${venue}`} 
-                                                    isMobile={isMobile}
-                                                />
+                                            <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: 2 }}>
+                                                <Grid item xs={12} md={6}>
+                                                    <FantasyPointsBarChart
+                                                        players={venueFantasyStats?.team1_players || []}
+                                                        title={`${selectedTeam1.abbreviated_name} Fantasy Points Breakdown`}
+                                                        isMobile={isMobile}
+                                                    />
+                                                </Grid>
+                                                <Grid item xs={12} md={6}>
+                                                    <FantasyPointsBarChart
+                                                        players={venueFantasyStats?.team2_players || []}
+                                                        title={`${selectedTeam2.abbreviated_name} Fantasy Points Breakdown`}
+                                                        isMobile={isMobile}
+                                                    />
+                                                </Grid>
                                             </Grid>
-                                        </Grid>         
-                                        <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: 2 }}>
-                                            <Grid item xs={12} md={6}>
-                                                <FantasyPointsBarChart 
-                                                    players={venueFantasyStats?.team1_players || []} 
-                                                    title={`${selectedTeam1.abbreviated_name} Fantasy Points Breakdown`} 
-                                                    isMobile={isMobile}
-                                                />
-                                            </Grid>
-                                            <Grid item xs={12} md={6}>
-                                                <FantasyPointsBarChart 
-                                                    players={venueFantasyStats?.team2_players || []} 
-                                                    title={`${selectedTeam2.abbreviated_name} Fantasy Points Breakdown`} 
-                                                    isMobile={isMobile}
-                                                />
-                                            </Grid>
-                                        </Grid> 
-                                    </>
-                                )}
-                                {fantasyTabValue === 1 && (
-                                    <>
-                                        <FantasyPointsTable 
-                                            players={venuePlayerHistory?.players || []} 
-                                            title={`Player Fantasy History at ${venue}`} 
-                                            isMobile={isMobile}
-                                        />
-                                        <FantasyPointsBarChart 
-                                            players={venuePlayerHistory?.players || []} 
-                                            title={`Top Players at ${venue}`} 
-                                            isMobile={isMobile}
-                                        />
-                                    </>
-                                )}
+                                        </>
+                                    )}
+                                    {fantasyTabValue === 1 && (
+                                        <>
+                                            <FantasyPointsTable
+                                                players={venuePlayerHistory?.players || []}
+                                                title={`Player Fantasy History at ${venue}`}
+                                                isMobile={isMobile}
+                                            />
+                                            <FantasyPointsBarChart
+                                                players={venuePlayerHistory?.players || []}
+                                                title={`Top Players at ${venue}`}
+                                                isMobile={isMobile}
+                                            />
+                                        </>
+                                    )}
+                                </Box>
+                            </Card>
+                        </Box>
+                    ),
+                },
+            );
+        }
+
+        if (statsData?.batting_leaders?.length > 0 || statsData?.bowling_leaders?.length > 0) {
+            allSlides.push({
+                id: 'leaders',
+                chipLabel: 'Leaders',
+                content: (
+                    <Grid container spacing={isMobile ? 2 : 3}>
+                        {statsData?.batting_leaders?.length > 0 && (
+                            <Grid item xs={12} md={6}>
+                                <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
+                                    <BattingLeaders data={statsData.batting_leaders} isMobile={isMobile} />
+                                </Card>
+                            </Grid>
+                        )}
+                        {statsData?.bowling_leaders?.length > 0 && (
+                            <Grid item xs={12} md={6}>
+                                <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
+                                    <BowlingLeaders data={statsData.bowling_leaders} isMobile={isMobile} />
+                                </Card>
+                            </Grid>
+                        )}
+                    </Grid>
+                ),
+            });
+        }
+
+        if (statsData?.batting_scatter?.length > 0) {
+            allSlides.push({
+                id: 'analysis',
+                chipLabel: 'Analysis',
+                content: (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <BattingScatterChart data={statsData.batting_scatter} isMobile={isMobile} />
+                        <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
+                            <Typography variant="h6" gutterBottom>
+                                Bowling Type Analysis
+                            </Typography>
+                            <Box sx={{ position: 'relative' }}>
+                                <BowlingAnalysis
+                                    venue={venue}
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    isMobile={isMobile}
+                                />
                             </Box>
                         </Card>
+                    </Box>
+                ),
+            });
+        }
+
+        allSlides.push({
+            id: 'credits',
+            chipLabel: 'Credits',
+            content: (
+                <Box sx={{ pt: 2 }}>
+                    <Typography variant="h6" gutterBottom align="center">
+                        Credits & Acknowledgements
+                    </Typography>
+                    <Grid container spacing={3} sx={{ mt: 1 }}>
+                        <Grid item xs={12} md={4}>
+                            <Typography variant="subtitle2" gutterBottom color="primary">
+                                Data Sources
+                            </Typography>
+                            <Typography variant="body2" paragraph>
+                                Ball-by-ball data from <a href="https://cricsheet.org/" target="_blank" rel="noopener noreferrer">Cricsheet.org</a>
+                            </Typography>
+                            <Typography variant="body2" paragraph>
+                                Player information from <a href="https://cricmetric.com/" target="_blank" rel="noopener noreferrer">Cricmetric</a>
+                            </Typography>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                            <Typography variant="subtitle2" gutterBottom color="primary">
+                                Metrics & Visualization Inspiration
+                            </Typography>
+                            <Typography variant="body2" component="div">
+                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                                    <a href="https://twitter.com/prasannalara" target="_blank" rel="noopener noreferrer">@prasannalara</a>
+                                </Box>
+                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                                    <a href="https://twitter.com/cricketingview" target="_blank" rel="noopener noreferrer">@cricketingview</a>
+                                </Box>
+                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                                    <a href="https://twitter.com/IndianMourinho" target="_blank" rel="noopener noreferrer">@IndianMourinho</a>
+                                </Box>
+                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                                    <a href="https://twitter.com/hganjoo_153" target="_blank" rel="noopener noreferrer">@hganjoo_153</a>
+                                </Box>
+                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                                    <a href="https://twitter.com/randomcricstat" target="_blank" rel="noopener noreferrer">@randomcricstat</a>
+                                </Box>
+                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                                    <a href="https://twitter.com/kaustats" target="_blank" rel="noopener noreferrer">@kaustats</a>
+                                </Box>
+                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                                    <a href="https://twitter.com/cricviz" target="_blank" rel="noopener noreferrer">@cricviz</a>
+                                </Box>
+                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
+                                    <a href="https://twitter.com/ajarrodkimber" target="_blank" rel="noopener noreferrer">@ajarrodkimber</a>
+                                </Box>
+                            </Typography>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                            <Typography variant="subtitle2" gutterBottom color="primary">
+                                Development Assistance
+                            </Typography>
+                            <Typography variant="body2" paragraph>
+                                Claude and ChatGPT for Vibe Coding my way through this project
+                            </Typography>
+                        </Grid>
                     </Grid>
-                </>
-            )}
-            
-            {statsData?.batting_leaders && statsData.batting_leaders.length > 0 && (
-                <Grid item xs={12} md={6}>
-                    <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
-                        <BattingLeaders data={statsData.batting_leaders} isMobile={isMobile} />
-                    </Card>
-                </Grid>
-            )}
-            {statsData?.bowling_leaders && statsData.bowling_leaders.length > 0 && (
-                <Grid item xs={12} md={6}>
-                    <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
-                        <BowlingLeaders data={statsData.bowling_leaders} isMobile={isMobile} />
-                    </Card>
-                </Grid>
-            )}
-            
-            {statsData?.batting_scatter && statsData.batting_scatter.length > 0 && (
-                <Grid item xs={12} md={12}>
-                    <BattingScatterChart data={statsData.batting_scatter} isMobile={isMobile} />
-                </Grid>
-            )}
-            {statsData?.batting_scatter && statsData.batting_scatter.length > 0 && (
-                <Grid item xs={12} md={12}>
-                    <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
-                        <Typography variant="h6" gutterBottom>
-                            Bowling Type Analysis
-                        </Typography>
-                        {/* Wrap BowlingAnalysis in error boundary */}
-                        <Box sx={{ position: 'relative' }}>
-                            <BowlingAnalysis 
-                            venue={venue}
-                            startDate={startDate}
-                            endDate={endDate}
-                                isMobile={isMobile}
-                        />
-                        </Box>
-                    </Card>
-                </Grid>
-            )}
-        </Grid>
-        
-        {/* Credits Section */}
-        <Box sx={{ mt: 6, mb: 3, pt: 4, borderTop: '1px solid #eee' }}>
-            <Typography variant="h6" gutterBottom align="center">
-                Credits & Acknowledgements
+                    <Typography variant="body2" color="textSecondary" align="center" sx={{ mt: 3, pb: 2 }}>
+                        Cricket Data Thing &copy; {new Date().getFullYear()} - Advanced cricket analytics and visualization
+                    </Typography>
+                </Box>
+            ),
+        });
+
+        return allSlides;
+    }, [venueStats, statsData, selectedTeam1, selectedTeam2, venue, startDate, endDate, matchHistory, venueFantasyStats, venuePlayerHistory, isMobile, fantasyTabValue]);
+
+    // Reset to first slide when teams change
+    useEffect(() => {
+        setActiveIndex(0);
+        if (swiperRef.current) {
+            swiperRef.current.slideTo(0);
+        }
+    }, [selectedTeam1, selectedTeam2]);
+
+if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
+
+return (
+    <Box sx={{ p: { xs: 1, sm: 2 }, pb: '60px' }}>
+        <Typography variant={isMobile ? "h5" : "h4"} gutterBottom>
+            {venue === "All Venues" ?
+                `All Venues - ${venueStats.total_matches} T20s` :
+                `${venue} - ${venueStats.total_matches} T20s`
+            }
+            <Typography variant="subtitle1" color="text.secondary">
+                {startDate} to {endDate}
             </Typography>
-            <Grid container spacing={3} sx={{ mt: 1 }}>
-                <Grid item xs={12} md={4}>
-                    <Typography variant="subtitle2" gutterBottom color="primary">
-                        Data Sources
-                    </Typography>
-                    <Typography variant="body2" paragraph>
-                        Ball-by-ball data from <a href="https://cricsheet.org/" target="_blank" rel="noopener noreferrer">Cricsheet.org</a>
-                    </Typography>
-                    <Typography variant="body2" paragraph>
-                        Player information from <a href="https://cricmetric.com/" target="_blank" rel="noopener noreferrer">Cricmetric</a>
-                    </Typography>
-                </Grid>
-                
-                <Grid item xs={12} md={4}>
-                    <Typography variant="subtitle2" gutterBottom color="primary">
-                        Metrics & Visualization Inspiration
-                    </Typography>
-                    <Typography variant="body2" component="div">
-                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                            <a href="https://twitter.com/prasannalara" target="_blank" rel="noopener noreferrer">@prasannalara</a>
-                        </Box>
-                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                            <a href="https://twitter.com/cricketingview" target="_blank" rel="noopener noreferrer">@cricketingview</a>
-                        </Box>
-                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                            <a href="https://twitter.com/IndianMourinho" target="_blank" rel="noopener noreferrer">@IndianMourinho</a>
-                        </Box>
-                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                            <a href="https://twitter.com/hganjoo_153" target="_blank" rel="noopener noreferrer">@hganjoo_153</a>
-                        </Box>
-                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                            <a href="https://twitter.com/randomcricstat" target="_blank" rel="noopener noreferrer">@randomcricstat</a>
-                        </Box>
-                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                            <a href="https://twitter.com/kaustats" target="_blank" rel="noopener noreferrer">@kaustats</a>
-                        </Box>
-                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                            <a href="https://twitter.com/cricviz" target="_blank" rel="noopener noreferrer">@cricviz</a>
-                        </Box>
-                        <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                            <a href="https://twitter.com/ajarrodkimber" target="_blank" rel="noopener noreferrer">@ajarrodkimber</a>
-                        </Box>
-                    </Typography>
-                </Grid>
-                
-                <Grid item xs={12} md={4}>
-                    <Typography variant="subtitle2" gutterBottom color="primary">
-                        Development Assistance
-                    </Typography>
-                    <Typography variant="body2" paragraph>
-                        Claude and ChatGPT for Vibe Coding my way through this project
-                    </Typography>
-                </Grid>
-            </Grid>
-            
-            <Typography variant="body2" color="textSecondary" align="center" sx={{ mt: 3, pb: 2 }}>
-                Cricket Data Thing © {new Date().getFullYear()} - Advanced cricket analytics and visualization
-            </Typography>
-        </Box>
+        </Typography>
+
+        <VenueCarousel
+            slides={slides}
+            activeIndex={activeIndex}
+            onSlideChange={handleSlideChange}
+            swiperRef={swiperRef}
+        />
+
+        <SlideChipBar
+            slides={slides}
+            activeIndex={activeIndex}
+            onChipClick={handleChipClick}
+        />
     </Box>
 );
 };

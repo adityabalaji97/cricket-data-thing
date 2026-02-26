@@ -24,6 +24,7 @@
     "react-scripts": "5.0.1",
     "react-window": "^1.8.11",
     "recharts": "^2.10.4",
+    "swiper": "^12.1.2",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
