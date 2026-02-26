@@ -223,6 +223,7 @@ const AppContent = () => {
           // If venue is present with autoload, or all params present, trigger the analysis
           const autoloadParam = getQueryParam('autoload') === 'true';
           if ((venueParam && autoloadParam) || (venueParam && team1Param && team2Param)) {
+            hasFetchedRef.current = false;
             setShowVisualizations(true);
           }
         }
@@ -261,6 +262,8 @@ const AppContent = () => {
   };
 
   useEffect(() => {
+    const abortController = new AbortController();
+
     const fetchMatchHistory = async () => {
       if (!showVisualizations) {
         return;
@@ -272,32 +275,38 @@ const AppContent = () => {
       }
       hasFetchedRef.current = true;
 
+      // Clear stale data before fetching
+      setMatchHistory(null);
+      setStatsData(null);
+      setVenueFantasyStats({ team1_players: [], team2_players: [] });
+      setVenuePlayerHistory({ players: [] });
+
       try {
         setLoading(true);
         setError(null);
-    
+
         const params = new URLSearchParams();
         params.append('start_date', startDate);
         params.append('end_date', endDate);
-        
+
         if (competitions.leagues?.length > 0) {
           competitions.leagues.forEach(league => {
             params.append('leagues', league);
           });
         }
-        
+
         params.append('include_international', competitions.international);
         if (competitions.international && competitions.topTeams) {
           params.append('top_teams', competitions.topTeams);
         }
-    
+
         try {
           // Use allSettled to avoid failing the entire Promise.all if one request fails
           const [venueResponseResult, statsResponseResult] = await Promise.allSettled([
-            axios.get(`${config.API_URL}/venue_notes/${encodeURIComponent(selectedVenue)}?${params.toString()}`),
-            axios.get(`${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/stats?${params.toString()}`)
+            axios.get(`${config.API_URL}/venue_notes/${encodeURIComponent(selectedVenue)}?${params.toString()}`, { signal: abortController.signal }),
+            axios.get(`${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/stats?${params.toString()}`, { signal: abortController.signal })
           ]);
-      
+
           // Handle results individually
           if (venueResponseResult.status === 'fulfilled') {
             setVenueStats(venueResponseResult.value.data);
@@ -323,7 +332,7 @@ const AppContent = () => {
               }
             });
           }
-          
+
           if (statsResponseResult.status === 'fulfilled') {
             setStatsData(statsResponseResult.value.data);
           } else {
@@ -336,25 +345,29 @@ const AppContent = () => {
             });
           }
         } catch (error) {
+          if (error.name === 'AbortError' || error.name === 'CanceledError') return;
           console.error('Error in main API calls:', error);
           setError('Failed to load venue data. Please try again.');
         }
-    
+
         // Only fetch team-specific data if both teams are selected
         if (selectedTeam1 && selectedTeam2) {
           try {
             const [historyResponseResult, fantasyResponseResult, playerHistoryResponseResult] = await Promise.allSettled([
               axios.get(
-                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/teams/${encodeURIComponent(selectedTeam1.full_name)}/${encodeURIComponent(selectedTeam2.full_name)}/history?${params.toString()}`
+                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/teams/${encodeURIComponent(selectedTeam1.full_name)}/${encodeURIComponent(selectedTeam2.full_name)}/history?${params.toString()}`,
+                { signal: abortController.signal }
               ),
               axios.get(
-                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/teams/${encodeURIComponent(selectedTeam1.full_name)}/${encodeURIComponent(selectedTeam2.full_name)}/fantasy_stats?${params.toString()}`
+                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/teams/${encodeURIComponent(selectedTeam1.full_name)}/${encodeURIComponent(selectedTeam2.full_name)}/fantasy_stats?${params.toString()}`,
+                { signal: abortController.signal }
               ),
               axios.get(
-                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/players/fantasy_history?team1=${encodeURIComponent(selectedTeam1.full_name)}&team2=${encodeURIComponent(selectedTeam2.full_name)}&${params.toString()}`
+                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/players/fantasy_history?team1=${encodeURIComponent(selectedTeam1.full_name)}&team2=${encodeURIComponent(selectedTeam2.full_name)}&${params.toString()}`,
+                { signal: abortController.signal }
               )
             ]);
-            
+
             // Handle team-specific results individually
             if (historyResponseResult.status === 'fulfilled') {
               setMatchHistory(historyResponseResult.value.data);
@@ -372,14 +385,14 @@ const AppContent = () => {
                 }
               });
             }
-            
+
             if (fantasyResponseResult.status === 'fulfilled') {
               setVenueFantasyStats(fantasyResponseResult.value.data);
             } else {
               console.error('Error fetching fantasy stats:', fantasyResponseResult.reason);
               setVenueFantasyStats({ team1_players: [], team2_players: [] });
             }
-            
+
             if (playerHistoryResponseResult.status === 'fulfilled') {
               setVenuePlayerHistory(playerHistoryResponseResult.value.data);
             } else {
@@ -387,6 +400,7 @@ const AppContent = () => {
               setVenuePlayerHistory({ players: [] });
             }
           } catch (error) {
+            if (error.name === 'AbortError' || error.name === 'CanceledError') return;
             console.error('Error in team-specific API calls:', error);
             setError('Failed to load team data. Please try again.');
             setMatchHistory(null);
@@ -399,8 +413,9 @@ const AppContent = () => {
           setVenueFantasyStats({ team1_players: [], team2_players: [] });
           setVenuePlayerHistory({ players: [] });
         }
-    
+
       } catch (error) {
+        if (error.name === 'AbortError' || error.name === 'CanceledError') return;
         console.error('Global error fetching data:', error);
         setError(error.response?.data?.detail || 'Failed to load data. Please check the console for details.');
       } finally {
@@ -409,6 +424,7 @@ const AppContent = () => {
     };
 
     fetchMatchHistory();
+    return () => abortController.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVenue, selectedTeam1, selectedTeam2, startDate, endDate, showVisualizations]);
 
