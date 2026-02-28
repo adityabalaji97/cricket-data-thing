@@ -50,6 +50,40 @@ const AppContent = () => {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  const getCurrentTabForPath = (path) => (
+    path === '/' ? 0 :
+    path === '/search' ? 1 :
+    path === '/venue' ? 2 :
+    path === '/player' ? 3 :
+    path === '/bowler' ? 4 :
+    path === '/comparison' ? 5 :
+    path === '/matchups' ? 6 :
+    path === '/query' ? 7 :
+    path === '/team' ? 8 :
+    path === '/team-comparison' ? 9 :
+    path === '/doppelgangers' ? 10 :
+    path === '/games/guess-innings' ? 11 :
+    path === '/games/player-journeys' ? 12 :
+    path.startsWith('/wrapped') ? false : 0
+  );
+
+  const getPageTitleForPath = (path) => (
+    path === '/' ? 'Home' :
+    path === '/search' ? 'Search' :
+    path === '/venue' ? 'Venue Analysis' :
+    path === '/player' ? 'Batter Profile' :
+    path === '/bowler' ? 'Bowler Profile' :
+    path === '/comparison' ? 'Batter Comparison' :
+    path === '/matchups' ? 'Matchups' :
+    path === '/query' ? 'Query Builder' :
+    path === '/team' ? 'Team Profile' :
+    path === '/team-comparison' ? 'Team Comparison' :
+    path === '/doppelgangers' ? 'Doppelgangers' :
+    path === '/games/guess-innings' ? 'Guess the Innings' :
+    path === '/games/player-journeys' ? 'Player Journeys' :
+    path.startsWith('/wrapped') ? '2025 Wrapped' : 'Home'
+  );
   
   // Helper function to get query parameters from URL
   const getQueryParam = (param) => {
@@ -108,49 +142,11 @@ const AppContent = () => {
   const handleNavigate = (path) => {
     handleMenuClose();
     navigate(path);
-    if (path === '/') {
-    setCurrentTab(0); // 0 for home/landing page
-    } else {
-    setCurrentTab(
-    path === '/search' ? 1 :
-    path === '/venue' ? 2 : 
-    path === '/player' ? 3 : 
-    path === '/bowler' ? 4 : 
-    path === '/comparison' ? 5 : 
-    path === '/matchups' ? 6 : 
-    path === '/query' ? 7 : 
-    path === '/team' ? 8 : 
-    path === '/team-comparison' ? 9 : 
-    path === '/doppelgangers' ? 10 :
-    path === '/games/guess-innings' ? 11 :
-    path === '/games/player-journeys' ? 12 :
-    path === '/wrapped/2025' ? 13 : 0
-    );
-    }
+    setCurrentTab(getCurrentTabForPath(path));
   };
 
   useEffect(() => {
-    // Set current tab based on location
-    const path = location.pathname;
-    if (path === '/') {
-      setCurrentTab(0); // Home tab
-    } else {
-      setCurrentTab(
-        path === '/search' ? 1 :
-        path === '/venue' ? 2 : 
-        path === '/player' ? 3 : 
-        path === '/bowler' ? 4 : 
-        path === '/comparison' ? 5 : 
-        path === '/matchups' ? 6 : 
-        path === '/query' ? 7 : 
-        path === '/team' ? 8 : 
-        path === '/team-comparison' ? 9 :
-        path === '/doppelgangers' ? 10 :
-        path === '/games/guess-innings' ? 11 :
-        path === '/games/player-journeys' ? 12 :
-        path === '/wrapped/2025' || path.startsWith('/wrapped') ? 13 : 0
-      );
-    }
+    setCurrentTab(getCurrentTabForPath(location.pathname));
   }, [location]);
 
   useEffect(() => {
@@ -453,20 +449,7 @@ const AppContent = () => {
 
   // Create page title based on current tab
   const getPageTitle = () => {
-    return currentTab === 0 ? 'Home' :
-           currentTab === 1 ? 'Search' :
-           currentTab === 2 ? 'Venue Analysis' : 
-           currentTab === 3 ? 'Batter Profile' : 
-           currentTab === 4 ? 'Bowler Profile' :  
-           currentTab === 5 ? 'Batter Comparison' : 
-           currentTab === 6 ? 'Matchups' : 
-           currentTab === 7 ? 'Query Builder' : 
-           currentTab === 8 ? 'Team Profile' : 
-           currentTab === 9 ? 'Team Comparison' :
-           currentTab === 10 ? 'Doppelgangers' :
-           currentTab === 11 ? 'Guess the Innings' :
-           currentTab === 12 ? 'Player Journeys' :
-           currentTab === 13 ? '2025 Wrapped' : 'Home';
+    return getPageTitleForPath(location.pathname);
   };
 
   return (
@@ -568,9 +551,6 @@ const AppContent = () => {
               <MenuItem onClick={() => handleNavigate('/games/player-journeys')}>
                 🛤️ Player Journeys
               </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/wrapped/2025')} sx={{ color: '#1DB954', fontWeight: 600 }}>
-                🎁 2025 Wrapped
-              </MenuItem>
             </Menu>
             <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap' }}>
               {getPageTitle()}
@@ -607,7 +587,6 @@ const AppContent = () => {
               <Tab label="Doppelgangers" component={Link} to="/doppelgangers" />
               <Tab label="🎯 Guess the Innings" component={Link} to="/games/guess-innings" />
               <Tab label="🛤️ Player Journeys" component={Link} to="/games/player-journeys" />
-              <Tab label="🎁 2025 Wrapped" component={Link} to="/wrapped/2025" sx={{ color: '#1DB954' }} />
             </Tabs>
             <IconButton
               onClick={() => setSearchExpanded(true)}
