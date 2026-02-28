@@ -25,9 +25,7 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import TeamComparisonTable from './TeamComparisonTable';
 import TeamComparisonVisualization from './TeamComparisonVisualization';
 import config from '../config';
-
-const DEFAULT_START_DATE = "2020-01-01";
-const TODAY = new Date().toISOString().split('T')[0];
+import { DEFAULT_START_DATE, TODAY } from '../utils/dateDefaults';
 
 const TeamComparison = () => {
   const location = useLocation();

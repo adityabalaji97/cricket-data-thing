@@ -36,6 +36,7 @@ import EloRacerChart from './EloRacerChart';
 import RecentMatchesSummaryCard from './RecentMatchesSummaryCard';
 import SearchBar from './search/SearchBar';
 import MatchPreviewCard from './MatchPreviewCard';
+import { DEFAULT_START_DATE as DEFAULT_ANALYSIS_START_DATE, TODAY } from '../utils/dateDefaults';
 
 // This will be a new component that serves as a landing page
 const LandingPage = () => {
@@ -43,8 +44,8 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isMedium = useMediaQuery(theme.breakpoints.down('md'));
-  const defaultAnalysisStartDate = '2024-01-01';
-  const defaultAnalysisEndDate = new Date().toISOString().slice(0, 10);
+  const defaultAnalysisStartDate = DEFAULT_ANALYSIS_START_DATE;
+  const defaultAnalysisEndDate = TODAY;
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [previewOpen, setPreviewOpen] = useState({});

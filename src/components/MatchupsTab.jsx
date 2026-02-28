@@ -39,9 +39,7 @@ import Matchups from './Matchups';
 import TeamBowlingTypeMatchups from './TeamBowlingTypeMatchups';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
 import { getMatchupContextualQueries } from '../utils/queryBuilderLinks';
-
-const DEFAULT_START_DATE = "2024-01-01";
-const TODAY = new Date().toISOString().split('T')[0];
+import { DEFAULT_START_DATE, TODAY } from '../utils/dateDefaults';
 
 const MatchupsTab = ({ isMobile }) => {
     // Get query parameters from URL

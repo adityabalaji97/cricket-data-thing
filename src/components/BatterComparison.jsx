@@ -33,9 +33,7 @@ import PhaseComparisonChart from './PhaseComparisonChart';
 import ComparisonInningsScatter from './ComparisonInningsScatter';
 import ComparisonAggregatedTable from './ComparisonAggregatedTable';
 import config from '../config';
-
-const DEFAULT_START_DATE = "2020-01-01";
-const TODAY = new Date().toISOString().split('T')[0];
+import { DEFAULT_START_DATE, TODAY } from '../utils/dateDefaults';
 
 const BatterComparison = () => {
   const location = useLocation();

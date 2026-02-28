@@ -43,8 +43,7 @@ import PlayerJourneysGame from './components/games/PlayerJourneysGame';
 import axios from 'axios';
 
 import config from './config';
-const DEFAULT_START_DATE = "2024-01-01";
-const TODAY = new Date().toISOString().split('T')[0];
+import { DEFAULT_START_DATE, TODAY } from './utils/dateDefaults';
 
 const AppContent = () => {
   const navigate = useNavigate();

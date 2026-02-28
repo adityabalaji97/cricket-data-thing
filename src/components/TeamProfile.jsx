@@ -24,9 +24,7 @@ import TeamBowlingOrderCard from './TeamBowlingOrderCard';
 import EloStatsCard from './EloStatsCard';
 import CustomPlayerSelector from './CustomPlayerSelector';
 import config from '../config';
-
-const DEFAULT_START_DATE = "2025-01-01";
-const TODAY = new Date().toISOString().split('T')[0];
+import { DEFAULT_START_DATE, TODAY } from '../utils/dateDefaults';
 
 const TeamProfile = ({ isMobile }) => {
   const location = useLocation();

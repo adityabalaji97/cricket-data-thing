@@ -1,5 +1,6 @@
-export const DEFAULT_START_DATE = '2020-01-01';
-export const TODAY = new Date().toISOString().split('T')[0];
+import { DEFAULT_START_DATE, TODAY } from '../../utils/dateDefaults';
+
+export { DEFAULT_START_DATE, TODAY };
 
 export const buildBowlerProfileFilters = ({ players, venues, playerSearch = {} }) => [
   {
