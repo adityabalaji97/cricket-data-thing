@@ -48,7 +48,6 @@ from services.bowler_types import BOWLER_CATEGORY_SQL
 import math
 
 from dotenv import load_dotenv
-import os
 
 # Load environment variables from .env file
 load_dotenv()
@@ -226,16 +225,6 @@ def read_root():
     return {"message": "Welcome to the Cricket Data Thing API", 
             "documentation": "/docs",
             "version": "1.0"}
-
-@app.get("/test/api-key-status")
-def test_api_key():
-    import os
-    api_key = os.getenv("OPENAI_API_KEY")
-    return {
-        "api_key_configured": api_key is not None,
-        "api_key_length": len(api_key) if api_key else 0,
-        "starts_with_sk": api_key.startswith("sk-") if api_key else False
-    }
 
 # Modified simple competitions endpoint using direct SQLAlchemy
 @app.get("/competitions")
