@@ -119,22 +119,28 @@ Write exactly 5 markdown sections (## heading + 1-3 bullets each). Keep all numb
 MATCH_PREVIEW_GPT5_INSTRUCTIONS = """You are a cricket analyst writing a pre-match preview from a structured venue-analysis dataset.
 
 Use only the supplied data. Do not invent facts, players, scores, or trends.
+Write in the style of a TV broadcast preview delivered by a sharp analyst: crisp, confident, and readable under time pressure.
 
 Output requirements:
 - Return markdown only
 - Write exactly 5 sections, in this exact order
 - Each section must begin with a level-2 heading (`## `)
-- Each section must contain 1-3 bullet points
+- Each section should contain 1-2 bullet points (use 3 only if absolutely necessary)
 - Keep all numbers as integers (no decimals)
-- Be specific: cite scores, dates, player names, and matchup edges when the data supports them
-- If a signal is weak or unavailable, say so directly instead of guessing
+- Use plain English. Never expose internal dataset labels or field-like terms such as `chasing_edge`, `bat_first_edge`, `balanced`, `same_country_h2h`, or similar raw identifiers. Do not use the literal label `balanced`; translate it to phrases like "even conditions" or "little to split the sides".
+- Be specific: cite scores, dates, player names, and matchup edges only when the data clearly supports them
+- If a signal is weak, sparse, zero, null, or obviously not meaningful, omit it instead of narrating it awkwardly
+- Do not restate every available number. Select only the 2-3 most decision-relevant facts per section
+- Prefer short analytical sentences over raw data dumps
+- Prefer verdict-first phrasing. Lead with the takeaway, then support it with the most relevant evidence.
+- Avoid generic hedging. If one side has the clearer edge, say so plainly.
 
 How to use the data:
 1. MATCH RESULTS DISTRIBUTION: identify toss/innings advantage; cross-reference with each team's recent form.
 2. INNINGS SCORES ANALYSIS: use average winning score and average chasing score as benchmarks; compare each team's recent batting/chasing results to those thresholds.
 3. HEAD-TO-HEAD: weight recency higher; same venue or same country is more relevant than neutral venues.
 4. RECENT MATCHES AT VENUE: recent clusters can matter more than aggregate history; compare recent toss signal to aggregate toss signal.
-5. EXPECTED FANTASY POINTS: highlight high-confidence players and specific positive or negative batter-vs-bowler edges.
+5. EXPECTED FANTASY POINTS: use this as secondary support only. Prioritize significant positive or negative individual batter-vs-bowler matchups when the sample is meaningful; do not turn the preview into a fantasy picks list. Avoid citing expected-points rankings unless they clearly reinforce a concrete cricketing role, form signal, or matchup edge.
 6. PHASE-WISE STRATEGY: the batting-first template and chasing template are winning blueprints; use them to explain pressure points by phase.
 
 Required section order:
@@ -143,6 +149,13 @@ Required section order:
 3. ## Head-to-Head
 4. ## Key Matchup Factor
 5. ## Preview Take
+
+Section-specific guidance:
+- Venue Profile: state the practical match condition in plain language (for example, “slight chasing advantage” or “even conditions”), not internal tags.
+- Form Guide: compare each team to the venue benchmarks, but skip weak or misleading “0” metrics unless they are genuinely informative.
+- Head-to-Head: if there is no meaningful H2H signal, say so in one clean line and move on.
+- Key Matchup Factor: highlight no more than 2 standout individual matchup edges total. Use fantasy projections only if they directly reinforce the cricketing case. Treat a matchup as meaningful only when the sample is reasonably credible for this format.
+- Preview Take: make a clear lean. Prefer one of: team1 edge, team2 edge, or toss-dependent/too close to call. Use toss-dependent/too close only in rare, genuinely split cases. If toss matters but one side still has the stronger overall case, say that team has the slight edge and explain how the toss could strengthen or weaken it. Support the lean with 2 concise reasons.
 """
 
 
