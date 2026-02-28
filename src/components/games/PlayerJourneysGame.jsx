@@ -48,8 +48,11 @@ const getFirstLetters = (name) => {
   return name.split(' ').map(word => word[0]).join('. ') + '.';
 };
 
-// Game URL for sharing
-const GAME_URL = 'https://hindsight2020.vercel.app/games/player-journeys';
+const GAME_PATH = '/games/player-journeys';
+
+const getGameUrl = () => (
+  typeof window === 'undefined' ? GAME_PATH : `${window.location.origin}${GAME_PATH}`
+);
 
 // Hint definitions in reveal order
 const HINT_CONFIG = [
@@ -269,7 +272,7 @@ ${hintLines}
 
 ${resultEmoji} Score: ${score}/3${streakText}
 
-Play: ${GAME_URL}`;
+Play: ${getGameUrl()}`;
   };
 
   const handleShare = async () => {

@@ -73,8 +73,11 @@ const formatDate = (dateStr) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-// Game URL for sharing (include https:// for clickable links)
-const GAME_URL = 'https://hindsight2020.vercel.app/games/guess-innings';
+const GAME_PATH = '/games/guess-innings';
+
+const getGameUrl = () => (
+  typeof window === 'undefined' ? GAME_PATH : `${window.location.origin}${GAME_PATH}`
+);
 
 // Hint definitions in reveal order
 const HINT_CONFIG = [
@@ -325,7 +328,7 @@ ${hintLines}
 
 ${resultEmoji} Score: ${score}/5${streakText}
 
-Play: ${GAME_URL}`;
+Play: ${getGameUrl()}`;
   };
 
   const handleShare = async () => {
