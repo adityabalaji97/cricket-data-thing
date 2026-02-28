@@ -25,13 +25,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/match-preview", tags=["Match Preview"])
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_MODEL = os.getenv("MATCH_PREVIEW_OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_TIMEOUT_SECONDS = float(
+    os.getenv("MATCH_PREVIEW_OPENAI_TIMEOUT_SECONDS", os.getenv("OPENAI_TIMEOUT_SECONDS", "20"))
+)
 MAX_TOKENS = 1200
+GPT5_MAX_OUTPUT_TOKENS = int(os.getenv("MATCH_PREVIEW_GPT5_MAX_OUTPUT_TOKENS", "4000"))
+GPT5_REASONING_EFFORT = os.getenv("MATCH_PREVIEW_GPT5_REASONING_EFFORT", "low")
 TEMPERATURE = 0.3
 PREVIEW_ENGINE_VERSION = "v3-narrative"
 DEFAULT_PREVIEW_MODE = "hybrid"
 
 preview_cache: Dict[str, Dict] = {}
+
+
+def _is_gpt5_model() -> bool:
+    return OPENAI_MODEL.startswith("gpt-5")
+
+
+def _chat_completion_kwargs() -> Dict[str, float]:
+    kwargs: Dict[str, float] = {}
+    kwargs["max_tokens"] = MAX_TOKENS
+    kwargs["temperature"] = TEMPERATURE
+    return kwargs
 
 
 MATCH_PREVIEW_REWRITE_PROMPT = """Rewrite the provided cricket pre-match preview bullets for readability only.
@@ -52,6 +68,23 @@ Return markdown only.
 
 Canonical preview markdown:
 {canonical_markdown}
+"""
+
+MATCH_PREVIEW_REWRITE_GPT5_INSTRUCTIONS = """Rewrite the provided cricket pre-match preview bullets for readability only.
+
+You must preserve:
+- all 5 section headings and their order exactly
+- 1-2 bullets per section
+- all numbers, player names, and factual claims
+- the meaning of phase-wise strategy bullets as winning templates
+
+Do not:
+- add new facts
+- add sections
+- remove numeric details
+- add prose before or after the sections
+
+Return markdown only.
 """
 
 MATCH_PREVIEW_NARRATIVE_PROMPT = """You are a cricket analyst writing a pre-match preview. You're given structured data from a venue analysis page. Your job is to weave the data into a compelling narrative, cross-referencing data points as described below.
@@ -83,6 +116,49 @@ Write exactly 5 markdown sections (## heading + 1-3 bullets each). Keep all numb
 {data_context}
 """
 
+MATCH_PREVIEW_GPT5_INSTRUCTIONS = """You are a cricket analyst writing a pre-match preview from a structured venue-analysis dataset.
+
+Use only the supplied data. Do not invent facts, players, scores, or trends.
+
+Output requirements:
+- Return markdown only
+- Write exactly 5 sections, in this exact order
+- Each section must begin with a level-2 heading (`## `)
+- Each section must contain 1-3 bullet points
+- Keep all numbers as integers (no decimals)
+- Be specific: cite scores, dates, player names, and matchup edges when the data supports them
+- If a signal is weak or unavailable, say so directly instead of guessing
+
+How to use the data:
+1. MATCH RESULTS DISTRIBUTION: identify toss/innings advantage; cross-reference with each team's recent form.
+2. INNINGS SCORES ANALYSIS: use average winning score and average chasing score as benchmarks; compare each team's recent batting/chasing results to those thresholds.
+3. HEAD-TO-HEAD: weight recency higher; same venue or same country is more relevant than neutral venues.
+4. RECENT MATCHES AT VENUE: recent clusters can matter more than aggregate history; compare recent toss signal to aggregate toss signal.
+5. EXPECTED FANTASY POINTS: highlight high-confidence players and specific positive or negative batter-vs-bowler edges.
+6. PHASE-WISE STRATEGY: the batting-first template and chasing template are winning blueprints; use them to explain pressure points by phase.
+
+Required section order:
+1. ## Venue Profile
+2. ## Form Guide
+3. ## Head-to-Head
+4. ## Key Matchup Factor
+5. ## Preview Take
+"""
+
+
+def _call_responses_api(*, instructions: str, input_text: str) -> str:
+    import openai
+
+    client = openai.OpenAI(api_key=OPENAI_API_KEY, timeout=OPENAI_TIMEOUT_SECONDS)
+    response = client.responses.create(
+        model=OPENAI_MODEL,
+        instructions=instructions,
+        input=input_text,
+        max_output_tokens=GPT5_MAX_OUTPUT_TOKENS,
+        reasoning={"effort": GPT5_REASONING_EFFORT},
+    )
+    return response.output_text.strip()
+
 
 def _cache_key(
     venue: str,
@@ -104,6 +180,7 @@ def _cache_key(
             "include_international": include_international,
             "top_teams": top_teams,
             "preview_version": PREVIEW_ENGINE_VERSION,
+            "openai_model": OPENAI_MODEL,
             "preview_mode": preview_mode,
         },
         sort_keys=True,
@@ -117,17 +194,22 @@ def _rewrite_with_llm(canonical_markdown: str, original_sections) -> tuple[str, 
         return canonical_markdown, False
 
     try:
-        import openai
+        if _is_gpt5_model():
+            content = _call_responses_api(
+                instructions=MATCH_PREVIEW_REWRITE_GPT5_INSTRUCTIONS,
+                input_text=f"Canonical preview markdown:\n{canonical_markdown}",
+            )
+        else:
+            import openai
 
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        prompt = MATCH_PREVIEW_REWRITE_PROMPT.format(canonical_markdown=canonical_markdown)
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE,
-        )
-        content = response.choices[0].message.content.strip()
+            client = openai.OpenAI(api_key=OPENAI_API_KEY, timeout=OPENAI_TIMEOUT_SECONDS)
+            prompt = MATCH_PREVIEW_REWRITE_PROMPT.format(canonical_markdown=canonical_markdown)
+            response = client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                **_chat_completion_kwargs(),
+            )
+            content = response.choices[0].message.content.strip()
         if not content:
             return canonical_markdown, False
         if not validate_llm_rewrite(original_sections, content):
@@ -144,17 +226,22 @@ def _generate_narrative_with_llm(data_context: str, original_sections) -> tuple[
     if not OPENAI_API_KEY:
         return None, False
     try:
-        import openai
+        if _is_gpt5_model():
+            content = _call_responses_api(
+                instructions=MATCH_PREVIEW_GPT5_INSTRUCTIONS,
+                input_text=f"## Data\n{data_context}",
+            )
+        else:
+            import openai
 
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        prompt = MATCH_PREVIEW_NARRATIVE_PROMPT.format(data_context=data_context)
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE,
-        )
-        content = response.choices[0].message.content.strip()
+            client = openai.OpenAI(api_key=OPENAI_API_KEY, timeout=OPENAI_TIMEOUT_SECONDS)
+            prompt = MATCH_PREVIEW_NARRATIVE_PROMPT.format(data_context=data_context)
+            response = client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                **_chat_completion_kwargs(),
+            )
+            content = response.choices[0].message.content.strip()
         if not content or not validate_llm_narrative(content):
             logger.warning("Match preview LLM narrative failed validation; falling back to deterministic")
             return None, False
@@ -221,6 +308,8 @@ def get_match_preview(
             "preview": preview_text,
             "preview_mode": preview_mode,
             "preview_version": PREVIEW_ENGINE_VERSION,
+            "llm_model": OPENAI_MODEL,
+            "llm_strategy": "responses" if _is_gpt5_model() else "chat.completions",
             "llm_used": llm_used,
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "cached": False,

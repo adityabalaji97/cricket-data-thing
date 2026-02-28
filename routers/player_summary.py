@@ -31,6 +31,9 @@ router = APIRouter(prefix="/player-summary", tags=["Player Summary"])
 # Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_TIMEOUT_SECONDS = float(
+    os.getenv("PLAYER_SUMMARY_OPENAI_TIMEOUT_SECONDS", os.getenv("OPENAI_TIMEOUT_SECONDS", "15"))
+)
 MAX_TOKENS = 500
 TEMPERATURE = 0.3
 
@@ -147,7 +150,7 @@ def generate_summary_with_llm(patterns: dict, player_type: str) -> str:
     
     try:
         import openai
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        client = openai.OpenAI(api_key=OPENAI_API_KEY, timeout=OPENAI_TIMEOUT_SECONDS)
         
         if player_type == "bowler":
             prompt = BOWLER_SUMMARY_PROMPT.format(pattern_json=json.dumps(patterns, indent=2))
@@ -160,7 +163,7 @@ def generate_summary_with_llm(patterns: dict, player_type: str) -> str:
                 {"role": "user", "content": prompt}
             ],
             max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE
+            temperature=TEMPERATURE,
         )
         
         return response.choices[0].message.content.strip()
