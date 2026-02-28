@@ -793,10 +793,8 @@ const MatchupMatrix = ({
                                         return <TableCell key={bowler} align="center" sx={{ backgroundColor: 'rgba(25, 118, 210, 0.08)' }}>-</TableCell>;
                                     }
                                     
-                                    // Better lookup logic with more debugging
+                                    // Better lookup logic for the consolidated row
                                     const bowlerData = bowlingConsolidated[bowler];
-                                    console.log(`Bowler: ${bowler}, Data:`, bowlerData);
-                                    console.log(`Available bowling data keys:`, Object.keys(bowlingConsolidated));
                                     
                                     return (
                                         <MetricCell 
@@ -865,18 +863,12 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
     if (error) return <Alert severity="error">{error}</Alert>;
     if (!matchupData) return null;
     
-    console.log("matchupData:", matchupData);
-    console.log("bowlingConsolidated for team1:", matchupData?.team1?.bowling_consolidated);
-    console.log("bowlingConsolidated for team2:", matchupData?.team2?.bowling_consolidated);
-
     if (!matchupData) {
-        console.log("No matchupData returned from API");
         return <Alert severity="info">No matchup data available.</Alert>;
     }
 
     // Check if matchupData has the expected structure
     if (!matchupData.team1 || !matchupData.team2) {
-        console.log("matchupData missing team structure:", matchupData);
         return <Alert severity="warning">Unexpected matchup data format.</Alert>;
     }
 
@@ -887,8 +879,6 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
         matchupData.team2.batting_matchups && 
         Object.keys(matchupData.team2.batting_matchups).length > 0
     );
-
-    console.log("hasMatchups check result:", hasMatchups);
 
     if (!hasMatchups) {
         return (

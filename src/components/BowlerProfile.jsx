@@ -66,12 +66,6 @@ const BowlerProfile = () => {
         const venuesRes = await fetch(`${config.API_URL}/venues`);
         setVenues(['All Venues', ...await venuesRes.json()]);
         
-        console.log('URL parameters:', { 
-          name: getQueryParam('name'), 
-          autoload: getQueryParam('autoload'),
-          start_date: getQueryParam('start_date')
-        });
-        
         // Get player name and other parameters from URL if present
         const playerNameFromURL = getQueryParam('name');
         const autoload = getQueryParam('autoload') === 'true';
@@ -81,7 +75,6 @@ const BowlerProfile = () => {
         
         // Update date range from URL parameters if present
         if (startDateFromURL || endDateFromURL) {
-          console.log('Setting date range from URL:', { start: startDateFromURL || DEFAULT_START_DATE, end: endDateFromURL || TODAY });
           setDateRange({
             start: startDateFromURL || DEFAULT_START_DATE,
             end: endDateFromURL || TODAY
@@ -90,7 +83,6 @@ const BowlerProfile = () => {
         
         // Set venue from URL if present
         if (venueFromURL) {
-          console.log('Setting venue from URL:', venueFromURL);
           setSelectedVenue(venueFromURL);
         }
         
@@ -106,7 +98,6 @@ const BowlerProfile = () => {
                   name: playerData.player_name,
                   display_name: playerData.display_name || playerData.player_name,
                 };
-                console.log('Setting player from URL:', resolvedPlayer);
                 setSelectedPlayer(resolvedPlayer);
                 setPlayerSearchInput(resolvedPlayer.display_name);
                 setPlayerOptions((prev) => {
@@ -172,7 +163,6 @@ const BowlerProfile = () => {
   const handleFetch = () => {
     const selectedPlayerName = typeof selectedPlayer === 'string' ? selectedPlayer : selectedPlayer?.name;
     if (!selectedPlayerName) return;
-    console.log('Manually triggered fetch for player:', selectedPlayerName);
     setShouldFetch(true);
   };
 
@@ -353,7 +343,6 @@ const BowlerProfile = () => {
       if (!shouldFetch || !selectedPlayerName) return;
       setShouldFetch(false);
       
-      console.log('Fetching bowling stats for player:', selectedPlayerName);
       setLoading(true);
       const params = new URLSearchParams();
       
@@ -384,8 +373,6 @@ const BowlerProfile = () => {
           bowling_ball_stats: ballStatsData.bowling_ball_stats || []
         });
         setDnaFetchTrigger(prev => prev + 1);
-        console.log('Bowling stats loaded successfully:', statsData);
-        console.log('Bowling ball stats loaded successfully:', ballStatsData);
       } catch (error) {
         console.error('Error loading bowling stats:', error);
         setError('Failed to load player bowling statistics');

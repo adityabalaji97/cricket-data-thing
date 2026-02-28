@@ -72,12 +72,6 @@ const PlayerProfile = () => {
         const venuesRes = await fetch(`${config.API_URL}/venues`);
         setVenues(['All Venues', ...await venuesRes.json()]);
         
-        console.log('URL parameters:', { 
-          name: getQueryParam('name'), 
-          autoload: getQueryParam('autoload'),
-          start_date: getQueryParam('start_date')
-        });
-        
         // Get player name and other parameters from URL if present
         const playerNameFromURL = getQueryParam('name');
         const autoload = getQueryParam('autoload') === 'true';
@@ -87,7 +81,6 @@ const PlayerProfile = () => {
         
         // Update date range from URL parameters if present
         if (startDateFromURL || endDateFromURL) {
-          console.log('Setting date range from URL:', { start: startDateFromURL || DEFAULT_START_DATE, end: endDateFromURL || TODAY });
           setDateRange({
             start: startDateFromURL || DEFAULT_START_DATE,
             end: endDateFromURL || TODAY
@@ -96,7 +89,6 @@ const PlayerProfile = () => {
         
         // Set venue from URL if present
         if (venueFromURL) {
-          console.log('Setting venue from URL:', venueFromURL);
           setSelectedVenue(venueFromURL);
         }
         
@@ -112,7 +104,6 @@ const PlayerProfile = () => {
                   name: playerData.player_name,
                   display_name: playerData.display_name || playerData.player_name,
                 };
-                console.log('Setting player from URL:', resolvedPlayer);
                 setSelectedPlayer(resolvedPlayer);
                 setPlayerSearchInput(resolvedPlayer.display_name);
                 setPlayerOptions((prev) => {
@@ -178,7 +169,6 @@ const PlayerProfile = () => {
   const handleFetch = () => {
     const selectedPlayerName = typeof selectedPlayer === 'string' ? selectedPlayer : selectedPlayer?.name;
     if (!selectedPlayerName) return;
-    console.log('Manually triggered fetch for player:', selectedPlayerName);
     setShouldFetch(true);
   };
 
@@ -316,7 +306,6 @@ const PlayerProfile = () => {
         if (!shouldFetch || !selectedPlayerName) return;
         setShouldFetch(false);
 
-        console.log('Fetching stats for player:', selectedPlayerName);
         setLoading(true);
         const params = new URLSearchParams();
         
@@ -347,7 +336,6 @@ const PlayerProfile = () => {
             ball_by_ball_stats: ballStatsData.ball_by_ball_stats || []
           });
           setDnaFetchTrigger(prev => prev + 1);
-          console.log('Stats loaded successfully');
         } catch (error) {
           console.error('Error loading stats:', error);
           setError('Failed to load player statistics');

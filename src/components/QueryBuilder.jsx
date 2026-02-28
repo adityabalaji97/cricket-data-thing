@@ -196,8 +196,6 @@ const QueryBuilder = ({ isMobile }) => {
     const urlGroupBy = getGroupByFromUrl();
     
     if (currentParams && currentParams.length > 1 && !hasLoadedFromUrl) {
-      console.log('Loading filters from URL:', urlFilters, 'GroupBy:', urlGroupBy);
-      
       setFilters(prevFilters => ({
         ...prevFilters,
         ...urlFilters
@@ -246,9 +244,7 @@ const QueryBuilder = ({ isMobile }) => {
       });
       
       urlGroupBy.forEach(col => params.append('group_by', col));
-      
-      console.log('Auto-executing query with URL parameters:', Object.fromEntries(params.entries()));
-      
+
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
       setQueryTab(1);
@@ -287,9 +283,7 @@ const QueryBuilder = ({ isMobile }) => {
         const newUrl = `${window.location.pathname}?${newParams}`;
         window.history.replaceState({}, '', newUrl);
       }
-      
-      console.log('Manual query execution. Parameters:', Object.fromEntries(params.entries()));
-      
+
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
       setQueryTab(1);
