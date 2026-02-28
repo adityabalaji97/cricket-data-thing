@@ -1,19 +1,61 @@
 // api/proxy.js
 const https = require('https');
 
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:3000',
+  'https://cricket-data-thing.vercel.app',
+  'https://hindsight2020.vercel.app',
+]);
+
+const getAllowedOrigin = (requestOrigin) => (
+  requestOrigin && ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : null
+);
+
+const getProxyOrigin = (host, requestOrigin) => {
+  const allowedOrigin = getAllowedOrigin(requestOrigin);
+  if (allowedOrigin) {
+    return allowedOrigin;
+  }
+
+  if (host && host.includes('hindsight2020.vercel.app')) {
+    return 'https://hindsight2020.vercel.app';
+  }
+
+  if (host && host.includes('cricket-data-thing.vercel.app')) {
+    return 'https://cricket-data-thing.vercel.app';
+  }
+
+  return 'https://hindsight2020.vercel.app';
+};
+
+const applyCorsHeaders = (req, res) => {
+  const allowedOrigin = getAllowedOrigin(req.headers.origin);
+
+  if (allowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Vary', 'Origin');
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    req.headers['access-control-request-headers'] || 'Content-Type'
+  );
+};
+
 module.exports = (req, res) => {
   // Get the path from the request
   const path = req.url.replace(/^\/api/, '');
-  
-  // Determine the origin based on the host
   const host = req.headers.host;
-  let origin;
-  if (host && host.includes('hindsight2020.vercel.app')) {
-    origin = 'https://hindsight2020.vercel.app';
-  } else if (host && host.includes('cricket-data-thing.vercel.app')) {
-    origin = 'https://cricket-data-thing.vercel.app';
-  } else {
-    origin = 'https://hindsight2020.vercel.app'; // default to new domain
+  const requestOrigin = req.headers.origin;
+  const proxyOrigin = getProxyOrigin(host, requestOrigin);
+
+  if (req.method === 'OPTIONS') {
+    applyCorsHeaders(req, res);
+    res.statusCode = 204;
+    res.end();
+    return;
   }
   
   // Set up the options for the proxied request
@@ -23,25 +65,25 @@ module.exports = (req, res) => {
     method: req.method,
     headers: {
       'Content-Type': 'application/json',
-      'Origin': origin,
+      'Origin': proxyOrigin,
       // Copy other headers as needed
     }
   };
 
   // Make the proxied request
   const proxyReq = https.request(options, (proxyRes) => {
-    // Set CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
     // Copy the status code
     res.statusCode = proxyRes.statusCode;
     
     // Copy the headers
     Object.keys(proxyRes.headers).forEach((key) => {
+      if (key.toLowerCase().startsWith('access-control-')) {
+        return;
+      }
       res.setHeader(key, proxyRes.headers[key]);
     });
+
+    applyCorsHeaders(req, res);
     
     // Stream the response
     proxyRes.pipe(res);
