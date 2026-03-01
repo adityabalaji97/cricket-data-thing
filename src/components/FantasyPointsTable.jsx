@@ -20,11 +20,19 @@ import {
   InputLabel
 } from '@mui/material';
 
-const FantasyPointsTable = ({ players, title, isMobile }) => {
+const FantasyPointsTable = ({
+  players,
+  title,
+  isMobile,
+  maxVisibleRows = null,
+  showPagination = true,
+  showControls = true,
+  tableMaxHeight = 440,
+}) => {
   const [sortField, setSortField] = useState('avg_fantasy_points');
   const [sortDirection, setSortDirection] = useState('desc');
   const [page, setPage] = useState(1);
-  const rowsPerPage = 10;
+  const rowsPerPage = Number.isFinite(maxVisibleRows) && maxVisibleRows > 0 ? maxVisibleRows : 10;
   
   const handleSort = (field) => {
     if (field === sortField) {
@@ -54,68 +62,71 @@ const FantasyPointsTable = ({ players, title, isMobile }) => {
     }
   });
   
-  // Paginate the data
-  const paginatedPlayers = sortedPlayers.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage
-  );
+  const paginatedPlayers = maxVisibleRows
+    ? sortedPlayers.slice(0, rowsPerPage)
+    : sortedPlayers.slice(
+        (page - 1) * rowsPerPage,
+        page * rowsPerPage
+      );
   
   return (
     <Box sx={{ mb: 4 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>{title}</Typography>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2 }}>
-        {isMobile ? (
-          <FormControl size="small" fullWidth>
-            <InputLabel sx={{ fontSize: '0.875rem' }}>Sort by</InputLabel>
-            <Select
-              value={sortField}
-              onChange={(e) => handleSort(e.target.value)}
-              label="Sort by"
-              sx={{ fontSize: '0.875rem' }}
-            >
-              <MenuItem value="avg_fantasy_points" sx={{ fontSize: '0.875rem' }}>Total Points</MenuItem>
-              <MenuItem value="avg_batting_points" sx={{ fontSize: '0.875rem' }}>Batting</MenuItem>
-              <MenuItem value="avg_bowling_points" sx={{ fontSize: '0.875rem' }}>Bowling</MenuItem>
-              <MenuItem value="avg_fielding_points" sx={{ fontSize: '0.875rem' }}>Fielding</MenuItem>
-            </Select>
-          </FormControl>
-        ) : (
-          <>
-            <Typography variant="body2" color="text.secondary">Sort by:</Typography>
-            <ButtonGroup size="small">
-              <Button
-                variant={sortField === 'avg_fantasy_points' ? 'contained' : 'outlined'}
-                onClick={() => handleSort('avg_fantasy_points')}
+      {showControls ? (
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2 }}>
+          {isMobile ? (
+            <FormControl size="small" fullWidth>
+              <InputLabel sx={{ fontSize: '0.875rem' }}>Sort by</InputLabel>
+              <Select
+                value={sortField}
+                onChange={(e) => handleSort(e.target.value)}
+                label="Sort by"
+                sx={{ fontSize: '0.875rem' }}
               >
-                Total Points
-              </Button>
-              <Button
-                variant={sortField === 'avg_batting_points' ? 'contained' : 'outlined'}
-                onClick={() => handleSort('avg_batting_points')}
-              >
-                Batting
-              </Button>
-              <Button
-                variant={sortField === 'avg_bowling_points' ? 'contained' : 'outlined'}
-                onClick={() => handleSort('avg_bowling_points')}
-              >
-                Bowling
-              </Button>
-              <Button
-                variant={sortField === 'avg_fielding_points' ? 'contained' : 'outlined'}
-                onClick={() => handleSort('avg_fielding_points')}
-              >
-                Fielding
-              </Button>
-            </ButtonGroup>
-          </>
-        )}
-      </Box>
+                <MenuItem value="avg_fantasy_points" sx={{ fontSize: '0.875rem' }}>Total Points</MenuItem>
+                <MenuItem value="avg_batting_points" sx={{ fontSize: '0.875rem' }}>Batting</MenuItem>
+                <MenuItem value="avg_bowling_points" sx={{ fontSize: '0.875rem' }}>Bowling</MenuItem>
+                <MenuItem value="avg_fielding_points" sx={{ fontSize: '0.875rem' }}>Fielding</MenuItem>
+              </Select>
+            </FormControl>
+          ) : (
+            <>
+              <Typography variant="body2" color="text.secondary">Sort by:</Typography>
+              <ButtonGroup size="small">
+                <Button
+                  variant={sortField === 'avg_fantasy_points' ? 'contained' : 'outlined'}
+                  onClick={() => handleSort('avg_fantasy_points')}
+                >
+                  Total Points
+                </Button>
+                <Button
+                  variant={sortField === 'avg_batting_points' ? 'contained' : 'outlined'}
+                  onClick={() => handleSort('avg_batting_points')}
+                >
+                  Batting
+                </Button>
+                <Button
+                  variant={sortField === 'avg_bowling_points' ? 'contained' : 'outlined'}
+                  onClick={() => handleSort('avg_bowling_points')}
+                >
+                  Bowling
+                </Button>
+                <Button
+                  variant={sortField === 'avg_fielding_points' ? 'contained' : 'outlined'}
+                  onClick={() => handleSort('avg_fielding_points')}
+                >
+                  Fielding
+                </Button>
+              </ButtonGroup>
+            </>
+          )}
+        </Box>
+      ) : null}
       
       <TableContainer
         component={Paper}
         sx={{
-          maxHeight: 440,
+          maxHeight: tableMaxHeight,
           overflow: 'auto',
           backgroundColor: isMobile ? 'transparent' : undefined,
           boxShadow: isMobile ? 0 : undefined
@@ -139,17 +150,17 @@ const FantasyPointsTable = ({ players, title, isMobile }) => {
                 <TableCell>{player.player_name}</TableCell>
                 {!isMobile && <TableCell>{player.team}</TableCell>}
                 <TableCell>{player.matches_played}</TableCell>
-                <TableCell><strong>{player.avg_fantasy_points.toFixed(1)}</strong></TableCell>
-                <TableCell>{player.avg_batting_points.toFixed(1)}</TableCell>
-                <TableCell>{player.avg_bowling_points.toFixed(1)}</TableCell>
-                {!isMobile && <TableCell>{player.avg_fielding_points.toFixed(1)}</TableCell>}
+                <TableCell><strong>{(player.avg_fantasy_points || 0).toFixed(1)}</strong></TableCell>
+                <TableCell>{(player.avg_batting_points || 0).toFixed(1)}</TableCell>
+                <TableCell>{(player.avg_bowling_points || 0).toFixed(1)}</TableCell>
+                {!isMobile && <TableCell>{(player.avg_fielding_points || 0).toFixed(1)}</TableCell>}
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
       
-      {sortedPlayers.length > rowsPerPage && (
+      {showPagination && !maxVisibleRows && sortedPlayers.length > rowsPerPage && (
         <Stack spacing={2} sx={{ mt: 2, alignItems: 'center' }}>
           <Pagination 
             count={Math.ceil(sortedPlayers.length / rowsPerPage)} 

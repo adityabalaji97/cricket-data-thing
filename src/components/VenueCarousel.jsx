@@ -1,23 +1,23 @@
 import React from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Pagination, A11y } from 'swiper/modules';
+import { A11y } from 'swiper/modules';
 import { Box } from '@mui/material';
 import 'swiper/css';
-import 'swiper/css/pagination';
 
-const VenueCarousel = ({ slides, onSlideChange, swiperRef }) => (
+const VenueCarousel = ({ cards, onSlideChange, swiperRef }) => (
   <Box sx={{
-    '.swiper-slide': {
-      overflowY: 'auto',
-      maxHeight: 'calc(100vh - 160px)',
-      WebkitOverflowScrolling: 'touch',
+    height: '100%',
+    '.swiper': {
+      height: '100%',
     },
-    '.swiper-pagination': {
-      display: 'none',
+    '.swiper-slide': {
+      height: 'auto',
+      display: 'flex',
+      alignItems: 'stretch',
     },
   }}>
     <Swiper
-      modules={[Pagination, A11y]}
+      modules={[A11y]}
       onSwiper={(swiper) => { swiperRef.current = swiper; }}
       onSlideChange={(swiper) => onSlideChange(swiper.activeIndex)}
       spaceBetween={16}
@@ -25,12 +25,19 @@ const VenueCarousel = ({ slides, onSlideChange, swiperRef }) => (
       speed={300}
       touchEventsTarget="wrapper"
       touchStartPreventDefault={false}
-      style={{ minHeight: '60vh' }}
+      threshold={14}
+      touchAngle={30}
+      resistanceRatio={0.6}
+      noSwiping
+      noSwipingSelector=".MuiTabs-root, .MuiTableContainer-root, .MuiPagination-root, .MuiButtonBase-root, [data-carousel-no-swipe]"
+      observer
+      observeParents
+      style={{ height: '100%' }}
     >
-      {slides.map((slide) => (
-        <SwiperSlide key={slide.id}>
-          <Box sx={{ px: { xs: 0.5, sm: 1 }, py: 1 }}>
-            {slide.content}
+      {cards.map((card) => (
+        <SwiperSlide key={card.id}>
+          <Box sx={{ width: '100%', px: { xs: 0.5, sm: 1 }, py: 1, display: 'flex' }}>
+            {card.content}
           </Box>
         </SwiperSlide>
       ))}

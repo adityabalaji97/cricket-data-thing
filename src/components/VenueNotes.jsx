@@ -49,7 +49,9 @@ import VenueTacticalMap from './VenueTacticalMap';
 import MatchPreviewCard from './MatchPreviewCard';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 import VenueCarousel from './VenueCarousel';
-import SlideChipBar from './SlideChipBar';
+import VenueNotesCardShell from './VenueNotesCardShell';
+import VenueNotesMobileNav from './VenueNotesMobileNav';
+import VenueNotesDesktopNav from './VenueNotesDesktopNav';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -878,6 +880,49 @@ const PhaseWiseStrategy = ({ data, isMobile }) => {
     );
 };
 
+const CompactFantasyComparison = ({
+    venue,
+    selectedTeam1,
+    selectedTeam2,
+    venueFantasyStats,
+    isMobile,
+}) => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }} data-carousel-no-swipe>
+        <FantasyPointsTable
+            players={venueFantasyStats?.team1_players || []}
+            title={`${selectedTeam1.abbreviated_name} top options at ${venue}`}
+            isMobile={isMobile}
+            maxVisibleRows={3}
+            showPagination={false}
+            showControls={false}
+            tableMaxHeight={190}
+        />
+        <FantasyPointsTable
+            players={venueFantasyStats?.team2_players || []}
+            title={`${selectedTeam2.abbreviated_name} top options at ${venue}`}
+            isMobile={isMobile}
+            maxVisibleRows={3}
+            showPagination={false}
+            showControls={false}
+            tableMaxHeight={190}
+        />
+    </Box>
+);
+
+const CompactFantasyVenueHistory = ({ venue, venuePlayerHistory, isMobile }) => (
+    <Box data-carousel-no-swipe>
+        <FantasyPointsTable
+            players={venuePlayerHistory?.players || []}
+            title={`Venue fantasy standouts at ${venue}`}
+            isMobile={isMobile}
+            maxVisibleRows={5}
+            showPagination={false}
+            showControls={false}
+            tableMaxHeight={220}
+        />
+    </Box>
+);
+
 const VenueNotes = ({
     venue,
     startDate,
@@ -893,26 +938,17 @@ const VenueNotes = ({
   }) => {
 
     const [fantasyTabValue, setFantasyTabValue] = useState(0);
-    const [activeIndex, setActiveIndex] = useState(0);
+    const [activeCardIndex, setActiveCardIndex] = useState(0);
+    const [activeSectionId, setActiveSectionId] = useState('results');
     const swiperRef = useRef(null);
+    const sectionRefs = useRef({});
 
-    const handleChipClick = useCallback((index) => {
-        if (swiperRef.current) {
-            swiperRef.current.slideTo(index);
-        }
-        setActiveIndex(index);
-    }, []);
-
-    const handleSlideChange = useCallback((index) => {
-        setActiveIndex(index);
-    }, []);
-
-    const slides = useMemo(() => {
-        const allSlides = [
+    const sectionGroups = useMemo(() => {
+        const groups = [
             {
                 id: 'results',
-                chipLabel: 'Results',
-                content: (
+                label: 'Results',
+                desktopContent: (
                     <Grid container spacing={isMobile ? 2 : 3}>
                         <Grid item xs={12} md={6}>
                             <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
@@ -926,52 +962,107 @@ const VenueNotes = ({
                         </Grid>
                     </Grid>
                 ),
+                mobileCards: [
+                    {
+                        id: 'results-distribution',
+                        cardLabel: 'Match Results',
+                        content: <WinPercentagesPie data={venueStats} />,
+                    },
+                    {
+                        id: 'results-scores',
+                        cardLabel: 'Score Benchmarks',
+                        content: <ScoresBarChart data={venueStats} />,
+                    },
+                ],
             },
             {
                 id: 'phases',
-                chipLabel: 'Phases',
-                content: (
+                label: 'Phases',
+                desktopContent: (
                     <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
                         <PhaseWiseStrategy data={venueStats} isMobile={isMobile} />
                     </Card>
                 ),
+                mobileCards: [
+                    {
+                        id: 'phases-strategy',
+                        cardLabel: 'Phase Strategy',
+                        content: <PhaseWiseStrategy data={venueStats} isMobile={isMobile} />,
+                    },
+                ],
             },
             {
                 id: 'tactical',
-                chipLabel: 'Tactical',
-                content: (
-                    <VenueTacticalMap
-                        venue={venue}
-                        startDate={startDate}
-                        endDate={endDate}
-                        isMobile={isMobile}
-                    />
+                label: 'Tactical',
+                desktopContent: (
+                    <Box data-carousel-no-swipe>
+                        <VenueTacticalMap
+                            venue={venue}
+                            startDate={startDate}
+                            endDate={endDate}
+                            isMobile={isMobile}
+                        />
+                    </Box>
                 ),
-            },
-            {
-                id: 'queries',
-                chipLabel: 'Queries',
-                content: (
-                    <ContextualQueryPrompts
-                        queries={getVenueContextualQueries(venue, {
-                            startDate,
-                            endDate,
-                            leagues: [],
-                            team1: selectedTeam1,
-                            team2: selectedTeam2,
-                        })}
-                        title={`Explore ${venue.split(',')[0]} Data`}
-                    />
-                ),
+                mobileCards: [
+                    {
+                        id: 'tactical-pitch',
+                        cardLabel: 'Pitch Map',
+                        content: (
+                            <Box data-carousel-no-swipe>
+                                <VenueTacticalMap
+                                    venue={venue}
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    isMobile={isMobile}
+                                    forcedView="pitch"
+                                    showTabs={false}
+                                />
+                            </Box>
+                        ),
+                    },
+                    {
+                        id: 'tactical-wagon',
+                        cardLabel: 'Wagon Wheel',
+                        content: (
+                            <Box data-carousel-no-swipe>
+                                <VenueTacticalMap
+                                    venue={venue}
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    isMobile={isMobile}
+                                    forcedView="wagon"
+                                    showTabs={false}
+                                />
+                            </Box>
+                        ),
+                    },
+                    {
+                        id: 'tactical-top-buckets',
+                        cardLabel: 'Top Buckets',
+                        content: (
+                            <Box data-carousel-no-swipe>
+                                <VenueTacticalMap
+                                    venue={venue}
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    isMobile={isMobile}
+                                    forcedView="topBuckets"
+                                    showTabs={false}
+                                />
+                            </Box>
+                        ),
+                    },
+                ],
             },
         ];
 
         if (selectedTeam1 && selectedTeam2) {
-            allSlides.push(
+            groups.push(
                 {
                     id: 'preview',
-                    chipLabel: 'Preview',
-                    content: (
+                    label: 'Preview',
+                    desktopContent: (
                         <MatchPreviewCard
                             venue={venue}
                             team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
@@ -983,11 +1074,29 @@ const VenueNotes = ({
                             isMobile={isMobile}
                         />
                     ),
+                    mobileCards: [
+                        {
+                            id: 'preview-match',
+                            cardLabel: 'Match Preview',
+                            content: (
+                                <MatchPreviewCard
+                                    venue={venue}
+                                    team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
+                                    team2Identifier={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    includeInternational
+                                    topTeams={20}
+                                    isMobile={isMobile}
+                                />
+                            ),
+                        },
+                    ],
                 },
                 {
                     id: 'history',
-                    chipLabel: 'History',
-                    content: matchHistory ? (
+                    label: 'History',
+                    desktopContent: matchHistory ? (
                         <MatchHistory
                             venue={venue}
                             team1={selectedTeam1.abbreviated_name}
@@ -1003,13 +1112,37 @@ const VenueNotes = ({
                             <CircularProgress size={24} />
                         </Box>
                     ),
+                    mobileCards: [
+                        {
+                            id: 'history-match',
+                            cardLabel: 'Match History',
+                            content: matchHistory ? (
+                                <Box data-carousel-no-swipe>
+                                    <MatchHistory
+                                        venue={venue}
+                                        team1={selectedTeam1.abbreviated_name}
+                                        team2={selectedTeam2.abbreviated_name}
+                                        venueResults={matchHistory.venue_results}
+                                        team1Results={matchHistory.team1_results}
+                                        team2Results={matchHistory.team2_results}
+                                        h2hStats={matchHistory.h2h_stats}
+                                        isMobile={isMobile}
+                                    />
+                                </Box>
+                            ) : (
+                                <Box sx={{ py: 6, textAlign: 'center' }}>
+                                    <CircularProgress size={24} />
+                                </Box>
+                            ),
+                        },
+                    ],
                 },
                 {
                     id: 'matchups',
-                    chipLabel: 'Matchups',
-                    content: (
+                    label: 'Matchups',
+                    desktopContent: (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            <Box>
+                            <Box data-carousel-no-swipe>
                                 <Typography variant="h5" gutterBottom>
                                     Player Matchups
                                 </Typography>
@@ -1025,7 +1158,7 @@ const VenueNotes = ({
                                 <Typography variant="h6" gutterBottom>
                                     Fantasy Points Analysis
                                 </Typography>
-                                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }} data-carousel-no-swipe>
                                     <Tabs value={fantasyTabValue} onChange={(e, newValue) => setFantasyTabValue(newValue)}>
                                         <Tab label="Team Comparison" />
                                         <Tab label="Venue History" />
@@ -1086,15 +1219,56 @@ const VenueNotes = ({
                             </Card>
                         </Box>
                     ),
+                    mobileCards: [
+                        {
+                            id: 'matchups-player',
+                            cardLabel: 'Player Matchups',
+                            content: (
+                                <Box data-carousel-no-swipe>
+                                    <Matchups
+                                        team1={selectedTeam1.full_name}
+                                        team2={selectedTeam2.full_name}
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        isMobile={isMobile}
+                                    />
+                                </Box>
+                            ),
+                        },
+                        {
+                            id: 'matchups-fantasy-team',
+                            cardLabel: 'Fantasy Team Comparison',
+                            content: (
+                                <CompactFantasyComparison
+                                    venue={venue}
+                                    selectedTeam1={selectedTeam1}
+                                    selectedTeam2={selectedTeam2}
+                                    venueFantasyStats={venueFantasyStats}
+                                    isMobile={isMobile}
+                                />
+                            ),
+                        },
+                        {
+                            id: 'matchups-fantasy-history',
+                            cardLabel: 'Fantasy Venue History',
+                            content: (
+                                <CompactFantasyVenueHistory
+                                    venue={venue}
+                                    venuePlayerHistory={venuePlayerHistory}
+                                    isMobile={isMobile}
+                                />
+                            ),
+                        },
+                    ],
                 },
             );
         }
 
         if (statsData?.batting_leaders?.length > 0 || statsData?.bowling_leaders?.length > 0) {
-            allSlides.push({
+            groups.push({
                 id: 'leaders',
-                chipLabel: 'Leaders',
-                content: (
+                label: 'Leaders',
+                desktopContent: (
                     <Grid container spacing={isMobile ? 2 : 3}>
                         {statsData?.batting_leaders?.length > 0 && (
                             <Grid item xs={12} md={6}>
@@ -1112,14 +1286,26 @@ const VenueNotes = ({
                         )}
                     </Grid>
                 ),
+                mobileCards: [
+                    ...(statsData?.batting_leaders?.length > 0 ? [{
+                        id: 'leaders-batting',
+                        cardLabel: 'Batting Leaders',
+                        content: <BattingLeaders data={statsData.batting_leaders} isMobile={isMobile} />,
+                    }] : []),
+                    ...(statsData?.bowling_leaders?.length > 0 ? [{
+                        id: 'leaders-bowling',
+                        cardLabel: 'Bowling Leaders',
+                        content: <BowlingLeaders data={statsData.bowling_leaders} isMobile={isMobile} />,
+                    }] : []),
+                ],
             });
         }
 
         if (statsData?.batting_scatter?.length > 0) {
-            allSlides.push({
+            groups.push({
                 id: 'analysis',
-                chipLabel: 'Analysis',
-                content: (
+                label: 'Analysis',
+                desktopContent: (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                         <BattingScatterChart data={statsData.batting_scatter} isMobile={isMobile} />
                         <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
@@ -1137,113 +1323,300 @@ const VenueNotes = ({
                         </Card>
                     </Box>
                 ),
+                mobileCards: [
+                    {
+                        id: 'analysis-scatter',
+                        cardLabel: 'Batting Scatter',
+                        content: <BattingScatterChart data={statsData.batting_scatter} isMobile={isMobile} />,
+                    },
+                    {
+                        id: 'analysis-bowling',
+                        cardLabel: 'Bowling Analysis',
+                        content: (
+                            <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
+                                <Box sx={{ position: 'relative' }}>
+                                    <BowlingAnalysis
+                                        venue={venue}
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        isMobile={isMobile}
+                                    />
+                                </Box>
+                            </Card>
+                        ),
+                    },
+                ],
             });
         }
 
-        allSlides.push({
-            id: 'credits',
-            chipLabel: 'Credits',
-            content: (
-                <Box sx={{ pt: 2 }}>
-                    <Typography variant="h6" gutterBottom align="center">
-                        Credits & Acknowledgements
-                    </Typography>
-                    <Grid container spacing={3} sx={{ mt: 1 }}>
-                        <Grid item xs={12} md={4}>
-                            <Typography variant="subtitle2" gutterBottom color="primary">
-                                Data Sources
-                            </Typography>
-                            <Typography variant="body2" paragraph>
-                                Ball-by-ball data from <a href="https://cricsheet.org/" target="_blank" rel="noopener noreferrer">Cricsheet.org</a>
-                            </Typography>
-                            <Typography variant="body2" paragraph>
-                                Player information from <a href="https://cricmetric.com/" target="_blank" rel="noopener noreferrer">Cricmetric</a>
-                            </Typography>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                            <Typography variant="subtitle2" gutterBottom color="primary">
-                                Metrics & Visualization Inspiration
-                            </Typography>
-                            <Typography variant="body2" component="div">
-                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                                    <a href="https://twitter.com/prasannalara" target="_blank" rel="noopener noreferrer">@prasannalara</a>
-                                </Box>
-                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                                    <a href="https://twitter.com/cricketingview" target="_blank" rel="noopener noreferrer">@cricketingview</a>
-                                </Box>
-                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                                    <a href="https://twitter.com/IndianMourinho" target="_blank" rel="noopener noreferrer">@IndianMourinho</a>
-                                </Box>
-                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                                    <a href="https://twitter.com/hganjoo_153" target="_blank" rel="noopener noreferrer">@hganjoo_153</a>
-                                </Box>
-                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                                    <a href="https://twitter.com/randomcricstat" target="_blank" rel="noopener noreferrer">@randomcricstat</a>
-                                </Box>
-                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                                    <a href="https://twitter.com/kaustats" target="_blank" rel="noopener noreferrer">@kaustats</a>
-                                </Box>
-                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                                    <a href="https://twitter.com/cricviz" target="_blank" rel="noopener noreferrer">@cricviz</a>
-                                </Box>
-                                <Box component="span" sx={{ display: 'inline-block', mr: 1, mb: 0.5 }}>
-                                    <a href="https://twitter.com/ajarrodkimber" target="_blank" rel="noopener noreferrer">@ajarrodkimber</a>
-                                </Box>
-                            </Typography>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                            <Typography variant="subtitle2" gutterBottom color="primary">
-                                Development Assistance
-                            </Typography>
-                            <Typography variant="body2" paragraph>
-                                Claude and ChatGPT for Vibe Coding my way through this project
-                            </Typography>
-                        </Grid>
-                    </Grid>
-                    <Typography variant="body2" color="textSecondary" align="center" sx={{ mt: 3, pb: 2 }}>
-                        Cricket Data Thing &copy; {new Date().getFullYear()} - Advanced cricket analytics and visualization
-                    </Typography>
-                </Box>
+        groups.push({
+            id: 'queries',
+            label: 'Queries',
+            desktopContent: (
+                <ContextualQueryPrompts
+                    queries={getVenueContextualQueries(venue, {
+                        startDate,
+                        endDate,
+                        leagues: [],
+                        team1: selectedTeam1,
+                        team2: selectedTeam2,
+                    })}
+                    title={`Explore ${venue.split(',')[0]} Data`}
+                />
             ),
+            mobileCards: [
+                {
+                    id: 'queries-explore',
+                    cardLabel: 'Explore Queries',
+                    content: (
+                        <ContextualQueryPrompts
+                            queries={getVenueContextualQueries(venue, {
+                                startDate,
+                                endDate,
+                                leagues: [],
+                                team1: selectedTeam1,
+                                team2: selectedTeam2,
+                            })}
+                            title={`Explore ${venue.split(',')[0]} Data`}
+                        />
+                    ),
+                },
+            ],
         });
 
-        return allSlides;
+        return groups;
     }, [venueStats, statsData, selectedTeam1, selectedTeam2, venue, startDate, endDate, matchHistory, venueFantasyStats, venuePlayerHistory, isMobile, fantasyTabValue]);
 
-    // Reset to first slide when teams change
-    useEffect(() => {
-        setActiveIndex(0);
-        if (swiperRef.current) {
-            swiperRef.current.slideTo(0);
+    const mobileCards = useMemo(
+        () => sectionGroups.flatMap((group) =>
+            group.mobileCards.map((card, index, groupCards) => ({
+                ...card,
+                groupId: group.id,
+                groupLabel: group.label,
+                groupCardIndex: index,
+                groupCardTotal: groupCards.length,
+            }))
+        ),
+        [sectionGroups]
+    );
+
+    const activeCard = mobileCards[activeCardIndex] || mobileCards[0];
+    const activeGroupId = activeCard?.groupId || sectionGroups[0]?.id || 'results';
+
+    const goToCard = useCallback((index) => {
+        if (!mobileCards.length) {
+            return;
         }
-    }, [selectedTeam1, selectedTeam2]);
+        const nextIndex = Math.max(0, Math.min(index, mobileCards.length - 1));
+        if (swiperRef.current && swiperRef.current.activeIndex !== nextIndex) {
+            swiperRef.current.slideTo(nextIndex);
+        }
+        setActiveCardIndex(nextIndex);
+    }, [mobileCards.length]);
+
+    const handleCardChange = useCallback((index) => {
+        setActiveCardIndex(index);
+    }, []);
+
+    const handleGroupClick = useCallback((groupId) => {
+        const nextIndex = mobileCards.findIndex((card) => card.groupId === groupId);
+        if (nextIndex >= 0) {
+            goToCard(nextIndex);
+        }
+    }, [goToCard, mobileCards]);
+
+    const handleSectionSelect = useCallback((sectionId) => {
+        setActiveSectionId(sectionId);
+        const sectionElement = sectionRefs.current[sectionId];
+        if (sectionElement) {
+            sectionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, []);
+
+    const carouselCards = useMemo(
+        () => mobileCards.map((card) => ({
+            ...card,
+            content: (
+                <VenueNotesCardShell
+                    groupLabel={card.groupLabel}
+                    cardLabel={card.cardLabel}
+                    metaText={`${card.groupCardIndex + 1} of ${card.groupCardTotal}`}
+                    isMobile
+                >
+                    {card.content}
+                </VenueNotesCardShell>
+            ),
+        })),
+        [mobileCards]
+    );
+
+    useEffect(() => {
+        if (activeCardIndex >= mobileCards.length && mobileCards.length > 0) {
+            goToCard(mobileCards.length - 1);
+        }
+    }, [activeCardIndex, goToCard, mobileCards.length]);
+
+    useEffect(() => {
+        setFantasyTabValue(0);
+        setActiveCardIndex(0);
+        setActiveSectionId('results');
+        if (swiperRef.current) {
+            swiperRef.current.slideTo(0, 0);
+        }
+    }, [selectedTeam1, selectedTeam2, venue]);
+
+    useEffect(() => {
+        if (isMobile || !sectionGroups.length) {
+            return undefined;
+        }
+
+        const visibleSections = new Map();
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                const sectionId = entry.target.dataset.sectionId;
+                if (!sectionId) {
+                    return;
+                }
+                if (entry.isIntersecting) {
+                    visibleSections.set(sectionId, entry.intersectionRatio);
+                } else {
+                    visibleSections.delete(sectionId);
+                }
+            });
+
+            const nextActive = [...visibleSections.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+            if (nextActive) {
+                setActiveSectionId(nextActive);
+            }
+        }, {
+            rootMargin: '-15% 0px -60% 0px',
+            threshold: [0.1, 0.35, 0.6],
+        });
+
+        sectionGroups.forEach((group) => {
+            const element = sectionRefs.current[group.id];
+            if (element) {
+                observer.observe(element);
+            }
+        });
+
+        return () => observer.disconnect();
+    }, [isMobile, sectionGroups]);
+
+    useEffect(() => {
+        if (!isMobile && activeGroupId) {
+            setActiveSectionId(activeGroupId);
+        }
+    }, [activeGroupId, isMobile]);
 
 if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
 
 return (
-    <Box sx={{ p: { xs: 1, sm: 2 }, pb: '60px' }}>
-        <Typography variant={isMobile ? "h5" : "h4"} gutterBottom>
-            {venue === "All Venues" ?
-                `All Venues - ${venueStats.total_matches} T20s` :
-                `${venue} - ${venueStats.total_matches} T20s`
-            }
-            <Typography variant="subtitle1" color="text.secondary">
-                {startDate} to {endDate}
+    <Box sx={{ p: { xs: 1, sm: 2 }, pb: isMobile ? '92px' : 0 }}>
+        <Box
+            sx={{
+                mb: 2.5,
+                px: { xs: 2, sm: 3 },
+                py: { xs: 2, sm: 2.5 },
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 3,
+                boxShadow: 1,
+                bgcolor: 'background.paper',
+                backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(250,250,250,1) 100%)',
+            }}
+        >
+            <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 700 }}>
+                {venue === "All Venues"
+                    ? `All Venues`
+                    : venue
+                }
             </Typography>
-        </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.25 }}>
+                <Box sx={{ px: 1.25, py: 0.5, borderRadius: 2, bgcolor: 'rgba(2, 132, 199, 0.08)', color: 'primary.main', fontSize: '0.8rem', fontWeight: 700 }}>
+                    {venueStats.total_matches} T20s
+                </Box>
+                <Box sx={{ px: 1.25, py: 0.5, borderRadius: 2, bgcolor: 'grey.100', color: 'text.secondary', fontSize: '0.8rem', fontWeight: 600 }}>
+                    {startDate} to {endDate}
+                </Box>
+            </Box>
+        </Box>
 
-        <VenueCarousel
-            slides={slides}
-            activeIndex={activeIndex}
-            onSlideChange={handleSlideChange}
-            swiperRef={swiperRef}
-        />
-
-        <SlideChipBar
-            slides={slides}
-            activeIndex={activeIndex}
-            onChipClick={handleChipClick}
-        />
+        {isMobile ? (
+            <>
+                <VenueCarousel
+                    cards={carouselCards}
+                    onSlideChange={handleCardChange}
+                    swiperRef={swiperRef}
+                />
+                <VenueNotesMobileNav
+                    sections={sectionGroups.map(({ id, label }) => ({ id, label }))}
+                    activeGroupId={activeGroupId}
+                    activeGroupLabel={activeCard?.groupLabel || sectionGroups[0]?.label || 'Results'}
+                    activeCardMeta={activeCard ? `${activeCard.groupCardIndex + 1} of ${activeCard.groupCardTotal}` : null}
+                    onGroupClick={handleGroupClick}
+                    onPrevious={() => goToCard(activeCardIndex - 1)}
+                    onNext={() => goToCard(activeCardIndex + 1)}
+                    disablePrevious={activeCardIndex === 0}
+                    disableNext={activeCardIndex >= mobileCards.length - 1}
+                />
+            </>
+        ) : (
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '240px minmax(0, 1fr)',
+                    gap: 3,
+                    alignItems: 'start',
+                }}
+            >
+                <VenueNotesDesktopNav
+                    sections={sectionGroups.map(({ id, label }) => ({ id, label }))}
+                    activeSectionId={activeSectionId}
+                    onSectionSelect={handleSectionSelect}
+                />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {sectionGroups.map((section) => (
+                        <Box
+                            key={section.id}
+                            ref={(element) => {
+                                sectionRefs.current[section.id] = element;
+                            }}
+                            data-section-id={section.id}
+                            sx={{ scrollMarginTop: '88px' }}
+                        >
+                            <Card
+                                sx={{
+                                    p: 3,
+                                    borderRadius: 3,
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    boxShadow: 1,
+                                }}
+                            >
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        display: 'block',
+                                        mb: 0.75,
+                                        color: 'primary.main',
+                                        fontWeight: 700,
+                                        letterSpacing: '0.08em',
+                                        textTransform: 'uppercase',
+                                    }}
+                                >
+                                    Section
+                                </Typography>
+                                <Typography variant="h5" sx={{ mb: 2.5, fontWeight: 700 }}>
+                                    {section.label}
+                                </Typography>
+                                {section.desktopContent}
+                            </Card>
+                        </Box>
+                    ))}
+                </Box>
+            </Box>
+        )}
     </Box>
 );
 };

@@ -24,8 +24,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import VenueNotes from './components/VenueNotes';
-import MatchHistory from './components/MatchHistory';
-import Matchups from './components/Matchups';
 import MatchupsTab from './components/MatchupsTab';
 import CompetitionFilter from './components/CompetitionFilter';
 import LandingPage from './components/LandingPage';
@@ -40,6 +38,7 @@ import WrappedPage from './components/wrapped/WrappedPage';
 import { GoogleSearchLanding, SearchBar } from './components/search';
 import GuessInningsGame from './components/games/GuessInningsGame';
 import PlayerJourneysGame from './components/games/PlayerJourneysGame';
+import CreditsPage from './components/CreditsPage';
 import axios from 'axios';
 
 import config from './config';
@@ -65,6 +64,7 @@ const AppContent = () => {
     path === '/doppelgangers' ? 10 :
     path === '/games/guess-innings' ? 11 :
     path === '/games/player-journeys' ? 12 :
+    path === '/credits' ? false :
     path.startsWith('/wrapped') ? false : 0
   );
 
@@ -82,6 +82,7 @@ const AppContent = () => {
     path === '/doppelgangers' ? 'Doppelgangers' :
     path === '/games/guess-innings' ? 'Guess the Innings' :
     path === '/games/player-journeys' ? 'Player Journeys' :
+    path === '/credits' ? 'Credits & Acknowledgements' :
     path.startsWith('/wrapped') ? '2025 Wrapped' : 'Home'
   );
   
@@ -614,6 +615,7 @@ const AppContent = () => {
         <Route path="/games/player-journeys" element={<PlayerJourneysGame isMobile={isMobile} />} />
         <Route path="/wrapped/2025" element={<WrappedPage />} />
         <Route path="/search" element={<GoogleSearchLanding />} />
+        <Route path="/credits" element={<CreditsPage />} />
         <Route path="/venue" element={
           <Box sx={{ my: 3 }}>
             {error && (
@@ -794,6 +796,33 @@ const AppContent = () => {
           </Box>
         } />
       </Routes>
+      {!location.pathname.startsWith('/wrapped') && (
+        <Box
+          sx={{
+            mt: 4,
+            mb: 3,
+            pt: 2,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            textAlign: 'center',
+          }}
+        >
+          <Typography
+            component={Link}
+            to="/credits"
+            variant="body2"
+            sx={{
+              color: 'text.secondary',
+              textDecoration: 'none',
+              '&:hover': {
+                color: 'primary.main',
+              },
+            }}
+          >
+            Credits & Acknowledgements
+          </Typography>
+        </Box>
+      )}
     </Container>
   );
 };

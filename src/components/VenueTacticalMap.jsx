@@ -28,6 +28,8 @@ const VenueTacticalMap = ({
   leagues,
   includeInternational = false,
   topTeams = null,
+  forcedView = null,
+  showTabs = true,
 }) => {
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -492,6 +494,14 @@ const VenueTacticalMap = ({
     );
   }
 
+  const activeTab = forcedView === 'pitch'
+    ? 0
+    : forcedView === 'wagon'
+    ? 1
+    : forcedView === 'topBuckets'
+    ? 2
+    : tab;
+
   return (
     <Card isMobile={isMobile}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', flexWrap: 'wrap', mb: 1.5 }}>
@@ -504,18 +514,22 @@ const VenueTacticalMap = ({
         </Box>
       </Box>
 
-      <FilterBar
-        filters={filterConfig}
-        activeFilters={{ phase, bowlKind, bowlStyle, batHand, line, length, shot, pitchMetric }}
-        onFilterChange={handleFilterChange}
-        isMobile={isMobile}
-      />
+      <Box data-carousel-no-swipe>
+        <FilterBar
+          filters={filterConfig}
+          activeFilters={{ phase, bowlKind, bowlStyle, batHand, line, length, shot, pitchMetric }}
+          onFilterChange={handleFilterChange}
+          isMobile={isMobile}
+        />
+      </Box>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mt: 1.5, mb: 1 }}>
-        <Tab label="Pitch Map" />
-        <Tab label="Wagon Wheel" />
-        <Tab label="Top Buckets" />
-      </Tabs>
+      {showTabs ? (
+        <Tabs value={activeTab} onChange={(_, v) => setTab(v)} sx={{ mt: 1.5, mb: 1 }}>
+          <Tab label="Pitch Map" />
+          <Tab label="Wagon Wheel" />
+          <Tab label="Top Buckets" />
+        </Tabs>
+      ) : null}
 
       {loading && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -523,7 +537,7 @@ const VenueTacticalMap = ({
         </Typography>
       )}
 
-      {tab === 0 && (
+      {activeTab === 0 && (
         <Box sx={{ maxWidth: isMobile ? 360 : 440, mx: 'auto' }}>
           {pitchData?.total_balls ? (
             <PitchMapVisualization
@@ -545,14 +559,16 @@ const VenueTacticalMap = ({
         </Box>
       )}
 
-      {tab === 1 && (
+      {activeTab === 1 && (
         <Box>
-          <FilterBar
-            filters={wagonTabFilters}
-            activeFilters={{ wagonView, wagonMetric }}
-            onFilterChange={handleFilterChange}
-            isMobile={isMobile}
-          />
+          <Box data-carousel-no-swipe>
+            <FilterBar
+              filters={wagonTabFilters}
+              activeFilters={{ wagonView, wagonMetric }}
+              onFilterChange={handleFilterChange}
+              isMobile={isMobile}
+            />
+          </Box>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1, mb: 1 }}>
             <Chip size="small" label={batHand === 'all' ? 'All batters' : batHand} />
             {selectedZone !== 'all' && (
@@ -581,14 +597,16 @@ const VenueTacticalMap = ({
         </Box>
       )}
 
-      {tab === 2 && (
+      {activeTab === 2 && (
         <Box>
-          <FilterBar
-            filters={topTableFilters}
-            activeFilters={{ groupBy, sortMetric }}
-            onFilterChange={handleFilterChange}
-            isMobile={isMobile}
-          />
+          <Box data-carousel-no-swipe>
+            <FilterBar
+              filters={topTableFilters}
+              activeFilters={{ groupBy, sortMetric }}
+              onFilterChange={handleFilterChange}
+              isMobile={isMobile}
+            />
+          </Box>
           <TableContainer sx={{ mt: 1.5, maxHeight: 420 }}>
             <Table size="small" stickyHeader>
               <TableHead>
