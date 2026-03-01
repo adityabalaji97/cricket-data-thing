@@ -141,21 +141,22 @@ const LandingPage = () => {
     loadUpcomingMatches();
   }, []);
 
-  // Determine today's match (first match within 24 hours or live)
-  const todaysMatch = upcomingMatches.length > 0 && (upcomingMatches[0].isLive || isWithin24Hours(upcomingMatches[0].date))
-    ? upcomingMatches[0]
-    : null;
+  // Determine today's matches (up to 2 that are live or within 24 hours)
+  const todaysMatches = upcomingMatches
+    .slice(0, 2)
+    .filter(m => m.isLive || isWithin24Hours(m.date));
 
-  const remainingMatches = todaysMatch
-    ? upcomingMatches.slice(1)
-    : upcomingMatches;
+  const remainingMatches = upcomingMatches.slice(todaysMatches.length);
 
-  // Today's Match Card
+  const hasLive = todaysMatches.some(m => m.isLive);
+
+  // Today's Matches Card
   const TodaysMatchSection = () => {
-    if (loading || !todaysMatch) return null;
+    if (loading || todaysMatches.length === 0) return null;
 
-    const match = todaysMatch;
-    const previewKey = `${match.team1Abbr}-${match.team2Abbr}-${match.venue}`;
+    const sectionTitle = hasLive
+      ? (todaysMatches.length > 1 ? "Live Matches" : "Live Match")
+      : (todaysMatches.length > 1 ? "Today's Matches" : "Today's Match");
 
     return (
       <Paper
@@ -165,91 +166,107 @@ const LandingPage = () => {
           mb: 3,
           borderRadius: 3,
           border: '1px solid',
-          borderColor: match.isLive ? 'error.light' : 'primary.light',
-          background: match.isLive
+          borderColor: hasLive ? 'error.light' : 'primary.light',
+          background: hasLive
             ? 'linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%)'
             : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-          <CalendarTodayIcon color={match.isLive ? 'error' : 'primary'} fontSize="small" />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <CalendarTodayIcon color={hasLive ? 'error' : 'primary'} fontSize="small" />
           <Typography variant="subtitle2" fontWeight="bold" sx={{ fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
-            {match.isLive ? "Live Match" : "Today's Match"}
+            {sectionTitle}
           </Typography>
-          {match.isLive && (
+          {hasLive && (
             <Chip label="LIVE" size="small" color="error" sx={{ height: 22, fontWeight: 700 }} />
           )}
-          <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-            {formatDate(match.date)}
-          </Typography>
         </Box>
 
-        <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>
-          {match.team1Abbr} vs {match.team2Abbr}
-        </Typography>
+        <Grid container spacing={2}>
+          {todaysMatches.map((match) => {
+            const previewKey = `${match.team1Abbr}-${match.team2Abbr}-${match.venue}`;
+            return (
+              <Grid item xs={12} md={todaysMatches.length > 1 ? 6 : 12} key={match.matchNumber}>
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
+                      {match.team1Abbr} vs {match.team2Abbr}
+                    </Typography>
+                    {match.isLive && todaysMatches.length > 1 && (
+                      <Chip label="LIVE" size="small" color="error" sx={{ height: 20, fontWeight: 700, fontSize: '0.65rem' }} />
+                    )}
+                    <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                      {formatDate(match.date)}
+                    </Typography>
+                  </Box>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-          {formatVenue(match.venue)}
-        </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    {formatVenue(match.venue)}
+                  </Typography>
 
-        {match.series && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-            {match.series}
-          </Typography>
-        )}
+                  {match.series && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                      {match.series}
+                    </Typography>
+                  )}
 
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
-          <Button
-            variant="outlined"
-            size="small"
-            color="primary"
-            component={Link}
-            startIcon={<StadiumIcon />}
-            to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1)}&team2=${encodeURIComponent(match.team2)}&includeInternational=true&topTeams=20&autoload=true`}
-          >
-            Venue Analysis
-          </Button>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="primary"
+                      component={Link}
+                      startIcon={<StadiumIcon />}
+                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1)}&team2=${encodeURIComponent(match.team2)}&includeInternational=true&topTeams=20&autoload=true`}
+                    >
+                      Venue
+                    </Button>
 
-          <Button
-            variant="outlined"
-            size="small"
-            color="secondary"
-            component={Link}
-            startIcon={<GroupsIcon />}
-            to={`/matchups?team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
-          >
-            Team Matchups
-          </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="secondary"
+                      component={Link}
+                      startIcon={<GroupsIcon />}
+                      to={`/matchups?team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
+                    >
+                      Matchups
+                    </Button>
 
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<InfoIcon />}
-            onClick={() =>
-              setPreviewOpen((prev) => ({
-                ...prev,
-                [previewKey]: !prev[previewKey]
-              }))
-            }
-          >
-            {previewOpen[previewKey] ? 'Hide AI Preview' : 'AI Preview'}
-          </Button>
-        </Box>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<InfoIcon />}
+                      onClick={() =>
+                        setPreviewOpen((prev) => ({
+                          ...prev,
+                          [previewKey]: !prev[previewKey]
+                        }))
+                      }
+                    >
+                      {previewOpen[previewKey] ? 'Hide Preview' : 'AI Preview'}
+                    </Button>
+                  </Box>
 
-        <Collapse in={Boolean(previewOpen[previewKey])} unmountOnExit>
-          <Box sx={{ mt: 1.5 }}>
-            <MatchPreviewCard
-              venue={match.venue}
-              team1Identifier={match.team1}
-              team2Identifier={match.team2}
-              startDate={defaultAnalysisStartDate}
-              endDate={defaultAnalysisEndDate}
-              includeInternational
-              topTeams={20}
-              isMobile={isMobile}
-            />
-          </Box>
-        </Collapse>
+                  <Collapse in={Boolean(previewOpen[previewKey])} unmountOnExit>
+                    <Box sx={{ mt: 1.5 }}>
+                      <MatchPreviewCard
+                        venue={match.venue}
+                        team1Identifier={match.team1}
+                        team2Identifier={match.team2}
+                        startDate={defaultAnalysisStartDate}
+                        endDate={defaultAnalysisEndDate}
+                        includeInternational
+                        topTeams={20}
+                        isMobile={isMobile}
+                      />
+                    </Box>
+                  </Collapse>
+                </Box>
+              </Grid>
+            );
+          })}
+        </Grid>
       </Paper>
     );
   };
@@ -280,7 +297,7 @@ const LandingPage = () => {
     return (
       <Box sx={{ mt: 4 }}>
         <Typography variant="subtitle1" sx={{ mb: 2 }}>
-          {todaysMatch ? 'Upcoming Matches' : 'Live / Upcoming T20I + Top Leagues'}
+          {todaysMatches.length > 0 ? 'Upcoming Matches' : 'Live / Upcoming T20I + Top Leagues'}
         </Typography>
 
         <Grid container spacing={3} sx={{ mt: 1 }}>
