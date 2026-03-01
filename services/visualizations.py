@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Optional, Any
 from datetime import date
 import logging
-from models import leagues_mapping
 from services.delivery_data_service import get_venue_aliases
 
 logger = logging.getLogger(__name__)
@@ -56,50 +55,7 @@ def get_player_name_for_delivery_details(db: Session, player_name: str) -> List[
     return list(set(names))  # Remove duplicates
 
 
-def expand_league_abbreviations(abbrevs: List[str]) -> List[str]:
-    """
-    Expand league abbreviations to include all variations.
-    This matches the approach used in query_builder_v2.
-
-    For each league, includes:
-    - The input value itself
-    - Both full name and abbreviation (if mapping exists)
-    - Any aliases (if applicable)
-    """
-    if not abbrevs:
-        return []
-
-    # Additional aliases for T20 Blast variations
-    t20_blast_names = ["T20 Blast", "Vitality Blast", "NatWest T20 Blast"]
-    t20i_names = ["T20I", "International Twenty20"]
-
-    expanded = []
-    for abbrev in abbrevs:
-        expanded.append(abbrev)
-
-        # Handle T20 Blast specially - add all variations
-        if abbrev in t20_blast_names or abbrev.lower() in ["t20 blast", "vitality blast"]:
-            expanded.extend(t20_blast_names)
-            continue
-
-        # Handle T20I specially - add all variations
-        if abbrev in t20i_names or abbrev.lower() == "t20i":
-            expanded.extend(t20i_names)
-            continue
-
-        # If input is a full name, add the abbreviation
-        if abbrev in leagues_mapping:
-            expanded.append(leagues_mapping[abbrev])
-        # If input is an abbreviation, add the full name
-        else:
-            # Try to find full name by looking up in reverse
-            for full_name, short_name in leagues_mapping.items():
-                if short_name == abbrev:
-                    expanded.append(full_name)
-                    break
-
-    # Remove duplicates while preserving order
-    return list(dict.fromkeys(expanded))
+from utils.league_utils import expand_league_abbreviations
 
 
 def get_wagon_wheel_data(

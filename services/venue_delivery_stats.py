@@ -8,7 +8,7 @@ from services.delivery_data_service import (
     build_competition_filter_delivery_details,
     build_venue_filter_delivery_details,
 )
-from services.visualizations import expand_league_abbreviations
+from utils.league_utils import expand_league_abbreviations
 from services.wrapped.card_length_masters import LENGTH_LABELS, LENGTH_ORDER
 
 

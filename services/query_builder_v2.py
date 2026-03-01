@@ -9,7 +9,7 @@ from sqlalchemy.sql import text
 from fastapi import HTTPException
 from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import date
-from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED, leagues_mapping, league_aliases, get_full_league_name
+from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
 import logging
 
 logger = logging.getLogger(__name__)
@@ -1218,24 +1218,7 @@ def build_where_clause(
     return where_clause, params
 
 
-def expand_league_abbreviations(abbrevs: List[str]) -> List[str]:
-    """Expand league abbreviations to include variations."""
-    expanded = []
-    for abbrev in abbrevs:
-        expanded.append(abbrev)
-        if abbrev in leagues_mapping:
-            expanded.append(leagues_mapping[abbrev])
-        else:
-            full_name = get_full_league_name(abbrev)
-            if full_name != abbrev:
-                expanded.append(full_name)
-        
-        for alias, std_name in league_aliases.items():
-            if abbrev == std_name or abbrev == alias:
-                expanded.append(alias)
-                expanded.append(std_name)
-    
-    return list(set(expanded))
+from utils.league_utils import expand_league_abbreviations
 
 
 def get_all_team_name_variations(team_name):

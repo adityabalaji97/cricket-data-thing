@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
 from database import get_session
-from services.visualizations import expand_league_abbreviations
+from utils.league_utils import expand_league_abbreviations
 
 router = APIRouter(prefix="/games", tags=["games"])
 

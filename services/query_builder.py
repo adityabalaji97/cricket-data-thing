@@ -163,8 +163,6 @@ def build_where_clause(
     
     # League filters (using your existing pattern)
     if leagues:
-        # Expand league abbreviations like in your main.py
-        from models import get_league_abbreviation, get_full_league_name
         expanded_leagues = expand_league_abbreviations(leagues)
         conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
         params["leagues"] = expanded_leagues
@@ -260,38 +258,7 @@ def build_where_clause(
     where_clause = "WHERE " + " AND ".join(conditions)
     return where_clause, params
 
-def expand_league_abbreviations(abbrevs: List[str]) -> List[str]:
-    """
-    Expand league abbreviations to include both abbreviation and full name.
-    Reused from main.py pattern.
-    """
-    from models import leagues_mapping, league_aliases, get_full_league_name
-    
-    expanded = []
-    for abbrev in abbrevs:
-        if abbrev in leagues_mapping:
-            expanded.append(abbrev)
-            expanded.append(leagues_mapping[abbrev])
-        else:
-            full_name = get_full_league_name(abbrev)
-            if full_name != abbrev:
-                expanded.append(full_name)
-                expanded.append(abbrev)
-            else:
-                expanded.append(abbrev)
-        
-        for alias, std_name in league_aliases.items():
-            if abbrev == std_name or abbrev == alias:
-                expanded.append(alias)
-                expanded.append(std_name)
-    
-    # Remove duplicates
-    result = []
-    for item in expanded:
-        if item not in result:
-            result.append(item)
-    
-    return result
+from utils.league_utils import expand_league_abbreviations
 
 def get_all_team_name_variations(team_name):
     """

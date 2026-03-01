@@ -59,7 +59,7 @@ class StatsFromDeliveryDetails:
             SELECT p_match as match_id, inns as innings, over, ball,
                    bat as batter, bowl as bowler,
                    team_bat as batting_team, team_bowl as bowling_team,
-                   score, outcome, out, dismissal, noball, wide, byes, legbyes
+                   score, batruns, outcome, out, dismissal, noball, wide, byes, legbyes
             FROM delivery_details
             WHERE p_match = :match_id
             ORDER BY inns, over, ball
@@ -78,15 +78,15 @@ class StatsFromDeliveryDetails:
             batting_team=batter_dels[0]['batting_team']
         )
         
-        stats.runs = sum(d['score'] or 0 for d in batter_dels)
+        stats.runs = sum(d['batruns'] or 0 for d in batter_dels)
         stats.balls_faced = len([d for d in batter_dels if not d['wide']])
         stats.wickets = sum(1 for d in batter_dels if d['out'])
-        stats.dots = sum(1 for d in batter_dels if (d['score'] or 0) == 0 and not d['wide'])
-        stats.ones = sum(1 for d in batter_dels if (d['score'] or 0) == 1)
-        stats.twos = sum(1 for d in batter_dels if (d['score'] or 0) == 2)
-        stats.threes = sum(1 for d in batter_dels if (d['score'] or 0) == 3)
-        stats.fours = sum(1 for d in batter_dels if (d['score'] or 0) == 4)
-        stats.sixes = sum(1 for d in batter_dels if (d['score'] or 0) == 6)
+        stats.dots = sum(1 for d in batter_dels if (d['batruns'] or 0) == 0 and not d['wide'])
+        stats.ones = sum(1 for d in batter_dels if (d['batruns'] or 0) == 1)
+        stats.twos = sum(1 for d in batter_dels if (d['batruns'] or 0) == 2)
+        stats.threes = sum(1 for d in batter_dels if (d['batruns'] or 0) == 3)
+        stats.fours = sum(1 for d in batter_dels if (d['batruns'] or 0) == 4)
+        stats.sixes = sum(1 for d in batter_dels if (d['batruns'] or 0) == 6)
         
         if stats.balls_faced > 0:
             stats.strike_rate = (stats.runs * 100.0) / stats.balls_faced
@@ -94,12 +94,12 @@ class StatsFromDeliveryDetails:
         # Phase stats
         for phase, (start, end) in [('pp', (0, 6)), ('middle', (6, 15)), ('death', (15, 99))]:
             phase_dels = [d for d in batter_dels if start <= d['over'] < end]
-            setattr(stats, f'{phase}_runs', sum(d['score'] or 0 for d in phase_dels))
+            setattr(stats, f'{phase}_runs', sum(d['batruns'] or 0 for d in phase_dels))
             balls = len([d for d in phase_dels if not d['wide']])
             setattr(stats, f'{phase}_balls', balls)
-            setattr(stats, f'{phase}_dots', sum(1 for d in phase_dels if (d['score'] or 0) == 0 and not d['wide']))
+            setattr(stats, f'{phase}_dots', sum(1 for d in phase_dels if (d['batruns'] or 0) == 0 and not d['wide']))
             setattr(stats, f'{phase}_wickets', sum(1 for d in phase_dels if d['out']))
-            setattr(stats, f'{phase}_boundaries', sum(1 for d in phase_dels if (d['score'] or 0) in [4, 6]))
+            setattr(stats, f'{phase}_boundaries', sum(1 for d in phase_dels if (d['batruns'] or 0) in [4, 6]))
             if balls > 0:
                 setattr(stats, f'{phase}_strike_rate', (getattr(stats, f'{phase}_runs') * 100.0) / balls)
         
