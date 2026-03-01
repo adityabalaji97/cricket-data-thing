@@ -166,12 +166,36 @@ def get_all_player_variants(player_names: List[str], db) -> List[str]:
     """
     if not player_names:
         return []
-    
+
     variants = get_player_name_variants(player_names, db, direction='new_to_old')
     all_names = set()
     for name, name_variants in variants.items():
         all_names.update(name_variants)
-    
+
+    return list(all_names)
+
+
+def _expand_player_names(player_names: List[str], db) -> List[str]:
+    """
+    Expand player names to include both legacy and delivery_details variants.
+    Checks both directions so either name format works as input.
+    """
+    if not player_names or not db:
+        return player_names
+
+    all_names = set(player_names)
+    try:
+        # old_to_new: "YS Samra" -> "Yuvraj Samra"
+        old_to_new = get_player_name_variants(player_names, db, direction='old_to_new')
+        for variants in old_to_new.values():
+            all_names.update(variants)
+        # new_to_old: "Yuvraj Samra" -> "YS Samra"
+        new_to_old = get_player_name_variants(player_names, db, direction='new_to_old')
+        for variants in new_to_old.values():
+            all_names.update(variants)
+    except Exception as e:
+        logger.warning(f"Error expanding player names: {e}")
+
     return list(all_names)
 
 
@@ -899,7 +923,8 @@ def query_deliveries_service(
                 over_max=over_max,
                 include_international=include_international,
                 top_teams=top_teams,
-                base_params=new_params
+                base_params=new_params,
+                db=db
             )
             
             # Get total balls from new table
@@ -1074,7 +1099,7 @@ def build_where_clause(
     venue, start_date, end_date, leagues, teams, batting_teams, bowling_teams,
     players, batters, bowlers, bat_hand, bowl_style, bowl_kind, crease_combo,
     line, length, shot, control, wagon_zone, innings, over_min, over_max,
-    include_international, top_teams, base_params
+    include_international, top_teams, base_params, db=None
 ):
     """Build dynamic WHERE clause for delivery_details table."""
     conditions = ["1=1"]
@@ -1142,18 +1167,22 @@ def build_where_clause(
     if team_conditions:
         conditions.append("(" + " AND ".join(team_conditions) + ")")
     
-    # Player filters
+    # Player filters - resolve aliases so legacy names (e.g. "YS Samra")
+    # also match delivery_details full names (e.g. "Yuvraj Samra")
     if players:
+        player_variants = _expand_player_names(players, db) if db else players
         conditions.append("(dd.bat = ANY(:players) OR dd.bowl = ANY(:players))")
-        params["players"] = players
-    
+        params["players"] = player_variants
+
     if batters:
+        batter_variants = _expand_player_names(batters, db) if db else batters
         conditions.append("dd.bat = ANY(:batters)")
-        params["batters"] = batters
-    
+        params["batters"] = batter_variants
+
     if bowlers:
+        bowler_variants = _expand_player_names(bowlers, db) if db else bowlers
         conditions.append("dd.bowl = ANY(:bowlers)")
-        params["bowlers"] = bowlers
+        params["bowlers"] = bowler_variants
     
     # Batter/Bowler attribute filters
     if bat_hand:
