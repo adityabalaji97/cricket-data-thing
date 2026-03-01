@@ -39,6 +39,7 @@ from routers.games import router as games_router
 from routers.venue_delivery_stats import router as venue_delivery_stats_router
 from routers.fixtures import router as fixtures_router
 from routers.match_preview import router as match_preview_router
+from routers.landing import router as landing_router
 from services.delivery_data_service import (
     get_venue_match_stats,
     get_match_scores,
@@ -179,6 +180,7 @@ app.include_router(games_router)
 app.include_router(venue_delivery_stats_router)
 app.include_router(fixtures_router)
 app.include_router(match_preview_router)
+app.include_router(landing_router)
 
 # Add CORS middleware
 app.add_middleware(
@@ -748,16 +750,8 @@ def get_venue_stats(
             competition_filter = " AND false"
         venue_filter = "AND m.venue = :venue" if venue != "All Venues" else ""
 
-        # Modified team mapping part of the query
-        team_mapping_cte = f"""
-        WITH team_mapping AS (
-            SELECT *
-            FROM (VALUES {','.join(f"('{k}', '{v}')" for k, v in teams_mapping.items())})
-            AS t(full_name, abbreviated_name)
-        )"""
-
         # Batting Query
-        batting_query = text("""
+        batting_query = text(f"""
             WITH team_mapping AS (
                 SELECT unnest(:full_names) as full_name,
                     unnest(:abbrev_names) as abbreviated_name
@@ -771,7 +765,7 @@ def get_venue_stats(
                     AND (:end_date IS NULL OR m.date <= :end_date)
                     {competition_filter}
             )
-            SELECT 
+            SELECT
                 bs.striker as name,
                 string_agg(DISTINCT COALESCE(tm.abbreviated_name, bs.batting_team), '/') as batting_team,
                 COUNT(DISTINCT bs.match_id) as innings,
@@ -787,10 +781,10 @@ def get_venue_stats(
             HAVING SUM(bs.balls_faced) >= 0
             ORDER BY total_runs DESC
             LIMIT 10
-        """.format(venue_filter=venue_filter, competition_filter=competition_filter))
+        """)
 
         # Bowling Query
-        bowling_query = text("""
+        bowling_query = text(f"""
             WITH team_mapping AS (
                 SELECT unnest(:full_names) as full_name,
                     unnest(:abbrev_names) as abbreviated_name
@@ -820,7 +814,7 @@ def get_venue_stats(
             HAVING SUM(CAST(bw.overs AS float)) >= 0
             ORDER BY total_wickets DESC
             LIMIT 10
-        """.format(venue_filter=venue_filter, competition_filter=competition_filter))
+        """)
 
         batting_leaders = db.execute(batting_query, params).fetchall()
         bowling_leaders = db.execute(bowling_query, params).fetchall()
@@ -853,7 +847,7 @@ def get_venue_stats(
         ]
 
         # Get all batters stats for scatter plot with most recent team
-        scatter_query = text("""
+        scatter_query = text(f"""
             WITH team_mapping AS (
                 SELECT unnest(:full_names) as full_name,
                     unnest(:abbrev_names) as abbreviated_name
@@ -1014,7 +1008,7 @@ def get_venue_stats(
                 CAST(balls::float / innings AS DECIMAL(10,2)) as balls_per_innings
             FROM avg_stats
             ORDER BY total_runs DESC
-        """.format(venue_filter=venue_filter, competition_filter=competition_filter))
+        """)
 
         # Execute scatter plot query
         scatter_data = db.execute(scatter_query, params).fetchall()
