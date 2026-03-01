@@ -51,7 +51,7 @@ def get_featured_innings(db: Session = Depends(get_session)):
 def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float):
     """Fetch standout innings and their wagon wheel data."""
 
-    # Step 1: Find standout innings from batting_stats
+    # Step 1: Find standout innings from batting_stats (used as candidate filter)
     innings_query = text(f"""
         SELECT bs.match_id, bs.striker, bs.innings, bs.runs, bs.balls_faced,
                bs.strike_rate, bs.fours, bs.sixes, bs.batting_team,
@@ -74,42 +74,53 @@ def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float
     results = []
 
     for row in innings_rows:
-        # Step 2: Look up player alias for delivery_details name
-        alias_query = text("""
-            SELECT alias_name FROM player_aliases
-            WHERE player_name = :player_name
-            LIMIT 1
-        """)
-        alias_row = db.execute(alias_query, {"player_name": row.striker}).fetchone()
-        batter_name_dd = alias_row.alias_name if alias_row else row.striker
-
-        # Step 3: Fetch wagon wheel deliveries from delivery_details
+        # Step 2: Fetch wagon wheel deliveries using correct column names
+        # delivery_details uses: p_match (not match_id), bat (not batter), inns (not innings)
         deliveries_query = text("""
-            SELECT wagon_x, wagon_y, score
+            SELECT wagon_x, wagon_y, score, cur_bat_runs, cur_bat_bf
             FROM delivery_details
-            WHERE match_id = :match_id
-              AND batter = :batter_name
-              AND innings = :innings
+            WHERE p_match = :match_id
+              AND bat = :batter_name
+              AND inns = :innings
               AND wagon_x IS NOT NULL
             ORDER BY over, ball
         """)
 
         deliveries = db.execute(deliveries_query, {
             "match_id": row.match_id,
-            "batter_name": batter_name_dd,
+            "batter_name": row.striker,
             "innings": row.innings
         }).fetchall()
+
+        # Use accurate runs/balls from delivery_details (last delivery has cumulative stats)
+        if deliveries:
+            last = deliveries[-1]
+            actual_runs = int(last.cur_bat_runs) if last.cur_bat_runs is not None else row.runs
+            actual_balls = int(last.cur_bat_bf) if last.cur_bat_bf is not None else row.balls_faced
+        else:
+            actual_runs = row.runs
+            actual_balls = row.balls_faced
+
+        actual_sr = round(actual_runs * 100.0 / actual_balls, 2) if actual_balls else 0
+
+        # Count fours and sixes from delivery-level data for accuracy
+        if deliveries:
+            fours = sum(1 for d in deliveries if d.score == 4)
+            sixes = sum(1 for d in deliveries if d.score == 6)
+        else:
+            fours = row.fours or 0
+            sixes = row.sixes or 0
 
         # Determine opponent team
         opponent = row.team2 if row.batting_team == row.team1 else row.team1
 
         results.append({
             "batter": row.striker,
-            "runs": row.runs,
-            "balls": row.balls_faced,
-            "strike_rate": round(row.strike_rate, 2) if row.strike_rate else 0,
-            "fours": row.fours or 0,
-            "sixes": row.sixes or 0,
+            "runs": actual_runs,
+            "balls": actual_balls,
+            "strike_rate": actual_sr,
+            "fours": fours,
+            "sixes": sixes,
             "team": row.batting_team,
             "opponent": opponent,
             "venue": row.venue,
