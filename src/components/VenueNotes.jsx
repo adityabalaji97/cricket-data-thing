@@ -587,11 +587,11 @@ const WinPercentagesPie = ({ data }) => {
     const leadingSegment = [...segments].sort((a, b) => b.value - a.value)[0];
 
     return (
-        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 2 : 2.5, px: { xs: 1.5, sm: 0 }, py: { xs: 1, sm: 1.5 } }}>
-            <Typography variant={isMobile ? "body1" : "subtitle1"} sx={{ fontWeight: 700 }}>
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1.5 : 2.5, px: { xs: 1.5, sm: 0 }, py: { xs: 0.75, sm: 1.5 } }}>
+            <Typography variant={isMobile ? "body2" : "subtitle1"} sx={{ fontWeight: 700, textAlign: isMobile ? 'center' : 'left' }}>
                 Results Split
             </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1, textAlign: 'center' }}>
                 {segments.map((segment) => {
                     const percentage = totalMatches > 0 ? (segment.value / totalMatches) * 100 : 0;
                     return (
@@ -657,14 +657,9 @@ const ScoresBarChart = ({ data }) => {
             secondInnings: Math.round(data.average_chasing_score || 0),
         },
         {
-            name: 'Highest',
-            firstInnings: -(data.highest_total || 0),
-            secondInnings: data.highest_total_chased || 0,
-        },
-        {
-            name: 'Lowest',
+            name: 'Def/Chase',
             firstInnings: -(data.lowest_total_defended || 0),
-            secondInnings: data.lowest_total || 0,
+            secondInnings: data.highest_total_chased || 0,
         }
     ].map((row) => ({
         ...row,
@@ -719,8 +714,8 @@ const ScoresBarChart = ({ data }) => {
     };
 
     return (
-        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1.5 : 2, px: { xs: 1.5, sm: 0 }, py: { xs: 1, sm: 1.5 } }}>
-            <Typography variant={isMobile ? "body1" : "subtitle1"} sx={{ fontWeight: 700 }}>
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1 : 2, px: { xs: 1.5, sm: 0 }, py: { xs: 0.75, sm: 1.5 } }}>
+            <Typography variant={isMobile ? "body2" : "subtitle1"} sx={{ fontWeight: 700, textAlign: isMobile ? 'center' : 'left' }}>
                 Innings Comparison
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 1 }}>
@@ -732,11 +727,12 @@ const ScoresBarChart = ({ data }) => {
                     2nd innings
                 </Typography>
             </Box>
-            <Box sx={{ height: isMobile ? 260 : 320 }}>
+            <Box sx={{ height: isMobile ? 186 : 260 }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                         data={scoreData}
                         layout="vertical"
+                        barCategoryGap={isMobile ? '28%' : '20%'}
                         margin={{
                             top: 8,
                             right: isMobile ? 34 : 42,
@@ -765,15 +761,19 @@ const ScoresBarChart = ({ data }) => {
                         />
                         <Bar
                             dataKey="firstInnings"
+                            stackId="innings"
                             fill="#2563eb"
                             radius={[6, 0, 0, 6]}
+                            barSize={isMobile ? 18 : 24}
                             label={renderLeftLabel}
                             isAnimationActive={false}
                         />
                         <Bar
                             dataKey="secondInnings"
+                            stackId="innings"
                             fill="#0f766e"
                             radius={[0, 6, 6, 0]}
+                            barSize={isMobile ? 18 : 24}
                             label={renderRightLabel}
                             isAnimationActive={false}
                         />
@@ -870,8 +870,8 @@ const PhaseWiseStrategy = ({ data, isMobile }) => {
     const firstInningsData = processPhaseData(data.phase_wise_stats?.batting_first_wins);
     const secondInningsData = processPhaseData(data.phase_wise_stats?.chasing_wins);
 
-    return (
-        <Box sx={{ mt: isMobile ? 0.5 : 2 }}>
+        return (
+        <Box sx={{ mt: isMobile ? 0.25 : 2, width: '100%', px: { xs: 1.5, sm: 0 } }}>
             <Typography variant={isMobile ? "h6" : "h5"} gutterBottom>Phase-wise Strategy</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 2 : 3 }}>
                 {renderPhase(firstInningsData, "Batting First")}
@@ -1010,14 +1010,14 @@ const VenueNotes = ({
                 ),
                 mobileCards: [
                     {
-                        id: 'results-distribution',
-                        cardLabel: 'Results Split',
-                        content: <WinPercentagesPie data={venueStats} />,
-                    },
-                    {
-                        id: 'results-scores',
-                        cardLabel: 'Innings Comparison',
-                        content: <ScoresBarChart data={venueStats} />,
+                        id: 'results-overview',
+                        cardLabel: 'Results & Scores',
+                        content: (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                                <WinPercentagesPie data={venueStats} />
+                                <ScoresBarChart data={venueStats} />
+                            </Box>
+                        ),
                     },
                 ],
             },
