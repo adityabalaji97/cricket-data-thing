@@ -464,7 +464,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               Group By — This changes everything!
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-              Choose how to slice your data. Try "batter + phase" or "bowler_type + length" for powerful insights.
+              Choose how to slice your data. Try "batter + phase" or "bowl_style + length" for powerful insights.
             </Typography>
             
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

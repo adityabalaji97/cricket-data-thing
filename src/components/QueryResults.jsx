@@ -395,7 +395,8 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       'match_id': 'Match ID',
       'crease_combo': 'Crease Combo',
       'ball_direction': 'Ball Direction',
-      'bowler_type': 'Bowler Type',
+      'bowl_style': 'Bowl Style',
+      'bowl_kind': 'Bowl Kind',
       'striker_batter_type': 'Striker Type',
       'non_striker_batter_type': 'Non-Striker Type',
       'runs_off_bat': 'Runs off Bat',
@@ -679,7 +680,7 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                 <TableRow sx={{ backgroundColor: 'grey.50' }}>
                   {visibleColumns.map((column) => {
                     const isFilterableColumn = groupBy.includes(column) || 
-                      ['crease_combo', 'ball_direction', 'bowler_type', 'striker_batter_type', 'non_striker_batter_type', 'venue', 'batting_team', 'bowling_team', 'batter', 'bowler', 'competition'].includes(column);
+                      ['crease_combo', 'ball_direction', 'bowl_style', 'bowl_kind', 'striker_batter_type', 'non_striker_batter_type', 'venue', 'batting_team', 'bowling_team', 'batter', 'bowler', 'competition'].includes(column);
                     
                     return (
                       <TableCell key={column} sx={{ py: 1 }}>

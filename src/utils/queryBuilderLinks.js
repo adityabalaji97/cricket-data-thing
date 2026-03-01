@@ -78,10 +78,10 @@ export const getBatterContextualQueries = (playerName, context = {}) => {
       url: buildQueryUrl(
         {
           ...baseFilters,
-          bowler_type: ['LC', 'LO', 'RL', 'RO'], // All spin types
+          bowl_style: ['LC', 'LO', 'RL', 'RO'], // All spin types
           min_balls: 10,
         },
-        ['phase', 'bowler_type']
+        ['phase', 'bowl_style']
       ),
       tags: ['spin', 'phase', 'matchup'],
       priority: 1,
@@ -93,10 +93,10 @@ export const getBatterContextualQueries = (playerName, context = {}) => {
       url: buildQueryUrl(
         {
           ...baseFilters,
-          bowler_type: ['RF', 'RFM', 'RM', 'LF', 'LFM', 'LM'], // All pace types
+          bowl_style: ['RF', 'RFM', 'RM', 'LF', 'LFM', 'LM'], // All pace types
           min_balls: 10,
         },
-        ['phase', 'bowler_type']
+        ['phase', 'bowl_style']
       ),
       tags: ['pace', 'phase', 'matchup'],
       priority: 2,
@@ -126,7 +126,7 @@ export const getBatterContextualQueries = (playerName, context = {}) => {
           over_max: 19,
           min_balls: 10,
         },
-        ['bowler_type']
+        ['bowl_style']
       ),
       tags: ['death', 'phase', 'finishing'],
       priority: 4,
@@ -142,7 +142,7 @@ export const getBatterContextualQueries = (playerName, context = {}) => {
           over_max: 5,
           min_balls: 10,
         },
-        ['bowler_type']
+        ['bowl_style']
       ),
       tags: ['powerplay', 'phase'],
       priority: 5,
@@ -213,7 +213,7 @@ export const getVenueContextualQueries = (venueName, context = {}) => {
           ...baseFilters,
           min_balls: 100,
         },
-        ['bowler_type']
+        ['bowl_style']
       ),
       tags: ['bowling', 'matchup'],
       priority: 2,
@@ -243,7 +243,7 @@ export const getVenueContextualQueries = (venueName, context = {}) => {
           over_max: 19,
           min_balls: 50,
         },
-        ['bowler_type']
+        ['bowl_style']
       ),
       tags: ['death', 'scoring'],
       priority: 4,
@@ -322,7 +322,7 @@ export const getMatchupContextualQueries = (team1, team2, context = {}) => {
           bowling_teams: [team2Name],
           min_balls: 20,
         },
-        ['batter', 'bowler_type']
+        ['batter', 'bowl_style']
       ),
       tags: ['matchup', team1Short],
       priority: 1,
@@ -338,7 +338,7 @@ export const getMatchupContextualQueries = (team1, team2, context = {}) => {
           bowling_teams: [team1Name],
           min_balls: 20,
         },
-        ['batter', 'bowler_type']
+        ['batter', 'bowl_style']
       ),
       tags: ['matchup', team2Short],
       priority: 2,
