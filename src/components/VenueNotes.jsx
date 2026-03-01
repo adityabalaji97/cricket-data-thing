@@ -584,7 +584,7 @@ const WinPercentagesPie = ({ data }) => {
 
     const totalMatches = segments.reduce((sum, segment) => sum + segment.value, 0);
     return (
-        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1.5 : 2.5, px: { xs: 2, sm: 0 }, py: { xs: 0.75, sm: 1.5 } }}>
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1.5 : 2.5, px: { xs: 1, sm: 0 }, py: { xs: 0.75, sm: 1.5 } }}>
             <Typography variant={isMobile ? "body2" : "subtitle1"} sx={{ fontWeight: 700, textAlign: isMobile ? 'center' : 'left' }}>
                 Results Split
             </Typography>
@@ -606,7 +606,7 @@ const WinPercentagesPie = ({ data }) => {
                     );
                 })}
             </Box>
-            <Box sx={{ px: isMobile ? 0.5 : 0 }}>
+            <Box sx={{ px: isMobile ? 0.25 : 0 }}>
                 <Box sx={{
                     display: 'flex',
                     alignItems: 'center',
@@ -654,7 +654,7 @@ const ScoresBarChart = ({ data }) => {
             secondInnings: Math.round(data.average_chasing_score || 0),
         },
         {
-            name: 'Defended /\nChased',
+            name: 'Def/Chase',
             firstInnings: Math.round(data.lowest_total_defended || 0),
             secondInnings: Math.round(data.highest_total_chased || 0),
         },
@@ -664,12 +664,12 @@ const ScoresBarChart = ({ data }) => {
         1,
         ...scoreData.flatMap((row) => [Math.abs(row.firstInnings), Math.abs(row.secondInnings)])
     );
-    const chartLimit = Math.ceil((maxAbsValue * 1.15) / 10) * 10;
+    const chartLimit = Math.ceil((maxAbsValue * 1.05) / 5) * 5;
     const chartOption = {
         animation: false,
         grid: {
-            left: isMobile ? 108 : 128,
-            right: isMobile ? 26 : 34,
+            left: isMobile ? 80 : 104,
+            right: isMobile ? 10 : 20,
             top: isMobile ? 26 : 30,
             bottom: 4,
             containLabel: false,
@@ -691,16 +691,19 @@ const ScoresBarChart = ({ data }) => {
             axisLine: { show: false },
             axisLabel: {
                 color: '#475569',
-                fontSize: isMobile ? 11 : 12,
-                lineHeight: isMobile ? 13 : 15,
+                width: isMobile ? 56 : 74,
+                overflow: 'truncate',
+                fontSize: isMobile ? 10 : 12,
+                lineHeight: isMobile ? 12 : 15,
                 fontWeight: 700,
-                margin: isMobile ? 18 : 20,
+                margin: isMobile ? 10 : 14,
+                align: 'right',
             },
         },
         graphic: [
             {
                 type: 'text',
-                left: isMobile ? '36%' : '38%',
+                left: isMobile ? '39%' : '40%',
                 top: 0,
                 style: {
                     text: '1st innings',
@@ -712,7 +715,7 @@ const ScoresBarChart = ({ data }) => {
             },
             {
                 type: 'text',
-                left: isMobile ? '62%' : '61%',
+                left: isMobile ? '63%' : '62%',
                 top: 0,
                 style: {
                     text: '2nd innings',
@@ -795,7 +798,7 @@ const ScoresBarChart = ({ data }) => {
     };
 
     return (
-        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1 : 2, px: { xs: 1.5, sm: 0 }, py: { xs: 0.75, sm: 1.5 } }}>
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1 : 2, px: { xs: 1, sm: 0 }, py: { xs: 0.75, sm: 1.5 } }}>
             <Typography variant={isMobile ? "body2" : "subtitle1"} sx={{ fontWeight: 700, textAlign: isMobile ? 'center' : 'left' }}>
                 Innings Comparison
             </Typography>
