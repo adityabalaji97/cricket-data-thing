@@ -7,6 +7,7 @@ const VenueNotesCardShell = ({
   metaText,
   isMobile = false,
   immersive = false,
+  fitContent = false,
   showHeader = true,
   children,
 }) => (
@@ -14,8 +15,8 @@ const VenueNotesCardShell = ({
     sx={{
       display: 'flex',
       flexDirection: 'column',
-      height: isMobile ? 'calc(100dvh - 176px)' : '100%',
-      minHeight: isMobile ? 360 : 'auto',
+      height: isMobile ? (fitContent ? 'auto' : 'calc(100dvh - 176px)') : '100%',
+      minHeight: isMobile ? (fitContent ? 'auto' : 360) : 'auto',
       borderRadius: immersive && isMobile ? 0 : 3,
       border: immersive && isMobile ? 'none' : '1px solid',
       borderColor: 'divider',
@@ -24,7 +25,7 @@ const VenueNotesCardShell = ({
       backgroundImage: immersive && isMobile
         ? 'none'
         : 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(250,250,250,1) 100%)',
-      overflow: 'hidden',
+      overflow: fitContent && isMobile ? 'visible' : 'hidden',
     }}
   >
     {showHeader ? (
@@ -87,7 +88,7 @@ const VenueNotesCardShell = ({
       sx={{
         flex: 1,
         minHeight: 0,
-        overflowY: 'auto',
+        overflowY: fitContent && isMobile ? 'visible' : 'auto',
         px: isMobile ? 0 : 2.5,
         py: isMobile ? 0 : 2,
       }}

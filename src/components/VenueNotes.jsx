@@ -24,10 +24,7 @@ import {
     useMediaQuery,
     useTheme
 } from '@mui/material';
-import { 
-    PieChart, 
-    Pie, 
-    Cell, 
+import {
     BarChart, 
     Bar, 
     XAxis, 
@@ -560,104 +557,85 @@ const WinPercentagesPie = ({ data }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-    // Responsive height calculation - fits in mobile viewport for screenshots
-    const chartHeight = isMobile ?
-        Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.58 : 360, 390) :
-        350;
+    const noResults = Math.max(
+        (data.total_matches || 0) - (data.batting_first_wins || 0) - (data.batting_second_wins || 0),
+        0
+    );
 
-    const totalDecisiveMatches = data.batting_first_wins + data.batting_second_wins;
-    const battingFirstPct = totalDecisiveMatches > 0 ?
-        (data.batting_first_wins / totalDecisiveMatches) * 100 : 0;
-    const fieldingFirstPct = totalDecisiveMatches > 0 ?
-        (data.batting_second_wins / totalDecisiveMatches) * 100 : 0;
-
-    const pieData = [
+    const segments = [
         {
-            name: 'Won Batting First',
-            value: battingFirstPct,
-            count: data.batting_first_wins
+            key: 'bat-first',
+            label: 'Bat first',
+            value: data.batting_first_wins || 0,
+            color: '#2563eb',
         },
         {
-            name: 'Won Fielding First',
-            value: fieldingFirstPct,
-            count: data.batting_second_wins
-        }
+            key: 'no-result',
+            label: 'NR',
+            value: noResults,
+            color: '#cbd5e1',
+        },
+        {
+            key: 'bowl-first',
+            label: 'Bowl first',
+            value: data.batting_second_wins || 0,
+            color: '#f59e0b',
+        },
     ];
 
-    const COLORS = ['#003f5c', '#bc5090'];
-
-    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
-      const RADIAN = Math.PI / 180;
-      const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-      const x = cx + radius * Math.cos(-midAngle * RADIAN);
-      const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-      return (
-        <text
-          x={x}
-          y={y}
-          fill="white"
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={isMobile ? 14 : 16}
-          fontWeight="bold"
-        >
-          {`${(percent * 100).toFixed(1)}%`}
-        </text>
-      );
-    };
+    const totalMatches = segments.reduce((sum, segment) => sum + segment.value, 0);
+    const leadingSegment = [...segments].sort((a, b) => b.value - a.value)[0];
 
     return (
-        <Box sx={{ width: '100%', height: chartHeight, display: 'flex', flexDirection: 'column' }}>
-            <Typography variant={isMobile ? "body1" : "subtitle1"} align="center" gutterBottom sx={{ fontWeight: 600, mb: isMobile ? 0.5 : 1 }}>
-                Match Results Distribution
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 2 : 2.5, px: { xs: 1.5, sm: 0 }, py: { xs: 1, sm: 1.5 } }}>
+            <Typography variant={isMobile ? "body1" : "subtitle1"} sx={{ fontWeight: 700 }}>
+                Results Split
             </Typography>
-            <Box sx={{ flex: 1, position: 'relative' }}>
-                <ResponsiveContainer>
-                    <PieChart>
-                        <Pie
-                            data={pieData}
-                            cx="50%"
-                            cy={isMobile ? "47%" : "40%"}
-                            innerRadius={isMobile ? 52 : 60}
-                            outerRadius={isMobile ? 106 : 110}
-                            paddingAngle={3}
-                            dataKey="value"
-                            nameKey="name"
-                            labelLine={false}
-                            label={renderCustomizedLabel}
-                        >
-                            {pieData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                        </Pie>
-                        <Tooltip
-                            formatter={(value, name, props) => [`${props.payload.count} wins (${value.toFixed(1)}%)`, name]}
-                        />
-                    </PieChart>
-                </ResponsiveContainer>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1 }}>
+                {segments.map((segment) => {
+                    const percentage = totalMatches > 0 ? (segment.value / totalMatches) * 100 : 0;
+                    return (
+                        <Box key={segment.key}>
+                            <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontWeight: 700 }}>
+                                {segment.label}
+                            </Typography>
+                            <Typography variant={isMobile ? "h5" : "h4"} sx={{ mt: 0.25, fontWeight: 700 }}>
+                                {segment.value}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                {percentage.toFixed(0)}%
+                            </Typography>
+                        </Box>
+                    );
+                })}
             </Box>
-            {/* Legend moved below chart for better mobile layout */}
             <Box sx={{
                 display: 'flex',
-                justifyContent: 'center',
-                gap: isMobile ? 2 : 3,
-                flexWrap: 'wrap',
-                mt: isMobile ? 0 : 1,
-                pb: isMobile ? 0.5 : 1
+                alignItems: 'center',
+                height: isMobile ? 18 : 20,
+                borderRadius: 999,
+                overflow: 'hidden',
+                bgcolor: 'grey.200',
             }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Box sx={{ width: 12, height: 12, bgcolor: COLORS[0], borderRadius: '50%' }} />
-                    <Typography variant="caption" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
-                        Won Batting First ({data.batting_first_wins})
-                    </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Box sx={{ width: 12, height: 12, bgcolor: COLORS[1], borderRadius: '50%' }} />
-                    <Typography variant="caption" sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}>
-                        Won Fielding First ({data.batting_second_wins})
-                    </Typography>
-                </Box>
+                {segments.map((segment) => (
+                    <Box
+                        key={segment.key}
+                        sx={{
+                            height: '100%',
+                            width: totalMatches > 0 ? `${(segment.value / totalMatches) * 100}%` : '33.33%',
+                            bgcolor: segment.color,
+                            transition: 'width 200ms ease',
+                        }}
+                    />
+                ))}
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center' }}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    {leadingSegment?.label} leads at this venue
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {totalMatches > 0 ? `${((leadingSegment?.value || 0) / totalMatches * 100).toFixed(0)}%` : '0%'}
+                </Typography>
             </Box>
         </Box>
     );
@@ -667,114 +645,136 @@ const ScoresBarChart = ({ data }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-    // Responsive height calculation - fits in mobile viewport for screenshots
-    const chartHeight = isMobile ?
-        Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.54 : 340, 380) :
-        350;
-
     const scoreData = [
         {
-            name: '1st Innings Avg',
-            shortName: '1st Inn',
-            value: Math.round(data.average_first_innings || 0),
+            name: 'Average',
+            firstInnings: -Math.round(data.average_first_innings || 0),
+            secondInnings: Math.round(data.average_second_innings || 0),
         },
         {
-            name: '2nd Innings Avg',
-            shortName: '2nd Inn',
-            value: Math.round(data.average_second_innings || 0),
+            name: 'Winning',
+            firstInnings: -Math.round(data.average_winning_score || 0),
+            secondInnings: Math.round(data.average_chasing_score || 0),
         },
         {
-            name: 'Avg Winning Score',
-            shortName: 'Win Score',
-            value: Math.round(data.average_winning_score || 0),
+            name: 'Highest',
+            firstInnings: -(data.highest_total || 0),
+            secondInnings: data.highest_total_chased || 0,
         },
         {
-            name: 'Avg Chasing Score',
-            shortName: 'Chase Score',
-            value: Math.round(data.average_chasing_score || 0),
-        },
-        {
-            name: 'Highest Total',
-            shortName: 'Highest',
-            value: data.highest_total || 0,
-        },
-        {
-            name: 'Highest Chased',
-            shortName: 'High Chase',
-            value: data.highest_total_chased || 0,
-        },
-        {
-            name: 'Lowest Defended',
-            shortName: 'Low Defend',
-            value: data.lowest_total_defended || 0,
-        },
-        {
-            name: 'Lowest Total',
-            shortName: 'Lowest',
-            value: data.lowest_total || 0,
+            name: 'Lowest',
+            firstInnings: -(data.lowest_total_defended || 0),
+            secondInnings: data.lowest_total || 0,
         }
-    ];
+    ].map((row) => ({
+        ...row,
+        firstLabel: Math.abs(row.firstInnings),
+        secondLabel: Math.abs(row.secondInnings),
+    }));
 
-    // Filter out zero values which might be causing display issues
-    const filteredScoreData = scoreData.filter(item => item.value > 0);
+    const maxAbsValue = Math.max(
+        1,
+        ...scoreData.flatMap((row) => [Math.abs(row.firstInnings), Math.abs(row.secondInnings)])
+    );
+    const chartLimit = Math.ceil((maxAbsValue + 10) / 10) * 10;
 
-    // Custom bar label component to ensure values are displayed
-    const CustomBarLabel = (props) => {
-        const { x, y, width, value, height } = props;
+    const renderLeftLabel = ({ x, y, height, value }) => {
+        if (!value) {
+            return null;
+        }
+
         return (
             <text
-                x={x + width + 5}
+                x={x - 6}
                 y={y + height / 2}
-                fill="#666"
+                fill="#475569"
+                fontSize={isMobile ? 10 : 12}
+                textAnchor="end"
+                dominantBaseline="middle"
+                fontWeight="600"
+            >
+                {Math.abs(value)}
+            </text>
+        );
+    };
+
+    const renderRightLabel = ({ x, y, width, height, value }) => {
+        if (!value) {
+            return null;
+        }
+
+        return (
+            <text
+                x={x + width + 6}
+                y={y + height / 2}
+                fill="#475569"
                 fontSize={isMobile ? 10 : 12}
                 textAnchor="start"
                 dominantBaseline="middle"
+                fontWeight="600"
             >
-                {value}
+                {Math.abs(value)}
             </text>
         );
     };
 
     return (
-        <Box sx={{ width: '100%', height: chartHeight, display: 'flex', flexDirection: 'column' }}>
-            <Typography variant={isMobile ? "body1" : "subtitle1"} align="center" gutterBottom sx={{ fontWeight: 600 }}>
-                Innings Scores Analysis
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1.5 : 2, px: { xs: 1.5, sm: 0 }, py: { xs: 1, sm: 1.5 } }}>
+            <Typography variant={isMobile ? "body1" : "subtitle1"} sx={{ fontWeight: 700 }}>
+                Innings Comparison
             </Typography>
-            <Box sx={{ flex: 1 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 1 }}>
+                <Typography variant="caption" align="right" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                    1st innings
+                </Typography>
+                <Box sx={{ width: 1, height: 14, bgcolor: 'divider' }} />
+                <Typography variant="caption" align="left" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                    2nd innings
+                </Typography>
+            </Box>
+            <Box sx={{ height: isMobile ? 260 : 320 }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                        data={filteredScoreData}
+                        data={scoreData}
                         layout="vertical"
                         margin={{
-                            top: 10,
-                            right: isMobile ? 35 : 50,
-                            left: isMobile ? 5 : 10,
-                            bottom: isMobile ? 10 : 20
+                            top: 8,
+                            right: isMobile ? 34 : 42,
+                            left: isMobile ? 34 : 42,
+                            bottom: 4
                         }}
                     >
+                        <ReferenceLine x={0} stroke="#cbd5e1" strokeWidth={2} />
                         <XAxis
                             type="number"
-                            domain={[0, 'dataMax + 20']}
-                            axisLine={true}
-                            grid={false}
-                            tick={{ fontSize: isMobile ? 9 : 12 }}
-                            label={isMobile ? undefined : { value: 'Runs', position: 'bottom', offset: 0 }}
+                            domain={[-chartLimit, chartLimit]}
+                            tick={false}
+                            axisLine={false}
+                            tickLine={false}
                         />
                         <YAxis
                             type="category"
-                            dataKey={isMobile ? "shortName" : "name"}
-                            width={isMobile ? 65 : 120}
+                            dataKey="name"
+                            width={isMobile ? 58 : 76}
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fontSize: isMobile ? 9 : 12 }}
+                            tick={{ fontSize: isMobile ? 10 : 12, fill: '#475569', fontWeight: 600 }}
                         />
                         <Tooltip
-                            formatter={(value, name, props) => [value, props.payload.name]}
+                            formatter={(value, name) => [Math.abs(value), name === 'firstInnings' ? '1st innings' : '2nd innings']}
                         />
                         <Bar
-                            dataKey="value"
-                            fill="#E6E6FA"
-                            label={<CustomBarLabel />}
+                            dataKey="firstInnings"
+                            fill="#2563eb"
+                            radius={[6, 0, 0, 6]}
+                            label={renderLeftLabel}
+                            isAnimationActive={false}
+                        />
+                        <Bar
+                            dataKey="secondInnings"
+                            fill="#0f766e"
+                            radius={[0, 6, 6, 0]}
+                            label={renderRightLabel}
                             isAnimationActive={false}
                         />
                     </BarChart>
@@ -1011,12 +1011,12 @@ const VenueNotes = ({
                 mobileCards: [
                     {
                         id: 'results-distribution',
-                        cardLabel: 'Match Results',
+                        cardLabel: 'Results Split',
                         content: <WinPercentagesPie data={venueStats} />,
                     },
                     {
                         id: 'results-scores',
-                        cardLabel: 'Score Benchmarks',
+                        cardLabel: 'Innings Comparison',
                         content: <ScoresBarChart data={venueStats} />,
                     },
                 ],
@@ -1483,6 +1483,7 @@ const VenueNotes = ({
                     metaText={`${card.groupCardIndex + 1} of ${card.groupCardTotal}`}
                     isMobile
                     immersive={card.groupId === 'results' || card.groupId === 'phases'}
+                    fitContent={card.groupId === 'results' || card.groupId === 'phases'}
                     showHeader={false}
                 >
                     {card.content}
