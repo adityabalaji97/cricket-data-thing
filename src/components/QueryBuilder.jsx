@@ -21,15 +21,19 @@ import QueryResults from './QueryResults';
 import { useUrlParams, filtersToUrlParams } from '../utils/urlParamParser';
 import axios from 'axios';
 import config from '../config';
+import { getSeasonStartDate } from '../utils/dateDefaults';
+
+const currentSeasonStart = getSeasonStartDate(new Date(), 0);
+const recentSeasonsStart = getSeasonStartDate(new Date(), 1);
 
 // Prefilled query examples showcasing new delivery_details features
 const PREFILLED_QUERIES = [
   {
-    title: "Chennai Super Kings batters by phase in 2025",
+    title: `Chennai Super Kings batters by phase in ${new Date().getFullYear()}`,
     description: "Analyze CSK batting performance across different match phases",
     filters: {
       batting_teams: ["Chennai Super Kings"],
-      start_date: "2025-01-01",
+      start_date: currentSeasonStart,
       leagues: ["IPL"],
       min_balls: 30
     },
@@ -70,7 +74,7 @@ const PREFILLED_QUERIES = [
     description: "Study pace bowling strategies in powerplay overs",
     filters: {
       leagues: ["IPL"],
-      start_date: "2024-01-01",
+      start_date: recentSeasonsStart,
       over_min: 0,
       over_max: 5,
       bowl_kind: ["pace bowler"],
