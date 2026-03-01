@@ -617,25 +617,11 @@ const AppContent = () => {
         <Route path="/search" element={<GoogleSearchLanding />} />
         <Route path="/credits" element={<CreditsPage />} />
         <Route path="/venue" element={
-          <Box sx={{ my: 3 }}>
+          <Box sx={{ my: { xs: 1.5, md: 3 } }}>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
               </Alert>
-            )}
-
-            {/* Show toggle button when visualizations are shown */}
-            {showVisualizations && (
-              <Box sx={{ mb: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => setFiltersExpanded(!filtersExpanded)}
-                  fullWidth
-                  sx={{ justifyContent: 'space-between' }}
-                >
-                  {filtersExpanded ? 'Hide Filters' : 'Show Filters'}
-                </Button>
-              </Box>
             )}
 
             <Collapse in={filtersExpanded || !showVisualizations}>
@@ -789,6 +775,8 @@ const AppContent = () => {
                   venueFantasyStats={venueFantasyStats}
                   venuePlayerHistory={venuePlayerHistory}
                   matchHistory={matchHistory}
+                  filtersExpanded={filtersExpanded}
+                  onToggleFilters={() => setFiltersExpanded((currentValue) => !currentValue)}
                   isMobile={isMobile}
                 />
               </>

@@ -6,6 +6,7 @@ import {
     Typography, 
     CircularProgress, 
     Alert,
+    Button,
     Table,
     TableBody,
     TableCell,
@@ -561,7 +562,7 @@ const WinPercentagesPie = ({ data }) => {
 
     // Responsive height calculation - fits in mobile viewport for screenshots
     const chartHeight = isMobile ?
-        Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.45 : 300, 320) :
+        Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.58 : 360, 390) :
         350;
 
     const totalDecisiveMatches = data.batting_first_wins + data.batting_second_wins;
@@ -608,7 +609,7 @@ const WinPercentagesPie = ({ data }) => {
 
     return (
         <Box sx={{ width: '100%', height: chartHeight, display: 'flex', flexDirection: 'column' }}>
-            <Typography variant={isMobile ? "body1" : "subtitle1"} align="center" gutterBottom sx={{ fontWeight: 600 }}>
+            <Typography variant={isMobile ? "body1" : "subtitle1"} align="center" gutterBottom sx={{ fontWeight: 600, mb: isMobile ? 0.5 : 1 }}>
                 Match Results Distribution
             </Typography>
             <Box sx={{ flex: 1, position: 'relative' }}>
@@ -617,9 +618,9 @@ const WinPercentagesPie = ({ data }) => {
                         <Pie
                             data={pieData}
                             cx="50%"
-                            cy={isMobile ? "45%" : "40%"}
-                            innerRadius={isMobile ? 45 : 60}
-                            outerRadius={isMobile ? 90 : 110}
+                            cy={isMobile ? "47%" : "40%"}
+                            innerRadius={isMobile ? 52 : 60}
+                            outerRadius={isMobile ? 106 : 110}
                             paddingAngle={3}
                             dataKey="value"
                             nameKey="name"
@@ -643,7 +644,7 @@ const WinPercentagesPie = ({ data }) => {
                 gap: isMobile ? 2 : 3,
                 flexWrap: 'wrap',
                 mt: isMobile ? 0 : 1,
-                pb: 1
+                pb: isMobile ? 0.5 : 1
             }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Box sx={{ width: 12, height: 12, bgcolor: COLORS[0], borderRadius: '50%' }} />
@@ -668,7 +669,7 @@ const ScoresBarChart = ({ data }) => {
 
     // Responsive height calculation - fits in mobile viewport for screenshots
     const chartHeight = isMobile ?
-        Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.5 : 320, 350) :
+        Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.54 : 340, 380) :
         350;
 
     const scoreData = [
@@ -870,9 +871,9 @@ const PhaseWiseStrategy = ({ data, isMobile }) => {
     const secondInningsData = processPhaseData(data.phase_wise_stats?.chasing_wins);
 
     return (
-        <Box sx={{ mt: 2 }}>
+        <Box sx={{ mt: isMobile ? 0.5 : 2 }}>
             <Typography variant={isMobile ? "h6" : "h5"} gutterBottom>Phase-wise Strategy</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 2 : 3 }}>
                 {renderPhase(firstInningsData, "Batting First")}
                 {renderPhase(secondInningsData, "Chasing")}
             </Box>
@@ -923,6 +924,49 @@ const CompactFantasyVenueHistory = ({ venue, venuePlayerHistory, isMobile }) => 
     </Box>
 );
 
+const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    year: 'numeric',
+});
+
+const parseDateString = (dateString) => {
+    if (!dateString) {
+        return null;
+    }
+
+    const [year, month, day] = dateString.split('-').map((part) => Number.parseInt(part, 10));
+    if (!year || !month || !day) {
+        return null;
+    }
+
+    return new Date(year, month - 1, day);
+};
+
+const formatVenueDateRange = (startDate, endDate) => {
+    const start = parseDateString(startDate);
+    const end = parseDateString(endDate);
+
+    if (!start || !end) {
+        return `${startDate} - ${endDate}`;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const normalizedEnd = new Date(end);
+    normalizedEnd.setHours(0, 0, 0, 0);
+
+    const startLabel = MONTH_YEAR_FORMATTER.format(start);
+    const endLabel = normalizedEnd.getTime() === today.getTime()
+        ? 'Today'
+        : MONTH_YEAR_FORMATTER.format(end);
+
+    if (startLabel === endLabel) {
+        return startLabel;
+    }
+
+    return `${startLabel} - ${endLabel}`;
+};
+
 const VenueNotes = ({
     venue,
     startDate,
@@ -934,6 +978,8 @@ const VenueNotes = ({
     venueFantasyStats,
     venuePlayerHistory,
     matchHistory,
+    filtersExpanded,
+    onToggleFilters,
     isMobile
   }) => {
 
@@ -1402,6 +1448,7 @@ const VenueNotes = ({
 
     const activeCard = mobileCards[activeCardIndex] || mobileCards[0];
     const activeGroupId = activeCard?.groupId || sectionGroups[0]?.id || 'results';
+    const formattedDateRange = useMemo(() => formatVenueDateRange(startDate, endDate), [startDate, endDate]);
 
     const goToCard = useCallback((index) => {
         if (!mobileCards.length) {
@@ -1417,13 +1464,6 @@ const VenueNotes = ({
     const handleCardChange = useCallback((index) => {
         setActiveCardIndex(index);
     }, []);
-
-    const handleGroupClick = useCallback((groupId) => {
-        const nextIndex = mobileCards.findIndex((card) => card.groupId === groupId);
-        if (nextIndex >= 0) {
-            goToCard(nextIndex);
-        }
-    }, [goToCard, mobileCards]);
 
     const handleSectionSelect = useCallback((sectionId) => {
         setActiveSectionId(sectionId);
@@ -1442,6 +1482,8 @@ const VenueNotes = ({
                     cardLabel={card.cardLabel}
                     metaText={`${card.groupCardIndex + 1} of ${card.groupCardTotal}`}
                     isMobile
+                    immersive={card.groupId === 'results' || card.groupId === 'phases'}
+                    showHeader={false}
                 >
                     {card.content}
                 </VenueNotesCardShell>
@@ -1512,33 +1554,56 @@ const VenueNotes = ({
 if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
 
 return (
-    <Box sx={{ p: { xs: 1, sm: 2 }, pb: isMobile ? '92px' : 0 }}>
+    <Box sx={{ mx: { xs: -1, sm: 0 }, p: { xs: 0, sm: 2 }, pb: isMobile ? '68px' : 0 }}>
         <Box
             sx={{
-                mb: 2.5,
-                px: { xs: 2, sm: 3 },
-                py: { xs: 2, sm: 2.5 },
-                border: '1px solid',
+                mb: { xs: 0.5, sm: 2.5 },
+                px: { xs: 1.5, sm: 3 },
+                py: { xs: 0.5, sm: 2.5 },
+                border: isMobile ? 'none' : '1px solid',
                 borderColor: 'divider',
-                borderRadius: 3,
-                boxShadow: 1,
-                bgcolor: 'background.paper',
-                backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(250,250,250,1) 100%)',
+                borderRadius: isMobile ? 0 : 3,
+                boxShadow: isMobile ? 'none' : 1,
+                bgcolor: isMobile ? 'transparent' : 'background.paper',
+                backgroundImage: isMobile
+                    ? 'none'
+                    : 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(250,250,250,1) 100%)',
             }}
         >
-            <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 700 }}>
-                {venue === "All Venues"
-                    ? `All Venues`
-                    : venue
-                }
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.25 }}>
-                <Box sx={{ px: 1.25, py: 0.5, borderRadius: 2, bgcolor: 'rgba(2, 132, 199, 0.08)', color: 'primary.main', fontSize: '0.8rem', fontWeight: 700 }}>
-                    {venueStats.total_matches} T20s
-                </Box>
-                <Box sx={{ px: 1.25, py: 0.5, borderRadius: 2, bgcolor: 'grey.100', color: 'text.secondary', fontSize: '0.8rem', fontWeight: 600 }}>
-                    {startDate} to {endDate}
-                </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                <Typography
+                    variant={isMobile ? "h6" : "h4"}
+                    sx={{
+                        fontWeight: 700,
+                        lineHeight: 1.15,
+                        flex: 1,
+                        minWidth: 0,
+                    }}
+                >
+                    {venue === "All Venues" ? 'All Venues' : venue}
+                </Typography>
+                {onToggleFilters ? (
+                    <Button
+                        size="small"
+                        variant="text"
+                        onClick={onToggleFilters}
+                        sx={{
+                            minWidth: 'auto',
+                            px: 0.5,
+                            py: 0.25,
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            flexShrink: 0,
+                        }}
+                    >
+                        {filtersExpanded ? 'Hide filters' : 'Edit filters'}
+                    </Button>
+                ) : null}
+            </Box>
+            <Box sx={{ mt: 0.25, px: 0.1 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    {`${venueStats.total_matches} T20s • ${formattedDateRange}`}
+                </Typography>
             </Box>
         </Box>
 
@@ -1550,11 +1615,8 @@ return (
                     swiperRef={swiperRef}
                 />
                 <VenueNotesMobileNav
-                    sections={sectionGroups.map(({ id, label }) => ({ id, label }))}
-                    activeGroupId={activeGroupId}
-                    activeGroupLabel={activeCard?.groupLabel || sectionGroups[0]?.label || 'Results'}
-                    activeCardMeta={activeCard ? `${activeCard.groupCardIndex + 1} of ${activeCard.groupCardTotal}` : null}
-                    onGroupClick={handleGroupClick}
+                    label={activeCard?.cardLabel || activeCard?.groupLabel || 'Results'}
+                    meta={activeCard ? `${activeCard.groupCardIndex + 1}/${activeCard.groupCardTotal}` : null}
                     onPrevious={() => goToCard(activeCardIndex - 1)}
                     onNext={() => goToCard(activeCardIndex + 1)}
                     disablePrevious={activeCardIndex === 0}

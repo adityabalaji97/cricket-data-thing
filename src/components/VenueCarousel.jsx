@@ -20,7 +20,7 @@ const VenueCarousel = ({ cards, onSlideChange, swiperRef }) => (
       modules={[A11y]}
       onSwiper={(swiper) => { swiperRef.current = swiper; }}
       onSlideChange={(swiper) => onSlideChange(swiper.activeIndex)}
-      spaceBetween={16}
+      spaceBetween={8}
       slidesPerView={1}
       speed={300}
       touchEventsTarget="wrapper"
@@ -36,7 +36,7 @@ const VenueCarousel = ({ cards, onSlideChange, swiperRef }) => (
     >
       {cards.map((card) => (
         <SwiperSlide key={card.id}>
-          <Box sx={{ width: '100%', px: { xs: 0.5, sm: 1 }, py: 1, display: 'flex' }}>
+          <Box sx={{ width: '100%', px: 0, py: 0.5, display: 'flex' }}>
             {card.content}
           </Box>
         </SwiperSlide>
