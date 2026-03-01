@@ -20,11 +20,11 @@ print(f"Connecting to database: {DATABASE_URL.split('@')[1] if '@' in DATABASE_U
 database = Database(DATABASE_URL)
 engine = create_engine(
     DATABASE_URL,
-    pool_size=10,  # Base connections per worker (4 workers * 10 = 40 base)
-    max_overflow=15,  # Overflow per worker (4 workers * 15 = 60 overflow, 100 total max within Heroku's 120 limit)
-    pool_timeout=30,  # Connection timeout
-    pool_recycle=1800,  # Recycle connections after 30 minutes
-    pool_pre_ping=True  # Check connections before using them
+    pool_size=3,  # Base connections per worker (4 workers * 3 = 12 base)
+    max_overflow=5,  # Overflow per worker (4 workers * 5 = 20 overflow, 32 total max)
+    pool_timeout=30,
+    pool_recycle=1800,
+    pool_pre_ping=True
 )
 
 def get_database_connection():

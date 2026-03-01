@@ -373,23 +373,12 @@ async def get_batter_summary(
     3. Generates natural language summary using LLM
     4. Caches result for subsequent requests
     
-    If no competition filters are provided, automatically includes ALL leagues + international (top 20 teams).
+    When no competition filters are provided, returns all matches (same behavior as Overview).
     """
     try:
         # Resolve player alias to legacy name (used in players/deliveries tables)
         resolved_name = resolve_to_legacy_name(player_name, db)
         logger.info(f"Resolved player name: '{player_name}' -> '{resolved_name}'")
-        
-        # If no filters provided, use ALL leagues + international
-        if not leagues and not include_international:
-            logger.info(f"No competition filters provided for {resolved_name}, using all leagues + international")
-            leagues_result = db.execute(text(
-                "SELECT DISTINCT competition FROM matches WHERE competition IS NOT NULL AND match_type = 'league'"
-            )).fetchall()
-            leagues = [r[0] for r in leagues_result if r[0]]
-            include_international = True
-            top_teams = 20
-            logger.info(f"Auto-populated {len(leagues)} leagues + international top 20")
         
         # Build filter dict for cache key
         filters = {
@@ -491,23 +480,12 @@ async def get_bowler_summary(
     """
     Generate AI-powered bowling summary for a player.
     
-    If no competition filters are provided, automatically includes ALL leagues + international (top 20 teams).
+    When no competition filters are provided, returns all matches (same behavior as Overview).
     """
     try:
         # Resolve player alias to legacy name (used in players/deliveries tables)
         resolved_name = resolve_to_legacy_name(player_name, db)
         logger.info(f"Resolved bowler name: '{player_name}' -> '{resolved_name}'")
-        
-        # If no filters provided, use ALL leagues + international
-        if not leagues and not include_international:
-            logger.info(f"No competition filters provided for bowler {resolved_name}, using all leagues + international")
-            leagues_result = db.execute(text(
-                "SELECT DISTINCT competition FROM matches WHERE competition IS NOT NULL AND match_type = 'league'"
-            )).fetchall()
-            leagues = [r[0] for r in leagues_result if r[0]]
-            include_international = True
-            top_teams = 20
-            logger.info(f"Auto-populated {len(leagues)} leagues + international top 20")
         
         filters = {
             "start_date": str(start_date) if start_date else None,
