@@ -16,6 +16,8 @@
     "@vercel/analytics": "^1.5.0",
     "ajv": "^8.17.1",
     "axios": "^1.6.5",
+    "echarts": "^6.0.0",
+    "echarts-for-react": "^3.0.6",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.511.0",
     "react": "^18.2.0",

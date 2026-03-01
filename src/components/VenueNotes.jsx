@@ -25,8 +25,6 @@ import {
     useTheme
 } from '@mui/material';
 import {
-    BarChart, 
-    Bar, 
     XAxis, 
     YAxis, 
     ResponsiveContainer, 
@@ -36,6 +34,7 @@ import {
     ReferenceLine,
     ReferenceArea,
 } from 'recharts';
+import ReactECharts from 'echarts-for-react';
 import BowlingAnalysis from './BowlingAnalysis';
 import FantasyPointsTable from './FantasyPointsTable';
 import FantasyPointsBarChart from './FantasyPointsBarChart';
@@ -584,10 +583,8 @@ const WinPercentagesPie = ({ data }) => {
     ];
 
     const totalMatches = segments.reduce((sum, segment) => sum + segment.value, 0);
-    const leadingSegment = [...segments].sort((a, b) => b.value - a.value)[0];
-
     return (
-        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1.5 : 2.5, px: { xs: 1.5, sm: 0 }, py: { xs: 0.75, sm: 1.5 } }}>
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1.5 : 2.5, px: { xs: 2, sm: 0 }, py: { xs: 0.75, sm: 1.5 } }}>
             <Typography variant={isMobile ? "body2" : "subtitle1"} sx={{ fontWeight: 700, textAlign: isMobile ? 'center' : 'left' }}>
                 Results Split
             </Typography>
@@ -609,33 +606,33 @@ const WinPercentagesPie = ({ data }) => {
                     );
                 })}
             </Box>
-            <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                height: isMobile ? 18 : 20,
-                borderRadius: 999,
-                overflow: 'hidden',
-                bgcolor: 'grey.200',
-            }}>
-                {segments.map((segment) => (
-                    <Box
-                        key={segment.key}
-                        sx={{
-                            height: '100%',
-                            width: totalMatches > 0 ? `${(segment.value / totalMatches) * 100}%` : '33.33%',
-                            bgcolor: segment.color,
-                            transition: 'width 200ms ease',
-                        }}
-                    />
-                ))}
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    {leadingSegment?.label} leads at this venue
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {totalMatches > 0 ? `${((leadingSegment?.value || 0) / totalMatches * 100).toFixed(0)}%` : '0%'}
-                </Typography>
+            <Box sx={{ px: isMobile ? 0.5 : 0 }}>
+                <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    width: '100%',
+                    minWidth: 0,
+                    height: isMobile ? 18 : 20,
+                    borderRadius: 999,
+                    overflow: 'hidden',
+                    bgcolor: 'grey.200',
+                }}>
+                    {totalMatches > 0 ? segments.map((segment) => (
+                        segment.value > 0 ? (
+                            <Box
+                                key={segment.key}
+                                sx={{
+                                    height: '100%',
+                                    flex: `${segment.value} 1 0`,
+                                    minWidth: 0,
+                                    bgcolor: segment.color,
+                                }}
+                            />
+                        ) : null
+                    )) : (
+                        <Box sx={{ height: '100%', flex: '1 1 auto', bgcolor: 'grey.300' }} />
+                    )}
+                </Box>
             </Box>
         </Box>
     );
@@ -648,69 +645,153 @@ const ScoresBarChart = ({ data }) => {
     const scoreData = [
         {
             name: 'Average',
-            firstInnings: -Math.round(data.average_first_innings || 0),
+            firstInnings: Math.round(data.average_first_innings || 0),
             secondInnings: Math.round(data.average_second_innings || 0),
         },
         {
             name: 'Winning',
-            firstInnings: -Math.round(data.average_winning_score || 0),
+            firstInnings: Math.round(data.average_winning_score || 0),
             secondInnings: Math.round(data.average_chasing_score || 0),
         },
         {
-            name: 'Def/Chase',
-            firstInnings: -(data.lowest_total_defended || 0),
-            secondInnings: data.highest_total_chased || 0,
-        }
-    ].map((row) => ({
-        ...row,
-        firstLabel: Math.abs(row.firstInnings),
-        secondLabel: Math.abs(row.secondInnings),
-    }));
+            name: 'Defended /\nChased',
+            firstInnings: Math.round(data.lowest_total_defended || 0),
+            secondInnings: Math.round(data.highest_total_chased || 0),
+        },
+    ];
 
     const maxAbsValue = Math.max(
         1,
         ...scoreData.flatMap((row) => [Math.abs(row.firstInnings), Math.abs(row.secondInnings)])
     );
-    const chartLimit = Math.ceil((maxAbsValue + 10) / 10) * 10;
-
-    const renderLeftLabel = ({ x, y, height, value }) => {
-        if (!value) {
-            return null;
-        }
-
-        return (
-            <text
-                x={x - 6}
-                y={y + height / 2}
-                fill="#475569"
-                fontSize={isMobile ? 10 : 12}
-                textAnchor="end"
-                dominantBaseline="middle"
-                fontWeight="600"
-            >
-                {Math.abs(value)}
-            </text>
-        );
-    };
-
-    const renderRightLabel = ({ x, y, width, height, value }) => {
-        if (!value) {
-            return null;
-        }
-
-        return (
-            <text
-                x={x + width + 6}
-                y={y + height / 2}
-                fill="#475569"
-                fontSize={isMobile ? 10 : 12}
-                textAnchor="start"
-                dominantBaseline="middle"
-                fontWeight="600"
-            >
-                {Math.abs(value)}
-            </text>
-        );
+    const chartLimit = Math.ceil((maxAbsValue * 1.15) / 10) * 10;
+    const chartOption = {
+        animation: false,
+        grid: {
+            left: isMobile ? 108 : 128,
+            right: isMobile ? 26 : 34,
+            top: isMobile ? 26 : 30,
+            bottom: 4,
+            containLabel: false,
+        },
+        xAxis: {
+            type: 'value',
+            min: -chartLimit,
+            max: chartLimit,
+            axisLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: { show: false },
+            splitLine: { show: false },
+        },
+        yAxis: {
+            type: 'category',
+            inverse: true,
+            data: scoreData.map((row) => row.name),
+            axisTick: { show: false },
+            axisLine: { show: false },
+            axisLabel: {
+                color: '#475569',
+                fontSize: isMobile ? 11 : 12,
+                lineHeight: isMobile ? 13 : 15,
+                fontWeight: 700,
+                margin: isMobile ? 18 : 20,
+            },
+        },
+        graphic: [
+            {
+                type: 'text',
+                left: isMobile ? '36%' : '38%',
+                top: 0,
+                style: {
+                    text: '1st innings',
+                    fill: '#64748b',
+                    fontSize: isMobile ? 11 : 12,
+                    fontWeight: 700,
+                    textAlign: 'center',
+                },
+            },
+            {
+                type: 'text',
+                left: isMobile ? '62%' : '61%',
+                top: 0,
+                style: {
+                    text: '2nd innings',
+                    fill: '#64748b',
+                    fontSize: isMobile ? 11 : 12,
+                    fontWeight: 700,
+                    textAlign: 'center',
+                },
+            },
+        ],
+        series: [
+            {
+                name: '1st innings',
+                type: 'bar',
+                stack: 'innings',
+                data: scoreData.map((row) => -row.firstInnings),
+                barWidth: isMobile ? 22 : 26,
+                itemStyle: {
+                    color: '#2563eb',
+                    borderRadius: [6, 0, 0, 6],
+                },
+                label: {
+                    show: true,
+                    position: 'insideLeft',
+                    formatter: ({ value }) => Math.abs(value),
+                    color: '#ffffff',
+                    fontSize: isMobile ? 11 : 12,
+                    fontWeight: 700,
+                    padding: [0, 0, 0, 8],
+                },
+                emphasis: { disabled: true },
+            },
+            {
+                name: '2nd innings',
+                type: 'bar',
+                stack: 'innings',
+                data: scoreData.map((row) => row.secondInnings),
+                barWidth: isMobile ? 22 : 26,
+                itemStyle: {
+                    color: '#0f766e',
+                    borderRadius: [0, 6, 6, 0],
+                },
+                label: {
+                    show: true,
+                    position: 'insideRight',
+                    formatter: ({ value }) => Math.abs(value),
+                    color: '#ffffff',
+                    fontSize: isMobile ? 11 : 12,
+                    fontWeight: 700,
+                    padding: [0, 8, 0, 0],
+                },
+                markLine: {
+                    symbol: 'none',
+                    silent: true,
+                    lineStyle: {
+                        color: '#cbd5e1',
+                        width: 2,
+                    },
+                    label: { show: false },
+                    data: [{ xAxis: 0 }],
+                },
+                emphasis: { disabled: true },
+            },
+        ],
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'shadow',
+            },
+            formatter: (params) => {
+                const first = params.find((item) => item.seriesName === '1st innings');
+                const second = params.find((item) => item.seriesName === '2nd innings');
+                return [
+                    `<strong>${params[0]?.axisValue || ''}</strong>`,
+                    `1st innings: ${Math.abs(first?.value || 0)}`,
+                    `2nd innings: ${Math.abs(second?.value || 0)}`,
+                ].join('<br/>');
+            },
+        },
     };
 
     return (
@@ -718,67 +799,14 @@ const ScoresBarChart = ({ data }) => {
             <Typography variant={isMobile ? "body2" : "subtitle1"} sx={{ fontWeight: 700, textAlign: isMobile ? 'center' : 'left' }}>
                 Innings Comparison
             </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 1 }}>
-                <Typography variant="caption" align="right" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                    1st innings
-                </Typography>
-                <Box sx={{ width: 1, height: 14, bgcolor: 'divider' }} />
-                <Typography variant="caption" align="left" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                    2nd innings
-                </Typography>
-            </Box>
-            <Box sx={{ height: isMobile ? 186 : 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                        data={scoreData}
-                        layout="vertical"
-                        barCategoryGap={isMobile ? '28%' : '20%'}
-                        margin={{
-                            top: 8,
-                            right: isMobile ? 34 : 42,
-                            left: isMobile ? 34 : 42,
-                            bottom: 4
-                        }}
-                    >
-                        <ReferenceLine x={0} stroke="#cbd5e1" strokeWidth={2} />
-                        <XAxis
-                            type="number"
-                            domain={[-chartLimit, chartLimit]}
-                            tick={false}
-                            axisLine={false}
-                            tickLine={false}
-                        />
-                        <YAxis
-                            type="category"
-                            dataKey="name"
-                            width={isMobile ? 58 : 76}
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fontSize: isMobile ? 10 : 12, fill: '#475569', fontWeight: 600 }}
-                        />
-                        <Tooltip
-                            formatter={(value, name) => [Math.abs(value), name === 'firstInnings' ? '1st innings' : '2nd innings']}
-                        />
-                        <Bar
-                            dataKey="firstInnings"
-                            stackId="innings"
-                            fill="#2563eb"
-                            radius={[6, 0, 0, 6]}
-                            barSize={isMobile ? 18 : 24}
-                            label={renderLeftLabel}
-                            isAnimationActive={false}
-                        />
-                        <Bar
-                            dataKey="secondInnings"
-                            stackId="innings"
-                            fill="#0f766e"
-                            radius={[0, 6, 6, 0]}
-                            barSize={isMobile ? 18 : 24}
-                            label={renderRightLabel}
-                            isAnimationActive={false}
-                        />
-                    </BarChart>
-                </ResponsiveContainer>
+            <Box sx={{ height: isMobile ? 214 : 272 }}>
+                <ReactECharts
+                    option={chartOption}
+                    notMerge
+                    lazyUpdate
+                    style={{ width: '100%', height: '100%' }}
+                    opts={{ renderer: 'svg' }}
+                />
             </Box>
         </Box>
     );
