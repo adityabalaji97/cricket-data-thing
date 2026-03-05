@@ -15,6 +15,7 @@ from services.visualizations import (
     get_venue_wagon_wheel_data,
     get_venue_pitch_map_data,
 )
+from services.venue_similarity import get_similar_venues
 
 router = APIRouter(prefix="/visualizations", tags=["visualizations"])
 
@@ -444,3 +445,36 @@ def get_venue_pitch_map(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch venue pitch map data: {str(e)}")
+
+
+@router.get("/venue/{venue}/similar")
+def get_venue_similar(
+    venue: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    min_matches: int = Query(default=10, ge=3, le=100),
+    top_n: int = Query(default=5, ge=1, le=15),
+    leagues: List[str] = Query(default=None),
+    include_international: Optional[bool] = Query(default=None),
+    top_teams: Optional[int] = Query(default=None, ge=1, le=30),
+    db: Session = Depends(get_session),
+):
+    try:
+        result = get_similar_venues(
+            venue=venue,
+            db=db,
+            start_date=start_date,
+            end_date=end_date,
+            min_matches=min_matches,
+            top_n=top_n,
+            leagues=leagues,
+            include_international=include_international,
+            top_teams=top_teams,
+        )
+        if not result.get("found"):
+            raise HTTPException(status_code=404, detail=result.get("error", "Venue not found"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch venue similarity data: {str(e)}")

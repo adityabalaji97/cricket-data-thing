@@ -43,6 +43,7 @@ import Matchups from './Matchups';
 import BattingScatterChart from './BattingScatterChart';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
 import VenueTacticalMap from './VenueTacticalMap';
+import VenueSimilarity from './VenueSimilarity';
 import MatchPreviewCard from './MatchPreviewCard';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 import VenueSectionTabs from './VenueSectionTabs';
@@ -966,7 +967,10 @@ const VenueNotes = ({
     matchHistory,
     filtersExpanded,
     onToggleFilters,
-    isMobile
+    isMobile,
+    leagues = [],
+    includeInternational = false,
+    topTeams = null,
   }) => {
 
     const [fantasyTabValue, setFantasyTabValue] = useState(0);
@@ -1054,11 +1058,31 @@ const VenueNotes = ({
                     startDate={startDate}
                     endDate={endDate}
                     isMobile={isMobile}
+                    leagues={leagues}
+                    includeInternational={includeInternational}
+                    topTeams={topTeams}
                 />
             ),
         });
 
-        // 5. FANTASY (only when both teams)
+        // 5. SIMILAR
+        groups.push({
+            id: 'similar',
+            label: 'Similar',
+            content: (
+                <VenueSimilarity
+                    venue={venue}
+                    startDate={startDate}
+                    endDate={endDate}
+                    isMobile={isMobile}
+                    leagues={leagues}
+                    includeInternational={includeInternational}
+                    topTeams={topTeams}
+                />
+            ),
+        });
+
+        // 6. FANTASY (only when both teams)
         if (selectedTeam1 && selectedTeam2) {
             groups.push({
                 id: 'fantasy',
@@ -1133,7 +1157,7 @@ const VenueNotes = ({
             });
         }
 
-        // 6. LEADERS
+        // 7. LEADERS
         if (statsData?.batting_leaders?.length > 0 || statsData?.bowling_leaders?.length > 0) {
             groups.push({
                 id: 'leaders',
@@ -1155,7 +1179,7 @@ const VenueNotes = ({
             });
         }
 
-        // 7. ANALYSIS
+        // 8. ANALYSIS
         if (statsData?.batting_scatter?.length > 0) {
             groups.push({
                 id: 'analysis',
@@ -1181,7 +1205,7 @@ const VenueNotes = ({
             });
         }
 
-        // 8. EXPLORE
+        // 9. EXPLORE
         groups.push({
             id: 'explore',
             label: 'Explore',
@@ -1200,7 +1224,7 @@ const VenueNotes = ({
         });
 
         return groups;
-    }, [venueStats, statsData, selectedTeam1, selectedTeam2, venue, startDate, endDate, matchHistory, venueFantasyStats, venuePlayerHistory, isMobile, fantasyTabValue]);
+    }, [venueStats, statsData, selectedTeam1, selectedTeam2, venue, startDate, endDate, matchHistory, venueFantasyStats, venuePlayerHistory, isMobile, fantasyTabValue, leagues, includeInternational, topTeams]);
 
     const formattedDateRange = useMemo(() => formatVenueDateRange(startDate, endDate), [startDate, endDate]);
 

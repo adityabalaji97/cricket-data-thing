@@ -778,6 +778,9 @@ const AppContent = () => {
                   filtersExpanded={filtersExpanded}
                   onToggleFilters={() => setFiltersExpanded((currentValue) => !currentValue)}
                   isMobile={isMobile}
+                  leagues={competitions.leagues}
+                  includeInternational={competitions.international}
+                  topTeams={competitions.topTeams}
                 />
               </>
             )}
