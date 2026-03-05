@@ -45,9 +45,7 @@ import ContextualQueryPrompts from './ContextualQueryPrompts';
 import VenueTacticalMap from './VenueTacticalMap';
 import MatchPreviewCard from './MatchPreviewCard';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
-import VenueCarousel from './VenueCarousel';
-import VenueNotesCardShell from './VenueNotesCardShell';
-import VenueNotesMobileNav from './VenueNotesMobileNav';
+import VenueSectionTabs from './VenueSectionTabs';
 import VenueNotesDesktopNav from './VenueNotesDesktopNav';
 
 const BattingScatter = ({ data, isMobile }) => {
@@ -912,49 +910,6 @@ const PhaseWiseStrategy = ({ data, isMobile }) => {
     );
 };
 
-const CompactFantasyComparison = ({
-    venue,
-    selectedTeam1,
-    selectedTeam2,
-    venueFantasyStats,
-    isMobile,
-}) => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }} data-carousel-no-swipe>
-        <FantasyPointsTable
-            players={venueFantasyStats?.team1_players || []}
-            title={`${selectedTeam1.abbreviated_name} top options at ${venue}`}
-            isMobile={isMobile}
-            maxVisibleRows={3}
-            showPagination={false}
-            showControls={false}
-            tableMaxHeight={190}
-        />
-        <FantasyPointsTable
-            players={venueFantasyStats?.team2_players || []}
-            title={`${selectedTeam2.abbreviated_name} top options at ${venue}`}
-            isMobile={isMobile}
-            maxVisibleRows={3}
-            showPagination={false}
-            showControls={false}
-            tableMaxHeight={190}
-        />
-    </Box>
-);
-
-const CompactFantasyVenueHistory = ({ venue, venuePlayerHistory, isMobile }) => (
-    <Box data-carousel-no-swipe>
-        <FantasyPointsTable
-            players={venuePlayerHistory?.players || []}
-            title={`Venue fantasy standouts at ${venue}`}
-            isMobile={isMobile}
-            maxVisibleRows={5}
-            showPagination={false}
-            showControls={false}
-            tableMaxHeight={220}
-        />
-    </Box>
-);
-
 const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat('en-US', {
     month: 'short',
     year: 'numeric',
@@ -1015,374 +970,197 @@ const VenueNotes = ({
   }) => {
 
     const [fantasyTabValue, setFantasyTabValue] = useState(0);
-    const [activeCardIndex, setActiveCardIndex] = useState(0);
-    const [activeSectionId, setActiveSectionId] = useState('results');
-    const swiperRef = useRef(null);
+    const [activeSectionId, setActiveSectionId] = useState('summary');
     const sectionRefs = useRef({});
 
     const sectionGroups = useMemo(() => {
         const groups = [
+            // 1. SUMMARY — venue stats at a glance
             {
-                id: 'results',
-                label: 'Results',
-                desktopContent: (
-                    <Grid container spacing={isMobile ? 2 : 3}>
-                        <Grid item xs={12} md={6}>
-                            <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
-                                <WinPercentagesPie data={venueStats} />
-                            </Card>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
-                                <ScoresBarChart data={venueStats} />
-                            </Card>
-                        </Grid>
-                    </Grid>
-                ),
-                mobileCards: [
-                    {
-                        id: 'results-overview',
-                        cardLabel: 'Results & Scores',
-                        content: (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-                                <WinPercentagesPie data={venueStats} />
-                                <ScoresBarChart data={venueStats} />
-                            </Box>
-                        ),
-                    },
-                ],
-            },
-            {
-                id: 'phases',
-                label: 'Phases',
-                desktopContent: (
-                    <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
+                id: 'summary',
+                label: 'Summary',
+                content: (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <WinPercentagesPie data={venueStats} />
+                        <ScoresBarChart data={venueStats} />
                         <PhaseWiseStrategy data={venueStats} isMobile={isMobile} />
-                    </Card>
+                    </Box>
                 ),
-                mobileCards: [
-                    {
-                        id: 'phases-strategy',
-                        cardLabel: 'Phase Strategy',
-                        content: <PhaseWiseStrategy data={venueStats} isMobile={isMobile} />,
-                    },
-                ],
             },
-            {
-                id: 'tactical',
-                label: 'Tactical',
-                desktopContent: (
-                    <Box data-carousel-no-swipe>
-                        <VenueTacticalMap
-                            venue={venue}
+        ];
+
+        // 2. AI PREVIEW (only when both teams selected)
+        if (selectedTeam1 && selectedTeam2) {
+            groups.push({
+                id: 'preview',
+                label: 'Preview',
+                content: (
+                    <MatchPreviewCard
+                        venue={venue}
+                        team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
+                        team2Identifier={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
+                        startDate={startDate}
+                        endDate={endDate}
+                        includeInternational
+                        topTeams={20}
+                        isMobile={isMobile}
+                    />
+                ),
+            });
+        }
+
+        // 3. TEAMS (H2H + history + matchups — only when both teams)
+        if (selectedTeam1 && selectedTeam2) {
+            groups.push({
+                id: 'teams',
+                label: 'Teams',
+                content: (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {matchHistory ? (
+                            <MatchHistory
+                                venue={venue}
+                                team1={selectedTeam1.abbreviated_name}
+                                team2={selectedTeam2.abbreviated_name}
+                                venueResults={matchHistory.venue_results}
+                                team1Results={matchHistory.team1_results}
+                                team2Results={matchHistory.team2_results}
+                                h2hStats={matchHistory.h2h_stats}
+                                isMobile={isMobile}
+                            />
+                        ) : (
+                            <Box sx={{ p: 2, textAlign: 'center' }}>
+                                <CircularProgress size={24} />
+                            </Box>
+                        )}
+                        <Matchups
+                            team1={selectedTeam1.full_name}
+                            team2={selectedTeam2.full_name}
                             startDate={startDate}
                             endDate={endDate}
                             isMobile={isMobile}
                         />
                     </Box>
                 ),
-                mobileCards: [
-                    {
-                        id: 'tactical-pitch',
-                        cardLabel: 'Pitch Map',
-                        content: (
-                            <Box data-carousel-no-swipe>
-                                <VenueTacticalMap
-                                    venue={venue}
-                                    startDate={startDate}
-                                    endDate={endDate}
-                                    isMobile={isMobile}
-                                    forcedView="pitch"
-                                    showTabs={false}
-                                />
-                            </Box>
-                        ),
-                    },
-                    {
-                        id: 'tactical-wagon',
-                        cardLabel: 'Wagon Wheel',
-                        content: (
-                            <Box data-carousel-no-swipe>
-                                <VenueTacticalMap
-                                    venue={venue}
-                                    startDate={startDate}
-                                    endDate={endDate}
-                                    isMobile={isMobile}
-                                    forcedView="wagon"
-                                    showTabs={false}
-                                />
-                            </Box>
-                        ),
-                    },
-                    {
-                        id: 'tactical-top-buckets',
-                        cardLabel: 'Top Buckets',
-                        content: (
-                            <Box data-carousel-no-swipe>
-                                <VenueTacticalMap
-                                    venue={venue}
-                                    startDate={startDate}
-                                    endDate={endDate}
-                                    isMobile={isMobile}
-                                    forcedView="topBuckets"
-                                    showTabs={false}
-                                />
-                            </Box>
-                        ),
-                    },
-                ],
-            },
-        ];
-
-        if (selectedTeam1 && selectedTeam2) {
-            groups.push(
-                {
-                    id: 'preview',
-                    label: 'Preview',
-                    desktopContent: (
-                        <MatchPreviewCard
-                            venue={venue}
-                            team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
-                            team2Identifier={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
-                            startDate={startDate}
-                            endDate={endDate}
-                            includeInternational
-                            topTeams={20}
-                            isMobile={isMobile}
-                        />
-                    ),
-                    mobileCards: [
-                        {
-                            id: 'preview-match',
-                            cardLabel: 'Match Preview',
-                            content: (
-                                <MatchPreviewCard
-                                    venue={venue}
-                                    team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
-                                    team2Identifier={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
-                                    startDate={startDate}
-                                    endDate={endDate}
-                                    includeInternational
-                                    topTeams={20}
-                                    isMobile={isMobile}
-                                />
-                            ),
-                        },
-                    ],
-                },
-                {
-                    id: 'history',
-                    label: 'History',
-                    desktopContent: matchHistory ? (
-                        <MatchHistory
-                            venue={venue}
-                            team1={selectedTeam1.abbreviated_name}
-                            team2={selectedTeam2.abbreviated_name}
-                            venueResults={matchHistory.venue_results}
-                            team1Results={matchHistory.team1_results}
-                            team2Results={matchHistory.team2_results}
-                            h2hStats={matchHistory.h2h_stats}
-                            isMobile={isMobile}
-                        />
-                    ) : (
-                        <Box sx={{ p: 2, textAlign: 'center' }}>
-                            <CircularProgress size={24} />
-                        </Box>
-                    ),
-                    mobileCards: [
-                        {
-                            id: 'history-match',
-                            cardLabel: 'Match History',
-                            content: matchHistory ? (
-                                <Box data-carousel-no-swipe>
-                                    <MatchHistory
-                                        venue={venue}
-                                        team1={selectedTeam1.abbreviated_name}
-                                        team2={selectedTeam2.abbreviated_name}
-                                        venueResults={matchHistory.venue_results}
-                                        team1Results={matchHistory.team1_results}
-                                        team2Results={matchHistory.team2_results}
-                                        h2hStats={matchHistory.h2h_stats}
-                                        isMobile={isMobile}
-                                    />
-                                </Box>
-                            ) : (
-                                <Box sx={{ py: 6, textAlign: 'center' }}>
-                                    <CircularProgress size={24} />
-                                </Box>
-                            ),
-                        },
-                    ],
-                },
-                {
-                    id: 'matchups',
-                    label: 'Matchups',
-                    desktopContent: (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            <Box data-carousel-no-swipe>
-                                <Typography variant="h5" gutterBottom>
-                                    Player Matchups
-                                </Typography>
-                                <Matchups
-                                    team1={selectedTeam1.full_name}
-                                    team2={selectedTeam2.full_name}
-                                    startDate={startDate}
-                                    endDate={endDate}
-                                    isMobile={isMobile}
-                                />
-                            </Box>
-                            <Card sx={{ p: 2, width: '100%' }}>
-                                <Typography variant="h6" gutterBottom>
-                                    Fantasy Points Analysis
-                                </Typography>
-                                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }} data-carousel-no-swipe>
-                                    <Tabs value={fantasyTabValue} onChange={(e, newValue) => setFantasyTabValue(newValue)}>
-                                        <Tab label="Team Comparison" />
-                                        <Tab label="Venue History" />
-                                    </Tabs>
-                                </Box>
-                                <Box sx={{ mt: 2 }}>
-                                    {fantasyTabValue === 0 && (
-                                        <>
-                                            <Grid container spacing={isMobile ? 1 : 2}>
-                                                <Grid item xs={12} md={6}>
-                                                    <FantasyPointsTable
-                                                        players={venueFantasyStats?.team1_players || []}
-                                                        title={`${selectedTeam1.abbreviated_name} Fantasy Points at ${venue}`}
-                                                        isMobile={isMobile}
-                                                    />
-                                                </Grid>
-                                                <Grid item xs={12} md={6}>
-                                                    <FantasyPointsTable
-                                                        players={venueFantasyStats?.team2_players || []}
-                                                        title={`${selectedTeam2.abbreviated_name} Fantasy Points at ${venue}`}
-                                                        isMobile={isMobile}
-                                                    />
-                                                </Grid>
-                                            </Grid>
-                                            <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: 2 }}>
-                                                <Grid item xs={12} md={6}>
-                                                    <FantasyPointsBarChart
-                                                        players={venueFantasyStats?.team1_players || []}
-                                                        title={`${selectedTeam1.abbreviated_name} Fantasy Points Breakdown`}
-                                                        isMobile={isMobile}
-                                                    />
-                                                </Grid>
-                                                <Grid item xs={12} md={6}>
-                                                    <FantasyPointsBarChart
-                                                        players={venueFantasyStats?.team2_players || []}
-                                                        title={`${selectedTeam2.abbreviated_name} Fantasy Points Breakdown`}
-                                                        isMobile={isMobile}
-                                                    />
-                                                </Grid>
-                                            </Grid>
-                                        </>
-                                    )}
-                                    {fantasyTabValue === 1 && (
-                                        <>
-                                            <FantasyPointsTable
-                                                players={venuePlayerHistory?.players || []}
-                                                title={`Player Fantasy History at ${venue}`}
-                                                isMobile={isMobile}
-                                            />
-                                            <FantasyPointsBarChart
-                                                players={venuePlayerHistory?.players || []}
-                                                title={`Top Players at ${venue}`}
-                                                isMobile={isMobile}
-                                            />
-                                        </>
-                                    )}
-                                </Box>
-                            </Card>
-                        </Box>
-                    ),
-                    mobileCards: [
-                        {
-                            id: 'matchups-player',
-                            cardLabel: 'Player Matchups',
-                            content: (
-                                <Box data-carousel-no-swipe>
-                                    <Matchups
-                                        team1={selectedTeam1.full_name}
-                                        team2={selectedTeam2.full_name}
-                                        startDate={startDate}
-                                        endDate={endDate}
-                                        isMobile={isMobile}
-                                    />
-                                </Box>
-                            ),
-                        },
-                        {
-                            id: 'matchups-fantasy-team',
-                            cardLabel: 'Fantasy Team Comparison',
-                            content: (
-                                <CompactFantasyComparison
-                                    venue={venue}
-                                    selectedTeam1={selectedTeam1}
-                                    selectedTeam2={selectedTeam2}
-                                    venueFantasyStats={venueFantasyStats}
-                                    isMobile={isMobile}
-                                />
-                            ),
-                        },
-                        {
-                            id: 'matchups-fantasy-history',
-                            cardLabel: 'Fantasy Venue History',
-                            content: (
-                                <CompactFantasyVenueHistory
-                                    venue={venue}
-                                    venuePlayerHistory={venuePlayerHistory}
-                                    isMobile={isMobile}
-                                />
-                            ),
-                        },
-                    ],
-                },
-            );
+            });
         }
 
+        // 4. TACTICAL (pitch map, wagon wheel, top buckets — inner tabs)
+        groups.push({
+            id: 'tactical',
+            label: 'Tactical',
+            content: (
+                <VenueTacticalMap
+                    venue={venue}
+                    startDate={startDate}
+                    endDate={endDate}
+                    isMobile={isMobile}
+                />
+            ),
+        });
+
+        // 5. FANTASY (only when both teams)
+        if (selectedTeam1 && selectedTeam2) {
+            groups.push({
+                id: 'fantasy',
+                label: 'Fantasy',
+                content: (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <Card sx={{ p: 2, width: '100%' }}>
+                            <Typography variant="h6" gutterBottom>
+                                Fantasy Points Analysis
+                            </Typography>
+                            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                                <Tabs value={fantasyTabValue} onChange={(e, newValue) => setFantasyTabValue(newValue)}>
+                                    <Tab label="Team Comparison" />
+                                    <Tab label="Venue History" />
+                                </Tabs>
+                            </Box>
+                            <Box sx={{ mt: 2 }}>
+                                {fantasyTabValue === 0 && (
+                                    <>
+                                        <Grid container spacing={isMobile ? 1 : 2}>
+                                            <Grid item xs={12} md={6}>
+                                                <FantasyPointsTable
+                                                    players={venueFantasyStats?.team1_players || []}
+                                                    title={`${selectedTeam1.abbreviated_name} Fantasy Points at ${venue}`}
+                                                    isMobile={isMobile}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <FantasyPointsTable
+                                                    players={venueFantasyStats?.team2_players || []}
+                                                    title={`${selectedTeam2.abbreviated_name} Fantasy Points at ${venue}`}
+                                                    isMobile={isMobile}
+                                                />
+                                            </Grid>
+                                        </Grid>
+                                        <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: 2 }}>
+                                            <Grid item xs={12} md={6}>
+                                                <FantasyPointsBarChart
+                                                    players={venueFantasyStats?.team1_players || []}
+                                                    title={`${selectedTeam1.abbreviated_name} Fantasy Points Breakdown`}
+                                                    isMobile={isMobile}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <FantasyPointsBarChart
+                                                    players={venueFantasyStats?.team2_players || []}
+                                                    title={`${selectedTeam2.abbreviated_name} Fantasy Points Breakdown`}
+                                                    isMobile={isMobile}
+                                                />
+                                            </Grid>
+                                        </Grid>
+                                    </>
+                                )}
+                                {fantasyTabValue === 1 && (
+                                    <>
+                                        <FantasyPointsTable
+                                            players={venuePlayerHistory?.players || []}
+                                            title={`Player Fantasy History at ${venue}`}
+                                            isMobile={isMobile}
+                                        />
+                                        <FantasyPointsBarChart
+                                            players={venuePlayerHistory?.players || []}
+                                            title={`Top Players at ${venue}`}
+                                            isMobile={isMobile}
+                                        />
+                                    </>
+                                )}
+                            </Box>
+                        </Card>
+                    </Box>
+                ),
+            });
+        }
+
+        // 6. LEADERS
         if (statsData?.batting_leaders?.length > 0 || statsData?.bowling_leaders?.length > 0) {
             groups.push({
                 id: 'leaders',
                 label: 'Leaders',
-                desktopContent: (
+                content: (
                     <Grid container spacing={isMobile ? 2 : 3}>
                         {statsData?.batting_leaders?.length > 0 && (
                             <Grid item xs={12} md={6}>
-                                <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
-                                    <BattingLeaders data={statsData.batting_leaders} isMobile={isMobile} />
-                                </Card>
+                                <BattingLeaders data={statsData.batting_leaders} isMobile={isMobile} />
                             </Grid>
                         )}
                         {statsData?.bowling_leaders?.length > 0 && (
                             <Grid item xs={12} md={6}>
-                                <Card sx={{ p: { xs: 0, sm: 2 }, width: '100%', boxShadow: isMobile ? 0 : undefined, backgroundColor: isMobile ? 'transparent' : undefined }}>
-                                    <BowlingLeaders data={statsData.bowling_leaders} isMobile={isMobile} />
-                                </Card>
+                                <BowlingLeaders data={statsData.bowling_leaders} isMobile={isMobile} />
                             </Grid>
                         )}
                     </Grid>
                 ),
-                mobileCards: [
-                    ...(statsData?.batting_leaders?.length > 0 ? [{
-                        id: 'leaders-batting',
-                        cardLabel: 'Batting Leaders',
-                        content: <BattingLeaders data={statsData.batting_leaders} isMobile={isMobile} />,
-                    }] : []),
-                    ...(statsData?.bowling_leaders?.length > 0 ? [{
-                        id: 'leaders-bowling',
-                        cardLabel: 'Bowling Leaders',
-                        content: <BowlingLeaders data={statsData.bowling_leaders} isMobile={isMobile} />,
-                    }] : []),
-                ],
             });
         }
 
+        // 7. ANALYSIS
         if (statsData?.batting_scatter?.length > 0) {
             groups.push({
                 id: 'analysis',
                 label: 'Analysis',
-                desktopContent: (
+                content: (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                         <BattingScatterChart data={statsData.batting_scatter} isMobile={isMobile} />
                         <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
@@ -1400,36 +1178,14 @@ const VenueNotes = ({
                         </Card>
                     </Box>
                 ),
-                mobileCards: [
-                    {
-                        id: 'analysis-scatter',
-                        cardLabel: 'Batting Scatter',
-                        content: <BattingScatterChart data={statsData.batting_scatter} isMobile={isMobile} />,
-                    },
-                    {
-                        id: 'analysis-bowling',
-                        cardLabel: 'Bowling Analysis',
-                        content: (
-                            <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
-                                <Box sx={{ position: 'relative' }}>
-                                    <BowlingAnalysis
-                                        venue={venue}
-                                        startDate={startDate}
-                                        endDate={endDate}
-                                        isMobile={isMobile}
-                                    />
-                                </Box>
-                            </Card>
-                        ),
-                    },
-                ],
             });
         }
 
+        // 8. EXPLORE
         groups.push({
-            id: 'queries',
-            label: 'Queries',
-            desktopContent: (
+            id: 'explore',
+            label: 'Explore',
+            content: (
                 <ContextualQueryPrompts
                     queries={getVenueContextualQueries(venue, {
                         startDate,
@@ -1441,60 +1197,12 @@ const VenueNotes = ({
                     title={`Explore ${venue.split(',')[0]} Data`}
                 />
             ),
-            mobileCards: [
-                {
-                    id: 'queries-explore',
-                    cardLabel: 'Explore Queries',
-                    content: (
-                        <ContextualQueryPrompts
-                            queries={getVenueContextualQueries(venue, {
-                                startDate,
-                                endDate,
-                                leagues: [],
-                                team1: selectedTeam1,
-                                team2: selectedTeam2,
-                            })}
-                            title={`Explore ${venue.split(',')[0]} Data`}
-                        />
-                    ),
-                },
-            ],
         });
 
         return groups;
     }, [venueStats, statsData, selectedTeam1, selectedTeam2, venue, startDate, endDate, matchHistory, venueFantasyStats, venuePlayerHistory, isMobile, fantasyTabValue]);
 
-    const mobileCards = useMemo(
-        () => sectionGroups.flatMap((group) =>
-            group.mobileCards.map((card, index, groupCards) => ({
-                ...card,
-                groupId: group.id,
-                groupLabel: group.label,
-                groupCardIndex: index,
-                groupCardTotal: groupCards.length,
-            }))
-        ),
-        [sectionGroups]
-    );
-
-    const activeCard = mobileCards[activeCardIndex] || mobileCards[0];
-    const activeGroupId = activeCard?.groupId || sectionGroups[0]?.id || 'results';
     const formattedDateRange = useMemo(() => formatVenueDateRange(startDate, endDate), [startDate, endDate]);
-
-    const goToCard = useCallback((index) => {
-        if (!mobileCards.length) {
-            return;
-        }
-        const nextIndex = Math.max(0, Math.min(index, mobileCards.length - 1));
-        if (swiperRef.current && swiperRef.current.activeIndex !== nextIndex) {
-            swiperRef.current.slideTo(nextIndex);
-        }
-        setActiveCardIndex(nextIndex);
-    }, [mobileCards.length]);
-
-    const handleCardChange = useCallback((index) => {
-        setActiveCardIndex(index);
-    }, []);
 
     const handleSectionSelect = useCallback((sectionId) => {
         setActiveSectionId(sectionId);
@@ -1504,43 +1212,13 @@ const VenueNotes = ({
         }
     }, []);
 
-    const carouselCards = useMemo(
-        () => mobileCards.map((card) => ({
-            ...card,
-            content: (
-                <VenueNotesCardShell
-                    groupLabel={card.groupLabel}
-                    cardLabel={card.cardLabel}
-                    metaText={`${card.groupCardIndex + 1} of ${card.groupCardTotal}`}
-                    isMobile
-                    immersive={card.groupId === 'results' || card.groupId === 'phases'}
-                    fitContent={card.groupId === 'results' || card.groupId === 'phases'}
-                    showHeader={false}
-                >
-                    {card.content}
-                </VenueNotesCardShell>
-            ),
-        })),
-        [mobileCards]
-    );
-
-    useEffect(() => {
-        if (activeCardIndex >= mobileCards.length && mobileCards.length > 0) {
-            goToCard(mobileCards.length - 1);
-        }
-    }, [activeCardIndex, goToCard, mobileCards.length]);
-
     useEffect(() => {
         setFantasyTabValue(0);
-        setActiveCardIndex(0);
-        setActiveSectionId('results');
-        if (swiperRef.current) {
-            swiperRef.current.slideTo(0, 0);
-        }
+        setActiveSectionId('summary');
     }, [selectedTeam1, selectedTeam2, venue]);
 
     useEffect(() => {
-        if (isMobile || !sectionGroups.length) {
+        if (!sectionGroups.length) {
             return undefined;
         }
 
@@ -1575,18 +1253,12 @@ const VenueNotes = ({
         });
 
         return () => observer.disconnect();
-    }, [isMobile, sectionGroups]);
-
-    useEffect(() => {
-        if (!isMobile && activeGroupId) {
-            setActiveSectionId(activeGroupId);
-        }
-    }, [activeGroupId, isMobile]);
+    }, [sectionGroups]);
 
 if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
 
 return (
-    <Box sx={{ mx: { xs: -1, sm: 0 }, p: { xs: 0, sm: 2 }, pb: isMobile ? '68px' : 0 }}>
+    <Box sx={{ mx: { xs: -1, sm: 0 }, p: { xs: 0, sm: 2 } }}>
         <Box
             sx={{
                 mb: { xs: 0.5, sm: 2.5 },
@@ -1641,19 +1313,26 @@ return (
 
         {isMobile ? (
             <>
-                <VenueCarousel
-                    cards={carouselCards}
-                    onSlideChange={handleCardChange}
-                    swiperRef={swiperRef}
+                <VenueSectionTabs
+                    sections={sectionGroups.map(({ id, label }) => ({ id, label }))}
+                    activeSectionId={activeSectionId}
+                    onSectionSelect={handleSectionSelect}
                 />
-                <VenueNotesMobileNav
-                    label={activeCard?.cardLabel || activeCard?.groupLabel || 'Results'}
-                    meta={activeCard ? `${activeCard.groupCardIndex + 1}/${activeCard.groupCardTotal}` : null}
-                    onPrevious={() => goToCard(activeCardIndex - 1)}
-                    onNext={() => goToCard(activeCardIndex + 1)}
-                    disablePrevious={activeCardIndex === 0}
-                    disableNext={activeCardIndex >= mobileCards.length - 1}
-                />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, px: 1, pb: 2 }}>
+                    {sectionGroups.map((section) => (
+                        <Box
+                            key={section.id}
+                            ref={(el) => { sectionRefs.current[section.id] = el; }}
+                            data-section-id={section.id}
+                            sx={{ scrollMarginTop: '56px' }}
+                        >
+                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, px: 0.5 }}>
+                                {section.label}
+                            </Typography>
+                            {section.content}
+                        </Box>
+                    ))}
+                </Box>
             </>
         ) : (
             <Box
@@ -1688,23 +1367,10 @@ return (
                                     boxShadow: 1,
                                 }}
                             >
-                                <Typography
-                                    variant="caption"
-                                    sx={{
-                                        display: 'block',
-                                        mb: 0.75,
-                                        color: 'primary.main',
-                                        fontWeight: 700,
-                                        letterSpacing: '0.08em',
-                                        textTransform: 'uppercase',
-                                    }}
-                                >
-                                    Section
-                                </Typography>
                                 <Typography variant="h5" sx={{ mb: 2.5, fontWeight: 700 }}>
                                     {section.label}
                                 </Typography>
-                                {section.desktopContent}
+                                {section.content}
                             </Card>
                         </Box>
                     ))}

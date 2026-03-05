@@ -71,7 +71,7 @@ const AppContent = () => {
   const getPageTitleForPath = (path) => (
     path === '/' ? 'Home' :
     path === '/search' ? 'Search' :
-    path === '/venue' ? 'Venue Analysis' :
+    path === '/venue' ? 'Match Preview' :
     path === '/player' ? 'Batter Profile' :
     path === '/bowler' ? 'Bowler Profile' :
     path === '/comparison' ? 'Batter Comparison' :
@@ -521,7 +521,7 @@ const AppContent = () => {
                 Search
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/venue')}>
-                Venue Analysis
+                Match Preview
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/player')}>
                 Batter Profile
@@ -577,7 +577,7 @@ const AppContent = () => {
             >
               <Tab label="Home" component={Link} to="/" />
               <Tab label="Search" component={Link} to="/search" />
-              <Tab label="Venue Analysis" component={Link} to="/venue" />
+              <Tab label="Match Preview" component={Link} to="/venue" />
               <Tab label="Batter Profile" component={Link} to="/player" />
               <Tab label="Bowler Profile" component={Link} to="/bowler" />
               <Tab label="Batter Comparison" component={Link} to="/comparison" />
