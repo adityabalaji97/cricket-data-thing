@@ -37,7 +37,7 @@ import MatchHistory from './MatchHistory';
 import Matchups from './Matchups';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
 import VenueTacticalMap from './VenueTacticalMap';
-import VenueSimilarity from './VenueSimilarity';
+import VenueSimilarity, { useVenueSimilarityData } from './VenueSimilarity';
 import MatchPreviewCard from './MatchPreviewCard';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 import VenueSectionTabs from './VenueSectionTabs';
@@ -948,6 +948,13 @@ const formatVenueDateRange = (startDate, endDate) => {
     return `${startLabel} - ${endLabel}`;
 };
 
+const DEFAULT_SIMILAR_ZONE_FILTERS = {
+    zoneMetric: 'boundary_pct',
+    batHand: null,
+    bowlKind: null,
+    bowlStyle: null,
+};
+
 const VenueNotes = ({
     venue,
     startDate,
@@ -966,7 +973,23 @@ const VenueNotes = ({
   }) => {
 
     const [activeSectionId, setActiveSectionId] = useState('summary');
+    const [similarZoneFilters, setSimilarZoneFilters] = useState(DEFAULT_SIMILAR_ZONE_FILTERS);
     const sectionRefs = useRef({});
+
+    const {
+        data: similarData,
+        tacticalEdgesData: similarTacticalEdgesData,
+        loading: similarLoading,
+        error: similarError,
+    } = useVenueSimilarityData({
+        venue,
+        startDate,
+        endDate,
+        leagues,
+        includeInternational,
+        topTeams,
+        zoneFilters: similarZoneFilters,
+    });
 
     const sectionGroups = useMemo(() => {
         const groups = [
@@ -1062,13 +1085,14 @@ const VenueNotes = ({
             label: 'Similar',
             content: (
                 <VenueSimilarity
-                    venue={venue}
-                    startDate={startDate}
-                    endDate={endDate}
+                    mode="insights"
+                    data={similarData}
+                    tacticalEdgesData={similarTacticalEdgesData}
+                    loading={similarLoading}
+                    error={similarError}
                     isMobile={isMobile}
-                    leagues={leagues}
-                    includeInternational={includeInternational}
-                    topTeams={topTeams}
+                    zoneFilters={similarZoneFilters}
+                    onZoneFiltersChange={setSimilarZoneFilters}
                 />
             ),
         });
@@ -1113,8 +1137,41 @@ const VenueNotes = ({
             ),
         });
 
+        // 8. VENUE TWINS (cards only, moved to the very end)
+        groups.push({
+            id: 'venueTwins',
+            label: 'Venue Twins',
+            content: (
+                <VenueSimilarity
+                    mode="cards"
+                    data={similarData}
+                    loading={similarLoading}
+                    error={similarError}
+                    isMobile={isMobile}
+                />
+            ),
+        });
+
         return groups;
-    }, [venueStats, statsData, selectedTeam1, selectedTeam2, venue, startDate, endDate, matchHistory, isMobile, leagues, includeInternational, topTeams]);
+    }, [
+        venueStats,
+        statsData,
+        selectedTeam1,
+        selectedTeam2,
+        venue,
+        startDate,
+        endDate,
+        matchHistory,
+        isMobile,
+        leagues,
+        includeInternational,
+        topTeams,
+        similarData,
+        similarTacticalEdgesData,
+        similarLoading,
+        similarError,
+        similarZoneFilters,
+    ]);
 
     const formattedDateRange = useMemo(() => formatVenueDateRange(startDate, endDate), [startDate, endDate]);
 
@@ -1128,6 +1185,7 @@ const VenueNotes = ({
 
     useEffect(() => {
         setActiveSectionId('summary');
+        setSimilarZoneFilters(DEFAULT_SIMILAR_ZONE_FILTERS);
     }, [selectedTeam1, selectedTeam2, venue]);
 
     useEffect(() => {

@@ -172,16 +172,79 @@ function interpolateHeatColor(t) {
  * Calculate data range for a metric from cells.
  */
 export function calculateDataRange(cells, metricKey, minBalls = 0) {
-  const values = cells
-    .filter(cell => cell.balls >= minBalls && cell[metricKey] !== null && cell[metricKey] !== undefined)
-    .map(cell => cell[metricKey]);
-  
-  if (values.length === 0) return null;
-  
-  return {
-    min: Math.min(...values),
-    max: Math.max(...values)
+  const colorMinBalls = Math.max(12, minBalls);
+  const priorStrength = 24;
+  const quantileLow = 0.10;
+  const quantileHigh = 0.90;
+
+  const eligible = cells
+    .filter((cell) => (
+      Number(cell.balls || 0) >= colorMinBalls
+      && cell[metricKey] !== null
+      && cell[metricKey] !== undefined
+      && Number.isFinite(Number(cell[metricKey]))
+    ));
+
+  if (eligible.length === 0) return null;
+
+  const rawValues = eligible.map((cell) => Number(cell[metricKey]));
+  const priorMean = rawValues.reduce((sum, value) => sum + value, 0) / rawValues.length;
+
+  const stabilizedValues = eligible.map((cell) => {
+    const balls = Number(cell.balls || 0);
+    const raw = Number(cell[metricKey] || 0);
+    const weight = balls / (balls + priorStrength);
+    return (weight * raw) + ((1 - weight) * priorMean);
+  }).sort((a, b) => a - b);
+
+  const quantile = (sortedValues, q) => {
+    if (!sortedValues.length) return null;
+    const clampedQ = Math.max(0, Math.min(1, q));
+    const index = (sortedValues.length - 1) * clampedQ;
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    if (lower === upper) return sortedValues[lower];
+    const fraction = index - lower;
+    return sortedValues[lower] + ((sortedValues[upper] - sortedValues[lower]) * fraction);
   };
+
+  const percentileMin = quantile(stabilizedValues, quantileLow);
+  const percentileMax = quantile(stabilizedValues, quantileHigh);
+  const fallbackMin = stabilizedValues[0];
+  const fallbackMax = stabilizedValues[stabilizedValues.length - 1];
+
+  let min = Number.isFinite(percentileMin) ? percentileMin : fallbackMin;
+  let max = Number.isFinite(percentileMax) ? percentileMax : fallbackMax;
+
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+    min = fallbackMin;
+    max = fallbackMax;
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+    min = priorMean - 1;
+    max = priorMean + 1;
+  }
+
+  return {
+    min,
+    max,
+    priorMean,
+    priorStrength,
+    colorMinBalls,
+    quantileLow,
+    quantileHigh,
+  };
+}
+
+export function getStabilizedMetricValue(cell, metricKey, dataRange) {
+  if (!cell || !dataRange) return null;
+  const raw = cell[metricKey];
+  if (raw === null || raw === undefined || !Number.isFinite(Number(raw))) return null;
+  const priorMean = Number(dataRange.priorMean);
+  const priorStrength = Number(dataRange.priorStrength || 24);
+  const balls = Number(cell.balls || 0);
+  const weight = balls / (balls + priorStrength);
+  return (weight * Number(raw)) + ((1 - weight) * priorMean);
 }
 
 /**

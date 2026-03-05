@@ -382,6 +382,7 @@ const ConsolidatedFantasyAnalysis = ({ matchupData, isMobile }) => {
     };
 
     const players = calculateFantasyPointsFromConsolidated();
+    const xPointsTableHeight = isMobile ? 320 : 360;
     
     if (players.length === 0) return null;
 
@@ -399,13 +400,13 @@ const ConsolidatedFantasyAnalysis = ({ matchupData, isMobile }) => {
                 </Typography>
             </Box>
 
-            <TableContainer sx={{ maxHeight: isMobile ? 'none' : 400, overflow: isMobile ? 'visible' : 'auto' }}>
-                <Table size="small" stickyHeader={!isMobile}>
+            <TableContainer sx={{ maxHeight: xPointsTableHeight, overflow: 'auto' }}>
+                <Table size="small" stickyHeader>
                     <TableHead>
                         <TableRow>
                             <TableCell sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem', p: isMobile ? 1 : 2 }}>Player</TableCell>
                             <TableCell sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem', p: isMobile ? 1 : 2 }}>Role</TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem', p: isMobile ? 1 : 2 }}>Expected FP</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem', p: isMobile ? 1 : 2 }}>xPoints</TableCell>
                             <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem', p: isMobile ? 1 : 2 }}>Confidence</TableCell>
                         </TableRow>
                     </TableHead>

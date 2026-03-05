@@ -299,7 +299,7 @@ const TeamFormRow = ({ teamCode, matches, isMobile, onTileSelect }) => {
     );
 
     return (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? 0.9 : 1.1, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? 0.9 : 1.1, minWidth: 0, width: '100%' }}>
             <Typography
                 variant="body2"
                 sx={{
@@ -312,11 +312,11 @@ const TeamFormRow = ({ teamCode, matches, isMobile, onTileSelect }) => {
                 {teamCode}
             </Typography>
             {!formTiles.length ? (
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
                     N/A
                 </Typography>
             ) : (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.45, minWidth: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.45, minWidth: 0, ml: 'auto', justifyContent: 'flex-end' }}>
                     {formTiles.map(({ match, result }, index) => {
                         const style = resultTileStyles[result] || resultTileStyles.NR;
                         const tile = (

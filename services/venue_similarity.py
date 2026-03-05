@@ -154,6 +154,60 @@ def _build_delivery_details_filters(
     return where_sql, params
 
 
+def _build_zone_output_filter_sql(
+    bat_hand: Optional[str],
+    bowl_kind: Optional[str],
+    bowl_style: Optional[str],
+    param_prefix: str = "zone",
+) -> Tuple[str, Dict[str, Any]]:
+    clauses: List[str] = []
+    params: Dict[str, Any] = {}
+
+    if bat_hand:
+        key = f"{param_prefix}_bat_hand"
+        clauses.append(f"dd.bat_hand = :{key}")
+        params[key] = bat_hand
+    if bowl_kind:
+        key = f"{param_prefix}_bowl_kind"
+        clauses.append(f"dd.bowl_kind = :{key}")
+        params[key] = bowl_kind
+    if bowl_style:
+        key = f"{param_prefix}_bowl_style"
+        clauses.append(f"dd.bowl_style = :{key}")
+        params[key] = bowl_style
+
+    if not clauses:
+        return "", params
+    return " AND " + " AND ".join(clauses), params
+
+
+def _add_zone_rows_to_map(
+    rows: List[Any],
+    zone_map: Dict[str, Dict[int, Dict[str, float]]],
+) -> None:
+    for row in rows:
+        raw_venue = row._mapping["venue"]
+        canonical_venue = _canonicalize_venue(raw_venue)
+        if not canonical_venue:
+            continue
+        zone = row._mapping.get("wagon_zone")
+        if zone is None:
+            continue
+        zone_int = int(zone)
+        if zone_int < 1 or zone_int > 8:
+            continue
+        zone_rec = zone_map[canonical_venue][zone_int]
+        zone_rec["balls"] += float(row._mapping.get("balls") or 0.0)
+        zone_rec["runs"] += float(row._mapping.get("runs") or 0.0)
+        zone_rec["boundaries"] += float(row._mapping.get("boundaries") or 0.0)
+
+
+def _safe_sort_value(value: Optional[str]) -> str:
+    if value is None:
+        return ""
+    return str(value).strip().lower()
+
+
 def _empty_match_agg() -> Dict[str, Any]:
     return {
         "total_matches": 0,
@@ -307,6 +361,10 @@ def get_similar_venues(
     leagues: Optional[List[str]] = None,
     include_international: Optional[bool] = None,
     top_teams: Optional[int] = None,
+    bat_hand: Optional[str] = None,
+    bowl_kind: Optional[str] = None,
+    bowl_style: Optional[str] = None,
+    zone_metric: str = "boundary_pct",
 ) -> Dict[str, Any]:
     """
     Find most similar and dissimilar venues using normalized venue feature vectors.
@@ -317,6 +375,12 @@ def get_similar_venues(
         leagues=leagues,
         include_international=include_international,
         top_teams=top_teams,
+    )
+    zone_metric = "run_pct" if zone_metric == "run_pct" else "boundary_pct"
+    zone_output_filter_sql, zone_output_params = _build_zone_output_filter_sql(
+        bat_hand=bat_hand,
+        bowl_kind=bowl_kind,
+        bowl_style=bowl_style,
     )
 
     match_rows = db.execute(
@@ -406,6 +470,42 @@ def get_similar_venues(
         params,
     ).fetchall()
 
+    zone_output_rows = db.execute(
+        text(
+            f"""
+            SELECT
+                dd.ground AS venue,
+                dd.wagon_zone AS wagon_zone,
+                COUNT(*) AS balls,
+                SUM(dd.score) AS runs,
+                SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) AS boundaries
+            FROM delivery_details dd
+            WHERE 1=1
+                {where_sql}
+                {zone_output_filter_sql}
+                AND dd.wagon_zone BETWEEN 1 AND 8
+            GROUP BY dd.ground, dd.wagon_zone
+            """
+        ),
+        {**params, **zone_output_params},
+    ).fetchall()
+
+    zone_filter_option_rows = db.execute(
+        text(
+            f"""
+            SELECT DISTINCT
+                NULLIF(TRIM(dd.bat_hand), '') AS bat_hand,
+                NULLIF(TRIM(dd.bowl_kind), '') AS bowl_kind,
+                NULLIF(TRIM(dd.bowl_style), '') AS bowl_style
+            FROM delivery_details dd
+            WHERE 1=1
+                {where_sql}
+                AND dd.wagon_zone BETWEEN 1 AND 8
+            """
+        ),
+        params,
+    ).fetchall()
+
     style_rows = db.execute(
         text(
             f"""
@@ -459,6 +559,9 @@ def get_similar_venues(
     zone_map: Dict[str, Dict[int, Dict[str, float]]] = defaultdict(
         lambda: defaultdict(lambda: {"balls": 0.0, "runs": 0.0, "boundaries": 0.0})
     )
+    zone_output_map: Dict[str, Dict[int, Dict[str, float]]] = defaultdict(
+        lambda: defaultdict(lambda: {"balls": 0.0, "runs": 0.0, "boundaries": 0.0})
+    )
     style_map: Dict[str, Dict[str, Dict[str, float]]] = defaultdict(
         lambda: defaultdict(lambda: {"balls": 0.0, "runs": 0.0, "wickets": 0.0, "dots": 0.0, "matches": 0.0})
     )
@@ -495,21 +598,8 @@ def get_similar_venues(
         for key in rec.keys():
             rec[key] += float(row._mapping.get(key) or 0.0)
 
-    for row in zone_rows:
-        raw_venue = row._mapping["venue"]
-        canonical_venue = _canonicalize_venue(raw_venue)
-        if not canonical_venue:
-            continue
-        zone = row._mapping.get("wagon_zone")
-        if zone is None:
-            continue
-        zone_int = int(zone)
-        if zone_int < 1 or zone_int > 8:
-            continue
-        zone_rec = zone_map[canonical_venue][zone_int]
-        zone_rec["balls"] += float(row._mapping.get("balls") or 0.0)
-        zone_rec["runs"] += float(row._mapping.get("runs") or 0.0)
-        zone_rec["boundaries"] += float(row._mapping.get("boundaries") or 0.0)
+    _add_zone_rows_to_map(zone_rows, zone_map)
+    _add_zone_rows_to_map(zone_output_rows, zone_output_map)
 
     for row in style_rows:
         raw_venue = row._mapping["venue"]
@@ -560,6 +650,26 @@ def get_similar_venues(
         profile, feature_values = _build_zone_profile(zone_map.get(venue_name, {}))
         zone_profiles[venue_name] = profile
         zone_features_map[venue_name] = feature_values
+
+    zone_output_profiles: Dict[str, Dict[str, Dict[str, Optional[float]]]] = {}
+    for venue_name in set(list(match_map.keys()) + list(zone_output_map.keys())):
+        profile, _ = _build_zone_profile(zone_output_map.get(venue_name, {}))
+        zone_output_profiles[venue_name] = profile
+
+    zone_filter_options = {
+        "bat_hand": sorted(
+            {row._mapping.get("bat_hand") for row in zone_filter_option_rows if row._mapping.get("bat_hand")},
+            key=_safe_sort_value,
+        ),
+        "bowl_kind": sorted(
+            {row._mapping.get("bowl_kind") for row in zone_filter_option_rows if row._mapping.get("bowl_kind")},
+            key=_safe_sort_value,
+        ),
+        "bowl_style": sorted(
+            {row._mapping.get("bowl_style") for row in zone_filter_option_rows if row._mapping.get("bowl_style")},
+            key=_safe_sort_value,
+        ),
+    }
 
     candidate_venues: List[str] = []
     venue_feature_vectors: Dict[str, Dict[str, Optional[float]]] = {}
@@ -631,10 +741,10 @@ def get_similar_venues(
 
     if target_is_all_venues:
         target_metrics = {feature: league_averages.get(feature) for feature in FEATURE_SPACE}
-        target_zone_profile = _aggregate_zone_profile(zone_map, candidate_venues)
+        target_zone_profile = _aggregate_zone_profile(zone_output_map, candidate_venues)
     else:
         target_metrics = venue_feature_vectors[target_venue]  # type: ignore[index]
-        target_zone_profile = zone_profiles.get(target_venue, {})
+        target_zone_profile = zone_output_profiles.get(target_venue, {})
 
     def _zscore_vector(metric_map: Dict[str, Optional[float]]) -> List[float]:
         vector: List[float] = []
@@ -685,7 +795,7 @@ def get_similar_venues(
             "distance": scored_row["distance"],
             "total_matches": int(match_metrics.get(venue_name, {}).get("total_matches") or 0),
             "metrics": _round_metrics(venue_feature_vectors.get(venue_name, {})),
-            "zone_profile": zone_profiles.get(venue_name, {}),
+            "zone_profile": zone_output_profiles.get(venue_name, {}),
             "bowling_insights": _build_bowling_insights_for_venue(venue_name),
         }
 
@@ -731,7 +841,7 @@ def get_similar_venues(
         int(match_metrics.get(venue_name, {}).get("total_matches") or 0)
         for venue_name in similar_venues
     )
-    similar_aggregate_zone_profile = _aggregate_zone_profile(zone_map, similar_venues)
+    similar_aggregate_zone_profile = _aggregate_zone_profile(zone_output_map, similar_venues)
 
     similar_aggregate_insights = {
         "description": f"Aggregate bowling stats across the {len(similar_venues)} most similar venues",
@@ -771,6 +881,13 @@ def get_similar_venues(
             "summary": "Lower distance means more similar. Features are z-score normalized within the qualified venue pool before Euclidean distance is computed.",
             "target_mode": "all_venues_average" if target_is_all_venues else "single_venue",
         },
+        "zone_metric": zone_metric,
+        "active_zone_filters": {
+            "bat_hand": bat_hand,
+            "bowl_kind": bowl_kind,
+            "bowl_style": bowl_style,
+        },
+        "filter_options": zone_filter_options,
         "target_metrics": _round_metrics(target_metrics),
         "league_averages": _round_metrics(league_averages),
         "target_zone_profile": target_zone_profile,
@@ -779,3 +896,322 @@ def get_similar_venues(
         "similar_aggregate_insights": similar_aggregate_insights,
     }
 
+
+def _bucket_bowl_kind(value: Optional[str]) -> str:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return "unknown"
+    if any(token in normalized for token in ["pace", "fast", "seam", "medium"]):
+        return "pace"
+    if any(token in normalized for token in ["spin", "slow"]):
+        return "spin"
+    return normalized
+
+
+def _coerce_positive_int(value: Optional[int], default: int) -> int:
+    if value is None:
+        return default
+    if value <= 0:
+        return default
+    return int(value)
+
+
+def get_venue_tactical_edges(
+    venue: str,
+    db: Session,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    leagues: Optional[List[str]] = None,
+    include_international: Optional[bool] = None,
+    top_teams: Optional[int] = None,
+    phase: Optional[str] = "overall",
+    bat_hand: Optional[str] = None,
+    bowl_kind: Optional[str] = None,
+    bowl_style: Optional[str] = None,
+    shot: Optional[str] = None,
+    baseline_mode: str = "league",
+    sort_by: str = "econ_delta",
+    sort_order: str = "desc",
+    min_balls: int = 24,
+    top_n_similar: int = 5,
+) -> Dict[str, Any]:
+    where_sql, params = _build_delivery_details_filters(
+        start_date=start_date,
+        end_date=end_date,
+        leagues=leagues,
+        include_international=include_international,
+        top_teams=top_teams,
+    )
+
+    extra_clauses: List[str] = ["dd.line IS NOT NULL", "dd.length IS NOT NULL"]
+    if phase and phase != "overall":
+        if phase == "powerplay":
+            extra_clauses.append("dd.over BETWEEN 0 AND 5")
+        elif phase == "middle":
+            extra_clauses.append("dd.over BETWEEN 6 AND 14")
+        elif phase == "death":
+            extra_clauses.append("dd.over BETWEEN 15 AND 19")
+    if bat_hand:
+        extra_clauses.append("dd.bat_hand = :edges_bat_hand")
+        params["edges_bat_hand"] = bat_hand
+    if bowl_kind:
+        extra_clauses.append("dd.bowl_kind = :edges_bowl_kind")
+        params["edges_bowl_kind"] = bowl_kind
+    if bowl_style:
+        extra_clauses.append("dd.bowl_style = :edges_bowl_style")
+        params["edges_bowl_style"] = bowl_style
+    if shot:
+        extra_clauses.append("dd.shot = :edges_shot")
+        params["edges_shot"] = shot
+
+    extra_sql = ""
+    if extra_clauses:
+        extra_sql = " AND " + " AND ".join(extra_clauses)
+
+    rows = db.execute(
+        text(
+            f"""
+            SELECT
+                dd.ground AS venue,
+                dd.line AS line,
+                dd.length AS length,
+                COALESCE(NULLIF(TRIM(dd.bowl_kind), ''), 'Unknown') AS bowl_kind,
+                COUNT(*) AS balls,
+                SUM(dd.score) AS runs,
+                SUM(CASE WHEN {WICKET_CONDITION} THEN 1 ELSE 0 END) AS wickets,
+                SUM(CASE WHEN dd.score = 0 THEN 1 ELSE 0 END) AS dots,
+                SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) AS boundaries
+            FROM delivery_details dd
+            WHERE 1=1
+                {where_sql}
+                {extra_sql}
+            GROUP BY dd.ground, dd.line, dd.length, COALESCE(NULLIF(TRIM(dd.bowl_kind), ''), 'Unknown')
+            """
+        ),
+        params,
+    ).fetchall()
+
+    if not rows:
+        return {
+            "found": True,
+            "rows": [],
+            "rows_by_baseline": {"league": [], "similar": []},
+            "filters": {
+                "phase": phase,
+                "bat_hand": bat_hand,
+                "bowl_kind": bowl_kind,
+                "bowl_style": bowl_style,
+                "shot": shot,
+            },
+            "thresholds": {"min_balls": _coerce_positive_int(min_balls, 24)},
+            "baseline_mode": "similar" if baseline_mode == "similar" else "league",
+            "available_baselines": ["league", "similar"],
+        }
+
+    # venue -> combo -> totals
+    by_venue: Dict[str, Dict[Tuple[str, str, str], Dict[str, float]]] = defaultdict(
+        lambda: defaultdict(lambda: {"balls": 0.0, "runs": 0.0, "wickets": 0.0, "dots": 0.0, "boundaries": 0.0})
+    )
+    for row in rows:
+        canonical_venue = _canonicalize_venue(row._mapping.get("venue"))
+        if not canonical_venue:
+            continue
+        line_value = (row._mapping.get("line") or "Unknown").strip()
+        length_value = (row._mapping.get("length") or "Unknown").strip()
+        kind_value = _bucket_bowl_kind(row._mapping.get("bowl_kind"))
+        key = (line_value, length_value, kind_value)
+        rec = by_venue[canonical_venue][key]
+        rec["balls"] += float(row._mapping.get("balls") or 0.0)
+        rec["runs"] += float(row._mapping.get("runs") or 0.0)
+        rec["wickets"] += float(row._mapping.get("wickets") or 0.0)
+        rec["dots"] += float(row._mapping.get("dots") or 0.0)
+        rec["boundaries"] += float(row._mapping.get("boundaries") or 0.0)
+
+    target_is_all_venues = venue == "All Venues"
+    target_venues: List[str]
+    if target_is_all_venues:
+        target_venues = list(by_venue.keys())
+    else:
+        aliases = get_venue_aliases(venue) or [venue]
+        canonical_aliases = {_canonicalize_venue(v) for v in aliases if v}
+        canonical_aliases.add(_canonicalize_venue(venue))
+        target_venues = [v for v in canonical_aliases if v and v in by_venue]
+        if not target_venues:
+            return {
+                "found": False,
+                "error": f"No tactical edge data found for venue '{venue}'",
+                "rows": [],
+                "rows_by_baseline": {"league": [], "similar": []},
+            }
+
+    similar_venues: List[str] = []
+    if not target_is_all_venues:
+        similar_result = get_similar_venues(
+            venue=venue,
+            db=db,
+            start_date=start_date,
+            end_date=end_date,
+            min_matches=10,
+            top_n=_coerce_positive_int(top_n_similar, 5),
+            leagues=leagues,
+            include_international=include_international,
+            top_teams=top_teams,
+        )
+        if similar_result.get("found"):
+            similar_venues = [
+                _canonicalize_venue(v.get("venue"))
+                for v in similar_result.get("most_similar", [])
+                if _canonicalize_venue(v.get("venue")) in by_venue
+            ]
+    if not similar_venues:
+        similar_venues = [v for v in by_venue.keys() if v not in set(target_venues)][: _coerce_positive_int(top_n_similar, 5)]
+
+    all_combos = {
+        combo
+        for venue_rows in by_venue.values()
+        for combo in venue_rows.keys()
+    }
+
+    def _aggregate_for_venues(venues: List[str], combo: Tuple[str, str, str]) -> Dict[str, float]:
+        out = {"balls": 0.0, "runs": 0.0, "wickets": 0.0, "dots": 0.0, "boundaries": 0.0}
+        for venue_name in venues:
+            row = by_venue.get(venue_name, {}).get(combo)
+            if not row:
+                continue
+            out["balls"] += row["balls"]
+            out["runs"] += row["runs"]
+            out["wickets"] += row["wickets"]
+            out["dots"] += row["dots"]
+            out["boundaries"] += row["boundaries"]
+        return out
+
+    def _metrics(raw: Dict[str, float]) -> Dict[str, Optional[float]]:
+        balls = raw["balls"]
+        return {
+            "balls": int(balls),
+            "economy": _safe_div(raw["runs"] * 6.0, balls),
+            "dot_pct": _safe_div(raw["dots"] * 100.0, balls),
+            "wicket_pct": _safe_div(raw["wickets"] * 100.0, balls),
+            "boundary_pct": _safe_div(raw["boundaries"] * 100.0, balls),
+        }
+
+    threshold = _coerce_positive_int(min_balls, 24)
+    candidate_rows: List[Dict[str, Any]] = []
+    for combo in all_combos:
+        target_raw = _aggregate_for_venues(target_venues, combo)
+        if target_raw["balls"] < threshold:
+            continue
+        league_raw = _aggregate_for_venues(list(by_venue.keys()), combo)
+        similar_raw = _aggregate_for_venues(similar_venues, combo)
+
+        target_metrics = _metrics(target_raw)
+        league_metrics = _metrics(league_raw)
+        similar_metrics = _metrics(similar_raw)
+
+        def _delta(base: Dict[str, Optional[float]]) -> Dict[str, Optional[float]]:
+            return {
+                "econ_delta": (
+                    (base.get("economy") - target_metrics.get("economy"))
+                    if base.get("economy") is not None and target_metrics.get("economy") is not None
+                    else None
+                ),
+                "dot_delta": (
+                    (target_metrics.get("dot_pct") - base.get("dot_pct"))
+                    if base.get("dot_pct") is not None and target_metrics.get("dot_pct") is not None
+                    else None
+                ),
+                "wicket_delta": (
+                    (target_metrics.get("wicket_pct") - base.get("wicket_pct"))
+                    if base.get("wicket_pct") is not None and target_metrics.get("wicket_pct") is not None
+                    else None
+                ),
+                "boundary_delta": (
+                    (base.get("boundary_pct") - target_metrics.get("boundary_pct"))
+                    if base.get("boundary_pct") is not None and target_metrics.get("boundary_pct") is not None
+                    else None
+                ),
+            }
+
+        line_value, length_value, bowl_kind_value = combo
+        candidate_rows.append(
+            {
+                "line": line_value,
+                "length": length_value,
+                "bowl_kind": bowl_kind_value,
+                "target": {
+                    "balls": int(target_metrics.get("balls") or 0),
+                    "economy": _round_or_none(target_metrics.get("economy")),
+                    "dot_pct": _round_or_none(target_metrics.get("dot_pct")),
+                    "wicket_pct": _round_or_none(target_metrics.get("wicket_pct")),
+                    "boundary_pct": _round_or_none(target_metrics.get("boundary_pct")),
+                },
+                "baselines": {
+                    "league": {
+                        "balls": int(league_metrics.get("balls") or 0),
+                        "economy": _round_or_none(league_metrics.get("economy")),
+                        "dot_pct": _round_or_none(league_metrics.get("dot_pct")),
+                        "wicket_pct": _round_or_none(league_metrics.get("wicket_pct")),
+                        "boundary_pct": _round_or_none(league_metrics.get("boundary_pct")),
+                    },
+                    "similar": {
+                        "balls": int(similar_metrics.get("balls") or 0),
+                        "economy": _round_or_none(similar_metrics.get("economy")),
+                        "dot_pct": _round_or_none(similar_metrics.get("dot_pct")),
+                        "wicket_pct": _round_or_none(similar_metrics.get("wicket_pct")),
+                        "boundary_pct": _round_or_none(similar_metrics.get("boundary_pct")),
+                    },
+                },
+                "deltas": {
+                    "league": {k: _round_or_none(v) for k, v in _delta(league_metrics).items()},
+                    "similar": {k: _round_or_none(v) for k, v in _delta(similar_metrics).items()},
+                },
+            }
+        )
+
+    resolved_sort_by = sort_by if sort_by in {"econ_delta", "dot_delta", "wicket_delta", "boundary_delta"} else "econ_delta"
+    reverse_sort = sort_order != "asc"
+
+    def _sorted_for_baseline(mode: str) -> List[Dict[str, Any]]:
+        rows_for_mode = []
+        for row in candidate_rows:
+            deltas = row["deltas"].get(mode, {})
+            rows_for_mode.append(
+                {
+                    "line": row["line"],
+                    "length": row["length"],
+                    "bowl_kind": row["bowl_kind"],
+                    "target": row["target"],
+                    "baseline": row["baselines"].get(mode, {}),
+                    "deltas": deltas,
+                }
+            )
+        rows_for_mode.sort(
+            key=lambda item: float(item.get("deltas", {}).get(resolved_sort_by) or 0.0),
+            reverse=reverse_sort,
+        )
+        return rows_for_mode
+
+    rows_by_baseline = {
+        "league": _sorted_for_baseline("league"),
+        "similar": _sorted_for_baseline("similar"),
+    }
+    resolved_baseline = "similar" if baseline_mode == "similar" else "league"
+
+    return {
+        "found": True,
+        "venue": venue,
+        "rows": rows_by_baseline[resolved_baseline],
+        "rows_by_baseline": rows_by_baseline,
+        "filters": {
+            "phase": phase,
+            "bat_hand": bat_hand,
+            "bowl_kind": bowl_kind,
+            "bowl_style": bowl_style,
+            "shot": shot,
+        },
+        "thresholds": {"min_balls": threshold},
+        "sorting": {"sort_by": resolved_sort_by, "sort_order": "asc" if not reverse_sort else "desc"},
+        "baseline_mode": resolved_baseline,
+        "available_baselines": ["league", "similar"],
+        "similar_venues_used": similar_venues,
+    }

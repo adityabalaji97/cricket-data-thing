@@ -15,7 +15,7 @@ from services.visualizations import (
     get_venue_wagon_wheel_data,
     get_venue_pitch_map_data,
 )
-from services.venue_similarity import get_similar_venues
+from services.venue_similarity import get_similar_venues, get_venue_tactical_edges
 
 router = APIRouter(prefix="/visualizations", tags=["visualizations"])
 
@@ -457,6 +457,10 @@ def get_venue_similar(
     leagues: List[str] = Query(default=None),
     include_international: Optional[bool] = Query(default=None),
     top_teams: Optional[int] = Query(default=None, ge=1, le=30),
+    bat_hand: Optional[str] = Query(default=None),
+    bowl_kind: Optional[str] = Query(default=None),
+    bowl_style: Optional[str] = Query(default=None),
+    zone_metric: str = Query(default="boundary_pct", pattern="^(boundary_pct|run_pct)$"),
     db: Session = Depends(get_session),
 ):
     try:
@@ -470,6 +474,10 @@ def get_venue_similar(
             leagues=leagues,
             include_international=include_international,
             top_teams=top_teams,
+            bat_hand=bat_hand,
+            bowl_kind=bowl_kind,
+            bowl_style=bowl_style,
+            zone_metric=zone_metric,
         )
         if not result.get("found"):
             raise HTTPException(status_code=404, detail=result.get("error", "Venue not found"))
@@ -478,3 +486,52 @@ def get_venue_similar(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch venue similarity data: {str(e)}")
+
+
+@router.get("/venue/{venue}/tactical-edges")
+def get_venue_tactical_edges_endpoint(
+    venue: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    leagues: List[str] = Query(default=None),
+    include_international: Optional[bool] = Query(default=None),
+    top_teams: Optional[int] = Query(default=None, ge=1, le=30),
+    phase: Optional[str] = Query(default="overall"),
+    bat_hand: Optional[str] = Query(default=None),
+    bowl_kind: Optional[str] = Query(default=None),
+    bowl_style: Optional[str] = Query(default=None),
+    shot: Optional[str] = Query(default=None),
+    baseline_mode: str = Query(default="league", pattern="^(league|similar)$"),
+    sort_by: str = Query(default="econ_delta", pattern="^(econ_delta|dot_delta|wicket_delta|boundary_delta)$"),
+    sort_order: str = Query(default="desc", pattern="^(asc|desc)$"),
+    min_balls: int = Query(default=24, ge=1, le=5000),
+    top_n_similar: int = Query(default=5, ge=1, le=20),
+    db: Session = Depends(get_session),
+):
+    try:
+        result = get_venue_tactical_edges(
+            venue=venue,
+            db=db,
+            start_date=start_date,
+            end_date=end_date,
+            leagues=leagues,
+            include_international=include_international,
+            top_teams=top_teams,
+            phase=phase,
+            bat_hand=bat_hand,
+            bowl_kind=bowl_kind,
+            bowl_style=bowl_style,
+            shot=shot,
+            baseline_mode=baseline_mode,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            min_balls=min_balls,
+            top_n_similar=top_n_similar,
+        )
+        if not result.get("found", True):
+            raise HTTPException(status_code=404, detail=result.get("error", "No tactical edge data found"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch tactical edge data: {str(e)}")

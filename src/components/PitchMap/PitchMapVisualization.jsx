@@ -20,7 +20,8 @@ import {
 import {
   getCellPosition,
   getHeatColor,
-  calculateDataRange
+  calculateDataRange,
+  getStabilizedMetricValue,
 } from './pitchMapUtils';
 
 const PitchMapVisualization = ({
@@ -233,13 +234,18 @@ const PitchCell = ({
     dimensions
   );
   
-  const hasData = cell.balls >= minBalls;
-  const color = hasData 
-    ? getHeatColor(cell[colorMetric], colorMetric, dataRange)
+  const hasDisplayData = cell.balls >= minBalls;
+  const stabilizedColorValue = getStabilizedMetricValue(cell, colorMetric, dataRange);
+  const hasColorData = (
+    stabilizedColorValue !== null
+    && Number(cell.balls || 0) >= Number(dataRange?.colorMinBalls || 12)
+  );
+  const color = hasColorData
+    ? getHeatColor(stabilizedColorValue, colorMetric, dataRange)
     : HEAT_COLORS.noData;
   
   // Tooltip content
-  const tooltipContent = hasData ? (
+  const tooltipContent = hasDisplayData ? (
     <Box sx={{ p: 1 }}>
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
         {cell.line && LINE_SHORT_LABELS[cell.line]}
@@ -275,10 +281,10 @@ const PitchCell = ({
           stroke="#fff"
           strokeWidth={1}
           rx={3}
-          opacity={hasData ? 0.9 : 0.3}
+          opacity={hasColorData ? 0.9 : 0.35}
         />
         
-        {hasData && (
+        {hasDisplayData && (
           <CellContent
             x={x}
             y={y}
