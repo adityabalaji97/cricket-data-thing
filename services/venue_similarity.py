@@ -86,6 +86,120 @@ FEATURE_SPACE: List[str] = [
     "good_length_sr",
 ] + [f"zone_{z}_run_pct" for z in range(1, 9)] + [f"zone_{z}_boundary_pct" for z in range(1, 9)]
 
+LINE_GROUP_ORDER = ["OFF", "MIDDLE", "LEG"]
+LENGTH_GROUP_ORDER = ["SHORT", "BOAL", "GOOD", "FULL", "YORKER"]
+
+
+def _normalize_axis_token(value: Optional[str]) -> str:
+    if value is None:
+        return ""
+    return str(value).strip().upper().replace("-", "_").replace(" ", "_")
+
+
+def _map_line_group(value: Optional[str]) -> Optional[str]:
+    token = _normalize_axis_token(value)
+    if not token:
+        return None
+
+    if any(marker in token for marker in ["DOWN_LEG", "LEGSTUMP", "LEG_STUMP", "OUTSIDE_LEG", "WIDE_DOWN_LEG"]):
+        return "LEG"
+    if any(marker in token for marker in ["OUTSIDE_OFF", "OFFSTUMP", "OFF_STUMP", "WIDE_OUTSIDE_OFF", "OFFSIDE"]):
+        return "OFF"
+    if any(marker in token for marker in ["MIDDLE", "ON_THE_STUMPS", "ON_STUMPS", "ON_THE_STUMP", "ON_STUMP", "STUMPS"]):
+        return "MIDDLE"
+    if token in {"OFF", "OFF_STUMP"}:
+        return "OFF"
+    if token in {"LEG", "LEG_SIDE"}:
+        return "LEG"
+    return None
+
+
+def _map_length_group(value: Optional[str]) -> Optional[str]:
+    token = _normalize_axis_token(value)
+    if not token:
+        return None
+
+    if "YORKER" in token:
+        return "YORKER"
+    if any(
+        marker in token
+        for marker in [
+            "BACK_OF_A_LENGTH",
+            "BACK_OF_LENGTH",
+            "SHORT_OF_A_GOOD_LENGTH",
+            "SHORT_OF_GOOD_LENGTH",
+            "SHORT_OF_A_LENGTH",
+            "SHORT_OF_LENGTH",
+            "BOAL",
+        ]
+    ):
+        return "BOAL"
+    if token in {"SHORT", "BOUNCER"} or token.startswith("SHORT_"):
+        return "SHORT"
+    if token in {"GOOD", "GOOD_LENGTH"} or ("GOOD" in token and "SHORT_OF" not in token):
+        return "GOOD"
+    if token in {"FULL", "FULL_TOSS"} or token.startswith("FULL_"):
+        return "FULL"
+    return None
+
+
+def _empty_line_length_agg() -> Dict[str, float]:
+    return {
+        "balls": 0.0,
+        "runs": 0.0,
+        "boundaries": 0.0,
+        "dots": 0.0,
+        "wickets": 0.0,
+    }
+
+
+def _build_line_length_grid_for_venues(
+    line_length_map: Dict[str, Dict[Tuple[str, str], Dict[str, float]]],
+    venues: List[str],
+) -> Dict[str, Dict[str, Optional[float]]]:
+    combined: Dict[Tuple[str, str], Dict[str, float]] = defaultdict(_empty_line_length_agg)
+
+    for venue in venues:
+        venue_rows = line_length_map.get(venue, {})
+        for key, raw in venue_rows.items():
+            rec = combined[key]
+            rec["balls"] += float(raw.get("balls") or 0.0)
+            rec["runs"] += float(raw.get("runs") or 0.0)
+            rec["boundaries"] += float(raw.get("boundaries") or 0.0)
+            rec["dots"] += float(raw.get("dots") or 0.0)
+            rec["wickets"] += float(raw.get("wickets") or 0.0)
+
+    output: Dict[str, Dict[str, Optional[float]]] = {}
+    for line_group in LINE_GROUP_ORDER:
+        for length_group in LENGTH_GROUP_ORDER:
+            raw = combined.get((line_group, length_group))
+            if not raw:
+                continue
+            balls = float(raw.get("balls") or 0.0)
+            if balls <= 0:
+                continue
+
+            runs = float(raw.get("runs") or 0.0)
+            boundaries = float(raw.get("boundaries") or 0.0)
+            dots = float(raw.get("dots") or 0.0)
+            wickets = float(raw.get("wickets") or 0.0)
+            output[f"{line_group}_{length_group}"] = {
+                "line_group": line_group,
+                "length_group": length_group,
+                "balls": int(balls),
+                "runs": _round_or_none(runs),
+                "boundaries": _round_or_none(boundaries),
+                "dots": _round_or_none(dots),
+                "wickets": _round_or_none(wickets),
+                "economy": _round_or_none(_safe_div(runs * 6.0, balls)),
+                "sr": _round_or_none(_safe_div(runs * 100.0, balls)),
+                "dot_pct": _round_or_none(_safe_div(dots * 100.0, balls)),
+                "boundary_pct": _round_or_none(_safe_div(boundaries * 100.0, balls)),
+                "wicket_pct": _round_or_none(_safe_div(wickets * 100.0, balls)),
+            }
+
+    return output
+
 
 def _safe_div(numerator: float, denominator: float) -> Optional[float]:
     if denominator in (None, 0):
@@ -843,6 +957,69 @@ def get_similar_venues(
     )
     similar_aggregate_zone_profile = _aggregate_zone_profile(zone_output_map, similar_venues)
 
+    line_length_params = {**params, **zone_output_params}
+    line_length_scope_sql = ""
+    if not target_is_all_venues:
+        scoped_venues = set(similar_venues)
+        if target_venue:
+            scoped_venues.add(target_venue)
+        scoped_aliases = set()
+        for scoped_venue in scoped_venues:
+            if not scoped_venue:
+                continue
+            scoped_aliases.update(get_venue_aliases(scoped_venue))
+            scoped_aliases.add(scoped_venue)
+        if scoped_aliases:
+            line_length_scope_sql = " AND dd.ground = ANY(:line_length_venues)"
+            line_length_params["line_length_venues"] = sorted(scoped_aliases)
+
+    line_length_rows = db.execute(
+        text(
+            f"""
+            SELECT
+                dd.ground AS venue,
+                dd.line AS line,
+                dd.length AS length,
+                COUNT(*) AS balls,
+                SUM(dd.score) AS runs,
+                SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) AS boundaries,
+                SUM(CASE WHEN dd.score = 0 THEN 1 ELSE 0 END) AS dots,
+                SUM(CASE WHEN {WICKET_CONDITION} THEN 1 ELSE 0 END) AS wickets
+            FROM delivery_details dd
+            WHERE 1=1
+                {where_sql}
+                {zone_output_filter_sql}
+                {line_length_scope_sql}
+                AND dd.line IS NOT NULL
+                AND dd.length IS NOT NULL
+            GROUP BY dd.ground, dd.line, dd.length
+            """
+        ),
+        line_length_params,
+    ).fetchall()
+
+    line_length_map: Dict[str, Dict[Tuple[str, str], Dict[str, float]]] = defaultdict(
+        lambda: defaultdict(_empty_line_length_agg)
+    )
+    for row in line_length_rows:
+        canonical_venue = _canonicalize_venue(row._mapping.get("venue"))
+        if not canonical_venue:
+            continue
+        line_group = _map_line_group(row._mapping.get("line"))
+        length_group = _map_length_group(row._mapping.get("length"))
+        if not line_group or not length_group:
+            continue
+        rec = line_length_map[canonical_venue][(line_group, length_group)]
+        rec["balls"] += float(row._mapping.get("balls") or 0.0)
+        rec["runs"] += float(row._mapping.get("runs") or 0.0)
+        rec["boundaries"] += float(row._mapping.get("boundaries") or 0.0)
+        rec["dots"] += float(row._mapping.get("dots") or 0.0)
+        rec["wickets"] += float(row._mapping.get("wickets") or 0.0)
+
+    target_line_length_venues = candidate_venues if target_is_all_venues else ([target_venue] if target_venue else [])
+    target_line_length_grid = _build_line_length_grid_for_venues(line_length_map, target_line_length_venues)
+    similar_line_length_grid = _build_line_length_grid_for_venues(line_length_map, similar_venues)
+
     similar_aggregate_insights = {
         "description": f"Aggregate bowling stats across the {len(similar_venues)} most similar venues",
         "total_matches": total_similar_matches,
@@ -861,6 +1038,7 @@ def get_similar_venues(
         "by_style": _format_style_stats(combined_style_totals),
         "by_phase": by_phase,
         "zone_profile": similar_aggregate_zone_profile,
+        "line_length_grid": similar_line_length_grid,
     }
 
     requested_venue_label = "All Venues" if target_is_all_venues else target_venue
@@ -891,6 +1069,7 @@ def get_similar_venues(
         "target_metrics": _round_metrics(target_metrics),
         "league_averages": _round_metrics(league_averages),
         "target_zone_profile": target_zone_profile,
+        "target_line_length_grid": target_line_length_grid,
         "most_similar": most_similar,
         "most_dissimilar": most_dissimilar,
         "similar_aggregate_insights": similar_aggregate_insights,
