@@ -286,10 +286,9 @@ const FormTileDetails = ({ match, teamCode, result }) => (
     </Box>
 );
 
-const TeamFormStrip = ({ teamCode, matches, isMobile }) => {
-    const [selectedMatch, setSelectedMatch] = useState(null);
+const TeamFormRow = ({ teamCode, matches, isMobile, onTileSelect }) => {
     const teamColor = getTeamColor(teamCode) || '#1d4ed8';
-    const tileSize = isMobile ? 30 : 36;
+    const tileSize = isMobile ? 24 : 26;
 
     const formTiles = useMemo(
         () => (matches || []).map((match) => ({
@@ -300,71 +299,109 @@ const TeamFormStrip = ({ teamCode, matches, isMobile }) => {
     );
 
     return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? 0.9 : 1.1, minWidth: 0 }}>
+            <Typography
+                variant="body2"
+                sx={{
+                    minWidth: isMobile ? 66 : 78,
+                    fontWeight: 700,
+                    color: teamColor,
+                    whiteSpace: 'nowrap',
+                }}
+            >
+                {teamCode}
+            </Typography>
+            {!formTiles.length ? (
+                <Typography variant="body2" color="text.secondary">
+                    N/A
+                </Typography>
+            ) : (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.45, minWidth: 0 }}>
+                    {formTiles.map(({ match, result }, index) => {
+                        const style = resultTileStyles[result] || resultTileStyles.NR;
+                        const tile = (
+                            <Box
+                                component="button"
+                                key={`${teamCode}-${match?.id || match?.date || 'form'}-${index}`}
+                                onClick={() => {
+                                    if (isMobile) {
+                                        onTileSelect({ teamCode, match, result });
+                                    }
+                                }}
+                                sx={{
+                                    width: tileSize,
+                                    minWidth: tileSize,
+                                    height: tileSize,
+                                    border: '1px solid',
+                                    borderColor: style.border,
+                                    borderRadius: 0.8,
+                                    bgcolor: style.bg,
+                                    color: style.color,
+                                    fontWeight: 800,
+                                    fontSize: isMobile ? '0.73rem' : '0.76rem',
+                                    lineHeight: 1,
+                                    cursor: isMobile ? 'pointer' : 'default',
+                                    p: 0,
+                                }}
+                            >
+                                {result}
+                            </Box>
+                        );
+
+                        if (isMobile) {
+                            return tile;
+                        }
+
+                        return (
+                            <Tooltip
+                                key={`${teamCode}-${match?.id || match?.date || 'form-tip'}-${index}`}
+                                title={<FormTileDetails match={match} teamCode={teamCode} result={result} />}
+                                arrow
+                            >
+                                {tile}
+                            </Tooltip>
+                        );
+                    })}
+                </Box>
+            )}
+        </Box>
+    );
+};
+
+const TeamFormCard = ({ team1, team2, team1Matches, team2Matches, isMobile }) => {
+    const [selectedMatch, setSelectedMatch] = useState(null);
+
+    return (
         <>
             <Card sx={{ p: isMobile ? 1.5 : 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-                <Typography
-                    variant={isMobile ? 'subtitle2' : 'h6'}
-                    sx={{
-                        fontWeight: 700,
-                        color: teamColor,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                    }}
-                >
-                    {`${teamCode} Recent Form`}
+                <Typography variant={isMobile ? 'subtitle2' : 'h6'} sx={{ fontWeight: 700 }}>
+                    Form
                 </Typography>
-                {!formTiles.length ? (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        No recent matches found.
-                    </Typography>
-                ) : (
-                    <Box sx={{ mt: 1.1, display: 'flex', alignItems: 'center', gap: isMobile ? 0.6 : 0.8, overflowX: 'auto', pb: 0.3 }}>
-                        {formTiles.map(({ match, result }, index) => {
-                            const style = resultTileStyles[result] || resultTileStyles.NR;
-                            const tile = (
-                                <Box
-                                    component="button"
-                                    onClick={() => {
-                                        if (isMobile) setSelectedMatch({ match, result });
-                                    }}
-                                    key={`${match?.id || match?.date || 'form'}-${index}`}
-                                    sx={{
-                                        width: tileSize,
-                                        minWidth: tileSize,
-                                        height: tileSize,
-                                        border: '1px solid',
-                                        borderColor: style.border,
-                                        borderRadius: 1,
-                                        bgcolor: style.bg,
-                                        color: style.color,
-                                        fontWeight: 800,
-                                        fontSize: isMobile ? '0.8rem' : '0.88rem',
-                                        cursor: isMobile ? 'pointer' : 'default',
-                                    }}
-                                >
-                                    {result}
-                                </Box>
-                            );
-
-                            if (isMobile) return tile;
-                            return (
-                                <Tooltip key={`${match?.id || match?.date || 'form-tip'}-${index}`} title={<FormTileDetails match={match} teamCode={teamCode} result={result} />} arrow>
-                                    {tile}
-                                </Tooltip>
-                            );
-                        })}
-                    </Box>
-                )}
+                <Box sx={{ mt: 1.1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <TeamFormRow
+                        teamCode={team1}
+                        matches={team1Matches || []}
+                        isMobile={isMobile}
+                        onTileSelect={setSelectedMatch}
+                    />
+                    <TeamFormRow
+                        teamCode={team2}
+                        matches={team2Matches || []}
+                        isMobile={isMobile}
+                        onTileSelect={setSelectedMatch}
+                    />
+                </Box>
             </Card>
 
             <Dialog open={Boolean(selectedMatch)} onClose={() => setSelectedMatch(null)} fullWidth maxWidth="xs">
-                <DialogTitle sx={{ fontWeight: 700 }}>{`${teamCode} Match Details`}</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 700 }}>
+                    {selectedMatch ? `${selectedMatch.teamCode} Match Details` : 'Match Details'}
+                </DialogTitle>
                 <DialogContent>
                     {selectedMatch && (
                         <FormTileDetails
                             match={selectedMatch.match}
-                            teamCode={teamCode}
+                            teamCode={selectedMatch.teamCode}
                             result={selectedMatch.result}
                         />
                     )}
@@ -383,11 +420,14 @@ const MatchHistory = ({ venue, team1, team2, venueResults, team1Results, team2Re
             <Grid item xs={12} lg={6}>
                 <VenueRecentMatches venue={venue} matches={venueResults || []} isMobile={isMobile} />
             </Grid>
-            <Grid item xs={6}>
-                <TeamFormStrip teamCode={team1} matches={team1Results || []} isMobile={isMobile} />
-            </Grid>
-            <Grid item xs={6}>
-                <TeamFormStrip teamCode={team2} matches={team2Results || []} isMobile={isMobile} />
+            <Grid item xs={12}>
+                <TeamFormCard
+                    team1={team1}
+                    team2={team2}
+                    team1Matches={team1Results}
+                    team2Matches={team2Results}
+                    isMobile={isMobile}
+                />
             </Grid>
         </Grid>
     </Box>

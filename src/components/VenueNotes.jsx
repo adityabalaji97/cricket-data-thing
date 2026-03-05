@@ -19,8 +19,6 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    Tabs,
-    Tab,
     useMediaQuery,
     useTheme
 } from '@mui/material';
@@ -35,12 +33,8 @@ import {
     ReferenceArea,
 } from 'recharts';
 import ReactECharts from 'echarts-for-react';
-import BowlingAnalysis from './BowlingAnalysis';
-import FantasyPointsTable from './FantasyPointsTable';
-import FantasyPointsBarChart from './FantasyPointsBarChart';
 import MatchHistory from './MatchHistory';
 import Matchups from './Matchups';
-import BattingScatterChart from './BattingScatterChart';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
 import VenueTacticalMap from './VenueTacticalMap';
 import VenueSimilarity from './VenueSimilarity';
@@ -962,8 +956,6 @@ const VenueNotes = ({
     statsData,
     selectedTeam1,
     selectedTeam2,
-    venueFantasyStats,
-    venuePlayerHistory,
     matchHistory,
     filtersExpanded,
     onToggleFilters,
@@ -973,7 +965,6 @@ const VenueNotes = ({
     topTeams = null,
   }) => {
 
-    const [fantasyTabValue, setFantasyTabValue] = useState(0);
     const [activeSectionId, setActiveSectionId] = useState('summary');
     const sectionRefs = useRef({});
 
@@ -1082,82 +1073,7 @@ const VenueNotes = ({
             ),
         });
 
-        // 6. FANTASY (only when both teams)
-        if (selectedTeam1 && selectedTeam2) {
-            groups.push({
-                id: 'fantasy',
-                label: 'Fantasy',
-                content: (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <Card sx={{ p: 2, width: '100%' }}>
-                            <Typography variant="h6" gutterBottom>
-                                Fantasy Points Analysis
-                            </Typography>
-                            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-                                <Tabs value={fantasyTabValue} onChange={(e, newValue) => setFantasyTabValue(newValue)}>
-                                    <Tab label="Team Comparison" />
-                                    <Tab label="Venue History" />
-                                </Tabs>
-                            </Box>
-                            <Box sx={{ mt: 2 }}>
-                                {fantasyTabValue === 0 && (
-                                    <>
-                                        <Grid container spacing={isMobile ? 1 : 2}>
-                                            <Grid item xs={12} md={6}>
-                                                <FantasyPointsTable
-                                                    players={venueFantasyStats?.team1_players || []}
-                                                    title={`${selectedTeam1.abbreviated_name} Fantasy Points at ${venue}`}
-                                                    isMobile={isMobile}
-                                                />
-                                            </Grid>
-                                            <Grid item xs={12} md={6}>
-                                                <FantasyPointsTable
-                                                    players={venueFantasyStats?.team2_players || []}
-                                                    title={`${selectedTeam2.abbreviated_name} Fantasy Points at ${venue}`}
-                                                    isMobile={isMobile}
-                                                />
-                                            </Grid>
-                                        </Grid>
-                                        <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: 2 }}>
-                                            <Grid item xs={12} md={6}>
-                                                <FantasyPointsBarChart
-                                                    players={venueFantasyStats?.team1_players || []}
-                                                    title={`${selectedTeam1.abbreviated_name} Fantasy Points Breakdown`}
-                                                    isMobile={isMobile}
-                                                />
-                                            </Grid>
-                                            <Grid item xs={12} md={6}>
-                                                <FantasyPointsBarChart
-                                                    players={venueFantasyStats?.team2_players || []}
-                                                    title={`${selectedTeam2.abbreviated_name} Fantasy Points Breakdown`}
-                                                    isMobile={isMobile}
-                                                />
-                                            </Grid>
-                                        </Grid>
-                                    </>
-                                )}
-                                {fantasyTabValue === 1 && (
-                                    <>
-                                        <FantasyPointsTable
-                                            players={venuePlayerHistory?.players || []}
-                                            title={`Player Fantasy History at ${venue}`}
-                                            isMobile={isMobile}
-                                        />
-                                        <FantasyPointsBarChart
-                                            players={venuePlayerHistory?.players || []}
-                                            title={`Top Players at ${venue}`}
-                                            isMobile={isMobile}
-                                        />
-                                    </>
-                                )}
-                            </Box>
-                        </Card>
-                    </Box>
-                ),
-            });
-        }
-
-        // 7. LEADERS
+        // 6. LEADERS
         if (statsData?.batting_leaders?.length > 0 || statsData?.bowling_leaders?.length > 0) {
             groups.push({
                 id: 'leaders',
@@ -1179,33 +1095,7 @@ const VenueNotes = ({
             });
         }
 
-        // 8. ANALYSIS
-        if (statsData?.batting_scatter?.length > 0) {
-            groups.push({
-                id: 'analysis',
-                label: 'Analysis',
-                content: (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        <BattingScatterChart data={statsData.batting_scatter} isMobile={isMobile} />
-                        <Card sx={{ p: { xs: 1, sm: 2 }, width: '100%' }}>
-                            <Typography variant="h6" gutterBottom>
-                                Bowling Type Analysis
-                            </Typography>
-                            <Box sx={{ position: 'relative' }}>
-                                <BowlingAnalysis
-                                    venue={venue}
-                                    startDate={startDate}
-                                    endDate={endDate}
-                                    isMobile={isMobile}
-                                />
-                            </Box>
-                        </Card>
-                    </Box>
-                ),
-            });
-        }
-
-        // 9. EXPLORE
+        // 7. EXPLORE
         groups.push({
             id: 'explore',
             label: 'Explore',
@@ -1224,7 +1114,7 @@ const VenueNotes = ({
         });
 
         return groups;
-    }, [venueStats, statsData, selectedTeam1, selectedTeam2, venue, startDate, endDate, matchHistory, venueFantasyStats, venuePlayerHistory, isMobile, fantasyTabValue, leagues, includeInternational, topTeams]);
+    }, [venueStats, statsData, selectedTeam1, selectedTeam2, venue, startDate, endDate, matchHistory, isMobile, leagues, includeInternational, topTeams]);
 
     const formattedDateRange = useMemo(() => formatVenueDateRange(startDate, endDate), [startDate, endDate]);
 
@@ -1237,7 +1127,6 @@ const VenueNotes = ({
     }, []);
 
     useEffect(() => {
-        setFantasyTabValue(0);
         setActiveSectionId('summary');
     }, [selectedTeam1, selectedTeam2, venue]);
 
