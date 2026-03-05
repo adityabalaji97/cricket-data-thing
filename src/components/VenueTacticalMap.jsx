@@ -77,6 +77,34 @@ const fmt = (value, digits = 1, suffix = '') => {
   return `${Number(value).toFixed(digits)}${suffix}`;
 };
 
+const appendSharedParams = (params, {
+  startDate,
+  endDate,
+  includeInternational,
+  topTeams,
+  leagues,
+}) => {
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+  if (includeInternational !== null && includeInternational !== undefined) {
+    params.append('include_international', String(includeInternational));
+  }
+  if (includeInternational && topTeams) {
+    params.append('top_teams', String(topTeams));
+  }
+  (Array.isArray(leagues) ? leagues : []).forEach((league) => params.append('leagues', league));
+};
+
+const appendDeliveryFilters = (params, filters) => {
+  if (filters.phase !== 'overall') params.append('phase', filters.phase);
+  if (filters.bowlKind !== 'all') params.append('bowl_kind', filters.bowlKind);
+  if (filters.bowlStyle !== 'all') params.append('bowl_style', filters.bowlStyle);
+  if (filters.batHand !== 'all') params.append('bat_hand', filters.batHand);
+  if (filters.line !== 'all') params.append('line', filters.line);
+  if (filters.length !== 'all') params.append('length', filters.length);
+  if (filters.shot !== 'all') params.append('shot', filters.shot);
+};
+
 const VenueTacticalMap = ({
   venue,
   startDate,
@@ -89,7 +117,8 @@ const VenueTacticalMap = ({
   showTabs = true,
 }) => {
   const [tab, setTab] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loadingWagon, setLoadingWagon] = useState(false);
+  const [loadingInsights, setLoadingInsights] = useState(false);
   const [error, setError] = useState(null);
   const [pitchData, setPitchData] = useState(null);
   const [wagonData, setWagonData] = useState(null);
@@ -100,8 +129,27 @@ const VenueTacticalMap = ({
   const [filterOpen, setFilterOpen] = useState(false);
 
   const leaguesKey = Array.isArray(leagues) ? leagues.join('|') : '';
+  const leaguesList = useMemo(() => (leaguesKey ? leaguesKey.split('|').filter(Boolean) : []), [leaguesKey]);
   const chartContainerRef = useRef(null);
   const [wagonSize, setWagonSize] = useState(360);
+  const loading = loadingWagon || loadingInsights;
+  const deliveryFilters = useMemo(() => ({
+    phase: filters.phase,
+    bowlKind: filters.bowlKind,
+    bowlStyle: filters.bowlStyle,
+    batHand: filters.batHand,
+    line: filters.line,
+    length: filters.length,
+    shot: filters.shot,
+  }), [
+    filters.phase,
+    filters.bowlKind,
+    filters.bowlStyle,
+    filters.batHand,
+    filters.line,
+    filters.length,
+    filters.shot,
+  ]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -118,27 +166,68 @@ const VenueTacticalMap = ({
     if (!venue) return;
     let cancelled = false;
 
-    const fetchData = async () => {
-      setLoading(true);
+    const fetchWagonData = async () => {
+      setLoadingWagon(true);
+      setError(null);
+      try {
+        const baseParams = new URLSearchParams();
+        appendSharedParams(baseParams, {
+          startDate,
+          endDate,
+          includeInternational,
+          topTeams,
+          leagues: leaguesList,
+        });
+        const base = `${config.API_URL}/visualizations/venue/${encodeURIComponent(venue)}`;
+        const wagonResp = await fetch(`${base}/wagon-wheel?${baseParams.toString()}`);
+        if (!wagonResp.ok) throw new Error('Failed to fetch venue wagon wheel');
+        const wagonJson = await wagonResp.json();
+
+        if (!cancelled) {
+          setWagonData(wagonJson);
+        }
+      } catch (err) {
+        console.error('Error fetching venue wagon wheel data:', err);
+        if (!cancelled) {
+          setError(err.message || 'Failed to load tactical explorer');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingWagon(false);
+        }
+      }
+    };
+
+    fetchWagonData();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    venue,
+    startDate,
+    endDate,
+    includeInternational,
+    topTeams,
+    leaguesList,
+  ]);
+
+  useEffect(() => {
+    if (!venue) return;
+    let cancelled = false;
+
+    const fetchPitchAndEdges = async () => {
+      setLoadingInsights(true);
       setError(null);
       try {
         const commonParams = new URLSearchParams();
-        if (startDate) commonParams.append('start_date', startDate);
-        if (endDate) commonParams.append('end_date', endDate);
-        if (filters.phase !== 'overall') commonParams.append('phase', filters.phase);
-        if (filters.bowlKind !== 'all') commonParams.append('bowl_kind', filters.bowlKind);
-        if (filters.bowlStyle !== 'all') commonParams.append('bowl_style', filters.bowlStyle);
-        if (filters.batHand !== 'all') commonParams.append('bat_hand', filters.batHand);
-        if (filters.line !== 'all') commonParams.append('line', filters.line);
-        if (filters.length !== 'all') commonParams.append('length', filters.length);
-        if (filters.shot !== 'all') commonParams.append('shot', filters.shot);
-        if (includeInternational !== null && includeInternational !== undefined) {
-          commonParams.append('include_international', String(includeInternational));
-        }
-        if (includeInternational && topTeams) {
-          commonParams.append('top_teams', String(topTeams));
-        }
-        (Array.isArray(leagues) ? leagues : []).forEach((league) => commonParams.append('leagues', league));
+        appendSharedParams(commonParams, {
+          startDate,
+          endDate,
+          includeInternational,
+          topTeams,
+          leagues: leaguesList,
+        });
+        appendDeliveryFilters(commonParams, deliveryFilters);
 
         const tacticalParams = new URLSearchParams(commonParams.toString());
         tacticalParams.append('baseline_mode', filters.baselineMode);
@@ -148,19 +237,16 @@ const VenueTacticalMap = ({
         tacticalParams.append('top_n_similar', '5');
 
         const base = `${config.API_URL}/visualizations/venue/${encodeURIComponent(venue)}`;
-        const [pitchResp, wagonResp, edgesResp] = await Promise.all([
+        const [pitchResp, edgesResp] = await Promise.all([
           fetch(`${base}/pitch-map?${commonParams.toString()}`),
-          fetch(`${base}/wagon-wheel?${commonParams.toString()}`),
           fetch(`${base}/tactical-edges?${tacticalParams.toString()}`),
         ]);
 
         if (!pitchResp.ok) throw new Error('Failed to fetch venue pitch map');
-        if (!wagonResp.ok) throw new Error('Failed to fetch venue wagon wheel');
         if (!edgesResp.ok) throw new Error('Failed to fetch tactical edges');
 
-        const [pitchJson, wagonJson, edgesJson] = await Promise.all([
+        const [pitchJson, edgesJson] = await Promise.all([
           pitchResp.json(),
-          wagonResp.json(),
           edgesResp.json(),
         ]);
 
@@ -171,22 +257,21 @@ const VenueTacticalMap = ({
             percent_balls: totalBalls > 0 ? (cell.balls * 100) / totalBalls : 0,
           }));
           setPitchData({ ...pitchJson, cells });
-          setWagonData(wagonJson);
           setTacticalEdgesData(edgesJson);
         }
       } catch (err) {
-        console.error('Error fetching venue tactical explorer data:', err);
+        console.error('Error fetching venue pitch/edge data:', err);
         if (!cancelled) {
           setError(err.message || 'Failed to load tactical explorer');
         }
       } finally {
         if (!cancelled) {
-          setLoading(false);
+          setLoadingInsights(false);
         }
       }
     };
 
-    fetchData();
+    fetchPitchAndEdges();
     return () => {
       cancelled = true;
     };
@@ -194,16 +279,40 @@ const VenueTacticalMap = ({
     venue,
     startDate,
     endDate,
-    filters,
+    deliveryFilters,
+    filters.baselineMode,
+    filters.sortBy,
+    filters.sortOrder,
     includeInternational,
     topTeams,
-    leaguesKey,
+    leaguesList,
   ]);
 
-  const deliveries = wagonData?.deliveries || [];
+  const allDeliveries = useMemo(() => wagonData?.deliveries ?? [], [wagonData]);
+  const deliveries = useMemo(() => {
+    return allDeliveries.filter((delivery) => {
+      if (filters.phase !== 'overall' && delivery.phase !== filters.phase) return false;
+      if (filters.bowlKind !== 'all' && delivery.bowl_kind !== filters.bowlKind) return false;
+      if (filters.bowlStyle !== 'all' && delivery.bowl_style !== filters.bowlStyle) return false;
+      if (filters.batHand !== 'all' && delivery.bat_hand !== filters.batHand) return false;
+      if (filters.line !== 'all' && delivery.line !== filters.line) return false;
+      if (filters.length !== 'all' && delivery.length !== filters.length) return false;
+      if (filters.shot !== 'all' && delivery.shot !== filters.shot) return false;
+      return true;
+    });
+  }, [
+    allDeliveries,
+    filters.phase,
+    filters.bowlKind,
+    filters.bowlStyle,
+    filters.batHand,
+    filters.line,
+    filters.length,
+    filters.shot,
+  ]);
 
   const options = useMemo(() => {
-    const uniq = (key) => [...new Set(deliveries.map((d) => d[key]).filter(Boolean))].sort();
+    const uniq = (key) => [...new Set(allDeliveries.map((d) => d[key]).filter(Boolean))].sort();
     return {
       bowlKinds: uniq('bowl_kind'),
       bowlStyles: uniq('bowl_style'),
@@ -212,7 +321,7 @@ const VenueTacticalMap = ({
       lengths: uniq('length'),
       shots: uniq('shot'),
     };
-  }, [deliveries]);
+  }, [allDeliveries]);
 
   const zoneStatsWithDerived = useMemo(() => {
     const zoneStats = {};
@@ -277,7 +386,7 @@ const VenueTacticalMap = ({
         ? 2
         : tab;
 
-  const noData = (pitchData?.total_balls || 0) === 0 && (wagonData?.total_deliveries || 0) === 0;
+  const noData = (pitchData?.total_balls || 0) === 0 && allDeliveries.length === 0;
 
   const openFilters = () => {
     setDraftFilters(filters);
@@ -321,7 +430,7 @@ const VenueTacticalMap = ({
 
   const renderFilterContent = () => {
     const filteredBowlStyles = (draftFilters.bowlKind && draftFilters.bowlKind !== 'all')
-      ? [...new Set(deliveries
+      ? [...new Set(allDeliveries
         .filter((delivery) => delivery.bowl_kind === draftFilters.bowlKind)
         .map((delivery) => delivery.bowl_style)
         .filter(Boolean))].sort()
@@ -645,7 +754,7 @@ const VenueTacticalMap = ({
             Zone view shows where boundaries and runs cluster. Click a zone to drill into rays.
           </Typography>
           <Box ref={chartContainerRef} sx={{ display: 'flex', justifyContent: 'center', minHeight: 280 }}>
-            {wagonData?.total_deliveries ? renderWagonWheel() : (
+            {deliveries.length ? renderWagonWheel() : (
               <EmptyState title="No wagon wheel data" description="No wagon coordinates available for these filters." isMobile={isMobile} minHeight={240} />
             )}
           </Box>

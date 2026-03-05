@@ -111,6 +111,8 @@ const buildZoneRadarOption = (targetZoneProfile, similarZoneProfile, zoneMetric 
     },
     radar: {
       radius: '68%',
+      startAngle: 90,
+      clockwise: true,
       indicator: Array.from({ length: 8 }, (_, index) => ({
         name: `Zone ${index + 1}`,
         max: maxValue,
