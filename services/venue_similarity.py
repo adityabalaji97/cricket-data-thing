@@ -87,7 +87,7 @@ FEATURE_SPACE: List[str] = [
 ] + [f"zone_{z}_run_pct" for z in range(1, 9)] + [f"zone_{z}_boundary_pct" for z in range(1, 9)]
 
 LINE_GROUP_ORDER = ["OFF", "MIDDLE", "LEG"]
-LENGTH_GROUP_ORDER = ["SHORT", "BOAL", "GOOD", "FULL", "YORKER"]
+LENGTH_GROUP_ORDER = ["YORKER", "FULL", "GOOD", "BOAL", "SHORT"]
 
 
 def _normalize_axis_token(value: Optional[str]) -> str:

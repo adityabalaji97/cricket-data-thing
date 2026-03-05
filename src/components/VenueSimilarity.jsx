@@ -45,17 +45,19 @@ const EDGE_LINE_GROUPS = [
 ];
 
 const EDGE_LENGTH_GROUPS = [
-  { key: 'SHORT', label: 'Short' },
-  { key: 'BOAL', label: 'BOAL' },
-  { key: 'GOOD', label: 'Good' },
-  { key: 'FULL', label: 'Full' },
   { key: 'YORKER', label: 'Yorker' },
+  { key: 'FULL', label: 'Full' },
+  { key: 'GOOD', label: 'Good' },
+  { key: 'BOAL', label: 'Back of Length' },
+  { key: 'SHORT', label: 'Short' },
 ];
 
 const PITCH_PROFILE_LENGTH_GROUPS = [
-  { key: 'SHORT', label: 'Short' },
-  { key: 'GOOD', label: 'Good' },
+  { key: 'YORKER', label: 'Yorker' },
   { key: 'FULL', label: 'Full' },
+  { key: 'GOOD', label: 'Good' },
+  { key: 'BOAL', label: 'Back of Length' },
+  { key: 'SHORT', label: 'Short' },
 ];
 
 const EDGE_MIN_BALLS_THRESHOLD = 15;
@@ -142,12 +144,7 @@ const mapLengthGroup = (value) => {
 };
 
 const mapProfileLengthGroup = (value) => {
-  const token = normalizeAxisToken(value);
-  if (!token) return null;
-  if (token === 'SHORT' || token === 'BOAL') return 'SHORT';
-  if (token === 'GOOD') return 'GOOD';
-  if (token === 'FULL' || token === 'YORKER') return 'FULL';
-  return null;
+  return mapLengthGroup(value);
 };
 
 const getDivergingCellColors = (value, maxAbs, forceNeutral = false) => {
@@ -428,7 +425,7 @@ const buildZoneRadarOption = (targetZoneProfile, similarZoneProfile, zoneMetric 
     },
     radar: {
       radius: '68%',
-      startAngle: 180,
+      startAngle: 135,
       clockwise: true,
       indicator: zoneLabels.map((label) => ({
         name: label,
