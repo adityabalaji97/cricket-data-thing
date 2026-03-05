@@ -787,7 +787,7 @@ const SimilarityInsightsView = ({
         <Chip size="small" label={`Min matches: ${data.min_matches}`} />
       </Box>
 
-      <Card sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+      <Card sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', boxShadow: 'none', order: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
           <Typography variant="body2" sx={{ fontWeight: 700 }}>
             Scoring Zone Shape: Target vs Similar Avg
@@ -803,7 +803,7 @@ const SimilarityInsightsView = ({
         </Box>
       </Card>
 
-      <Card sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+      <Card sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', boxShadow: 'none', order: 1 }}>
         <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.75 }}>
           Similar Venues Pitch Profile
         </Typography>
