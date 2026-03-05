@@ -81,32 +81,61 @@ const getMatchSummary = (match) => {
     return `${toDateLabel(match?.date)} • ${getWinnerName(match)} won (${mode.label})`;
 };
 
+const teamWonMatch = (match, side) => {
+    const winnerCandidates = [match?.winner, match?.winner_display]
+        .map(normalizeTeam)
+        .filter(Boolean)
+        .filter((name) => name !== '-');
+    if (!winnerCandidates.length) return false;
+
+    const teamCandidates = side === 'team1'
+        ? [match?.team1, match?.team1_display]
+        : [match?.team2, match?.team2_display];
+    const normalizedTeamCandidates = teamCandidates.map(normalizeTeam).filter(Boolean);
+    return winnerCandidates.some((winnerName) => normalizedTeamCandidates.includes(winnerName));
+};
+
 const MatchCompactRow = ({ match, indexPrefix }) => {
     const mode = getWinMode(match);
+    const team1Name = getTeam1Name(match);
+    const team2Name = getTeam2Name(match);
+    const team1Won = teamWonMatch(match, 'team1');
+    const team2Won = teamWonMatch(match, 'team2');
+    const team1Color = team1Won ? (getTeamColor(team1Name) || '#1d4ed8') : '#0f172a';
+    const team2Color = team2Won ? (getTeamColor(team2Name) || '#1d4ed8') : '#0f172a';
+
     return (
         <Box
             key={`${indexPrefix}-${match?.id || match?.date || 'match'}`}
             sx={{
                 px: 1,
-                py: 0.9,
+                py: 0.75,
                 borderRadius: 1.25,
                 border: '1px solid',
                 borderColor: 'divider',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 1.1,
+                gap: 1,
             }}
         >
-            <Box sx={{ minWidth: 0 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                    {toDateLabel(match?.date)}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {`${getWinnerName(match)} won`}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {`${getTeam1Name(match)} ${match?.score1 || '-'} vs ${getTeam2Name(match)} ${match?.score2 || '-'}`}
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <Box component="span" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                        {toDateLabel(match?.date)}
+                    </Box>
+                    <Box component="span" sx={{ color: 'text.secondary', mx: 0.8 }}>
+                        •
+                    </Box>
+                    <Box component="span" sx={{ color: team1Color, fontWeight: team1Won ? 800 : 600 }}>
+                        {`${team1Name} ${match?.score1 || '-'}`}
+                    </Box>
+                    <Box component="span" sx={{ color: 'text.secondary', mx: 0.7 }}>
+                        vs
+                    </Box>
+                    <Box component="span" sx={{ color: team2Color, fontWeight: team2Won ? 800 : 600 }}>
+                        {`${team2Name} ${match?.score2 || '-'}`}
+                    </Box>
                 </Typography>
             </Box>
             <Chip size="small" color={mode.color} label={mode.label} />
