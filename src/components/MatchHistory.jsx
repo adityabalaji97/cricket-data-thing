@@ -95,7 +95,7 @@ const teamWonMatch = (match, side) => {
     return winnerCandidates.some((winnerName) => normalizedTeamCandidates.includes(winnerName));
 };
 
-const MatchCompactRow = ({ match, indexPrefix }) => {
+const MatchCompactRow = ({ match, indexPrefix, isMobile }) => {
     const mode = getWinMode(match);
     const team1Name = getTeam1Name(match);
     const team2Name = getTeam2Name(match);
@@ -138,7 +138,7 @@ const MatchCompactRow = ({ match, indexPrefix }) => {
                     </Box>
                 </Typography>
             </Box>
-            <Chip size="small" color={mode.color} label={mode.label} />
+            {!isMobile && <Chip size="small" color={mode.color} label={mode.label} />}
         </Box>
     );
 };
@@ -229,6 +229,7 @@ const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
                             key={`h2h-${match?.id || match?.date || index}`}
                             match={match}
                             indexPrefix="h2h"
+                            isMobile={isMobile}
                         />
                     ))}
                 </Box>
@@ -260,6 +261,7 @@ const VenueRecentMatches = ({ venue, matches, isMobile }) => (
                         key={`venue-${match?.id || match?.date || index}`}
                         match={match}
                         indexPrefix="venue"
+                        isMobile={isMobile}
                     />
                 ))}
             </Box>
@@ -287,6 +289,7 @@ const FormTileDetails = ({ match, teamCode, result }) => (
 const TeamFormStrip = ({ teamCode, matches, isMobile }) => {
     const [selectedMatch, setSelectedMatch] = useState(null);
     const teamColor = getTeamColor(teamCode) || '#1d4ed8';
+    const tileSize = isMobile ? 30 : 36;
 
     const formTiles = useMemo(
         () => (matches || []).map((match) => ({
@@ -299,7 +302,16 @@ const TeamFormStrip = ({ teamCode, matches, isMobile }) => {
     return (
         <>
             <Card sx={{ p: isMobile ? 1.5 : 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-                <Typography variant={isMobile ? 'subtitle1' : 'h6'} sx={{ fontWeight: 700, color: teamColor }}>
+                <Typography
+                    variant={isMobile ? 'subtitle2' : 'h6'}
+                    sx={{
+                        fontWeight: 700,
+                        color: teamColor,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                    }}
+                >
                     {`${teamCode} Recent Form`}
                 </Typography>
                 {!formTiles.length ? (
@@ -307,7 +319,7 @@ const TeamFormStrip = ({ teamCode, matches, isMobile }) => {
                         No recent matches found.
                     </Typography>
                 ) : (
-                    <Box sx={{ mt: 1.2, display: 'flex', alignItems: 'center', gap: 0.9, overflowX: 'auto', pb: 0.4 }}>
+                    <Box sx={{ mt: 1.1, display: 'flex', alignItems: 'center', gap: isMobile ? 0.6 : 0.8, overflowX: 'auto', pb: 0.3 }}>
                         {formTiles.map(({ match, result }, index) => {
                             const style = resultTileStyles[result] || resultTileStyles.NR;
                             const tile = (
@@ -318,16 +330,16 @@ const TeamFormStrip = ({ teamCode, matches, isMobile }) => {
                                     }}
                                     key={`${match?.id || match?.date || 'form'}-${index}`}
                                     sx={{
-                                        width: 40,
-                                        minWidth: 40,
-                                        height: 40,
+                                        width: tileSize,
+                                        minWidth: tileSize,
+                                        height: tileSize,
                                         border: '1px solid',
                                         borderColor: style.border,
-                                        borderRadius: 1.25,
+                                        borderRadius: 1,
                                         bgcolor: style.bg,
                                         color: style.color,
                                         fontWeight: 800,
-                                        fontSize: '0.95rem',
+                                        fontSize: isMobile ? '0.8rem' : '0.88rem',
                                         cursor: isMobile ? 'pointer' : 'default',
                                     }}
                                 >
@@ -371,10 +383,10 @@ const MatchHistory = ({ venue, team1, team2, venueResults, team1Results, team2Re
             <Grid item xs={12} lg={6}>
                 <VenueRecentMatches venue={venue} matches={venueResults || []} isMobile={isMobile} />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={6}>
                 <TeamFormStrip teamCode={team1} matches={team1Results || []} isMobile={isMobile} />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={6}>
                 <TeamFormStrip teamCode={team2} matches={team2Results || []} isMobile={isMobile} />
             </Grid>
         </Grid>
