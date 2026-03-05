@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import {
     Box,
+    Button,
     Card,
     Chip,
+    Collapse,
     Dialog,
     DialogContent,
     DialogTitle,
@@ -31,6 +33,8 @@ const toDateLabel = (isoDate) => {
     return DATE_FORMATTER.format(parsed);
 };
 
+const normalizeTeam = (value) => (value || '').toString().trim().toLowerCase();
+
 const getWinnerName = (match) => match?.winner_display || match?.winner || 'No Result';
 const getTeam1Name = (match) => match?.team1_display || match?.team1 || 'Team 1';
 const getTeam2Name = (match) => match?.team2_display || match?.team2 || 'Team 2';
@@ -38,23 +42,37 @@ const getTeam2Name = (match) => match?.team2_display || match?.team2 || 'Team 2'
 const getWinMode = (match) => {
     if (match?.won_batting_first === true) return { label: 'Defended', color: 'primary' };
     if (match?.won_fielding_first === true) return { label: 'Chased', color: 'success' };
+    if (match?.won_batting_first === false && match?.winner && match?.winner !== '-') {
+        return { label: 'Chased', color: 'success' };
+    }
     return { label: 'NR', color: 'default' };
 };
 
 const resolveTeamSide = (match, teamCode) => {
     if (!teamCode) return null;
-    if (teamCode === match?.team1_display || teamCode === match?.team1) return 'team1';
-    if (teamCode === match?.team2_display || teamCode === match?.team2) return 'team2';
+    const target = normalizeTeam(teamCode);
+    if (!target) return null;
+    const team1Candidates = [match?.team1_display, match?.team1].map(normalizeTeam).filter(Boolean);
+    const team2Candidates = [match?.team2_display, match?.team2].map(normalizeTeam).filter(Boolean);
+    if (team1Candidates.includes(target)) return 'team1';
+    if (team2Candidates.includes(target)) return 'team2';
     return null;
 };
 
 const getTeamResult = (match, teamCode) => {
     const side = resolveTeamSide(match, teamCode);
-    if (!side || !match?.winner) return 'NR';
+    const winnerCandidates = [match?.winner, match?.winner_display]
+        .map(normalizeTeam)
+        .filter(Boolean)
+        .filter((name) => name !== '-');
+    if (!side || winnerCandidates.length === 0) return 'NR';
 
-    const won = side === 'team1'
-        ? match.winner === match.team1 || match.winner_display === match.team1_display
-        : match.winner === match.team2 || match.winner_display === match.team2_display;
+    const teamCandidates = side === 'team1'
+        ? [match?.team1, match?.team1_display]
+        : [match?.team2, match?.team2_display];
+    const normalizedTeamCandidates = teamCandidates.map(normalizeTeam).filter(Boolean);
+
+    const won = winnerCandidates.some((winnerName) => normalizedTeamCandidates.includes(winnerName));
     return won ? 'W' : 'L';
 };
 
@@ -63,11 +81,46 @@ const getMatchSummary = (match) => {
     return `${toDateLabel(match?.date)} • ${getWinnerName(match)} won (${mode.label})`;
 };
 
+const MatchCompactRow = ({ match, indexPrefix }) => {
+    const mode = getWinMode(match);
+    return (
+        <Box
+            key={`${indexPrefix}-${match?.id || match?.date || 'match'}`}
+            sx={{
+                px: 1,
+                py: 0.9,
+                borderRadius: 1.25,
+                border: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1.1,
+            }}
+        >
+            <Box sx={{ minWidth: 0 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                    {toDateLabel(match?.date)}
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {`${getWinnerName(match)} won`}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {`${getTeam1Name(match)} ${match?.score1 || '-'} vs ${getTeam2Name(match)} ${match?.score2 || '-'}`}
+                </Typography>
+            </Box>
+            <Chip size="small" color={mode.color} label={mode.label} />
+        </Box>
+    );
+};
+
 const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
+    const [showDetails, setShowDetails] = useState(false);
     const team1Wins = stats?.team1_wins || 0;
     const team2Wins = stats?.team2_wins || 0;
     const draws = stats?.draws || 0;
     const total = team1Wins + team2Wins + draws;
+    const recentH2H = stats?.recent_matches || [];
     const team1Color = getTeamColor(team1) || '#1d4ed8';
     const team2Color = getTeamColor(team2) || '#7c3aed';
 
@@ -130,32 +183,34 @@ const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
                     )}
                 </Box>
             </Box>
-            <Box sx={{ mt: 1.3, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                {(stats?.recent_matches || []).slice(0, 4).map((match, index) => {
-                    const mode = getWinMode(match);
-                    return (
-                        <Box
-                            key={`${match?.id || match?.date || 'h2h'}-${index}`}
-                            sx={{
-                                px: 1,
-                                py: 0.85,
-                                borderRadius: 1.25,
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: 1,
-                            }}
-                        >
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {`${getTeam1Name(match)} ${match?.score1 || '-'} vs ${getTeam2Name(match)} ${match?.score2 || '-'}`}
-                            </Typography>
-                            <Chip size="small" color={mode.color} label={mode.label} />
-                        </Box>
-                    );
-                })}
+            <Box sx={{ mt: 1.05 }}>
+                <Button
+                    size="small"
+                    onClick={() => setShowDetails((prev) => !prev)}
+                    disabled={recentH2H.length === 0}
+                    sx={{ px: 0, textTransform: 'none', fontWeight: 700 }}
+                >
+                    {showDetails ? 'Hide H2H details' : `Show H2H details (${recentH2H.length})`}
+                </Button>
             </Box>
+            <Collapse in={showDetails} timeout="auto" unmountOnExit>
+                <Box sx={{ mt: 0.9, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                    {recentH2H.map((match, index) => (
+                        <MatchCompactRow
+                            key={`h2h-${match?.id || match?.date || index}`}
+                            match={match}
+                            indexPrefix="h2h"
+                        />
+                    ))}
+                </Box>
+            </Collapse>
+            {recentH2H.length === 0 && (
+                <Box sx={{ mt: 0.9 }}>
+                    <Typography variant="caption" color="text.secondary">
+                        No recent H2H data available.
+                    </Typography>
+                </Box>
+            )}
         </Card>
     );
 };
@@ -170,29 +225,15 @@ const VenueRecentMatches = ({ venue, matches, isMobile }) => (
                 No recent matches found for this venue.
             </Typography>
         ) : (
-            <Grid container spacing={1}>
-                {matches.map((match, index) => {
-                    const mode = getWinMode(match);
-                    return (
-                        <Grid item xs={12} sm={6} key={`${match?.id || match?.date || 'venue'}-${index}`}>
-                            <Box sx={{ p: 1.1, borderRadius: 1.5, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.8 }}>
-                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        {toDateLabel(match?.date)}
-                                    </Typography>
-                                    <Chip size="small" color={mode.color} label={mode.label} />
-                                </Box>
-                                <Typography variant="body2" sx={{ mt: 0.8, fontWeight: 700 }}>
-                                    {`${getWinnerName(match)} won`}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                    {`${getTeam1Name(match)} ${match?.score1 || '-'} vs ${getTeam2Name(match)} ${match?.score2 || '-'}`}
-                                </Typography>
-                            </Box>
-                        </Grid>
-                    );
-                })}
-            </Grid>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                {matches.map((match, index) => (
+                    <MatchCompactRow
+                        key={`venue-${match?.id || match?.date || index}`}
+                        match={match}
+                        indexPrefix="venue"
+                    />
+                ))}
+            </Box>
         )}
     </Card>
 );
