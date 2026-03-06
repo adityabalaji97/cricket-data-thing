@@ -473,45 +473,85 @@ export const useVenueSimilarityData = ({
 
   const effectiveLeagues = useMemo(() => (Array.isArray(leagues) ? leagues : []), [leagues]);
 
+  const buildCoreParams = () => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    params.append('min_matches', '10');
+    params.append('top_n', '5');
+    if (includeInternational !== null && includeInternational !== undefined) {
+      params.append('include_international', String(includeInternational));
+    }
+    if (includeInternational && topTeams) {
+      params.append('top_teams', String(topTeams));
+    }
+    effectiveLeagues.forEach((league) => params.append('leagues', league));
+    return params;
+  };
+
+  // Reset tactical edges when core params change (so it refetches with new similar data)
+  useEffect(() => {
+    setTacticalEdgesData(null);
+  }, [venue, startDate, endDate, includeInternational, topTeams, effectiveLeagues]);
+
+  // Effect 1: Fetch similar data (depends on core params + zone output filters)
+  // Zone metric (boundary_pct vs run_pct) is display-only — both values are in the response
   useEffect(() => {
     if (!venue) return;
     let cancelled = false;
 
-    const fetchSimilarity = async () => {
+    const fetchSimilar = async () => {
       setLoading(true);
       setError(null);
       try {
-        const similarParams = new URLSearchParams();
-        if (startDate) similarParams.append('start_date', startDate);
-        if (endDate) similarParams.append('end_date', endDate);
-        similarParams.append('min_matches', '10');
-        similarParams.append('top_n', '5');
-        if (includeInternational !== null && includeInternational !== undefined) {
-          similarParams.append('include_international', String(includeInternational));
-        }
-        if (includeInternational && topTeams) {
-          similarParams.append('top_teams', String(topTeams));
-        }
-        effectiveLeagues.forEach((league) => similarParams.append('leagues', league));
-
+        const similarParams = buildCoreParams();
         if (zoneFilters?.batHand) similarParams.append('bat_hand', zoneFilters.batHand);
         if (zoneFilters?.bowlKind) similarParams.append('bowl_kind', zoneFilters.bowlKind);
         if (zoneFilters?.bowlStyle) similarParams.append('bowl_style', zoneFilters.bowlStyle);
-        similarParams.append('zone_metric', zoneFilters?.zoneMetric === 'run_pct' ? 'run_pct' : 'boundary_pct');
 
         const similarResponse = await axios.get(`${config.API_URL}/visualizations/venue/${encodeURIComponent(venue)}/similar?${similarParams.toString()}`);
-        if (cancelled) return;
+        if (!cancelled) {
+          setData(similarResponse.data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setData(null);
+          setError(err?.response?.data?.detail || 'Failed to load similar venues');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
 
-        setData(similarResponse.data);
+    fetchSimilar();
+    return () => { cancelled = true; };
+  }, [
+    venue,
+    startDate,
+    endDate,
+    includeInternational,
+    topTeams,
+    effectiveLeagues,
+    zoneFilters?.batHand,
+    zoneFilters?.bowlKind,
+    zoneFilters?.bowlStyle,
+  ]);
 
-        const edgesParams = new URLSearchParams(similarParams.toString());
+  // Effect 2: Fetch tactical edges once similar data arrives (core params only, not zone filters)
+  useEffect(() => {
+    if (!venue || !data?.most_similar || tacticalEdgesData) return;
+    let cancelled = false;
+
+    const fetchEdges = async () => {
+      try {
+        const edgesParams = buildCoreParams();
         edgesParams.set('baseline_mode', 'league');
         edgesParams.set('sort_by', 'econ_delta');
         edgesParams.set('sort_order', 'desc');
         edgesParams.set('min_balls', '24');
         edgesParams.set('top_n_similar', '5');
 
-        const similarVenueNames = (similarResponse.data.most_similar || [])
+        const similarVenueNames = (data.most_similar || [])
           .map((v) => v.venue)
           .filter(Boolean)
           .join(',');
@@ -520,37 +560,19 @@ export const useVenueSimilarityData = ({
         }
 
         const edgesResponse = await axios.get(`${config.API_URL}/visualizations/venue/${encodeURIComponent(venue)}/tactical-edges?${edgesParams.toString()}`);
-
         if (!cancelled) {
           setTacticalEdgesData(edgesResponse.data);
         }
       } catch (err) {
         if (!cancelled) {
-          setData(null);
           setTacticalEdgesData(null);
-          setError(err?.response?.data?.detail || 'Failed to load similar venues');
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchSimilarity();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    venue,
-    startDate,
-    endDate,
-    includeInternational,
-    topTeams,
-    effectiveLeagues,
-    zoneFilters?.zoneMetric,
-    zoneFilters?.batHand,
-    zoneFilters?.bowlKind,
-    zoneFilters?.bowlStyle,
-  ]);
+    fetchEdges();
+    return () => { cancelled = true; };
+  }, [venue, startDate, endDate, includeInternational, topTeams, effectiveLeagues, data?.most_similar, tacticalEdgesData]);
 
   return { data, tacticalEdgesData, loading, error };
 };
