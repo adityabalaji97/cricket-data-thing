@@ -978,7 +978,6 @@ const VenueNotes = ({
 
     const {
         data: similarData,
-        tacticalEdgesData: similarTacticalEdgesData,
         loading: similarLoading,
         error: similarError,
     } = useVenueSimilarityData({
@@ -1087,7 +1086,6 @@ const VenueNotes = ({
                 <VenueSimilarity
                     mode="insights"
                     data={similarData}
-                    tacticalEdgesData={similarTacticalEdgesData}
                     loading={similarLoading}
                     error={similarError}
                     isMobile={isMobile}
@@ -1167,7 +1165,6 @@ const VenueNotes = ({
         includeInternational,
         topTeams,
         similarData,
-        similarTacticalEdgesData,
         similarLoading,
         similarError,
         similarZoneFilters,

@@ -396,14 +396,14 @@ def _build_zone_profile(
     zone_totals: Dict[int, Dict[str, float]]
 ) -> Tuple[Dict[str, Dict[str, Optional[float]]], Dict[str, Optional[float]]]:
     total_zone_runs = sum(v["runs"] for v in zone_totals.values())
-    total_zone_balls = sum(v["balls"] for v in zone_totals.values())
+    total_zone_boundaries = sum(v["boundaries"] for v in zone_totals.values())
     profile: Dict[str, Dict[str, Optional[float]]] = {}
     feature_values: Dict[str, Optional[float]] = {}
 
     for zone in range(1, 9):
         zone_row = zone_totals.get(zone, {"balls": 0.0, "runs": 0.0, "boundaries": 0.0})
         run_pct = _safe_div(zone_row["runs"] * 100.0, total_zone_runs)
-        boundary_pct = _safe_div(zone_row["boundaries"] * 100.0, total_zone_balls)
+        boundary_pct = _safe_div(zone_row["boundaries"] * 100.0, total_zone_boundaries)
         strike_rate = _safe_div(zone_row["runs"] * 100.0, zone_row["balls"])
         zone_key = str(zone)
         profile[zone_key] = {
