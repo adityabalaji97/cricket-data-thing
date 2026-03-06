@@ -36,7 +36,6 @@ import ReactECharts from 'echarts-for-react';
 import MatchHistory from './MatchHistory';
 import Matchups from './Matchups';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
-import VenueTacticalMap from './VenueTacticalMap';
 import VenueSimilarity, { useVenueSimilarityData } from './VenueSimilarity';
 import MatchPreviewCard from './MatchPreviewCard';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
@@ -978,6 +977,7 @@ const VenueNotes = ({
 
     const {
         data: similarData,
+        tacticalEdgesData: similarTacticalEdgesData,
         loading: similarLoading,
         error: similarError,
     } = useVenueSimilarityData({
@@ -1061,24 +1061,7 @@ const VenueNotes = ({
             });
         }
 
-        // 4. TACTICAL (pitch map, wagon wheel, top buckets — inner tabs)
-        groups.push({
-            id: 'tactical',
-            label: 'Tactical',
-            content: (
-                <VenueTacticalMap
-                    venue={venue}
-                    startDate={startDate}
-                    endDate={endDate}
-                    isMobile={isMobile}
-                    leagues={leagues}
-                    includeInternational={includeInternational}
-                    topTeams={topTeams}
-                />
-            ),
-        });
-
-        // 5. SIMILAR
+        // 4. SIMILAR
         groups.push({
             id: 'similar',
             label: 'Similar',
@@ -1086,6 +1069,7 @@ const VenueNotes = ({
                 <VenueSimilarity
                     mode="insights"
                     data={similarData}
+                    tacticalEdgesData={similarTacticalEdgesData}
                     loading={similarLoading}
                     error={similarError}
                     isMobile={isMobile}
@@ -1165,6 +1149,7 @@ const VenueNotes = ({
         includeInternational,
         topTeams,
         similarData,
+        similarTacticalEdgesData,
         similarLoading,
         similarError,
         similarZoneFilters,

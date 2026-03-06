@@ -467,6 +467,7 @@ export const useVenueSimilarityData = ({
   zoneFilters,
 }) => {
   const [data, setData] = useState(null);
+  const [tacticalEdgesData, setTacticalEdgesData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -488,7 +489,12 @@ export const useVenueSimilarityData = ({
     return params;
   };
 
-  // Fetch similar data (depends on core params + zone output filters)
+  // Reset tactical edges when core params change (so it refetches with new similar data)
+  useEffect(() => {
+    setTacticalEdgesData(null);
+  }, [venue, startDate, endDate, includeInternational, topTeams, effectiveLeagues]);
+
+  // Effect 1: Fetch similar data (depends on core params + zone output filters)
   // Zone metric (boundary_pct vs run_pct) is display-only — both values are in the response
   useEffect(() => {
     if (!venue) return;
@@ -531,7 +537,44 @@ export const useVenueSimilarityData = ({
     zoneFilters?.bowlStyle,
   ]);
 
-  return { data, loading, error };
+  // Effect 2: Fetch tactical edges once similar data arrives (core params only, not zone filters)
+  useEffect(() => {
+    if (!venue || !data?.most_similar || tacticalEdgesData) return;
+    let cancelled = false;
+
+    const fetchEdges = async () => {
+      try {
+        const edgesParams = buildCoreParams();
+        edgesParams.set('baseline_mode', 'league');
+        edgesParams.set('sort_by', 'econ_delta');
+        edgesParams.set('sort_order', 'desc');
+        edgesParams.set('min_balls', '24');
+        edgesParams.set('top_n_similar', '5');
+
+        const similarVenueNames = (data.most_similar || [])
+          .map((v) => v.venue)
+          .filter(Boolean)
+          .join(',');
+        if (similarVenueNames) {
+          edgesParams.set('similar_venues', similarVenueNames);
+        }
+
+        const edgesResponse = await axios.get(`${config.API_URL}/visualizations/venue/${encodeURIComponent(venue)}/tactical-edges?${edgesParams.toString()}`);
+        if (!cancelled) {
+          setTacticalEdgesData(edgesResponse.data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setTacticalEdgesData(null);
+        }
+      }
+    };
+
+    fetchEdges();
+    return () => { cancelled = true; };
+  }, [venue, startDate, endDate, includeInternational, topTeams, effectiveLeagues, data?.most_similar, tacticalEdgesData]);
+
+  return { data, tacticalEdgesData, loading, error };
 };
 
 const ZoneFilterModal = ({
@@ -641,6 +684,7 @@ const ZoneFilterModal = ({
 
 const SimilarityInsightsView = ({
   data,
+  tacticalEdgesData,
   loading,
   error,
   isMobile,
@@ -648,6 +692,10 @@ const SimilarityInsightsView = ({
   onZoneFiltersChange,
 }) => {
   const [filterOpen, setFilterOpen] = useState(false);
+  const [edgeBaselineMode, setEdgeBaselineMode] = useState('league');
+  const [edgeMetric, setEdgeMetric] = useState('dot_delta');
+  const [edgeBowlKind, setEdgeBowlKind] = useState('all');
+  const [edgeDetail, setEdgeDetail] = useState({ anchorEl: null, key: null });
   const [pitchMetric, setPitchMetric] = useState('sr');
   const [pitchDetail, setPitchDetail] = useState({ anchorEl: null, key: null });
 
@@ -657,6 +705,25 @@ const SimilarityInsightsView = ({
     const activeBatHand = zoneFilters?.batHand || data?.active_zone_filters?.bat_hand || null;
     return buildZoneRadarOption(data?.target_zone_profile || {}, similarZoneProfile, metric, activeBatHand);
   }, [data, zoneFilters?.zoneMetric, zoneFilters?.batHand]);
+
+  const edgeRows = useMemo(
+    () => tacticalEdgesData?.rows_by_baseline?.[edgeBaselineMode] || tacticalEdgesData?.rows || [],
+    [tacticalEdgesData, edgeBaselineMode],
+  );
+
+  const tacticalGrid = useMemo(
+    () => aggregateTacticalGrid(edgeRows, edgeBowlKind),
+    [edgeRows, edgeBowlKind],
+  );
+
+  const tacticalMaxAbs = useMemo(() => {
+    const values = Object.values(tacticalGrid)
+      .filter((cell) => Number(cell?.targetBalls || 0) >= EDGE_MIN_BALLS_THRESHOLD)
+      .map((cell) => toNumber(cell?.deltas?.[edgeMetric]))
+      .filter((value) => value !== null)
+      .map((value) => Math.abs(Number(value)));
+    return values.length ? Math.max(...values, 0.5) : 0.5;
+  }, [tacticalGrid, edgeMetric]);
 
   const similarPitchProfile = useMemo(
     () => aggregatePitchProfileGrid(data?.similar_aggregate_insights?.line_length_grid || {}),
@@ -696,6 +763,10 @@ const SimilarityInsightsView = ({
   }, [similarPitchProfile, pitchMetric]);
 
   useEffect(() => {
+    setEdgeDetail({ anchorEl: null, key: null });
+  }, [edgeBaselineMode, edgeMetric, edgeBowlKind, tacticalEdgesData]);
+
+  useEffect(() => {
     setPitchDetail({ anchorEl: null, key: null });
   }, [pitchMetric, data]);
 
@@ -715,6 +786,12 @@ const SimilarityInsightsView = ({
   }
 
   if (!data) return null;
+
+  const edgeMetricMeta = EDGE_METRICS[edgeMetric] || EDGE_METRICS.dot_delta;
+  const edgeDetailCell = edgeDetail.key ? tacticalGrid[edgeDetail.key] : null;
+  const edgeDetailLineLabel = EDGE_LINE_GROUPS.find((entry) => entry.key === edgeDetailCell?.lineGroup)?.label || edgeDetailCell?.lineGroup;
+  const edgeDetailLengthLabel = EDGE_LENGTH_GROUPS.find((entry) => entry.key === edgeDetailCell?.lengthGroup)?.label || edgeDetailCell?.lengthGroup;
+  const baselineLabel = edgeBaselineMode === 'similar' ? 'Similar Baseline' : 'League Baseline';
 
   const pitchMetricMeta = PITCH_METRICS[pitchMetric] || PITCH_METRICS.sr;
   const pitchDetailSimilarCell = pitchDetail.key ? similarPitchProfile[pitchDetail.key] : null;
@@ -866,6 +943,158 @@ const SimilarityInsightsView = ({
         </Typography>
       </Card>
 
+      <Card sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.75 }}>
+          Tactical Edges at This Venue
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Green cells are bowler-favorable deltas vs baseline; red cells are batter-favorable.
+        </Typography>
+
+        <Box sx={{ mt: 1, display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+          <Chip
+            size="small"
+            color={edgeBaselineMode === 'league' ? 'primary' : 'default'}
+            variant={edgeBaselineMode === 'league' ? 'filled' : 'outlined'}
+            label="League Baseline"
+            onClick={() => setEdgeBaselineMode('league')}
+          />
+          <Chip
+            size="small"
+            color={edgeBaselineMode === 'similar' ? 'primary' : 'default'}
+            variant={edgeBaselineMode === 'similar' ? 'filled' : 'outlined'}
+            label="Similar Baseline"
+            onClick={() => setEdgeBaselineMode('similar')}
+          />
+        </Box>
+
+        <Box sx={{ mt: 1, display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+          {Object.entries(EDGE_METRICS).map(([metricKey, metricMeta]) => (
+            <Chip
+              key={`edge-metric-${metricKey}`}
+              size="small"
+              color={edgeMetric === metricKey ? 'primary' : 'default'}
+              variant={edgeMetric === metricKey ? 'filled' : 'outlined'}
+              label={metricMeta.label}
+              onClick={() => setEdgeMetric(metricKey)}
+            />
+          ))}
+        </Box>
+
+        <Box sx={{ mt: 1, display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+          <Chip
+            size="small"
+            color={edgeBowlKind === 'all' ? 'primary' : 'default'}
+            variant={edgeBowlKind === 'all' ? 'filled' : 'outlined'}
+            label="All"
+            onClick={() => setEdgeBowlKind('all')}
+          />
+          <Chip
+            size="small"
+            color={edgeBowlKind === 'pace' ? 'primary' : 'default'}
+            variant={edgeBowlKind === 'pace' ? 'filled' : 'outlined'}
+            label="Pace"
+            onClick={() => setEdgeBowlKind('pace')}
+          />
+          <Chip
+            size="small"
+            color={edgeBowlKind === 'spin' ? 'primary' : 'default'}
+            variant={edgeBowlKind === 'spin' ? 'filled' : 'outlined'}
+            label="Spin"
+            onClick={() => setEdgeBowlKind('spin')}
+          />
+        </Box>
+
+        <Box sx={{ mt: 1.1, border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '84px repeat(3, minmax(70px, 1fr))' }}>
+            <Box sx={{ borderRight: '1px solid', borderColor: 'divider', bgcolor: 'grey.50' }} />
+            {EDGE_LINE_GROUPS.map((line) => (
+              <Box
+                key={`edge-head-${line.key}`}
+                sx={{
+                  p: 0.8,
+                  textAlign: 'center',
+                  borderRight: line.key === 'LEG' ? 'none' : '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'grey.50',
+                }}
+              >
+                <Typography variant="caption" sx={{ fontWeight: 700 }}>{line.label}</Typography>
+              </Box>
+            ))}
+
+            {EDGE_LENGTH_GROUPS.map((length) => (
+              <React.Fragment key={`edge-row-${length.key}`}>
+                <Box
+                  sx={{
+                    minHeight: 52,
+                    px: 0.9,
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderTop: '1px solid',
+                    borderRight: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'grey.50',
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>{length.label}</Typography>
+                </Box>
+                {EDGE_LINE_GROUPS.map((line) => {
+                  const key = `${length.key}_${line.key}`;
+                  const cell = tacticalGrid[key];
+                  const value = toNumber(cell?.deltas?.[edgeMetric]);
+                  const targetBalls = Number(cell?.targetBalls || 0);
+                  const lowSample = targetBalls > 0 && targetBalls < EDGE_MIN_BALLS_THRESHOLD;
+                  const colors = getDivergingCellColors(value, tacticalMaxAbs, lowSample || value === null);
+
+                  return (
+                    <Box
+                      key={`edge-cell-${key}`}
+                      role={value !== null ? 'button' : undefined}
+                      tabIndex={value !== null ? 0 : -1}
+                      onClick={value !== null ? (event) => setEdgeDetail({ anchorEl: event.currentTarget, key }) : undefined}
+                      onKeyDown={(event) => {
+                        if (value !== null && (event.key === 'Enter' || event.key === ' ')) {
+                          event.preventDefault();
+                          setEdgeDetail({ anchorEl: event.currentTarget, key });
+                        }
+                      }}
+                      sx={{
+                        minHeight: 52,
+                        p: 0.8,
+                        borderTop: '1px solid',
+                        borderRight: line.key === 'LEG' ? 'none' : '1px solid',
+                        borderColor: colors.borderColor,
+                        cursor: value !== null ? 'pointer' : 'default',
+                        backgroundColor: colors.backgroundColor,
+                        color: colors.color,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        textAlign: 'center',
+                        gap: 0.2,
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                        {formatSigned(value, edgeMetricMeta.digits, edgeMetricMeta.suffix)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>
+                        {targetBalls || 0} balls
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+          </Box>
+        </Box>
+
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
+          Cells under {EDGE_MIN_BALLS_THRESHOLD} balls are dimmed.
+        </Typography>
+      </Card>
+
       <ZoneFilterModal
         open={filterOpen}
         onClose={() => setFilterOpen(false)}
@@ -878,6 +1107,39 @@ const SimilarityInsightsView = ({
         filters={zoneFilters}
         options={data?.filter_options || {}}
       />
+
+      <Popover
+        open={Boolean(edgeDetail.anchorEl && edgeDetailCell)}
+        anchorEl={edgeDetail.anchorEl}
+        onClose={() => setEdgeDetail({ anchorEl: null, key: null })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        {edgeDetailCell && (
+          <Box sx={{ p: 1.2, minWidth: 230, maxWidth: 280 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              {edgeDetailLengthLabel} • {edgeDetailLineLabel}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.8 }}>
+              {edgeMetricMeta.label} delta ({baselineLabel})
+            </Typography>
+
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              {formatSigned(edgeDetailCell.deltas?.[edgeMetric], edgeMetricMeta.digits, edgeMetricMeta.suffix)}
+            </Typography>
+
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.8 }}>
+              This venue: {fmt(edgeDetailCell.targetMetrics?.[edgeMetricMeta.metricKey], edgeMetricMeta.digits, edgeMetricMeta.suffix)}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block' }}>
+              {baselineLabel}: {fmt(edgeDetailCell.baselineMetrics?.[edgeMetricMeta.metricKey], edgeMetricMeta.digits, edgeMetricMeta.suffix)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.6 }}>
+              Balls: {edgeDetailCell.targetBalls || 0} (target) / {edgeDetailCell.baselineBalls || 0} (baseline)
+            </Typography>
+          </Box>
+        )}
+      </Popover>
 
       <Popover
         open={Boolean(pitchDetail.anchorEl && pitchDetailSimilarCell)}
@@ -1028,6 +1290,7 @@ const VenueTwinsCardsView = ({ data, loading, error }) => {
 const VenueSimilarity = ({
   mode = 'insights',
   data,
+  tacticalEdgesData,
   loading,
   error,
   isMobile = false,
@@ -1041,6 +1304,7 @@ const VenueSimilarity = ({
   return (
     <SimilarityInsightsView
       data={data}
+      tacticalEdgesData={tacticalEdgesData}
       loading={loading}
       error={error}
       isMobile={isMobile}
