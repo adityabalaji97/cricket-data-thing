@@ -499,6 +499,11 @@ export const useVenueSimilarityData = ({
         if (zoneFilters?.bowlStyle) similarParams.append('bowl_style', zoneFilters.bowlStyle);
         similarParams.append('zone_metric', zoneFilters?.zoneMetric === 'run_pct' ? 'run_pct' : 'boundary_pct');
 
+        const similarResponse = await axios.get(`${config.API_URL}/visualizations/venue/${encodeURIComponent(venue)}/similar?${similarParams.toString()}`);
+        if (cancelled) return;
+
+        setData(similarResponse.data);
+
         const edgesParams = new URLSearchParams(similarParams.toString());
         edgesParams.set('baseline_mode', 'league');
         edgesParams.set('sort_by', 'econ_delta');
@@ -506,13 +511,17 @@ export const useVenueSimilarityData = ({
         edgesParams.set('min_balls', '24');
         edgesParams.set('top_n_similar', '5');
 
-        const [similarResponse, edgesResponse] = await Promise.all([
-          axios.get(`${config.API_URL}/visualizations/venue/${encodeURIComponent(venue)}/similar?${similarParams.toString()}`),
-          axios.get(`${config.API_URL}/visualizations/venue/${encodeURIComponent(venue)}/tactical-edges?${edgesParams.toString()}`),
-        ]);
+        const similarVenueNames = (similarResponse.data.most_similar || [])
+          .map((v) => v.venue)
+          .filter(Boolean)
+          .join(',');
+        if (similarVenueNames) {
+          edgesParams.set('similar_venues', similarVenueNames);
+        }
+
+        const edgesResponse = await axios.get(`${config.API_URL}/visualizations/venue/${encodeURIComponent(venue)}/tactical-edges?${edgesParams.toString()}`);
 
         if (!cancelled) {
-          setData(similarResponse.data);
           setTacticalEdgesData(edgesResponse.data);
         }
       } catch (err) {

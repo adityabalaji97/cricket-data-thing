@@ -506,9 +506,15 @@ def get_venue_tactical_edges_endpoint(
     sort_order: str = Query(default="desc", pattern="^(asc|desc)$"),
     min_balls: int = Query(default=24, ge=1, le=5000),
     top_n_similar: int = Query(default=5, ge=1, le=20),
+    similar_venues: Optional[str] = Query(default=None),
     db: Session = Depends(get_session),
 ):
     try:
+        similar_venues_list = (
+            [v.strip() for v in similar_venues.split(",") if v.strip()]
+            if similar_venues
+            else None
+        )
         result = get_venue_tactical_edges(
             venue=venue,
             db=db,
@@ -527,6 +533,7 @@ def get_venue_tactical_edges_endpoint(
             sort_order=sort_order,
             min_balls=min_balls,
             top_n_similar=top_n_similar,
+            similar_venues_override=similar_venues_list,
         )
         if not result.get("found", True):
             raise HTTPException(status_code=404, detail=result.get("error", "No tactical edge data found"))

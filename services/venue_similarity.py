@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from collections import defaultdict
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
@@ -243,11 +244,11 @@ def _build_delivery_details_filters(
     clauses: List[str] = []
 
     if start_date:
-        clauses.append("dd.match_date::date >= :start_date")
-        params["start_date"] = start_date
+        clauses.append("dd.match_date >= :start_date_str")
+        params["start_date_str"] = start_date.isoformat()
     if end_date:
-        clauses.append("dd.match_date::date <= :end_date")
-        params["end_date"] = end_date
+        clauses.append("dd.match_date <= :end_date_str")
+        params["end_date_str"] = end_date.isoformat()
 
     where_sql = ""
     if clauses:
@@ -465,6 +466,10 @@ def _format_style_stats(style_totals: Dict[str, Dict[str, float]]) -> Dict[str, 
     return output
 
 
+_similarity_cache: Dict[tuple, Dict[str, Any]] = {}
+_CACHE_TTL = 1800  # 30 minutes
+
+
 def get_similar_venues(
     venue: str,
     db: Session,
@@ -483,6 +488,25 @@ def get_similar_venues(
     """
     Find most similar and dissimilar venues using normalized venue feature vectors.
     """
+    cache_key = (
+        venue,
+        start_date,
+        end_date,
+        min_matches,
+        top_n,
+        tuple(sorted(leagues or [])),
+        include_international,
+        top_teams,
+        bat_hand,
+        bowl_kind,
+        bowl_style,
+        zone_metric,
+    )
+    if cache_key in _similarity_cache:
+        entry = _similarity_cache[cache_key]
+        if time.time() - entry["ts"] < _CACHE_TTL:
+            return entry["data"]
+
     where_sql, params = _build_delivery_details_filters(
         start_date=start_date,
         end_date=end_date,
@@ -1043,7 +1067,7 @@ def get_similar_venues(
 
     requested_venue_label = "All Venues" if target_is_all_venues else target_venue
 
-    return {
+    result = {
         "found": True,
         "venue": requested_venue_label,
         "requested_venue": venue,
@@ -1074,6 +1098,9 @@ def get_similar_venues(
         "most_dissimilar": most_dissimilar,
         "similar_aggregate_insights": similar_aggregate_insights,
     }
+
+    _similarity_cache[cache_key] = {"data": result, "ts": time.time()}
+    return result
 
 
 def _bucket_bowl_kind(value: Optional[str]) -> str:
@@ -1113,6 +1140,7 @@ def get_venue_tactical_edges(
     sort_order: str = "desc",
     min_balls: int = 24,
     top_n_similar: int = 5,
+    similar_venues_override: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     where_sql, params = _build_delivery_details_filters(
         start_date=start_date,
@@ -1225,23 +1253,30 @@ def get_venue_tactical_edges(
 
     similar_venues: List[str] = []
     if not target_is_all_venues:
-        similar_result = get_similar_venues(
-            venue=venue,
-            db=db,
-            start_date=start_date,
-            end_date=end_date,
-            min_matches=10,
-            top_n=_coerce_positive_int(top_n_similar, 5),
-            leagues=leagues,
-            include_international=include_international,
-            top_teams=top_teams,
-        )
-        if similar_result.get("found"):
+        if similar_venues_override is not None:
             similar_venues = [
-                _canonicalize_venue(v.get("venue"))
-                for v in similar_result.get("most_similar", [])
-                if _canonicalize_venue(v.get("venue")) in by_venue
+                _canonicalize_venue(v)
+                for v in similar_venues_override
+                if _canonicalize_venue(v) in by_venue
             ]
+        else:
+            similar_result = get_similar_venues(
+                venue=venue,
+                db=db,
+                start_date=start_date,
+                end_date=end_date,
+                min_matches=10,
+                top_n=_coerce_positive_int(top_n_similar, 5),
+                leagues=leagues,
+                include_international=include_international,
+                top_teams=top_teams,
+            )
+            if similar_result.get("found"):
+                similar_venues = [
+                    _canonicalize_venue(v.get("venue"))
+                    for v in similar_result.get("most_similar", [])
+                    if _canonicalize_venue(v.get("venue")) in by_venue
+                ]
     if not similar_venues:
         similar_venues = [v for v in by_venue.keys() if v not in set(target_venues)][: _coerce_positive_int(top_n_similar, 5)]
 
