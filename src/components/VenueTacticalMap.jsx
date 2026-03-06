@@ -345,6 +345,7 @@ const VenueTacticalMap = ({
     }
 
     const totalRuns = Object.values(zoneStats).reduce((sum, zone) => sum + toNumber(zone.runs), 0);
+    const totalBalls = Object.values(zoneStats).reduce((sum, zone) => sum + toNumber(zone.balls), 0);
     const out = {};
     for (let zone = 1; zone <= 8; zone += 1) {
       const key = String(zone);
@@ -352,7 +353,7 @@ const VenueTacticalMap = ({
       out[key] = {
         ...row,
         strike_rate: row.balls > 0 ? (row.runs * 100) / row.balls : 0,
-        boundary_pct: row.balls > 0 ? (row.boundaries * 100) / row.balls : 0,
+        boundary_pct: totalBalls > 0 ? (row.boundaries * 100) / totalBalls : 0,
         boundary_count: row.boundaries,
         run_pct: totalRuns > 0 ? (row.runs * 100) / totalRuns : 0,
       };
