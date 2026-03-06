@@ -16,6 +16,11 @@ from urllib.error import URLError, HTTPError
 
 from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
 
+try:
+    from venue_standardization import VENUE_STANDARDIZATION
+except ImportError:
+    VENUE_STANDARDIZATION = {}
+
 logger = logging.getLogger(__name__)
 
 ESPN_CRICKET_SCOREBOARD_URL = (
@@ -25,10 +30,34 @@ ESPN_CRICKET_SCOREBOARD_URL = (
 ESPN_LOOKAHEAD_DAYS = 4  # today + next 3 days
 
 # Translate common ESPN venue strings to the DB venue names used in this app.
+# ESPN often appends city/locality that differs from what the DB uses.
 VENUE_NAME_MAP = {
-    "M.Chinnaswamy Stadium, Bengaluru": "M Chinnaswamy Stadium, Bangalore",
-    "M Chinnaswamy Stadium, Bengaluru": "M Chinnaswamy Stadium, Bangalore",
+    "M.Chinnaswamy Stadium, Bengaluru": "M Chinnaswamy Stadium",
+    "M Chinnaswamy Stadium, Bengaluru": "M Chinnaswamy Stadium",
+    "M Chinnaswamy Stadium, Bangalore": "M Chinnaswamy Stadium",
     "Arun Jaitley Stadium, Delhi": "Feroz Shah Kotla",
+    "Narendra Modi Stadium, Motera, Ahmedabad": "Narendra Modi Stadium",
+    "Narendra Modi Stadium, Motera": "Narendra Modi Stadium",
+    "Narendra Modi Stadium, Ahmedabad": "Narendra Modi Stadium",
+    "Wankhede Stadium, Mumbai": "Wankhede Stadium",
+    "Eden Gardens, Kolkata": "Eden Gardens",
+    "MA Chidambaram Stadium, Chepauk, Chennai": "MA Chidambaram Stadium",
+    "MA Chidambaram Stadium, Chennai": "MA Chidambaram Stadium",
+    "Rajiv Gandhi International Stadium, Uppal, Hyderabad": "Rajiv Gandhi International Stadium",
+    "Rajiv Gandhi International Stadium, Hyderabad": "Rajiv Gandhi International Stadium",
+    "Sawai Mansingh Stadium, Jaipur": "Sawai Mansingh Stadium",
+    "Ekana Cricket Stadium, Lucknow": "Ekana Cricket Stadium",
+    "Bharat Ratna Shri Atal Bihari Vajpayee Ekana Cricket Stadium, Lucknow": "Ekana Cricket Stadium",
+    "Punjab Cricket Association IS Bindra Stadium, Mohali": "Punjab Cricket Association IS Bindra Stadium",
+    "Punjab Cricket Association IS Bindra Stadium, Mohali, Chandigarh": "Punjab Cricket Association IS Bindra Stadium",
+    "Himachal Pradesh Cricket Association Stadium, Dharamsala": "Himachal Pradesh Cricket Association Stadium",
+    "Maharashtra Cricket Association Stadium, Pune": "Maharashtra Cricket Association Stadium",
+    "Holkar Cricket Stadium, Indore": "Holkar Cricket Stadium",
+    "JSCA International Stadium Complex, Ranchi": "JSCA International Stadium Complex",
+    "Barabati Stadium, Cuttack": "Barabati Stadium",
+    "Barsapara Cricket Stadium, Guwahati": "Barsapara Cricket Stadium",
+    "Dr DY Patil Sports Academy, Mumbai": "Dr DY Patil Sports Academy",
+    "Brabourne Stadium, Mumbai": "Brabourne Stadium",
 }
 
 _fixture_cache: Dict[str, Any] = {
@@ -72,7 +101,14 @@ def _cached_fixtures_valid() -> bool:
 def _normalize_venue(raw_venue: Optional[str]) -> Optional[str]:
     if not raw_venue:
         return raw_venue
-    return VENUE_NAME_MAP.get(raw_venue, raw_venue)
+    # Check explicit ESPN overrides first, then the full standardization map
+    mapped = VENUE_NAME_MAP.get(raw_venue)
+    if mapped:
+        return mapped
+    mapped = VENUE_STANDARDIZATION.get(raw_venue)
+    if mapped:
+        return mapped
+    return raw_venue
 
 
 def _team_abbreviation(team_obj: Dict[str, Any], display_name: str) -> str:

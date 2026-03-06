@@ -63,7 +63,7 @@ def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float
           AND bs.strike_rate >= :min_sr
           AND bs.balls_faced >= 15
         ORDER BY bs.runs DESC, bs.strike_rate DESC
-        LIMIT 6
+        LIMIT 20
     """)
 
     innings_rows = db.execute(innings_query, {
@@ -74,6 +74,9 @@ def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float
     results = []
 
     for row in innings_rows:
+        if len(results) >= 6:
+            break
+
         # Step 2: Fetch wagon wheel deliveries using correct column names
         # delivery_details uses: p_match (not match_id), bat (not batter), inns (not innings)
         deliveries_query = text("""
@@ -92,24 +95,19 @@ def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float
             "innings": row.innings
         }).fetchall()
 
-        # Use accurate runs/balls from delivery_details (last delivery has cumulative stats)
-        if deliveries:
-            last = deliveries[-1]
-            actual_runs = int(last.cur_bat_runs) if last.cur_bat_runs is not None else row.runs
-            actual_balls = int(last.cur_bat_bf) if last.cur_bat_bf is not None else row.balls_faced
-        else:
-            actual_runs = row.runs
-            actual_balls = row.balls_faced
+        # Skip innings with no wagon wheel data
+        if not deliveries:
+            continue
 
+        # Use accurate runs/balls from delivery_details (last delivery has cumulative stats)
+        last = deliveries[-1]
+        actual_runs = int(last.cur_bat_runs) if last.cur_bat_runs is not None else row.runs
+        actual_balls = int(last.cur_bat_bf) if last.cur_bat_bf is not None else row.balls_faced
         actual_sr = round(actual_runs * 100.0 / actual_balls, 2) if actual_balls else 0
 
         # Count fours and sixes from delivery-level data for accuracy
-        if deliveries:
-            fours = sum(1 for d in deliveries if d.score == 4)
-            sixes = sum(1 for d in deliveries if d.score == 6)
-        else:
-            fours = row.fours or 0
-            sixes = row.sixes or 0
+        fours = sum(1 for d in deliveries if d.score == 4)
+        sixes = sum(1 for d in deliveries if d.score == 6)
 
         # Determine opponent team
         opponent = row.team2 if row.batting_team == row.team1 else row.team1
