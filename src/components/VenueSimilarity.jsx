@@ -35,8 +35,8 @@ const METRIC_META = {
   spin_economy: { label: 'Spin Econ', digits: 2, suffix: '' },
 };
 
-const ZONE_LABELS_RHB = ['Point', 'Cover', 'Long Off', 'Long On', 'Midwicket', 'Sq Leg', 'Fine Leg', 'Behind'];
-const ZONE_LABELS_LHB = ['Sq Leg', 'Midwicket', 'Long On', 'Long Off', 'Cover', 'Point', 'Third Man', 'Fine Leg'];
+const ZONE_LABELS_RHB = ['Fine Leg', 'Square Leg', 'Midwicket', 'Long On', 'Long Off', 'Cover', 'Point', 'Third Man'];
+const ZONE_LABELS_LHB = ['Third Man', 'Point', 'Cover', 'Long Off', 'Long On', 'Midwicket', 'Square Leg', 'Fine Leg'];
 
 const EDGE_LINE_GROUPS = [
   { key: 'OFF', label: 'Off' },
@@ -425,7 +425,7 @@ const buildZoneRadarOption = (targetZoneProfile, similarZoneProfile, zoneMetric 
     },
     radar: {
       radius: '68%',
-      startAngle: 135,
+      startAngle: 67.5,
       clockwise: true,
       indicator: zoneLabels.map((label) => ({
         name: label,

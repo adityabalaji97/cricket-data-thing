@@ -19,7 +19,7 @@ const WagonWheel = ({ zoneBreakdown, size = 120, isLHB = false }) => {
   // Zone angles (8 zones, each 45 degrees, starting from fine leg)
   const zones = [
     { zone: 1, label: 'Fine Leg', startAngle: 180, endAngle: 225 },
-    { zone: 2, label: 'Sq Leg', startAngle: 225, endAngle: 270 },
+    { zone: 2, label: 'Square Leg', startAngle: 225, endAngle: 270 },
     { zone: 3, label: 'Midwicket', startAngle: 270, endAngle: 315 },
     { zone: 4, label: 'Long On', startAngle: 315, endAngle: 360 },
     { zone: 5, label: 'Long Off', startAngle: 0, endAngle: 45 },

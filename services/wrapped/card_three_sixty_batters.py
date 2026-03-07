@@ -169,15 +169,14 @@ def get_three_sixty_batters_data(
         })
     
     zone_labels = {
-        0: "Third Man",
-        1: "Point",
-        2: "Cover",
-        3: "Long Off",
+        1: "Fine Leg",
+        2: "Square Leg",
+        3: "Midwicket",
         4: "Long On",
-        5: "Midwicket",
-        6: "Square Leg",
-        7: "Fine Leg",
-        8: "Behind"
+        5: "Long Off",
+        6: "Cover",
+        7: "Point",
+        8: "Third Man"
     }
     
     return {

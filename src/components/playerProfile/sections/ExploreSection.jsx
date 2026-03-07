@@ -1,12 +1,18 @@
 import React from 'react';
 import { Card, Typography, Chip, Stack } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import { getBatterQueryLinks, getBowlerQueryLinks } from '../../../utils/queryBuilderLinks';
+import { getBatterContextualQueries, getBowlerContextualQueries } from '../../../utils/queryBuilderLinks';
 
 const ExploreSection = ({ playerName, mode, dateRange, venue }) => {
+  const context = {
+    startDate: dateRange?.start,
+    endDate: dateRange?.end,
+    venue,
+  };
+
   const links = mode === 'bowling'
-    ? getBowlerQueryLinks(playerName, dateRange, venue)
-    : getBatterQueryLinks(playerName, dateRange, venue);
+    ? getBowlerContextualQueries(playerName, context)
+    : getBatterContextualQueries(playerName, context);
 
   return (
     <Card sx={{ p: { xs: 1.5, sm: 2 } }}>
@@ -17,14 +23,16 @@ const ExploreSection = ({ playerName, mode, dateRange, venue }) => {
         Dive deeper into the data with pre-built queries
       </Typography>
       <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 2 }}>
-        {links.map((link, idx) => (
+        {(links || []).map((link, idx) => (
           <Chip
             key={idx}
-            label={link.label}
+            label={link.question || link.label}
             icon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
             variant="outlined"
             size="small"
-            onClick={() => window.open(link.url, '_blank')}
+            component="a"
+            href={link.url}
+            clickable
             sx={{
               cursor: 'pointer',
               borderColor: 'primary.light',

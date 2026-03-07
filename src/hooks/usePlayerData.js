@@ -33,7 +33,7 @@ const usePlayerData = (playerName, dateRange, selectedVenue, competitionFilters)
   const fetchPlayerType = useCallback(async () => {
     if (!playerName) return;
     try {
-      const res = await fetch(`${config.API_URL}/search/player-type/${encodeURIComponent(playerName)}`);
+      const res = await fetch(`${config.API_URL}/players/${encodeURIComponent(playerName)}/player_type`);
       if (res.ok) {
         const data = await res.json();
         setPlayerType(data);
@@ -82,7 +82,7 @@ const usePlayerData = (playerName, dateRange, selectedVenue, competitionFilters)
 
     // Batter dismissal stats
     fetches.push(
-      fetch(`${config.API_URL}/player/${encodeURIComponent(playerName)}/dismissal_stats?${params}`)
+      fetch(`${config.API_URL}/players/${encodeURIComponent(playerName)}/dismissal_stats?${params}`)
         .then(r => r.ok ? r.json() : null)
         .then(data => setDismissalStats(data))
         .catch(() => setDismissalStats(null))
@@ -90,7 +90,7 @@ const usePlayerData = (playerName, dateRange, selectedVenue, competitionFilters)
 
     // Bowler dismissal stats
     fetches.push(
-      fetch(`${config.API_URL}/player/${encodeURIComponent(playerName)}/bowling_dismissal_stats?${params}`)
+      fetch(`${config.API_URL}/players/${encodeURIComponent(playerName)}/bowling_dismissal_stats?${params}`)
         .then(r => r.ok ? r.json() : null)
         .then(data => setBowlingDismissalStats(data))
         .catch(() => setBowlingDismissalStats(null))

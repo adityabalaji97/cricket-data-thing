@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List
 from database import get_session
 from services.players import get_batters_service, get_bowlers_service
@@ -77,3 +78,106 @@ def get_all_players(db: Session = Depends(get_session)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch players: {str(e)}")
+
+
+@router.get("/{player_name}/dismissal_stats")
+def get_dismissal_stats(player_name: str, db: Session = Depends(get_session)):
+    """Get dismissal mode distribution for a batter."""
+    try:
+        query = text("""
+            SELECT
+                d.wicket_type,
+                COUNT(*) as count,
+                CASE
+                    WHEN d.over < 6 THEN 'powerplay'
+                    WHEN d.over < 16 THEN 'middle'
+                    ELSE 'death'
+                END as phase
+            FROM deliveries d
+            WHERE d.batter = :player_name
+              AND d.wicket_type IS NOT NULL
+              AND d.wicket_type != ''
+            GROUP BY d.wicket_type, phase
+            ORDER BY count DESC
+        """)
+        rows = db.execute(query, {"player_name": player_name}).fetchall()
+
+        overall = {}
+        by_phase = {}
+        for row in rows:
+            wt = row.wicket_type
+            count = row.count
+            phase = row.phase
+            overall[wt] = overall.get(wt, 0) + count
+            if phase not in by_phase:
+                by_phase[phase] = {}
+            by_phase[phase][wt] = by_phase[phase].get(wt, 0) + count
+
+        return {
+            "player_name": player_name,
+            "overall": overall,
+            "by_phase": by_phase
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch dismissal stats: {str(e)}")
+
+
+@router.get("/{player_name}/bowling_dismissal_stats")
+def get_bowling_dismissal_stats(player_name: str, db: Session = Depends(get_session)):
+    """Get dismissal mode distribution for a bowler (how they take wickets)."""
+    try:
+        query = text("""
+            SELECT
+                d.wicket_type,
+                COUNT(*) as count,
+                CASE
+                    WHEN d.over < 6 THEN 'powerplay'
+                    WHEN d.over < 16 THEN 'middle'
+                    ELSE 'death'
+                END as phase
+            FROM deliveries d
+            WHERE d.bowler = :player_name
+              AND d.wicket_type IS NOT NULL
+              AND d.wicket_type != ''
+            GROUP BY d.wicket_type, phase
+            ORDER BY count DESC
+        """)
+        rows = db.execute(query, {"player_name": player_name}).fetchall()
+
+        overall = {}
+        by_phase = {}
+        for row in rows:
+            wt = row.wicket_type
+            count = row.count
+            phase = row.phase
+            overall[wt] = overall.get(wt, 0) + count
+            if phase not in by_phase:
+                by_phase[phase] = {}
+            by_phase[phase][wt] = by_phase[phase].get(wt, 0) + count
+
+        return {
+            "player_name": player_name,
+            "overall": overall,
+            "by_phase": by_phase
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch bowling dismissal stats: {str(e)}")
+
+
+@router.get("/{player_name}/player_type")
+def get_player_type(player_name: str, db: Session = Depends(get_session)):
+    """Detect if player has batting and/or bowling data."""
+    try:
+        batting_query = text("SELECT COUNT(*) FROM deliveries WHERE batter = :name LIMIT 1")
+        bowling_query = text("SELECT COUNT(*) FROM deliveries WHERE bowler = :name LIMIT 1")
+
+        has_batting = db.execute(batting_query, {"name": player_name}).scalar() > 0
+        has_bowling = db.execute(bowling_query, {"name": player_name}).scalar() > 0
+
+        return {
+            "player_name": player_name,
+            "has_batting_data": has_batting,
+            "has_bowling_data": has_bowling
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to detect player type: {str(e)}")

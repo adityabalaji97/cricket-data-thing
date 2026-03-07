@@ -642,14 +642,35 @@ const VenueTacticalMap = ({
       );
     });
 
+    const FIELD_POSITION_LABELS = ['Fine Leg', 'Square Leg', 'Midwicket', 'Long On', 'Long Off', 'Cover', 'Point', 'Third Man'];
+
+    const fieldPositionLabels = FIELD_POSITION_LABELS.map((label, index) => {
+      const angle = ((index) * Math.PI / 4) - Math.PI / 2 + Math.PI / 8;
+      const r = maxRadius + (isMobile ? 16 : 20);
+      return (
+        <text
+          key={`field-label-${index}`}
+          x={centerX + r * Math.cos(angle)}
+          y={centerY + r * Math.sin(angle)}
+          textAnchor="middle"
+          fontSize={isMobile ? 8 : 9}
+          fill="#888"
+          fontWeight={500}
+        >
+          {label}
+        </text>
+      );
+    });
+
     return (
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ maxWidth: '100%' }}>
+      <svg width={width + 40} height={height + 40} viewBox={`-20 -20 ${width + 40} ${height + 40}`} style={{ maxWidth: '100%' }}>
         <circle cx={centerX} cy={centerY} r={maxRadius} fill="#fafafa" stroke="#ddd" strokeWidth="2" />
         {filters.wagonView === 'zones' && zoneWedges}
         {zoneLines}
         {filters.wagonView === 'rays' && linesSvg}
         <circle cx={centerX} cy={centerY} r={6} fill="#333" />
         {zoneLabels}
+        {fieldPositionLabels}
       </svg>
     );
   };
