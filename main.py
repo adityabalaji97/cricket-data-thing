@@ -3783,10 +3783,6 @@ def get_player_dismissal_stats(
             "start_date": start_date,
             "end_date": end_date,
             "venue": venue,
-            "has_leagues": bool(leagues),
-            "include_international": include_international,
-            "top_teams": top_teams is not None,
-            "top_team_list": INTERNATIONAL_TEAMS_RANKED[:top_teams] if top_teams else []
         }
 
         if leagues:
@@ -3794,17 +3790,22 @@ def get_player_dismissal_stats(
         else:
             params["leagues"] = []
 
-        match_filter = """
-            AND (
-                (:has_leagues AND m.match_type = 'league' AND m.competition = ANY(:leagues))
-                OR (:include_international AND m.match_type = 'international'
-                    AND (:top_teams IS NULL OR
-                        (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
-                    )
+        competition_conditions = []
+        if leagues:
+            competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
+        else:
+            competition_conditions.append("m.match_type = 'league'")
+
+        if include_international:
+            if top_teams:
+                params["top_team_list"] = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+                competition_conditions.append(
+                    "(m.match_type = 'international' AND m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))"
                 )
-                OR (NOT :has_leagues AND NOT :include_international)
-            )
-        """
+            else:
+                competition_conditions.append("m.match_type = 'international'")
+
+        match_filter = "AND (" + " OR ".join(competition_conditions) + ")"
 
         dismissal_query = text(f"""
             SELECT
@@ -3893,10 +3894,6 @@ def get_player_bowling_dismissal_stats(
             "start_date": start_date,
             "end_date": end_date,
             "venue": venue,
-            "has_leagues": bool(leagues),
-            "include_international": include_international,
-            "top_teams": top_teams is not None,
-            "top_team_list": INTERNATIONAL_TEAMS_RANKED[:top_teams] if top_teams else []
         }
 
         if leagues:
@@ -3904,17 +3901,22 @@ def get_player_bowling_dismissal_stats(
         else:
             params["leagues"] = []
 
-        match_filter = """
-            AND (
-                (:has_leagues AND m.match_type = 'league' AND m.competition = ANY(:leagues))
-                OR (:include_international AND m.match_type = 'international'
-                    AND (:top_teams IS NULL OR
-                        (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
-                    )
+        competition_conditions = []
+        if leagues:
+            competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
+        else:
+            competition_conditions.append("m.match_type = 'league'")
+
+        if include_international:
+            if top_teams:
+                params["top_team_list"] = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+                competition_conditions.append(
+                    "(m.match_type = 'international' AND m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))"
                 )
-                OR (NOT :has_leagues AND NOT :include_international)
-            )
-        """
+            else:
+                competition_conditions.append("m.match_type = 'international'")
+
+        match_filter = "AND (" + " OR ".join(competition_conditions) + ")"
 
         dismissal_query = text(f"""
             SELECT
@@ -4003,10 +4005,6 @@ def get_venue_dismissals(
             "venue": venue,
             "start_date": start_date,
             "end_date": end_date,
-            "has_leagues": bool(leagues),
-            "include_international": include_international,
-            "top_teams": top_teams is not None,
-            "top_team_list": INTERNATIONAL_TEAMS_RANKED[:top_teams] if top_teams else []
         }
 
         if leagues:
@@ -4015,17 +4013,22 @@ def get_venue_dismissals(
             params["leagues"] = []
 
         venue_filter = "AND m.venue = :venue" if venue != "All Venues" else ""
-        match_filter = """
-            AND (
-                (:has_leagues AND m.match_type = 'league' AND m.competition = ANY(:leagues))
-                OR (:include_international AND m.match_type = 'international'
-                    AND (:top_teams IS NULL OR
-                        (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
-                    )
+        competition_conditions = []
+        if leagues:
+            competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
+        else:
+            competition_conditions.append("m.match_type = 'league'")
+
+        if include_international:
+            if top_teams:
+                params["top_team_list"] = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+                competition_conditions.append(
+                    "(m.match_type = 'international' AND m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))"
                 )
-                OR (NOT :has_leagues AND NOT :include_international)
-            )
-        """
+            else:
+                competition_conditions.append("m.match_type = 'international'")
+
+        match_filter = "AND (" + " OR ".join(competition_conditions) + ")"
 
         overall_query = text(f"""
             SELECT d.wicket_type, COUNT(*) as count

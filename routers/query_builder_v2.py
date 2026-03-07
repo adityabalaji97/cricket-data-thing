@@ -109,6 +109,7 @@ def query_deliveries(
     shot: List[str] = Query(default=[], description="Filter by shot type (COVER_DRIVE, FLICK, PULL, DEFENDED, etc.)"),
     control: Optional[int] = Query(default=None, ge=0, le=1, description="Filter by shot control (0=uncontrolled, 1=controlled)"),
     wagon_zone: List[int] = Query(default=[], description="Filter by wagon wheel zone (0-8)"),
+    dismissal: List[str] = Query(default=[], description="Filter by dismissal type (caught, bowled, lbw, etc.)"),
     
     # Match context filters
     innings: Optional[int] = Query(default=None, description="Filter by innings (1 or 2)"),
@@ -168,6 +169,7 @@ def query_deliveries(
         line = preprocess_list_param(line)
         length = preprocess_list_param(length)
         shot = preprocess_list_param(shot)
+        dismissal = preprocess_list_param(dismissal)
         group_by = preprocess_list_param(group_by)
         
         # Handle wagon_zone separately since it's List[int]
@@ -193,6 +195,7 @@ def query_deliveries(
             shot=shot,
             control=control,
             wagon_zone=wagon_zone,
+            dismissal=dismissal,
             innings=innings,
             over_min=over_min,
             over_max=over_max,
@@ -268,7 +271,7 @@ def get_available_columns(db: Session = Depends(get_session)):
                 "match": ["innings", "over_min", "over_max"],
                 "batter": ["bat_hand", "crease_combo"],
                 "bowler": ["bowl_style", "bowl_kind"],
-                "delivery": ["line", "length", "shot", "control", "wagon_zone"],
+                "delivery": ["line", "length", "shot", "control", "wagon_zone", "dismissal"],
                 "grouped_filters": ["min_balls", "max_balls", "min_runs", "max_runs"]
             },
             
@@ -277,7 +280,7 @@ def get_available_columns(db: Session = Depends(get_session)):
                 "batting_team", "bowling_team", "batter", "bowler",
                 "innings", "phase",
                 "bat_hand", "bowl_style", "bowl_kind", "crease_combo",
-                "line", "length", "shot", "control", "wagon_zone"
+                "line", "length", "shot", "control", "wagon_zone", "dismissal"
             ],
             
             # Options with coverage info

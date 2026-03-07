@@ -30,7 +30,8 @@ ADVANCED_COLUMNS = {
 # Columns available in both tables (can be queried across full date range)
 COMMON_COLUMNS = {
     'venue', 'competition', 'year', 'batting_team', 'bowling_team',
-    'batter', 'bowler', 'innings', 'phase', 'match_id', 'country'
+    'batter', 'bowler', 'innings', 'phase', 'match_id', 'country',
+    'dismissal'
 }
 
 # Columns that exist in both but have different coverage
@@ -242,13 +243,14 @@ def get_legacy_grouping_columns_map():
         "shot": "NULL",
         "control": "NULL",
         "wagon_zone": "NULL",
+        "dismissal": "d.wicket_type",
     }
 
 
 def build_legacy_where_clause(
     venue, start_date, end_date, leagues, teams, batting_teams, bowling_teams,
-    players, batters, bowlers, crease_combo, innings, over_min, over_max,
-    include_international, top_teams, base_params, db
+    players, batters, bowlers, crease_combo, dismissal, innings, over_min, over_max,
+    include_international, top_teams, group_by, base_params, db
 ):
     """Build dynamic WHERE clause for legacy deliveries table."""
     conditions = ["1=1"]
@@ -343,6 +345,14 @@ def build_legacy_where_clause(
                 expanded_crease.append("LHB_RHB")
         conditions.append("d.crease_combo = ANY(:crease_combo)")
         params["crease_combo"] = list(set(expanded_crease))
+
+    if dismissal:
+        conditions.append("d.wicket_type = ANY(:dismissal)")
+        params["dismissal"] = dismissal
+
+    # Grouping by dismissal should only include wicket deliveries
+    if group_by and "dismissal" in group_by:
+        conditions.append("d.wicket_type IS NOT NULL AND d.wicket_type != ''")
     
     # Match context filters
     if innings:
@@ -792,6 +802,7 @@ def query_deliveries_service(
     shot: List[str],
     control: Optional[int],
     wagon_zone: List[int],
+    dismissal: List[str],
     
     # Match context filters
     innings: Optional[int],
@@ -841,6 +852,7 @@ def query_deliveries_service(
             'shot': shot,
             'control': control,
             'wagon_zone': wagon_zone,
+            'dismissal': dismissal,
         }
         
         # Analyze query to determine which tables to use
@@ -874,6 +886,7 @@ def query_deliveries_service(
             "shot": shot,
             "control": control,
             "wagon_zone": wagon_zone,
+            "dismissal": dismissal,
             "innings": innings,
             "over_range": f"{over_min}-{over_max}" if over_min is not None or over_max is not None else None,
             "group_by": group_by
@@ -918,11 +931,13 @@ def query_deliveries_service(
                 shot=shot,
                 control=control,
                 wagon_zone=wagon_zone,
+                dismissal=dismissal,
                 innings=innings,
                 over_min=over_min,
                 over_max=over_max,
                 include_international=include_international,
                 top_teams=top_teams,
+                group_by=group_by,
                 base_params=new_params,
                 db=db
             )
@@ -977,11 +992,13 @@ def query_deliveries_service(
                 batters=batters,
                 bowlers=bowlers,
                 crease_combo=crease_combo,
+                dismissal=dismissal,
                 innings=innings,
                 over_min=over_min,
                 over_max=over_max,
                 include_international=include_international,
                 top_teams=top_teams,
+                group_by=group_by,
                 base_params=legacy_params,
                 db=db
             )
@@ -1098,8 +1115,8 @@ def query_deliveries_service(
 def build_where_clause(
     venue, start_date, end_date, leagues, teams, batting_teams, bowling_teams,
     players, batters, bowlers, bat_hand, bowl_style, bowl_kind, crease_combo,
-    line, length, shot, control, wagon_zone, innings, over_min, over_max,
-    include_international, top_teams, base_params, db=None
+    line, length, shot, control, wagon_zone, dismissal, innings, over_min, over_max,
+    include_international, top_teams, group_by, base_params, db=None
 ):
     """Build dynamic WHERE clause for delivery_details table."""
     conditions = ["1=1"]
@@ -1229,6 +1246,14 @@ def build_where_clause(
     if wagon_zone:
         conditions.append("dd.wagon_zone = ANY(:wagon_zone)")
         params["wagon_zone"] = wagon_zone
+
+    if dismissal:
+        conditions.append("dd.dismissal = ANY(:dismissal)")
+        params["dismissal"] = dismissal
+
+    # Grouping by dismissal should only include wicket deliveries
+    if group_by and "dismissal" in group_by:
+        conditions.append("dd.dismissal IS NOT NULL AND dd.dismissal != ''")
     
     # Match context filters
     if innings:
@@ -1401,6 +1426,7 @@ def get_grouping_columns_map():
         "shot": "dd.shot",
         "control": "dd.control",
         "wagon_zone": "dd.wagon_zone",
+        "dismissal": "dd.dismissal",
     }
 
 
