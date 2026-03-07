@@ -280,6 +280,9 @@ const UnifiedPlayerProfile = ({ isMobile }) => {
                 dismissalData={currentDismissalStats}
                 mode={activeTab}
                 playerName={selectedPlayer}
+                dateRange={dateRange}
+                selectedVenue={selectedVenue}
+                competitionFilters={competitionFilters}
                 isMobile={isMobile}
               />
             </Box>

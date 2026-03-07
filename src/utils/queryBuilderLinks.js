@@ -72,6 +72,21 @@ export const getBatterContextualQueries = (playerName, context = {}) => {
   const shortName = getShortName(playerName);
 
   const queries = [
+    // Query 0: Caught dismissal hotspots
+    {
+      question: `Where does ${shortName} get caught most often?`,
+      url: buildQueryUrl(
+        {
+          ...baseFilters,
+          dismissal: ['caught'],
+          min_balls: 5,
+        },
+        ['wagon_zone']
+      ),
+      tags: ['dismissal', 'caught', 'tactical'],
+      priority: 0,
+    },
+
     // Query 1: Performance vs Spin by Phase
     {
       question: `How does ${shortName} perform against spin in each phase?`,
@@ -191,6 +206,21 @@ export const getVenueContextualQueries = (venueName, context = {}) => {
   const shortVenue = getShortVenue(venueName);
 
   const queries = [
+    // Query 0: Caught dismissal hotspots
+    {
+      question: `Where are catches taken at ${shortVenue}?`,
+      url: buildQueryUrl(
+        {
+          ...baseFilters,
+          dismissal: ['caught'],
+          min_balls: 10,
+        },
+        ['wagon_zone']
+      ),
+      tags: ['dismissal', 'caught', 'fielding'],
+      priority: 0,
+    },
+
     // Query 1: Batting by Phase
     {
       question: `Scoring patterns at ${shortVenue} by phase`,
@@ -386,6 +416,21 @@ export const getBowlerContextualQueries = (playerName, context = {}) => {
   const shortName = getShortName(playerName);
 
   const queries = [
+    // Query 0: Where this bowler induces catches
+    {
+      question: `Where does ${shortName} induce catches?`,
+      url: buildQueryUrl(
+        {
+          ...baseFilters,
+          dismissal: ['caught'],
+          min_balls: 5,
+        },
+        ['wagon_zone']
+      ),
+      tags: ['dismissal', 'caught', 'bowling'],
+      priority: 0,
+    },
+
     // Query 1: Performance vs LHB vs RHB
     {
       question: `${shortName} vs left-handers vs right-handers`,

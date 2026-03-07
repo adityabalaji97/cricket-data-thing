@@ -68,6 +68,7 @@ export const parseUrlParams = (search) => {
   filters.shot = getArrayParam('shot');
   filters.control = getIntParam('control');
   filters.wagon_zone = getIntArrayParam('wagon_zone');
+  filters.dismissal = getArrayParam('dismissal');
   
   // Grouped result filters
   filters.min_balls = getIntParam('min_balls');

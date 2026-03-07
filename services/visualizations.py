@@ -70,9 +70,13 @@ def get_wagon_wheel_data(
     phase: Optional[str] = None,  # overall, powerplay, middle, death
     bowl_kind: Optional[str] = None,  # pace, spin
     bowl_style: Optional[str] = None,  # specific bowler types
+    bat_hand: Optional[str] = None,  # batter handedness
     line: Optional[str] = None,  # ball line (e.g., OUTSIDE_OFFSTUMP)
     length: Optional[str] = None,  # ball length (e.g., FULL, GOOD_LENGTH)
     shot: Optional[str] = None,  # shot type (e.g., COVER_DRIVE)
+    dismissal: Optional[str] = None,
+    dismissal_mode: str = "exact",  # exact | wicket
+    max_points: int = 2000,
 ) -> List[Dict[str, Any]]:
     """
     Get wagon wheel data for a batter with optional filters.
@@ -167,6 +171,16 @@ def get_wagon_wheel_data(
             conditions.append("dd.bowl_style = :bowl_style")
             params["bowl_style"] = bowl_style
 
+        if bat_hand:
+            conditions.append("dd.bat_hand = :bat_hand")
+            params["bat_hand"] = bat_hand
+
+        if dismissal_mode == "wicket":
+            conditions.append("dd.dismissal IS NOT NULL AND dd.dismissal != ''")
+        elif dismissal:
+            conditions.append("LOWER(COALESCE(dd.dismissal, '')) = LOWER(:dismissal)")
+            params["dismissal"] = dismissal
+
         # Ball delivery filters
         if line:
             conditions.append("dd.line = :line")
@@ -199,6 +213,8 @@ def get_wagon_wheel_data(
                 dd.match_date as date,
                 dd.ground as venue,
                 dd.competition,
+                dd.dismissal,
+                CASE WHEN LOWER(COALESCE(dd.dismissal, '')) = 'caught' THEN true ELSE false END as is_caught,
                 CASE
                     WHEN dd.over BETWEEN 0 AND 5 THEN 'powerplay'
                     WHEN dd.over BETWEEN 6 AND 14 THEN 'middle'
@@ -207,7 +223,9 @@ def get_wagon_wheel_data(
             FROM delivery_details dd
             WHERE {where_clause}
             ORDER BY dd.date, dd.match_id, dd.over, dd.ball
+            LIMIT :max_points
         """)
+        params["max_points"] = max(1, int(max_points or 2000))
 
         result = db.execute(query, params).fetchall()
 
@@ -229,6 +247,8 @@ def get_wagon_wheel_data(
                 "date": str(row.date) if row.date else None,
                 "venue": row.venue,
                 "competition": row.competition,
+                "dismissal": row.dismissal,
+                "is_caught": bool(row.is_caught),
             }
             for row in result
         ]
@@ -416,9 +436,15 @@ def get_bowler_wagon_wheel_data(
     include_international: bool = False,
     top_teams: Optional[int] = None,
     phase: Optional[str] = None,
+    bowl_kind: Optional[str] = None,
+    bowl_style: Optional[str] = None,
+    bat_hand: Optional[str] = None,
     line: Optional[str] = None,
     length: Optional[str] = None,
     shot: Optional[str] = None,
+    dismissal: Optional[str] = None,
+    dismissal_mode: str = "exact",  # exact | wicket
+    max_points: int = 2000,
 ) -> List[Dict[str, Any]]:
     """
     Get wagon wheel data for a bowler - shows where the bowler was hit.
@@ -488,6 +514,24 @@ def get_bowler_wagon_wheel_data(
             elif phase == "death":
                 conditions.append("dd.over >= 15")
 
+        if bowl_kind:
+            conditions.append("dd.bowl_kind = :bowl_kind")
+            params["bowl_kind"] = bowl_kind
+
+        if bowl_style:
+            conditions.append("dd.bowl_style = :bowl_style")
+            params["bowl_style"] = bowl_style
+
+        if bat_hand:
+            conditions.append("dd.bat_hand = :bat_hand")
+            params["bat_hand"] = bat_hand
+
+        if dismissal_mode == "wicket":
+            conditions.append("dd.dismissal IS NOT NULL AND dd.dismissal != ''")
+        elif dismissal:
+            conditions.append("LOWER(COALESCE(dd.dismissal, '')) = LOWER(:dismissal)")
+            params["dismissal"] = dismissal
+
         # Ball delivery filters
         if line:
             conditions.append("dd.line = :line")
@@ -520,6 +564,8 @@ def get_bowler_wagon_wheel_data(
                 dd.match_date as date,
                 dd.ground as venue,
                 dd.competition,
+                dd.dismissal,
+                CASE WHEN LOWER(COALESCE(dd.dismissal, '')) = 'caught' THEN true ELSE false END as is_caught,
                 CASE
                     WHEN dd.over BETWEEN 0 AND 5 THEN 'powerplay'
                     WHEN dd.over BETWEEN 6 AND 14 THEN 'middle'
@@ -528,7 +574,9 @@ def get_bowler_wagon_wheel_data(
             FROM delivery_details dd
             WHERE {where_clause}
             ORDER BY dd.date, dd.match_id, dd.over, dd.ball
+            LIMIT :max_points
         """)
+        params["max_points"] = max(1, int(max_points or 2000))
 
         result = db.execute(query, params).fetchall()
 
@@ -550,6 +598,8 @@ def get_bowler_wagon_wheel_data(
                 "date": str(row.date) if row.date else None,
                 "venue": row.venue,
                 "competition": row.competition,
+                "dismissal": row.dismissal,
+                "is_caught": bool(row.is_caught),
             }
             for row in result
         ]
@@ -719,6 +769,9 @@ def get_venue_wagon_wheel_data(
     line: Optional[str] = None,
     length: Optional[str] = None,
     shot: Optional[str] = None,
+    dismissal: Optional[str] = None,
+    dismissal_mode: str = "exact",  # exact | wicket
+    max_points: int = 2000,
 ) -> List[Dict[str, Any]]:
     """Get venue-level wagon wheel deliveries for tactical analysis."""
     try:
@@ -790,6 +843,12 @@ def get_venue_wagon_wheel_data(
             conditions.append("dd.shot = :shot")
             params["shot"] = shot
 
+        if dismissal_mode == "wicket":
+            conditions.append("dd.dismissal IS NOT NULL AND dd.dismissal != ''")
+        elif dismissal:
+            conditions.append("LOWER(COALESCE(dd.dismissal, '')) = LOWER(:dismissal)")
+            params["dismissal"] = dismissal
+
         where_clause = " AND ".join(conditions)
 
         query = text(f"""
@@ -811,7 +870,9 @@ def get_venue_wagon_wheel_data(
                 dd.match_date as date,
                 dd.ground as venue,
                 dd.competition,
+                dd.dismissal,
                 CASE WHEN dd.out::boolean = true THEN true ELSE false END as is_wicket,
+                CASE WHEN LOWER(COALESCE(dd.dismissal, '')) = 'caught' THEN true ELSE false END as is_caught,
                 CASE
                     WHEN dd.over BETWEEN 0 AND 5 THEN 'powerplay'
                     WHEN dd.over BETWEEN 6 AND 14 THEN 'middle'
@@ -820,7 +881,9 @@ def get_venue_wagon_wheel_data(
             FROM delivery_details dd
             WHERE {where_clause}
             ORDER BY dd.match_date, dd.p_match, dd.over, dd.ball
+            LIMIT :max_points
         """)
+        params["max_points"] = max(1, int(max_points or 2000))
 
         result = db.execute(query, params).fetchall()
         return [
@@ -843,7 +906,9 @@ def get_venue_wagon_wheel_data(
                 "date": str(row.date) if row.date else None,
                 "venue": row.venue,
                 "competition": row.competition,
+                "dismissal": row.dismissal,
                 "is_wicket": bool(row.is_wicket),
+                "is_caught": bool(row.is_caught),
             }
             for row in result
         ]
