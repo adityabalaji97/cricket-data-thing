@@ -3446,6 +3446,10 @@ def get_player_bowling_stats(
 
         # Execute all queries
         overall = db.execute(overall_query, params).fetchone()
+
+        if not overall or not overall.matches:
+            return {"overall": {"matches": 0}, "phase_stats": {}, "over_distribution": [], "batter_handedness": {}, "innings": [], "over_combinations": []}
+
         maidens = db.execute(maidens_query, params).fetchone()
         phase_stats = db.execute(phase_query, params).fetchone()
         over_distribution = db.execute(over_distribution_query, params).fetchall()
