@@ -27,7 +27,7 @@ import config from '../config';
 import {
   getScoringZoneLabel,
   normalizeScoringZone,
-  SCORING_ZONE_VALUES,
+  SCORING_ZONE_CLOCKWISE_FROM_TOP,
 } from '../utils/wagonZones';
 
 const DEFAULT_FILTERS = {
@@ -477,7 +477,7 @@ const DismissalFieldDesigner = ({
               {renderSelect(
                 'Zone',
                 'selectedZone',
-                SCORING_ZONE_VALUES.map((zone) => ({
+                SCORING_ZONE_CLOCKWISE_FROM_TOP.map((zone) => ({
                   value: zone,
                   label: `${zone} - ${getScoringZoneLabel(zone)}`,
                 }))
@@ -501,7 +501,7 @@ const DismissalFieldDesigner = ({
               {renderSelect(
                 'Zone',
                 'selectedZone',
-                SCORING_ZONE_VALUES.map((zone) => ({
+                SCORING_ZONE_CLOCKWISE_FROM_TOP.map((zone) => ({
                   value: zone,
                   label: `${zone} - ${getScoringZoneLabel(zone)}`,
                 }))

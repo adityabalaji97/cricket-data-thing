@@ -3,6 +3,7 @@ import { Box, Typography } from '@mui/material';
 import {
   getScoringZoneLabel,
   normalizeScoringZone,
+  SCORING_ZONE_CLOCKWISE_FROM_TOP,
 } from '../../utils/wagonZones';
 
 const CaughtDismissalScatterMap = ({
@@ -56,8 +57,13 @@ const CaughtDismissalScatterMap = ({
     })
   ), [withZone, centerX, centerY, scale, selectedZone, dotMode, isMobile]);
 
-  const zoneWedges = Array.from({ length: 8 }).map((_, index) => {
-    const zoneNum = index + 1;
+  const labelForMap = (zoneNum) => {
+    const label = getScoringZoneLabel(zoneNum);
+    return label === 'Square Leg' ? 'Sq Leg' : label;
+  };
+
+  const zoneWedges = SCORING_ZONE_CLOCKWISE_FROM_TOP.map((zoneValue, index) => {
+    const zoneNum = Number(zoneValue);
     const startAngle = -Math.PI / 2 + index * (Math.PI / 4);
     const endAngle = startAngle + (Math.PI / 4);
     const x1 = centerX + maxRadius * Math.cos(startAngle);
@@ -85,6 +91,28 @@ const CaughtDismissalScatterMap = ({
     );
   });
 
+  const zoneLabels = SCORING_ZONE_CLOCKWISE_FROM_TOP.map((zoneValue, index) => {
+    const zoneNum = Number(zoneValue);
+    const midAngle = -Math.PI / 2 + index * (Math.PI / 4) + (Math.PI / 8);
+    const r = maxRadius * 0.78;
+
+    return (
+      <text
+        key={`zone-label-${zoneNum}`}
+        x={centerX + r * Math.cos(midAngle)}
+        y={centerY + r * Math.sin(midAngle)}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={isMobile ? 9 : 10}
+        fontWeight={600}
+        fill="#4b5563"
+        style={{ pointerEvents: 'none' }}
+      >
+        {labelForMap(zoneNum)}
+      </text>
+    );
+  });
+
   const resetHint = selectedZone !== 'all';
 
   return (
@@ -107,11 +135,12 @@ const CaughtDismissalScatterMap = ({
           {zoneWedges}
           <circle cx={centerX} cy={centerY} r={maxRadius * 0.5} fill="none" stroke="#e6e6e6" strokeWidth="1" strokeDasharray="4,4" />
           {points}
+          {zoneLabels}
           <circle cx={centerX} cy={centerY} r={6} fill="#1f1f1f" />
         </svg>
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
-        Tap a zone to focus recommendations for that fielding position.
+        Behind is aligned to 12 o'clock. Tap a zone to focus recommendations.
       </Typography>
     </Box>
   );
