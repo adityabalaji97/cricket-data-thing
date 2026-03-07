@@ -240,6 +240,9 @@ const VenueBoundaryShape = ({
         <Chip size="small" label={`Matches used ${sample.matches_used || 0}`} />
         <Chip size="small" label={`Non-sentinel 4s ${safePercent(quality.nonzero_rate, 1)}`} />
       </Stack>
+      <Typography variant="caption" color="text.secondary">
+        {`Quality gate: match contour is used only when at least 50% of angle bins are hit with >=2 fours/bin (${sample.matches_used || 0} of ${sample.matches_with_nonzero4 || 0} matches in this filter).`}
+      </Typography>
 
       {renderPolarProfile()}
 

@@ -6,6 +6,27 @@ import {
   SCORING_ZONE_CLOCKWISE_FROM_TOP,
 } from '../../utils/wagonZones';
 
+// RHB baseline label anchors tuned to match annotated field-map positions.
+const RHB_LABEL_LAYOUT_BY_ZONE = Object.freeze({
+  8: { clock_deg: 0, radius_ratio: 1.08 },   // Behind (top edge)
+  1: { clock_deg: 45, radius_ratio: 1.08 },  // Fine Leg (upper-right edge)
+  2: { clock_deg: 88, radius_ratio: 1.08 },  // Square Leg (right edge)
+  3: { clock_deg: 138, radius_ratio: 1.08 }, // Midwicket (lower-right edge)
+  4: { clock_deg: 168, radius_ratio: 1.03 }, // Long On (near lower arc edge)
+  5: { clock_deg: 222, radius_ratio: 1.03 }, // Long Off (near lower arc edge)
+  6: { clock_deg: 266, radius_ratio: 1.08 }, // Cover (left edge)
+  7: { clock_deg: 318, radius_ratio: 1.08 }, // Point (upper-left edge)
+});
+
+const clockToCartesian = (clockDeg, radius, cx, cy) => {
+  // Clock convention: 0 deg at 12 o'clock, clockwise positive.
+  const radians = ((clockDeg - 90) * Math.PI) / 180;
+  return {
+    x: cx + (radius * Math.cos(radians)),
+    y: cy + (radius * Math.sin(radians)),
+  };
+};
+
 const CaughtDismissalScatterMap = ({
   deliveries = [],
   isMobile = false,
@@ -94,17 +115,34 @@ const CaughtDismissalScatterMap = ({
 
   const zoneLabels = SCORING_ZONE_CLOCKWISE_FROM_TOP.map((zoneValue, index) => {
     const zoneNum = Number(zoneValue);
-    const midAngle = -Math.PI / 2 + index * (Math.PI / 4) + (Math.PI / 8);
-    const r = maxRadius * 0.78;
+    const fallbackClockDeg = index * 45;
+    const layout = RHB_LABEL_LAYOUT_BY_ZONE[zoneNum] || {
+      clock_deg: fallbackClockDeg,
+      radius_ratio: 1.04,
+    };
+    const labelPoint = clockToCartesian(
+      Number(layout.clock_deg),
+      maxRadius * Number(layout.radius_ratio),
+      centerX,
+      centerY,
+    );
+    const x = labelPoint.x;
+    const y = labelPoint.y;
+
+    const anchor = x > (centerX + 10)
+      ? 'start'
+      : x < (centerX - 10)
+        ? 'end'
+        : 'middle';
 
     return (
       <text
         key={`zone-label-${zoneNum}`}
-        x={centerX + r * Math.cos(midAngle)}
-        y={centerY + r * Math.sin(midAngle)}
-        textAnchor="middle"
+        x={x}
+        y={y}
+        textAnchor={anchor}
         dominantBaseline="middle"
-        fontSize={isMobile ? 9 : 10}
+        fontSize={isMobile ? 10 : 11}
         fontWeight={600}
         fill="#4b5563"
         style={{ pointerEvents: 'none' }}
