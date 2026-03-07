@@ -24,6 +24,11 @@ import CaughtDismissalScatterMap from './charts/CaughtDismissalScatterMap';
 import ExploreLink from './ui/ExploreLink';
 import { buildQueryUrl } from '../utils/queryBuilderLinks';
 import config from '../config';
+import {
+  getScoringZoneLabel,
+  normalizeScoringZone,
+  SCORING_ZONE_VALUES,
+} from '../utils/wagonZones';
 
 const DEFAULT_FILTERS = {
   phase: 'overall',
@@ -37,35 +42,6 @@ const PHASE_LABELS = {
   powerplay: 'Powerplay',
   middle: 'Middle',
   death: 'Death',
-};
-
-const ZONE_LABELS = {
-  1: 'Long Off Arc',
-  2: 'Midwicket Arc',
-  3: 'Square Leg Arc',
-  4: 'Fine Leg Arc',
-  5: 'Behind Point Arc',
-  6: 'Point Arc',
-  7: 'Cover Arc',
-  8: 'Long On Arc',
-};
-
-const normalizeZone = (delivery) => {
-  const rawZone = Number(delivery?.wagon_zone);
-  if (Number.isFinite(rawZone) && rawZone >= 1 && rawZone <= 8) {
-    return String(rawZone);
-  }
-
-  const x = Number(delivery?.wagon_x);
-  const y = Number(delivery?.wagon_y);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-
-  const dx = x - 150;
-  const dy = y - 150;
-  let theta = Math.atan2(dy, dx) + Math.PI / 2;
-  if (theta < 0) theta += Math.PI * 2;
-  const sector = Math.floor(theta / (Math.PI / 4)) + 1;
-  return String(sector > 8 ? 1 : sector);
 };
 
 const toCountMap = (deliveries, key) => {
@@ -183,7 +159,7 @@ const DismissalFieldDesigner = ({
   const deliveriesWithZone = useMemo(() => (
     deliveries.map((delivery) => ({
       ...delivery,
-      __zone: normalizeZone(delivery),
+      __zone: normalizeScoringZone(delivery),
     }))
   ), [deliveries]);
 
@@ -245,7 +221,7 @@ const DismissalFieldDesigner = ({
     const batHandCounts = toCountMap(visibleDeliveries, 'bat_hand');
     const [topHand, topHandCount] = topEntry(batHandCounts);
 
-    const zoneLabel = ZONE_LABELS[Number(topZone.zone)] || `Zone ${topZone.zone}`;
+    const zoneLabel = getScoringZoneLabel(topZone.zone);
     const phaseLabel = PHASE_LABELS[topPhase] || topPhase || 'overall';
 
     const tip1 = `${lowSample ? 'Directional:' : 'Primary arc:'} ${zoneLabel} (${topZone.count}/${sample}, ${topZone.pct.toFixed(1)}%).`;
@@ -346,30 +322,37 @@ const DismissalFieldDesigner = ({
     filters.batHand,
   ]);
 
-  const renderSelect = (label, key, values, includeAll = true) => (
-    <FormControl size="small" fullWidth>
-      <InputLabel>{label}</InputLabel>
-      <Select
-        label={label}
-        value={draftFilters[key]}
-        onChange={(event) => {
-          const value = event.target.value;
-          setDraftFilters((prev) => {
-            const next = { ...prev, [key]: value };
-            if (key === 'bowlKind') next.bowlStyle = 'all';
-            return next;
-          });
-        }}
-      >
-        {includeAll && <MenuItem value="all">All</MenuItem>}
-        {values.map((value) => (
-          <MenuItem key={`${key}-${value}`} value={value}>
-            {value}
-          </MenuItem>
-        ))}
-      </Select>
-    </FormControl>
-  );
+  const renderSelect = (label, key, values, includeAll = true) => {
+    const options = values.map((value) => {
+      if (typeof value === 'object' && value !== null) return value;
+      return { value, label: value };
+    });
+
+    return (
+      <FormControl size="small" fullWidth>
+        <InputLabel>{label}</InputLabel>
+        <Select
+          label={label}
+          value={draftFilters[key]}
+          onChange={(event) => {
+            const value = event.target.value;
+            setDraftFilters((prev) => {
+              const next = { ...prev, [key]: value };
+              if (key === 'bowlKind') next.bowlStyle = 'all';
+              return next;
+            });
+          }}
+        >
+          {includeAll && <MenuItem value="all">All</MenuItem>}
+          {options.map((option) => (
+            <MenuItem key={`${key}-${option.value}`} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    );
+  };
 
   const openFilters = () => {
     setDraftFilters(filters);
@@ -440,7 +423,7 @@ const DismissalFieldDesigner = ({
                   <Chip
                     key={`hotspot-${item.zone}`}
                     size="small"
-                    label={`${ZONE_LABELS[Number(item.zone)] || `Zone ${item.zone}`}: ${item.count} (${item.pct.toFixed(1)}%)`}
+                    label={`${getScoringZoneLabel(item.zone)}: ${item.count} (${item.pct.toFixed(1)}%)`}
                     color={item.zone === zoneStats[0].zone ? 'primary' : 'default'}
                     variant={item.zone === zoneStats[0].zone ? 'filled' : 'outlined'}
                   />
@@ -491,7 +474,14 @@ const DismissalFieldDesigner = ({
               {renderSelect('Pace/Spin', 'bowlKind', options.bowlKinds)}
               {renderSelect('Bowler Type', 'bowlStyle', bowlStylesForKind)}
               {renderSelect('Bat Hand', 'batHand', options.batHands)}
-              {renderSelect('Zone', 'selectedZone', ['1', '2', '3', '4', '5', '6', '7', '8'])}
+              {renderSelect(
+                'Zone',
+                'selectedZone',
+                SCORING_ZONE_VALUES.map((zone) => ({
+                  value: zone,
+                  label: `${zone} - ${getScoringZoneLabel(zone)}`,
+                }))
+              )}
             </Box>
             <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
               <Button variant="outlined" fullWidth onClick={clearFilters}>Clear</Button>
@@ -508,7 +498,14 @@ const DismissalFieldDesigner = ({
               {renderSelect('Pace/Spin', 'bowlKind', options.bowlKinds)}
               {renderSelect('Bowler Type', 'bowlStyle', bowlStylesForKind)}
               {renderSelect('Bat Hand', 'batHand', options.batHands)}
-              {renderSelect('Zone', 'selectedZone', ['1', '2', '3', '4', '5', '6', '7', '8'])}
+              {renderSelect(
+                'Zone',
+                'selectedZone',
+                SCORING_ZONE_VALUES.map((zone) => ({
+                  value: zone,
+                  label: `${zone} - ${getScoringZoneLabel(zone)}`,
+                }))
+              )}
             </Box>
           </DialogContent>
           <DialogActions>

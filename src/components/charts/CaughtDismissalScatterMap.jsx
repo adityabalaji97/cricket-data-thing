@@ -1,40 +1,9 @@
 import React, { useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
-
-const ZONE_LABELS = {
-  1: 'Long Off Arc',
-  2: 'Midwicket Arc',
-  3: 'Square Leg Arc',
-  4: 'Fine Leg Arc',
-  5: 'Behind Point Arc',
-  6: 'Point Arc',
-  7: 'Cover Arc',
-  8: 'Long On Arc',
-};
-
-const normalizeZone = (delivery) => {
-  const rawZone = Number(delivery?.wagon_zone);
-  if (Number.isFinite(rawZone) && rawZone >= 1 && rawZone <= 8) {
-    return String(rawZone);
-  }
-
-  const x = Number(delivery?.wagon_x);
-  const y = Number(delivery?.wagon_y);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    return null;
-  }
-
-  const dx = x - 150;
-  const dy = y - 150;
-  if (dx === 0 && dy === 0) {
-    return '1';
-  }
-
-  let theta = Math.atan2(dy, dx) + Math.PI / 2;
-  if (theta < 0) theta += Math.PI * 2;
-  const sector = Math.floor(theta / (Math.PI / 4)) + 1;
-  return String(sector > 8 ? 1 : sector);
-};
+import {
+  getScoringZoneLabel,
+  normalizeScoringZone,
+} from '../../utils/wagonZones';
 
 const CaughtDismissalScatterMap = ({
   deliveries = [],
@@ -54,7 +23,7 @@ const CaughtDismissalScatterMap = ({
     deliveries
       .map((delivery) => ({
         ...delivery,
-        __zone: normalizeZone(delivery),
+        __zone: normalizeScoringZone(delivery),
       }))
       .filter((delivery) => delivery.__zone)
   ), [deliveries]);
@@ -80,7 +49,7 @@ const CaughtDismissalScatterMap = ({
           opacity={inSelectedZone ? 0.78 : 0.18}
         >
           <title>
-            {`Zone ${delivery.__zone} • ${delivery.phase || 'overall'} • ${delivery.bowl_kind || 'unknown'} • ${delivery.bowl_style || 'unknown'}`}
+            {`Zone ${delivery.__zone} (${getScoringZoneLabel(delivery.__zone)}) • ${delivery.phase || 'overall'} • ${delivery.bowl_kind || 'unknown'} • ${delivery.bowl_style || 'unknown'}`}
           </title>
         </circle>
       );
@@ -111,7 +80,7 @@ const CaughtDismissalScatterMap = ({
           }
         }}
       >
-        <title>{`Zone ${zoneNum}: ${ZONE_LABELS[zoneNum]}`}</title>
+        <title>{`Zone ${zoneNum}: ${getScoringZoneLabel(zoneNum)}`}</title>
       </path>
     );
   });
@@ -142,7 +111,7 @@ const CaughtDismissalScatterMap = ({
         </svg>
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
-        Tap a zone to focus recommendations for that arc.
+        Tap a zone to focus recommendations for that fielding position.
       </Typography>
     </Box>
   );
