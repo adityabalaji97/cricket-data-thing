@@ -2,21 +2,23 @@ import React, { useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
 import {
   getScoringZoneLabel,
+  isLeftHandBat,
   normalizeScoringZone,
   SCORING_ZONE_CLOCKWISE_FROM_TOP,
 } from '../../utils/wagonZones';
 
-// RHB baseline label anchors tuned to match annotated field-map positions.
-const RHB_LABEL_LAYOUT_BY_ZONE = Object.freeze({
-  8: { clock_deg: 0, radius_ratio: 1.08 },   // Behind (top edge)
-  1: { clock_deg: 45, radius_ratio: 1.08 },  // Fine Leg (upper-right edge)
-  2: { clock_deg: 88, radius_ratio: 1.08 },  // Square Leg (right edge)
-  3: { clock_deg: 138, radius_ratio: 1.08 }, // Midwicket (lower-right edge)
-  4: { clock_deg: 168, radius_ratio: 1.03 }, // Long On (near lower arc edge)
-  5: { clock_deg: 222, radius_ratio: 1.03 }, // Long Off (near lower arc edge)
-  6: { clock_deg: 266, radius_ratio: 1.08 }, // Cover (left edge)
-  7: { clock_deg: 318, radius_ratio: 1.08 }, // Point (upper-left edge)
-});
+// RHB baseline field labels from user-provided clock annotations.
+const RHB_FIELD_LABELS = Object.freeze([
+  { id: 'behind', label: 'Behind', clock_deg: 0, radius_ratio: 1.10 },
+  { id: 'fine_leg', label: 'Fine Leg', clock_deg: 75, radius_ratio: 1.09 },   // 2.5
+  { id: 'square_leg', label: 'Square Leg', clock_deg: 90, radius_ratio: 1.10 }, // 3
+  { id: 'midwicket', label: 'Midwicket', clock_deg: 135, radius_ratio: 1.09 }, // 4.5
+  { id: 'long_on', label: 'Long On', clock_deg: 165, radius_ratio: 1.04 },    // 5-6
+  { id: 'long_off', label: 'Long Off', clock_deg: 195, radius_ratio: 1.04 },  // 6-7
+  { id: 'cover', label: 'Cover', clock_deg: 225, radius_ratio: 1.09 },        // 7.5
+  { id: 'point', label: 'Point', clock_deg: 270, radius_ratio: 1.10 },        // 9
+  { id: 'third_man', label: 'Third Man', clock_deg: 315, radius_ratio: 1.09 }, // 10.5
+]);
 
 const clockToCartesian = (clockDeg, radius, cx, cy) => {
   // Clock convention: 0 deg at 12 o'clock, clockwise positive.
@@ -25,6 +27,11 @@ const clockToCartesian = (clockDeg, radius, cx, cy) => {
     x: cx + (radius * Math.cos(radians)),
     y: cy + (radius * Math.sin(radians)),
   };
+};
+
+const mirrorClockDegAcrossVerticalAxis = (clockDeg) => {
+  const normalized = ((clockDeg % 360) + 360) % 360;
+  return (360 - normalized) % 360;
 };
 
 const CaughtDismissalScatterMap = ({
@@ -79,10 +86,13 @@ const CaughtDismissalScatterMap = ({
     })
   ), [withZone, centerX, centerY, scale, selectedZone, dotMode, isMobile, batHand]);
 
-  const labelForMap = (zoneNum) => {
-    const label = getScoringZoneLabel(zoneNum, batHand);
-    return label === 'Square Leg' ? 'Sq Leg' : label;
-  };
+  const fieldLabels = useMemo(() => {
+    const useMirrored = isLeftHandBat(batHand);
+    return RHB_FIELD_LABELS.map((item) => ({
+      ...item,
+      clock_deg: useMirrored ? mirrorClockDegAcrossVerticalAxis(item.clock_deg) : item.clock_deg,
+    }));
+  }, [batHand]);
 
   const zoneWedges = SCORING_ZONE_CLOCKWISE_FROM_TOP.map((zoneValue, index) => {
     const zoneNum = Number(zoneValue);
@@ -113,13 +123,7 @@ const CaughtDismissalScatterMap = ({
     );
   });
 
-  const zoneLabels = SCORING_ZONE_CLOCKWISE_FROM_TOP.map((zoneValue, index) => {
-    const zoneNum = Number(zoneValue);
-    const fallbackClockDeg = index * 45;
-    const layout = RHB_LABEL_LAYOUT_BY_ZONE[zoneNum] || {
-      clock_deg: fallbackClockDeg,
-      radius_ratio: 1.04,
-    };
+  const zoneLabels = fieldLabels.map((layout) => {
     const labelPoint = clockToCartesian(
       Number(layout.clock_deg),
       maxRadius * Number(layout.radius_ratio),
@@ -137,7 +141,7 @@ const CaughtDismissalScatterMap = ({
 
     return (
       <text
-        key={`zone-label-${zoneNum}`}
+        key={`field-label-${layout.id}`}
         x={x}
         y={y}
         textAnchor={anchor}
@@ -147,7 +151,7 @@ const CaughtDismissalScatterMap = ({
         fill="#4b5563"
         style={{ pointerEvents: 'none' }}
       >
-        {labelForMap(zoneNum)}
+        {layout.label}
       </text>
     );
   });

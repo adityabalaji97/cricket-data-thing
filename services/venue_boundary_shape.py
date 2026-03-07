@@ -201,10 +201,9 @@ def compute_boundary_shape_model(
             }
         )
 
-    # 4) Used matches threshold.
-    used_matches = {
-        match_id for match_id, bins_hit in bins_hit_by_match.items() if bins_hit >= min_bins_hit
-    }
+    # 4) Use all matches in the filter window that have non-sentinel 4s.
+    # The per-bin q90 still requires >=2 points in that match/bin.
+    used_matches = set(per_match_total_nonzero4.keys())
 
     # 5) Venue profile bins and summary.
     r_q90_by_bin: Dict[int, List[float]] = defaultdict(list)
@@ -253,7 +252,7 @@ def compute_boundary_shape_model(
             )
 
     avg_bins_with_data = (
-        _safe_div(sum(bins_hit_by_match[m] for m in used_matches), matches_used_count)
+        _safe_div(sum(bins_hit_by_match.get(m, 0) for m in used_matches), matches_used_count)
         if matches_used_count
         else 0.0
     )

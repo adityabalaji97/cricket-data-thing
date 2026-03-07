@@ -89,6 +89,29 @@ def test_outlier_is_soft_clipped_from_contour_inputs():
     assert float(profile_bin0["r_median"]) < 200.0
 
 
+def test_model_includes_all_matches_in_filter_window():
+    points = []
+    # Match M1 has broad directional support.
+    for bin_idx in range(12):
+        angle_deg = (bin_idx * 15) + 1
+        points.append(_point_from_polar("M1", angle_deg, 180.0))
+        points.append(_point_from_polar("M1", angle_deg, 181.0))
+
+    # Match M2 is sparse (single qualifying bin only), but should still be included.
+    points.append(_point_from_polar("M2", 1.0, 180.0))
+    points.append(_point_from_polar("M2", 1.0, 181.0))
+
+    model = compute_boundary_shape_model(points=points, angle_bin_size=15, min_matches=20)
+
+    # All matches with non-sentinel 4s are included in venue stacking now.
+    assert model["matches_used"] == 2
+    assert 6.0 <= model["avg_bins_with_data"] <= 7.0
+
+    profile_bin0 = next(bin_row for bin_row in model["profile_bins"] if bin_row["angle_bin"] == 0)
+    # Bin coverage should be 100% because both matches contributed to bin 0.
+    assert abs(float(profile_bin0["bin_coverage_pct"]) - 100.0) < 0.01
+
+
 def test_warning_flags_thresholds():
     warnings = _compose_warning_flags(
         matches_used=10,
