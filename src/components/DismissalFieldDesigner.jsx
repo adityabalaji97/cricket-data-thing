@@ -26,6 +26,7 @@ import { buildQueryUrl } from '../utils/queryBuilderLinks';
 import config from '../config';
 import {
   getScoringZoneLabel,
+  isLeftHandBat,
   normalizeScoringZone,
   SCORING_ZONE_CLOCKWISE_FROM_TOP,
 } from '../utils/wagonZones';
@@ -187,6 +188,14 @@ const DismissalFieldDesigner = ({
     )].sort();
   }, [deliveries, draftFilters.bowlKind, options.bowlStyles]);
 
+  const activeLabelBatHand = useMemo(() => (
+    isLeftHandBat(filters.batHand) ? 'LHB' : 'RHB'
+  ), [filters.batHand]);
+
+  const draftLabelBatHand = useMemo(() => (
+    isLeftHandBat(draftFilters.batHand) ? 'LHB' : 'RHB'
+  ), [draftFilters.batHand]);
+
   const zoneStats = useMemo(() => {
     const counts = {};
     visibleDeliveries.forEach((delivery) => {
@@ -221,7 +230,7 @@ const DismissalFieldDesigner = ({
     const batHandCounts = toCountMap(visibleDeliveries, 'bat_hand');
     const [topHand, topHandCount] = topEntry(batHandCounts);
 
-    const zoneLabel = getScoringZoneLabel(topZone.zone);
+    const zoneLabel = getScoringZoneLabel(topZone.zone, activeLabelBatHand);
     const phaseLabel = PHASE_LABELS[topPhase] || topPhase || 'overall';
 
     const tip1 = `${lowSample ? 'Directional:' : 'Primary arc:'} ${zoneLabel} (${topZone.count}/${sample}, ${topZone.pct.toFixed(1)}%).`;
@@ -242,7 +251,7 @@ const DismissalFieldDesigner = ({
       lowSample,
       tips: [tip1, tip2, tip3],
     };
-  }, [visibleDeliveries, zoneStats, filters.bowlKind]);
+  }, [visibleDeliveries, zoneStats, filters.bowlKind, activeLabelBatHand]);
 
   const summary = useMemo(() => {
     const totalDismissals = Number(summaryData?.total_dismissals ?? summaryData?.total_wickets ?? 0);
@@ -407,6 +416,7 @@ const DismissalFieldDesigner = ({
             deliveries={visibleDeliveries}
             isMobile={isMobile}
             dotMode="caught"
+            batHand={activeLabelBatHand}
             selectedZone={filters.selectedZone}
             onZoneSelect={(zone) => setFilters((prev) => ({ ...prev, selectedZone: zone }))}
           />
@@ -423,7 +433,7 @@ const DismissalFieldDesigner = ({
                   <Chip
                     key={`hotspot-${item.zone}`}
                     size="small"
-                    label={`${getScoringZoneLabel(item.zone)}: ${item.count} (${item.pct.toFixed(1)}%)`}
+                    label={`${getScoringZoneLabel(item.zone, activeLabelBatHand)}: ${item.count} (${item.pct.toFixed(1)}%)`}
                     color={item.zone === zoneStats[0].zone ? 'primary' : 'default'}
                     variant={item.zone === zoneStats[0].zone ? 'filled' : 'outlined'}
                   />
@@ -479,7 +489,7 @@ const DismissalFieldDesigner = ({
                 'selectedZone',
                 SCORING_ZONE_CLOCKWISE_FROM_TOP.map((zone) => ({
                   value: zone,
-                  label: `${zone} - ${getScoringZoneLabel(zone)}`,
+                  label: `${zone} - ${getScoringZoneLabel(zone, draftLabelBatHand)}`,
                 }))
               )}
             </Box>
@@ -503,7 +513,7 @@ const DismissalFieldDesigner = ({
                 'selectedZone',
                 SCORING_ZONE_CLOCKWISE_FROM_TOP.map((zone) => ({
                   value: zone,
-                  label: `${zone} - ${getScoringZoneLabel(zone)}`,
+                  label: `${zone} - ${getScoringZoneLabel(zone, draftLabelBatHand)}`,
                 }))
               )}
             </Box>

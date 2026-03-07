@@ -37,6 +37,10 @@ class TestVenueEndpoints:
         r = client.get("/venues/TestVenue/stats")
         _assert_not_500(r, "GET /venues/{venue}/stats")
 
+    def test_venue_boundary_shape(self, client):
+        r = client.get("/visualizations/venue/TestVenue/boundary-shape")
+        _assert_not_500(r, "GET /visualizations/venue/{venue}/boundary-shape")
+
     def test_venue_history(self, client):
         r = client.get("/venues/TestVenue/teams/TeamA/TeamB/history")
         _assert_not_500(r, "GET /venues/{venue}/teams/{t1}/{t2}/history")

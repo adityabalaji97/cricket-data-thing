@@ -16,6 +16,7 @@ from services.visualizations import (
     get_venue_pitch_map_data,
 )
 from services.venue_similarity import get_similar_venues, get_venue_tactical_edges
+from services.venue_boundary_shape import get_venue_boundary_shape_data
 
 router = APIRouter(prefix="/visualizations", tags=["visualizations"])
 
@@ -484,6 +485,39 @@ def get_venue_pitch_map(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch venue pitch map data: {str(e)}")
+
+
+@router.get("/venue/{venue}/boundary-shape")
+def get_venue_boundary_shape(
+    venue: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    leagues: List[str] = Query(default=[]),
+    include_international: bool = Query(default=False),
+    top_teams: Optional[int] = Query(default=None),
+    min_matches: int = Query(default=20, ge=5, le=250),
+    angle_bin_size: int = Query(default=15),
+    db: Session = Depends(get_session),
+):
+    try:
+        if angle_bin_size not in (10, 15, 20):
+            raise HTTPException(status_code=422, detail="angle_bin_size must be one of 10, 15, or 20")
+
+        return get_venue_boundary_shape_data(
+            db=db,
+            venue=venue,
+            start_date=start_date,
+            end_date=end_date,
+            leagues=leagues,
+            include_international=include_international,
+            top_teams=top_teams,
+            min_matches=min_matches,
+            angle_bin_size=angle_bin_size,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch venue boundary shape data: {str(e)}")
 
 
 @router.get("/venue/{venue}/similar")

@@ -1,4 +1,4 @@
-export const SCORING_ZONE_LABELS = Object.freeze({
+export const SCORING_ZONE_LABELS_RHB = Object.freeze({
   1: 'Fine Leg',
   2: 'Square Leg',
   3: 'Midwicket',
@@ -9,6 +9,19 @@ export const SCORING_ZONE_LABELS = Object.freeze({
   8: 'Behind',
 });
 
+export const SCORING_ZONE_VERTICAL_MIRROR_MAP = Object.freeze({
+  1: 7,
+  2: 6,
+  3: 5,
+  4: 4,
+  5: 3,
+  6: 2,
+  7: 1,
+  8: 8,
+});
+
+export const SCORING_ZONE_LABELS = SCORING_ZONE_LABELS_RHB;
+
 // Clockwise zone order around the field with 12 o'clock at "Behind" (zone 8).
 export const SCORING_ZONE_CLOCKWISE_FROM_TOP = Object.freeze([
   '8', '1', '2', '3', '4', '5', '6', '7',
@@ -18,9 +31,21 @@ export const SCORING_ZONE_VALUES = Object.freeze(
   Array.from({ length: 8 }, (_, index) => String(index + 1))
 );
 
-export const getScoringZoneLabel = (zone) => {
+export const isLeftHandBat = (batHand) => {
+  const normalized = String(batHand || '').trim().toUpperCase();
+  return normalized === 'LHB' || normalized === 'LEFT';
+};
+
+export const getMirroredZone = (zone) => {
   const zoneNum = Number(zone);
-  return SCORING_ZONE_LABELS[zoneNum] || `Zone ${zone}`;
+  return SCORING_ZONE_VERTICAL_MIRROR_MAP[zoneNum] || zoneNum;
+};
+
+export const getScoringZoneLabel = (zone, batHand = 'RHB') => {
+  const zoneNum = Number(zone);
+  if (!Number.isFinite(zoneNum)) return `Zone ${zone}`;
+  const labelZone = isLeftHandBat(batHand) ? getMirroredZone(zoneNum) : zoneNum;
+  return SCORING_ZONE_LABELS_RHB[labelZone] || `Zone ${zone}`;
 };
 
 export const normalizeScoringZone = (delivery) => {

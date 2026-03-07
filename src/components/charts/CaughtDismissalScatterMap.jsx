@@ -10,6 +10,7 @@ const CaughtDismissalScatterMap = ({
   deliveries = [],
   isMobile = false,
   dotMode = 'caught',
+  batHand = 'RHB',
   selectedZone = 'all',
   onZoneSelect,
 }) => {
@@ -50,15 +51,15 @@ const CaughtDismissalScatterMap = ({
           opacity={inSelectedZone ? 0.78 : 0.18}
         >
           <title>
-            {`Zone ${delivery.__zone} (${getScoringZoneLabel(delivery.__zone)}) • ${delivery.phase || 'overall'} • ${delivery.bowl_kind || 'unknown'} • ${delivery.bowl_style || 'unknown'}`}
+            {`Zone ${delivery.__zone} (${getScoringZoneLabel(delivery.__zone, batHand)}) • ${delivery.phase || 'overall'} • ${delivery.bowl_kind || 'unknown'} • ${delivery.bowl_style || 'unknown'}`}
           </title>
         </circle>
       );
     })
-  ), [withZone, centerX, centerY, scale, selectedZone, dotMode, isMobile]);
+  ), [withZone, centerX, centerY, scale, selectedZone, dotMode, isMobile, batHand]);
 
   const labelForMap = (zoneNum) => {
-    const label = getScoringZoneLabel(zoneNum);
+    const label = getScoringZoneLabel(zoneNum, batHand);
     return label === 'Square Leg' ? 'Sq Leg' : label;
   };
 
@@ -86,7 +87,7 @@ const CaughtDismissalScatterMap = ({
           }
         }}
       >
-        <title>{`Zone ${zoneNum}: ${getScoringZoneLabel(zoneNum)}`}</title>
+        <title>{`Zone ${zoneNum}: ${getScoringZoneLabel(zoneNum, batHand)}`}</title>
       </path>
     );
   });
@@ -140,7 +141,7 @@ const CaughtDismissalScatterMap = ({
         </svg>
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
-        Behind is aligned to 12 o'clock. Tap a zone to focus recommendations.
+        Behind is aligned to 12 o'clock. LHB labels are mirrored across the 12-6 axis.
       </Typography>
     </Box>
   );

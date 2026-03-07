@@ -39,6 +39,7 @@ import ContextualQueryPrompts from './ContextualQueryPrompts';
 import VenueSimilarity, { useVenueSimilarityData } from './VenueSimilarity';
 import MatchPreviewCard from './MatchPreviewCard';
 import VenueDismissalAnalytics from './VenueDismissalAnalytics';
+import VenueBoundaryShape from './VenueBoundaryShape';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 import VenueSectionTabs from './VenueSectionTabs';
 import VenueNotesDesktopNav from './VenueNotesDesktopNav';
@@ -1076,6 +1077,23 @@ const VenueNotes = ({
                     isMobile={isMobile}
                     zoneFilters={similarZoneFilters}
                     onZoneFiltersChange={setSimilarZoneFilters}
+                />
+            ),
+        });
+
+        // 5. BOUNDARY SHAPE
+        groups.push({
+            id: 'boundaryShape',
+            label: 'Boundary Shape',
+            content: (
+                <VenueBoundaryShape
+                    venue={venue}
+                    startDate={startDate}
+                    endDate={endDate}
+                    leagues={leagues}
+                    includeInternational={includeInternational}
+                    topTeams={topTeams}
+                    isMobile={isMobile}
                 />
             ),
         });
