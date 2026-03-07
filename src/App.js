@@ -22,13 +22,12 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import VenueNotes from './components/VenueNotes';
 import MatchupsTab from './components/MatchupsTab';
 import CompetitionFilter from './components/CompetitionFilter';
 import LandingPage from './components/LandingPage';
-import PlayerProfile from './components/PlayerProfile';
-import BowlerProfile from './components/BowlerProfile'; // Import the new BowlerProfile component
+import UnifiedPlayerProfile from './components/UnifiedPlayerProfile';
 import BatterComparison from './components/BatterComparison';
 import QueryBuilder from './components/QueryBuilder'; // Import the new QueryBuilder component
 import TeamProfile from './components/TeamProfile';
@@ -44,6 +43,14 @@ import axios from 'axios';
 import config from './config';
 import { DEFAULT_START_DATE, TODAY } from './utils/dateDefaults';
 
+// Redirect /bowler?name=X&autoload=true to /player?name=X&tab=bowling&autoload=true
+const BowlerRedirect = () => {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  searchParams.set('tab', 'bowling');
+  return <Navigate to={`/player?${searchParams.toString()}`} replace />;
+};
+
 const AppContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -55,15 +62,14 @@ const AppContent = () => {
     path === '/search' ? 1 :
     path === '/venue' ? 2 :
     path === '/player' ? 3 :
-    path === '/bowler' ? 4 :
-    path === '/comparison' ? 5 :
-    path === '/matchups' ? 6 :
-    path === '/query' ? 7 :
-    path === '/team' ? 8 :
-    path === '/team-comparison' ? 9 :
-    path === '/doppelgangers' ? 10 :
-    path === '/games/guess-innings' ? 11 :
-    path === '/games/player-journeys' ? 12 :
+    path === '/comparison' ? 4 :
+    path === '/matchups' ? 5 :
+    path === '/query' ? 6 :
+    path === '/team' ? 7 :
+    path === '/team-comparison' ? 8 :
+    path === '/doppelgangers' ? 9 :
+    path === '/games/guess-innings' ? 10 :
+    path === '/games/player-journeys' ? 11 :
     path === '/credits' ? false :
     path.startsWith('/wrapped') ? false : 0
   );
@@ -72,8 +78,7 @@ const AppContent = () => {
     path === '/' ? 'Home' :
     path === '/search' ? 'Search' :
     path === '/venue' ? 'Match Preview' :
-    path === '/player' ? 'Batter Profile' :
-    path === '/bowler' ? 'Bowler Profile' :
+    path === '/player' ? 'Player Profile' :
     path === '/comparison' ? 'Batter Comparison' :
     path === '/matchups' ? 'Matchups' :
     path === '/query' ? 'Query Builder' :
@@ -524,10 +529,7 @@ const AppContent = () => {
                 Match Preview
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/player')}>
-                Batter Profile
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/bowler')}>
-                Bowler Profile
+                Player Profile
               </MenuItem>
               <MenuItem onClick={() => handleNavigate('/comparison')}>
                 Batter Comparison
@@ -578,8 +580,7 @@ const AppContent = () => {
               <Tab label="Home" component={Link} to="/" />
               <Tab label="Search" component={Link} to="/search" />
               <Tab label="Match Preview" component={Link} to="/venue" />
-              <Tab label="Batter Profile" component={Link} to="/player" />
-              <Tab label="Bowler Profile" component={Link} to="/bowler" />
+              <Tab label="Player Profile" component={Link} to="/player" />
               <Tab label="Batter Comparison" component={Link} to="/comparison" />
               <Tab label="Matchups" component={Link} to="/matchups" />
               <Tab label="Query Builder" component={Link} to="/query" />
@@ -603,8 +604,8 @@ const AppContent = () => {
 
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/player" element={<PlayerProfile isMobile={isMobile} />} />
-        <Route path="/bowler" element={<BowlerProfile isMobile={isMobile} />} />
+        <Route path="/player" element={<UnifiedPlayerProfile isMobile={isMobile} />} />
+        <Route path="/bowler" element={<BowlerRedirect />} />
         <Route path="/comparison" element={<BatterComparison />} />
         <Route path="/matchups" element={<MatchupsTab isMobile={isMobile} />} />
         <Route path="/query" element={<QueryBuilder isMobile={isMobile} />} />

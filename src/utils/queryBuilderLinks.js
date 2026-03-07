@@ -475,3 +475,23 @@ export const getBowlerContextualQueries = (playerName, context = {}) => {
 
   return queries;
 };
+
+/**
+ * Lightweight chip links used by UnifiedPlayerProfile Explore section.
+ * Kept as compatibility wrappers over the richer contextual query builders.
+ */
+export const getBatterQueryLinks = (playerName, dateRange = {}, venue = null) => (
+  getBatterContextualQueries(playerName, {
+    startDate: dateRange?.start,
+    endDate: dateRange?.end,
+    venue,
+  }).map((query) => ({ label: query.question, url: query.url }))
+);
+
+export const getBowlerQueryLinks = (playerName, dateRange = {}, venue = null) => (
+  getBowlerContextualQueries(playerName, {
+    startDate: dateRange?.start,
+    endDate: dateRange?.end,
+    venue,
+  }).map((query) => ({ label: query.question, url: query.url }))
+);

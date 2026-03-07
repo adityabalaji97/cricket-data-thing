@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import text
 from database import get_session
 from services.search import (
     search_entities,
@@ -10,8 +11,10 @@ from services.search import (
 )
 from typing import Optional, List
 from datetime import date
+import logging
 
 router = APIRouter(prefix="/search", tags=["search"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/suggestions")
@@ -171,3 +174,33 @@ def get_doppelganger_leaderboard_route(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get doppelganger leaderboard: {str(e)}")
+
+
+@router.get("/player-type/{player_name}")
+def get_player_type(
+    player_name: str,
+    db: Session = Depends(get_session)
+):
+    """
+    Detect whether a player has batting data, bowling data, or both.
+    Returns boolean flags for UI tab visibility.
+    """
+    try:
+        batting_query = text("""
+            SELECT COUNT(*) as cnt FROM batting_stats WHERE striker = :player_name
+        """)
+        bowling_query = text("""
+            SELECT COUNT(*) as cnt FROM bowling_stats WHERE bowler = :player_name
+        """)
+
+        batting_count = db.execute(batting_query, {"player_name": player_name}).fetchone()
+        bowling_count = db.execute(bowling_query, {"player_name": player_name}).fetchone()
+
+        return {
+            "player_name": player_name,
+            "has_batting_data": (batting_count.cnt or 0) > 0,
+            "has_bowling_data": (bowling_count.cnt or 0) > 0
+        }
+    except Exception as e:
+        logger.error(f"Error in get_player_type: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
