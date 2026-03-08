@@ -1737,11 +1737,12 @@ def get_player_stats(
         match_filter = """
             AND (
                 (:has_leagues AND m.match_type = 'league' AND m.competition = ANY(:leagues))
-                OR (:include_international AND m.match_type = 'international' 
-                    AND (:top_teams IS NULL OR 
+                OR (:include_international AND m.match_type = 'international'
+                    AND (:top_teams IS NULL OR
                         (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
                     )
                 )
+                OR (NOT :has_leagues AND m.match_type = 'league')
                 OR (NOT :has_leagues AND NOT :include_international)
             )
         """
@@ -2150,11 +2151,12 @@ def get_player_ball_stats(
         match_filter = """
             AND (
                 (:has_leagues AND m.match_type = 'league' AND m.competition = ANY(:leagues))
-                OR (:include_international AND m.match_type = 'international' 
-                    AND (:top_teams IS NULL OR 
+                OR (:include_international AND m.match_type = 'international'
+                    AND (:top_teams IS NULL OR
                         (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
                     )
                 )
+                OR (NOT :has_leagues AND m.match_type = 'league')
                 OR (NOT :has_leagues AND NOT :include_international)
             )
         """
@@ -3137,11 +3139,12 @@ def get_player_bowling_stats(
         match_filter = """
             AND (
                 (:has_leagues AND m.match_type = 'league' AND m.competition = ANY(:leagues))
-                OR (:include_international AND m.match_type = 'international' 
-                    AND (:top_teams IS NULL OR 
+                OR (:include_international AND m.match_type = 'international'
+                    AND (:top_teams IS NULL OR
                         (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
                     )
                 )
+                OR (NOT :has_leagues AND m.match_type = 'league')
                 OR (NOT :has_leagues AND NOT :include_international)
             )
         """
