@@ -81,15 +81,24 @@ LINE_NORMALIZE = {
     "ON_THE_STUMPS": "ON_THE_STUMPS",
     "MIDDLE": "ON_THE_STUMPS",
     "LEG_STUMP": "DOWN_LEG",
+    "LEG": "DOWN_LEG",
     "DOWN_LEG": "DOWN_LEG",
+    "WIDE_LEG": "WIDE_DOWN_LEG",
     "WIDE_DOWN_LEG": "WIDE_DOWN_LEG",
+    "OFF": "OUTSIDE_OFFSTUMP",
+    "STUMPS": "ON_THE_STUMPS",
 }
 
 LENGTH_NORMALIZE = {
     "SHORT": "SHORT",
     "SHORT_OF_A_GOOD_LENGTH": "SHORT_OF_A_GOOD_LENGTH",
+    "SHORT_OF_GOOD_LENGTH": "SHORT_OF_A_GOOD_LENGTH",
     "SHORT_OF_LENGTH": "SHORT_OF_A_GOOD_LENGTH",
+    "SHORT_OF_A_LENGTH": "SHORT_OF_A_GOOD_LENGTH",
+    "BACK_OF_A_LENGTH": "SHORT_OF_A_GOOD_LENGTH",
+    "BACK_OF_LENGTH": "SHORT_OF_A_GOOD_LENGTH",
     "GOOD_LENGTH": "GOOD_LENGTH",
+    "GOOD": "GOOD_LENGTH",
     "FULL": "FULL",
     "YORKER": "YORKER",
     "FULL_TOSS": "FULL_TOSS",
@@ -99,7 +108,9 @@ LENGTH_NORMALIZE = {
 def _normalize_line_bucket(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
-    token = str(value).strip().upper()
+    token = str(value).strip().upper().replace("-", "_").replace(" ", "_")
+    while "__" in token:
+        token = token.replace("__", "_")
     normalized = LINE_NORMALIZE.get(token)
     if normalized in LINE_ORDER:
         return normalized
@@ -109,7 +120,9 @@ def _normalize_line_bucket(value: Optional[str]) -> Optional[str]:
 def _normalize_length_bucket(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
-    token = str(value).strip().upper()
+    token = str(value).strip().upper().replace("-", "_").replace(" ", "_")
+    while "__" in token:
+        token = token.replace("__", "_")
     normalized = LENGTH_NORMALIZE.get(token)
     if normalized in LENGTH_ORDER:
         return normalized

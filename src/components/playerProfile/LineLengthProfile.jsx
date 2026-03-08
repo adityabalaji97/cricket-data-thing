@@ -218,6 +218,68 @@ const CombinedLineLengthGrid = ({ data, metric, comparison, isMobile }) => {
   );
 };
 
+const LegacyLineLengthTable = ({
+  data,
+  metric,
+  comparison,
+  isMobile,
+  activeView,
+  onActiveViewChange,
+}) => {
+  const profile = activeView === 0 ? (data.length_profile || []) : (data.line_profile || []);
+  const bucketLabel = activeView === 0 ? 'Length' : 'Line';
+
+  return (
+    <Box sx={{ width: '100%' }}>
+      <Tabs
+        value={activeView}
+        onChange={(_, v) => onActiveViewChange(v)}
+        sx={{ mb: 1, minHeight: 32, '& .MuiTab-root': { minHeight: 32, py: 0.5 } }}
+      >
+        <Tab label="By Length" />
+        <Tab label="By Line" />
+      </Tabs>
+
+      <Box sx={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0 }}>
+          <thead>
+            <tr>
+              <th style={{ padding: 8, textAlign: 'left', borderBottom: `1px solid ${colors.neutral[200]}` }}>{bucketLabel}</th>
+              <th style={{ padding: 8, textAlign: 'center', borderBottom: `1px solid ${colors.neutral[200]}` }}>Balls</th>
+              <th style={{ padding: 8, textAlign: 'center', borderBottom: `1px solid ${colors.neutral[200]}` }}>{isMobile ? metric.shortLabel : metric.label}</th>
+              <th style={{ padding: 8, textAlign: 'center', borderBottom: `1px solid ${colors.neutral[200]}` }}>Delta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {profile.map((row) => {
+              const balls = Number(row?.player?.balls || 0);
+              const belowThreshold = balls < MIN_BALLS;
+              const playerVal = row?.player?.[metric.value];
+              const baselineVal = row?.[comparison]?.[metric.value];
+              const delta = (playerVal != null && baselineVal != null) ? playerVal - baselineVal : null;
+              const sign = delta > 0 ? '+' : '';
+              const deltaColor = delta != null ? getDeltaColor(delta, metric.invertColor) : colors.neutral[400];
+
+              return (
+                <tr key={row.bucket} style={{ opacity: belowThreshold ? 0.45 : 1 }}>
+                  <td style={{ padding: 8, borderBottom: `1px solid ${colors.neutral[100]}`, fontWeight: 600 }}>{row.label || row.bucket}</td>
+                  <td style={{ padding: 8, textAlign: 'center', borderBottom: `1px solid ${colors.neutral[100]}` }}>{balls}</td>
+                  <td style={{ padding: 8, textAlign: 'center', borderBottom: `1px solid ${colors.neutral[100]}` }}>
+                    {playerVal != null ? playerVal.toFixed(1) : '--'}
+                  </td>
+                  <td style={{ padding: 8, textAlign: 'center', borderBottom: `1px solid ${colors.neutral[100]}`, color: deltaColor, fontWeight: 700 }}>
+                    {delta != null ? `${sign}${delta.toFixed(1)}` : '--'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Box>
+    </Box>
+  );
+};
+
 const LineLengthProfile = ({ playerName, mode, dateRange, selectedVenue, competitionFilters, isMobile: isMobileProp }) => {
   const theme = useTheme();
   const isMobileQuery = useMediaQuery(theme.breakpoints.down('sm'));
@@ -228,6 +290,7 @@ const LineLengthProfile = ({ playerName, mode, dateRange, selectedVenue, competi
   const [error, setError] = useState(null);
   const [selectedMetric, setSelectedMetric] = useState(0);
   const [selectedComparison, setSelectedComparison] = useState(0);
+  const [legacyActiveView, setLegacyActiveView] = useState(0);
   const [similarPlayers, setSimilarPlayers] = useState([]);
 
   useEffect(() => {
@@ -326,6 +389,7 @@ const LineLengthProfile = ({ playerName, mode, dateRange, selectedVenue, competi
 
   const metric = METRIC_OPTIONS[selectedMetric];
   const isBowling = mode === 'bowling';
+  const hasGridPayload = !!data?.line_length_grid?.cells;
   const gridCells = Object.values(data?.line_length_grid?.cells || {});
   const hasGridData = gridCells.some((cell) => Number(cell?.player?.balls || 0) > 0);
   const hasLegacyData = (data.length_profile || []).length > 0 || (data.line_profile || []).length > 0;
@@ -402,12 +466,30 @@ const LineLengthProfile = ({ playerName, mode, dateRange, selectedVenue, competi
         )}
 
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-          <CombinedLineLengthGrid
-            data={data}
-            metric={metric}
-            comparison={comparison}
-            isMobile={isMobile}
-          />
+          {hasGridData ? (
+            <CombinedLineLengthGrid
+              data={data}
+              metric={metric}
+              comparison={comparison}
+              isMobile={isMobile}
+            />
+          ) : (
+            <Box sx={{ width: '100%' }}>
+              {!hasGridPayload && (
+                <Alert severity="info" sx={{ mb: 1 }}>
+                  Combined line×length grid not available in API response yet. Showing legacy view.
+                </Alert>
+              )}
+              <LegacyLineLengthTable
+                data={data}
+                metric={metric}
+                comparison={comparison}
+                isMobile={isMobile}
+                activeView={legacyActiveView}
+                onActiveViewChange={setLegacyActiveView}
+              />
+            </Box>
+          )}
         </Box>
 
         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 1.5, flexWrap: 'wrap' }}>
