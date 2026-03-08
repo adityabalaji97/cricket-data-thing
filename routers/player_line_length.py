@@ -99,8 +99,8 @@ def _aggregate_sql(group_col: str, player_filter: str, comp_filter: str) -> str:
         FROM delivery_details dd
         WHERE dd.{group_col} IS NOT NULL
         {player_filter}
-        AND (:start_date IS NULL OR dd.date >= :start_date)
-        AND (:end_date IS NULL OR dd.date <= :end_date)
+        AND (:start_year IS NULL OR dd.year >= :start_year)
+        AND (:end_year IS NULL OR dd.year <= :end_year)
         AND (:venue IS NULL OR dd.ground = :venue)
         {comp_filter}
         GROUP BY dd.{group_col}
@@ -132,8 +132,8 @@ def get_player_line_length_profile(
     try:
         base_params: dict = {
             "player_name": player_name,
-            "start_date": start_date,
-            "end_date": end_date,
+            "start_year": start_date.year if start_date else None,
+            "end_year": end_date.year if end_date else None,
             "venue": venue,
         }
         comp_filter = _build_comp_filter(
