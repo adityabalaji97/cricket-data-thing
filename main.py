@@ -8,7 +8,7 @@ from sqlalchemy import func, desc, and_, or_
 from pydantic import BaseModel
 from collections import defaultdict
 from statistics import mean
-from database import database, get_session
+from database import database, get_session, initialize_database
 from models import Match, Delivery, Player, BattingStats, BowlingStats
 # main.py (add to existing FastAPI app)
 from fastapi import FastAPI, Depends, HTTPException
@@ -114,7 +114,7 @@ async def db_error_middleware(request, call_next):
 
 @app.on_event("startup")
 def startup():
-    # Database tables are initialized via get_database_connection() when needed
+    initialize_database()
     logging.info("Application startup complete")
 
 

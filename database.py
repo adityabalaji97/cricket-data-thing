@@ -17,23 +17,41 @@ if DATABASE_URL.startswith("postgres://"):
 
 print(f"Connecting to database: {DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else 'localhost'}")
 
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "2"))
+DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "1"))
+DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "20"))
+DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "1800"))
+AUTO_CREATE_TABLES = os.getenv("AUTO_CREATE_TABLES", "false").lower() in {"1", "true", "yes"}
+
+print(
+    "DB pool config:",
+    f"pool_size={DB_POOL_SIZE}",
+    f"max_overflow={DB_MAX_OVERFLOW}",
+    f"pool_timeout={DB_POOL_TIMEOUT}",
+    f"pool_recycle={DB_POOL_RECYCLE}",
+)
+
 database = Database(DATABASE_URL)
 engine = create_engine(
     DATABASE_URL,
-    pool_size=3,  # Base connections per worker (4 workers * 3 = 12 base)
-    max_overflow=5,  # Overflow per worker (4 workers * 5 = 20 overflow, 32 total max)
-    pool_timeout=30,
-    pool_recycle=1800,
+    pool_size=DB_POOL_SIZE,
+    max_overflow=DB_MAX_OVERFLOW,
+    pool_timeout=DB_POOL_TIMEOUT,
+    pool_recycle=DB_POOL_RECYCLE,
     pool_pre_ping=True
 )
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def initialize_database():
+    # Optional safety for local/dev only; production should rely on migrations.
+    if AUTO_CREATE_TABLES:
+        Base.metadata.create_all(bind=engine)
 
 def get_database_connection():
-    Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     return engine, SessionLocal
 
 def get_session():
-    _, SessionLocal = get_database_connection()
     session = SessionLocal()
     try:
         yield session
