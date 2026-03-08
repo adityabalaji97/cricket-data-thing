@@ -51,11 +51,21 @@ function getCellBgColor(delta, invertColor, balls, minBalls) {
   return `rgba(239, 68, 68, ${alpha})`;
 }
 
-const CombinedLineLengthGrid = ({ data, metric, comparison, isMobile }) => {
+function normalizeBatHand(value) {
+  if (!value) return null;
+  const token = String(value).trim().toUpperCase().replace(/[\s-]+/g, '_');
+  if (token === 'LHB' || token === 'LEFT' || token === 'LEFT_HANDED' || token === 'LEFT_HANDED_BAT') return 'LHB';
+  if (token === 'RHB' || token === 'RIGHT' || token === 'RIGHT_HANDED' || token === 'RIGHT_HANDED_BAT') return 'RHB';
+  return null;
+}
+
+const CombinedLineLengthGrid = ({ data, metric, comparison, isMobile, mirrorLineForLhb = false }) => {
   const grid = data?.line_length_grid || {};
   const cells = grid?.cells || {};
-  const lineOrder = Array.isArray(grid?.line_order) && grid.line_order.length ? grid.line_order : LINE_ORDER;
-  const lengthOrder = Array.isArray(grid?.length_order) && grid.length_order.length ? grid.length_order : LENGTH_ORDER;
+  const baseLineOrder = Array.isArray(grid?.line_order) && grid.line_order.length ? grid.line_order : LINE_ORDER;
+  const baseLengthOrder = Array.isArray(grid?.length_order) && grid.length_order.length ? grid.length_order : LENGTH_ORDER;
+  const lineOrder = mirrorLineForLhb ? [...baseLineOrder].reverse() : baseLineOrder;
+  const lengthOrder = [...baseLengthOrder].reverse();
 
   const rowHeaderWidth = isMobile ? 74 : 112;
   const minCellWidth = isMobile ? 68 : 88;
@@ -408,6 +418,8 @@ const LineLengthProfile = ({ playerName, mode, dateRange, selectedVenue, competi
 
   const comparisonIndex = Math.min(selectedComparison, availableComparisons.length - 1);
   const comparison = availableComparisons[comparisonIndex]?.value || 'global_avg';
+  const playerBatHand = normalizeBatHand(data?.player_bat_hand);
+  const mirrorLineForLhb = mode === 'batting' && playerBatHand === 'LHB';
 
   if (!hasGridData && !hasLegacyData) {
     return (
@@ -472,6 +484,7 @@ const LineLengthProfile = ({ playerName, mode, dateRange, selectedVenue, competi
               metric={metric}
               comparison={comparison}
               isMobile={isMobile}
+              mirrorLineForLhb={mirrorLineForLhb}
             />
           ) : (
             <Box sx={{ width: '100%' }}>

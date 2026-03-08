@@ -281,6 +281,37 @@ def _resolve_player_list_for_delivery_details(
     return sorted(resolved)
 
 
+def _fetch_player_bat_hand(
+    db: Session,
+    player_names: List[str],
+    base_params: Dict[str, Any],
+    comp_filter: str,
+) -> Optional[str]:
+    if not player_names:
+        return None
+    try:
+        params = {**base_params, "player_names": player_names}
+        sql = text(f"""
+            SELECT dd.bat_hand AS bat_hand, COUNT(*) AS cnt
+            FROM delivery_details dd
+            WHERE dd.bat = ANY(:player_names)
+            AND dd.bat_hand IS NOT NULL
+            AND dd.bat_hand != ''
+            AND (:start_year IS NULL OR dd.year >= :start_year)
+            AND (:end_year IS NULL OR dd.year <= :end_year)
+            AND (:venue IS NULL OR dd.ground = :venue)
+            {comp_filter}
+            GROUP BY dd.bat_hand
+            ORDER BY cnt DESC
+            LIMIT 1
+        """)
+        row = db.execute(sql, params).fetchone()
+        return row.bat_hand if row and row.bat_hand else None
+    except Exception as exc:
+        logger.warning("Could not determine batter hand for '%s': %s", player_names, exc)
+        return None
+
+
 def _empty_line_length_agg() -> Dict[str, float]:
     return {
         "balls": 0.0,
@@ -503,6 +534,7 @@ def get_player_line_length_profile(
             player_names = [player_name]
         base_params["player_names"] = player_names
         player_filter = f"AND dd.{player_col} = ANY(:player_names)"
+        player_bat_hand = _fetch_player_bat_hand(db, player_names, base_params, comp_filter) if mode == "batting" else None
 
         def _fetch(group_col, extra_filter, extra_params=None):
             p = {**base_params}
@@ -636,6 +668,7 @@ def get_player_line_length_profile(
         return {
             "player_name": player_name,
             "mode": mode,
+            "player_bat_hand": player_bat_hand,
             "bowler_info": bowler_info,
             "length_profile": length_profile,
             "line_profile": line_profile,
