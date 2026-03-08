@@ -101,3 +101,19 @@ def test_build_line_length_grid_returns_metrics_and_deltas():
     assert empty_cell["player"] is None
     assert empty_cell["global_avg"] is None
     assert empty_cell["deltas"]["global_avg"] is None
+
+
+def test_pick_initials_fallback_name_matches_initials_and_surname():
+    candidates = [
+        "Ruturaj Gaikwad",
+        "Rahul Gaikwad",
+        "Some Other",
+    ]
+    resolved = pll._pick_initials_fallback_name("RD Gaikwad", candidates)
+    assert resolved == "Ruturaj Gaikwad"
+
+
+def test_pick_initials_fallback_name_returns_none_when_not_initial_style():
+    candidates = ["Ruturaj Gaikwad"]
+    resolved = pll._pick_initials_fallback_name("Ruturaj Gaikwad", candidates)
+    assert resolved is None

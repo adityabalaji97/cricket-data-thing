@@ -14,9 +14,10 @@ Uses the delivery_details table which has columns:
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
-from typing import Optional, List, Dict, Tuple, Any
+from typing import Optional, List, Dict, Tuple, Any, Set
 from datetime import date
 import logging
+import re
 
 from database import get_session
 from utils.league_utils import expand_league_abbreviations
@@ -127,6 +128,157 @@ def _normalize_length_bucket(value: Optional[str]) -> Optional[str]:
     if normalized in LENGTH_ORDER:
         return normalized
     return token if token in LENGTH_ORDER else None
+
+
+def _split_name_tokens(name: str) -> List[str]:
+    if not name:
+        return []
+    return [t for t in re.split(r"[.\s]+", str(name).strip()) if t]
+
+
+def _clean_name_token(token: str) -> str:
+    return "".join(ch for ch in token.upper() if ch.isalpha())
+
+
+def _name_initials(name: str) -> str:
+    tokens = _split_name_tokens(name)
+    if not tokens:
+        return ""
+    if len(tokens) == 1:
+        return _clean_name_token(tokens[0])[:1]
+    initials: List[str] = []
+    for token in tokens[:-1]:
+        cleaned = _clean_name_token(token)
+        if cleaned:
+            initials.append(cleaned[0])
+    return "".join(initials)
+
+
+def _pick_initials_fallback_name(requested_name: str, candidates: List[str]) -> Optional[str]:
+    """
+    Match initial-style name inputs (e.g. "RD Gaikwad") to full names
+    ordered by frequency (candidates are expected pre-sorted).
+    """
+    req_tokens = _split_name_tokens(requested_name)
+    if len(req_tokens) < 2:
+        return None
+
+    requested_initials = _clean_name_token(req_tokens[0])
+    if not requested_initials or len(requested_initials) > 3:
+        return None
+
+    requested_surname = req_tokens[-1].lower()
+    soft_match = None
+
+    for candidate in candidates:
+        cand_tokens = _split_name_tokens(candidate)
+        if len(cand_tokens) < 2:
+            continue
+        if cand_tokens[-1].lower() != requested_surname:
+            continue
+
+        cand_initials = _name_initials(candidate)
+        if cand_initials:
+            if cand_initials == requested_initials:
+                return candidate
+            if requested_initials.startswith(cand_initials):
+                return candidate
+            if cand_initials.startswith(requested_initials):
+                return candidate
+
+        first_initial = _clean_name_token(cand_tokens[0])[:1]
+        if first_initial and first_initial == requested_initials[:1] and soft_match is None:
+            soft_match = candidate
+
+    return soft_match
+
+
+def _resolve_player_names_for_delivery_details(
+    db: Session,
+    player_name: str,
+    player_col: str,
+) -> List[str]:
+    """
+    Resolve a requested name to likely delivery_details variants.
+    Includes alias table mappings plus initials/surname fallback.
+    """
+    requested = (player_name or "").strip()
+    if not requested:
+        return []
+
+    resolved: Set[str] = {requested}
+
+    try:
+        alias_rows = db.execute(
+            text("""
+                SELECT player_name, alias_name
+                FROM player_aliases
+                WHERE LOWER(player_name) = LOWER(:name)
+                   OR LOWER(alias_name) = LOWER(:name)
+            """),
+            {"name": requested},
+        ).fetchall()
+        for row in alias_rows:
+            if row.player_name:
+                resolved.add(row.player_name)
+            if row.alias_name:
+                resolved.add(row.alias_name)
+    except Exception as exc:
+        logger.warning("Alias resolution failed for '%s': %s", requested, exc)
+
+    try:
+        exact_rows = db.execute(
+            text(f"""
+                SELECT DISTINCT dd.{player_col} AS resolved_name
+                FROM delivery_details dd
+                WHERE LOWER(dd.{player_col}) = LOWER(:name)
+                LIMIT 5
+            """),
+            {"name": requested},
+        ).fetchall()
+        for row in exact_rows:
+            if row.resolved_name:
+                resolved.add(row.resolved_name)
+    except Exception as exc:
+        logger.warning("Exact player-name lookup failed for '%s': %s", requested, exc)
+
+    try:
+        req_tokens = _split_name_tokens(requested)
+        req_initials = _clean_name_token(req_tokens[0]) if req_tokens else ""
+        if len(req_tokens) >= 2 and 1 <= len(req_initials) <= 3:
+            surname = req_tokens[-1]
+            candidate_rows = db.execute(
+                text(f"""
+                    SELECT dd.{player_col} AS candidate_name, COUNT(*) AS cnt
+                    FROM delivery_details dd
+                    WHERE LOWER(dd.{player_col}) LIKE LOWER(:surname_pattern)
+                    GROUP BY dd.{player_col}
+                    ORDER BY cnt DESC
+                    LIMIT 50
+                """),
+                {"surname_pattern": f"% {surname}"},
+            ).fetchall()
+            fallback = _pick_initials_fallback_name(
+                requested_name=requested,
+                candidates=[row.candidate_name for row in candidate_rows if row.candidate_name],
+            )
+            if fallback:
+                resolved.add(fallback)
+    except Exception as exc:
+        logger.warning("Initials fallback resolution failed for '%s': %s", requested, exc)
+
+    return sorted(name for name in resolved if name)
+
+
+def _resolve_player_list_for_delivery_details(
+    db: Session,
+    player_names: List[str],
+    player_col: str,
+) -> List[str]:
+    resolved: Set[str] = set()
+    for name in player_names or []:
+        resolved.update(_resolve_player_names_for_delivery_details(db, name, player_col))
+    return sorted(resolved)
 
 
 def _empty_line_length_agg() -> Dict[str, float]:
@@ -336,7 +488,6 @@ def get_player_line_length_profile(
 ):
     try:
         base_params: dict = {
-            "player_name": player_name,
             "start_year": start_date.year if start_date else None,
             "end_year": end_date.year if end_date else None,
             "venue": venue,
@@ -347,7 +498,11 @@ def get_player_line_length_profile(
 
         # delivery_details uses 'bat' and 'bowl' columns for player names
         player_col = "bat" if mode == "batting" else "bowl"
-        player_filter = f"AND dd.{player_col} = :player_name"
+        player_names = _resolve_player_names_for_delivery_details(db, player_name, player_col)
+        if not player_names:
+            player_names = [player_name]
+        base_params["player_names"] = player_names
+        player_filter = f"AND dd.{player_col} = ANY(:player_names)"
 
         def _fetch(group_col, extra_filter, extra_params=None):
             p = {**base_params}
@@ -383,13 +538,15 @@ def get_player_line_length_profile(
         similar_line = {}
         similar_line_length_cells = {}
         if similar_players:
-            sim_filter = f"AND dd.{player_col} = ANY(:similar_list)"
-            sim_extra = {"similar_list": similar_players}
-            similar_length = _fetch("length", sim_filter, sim_extra)
-            similar_line = _fetch("line", sim_filter, sim_extra)
-            similar_line_length_cells = _rows_to_line_length_agg(
-                _fetch_line_length(sim_filter, sim_extra)
-            )
+            resolved_similar = _resolve_player_list_for_delivery_details(db, similar_players, player_col)
+            if resolved_similar:
+                sim_filter = f"AND dd.{player_col} = ANY(:similar_list)"
+                sim_extra = {"similar_list": resolved_similar}
+                similar_length = _fetch("length", sim_filter, sim_extra)
+                similar_line = _fetch("line", sim_filter, sim_extra)
+                similar_line_length_cells = _rows_to_line_length_agg(
+                    _fetch_line_length(sim_filter, sim_extra)
+                )
 
         # 4. Bowl-kind / bowl-style averages (bowling mode only)
         bowler_info = None
@@ -401,11 +558,11 @@ def get_player_line_length_profile(
             detect_sql = text("""
                 SELECT bowl_kind, bowl_style, COUNT(*) as cnt
                 FROM delivery_details
-                WHERE bowl = :player_name AND bowl_kind IS NOT NULL
+                WHERE bowl = ANY(:player_names) AND bowl_kind IS NOT NULL
                 GROUP BY bowl_kind, bowl_style
                 ORDER BY cnt DESC LIMIT 1
             """)
-            detect_row = db.execute(detect_sql, {"player_name": player_name}).fetchone()
+            detect_row = db.execute(detect_sql, {"player_names": player_names}).fetchone()
             if detect_row:
                 bowler_info = {
                     "bowl_kind": detect_row.bowl_kind,
@@ -468,7 +625,7 @@ def get_player_line_length_profile(
                    COUNT(CASE WHEN dd.length IS NOT NULL THEN 1 END) as with_length,
                    COUNT(CASE WHEN dd.line IS NOT NULL THEN 1 END) as with_line
             FROM delivery_details dd
-            WHERE dd.{player_col} = :player_name
+            WHERE dd.{player_col} = ANY(:player_names)
             AND (:start_year IS NULL OR dd.year >= :start_year)
             AND (:end_year IS NULL OR dd.year <= :end_year)
             AND (:venue IS NULL OR dd.ground = :venue)
