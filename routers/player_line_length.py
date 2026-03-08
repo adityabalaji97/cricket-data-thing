@@ -4,6 +4,11 @@ Player Line & Length Profile
 Returns line/length aggregated stats for a player compared against
 global averages, optional similar-player averages, and (for bowlers)
 same bowl_kind / bowl_style averages.
+
+Uses the delivery_details table which has columns:
+  bat/bowl (player names), p_match (match id), ground, competition,
+  date, year, length, line, control, batruns, score, dismissal,
+  wide, noball, bowl_kind, bowl_style, team_bat, team_bowl
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,7 +24,6 @@ from utils.league_utils import expand_league_abbreviations
 router = APIRouter(tags=["Player Line & Length"])
 logger = logging.getLogger(__name__)
 
-# Top international teams (matches games.py)
 TOP_INTERNATIONAL_TEAMS = [
     'India', 'Australia', 'England', 'West Indies', 'New Zealand',
     'South Africa', 'Pakistan', 'Sri Lanka', 'Bangladesh', 'Afghanistan',
@@ -33,48 +37,49 @@ LENGTH_LABELS = {
     "FULL": "Full",
     "GOOD_LENGTH": "Good Length",
     "SHORT_OF_LENGTH": "Short of Length",
+    "SHORT_OF_A_GOOD_LENGTH": "Short of Good Length",
     "SHORT": "Short",
 }
 
 LINE_LABELS = {
     "DOWN_LEG": "Down Leg",
     "LEG_STUMP": "Leg Stump",
+    "ON_THE_STUMPS": "On the Stumps",
     "MIDDLE": "Middle",
     "OFF_STUMP": "Off Stump",
+    "OUTSIDE_OFFSTUMP": "Outside Off",
     "OUTSIDE_OFF": "Outside Off",
     "WIDE_OUTSIDE_OFF": "Wide Outside Off",
+    "WIDE_OUTSIDE_OFFSTUMP": "Wide Outside Off",
 }
 
 
-def _build_match_filter(params: dict, leagues: Optional[List[str]],
-                        include_international: bool,
-                        top_teams: Optional[int]) -> str:
-    """Build the competition / match-type filter clause."""
+def _build_comp_filter(params: dict, leagues: Optional[List[str]],
+                       include_international: bool,
+                       top_teams: Optional[int]) -> str:
+    """Build competition filter for delivery_details (no matches join needed)."""
     expanded = expand_league_abbreviations(leagues) if leagues else []
     has_leagues = bool(expanded)
-    params["has_leagues"] = has_leagues
-    params["leagues"] = expanded
-    params["include_international"] = include_international
-    params["top_teams"] = top_teams is not None
-    params["top_team_list"] = TOP_INTERNATIONAL_TEAMS[:top_teams] if top_teams else []
 
-    # When no competition filters are set, don't filter by competition at all
     if not has_leagues and not include_international:
         return ""
 
-    return """
-        AND (
-            (:has_leagues AND m.match_type = 'league' AND m.competition = ANY(:leagues))
-            OR (:include_international AND m.match_type = 'international'
-                AND (:top_teams IS NULL OR
-                    (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
-                )
-            )
+    conditions = []
+    if has_leagues:
+        conditions.append("dd.competition = ANY(:leagues)")
+        params["leagues"] = expanded
+
+    if include_international:
+        top_team_list = TOP_INTERNATIONAL_TEAMS[:top_teams] if top_teams else TOP_INTERNATIONAL_TEAMS[:10]
+        params["top_team_list"] = top_team_list
+        conditions.append(
+            "(dd.competition = 'T20I' AND dd.team_bat = ANY(:top_team_list) AND dd.team_bowl = ANY(:top_team_list))"
         )
-    """
+
+    return "AND (" + " OR ".join(conditions) + ")"
 
 
-def _aggregate_sql(group_col: str, player_filter: str, match_filter: str) -> str:
+def _aggregate_sql(group_col: str, player_filter: str, comp_filter: str) -> str:
     """Return SQL that aggregates line/length metrics from delivery_details."""
     return f"""
         SELECT
@@ -92,19 +97,17 @@ def _aggregate_sql(group_col: str, player_filter: str, match_filter: str) -> str
                               AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) * 100.0 AS FLOAT)
                 / NULLIF(COUNT(*), 0)                           AS dot_pct
         FROM delivery_details dd
-        JOIN matches m ON dd.match_id = m.id
         WHERE dd.{group_col} IS NOT NULL
         {player_filter}
         AND (:start_date IS NULL OR dd.date >= :start_date)
         AND (:end_date IS NULL OR dd.date <= :end_date)
-        AND (:venue IS NULL OR m.venue = :venue)
-        {match_filter}
+        AND (:venue IS NULL OR dd.ground = :venue)
+        {comp_filter}
         GROUP BY dd.{group_col}
     """
 
 
 def _row_to_metrics(row) -> dict:
-    """Extract rounded metrics from a SQL result row."""
     return {
         "strike_rate": round(row.strike_rate, 1) if row.strike_rate else 0,
         "control_pct": round(row.control_pct, 1) if row.control_pct else 0,
@@ -133,19 +136,19 @@ def get_player_line_length_profile(
             "end_date": end_date,
             "venue": venue,
         }
-        match_filter = _build_match_filter(
+        comp_filter = _build_comp_filter(
             base_params, leagues, include_international, top_teams
         )
 
-        player_col = "batter" if mode == "batting" else "bowler"
+        # delivery_details uses 'bat' and 'bowl' columns for player names
+        player_col = "bat" if mode == "batting" else "bowl"
         player_filter = f"AND dd.{player_col} = :player_name"
 
-        # Helper to run an aggregate query
         def _fetch(group_col, extra_filter, extra_params=None):
             p = {**base_params}
             if extra_params:
                 p.update(extra_params)
-            sql = _aggregate_sql(group_col, extra_filter, match_filter)
+            sql = _aggregate_sql(group_col, extra_filter, comp_filter)
             rows = db.execute(text(sql), p).fetchall()
             return {r.bucket: r for r in rows}
 
@@ -175,7 +178,7 @@ def get_player_line_length_profile(
             detect_sql = text("""
                 SELECT bowl_kind, bowl_style, COUNT(*) as cnt
                 FROM delivery_details
-                WHERE bowler = :player_name AND bowl_kind IS NOT NULL
+                WHERE bowl = :player_name AND bowl_kind IS NOT NULL
                 GROUP BY bowl_kind, bowl_style
                 ORDER BY cnt DESC LIMIT 1
             """)
@@ -229,12 +232,11 @@ def get_player_line_length_profile(
                    COUNT(CASE WHEN dd.length IS NOT NULL THEN 1 END) as with_length,
                    COUNT(CASE WHEN dd.line IS NOT NULL THEN 1 END) as with_line
             FROM delivery_details dd
-            JOIN matches m ON dd.match_id = m.id
             WHERE dd.{player_col} = :player_name
             AND (:start_date IS NULL OR dd.date >= :start_date)
             AND (:end_date IS NULL OR dd.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
+            AND (:venue IS NULL OR dd.ground = :venue)
+            {comp_filter}
         """)
         coverage = db.execute(coverage_sql, base_params).fetchone()
 
