@@ -51,11 +51,16 @@ def _build_match_filter(params: dict, leagues: Optional[List[str]],
                         top_teams: Optional[int]) -> str:
     """Build the competition / match-type filter clause."""
     expanded = expand_league_abbreviations(leagues) if leagues else []
-    params["has_leagues"] = bool(expanded)
+    has_leagues = bool(expanded)
+    params["has_leagues"] = has_leagues
     params["leagues"] = expanded
     params["include_international"] = include_international
     params["top_teams"] = top_teams is not None
     params["top_team_list"] = TOP_INTERNATIONAL_TEAMS[:top_teams] if top_teams else []
+
+    # When no competition filters are set, don't filter by competition at all
+    if not has_leagues and not include_international:
+        return ""
 
     return """
         AND (
