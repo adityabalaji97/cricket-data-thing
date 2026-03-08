@@ -76,7 +76,7 @@ def _aggregate_sql(group_col: str, player_filter: str, match_filter: str) -> str
             dd.{group_col}                                      AS bucket,
             COUNT(*)                                            AS balls,
             SUM(dd.batruns)                                     AS runs,
-            SUM(CASE WHEN dd.out THEN 1 ELSE 0 END)            AS wickets,
+            SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) AS wickets,
             CAST(SUM(dd.batruns) * 100.0 AS FLOAT)
                 / NULLIF(COUNT(*), 0)                           AS strike_rate,
             CAST(SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) * 100.0 AS FLOAT)
