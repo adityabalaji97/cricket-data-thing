@@ -233,8 +233,8 @@ def get_player_line_length_profile(
                    COUNT(CASE WHEN dd.line IS NOT NULL THEN 1 END) as with_line
             FROM delivery_details dd
             WHERE dd.{player_col} = :player_name
-            AND (:start_date IS NULL OR dd.date >= :start_date)
-            AND (:end_date IS NULL OR dd.date <= :end_date)
+            AND (:start_year IS NULL OR dd.year >= :start_year)
+            AND (:end_year IS NULL OR dd.year <= :end_year)
             AND (:venue IS NULL OR dd.ground = :venue)
             {comp_filter}
         """)
