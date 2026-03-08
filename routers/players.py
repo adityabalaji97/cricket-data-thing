@@ -103,19 +103,27 @@ def get_dismissal_stats(player_name: str, db: Session = Depends(get_session)):
         rows = db.execute(query, {"player_name": player_name}).fetchall()
 
         overall = {}
-        by_phase = {}
+        by_phase_raw = {}
         for row in rows:
             wt = row.wicket_type
             count = row.count
             phase = row.phase
             overall[wt] = overall.get(wt, 0) + count
-            if phase not in by_phase:
-                by_phase[phase] = {}
-            by_phase[phase][wt] = by_phase[phase].get(wt, 0) + count
+            if phase not in by_phase_raw:
+                by_phase_raw[phase] = {}
+            by_phase_raw[phase][wt] = by_phase_raw[phase].get(wt, 0) + count
+
+        dismissals = [{"type": k, "count": v} for k, v in overall.items()]
+        total_dismissals = sum(v for v in overall.values())
+        by_phase = {
+            phase: [{"type": k, "count": v} for k, v in types.items()]
+            for phase, types in by_phase_raw.items()
+        }
 
         return {
             "player_name": player_name,
-            "overall": overall,
+            "dismissals": dismissals,
+            "total_dismissals": total_dismissals,
             "by_phase": by_phase
         }
     except Exception as e:
@@ -145,19 +153,27 @@ def get_bowling_dismissal_stats(player_name: str, db: Session = Depends(get_sess
         rows = db.execute(query, {"player_name": player_name}).fetchall()
 
         overall = {}
-        by_phase = {}
+        by_phase_raw = {}
         for row in rows:
             wt = row.wicket_type
             count = row.count
             phase = row.phase
             overall[wt] = overall.get(wt, 0) + count
-            if phase not in by_phase:
-                by_phase[phase] = {}
-            by_phase[phase][wt] = by_phase[phase].get(wt, 0) + count
+            if phase not in by_phase_raw:
+                by_phase_raw[phase] = {}
+            by_phase_raw[phase][wt] = by_phase_raw[phase].get(wt, 0) + count
+
+        dismissals = [{"type": k, "count": v} for k, v in overall.items()]
+        total_wickets = sum(v for v in overall.values())
+        by_phase = {
+            phase: [{"type": k, "count": v} for k, v in types.items()]
+            for phase, types in by_phase_raw.items()
+        }
 
         return {
             "player_name": player_name,
-            "overall": overall,
+            "dismissals": dismissals,
+            "total_wickets": total_wickets,
             "by_phase": by_phase
         }
     except Exception as e:
