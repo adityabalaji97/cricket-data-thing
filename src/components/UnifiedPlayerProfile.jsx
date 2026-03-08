@@ -216,7 +216,17 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       {
         id: 'performance',
         label: 'Performance',
-        content: <PerformanceSection stats={currentStats} mode={activeTab} isMobile={isMobile} />,
+        content: (
+          <PerformanceSection
+            stats={currentStats}
+            mode={activeTab}
+            isMobile={isMobile}
+            playerName={selectedPlayer}
+            dateRange={dateRange}
+            selectedVenue={selectedVenue}
+            competitionFilters={competitionFilters}
+          />
+        ),
       },
     ];
 
