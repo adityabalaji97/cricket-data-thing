@@ -152,6 +152,9 @@ def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=No
             print(f"  Chunk {i+1}: All {chunk_size} rows already exist, skipping...", end='\r')
             continue
         
+        # Replace "-" with None in all columns (CSV uses "-" for missing numeric values)
+        df = df.replace('-', None)
+
         # Handle NaN
         df = df.where(pd.notnull(df), None)
         
