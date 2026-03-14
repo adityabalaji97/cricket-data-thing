@@ -276,7 +276,7 @@ def _get_delivery_schema_config(db: Session) -> Dict[str, Any]:
     rows = db.execute(
         text(
             """
-            SELECT column_name
+            SELECT column_name, data_type
             FROM information_schema.columns
             WHERE table_name = 'delivery_details'
               AND table_schema = ANY(current_schemas(false))
@@ -284,6 +284,7 @@ def _get_delivery_schema_config(db: Session) -> Dict[str, Any]:
         )
     ).fetchall()
     columns = {str(row[0]) for row in rows}
+    column_types = {str(row[0]): str(row[1]).lower() for row in rows}
 
     batter_cols = [col for col in ("batter", "bat") if col in columns]
     bowler_cols = [col for col in ("bowler", "bowl") if col in columns]
@@ -306,10 +307,27 @@ def _get_delivery_schema_config(db: Session) -> Dict[str, Any]:
             detail="delivery_details schema missing date/match_date/year required for rankings",
         )
 
-    if len(date_cols) == 2:
-        date_expr = "COALESCE(dd.date, dd.match_date)"
-    elif len(date_cols) == 1:
-        date_expr = f"dd.{date_cols[0]}"
+    if "date" in columns:
+        date_expr = "dd.date"
+    elif "match_date" in columns:
+        match_date_type = column_types.get("match_date", "")
+        if match_date_type == "date":
+            date_expr = "dd.match_date"
+        elif match_date_type.startswith("timestamp"):
+            date_expr = "dd.match_date::date"
+        else:
+            # String-like match_date fallback for schemas without a typed date column.
+            # Supports common YYYY-MM-DD and DD/MM/(YY|YYYY) formats.
+            date_expr = (
+                "CASE "
+                "WHEN NULLIF(TRIM(dd.match_date), '') ~ '^\\d{4}-\\d{2}-\\d{2}$' "
+                "THEN TO_DATE(NULLIF(TRIM(dd.match_date), ''), 'YYYY-MM-DD') "
+                "WHEN NULLIF(TRIM(dd.match_date), '') ~ '^\\d{1,2}/\\d{1,2}/\\d{2}$' "
+                "THEN TO_DATE(NULLIF(TRIM(dd.match_date), ''), 'DD/MM/YY') "
+                "WHEN NULLIF(TRIM(dd.match_date), '') ~ '^\\d{1,2}/\\d{1,2}/\\d{4}$' "
+                "THEN TO_DATE(NULLIF(TRIM(dd.match_date), ''), 'DD/MM/YYYY') "
+                "ELSE NULL END"
+            )
     else:
         date_expr = None
 
