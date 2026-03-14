@@ -1,18 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
   Box,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
+  Collapse,
   LinearProgress,
+  Slider,
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TuneIcon from '@mui/icons-material/Tune';
 import {
   Legend,
   PolarAngleAxis,
@@ -25,65 +23,75 @@ import {
 } from 'recharts';
 
 import config from '../config';
+import VenueSectionTabs from './VenueSectionTabs';
 
 const TEAM_COLORS = ['#1976d2', '#ef6c00', '#2e7d32'];
-const DEFAULT_CATEGORY_WEIGHTS = {
-  win_rate: 0.12,
-  elo: 0.1,
-  batting: 0.18,
-  bowling: 0.18,
-  pace_spin: 0.12,
-  venue_adaptability: 0.1,
-  situational: 0.1,
-  squad_depth: 0.1,
-};
-const DEFAULT_EXPLAINER_STEPS = [
-  'Resolve squad names to canonical players from the roster file.',
-  'Aggregate player-level match data into team metrics by category.',
-  'Convert each metric to percentile scores across all IPL teams.',
-  'Average category metrics, apply weights, and rank teams by composite score.',
+
+const CATEGORY_KEYS = [
+  'win_rate', 'elo', 'batting', 'bowling',
+  'pace_spin', 'venue_adaptability', 'situational', 'squad_depth',
 ];
-const DEFAULT_DATA_SOURCES = [
-  'matches',
-  'batting_stats',
-  'bowling_stats',
-  'deliveries',
-  'delivery_details',
-  'player_aliases',
-  'players',
-  'ipl_rosters',
+
+const WEIGHT_PRESETS = {
+  Balanced: { win_rate: 0.12, elo: 0.10, batting: 0.18, bowling: 0.18, pace_spin: 0.12, venue_adaptability: 0.10, situational: 0.10, squad_depth: 0.10 },
+  'Batting-heavy': { win_rate: 0.10, elo: 0.08, batting: 0.28, bowling: 0.10, pace_spin: 0.10, venue_adaptability: 0.10, situational: 0.12, squad_depth: 0.12 },
+  'Bowling-heavy': { win_rate: 0.10, elo: 0.08, batting: 0.10, bowling: 0.28, pace_spin: 0.12, venue_adaptability: 0.10, situational: 0.10, squad_depth: 0.12 },
+  'Recent Form': { win_rate: 0.22, elo: 0.20, batting: 0.14, bowling: 0.14, pace_spin: 0.08, venue_adaptability: 0.08, situational: 0.08, squad_depth: 0.06 },
+};
+
+const DATE_PRESETS = [
+  { label: '1Y', years: 1 },
+  { label: '2Y', years: 2 },
+  { label: '3Y', years: 3 },
+  { label: 'IPL 2025', start: '2025-03-01', end: '2025-06-01' },
+  { label: 'IPL 2024', start: '2024-03-01', end: '2024-06-01' },
+  { label: 'Custom' },
+];
+
+const SECTIONS = [
+  { id: 'controls', label: 'Controls' },
+  { id: 'leaderboard', label: 'Leaderboard' },
+  { id: 'radar', label: 'Top 3 Radar' },
 ];
 
 const formatLabel = (value) =>
-  value
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 const formatMetricValue = (value) => {
-  if (value === null || value === undefined) {
-    return 'N/A';
-  }
-  if (typeof value !== 'number') {
-    return String(value);
-  }
-  if (Math.abs(value) <= 1) {
-    return value.toFixed(3);
-  }
-  if (Math.abs(value) >= 100) {
-    return value.toFixed(1);
-  }
+  if (value === null || value === undefined) return 'N/A';
+  if (typeof value !== 'number') return String(value);
+  if (Math.abs(value) <= 1) return value.toFixed(3);
+  if (Math.abs(value) >= 100) return value.toFixed(1);
   return value.toFixed(2);
 };
 
+const rerank = (predictions, weights) =>
+  predictions
+    .map((team) => {
+      const composite = Object.entries(weights).reduce(
+        (sum, [cat, w]) => sum + (team.category_scores[cat]?.score || 50) * w,
+        0,
+      );
+      return { ...team, composite_score: composite };
+    })
+    .sort((a, b) => b.composite_score - a.composite_score)
+    .map((team, i) => ({ ...team, rank: i + 1 }));
+
+const normalizeWeights = (weights) => {
+  const total = Object.values(weights).reduce((s, v) => s + v, 0);
+  if (total === 0) return weights;
+  const result = {};
+  for (const k of Object.keys(weights)) result[k] = weights[k] / total;
+  return result;
+};
+
+const toDateStr = (d) => d.toISOString().slice(0, 10);
+
 const RadarTooltip = ({ active, payload, label }) => {
-  if (!active || !payload || !payload.length) {
-    return null;
-  }
+  if (!active || !payload?.length) return null;
   return (
     <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', p: 1.25, borderRadius: 1 }}>
-      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-        {label}
-      </Typography>
+      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{label}</Typography>
       {payload.map((entry) => (
         <Typography key={entry.name} variant="caption" sx={{ display: 'block', color: entry.color }}>
           {entry.name}: {Number(entry.value || 0).toFixed(1)}
@@ -95,178 +103,474 @@ const RadarTooltip = ({ active, payload, label }) => {
 
 const IPLPredictions = () => {
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [error, setError] = useState(null);
   const [payload, setPayload] = useState(null);
-  const [expanded, setExpanded] = useState(null);
+  const [expandedTeam, setExpandedTeam] = useState(null);
 
+  // Controls state
+  const [activeDatePreset, setActiveDatePreset] = useState('1Y');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [activeWeightPreset, setActiveWeightPreset] = useState('Balanced');
+  const [weights, setWeights] = useState(WEIGHT_PRESETS.Balanced);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Section navigation
+  const [activeSection, setActiveSection] = useState('controls');
+  const sectionRefs = useRef({});
+  const observerRef = useRef(null);
+
+  // Intersection observer for active section tracking
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await fetch(`${config.API_URL}/teams/ipl-predictions`);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.dataset.section);
+          }
         }
-        const data = await response.json();
-        setPayload(data);
-      } catch (fetchError) {
-        console.error('Failed to fetch IPL predictions:', fetchError);
-        setError('Failed to load IPL predictions.');
-      } finally {
-        setLoading(false);
-      }
-    };
+      },
+      { rootMargin: '-15% 0px -60% 0px' },
+    );
 
-    load();
+    const refs = sectionRefs.current;
+    for (const id of Object.keys(refs)) {
+      if (refs[id]) observerRef.current.observe(refs[id]);
+    }
+
+    return () => observerRef.current?.disconnect();
+  }, [payload]);
+
+  const setSectionRef = useCallback((id) => (el) => {
+    sectionRefs.current[id] = el;
+    if (el && observerRef.current) observerRef.current.observe(el);
   }, []);
 
-  const predictions = useMemo(() => payload?.predictions ?? [], [payload]);
+  const handleSectionSelect = useCallback((id) => {
+    setActiveSection(id);
+    sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  // Fetch predictions
+  const fetchPredictions = useCallback(async (startDate, endDate, isRefetch = false) => {
+    try {
+      if (isRefetch) setRefetching(true);
+      else setLoading(true);
+      setError(null);
+
+      const params = new URLSearchParams();
+      if (startDate) params.set('start_date', startDate);
+      if (endDate) params.set('end_date', endDate);
+      const qs = params.toString();
+      const url = `${config.API_URL}/teams/ipl-predictions${qs ? `?${qs}` : ''}`;
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setPayload(await response.json());
+    } catch (err) {
+      console.error('Failed to fetch IPL predictions:', err);
+      setError('Failed to load IPL predictions.');
+    } finally {
+      setLoading(false);
+      setRefetching(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => { fetchPredictions(); }, [fetchPredictions]);
+
+  // Date preset handler
+  const handleDatePreset = useCallback((preset) => {
+    setActiveDatePreset(preset.label);
+    if (preset.label === 'Custom') return;
+
+    let start, end;
+    if (preset.start && preset.end) {
+      start = preset.start;
+      end = preset.end;
+    } else if (preset.years) {
+      const now = new Date();
+      end = toDateStr(now);
+      const s = new Date(now);
+      s.setFullYear(s.getFullYear() - preset.years);
+      start = toDateStr(s);
+    }
+    fetchPredictions(start, end, !!payload);
+  }, [fetchPredictions, payload]);
+
+  const handleCustomDateFetch = useCallback(() => {
+    if (customStart && customEnd) {
+      fetchPredictions(customStart, customEnd, !!payload);
+    }
+  }, [customStart, customEnd, fetchPredictions, payload]);
+
+  // Weight handlers
+  const handleWeightPreset = useCallback((name) => {
+    setActiveWeightPreset(name);
+    setWeights(WEIGHT_PRESETS[name]);
+  }, []);
+
+  const handleSliderChange = useCallback((cat, newVal) => {
+    setWeights((prev) => {
+      const updated = { ...prev, [cat]: newVal / 100 };
+      const normalized = normalizeWeights(updated);
+      return normalized;
+    });
+    setActiveWeightPreset(null);
+  }, []);
+
+  // Derived data
+  const rawPredictions = useMemo(() => payload?.predictions ?? [], [payload]);
   const modelExplainer = useMemo(() => payload?.model_explainer ?? {}, [payload]);
-  const categoryWeights = useMemo(
-    () => modelExplainer.category_weights || DEFAULT_CATEGORY_WEIGHTS,
-    [modelExplainer],
+  const categoryMetricKeys = useMemo(() => modelExplainer.category_metric_keys || {}, [modelExplainer]);
+
+  const predictions = useMemo(
+    () => rawPredictions.length ? rerank(rawPredictions, weights) : [],
+    [rawPredictions, weights],
   );
-  const categoryMetricKeys = useMemo(
-    () => modelExplainer.category_metric_keys || {},
-    [modelExplainer],
-  );
-  const explainerSteps = useMemo(
-    () => modelExplainer.steps || DEFAULT_EXPLAINER_STEPS,
-    [modelExplainer],
-  );
-  const dataSources = useMemo(
-    () => modelExplainer.data_sources || DEFAULT_DATA_SOURCES,
-    [modelExplainer],
-  );
-  const categoryKeys = useMemo(
-    () => (predictions[0]?.category_scores ? Object.keys(predictions[0].category_scores) : []),
-    [predictions],
-  );
-  const weightedCategories = useMemo(
-    () =>
-      Object.entries(categoryWeights).sort((left, right) => {
-        return right[1] - left[1];
-      }),
-    [categoryWeights],
-  );
-  const topThree = predictions.slice(0, 3);
+
+  const topThree = useMemo(() => predictions.slice(0, 3), [predictions]);
 
   const radarData = useMemo(
-    () =>
-      categoryKeys.map((categoryKey) => {
-        const point = { category: formatLabel(categoryKey) };
-        topThree.forEach((team) => {
-          point[team.team] = Number(team.category_scores?.[categoryKey]?.score || 0);
-        });
-        return point;
-      }),
-    [categoryKeys, topThree],
+    () => CATEGORY_KEYS.map((cat) => {
+      const point = { category: formatLabel(cat) };
+      topThree.forEach((team) => {
+        point[team.team] = Number(team.category_scores?.[cat]?.score || 0);
+      });
+      return point;
+    }),
+    [topThree],
   );
 
+  // Initial load spinner
+  if (loading && !payload) {
+    return (
+      <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Box sx={{ py: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        IPL Championship Predictions
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Composite score is percentile-based across 8 categories and weighted into a 0-100 ranking.
-      </Typography>
+    <Box sx={{ pb: 3 }}>
+      <VenueSectionTabs
+        sections={SECTIONS}
+        activeSectionId={activeSection}
+        onSectionSelect={handleSectionSelect}
+      />
 
-      {payload?.date_range ? (
-        <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`Date range: ${payload.date_range.start} to ${payload.date_range.end}`}
-          />
-          <Chip size="small" variant="outlined" label={`Teams: ${payload.total_teams || 0}`} />
-          {modelExplainer.version ? <Chip size="small" variant="outlined" label={`Model: ${modelExplainer.version}`} /> : null}
-          {payload.generated_at ? <Chip size="small" variant="outlined" label={`Generated: ${payload.generated_at.slice(0, 19)}Z`} /> : null}
+      {/* Section 1: Controls */}
+      <Box
+        ref={setSectionRef('controls')}
+        data-section="controls"
+        sx={{ scrollMarginTop: '56px', px: { xs: 2, sm: 2.5 }, pt: 2.5 }}
+      >
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+          IPL Championship Predictions
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Composite percentile ranking across 8 categories.
+        </Typography>
+
+        {/* Date range */}
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', mb: 0.75 }}>
+          Date Range
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1.5 }}>
+          {DATE_PRESETS.map((preset) => (
+            <Chip
+              key={preset.label}
+              label={preset.label}
+              size="small"
+              variant={activeDatePreset === preset.label ? 'filled' : 'outlined'}
+              color={activeDatePreset === preset.label ? 'primary' : 'default'}
+              onClick={() => handleDatePreset(preset)}
+              sx={{ fontWeight: 600, fontSize: '0.8rem' }}
+            />
+          ))}
+          {refetching && <CircularProgress size={20} sx={{ ml: 0.5 }} />}
         </Box>
-      ) : null}
 
-      <Card sx={{ mb: 2 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            How This Prediction Is Calculated
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            {modelExplainer.description ||
-              'Composite model using recency-weighted player/team inputs, percentile normalization, and weighted category blending.'}
-          </Typography>
-
-          <Box sx={{ display: 'grid', gap: 0.5, mb: 1.5 }}>
-            {explainerSteps.map((step, index) => (
-              <Typography key={`step-${index}`} variant="body2" color="text.secondary">
-                {index + 1}. {step}
-              </Typography>
-            ))}
+        <Collapse in={activeDatePreset === 'Custom'}>
+          <Box sx={{ display: 'flex', gap: 1.5, mb: 1.5, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Start</Typography>
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                style={{ display: 'block', padding: '6px 8px', border: '1px solid #ccc', borderRadius: 6, fontSize: 14 }}
+              />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary">End</Typography>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                style={{ display: 'block', padding: '6px 8px', border: '1px solid #ccc', borderRadius: 6, fontSize: 14 }}
+              />
+            </Box>
+            <Chip
+              label="Apply"
+              size="small"
+              color="primary"
+              onClick={handleCustomDateFetch}
+              disabled={!customStart || !customEnd}
+              sx={{ fontWeight: 600, mb: 0.5 }}
+            />
           </Box>
+        </Collapse>
 
-          <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-            Category Weights
+        {/* Weight presets */}
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', mb: 0.75 }}>
+          Weight Preset
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1 }}>
+          {Object.keys(WEIGHT_PRESETS).map((name) => (
+            <Chip
+              key={name}
+              label={name}
+              size="small"
+              variant={activeWeightPreset === name ? 'filled' : 'outlined'}
+              color={activeWeightPreset === name ? 'primary' : 'default'}
+              onClick={() => handleWeightPreset(name)}
+              sx={{ fontWeight: 600, fontSize: '0.8rem' }}
+            />
+          ))}
+        </Box>
+
+        <Box
+          onClick={() => setShowAdvanced((v) => !v)}
+          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', mb: 1, color: 'primary.main' }}
+        >
+          <TuneIcon sx={{ fontSize: 16 }} />
+          <Typography variant="caption" sx={{ fontWeight: 600 }}>
+            {showAdvanced ? 'Hide weights' : 'Customize weights'}
           </Typography>
-          <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, mb: 1.5 }}>
-            {weightedCategories.map(([categoryKey, weight]) => (
-              <Box key={`weight-${categoryKey}`}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="caption">{formatLabel(categoryKey)}</Typography>
+        </Box>
+
+        <Collapse in={showAdvanced}>
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+            gap: { xs: 1, sm: 1.5 },
+            mb: 1.5,
+            p: 2,
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+          }}>
+            {CATEGORY_KEYS.map((cat) => (
+              <Box key={cat}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: -0.5 }}>
+                  <Typography variant="caption">{formatLabel(cat)}</Typography>
                   <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                    {(Number(weight) * 100).toFixed(0)}%
+                    {Math.round((weights[cat] || 0) * 100)}%
                   </Typography>
                 </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={Math.max(0, Math.min(100, Number(weight) * 100))}
-                  sx={{ height: 7, borderRadius: 8, mt: 0.4 }}
+                <Slider
+                  size="small"
+                  min={0}
+                  max={40}
+                  value={Math.round((weights[cat] || 0) * 100)}
+                  onChange={(_, v) => handleSliderChange(cat, v)}
+                  sx={{ py: 1 }}
                 />
               </Box>
             ))}
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <Chip
+                label="Reset"
+                size="small"
+                variant="outlined"
+                onClick={() => handleWeightPreset(activeWeightPreset || 'Balanced')}
+                sx={{ fontWeight: 600 }}
+              />
+            </Box>
           </Box>
+        </Collapse>
 
-          <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-            Data Sources Used
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-            {dataSources.map((source) => (
-              <Chip key={source} size="small" variant="outlined" label={source} />
-            ))}
+        {/* Footer meta */}
+        {payload?.date_range && (
+          <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1, mb: 1 }}>
+            <Chip size="small" variant="outlined" label={`${payload.date_range.start} → ${payload.date_range.end}`} />
+            {payload.total_teams ? <Chip size="small" variant="outlined" label={`${payload.total_teams} teams`} /> : null}
+            {modelExplainer.version ? <Chip size="small" variant="outlined" label={`v${modelExplainer.version}`} /> : null}
           </Box>
-        </CardContent>
-      </Card>
+        )}
 
-      {loading ? (
-        <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
-          <CircularProgress />
+        {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+      </Box>
+
+      {/* Section 2: Leaderboard */}
+      <Box
+        ref={setSectionRef('leaderboard')}
+        data-section="leaderboard"
+        sx={{ scrollMarginTop: '56px', px: { xs: 2, sm: 2.5 }, pt: 3 }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
+          Leaderboard
+        </Typography>
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {predictions.map((team) => {
+            const isExpanded = expandedTeam === team.team;
+            return (
+              <Box
+                key={team.team}
+                sx={{
+                  borderRadius: 3,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  boxShadow: 1,
+                  bgcolor: 'background.paper',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setExpandedTeam(isExpanded ? null : team.team)}
+              >
+                {/* Header */}
+                <Box sx={{ px: 2, py: 1.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Box sx={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      bgcolor: 'primary.main', color: 'white',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.75rem', fontWeight: 700, flexShrink: 0,
+                    }}>
+                      {team.rank}
+                    </Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                      {team.team}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {team.team_full_name}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      color="primary"
+                      label={Number(team.composite_score || 0).toFixed(1)}
+                      sx={{ fontWeight: 700, minWidth: 48 }}
+                    />
+                    <ExpandMoreIcon sx={{
+                      fontSize: 20, color: 'text.secondary',
+                      transform: isExpanded ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.2s',
+                    }} />
+                  </Box>
+
+                  {/* Category mini-bars */}
+                  <Box sx={{ display: 'grid', gap: 0.75, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
+                    {CATEGORY_KEYS.map((cat) => {
+                      const score = Number(team.category_scores?.[cat]?.score || 0);
+                      return (
+                        <Box key={cat} sx={{ minWidth: 0 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="caption" color="text.secondary" noWrap>
+                              {formatLabel(cat)}
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontWeight: 600, ml: 0.5 }}>
+                              {score.toFixed(0)}
+                            </Typography>
+                          </Box>
+                          <LinearProgress
+                            variant="determinate"
+                            value={Math.max(0, Math.min(100, score))}
+                            sx={{ height: 6, borderRadius: 8, mt: 0.25 }}
+                          />
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+
+                {/* Expandable detail */}
+                <Collapse in={isExpanded}>
+                  <Box sx={{
+                    px: 2, pb: 2, pt: 0.5,
+                    borderTop: '1px solid',
+                    borderColor: 'divider',
+                    display: 'grid',
+                    gap: 1.25,
+                    gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                  }}>
+                    {CATEGORY_KEYS.map((cat) => {
+                      const category = team.category_scores?.[cat] || {};
+                      const raw = category.raw || {};
+                      const scoringKeySet = new Set(categoryMetricKeys[cat] || []);
+                      const scoringEntries = Object.entries(raw).filter(([k]) => scoringKeySet.has(k));
+                      const supportEntries = Object.entries(raw).filter(([k]) => !scoringKeySet.has(k));
+                      return (
+                        <Box key={cat} sx={{ p: 1.25, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                            {formatLabel(cat)}: {Number(category.score || 0).toFixed(1)}
+                          </Typography>
+                          {scoringEntries.length > 0 && (
+                            <Box sx={{ mb: supportEntries.length ? 0.75 : 0 }}>
+                              <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.25 }}>
+                                Scoring Metrics
+                              </Typography>
+                              {scoringEntries.map(([k, v]) => (
+                                <Typography key={k} variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                  {formatLabel(k)}: {formatMetricValue(v)}
+                                </Typography>
+                              ))}
+                            </Box>
+                          )}
+                          {supportEntries.length > 0 && (
+                            <Box>
+                              <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.25 }}>
+                                Data (Coverage / Volumes)
+                              </Typography>
+                              {supportEntries.map(([k, v]) => (
+                                <Typography key={k} variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                  {formatLabel(k)}: {formatMetricValue(v)}
+                                </Typography>
+                              ))}
+                            </Box>
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Collapse>
+              </Box>
+            );
+          })}
         </Box>
-      ) : null}
+      </Box>
 
-      {error ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      ) : null}
+      {/* Section 3: Top 3 Radar */}
+      <Box
+        ref={setSectionRef('radar')}
+        data-section="radar"
+        sx={{ scrollMarginTop: '56px', px: { xs: 2, sm: 2.5 }, pt: 3, pb: 2 }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
+          Top 3 Radar
+        </Typography>
 
-      {!loading && !error && topThree.length ? (
-        <Card sx={{ mb: 2 }}>
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 1.5 }}>
-              Top 3 Radar (Category Scores)
-            </Typography>
-            <Box sx={{ width: '100%', height: 380 }}>
+        {topThree.length > 0 && (
+          <Box sx={{
+            borderRadius: 3, border: '1px solid', borderColor: 'divider',
+            boxShadow: 1, bgcolor: 'background.paper', p: { xs: 1, sm: 2 },
+          }}>
+            <Box sx={{ width: '100%', height: { xs: 280, md: 380 } }}>
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={radarData} outerRadius="72%">
                   <PolarGrid />
                   <PolarAngleAxis dataKey="category" tick={{ fontSize: 11 }} />
                   <PolarRadiusAxis domain={[0, 100]} tickCount={6} />
-                  {topThree.map((team, index) => (
+                  {topThree.map((team, i) => (
                     <Radar
                       key={team.team}
                       name={`${team.rank}. ${team.team}`}
                       dataKey={team.team}
-                      stroke={TEAM_COLORS[index % TEAM_COLORS.length]}
-                      fill={TEAM_COLORS[index % TEAM_COLORS.length]}
+                      stroke={TEAM_COLORS[i % TEAM_COLORS.length]}
+                      fill={TEAM_COLORS[i % TEAM_COLORS.length]}
                       fillOpacity={0.18}
                       strokeWidth={2}
                     />
@@ -276,107 +580,9 @@ const IPLPredictions = () => {
                 </RadarChart>
               </ResponsiveContainer>
             </Box>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {!loading && !error ? (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 1.5 }}>
-              Leaderboard
-            </Typography>
-            {predictions.map((team) => (
-              <Accordion
-                key={team.team}
-                expanded={expanded === team.team}
-                onChange={(_, isExpanded) => setExpanded(isExpanded ? team.team : null)}
-                disableGutters
-              >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Box sx={{ width: '100%' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                        #{team.rank} {team.team} ({team.team_full_name})
-                      </Typography>
-                      <Chip
-                        size="small"
-                        color="primary"
-                        label={`Composite ${Number(team.composite_score || 0).toFixed(1)}`}
-                      />
-                    </Box>
-                    <Box sx={{ mt: 1, display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
-                      {categoryKeys.map((categoryKey) => {
-                        const score = Number(team.category_scores?.[categoryKey]?.score || 0);
-                        return (
-                          <Box key={`${team.team}-${categoryKey}`} sx={{ minWidth: 0 }}>
-                            <Typography variant="caption" color="text.secondary">
-                              {formatLabel(categoryKey)}
-                            </Typography>
-                            <LinearProgress
-                              variant="determinate"
-                              value={Math.max(0, Math.min(100, score))}
-                              sx={{ height: 7, borderRadius: 8, mt: 0.3 }}
-                            />
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  </Box>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-                    {categoryKeys.map((categoryKey) => {
-                      const category = team.category_scores?.[categoryKey] || {};
-                      const raw = category.raw || {};
-                      const scoringKeySet = new Set(categoryMetricKeys[categoryKey] || []);
-                      const scoringEntries = Object.entries(raw).filter(([metricKey]) => scoringKeySet.has(metricKey));
-                      const supportEntries = Object.entries(raw).filter(([metricKey]) => !scoringKeySet.has(metricKey));
-                      return (
-                        <Card key={`${team.team}-${categoryKey}-detail`} variant="outlined">
-                          <CardContent sx={{ py: 1.25 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.75 }}>
-                              {formatLabel(categoryKey)}: {Number(category.score || 0).toFixed(1)}
-                            </Typography>
-                            {scoringEntries.length ? (
-                              <Box sx={{ mb: supportEntries.length ? 1 : 0 }}>
-                                <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.35 }}>
-                                  Scoring Metrics
-                                </Typography>
-                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 0.35 }}>
-                                  {scoringEntries.map(([metricKey, metricValue]) => (
-                                    <Typography key={`${team.team}-${categoryKey}-${metricKey}`} variant="caption" color="text.secondary">
-                                      {formatLabel(metricKey)}: {formatMetricValue(metricValue)}
-                                    </Typography>
-                                  ))}
-                                </Box>
-                              </Box>
-                            ) : null}
-                            {supportEntries.length ? (
-                              <Box>
-                                <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.35 }}>
-                                  Data Used (Coverage / Volumes)
-                                </Typography>
-                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 0.35 }}>
-                                  {supportEntries.map(([metricKey, metricValue]) => (
-                                    <Typography key={`${team.team}-${categoryKey}-${metricKey}`} variant="caption" color="text.secondary">
-                                      {formatLabel(metricKey)}: {formatMetricValue(metricValue)}
-                                    </Typography>
-                                  ))}
-                                </Box>
-                              </Box>
-                            ) : null}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </Box>
-                </AccordionDetails>
-              </Accordion>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 };

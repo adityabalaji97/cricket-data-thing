@@ -254,7 +254,7 @@ def _default_date_range(
     end_date: Optional[date] = None,
 ) -> Tuple[date, date]:
     end = end_date or date.today()
-    start = start_date or (end - timedelta(days=365 * 3))
+    start = start_date or (end - timedelta(days=365))
     return start, end
 
 
