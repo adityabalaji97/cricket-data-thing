@@ -52,7 +52,6 @@ import math
 from dotenv import load_dotenv
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
-import os
 
 # Load environment variables from .env file
 load_dotenv()
@@ -62,7 +61,7 @@ from utils.league_utils import expand_league_abbreviations
 
 logging.basicConfig(filename='venue_stats.log', level=logging.INFO)
 
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 app = FastAPI(title="Cricket Stats API")
 app.include_router(matchups_router)
@@ -93,7 +92,6 @@ app.add_middleware(
 
 FRONTEND_BUILD_DIR = Path(__file__).resolve().parent / "build"
 FRONTEND_INDEX_FILE = FRONTEND_BUILD_DIR / "index.html"
-FRONTEND_APP_URL = os.getenv("FRONTEND_APP_URL", "https://cricket-data-thing.vercel.app")
 
 if (FRONTEND_BUILD_DIR / "static").exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD_DIR / "static")), name="frontend-static")
@@ -143,12 +141,269 @@ def read_root():
             "version": "1.0"}
 
 
+def _build_ipl_predictions_dashboard_html() -> str:
+    return """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IPL Championship Predictions</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-soft: #111827;
+      --card: #111827;
+      --card-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #f59e0b;
+      --line: #374151;
+      --ok: #10b981;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 20% 10%, #1f2937 0%, var(--bg) 45%, #020617 100%);
+      color: var(--text);
+      padding: 24px;
+    }
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+    .card {
+      background: linear-gradient(160deg, rgba(17,24,39,.96), rgba(15,23,42,.96));
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    h2 { font-size: 1.05rem; margin-bottom: 8px; }
+    .muted { color: var(--muted); }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: .78rem;
+      color: var(--muted);
+      padding: 4px 10px;
+      background: rgba(17,24,39,.75);
+    }
+    .steps { margin: 8px 0 0 0; padding-left: 18px; color: var(--muted); }
+    .steps li { margin: 4px 0; }
+    .weights { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); margin-top: 10px; }
+    .weight-row { border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: rgba(31,41,55,.35); }
+    .weight-header { display: flex; justify-content: space-between; font-size: .78rem; color: var(--muted); margin-bottom: 5px; }
+    .bar { width: 100%; height: 8px; background: rgba(148,163,184,.22); border-radius: 999px; overflow: hidden; }
+    .bar > span { height: 100%; display: block; background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 960px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 8px; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: .78rem; }
+    td { font-size: .88rem; }
+    .rank { font-weight: 700; color: var(--accent); }
+    .score { font-weight: 700; }
+    details { margin: 10px 0 2px 0; }
+    summary { cursor: pointer; color: #cbd5e1; font-weight: 600; }
+    .cat-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); margin-top: 10px; }
+    .cat-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(2,6,23,.5);
+    }
+    .cat-title { font-size: .82rem; font-weight: 700; color: #f3f4f6; margin-bottom: 6px; }
+    .kv { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 5px 8px; font-size: .76rem; }
+    .kv dt { color: var(--muted); margin: 0; }
+    .kv dd { margin: 0; color: #d1d5db; font-variant-numeric: tabular-nums; }
+    .subhead {
+      margin: 8px 0 6px 0;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #94a3b8;
+    }
+    .loading, .error {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: .86rem;
+      background: rgba(17,24,39,.55);
+      color: #cbd5e1;
+    }
+    .error { border-color: #7f1d1d; color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="card">
+      <h1>IPL Championship Predictions</h1>
+      <p class="muted" style="margin: 0;">
+        Live model output for all 10 IPL teams with scoring methodology, category breakdowns, and raw data inputs.
+      </p>
+      <div id="meta" class="chips"></div>
+    </section>
+
+    <section class="card">
+      <h2>How This Is Calculated</h2>
+      <p id="description" class="muted" style="margin: 0;"></p>
+      <ol id="steps" class="steps"></ol>
+      <h3 style="font-size: .95rem; margin-top: 12px;">Category Weights</h3>
+      <div id="weights" class="weights"></div>
+      <h3 style="font-size: .95rem; margin-top: 12px;">Data Sources</h3>
+      <div id="sources" class="chips"></div>
+    </section>
+
+    <section class="card">
+      <h2>All 10 Teams</h2>
+      <div id="status" class="loading">Loading predictions...</div>
+      <div id="table" class="table-wrap" style="display:none;"></div>
+    </section>
+  </main>
+
+  <script>
+    const fmtLabel = (value) => String(value || '')
+      .replace(/_/g, ' ')
+      .replace(/\\b\\w/g, (ch) => ch.toUpperCase());
+
+    const fmtValue = (value) => {
+      if (value === null || value === undefined) return 'N/A';
+      if (typeof value !== 'number') return String(value);
+      if (Math.abs(value) <= 1) return value.toFixed(3);
+      if (Math.abs(value) >= 100) return value.toFixed(1);
+      return value.toFixed(2);
+    };
+
+    const escapeHtml = (value) => String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+
+    const renderKv = (entries) => {
+      if (!entries.length) return '<p class="muted" style="margin:0;">No data</p>';
+      return `<dl class="kv">${entries.map(([k, v]) => `
+        <dt>${escapeHtml(fmtLabel(k))}</dt>
+        <dd>${escapeHtml(fmtValue(v))}</dd>
+      `).join('')}</dl>`;
+    };
+
+    async function load() {
+      const statusEl = document.getElementById('status');
+      const tableEl = document.getElementById('table');
+      try {
+        const response = await fetch('/teams/ipl-predictions');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        const explainer = payload.model_explainer || {};
+        const categoryWeights = explainer.category_weights || {};
+        const metricKeys = explainer.category_metric_keys || {};
+        const predictions = payload.predictions || [];
+
+        document.getElementById('meta').innerHTML = `
+          <span class="chip">Date Range: ${escapeHtml(payload.date_range?.start || 'N/A')} to ${escapeHtml(payload.date_range?.end || 'N/A')}</span>
+          <span class="chip">Generated: ${escapeHtml(payload.generated_at || 'N/A')}</span>
+          <span class="chip">Teams: ${escapeHtml(payload.total_teams || 0)}</span>
+          <span class="chip">Model: ${escapeHtml(explainer.version || 'N/A')}</span>
+        `;
+
+        document.getElementById('description').textContent = explainer.description || 'No model description provided.';
+        document.getElementById('steps').innerHTML = (explainer.steps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join('');
+        document.getElementById('sources').innerHTML = (explainer.data_sources || []).map((source) => `<span class="chip">${escapeHtml(source)}</span>`).join('');
+        document.getElementById('weights').innerHTML = Object.entries(categoryWeights)
+          .sort((a, b) => b[1] - a[1])
+          .map(([category, weight]) => `
+            <div class="weight-row">
+              <div class="weight-header">
+                <span>${escapeHtml(fmtLabel(category))}</span>
+                <strong>${escapeHtml((Number(weight) * 100).toFixed(0))}%</strong>
+              </div>
+              <div class="bar"><span style="width:${Math.max(0, Math.min(100, Number(weight) * 100))}%"></span></div>
+            </div>
+          `)
+          .join('');
+
+        const header = `
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Team</th>
+                <th>Composite Score</th>
+                <th>Category Scores (0-100)</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        const rows = predictions.map((team) => {
+          const categories = team.category_scores || {};
+          const categorySummary = Object.entries(categories)
+            .map(([k, v]) => `${fmtLabel(k)}: ${fmtValue(v?.score)}`)
+            .join(' | ');
+
+          const detailsHtml = Object.entries(categories).map(([categoryKey, categoryValue]) => {
+            const raw = categoryValue?.raw || {};
+            const scoringSet = new Set(metricKeys[categoryKey] || []);
+            const scoringEntries = Object.entries(raw).filter(([key]) => scoringSet.has(key));
+            const supportEntries = Object.entries(raw).filter(([key]) => !scoringSet.has(key));
+            return `
+              <div class="cat-card">
+                <div class="cat-title">${escapeHtml(fmtLabel(categoryKey))}: ${escapeHtml(fmtValue(categoryValue?.score))}</div>
+                <div class="subhead">Scoring Metrics</div>
+                ${renderKv(scoringEntries)}
+                <div class="subhead">Data Used (Coverage / Volumes)</div>
+                ${renderKv(supportEntries)}
+              </div>
+            `;
+          }).join('');
+
+          return `
+            <tr>
+              <td class="rank">#${escapeHtml(team.rank)}</td>
+              <td>
+                <strong>${escapeHtml(team.team)}</strong><br />
+                <span class="muted">${escapeHtml(team.team_full_name || '')}</span>
+              </td>
+              <td class="score">${escapeHtml(fmtValue(team.composite_score))}</td>
+              <td class="muted">${escapeHtml(categorySummary)}</td>
+              <td>
+                <details>
+                  <summary>Open team metrics + data inputs</summary>
+                  <div class="cat-grid">${detailsHtml}</div>
+                </details>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        tableEl.innerHTML = `${header}${rows}</tbody></table>`;
+        statusEl.style.display = 'none';
+        tableEl.style.display = 'block';
+      } catch (error) {
+        statusEl.className = 'error';
+        statusEl.textContent = `Failed to load predictions: ${error.message}`;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
+"""
+
+
 @app.get("/ipl-predictions", include_in_schema=False)
 @app.get("/ipl-predictions/", include_in_schema=False)
 def serve_ipl_predictions_page():
-    if not FRONTEND_INDEX_FILE.exists():
-        return RedirectResponse(url=f"{FRONTEND_APP_URL}/ipl-predictions", status_code=307)
-    return FileResponse(str(FRONTEND_INDEX_FILE))
+    return HTMLResponse(content=_build_ipl_predictions_dashboard_html())
 
 
 @app.get("/asset-manifest.json", include_in_schema=False)
