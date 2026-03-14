@@ -42,7 +42,7 @@ const GlobalRankTooltip = ({ active, payload, label }) => {
 const GlobalT20RankSection = ({ mode, rankPayload, loading }) => {
   const modePayload = mode === 'bowling' ? rankPayload?.bowling : rankPayload?.batting;
   const ranking = modePayload?.ranking;
-  const trajectory = (modePayload?.trajectory || []).slice(-12).map((point) => ({
+  const trajectory = (modePayload?.trajectory || []).slice(-6).map((point) => ({
     ...point,
     label: point.date ? point.date.slice(2, 7) : '--',
     score: point.quality_score,
@@ -115,7 +115,7 @@ const GlobalT20RankSection = ({ mode, rankPayload, loading }) => {
 
       <Box>
         <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
-          Last 12 Months
+          Last 6 Months
         </Typography>
         <Box sx={{ mt: 0.5, height: 120, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75 }}>
           {hasTrajectoryValues ? (
@@ -288,7 +288,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         const params = new URLSearchParams();
         params.set('start_date', dateRange.start);
         params.set('end_date', dateRange.end);
-        params.set('snapshots', '12');
+        params.set('snapshots', '6');
         params.set('mode', activeTab === 'bowling' ? 'bowling' : 'batting');
 
         const response = await fetch(

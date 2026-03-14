@@ -214,7 +214,7 @@ const RankingCard = ({
 
           <Box>
             <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Career Trajectory (Last 12 Months)
+              Career Trajectory (Last 6 Months)
             </Typography>
             <Box sx={{ mt: 0.5, height: 120, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75 }}>
               {trajectoryLoading ? (
@@ -381,7 +381,7 @@ const GlobalT20Rankings = () => {
       const params = new URLSearchParams();
       params.set('start_date', startDate);
       params.set('end_date', endDate);
-      params.set('snapshots', '12');
+      params.set('snapshots', '6');
       params.set('mode', mode);
       if (bowlKind !== 'all') params.set('bowl_kind', bowlKind);
 
