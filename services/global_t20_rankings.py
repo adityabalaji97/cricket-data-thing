@@ -29,12 +29,20 @@ from sqlalchemy.sql import text
 from services.player_aliases import get_player_names
 
 try:
+    import numpy as np
+except Exception:  # pragma: no cover - optional runtime dependency
+    np = None
+
+try:
     import pandas as pd
+except Exception:  # pragma: no cover - optional runtime dependency
+    pd = None
+
+try:
     import statsmodels.formula.api as smf
 
     HAS_STATSMODELS = True
 except Exception:  # pragma: no cover - fallback path
-    pd = None
     smf = None
     HAS_STATSMODELS = False
 
@@ -747,6 +755,61 @@ def _fit_competition_weights_mixedlm(rows: Sequence[Dict[str, Any]]) -> Optional
         return None
 
 
+def _fit_competition_weights_centered_wls(rows: Sequence[Dict[str, Any]]) -> Optional[Dict[str, float]]:
+    """
+    Robust fallback when MixedLM is unstable:
+    - center log_deviation within each player (removes player intercept)
+    - fit weighted least squares on competition dummies
+    """
+    if not rows or pd is None or np is None:
+        return None
+
+    df = pd.DataFrame(rows)
+    if df.empty or df["competition"].nunique() < 2:
+        return None
+    if df["player"].nunique() < 8:
+        return None
+
+    try:
+        df = df.copy()
+        df["log_deviation"] = df["log_deviation"].astype(float)
+        df["balls"] = df["balls"].astype(float).clip(lower=1.0)
+        df["player_mean"] = df.groupby("player")["log_deviation"].transform("mean")
+        df["y_centered"] = df["log_deviation"] - df["player_mean"]
+
+        design = pd.get_dummies(df["competition"], dtype=float)
+        if design.empty:
+            return None
+
+        x = design.to_numpy(dtype=float)
+        y = df["y_centered"].to_numpy(dtype=float)
+        w = df["balls"].to_numpy(dtype=float)
+        sqrt_w = np.sqrt(w)
+
+        xw = x * sqrt_w[:, None]
+        yw = y * sqrt_w
+        beta, *_ = np.linalg.lstsq(xw, yw, rcond=None)
+
+        raw_weights: Dict[str, float] = {}
+        for idx, comp in enumerate(design.columns.tolist()):
+            raw_weights[str(comp)] = math.exp(float(beta[idx]))
+
+        if not raw_weights:
+            return None
+
+        med = median(raw_weights.values())
+        if med <= 0:
+            med = 1.0
+
+        return {
+            comp: _clamp(weight / med, 0.70, 1.40)
+            for comp, weight in raw_weights.items()
+        }
+    except Exception as exc:  # pragma: no cover - data-dependent
+        logger.warning("Centered WLS competition weights failed, using default fallback: %s", exc)
+        return None
+
+
 def _merge_competition_weights(computed: Optional[Dict[str, float]]) -> Dict[str, float]:
     merged = dict(DEFAULT_COMPETITION_WEIGHTS)
 
@@ -775,11 +838,28 @@ def _get_competition_weights(
     totals = dict(batting_totals) if batting_totals is not None else _fetch_batting_totals(db, start, end)
 
     comp_rows = _build_comp_weight_rows(cells, totals)
-    computed = _fit_competition_weights_mixedlm(comp_rows)
+
+    computed: Optional[Dict[str, float]] = None
+    source = "fallback_insufficient_cross_league"
+
+    if comp_rows:
+        computed = _fit_competition_weights_mixedlm(comp_rows)
+        if computed:
+            source = "mixedlm"
+        else:
+            centered = _fit_competition_weights_centered_wls(comp_rows)
+            if centered:
+                computed = centered
+                source = "centered_wls"
+            elif not HAS_STATSMODELS and (pd is None or np is None):
+                source = "fallback_statsmodels_missing"
+    else:
+        if not HAS_STATSMODELS and (pd is None or np is None):
+            source = "fallback_statsmodels_missing"
 
     payload = {
         "weights": _merge_competition_weights(computed),
-        "source": "mixedlm" if computed else ("fallback_statsmodels_missing" if not HAS_STATSMODELS else "fallback_insufficient_cross_league"),
+        "source": source,
         "cross_league_samples": len(comp_rows),
     }
 
@@ -1397,7 +1477,7 @@ def _build_player_trajectory(
             start=window_start,
             end=month_end,
             bowl_kind=bowl_kind,
-            force_refresh=False,
+            force_refresh=force_refresh,
         )
 
         row = _find_player_row(payload.get("rankings", []), player_candidates)

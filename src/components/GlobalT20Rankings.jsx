@@ -90,6 +90,8 @@ const RankingCard = ({
 }) => {
   const baseParams = row.base_params || {};
   const perCompetition = row.per_competition || {};
+  const hasTrajectoryValues = Array.isArray(trajectory)
+    && trajectory.some((point) => point?.quality_score !== null && point?.quality_score !== undefined);
 
   return (
     <Box
@@ -219,7 +221,7 @@ const RankingCard = ({
                 <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <CircularProgress size={18} />
                 </Box>
-              ) : trajectory && trajectory.length ? (
+              ) : hasTrajectoryValues ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trajectory} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
                     <XAxis dataKey="label" tick={{ fontSize: 10 }} />
