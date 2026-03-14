@@ -125,8 +125,9 @@ def resolve_names_via_db(rosters: dict) -> dict:
             for player in data["players"]:
                 original_name = player["name"]
 
-                # Try alias resolution first
-                names = get_player_names(original_name, db)
+                # Try direct alias resolution first (new/display name -> legacy name)
+                legacy_candidate = resolve_to_legacy_name(original_name, db)
+                names = get_player_names(legacy_candidate, db)
                 legacy = names["legacy_name"]
 
                 # Check if this legacy name exists in our players table
@@ -142,15 +143,48 @@ def resolve_names_via_db(rosters: dict) -> dict:
                         print(f"  Resolved: {original_name} -> {legacy}")
                     continue
 
-                # Try fuzzy match against players table
+                # Try fuzzy match across both players.name and player_aliases.alias_name
+                search_term = original_name.strip().lower()
+                surname = original_name.split()[-1].lower() if original_name.split() else search_term
                 fuzzy = db.execute(
                     text("""
-                        SELECT name FROM players
-                        WHERE LOWER(name) LIKE :pattern
-                        ORDER BY LENGTH(name)
+                        WITH candidates AS (
+                            SELECT
+                                p.name AS legacy_name,
+                                p.name AS matched_name,
+                                1 AS source_rank
+                            FROM players p
+                            WHERE LOWER(p.name) LIKE :full_pattern
+                               OR LOWER(p.name) LIKE :surname_pattern
+
+                            UNION ALL
+
+                            SELECT
+                                pa.player_name AS legacy_name,
+                                pa.alias_name AS matched_name,
+                                2 AS source_rank
+                            FROM player_aliases pa
+                            WHERE LOWER(pa.alias_name) LIKE :full_pattern
+                               OR LOWER(pa.alias_name) LIKE :surname_pattern
+                        )
+                        SELECT legacy_name
+                        FROM candidates
+                        ORDER BY
+                            source_rank ASC,
+                            CASE
+                                WHEN LOWER(matched_name) = :exact THEN 0
+                                WHEN LOWER(matched_name) LIKE :prefix THEN 1
+                                ELSE 2
+                            END ASC,
+                            LENGTH(matched_name) ASC
                         LIMIT 3
                     """),
-                    {"pattern": f"%{original_name.split()[-1].lower()}%"}
+                    {
+                        "full_pattern": f"%{search_term}%",
+                        "surname_pattern": f"%{surname}%",
+                        "exact": search_term,
+                        "prefix": f"{search_term}%",
+                    }
                 ).fetchall()
 
                 if fuzzy:

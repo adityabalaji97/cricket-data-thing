@@ -9,6 +9,7 @@ from services.teams_batting_order import get_team_batting_order_service
 from services.teams_bowling_order import get_team_bowling_order_service
 from services.elo import get_team_elo_stats_service, get_team_matches_with_elo_service, get_teams_elo_rankings_service, get_teams_elo_history_service
 from services.team_roster import get_team_roster_service
+from services.team_h2h import get_team_h2h_summary_service
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -463,5 +464,21 @@ def get_team_roster(
     """
     try:
         return get_team_roster_service(team_name=team_name, db=db)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{team_name}/h2h-summary")
+def get_team_h2h_summary(
+    team_name: str,
+    db: Session = Depends(get_session)
+):
+    """
+    Get IPL head-to-head summary for a team against all other active IPL teams.
+    """
+    try:
+        return get_team_h2h_summary_service(team_name=team_name, db=db)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

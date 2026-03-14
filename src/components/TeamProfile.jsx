@@ -1,63 +1,75 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Container, 
-  Box, 
-  Button, 
-  Typography, 
-  TextField, 
-  CircularProgress, 
-  Alert, 
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
   Autocomplete,
+  Box,
+  Button,
   Card,
   CardContent,
-  Grid,
+  CircularProgress,
+  Container,
+  FormControlLabel,
   Switch,
-  FormControlLabel
+  TextField,
+  Typography,
 } from '@mui/material';
-import { useLocation, useNavigate } from 'react-router-dom';
-import CompetitionFilter from './CompetitionFilter';
-import TeamStatsCards from './TeamStatsCards';
-import TeamPhasePerformanceRadar from './TeamPhasePerformanceRadar';
-import TeamBowlingPhasePerformanceRadar from './TeamBowlingPhasePerformanceRadar';
+import { useNavigate } from 'react-router-dom';
+
+import CustomPlayerSelector from './CustomPlayerSelector';
+import EloStatsCard from './EloStatsCard';
 import TeamBattingOrderCard from './TeamBattingOrderCard';
 import TeamBowlingOrderCard from './TeamBowlingOrderCard';
-import EloStatsCard from './EloStatsCard';
-import CustomPlayerSelector from './CustomPlayerSelector';
+import TeamBowlingPhasePerformanceRadar from './TeamBowlingPhasePerformanceRadar';
+import TeamChampionshipSection from './TeamChampionshipSection';
+import TeamH2HSection from './TeamH2HSection';
+import TeamPhasePerformanceRadar from './TeamPhasePerformanceRadar';
+import TeamSquadSection from './TeamSquadSection';
+import TeamStatsCards from './TeamStatsCards';
+import VenueNotesCardShell from './VenueNotesCardShell';
+import VenueNotesDesktopNav from './VenueNotesDesktopNav';
+import VenueSectionTabs from './VenueSectionTabs';
+import RecentFormStrip from './playerProfile/RecentFormStrip';
 import config from '../config';
 import { DEFAULT_START_DATE, TODAY } from '../utils/dateDefaults';
 
+const OVERVIEW_SECTION_ID = 'overview';
+
+const parseRunsFromScore = (scoreText) => {
+  if (!scoreText) {
+    return 0;
+  }
+  const [runsPart] = String(scoreText).split('/');
+  const parsed = Number.parseInt(runsPart, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const TeamProfile = ({ isMobile }) => {
-  const location = useLocation();
   const navigate = useNavigate();
-  
-  // Helper function to get URL parameters
-  const getQueryParam = (param) => {
-    const searchParams = new URLSearchParams(location.search);
-    return searchParams.get(param);
-  };
-  
-  // Mode state: false = team mode, true = custom players mode
+
   const [isCustomMode, setIsCustomMode] = useState(false);
-  
-  // Team mode state
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [teams, setTeams] = useState([]);
-  
-  // Custom players mode state
   const [customPlayers, setCustomPlayers] = useState([]);
-  
-  // Shared state
+
   const [dateRange, setDateRange] = useState({ start: DEFAULT_START_DATE, end: TODAY });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
   const [teamData, setTeamData] = useState(null);
   const [phaseStats, setPhaseStats] = useState(null);
   const [bowlingPhaseStats, setBowlingPhaseStats] = useState(null);
   const [eloStats, setEloStats] = useState(null);
   const [battingOrderData, setBattingOrderData] = useState(null);
   const [bowlingOrderData, setBowlingOrderData] = useState(null);
+  const [rosterData, setRosterData] = useState(null);
+  const [h2hSummaryData, setH2HSummaryData] = useState(null);
+  const [championshipData, setChampionshipData] = useState(null);
+
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  const [activeSectionId, setActiveSectionId] = useState(OVERVIEW_SECTION_ID);
+  const sectionRefs = useRef({});
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -65,74 +77,89 @@ const TeamProfile = ({ isMobile }) => {
         const teamsRes = await fetch(`${config.API_URL}/teams`);
         const teamsList = await teamsRes.json();
         setTeams(teamsList);
-        
-        // Get team name from URL if present
-        const teamNameFromURL = getQueryParam('team');
-        const autoload = getQueryParam('autoload') === 'true';
-        const startDateFromURL = getQueryParam('start_date');
-        const endDateFromURL = getQueryParam('end_date');
-        
-        // Update date range from URL parameters if present
+
+        const searchParams = new URLSearchParams(window.location.search);
+        const teamNameFromURL = searchParams.get('team');
+        const autoload = searchParams.get('autoload') === 'true';
+        const startDateFromURL = searchParams.get('start_date');
+        const endDateFromURL = searchParams.get('end_date');
+
         if (startDateFromURL || endDateFromURL) {
           setDateRange({
             start: startDateFromURL || DEFAULT_START_DATE,
-            end: endDateFromURL || TODAY
+            end: endDateFromURL || TODAY,
           });
         }
-        
+
         if (teamNameFromURL) {
-          // Find team by either full name or abbreviated name
-          const team = teamsList.find(t => 
-            t.full_name === teamNameFromURL || t.abbreviated_name === teamNameFromURL
+          const team = teamsList.find(
+            (candidate) =>
+              candidate.full_name === teamNameFromURL || candidate.abbreviated_name === teamNameFromURL,
           );
           if (team) {
             setSelectedTeam(team);
-            
-            // Auto-trigger data fetch if autoload parameter is true
             if (autoload) {
-              setTimeout(() => {
-                setShouldFetch(true);
-              }, 500);
+              setTimeout(() => setShouldFetch(true), 500);
             }
           }
         }
-        
+
         setInitialLoadComplete(true);
-      } catch (error) {
-        console.error('Error fetching initial data:', error);
+      } catch (fetchError) {
+        console.error('Error fetching initial data:', fetchError);
         setError('Failed to load initial data');
         setInitialLoadComplete(true);
       }
     };
+
     fetchInitialData();
   }, []);
 
-  // Update URL when user changes filters
   useEffect(() => {
-    if (!initialLoadComplete) return;
-    
+    if (!initialLoadComplete) {
+      return;
+    }
+
     const searchParams = new URLSearchParams();
-    
     if (!isCustomMode && selectedTeam) {
       searchParams.set('team', selectedTeam.abbreviated_name);
     }
-    
     if (dateRange.start !== DEFAULT_START_DATE) {
       searchParams.set('start_date', dateRange.start);
     }
-    
     if (dateRange.end !== TODAY) {
       searchParams.set('end_date', dateRange.end);
     }
-    
-    if (teamData) {
+    if (teamData || (isCustomMode && (phaseStats || bowlingPhaseStats || battingOrderData || bowlingOrderData))) {
       searchParams.set('autoload', 'true');
     }
-    
-    // Update URL without reloading the page
+
     const newUrl = searchParams.toString() ? `?${searchParams.toString()}` : '';
     navigate(newUrl, { replace: true });
-  }, [selectedTeam, dateRange, teamData, initialLoadComplete, navigate, isCustomMode]);
+  }, [
+    selectedTeam,
+    dateRange,
+    teamData,
+    phaseStats,
+    bowlingPhaseStats,
+    battingOrderData,
+    bowlingOrderData,
+    initialLoadComplete,
+    navigate,
+    isCustomMode,
+  ]);
+
+  const resetFetchedData = useCallback(() => {
+    setTeamData(null);
+    setPhaseStats(null);
+    setBowlingPhaseStats(null);
+    setEloStats(null);
+    setBattingOrderData(null);
+    setBowlingOrderData(null);
+    setRosterData(null);
+    setH2HSummaryData(null);
+    setChampionshipData(null);
+  }, []);
 
   const handleFetch = () => {
     if (isCustomMode && customPlayers.length === 0) {
@@ -146,114 +173,121 @@ const TeamProfile = ({ isMobile }) => {
     setShouldFetch(true);
   };
 
-  // Handle mode toggle
   const handleModeToggle = (event) => {
     setIsCustomMode(event.target.checked);
     setError(null);
-    setTeamData(null);
-    setPhaseStats(null);
-    setBowlingPhaseStats(null);
-    setEloStats(null);
-    setBattingOrderData(null);
-    setBowlingOrderData(null);
+    resetFetchedData();
     setShouldFetch(false);
+    setActiveSectionId(OVERVIEW_SECTION_ID);
   };
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!shouldFetch) return;
-      
+      if (!shouldFetch) {
+        return;
+      }
+
       if (isCustomMode && customPlayers.length === 0) {
         setError('Please select at least one player');
         return;
       }
-      
       if (!isCustomMode && !selectedTeam) {
         setError('Please select a team');
         return;
       }
-      
+
       setLoading(true);
       setError(null);
-      
+
       try {
         const params = new URLSearchParams();
-        if (dateRange.start) params.append('start_date', dateRange.start);
-        if (dateRange.end) params.append('end_date', dateRange.end);
-        
-        let requests = [];
-        
+        if (dateRange.start) {
+          params.append('start_date', dateRange.start);
+        }
+        if (dateRange.end) {
+          params.append('end_date', dateRange.end);
+        }
+
         if (isCustomMode) {
-          // Custom players mode - only fetch visualization data
-          customPlayers.forEach(player => params.append('players', player));
-          
-          requests = [
+          customPlayers.forEach((player) => params.append('players', player));
+
+          const requests = await Promise.all([
             fetch(`${config.API_URL}/teams/phase-stats?${params}`),
             fetch(`${config.API_URL}/teams/bowling-phase-stats?${params}`),
             fetch(`${config.API_URL}/teams/batting-order?${params}`),
-            fetch(`${config.API_URL}/teams/bowling-order?${params}`)
-          ];
-          
-          const [phaseStatsResponse, bowlingPhaseStatsResponse, battingOrderResponse, bowlingOrderResponse] = await Promise.all(requests);
-          
-          if (!phaseStatsResponse.ok || !bowlingPhaseStatsResponse.ok || !battingOrderResponse.ok || !bowlingOrderResponse.ok) {
-            throw new Error(`HTTP error! phase: ${phaseStatsResponse.status}, bowling: ${bowlingPhaseStatsResponse.status}, batting-order: ${battingOrderResponse.status}, bowling-order: ${bowlingOrderResponse.status}`);
-          }
-          
-          const [phaseStatsData, bowlingPhaseStatsData, battingOrderData, bowlingOrderData] = await Promise.all([
-            phaseStatsResponse.json(),
-            bowlingPhaseStatsResponse.json(),
-            battingOrderResponse.json(),
-            bowlingOrderResponse.json()
+            fetch(`${config.API_URL}/teams/bowling-order?${params}`),
           ]);
-          
-          setPhaseStats(phaseStatsData.phase_stats);
-          setBowlingPhaseStats(bowlingPhaseStatsData.bowling_phase_stats);
-          setBattingOrderData(battingOrderData);
-          setBowlingOrderData(bowlingOrderData);
-          
-          // Clear team-specific data
+
+          if (requests.some((response) => !response.ok)) {
+            const statuses = requests.map((response) => response.status).join(', ');
+            throw new Error(`Failed custom-mode requests: ${statuses}`);
+          }
+
+          const [phaseStatsPayload, bowlingPhasePayload, battingOrderPayload, bowlingOrderPayload] = await Promise.all(
+            requests.map((response) => response.json()),
+          );
+
+          setPhaseStats(phaseStatsPayload.phase_stats);
+          setBowlingPhaseStats(bowlingPhasePayload.bowling_phase_stats);
+          setBattingOrderData(battingOrderPayload);
+          setBowlingOrderData(bowlingOrderPayload);
+
           setTeamData(null);
           setEloStats(null);
-          
+          setRosterData(null);
+          setH2HSummaryData(null);
+          setChampionshipData(null);
         } else {
-          // Team mode - fetch all data including team stats
           params.append('team_name', selectedTeam.abbreviated_name);
-          
-          requests = [
-            fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/matches?${params}&include_elo=true`),
+          const teamKey = encodeURIComponent(selectedTeam.abbreviated_name);
+
+          const primaryResponses = await Promise.all([
+            fetch(`${config.API_URL}/teams/${teamKey}/matches?${params}&include_elo=true`),
             fetch(`${config.API_URL}/teams/phase-stats?${params}`),
             fetch(`${config.API_URL}/teams/bowling-phase-stats?${params}`),
-            fetch(`${config.API_URL}/teams/${encodeURIComponent(selectedTeam.abbreviated_name)}/elo-stats?${params}`),
+            fetch(`${config.API_URL}/teams/${teamKey}/elo-stats?${params}`),
             fetch(`${config.API_URL}/teams/batting-order?${params}`),
-            fetch(`${config.API_URL}/teams/bowling-order?${params}`)
-          ];
-          
-          const [matchesResponse, phaseStatsResponse, bowlingPhaseStatsResponse, eloStatsResponse, battingOrderResponse, bowlingOrderResponse] = await Promise.all(requests);
-          
-          if (!matchesResponse.ok || !phaseStatsResponse.ok || !bowlingPhaseStatsResponse.ok || !eloStatsResponse.ok || !battingOrderResponse.ok || !bowlingOrderResponse.ok) {
-            throw new Error(`HTTP error! matches: ${matchesResponse.status}, phase: ${phaseStatsResponse.status}, bowling: ${bowlingPhaseStatsResponse.status}, elo: ${eloStatsResponse.status}, batting-order: ${battingOrderResponse.status}, bowling-order: ${bowlingOrderResponse.status}`);
-          }
-          
-          const [matchesData, phaseStatsData, bowlingPhaseStatsData, eloStatsData, battingOrderData, bowlingOrderData] = await Promise.all([
-            matchesResponse.json(),
-            phaseStatsResponse.json(),
-            bowlingPhaseStatsResponse.json(),
-            eloStatsResponse.json(),
-            battingOrderResponse.json(),
-            bowlingOrderResponse.json()
+            fetch(`${config.API_URL}/teams/bowling-order?${params}`),
           ]);
-          
-          setTeamData(matchesData);
-          setPhaseStats(phaseStatsData.phase_stats);
-          setBowlingPhaseStats(bowlingPhaseStatsData.bowling_phase_stats);
-          setEloStats(eloStatsData);
-          setBattingOrderData(battingOrderData);
-          setBowlingOrderData(bowlingOrderData);
+
+          if (primaryResponses.some((response) => !response.ok)) {
+            const statuses = primaryResponses.map((response) => response.status).join(', ');
+            throw new Error(`Failed team-mode requests: ${statuses}`);
+          }
+
+          const [
+            matchesPayload,
+            phaseStatsPayload,
+            bowlingPhasePayload,
+            eloPayload,
+            battingOrderPayload,
+            bowlingOrderPayload,
+          ] = await Promise.all(primaryResponses.map((response) => response.json()));
+
+          const [rosterPayload, h2hPayload, championshipPayload] = await Promise.all([
+            fetch(`${config.API_URL}/teams/${teamKey}/roster`)
+              .then(async (response) => (response.ok ? response.json() : null))
+              .catch(() => null),
+            fetch(`${config.API_URL}/teams/${teamKey}/h2h-summary`)
+              .then(async (response) => (response.ok ? response.json() : null))
+              .catch(() => null),
+            fetch(`${config.API_URL}/teams/${teamKey}/championship-score`)
+              .then(async (response) => (response.ok ? response.json() : null))
+              .catch(() => null),
+          ]);
+
+          setTeamData(matchesPayload);
+          setPhaseStats(phaseStatsPayload.phase_stats);
+          setBowlingPhaseStats(bowlingPhasePayload.bowling_phase_stats);
+          setEloStats(eloPayload);
+          setBattingOrderData(battingOrderPayload);
+          setBowlingOrderData(bowlingOrderPayload);
+          setRosterData(rosterPayload);
+          setH2HSummaryData(h2hPayload);
+          setChampionshipData(championshipPayload);
         }
-        
-      } catch (error) {
-        console.error('Error loading data:', error);
+      } catch (fetchError) {
+        console.error('Error loading team profile data:', fetchError);
         setError('Failed to load data');
       } finally {
         setLoading(false);
@@ -264,66 +298,243 @@ const TeamProfile = ({ isMobile }) => {
     fetchData();
   }, [shouldFetch, selectedTeam, dateRange, isCustomMode, customPlayers]);
 
-  // Calculate key metrics from matches (only for team mode)
-  const calculateMetrics = (matches) => {
-    if (!matches || matches.length === 0) {
+  useEffect(() => {
+    setActiveSectionId(OVERVIEW_SECTION_ID);
+  }, [selectedTeam?.abbreviated_name, isCustomMode]);
+
+  const calculateMetrics = useCallback(
+    (matches) => {
+      if (!matches || matches.length === 0) {
+        return {
+          totalMatches: 0,
+          wins: 0,
+          losses: 0,
+          noResults: 0,
+          winLossRatio: '0:0',
+          wonBattingFirst: 0,
+          wonFieldingFirst: 0,
+          battedFirstMatches: 0,
+          fieldedFirstMatches: 0,
+          tossWins: 0,
+          tossBatFirst: 0,
+          tossBowlFirst: 0,
+        };
+      }
+
+      const wins = matches.filter((match) => match.result === 'W').length;
+      const losses = matches.filter((match) => match.result === 'L').length;
+      const noResults = matches.filter((match) => match.result === 'NR').length;
+      const wonBattingFirst = matches.filter((match) => match.result === 'W' && match.batted_first).length;
+      const wonFieldingFirst = matches.filter((match) => match.result === 'W' && !match.batted_first).length;
+      const battedFirstMatches = matches.filter((match) => match.batted_first).length;
+      const fieldedFirstMatches = matches.filter((match) => !match.batted_first).length;
+
+      const tossWins = matches.filter(
+        (match) => match.toss_winner === selectedTeam?.abbreviated_name || match.toss_winner === selectedTeam?.full_name,
+      ).length;
+      const tossBatFirst = matches.filter(
+        (match) =>
+          (match.toss_winner === selectedTeam?.abbreviated_name || match.toss_winner === selectedTeam?.full_name) &&
+          match.toss_decision === 'bat',
+      ).length;
+      const tossBowlFirst = matches.filter(
+        (match) =>
+          (match.toss_winner === selectedTeam?.abbreviated_name || match.toss_winner === selectedTeam?.full_name) &&
+          match.toss_decision === 'field',
+      ).length;
+
       return {
-        totalMatches: 0,
-        wins: 0,
-        losses: 0,
-        noResults: 0,
-        winLossRatio: '0:0',
-        wonBattingFirst: 0,
-        wonFieldingFirst: 0,
-        battedFirstMatches: 0,
-        fieldedFirstMatches: 0,
-        tossWins: 0,
-        tossBatFirst: 0,
-        tossBowlFirst: 0
+        totalMatches: matches.length,
+        wins,
+        losses,
+        noResults,
+        winLossRatio: `${wins}:${losses}`,
+        wonBattingFirst,
+        wonFieldingFirst,
+        battedFirstMatches,
+        fieldedFirstMatches,
+        tossWins,
+        tossBatFirst,
+        tossBowlFirst,
       };
-    }
-
-    const wins = matches.filter(m => m.result === 'W').length;
-    const losses = matches.filter(m => m.result === 'L').length;
-    const noResults = matches.filter(m => m.result === 'NR').length;
-    const wonBattingFirst = matches.filter(m => m.result === 'W' && m.batted_first).length;
-    const wonFieldingFirst = matches.filter(m => m.result === 'W' && !m.batted_first).length;
-    const battedFirstMatches = matches.filter(m => m.batted_first).length;
-    const fieldedFirstMatches = matches.filter(m => !m.batted_first).length;
-    
-    // Calculate toss statistics
-    const tossWins = matches.filter(m => m.toss_winner === selectedTeam?.abbreviated_name || m.toss_winner === selectedTeam?.full_name).length;
-    const tossBatFirst = matches.filter(m => 
-      (m.toss_winner === selectedTeam?.abbreviated_name || m.toss_winner === selectedTeam?.full_name) && 
-      m.toss_decision === 'bat'
-    ).length;
-    const tossBowlFirst = matches.filter(m => 
-      (m.toss_winner === selectedTeam?.abbreviated_name || m.toss_winner === selectedTeam?.full_name) && 
-      m.toss_decision === 'field'
-    ).length;
-
-    return {
-      totalMatches: matches.length,
-      wins,
-      losses,
-      noResults,
-      winLossRatio: `${wins}:${losses}`,
-      wonBattingFirst,
-      wonFieldingFirst,
-      battedFirstMatches,
-      fieldedFirstMatches,
-      tossWins,
-      tossBatFirst,
-      tossBowlFirst
-    };
-  };
+    },
+    [selectedTeam],
+  );
 
   const metrics = teamData ? calculateMetrics(teamData.matches) : null;
-  const displayName = isCustomMode 
+  const displayName = isCustomMode
     ? `Custom Players (${customPlayers.length})`
-    : selectedTeam 
+    : selectedTeam
       ? `${selectedTeam.full_name} (${selectedTeam.abbreviated_name})`
       : '';
+
+  const recentFormInnings = useMemo(() => {
+    const matches = teamData?.matches || [];
+    return matches.slice(0, 5).map((match) => ({
+      runs: parseRunsFromScore(match.team_score),
+      opponent: match.opponent || '?',
+    }));
+  }, [teamData]);
+
+  const sectionGroups = useMemo(() => {
+    if (isCustomMode || !selectedTeam) {
+      return [];
+    }
+
+    return [
+      {
+        id: 'overview',
+        label: 'Overview',
+        content: (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {teamData && metrics ? (
+              <TeamStatsCards metrics={metrics} teamName={displayName} dateRange={dateRange} />
+            ) : (
+              <Alert severity="info">No recent match summary available for this date range.</Alert>
+            )}
+            <EloStatsCard eloStats={eloStats} teamName={displayName} dateRange={dateRange} />
+            <Card>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Recent Form
+                </Typography>
+                {recentFormInnings.length ? (
+                  <RecentFormStrip innings={recentFormInnings} mode="batting" isMobile={isMobile} />
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    No matches available to compute recent form.
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+        ),
+      },
+      {
+        id: 'squad',
+        label: 'Squad',
+        content: <TeamSquadSection rosterData={rosterData} />,
+      },
+      {
+        id: 'phases',
+        label: 'Phases',
+        content: (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {phaseStats ? (
+              <TeamPhasePerformanceRadar phaseStats={phaseStats} teamName={selectedTeam.abbreviated_name} />
+            ) : (
+              <Alert severity="info">Batting phase stats are unavailable.</Alert>
+            )}
+            {bowlingPhaseStats ? (
+              <TeamBowlingPhasePerformanceRadar
+                bowlingPhaseStats={bowlingPhaseStats}
+                teamName={selectedTeam.abbreviated_name}
+              />
+            ) : (
+              <Alert severity="info">Bowling phase stats are unavailable.</Alert>
+            )}
+          </Box>
+        ),
+      },
+      {
+        id: 'batting',
+        label: 'Batting',
+        content: battingOrderData ? (
+          <TeamBattingOrderCard battingOrderData={battingOrderData} teamName={selectedTeam.abbreviated_name} />
+        ) : (
+          <Alert severity="info">Batting order data is unavailable.</Alert>
+        ),
+      },
+      {
+        id: 'bowling',
+        label: 'Bowling',
+        content: bowlingOrderData ? (
+          <TeamBowlingOrderCard bowlingOrderData={bowlingOrderData} teamName={selectedTeam.abbreviated_name} />
+        ) : (
+          <Alert severity="info">Bowling order data is unavailable.</Alert>
+        ),
+      },
+      {
+        id: 'h2h',
+        label: 'Head-to-Head',
+        content: <TeamH2HSection h2hData={h2hSummaryData} />,
+      },
+      {
+        id: 'prediction',
+        label: 'Title Odds',
+        content: <TeamChampionshipSection championshipData={championshipData} teamLabel={selectedTeam.abbreviated_name} />,
+      },
+    ];
+  }, [
+    isCustomMode,
+    selectedTeam,
+    teamData,
+    metrics,
+    displayName,
+    dateRange,
+    eloStats,
+    recentFormInnings,
+    isMobile,
+    rosterData,
+    phaseStats,
+    bowlingPhaseStats,
+    battingOrderData,
+    bowlingOrderData,
+    h2hSummaryData,
+    championshipData,
+  ]);
+
+  const handleSectionSelect = useCallback((sectionId) => {
+    setActiveSectionId(sectionId);
+    const sectionElement = sectionRefs.current[sectionId];
+    if (sectionElement) {
+      sectionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sectionGroups.length || isCustomMode) {
+      return undefined;
+    }
+
+    const visibleSections = new Map();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const sectionId = entry.target.dataset.sectionId;
+          if (!sectionId) {
+            return;
+          }
+          if (entry.isIntersecting) {
+            visibleSections.set(sectionId, entry.intersectionRatio);
+          } else {
+            visibleSections.delete(sectionId);
+          }
+        });
+
+        const nextActive = [...visibleSections.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+        if (nextActive) {
+          setActiveSectionId(nextActive);
+        }
+      },
+      {
+        rootMargin: '-15% 0px -60% 0px',
+        threshold: [0.1, 0.35, 0.6],
+      },
+    );
+
+    sectionGroups.forEach((section) => {
+      const element = sectionRefs.current[section.id];
+      if (element) {
+        observer.observe(element);
+      }
+    });
+
+    return () => observer.disconnect();
+  }, [sectionGroups, isCustomMode]);
+
+  const hasCustomResults = Boolean(isCustomMode && (phaseStats || bowlingPhaseStats || battingOrderData || bowlingOrderData));
+  const hasTeamResults = Boolean(!isCustomMode && (teamData || rosterData || h2hSummaryData || championshipData));
 
   return (
     <Container maxWidth="xl">
@@ -331,35 +542,29 @@ const TeamProfile = ({ isMobile }) => {
         <Typography variant="h4" gutterBottom>
           Team Profile
         </Typography>
-        
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        {/* Mode Toggle */}
+        {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
+
         <Box sx={{ mb: 3 }}>
           <FormControlLabel
-            control={
-              <Switch
-                checked={isCustomMode}
-                onChange={handleModeToggle}
-                name="customMode"
-              />
-            }
+            control={<Switch checked={isCustomMode} onChange={handleModeToggle} name="customMode" />}
             label="Custom Player Analysis"
           />
         </Box>
 
-        {/* Team Selection (Team Mode) */}
-        {!isCustomMode && (
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: { xs: 'column', md: 'row' }, 
-            gap: 2, 
-            mb: 4,
-            alignItems: { xs: 'stretch', md: 'flex-end' }
-          }}>
+        {!isCustomMode ? (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              gap: 2,
+              mb: 4,
+              alignItems: { xs: 'stretch', md: 'flex-end' },
+            }}
+          >
             <Autocomplete
               value={selectedTeam}
-              onChange={(_, newValue) => setSelectedTeam(newValue)}
+              onChange={(_, nextTeam) => setSelectedTeam(nextTeam)}
               options={teams}
               sx={{ width: { xs: '100%', md: 300 } }}
               getOptionLabel={(option) => option?.abbreviated_name || ''}
@@ -370,94 +575,89 @@ const TeamProfile = ({ isMobile }) => {
                   </Typography>
                 </li>
               )}
-              renderInput={(params) => (
-                <TextField {...params} label="Select Team" variant="outlined" required />
-              )}
-              isOptionEqualToValue={(option, value) => 
-                option?.full_name === value?.full_name
-              }
+              renderInput={(params) => <TextField {...params} label="Select Team" variant="outlined" required />}
+              isOptionEqualToValue={(option, value) => option?.full_name === value?.full_name}
             />
 
             <TextField
               label="Start Date"
               type="date"
               value={dateRange.start}
-              onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+              onChange={(event) => setDateRange((prev) => ({ ...prev, start: event.target.value }))}
               InputLabelProps={{ shrink: true }}
               sx={{ width: { xs: '100%', md: 'auto' } }}
             />
-            
+
             <TextField
               label="End Date"
               type="date"
               value={dateRange.end}
-              onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+              onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))}
               InputLabelProps={{ shrink: true }}
               inputProps={{ max: TODAY }}
               sx={{ width: { xs: '100%', md: 'auto' } }}
             />
-            
-            <Button 
+
+            <Button
               variant="contained"
               onClick={handleFetch}
               disabled={!selectedTeam || loading}
               id="go-button"
-              sx={{ 
+              sx={{
                 height: '56px',
                 width: { xs: '100%', md: 'auto' },
-                minWidth: '80px'
+                minWidth: '80px',
               }}
             >
               GO
             </Button>
           </Box>
-        )}
-
-        {/* Custom Player Selection (Custom Mode) */}
-        {isCustomMode && (
+        ) : (
           <Box>
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: { xs: 'column', md: 'row' }, 
-              gap: 2, 
-              mb: 2,
-              alignItems: { xs: 'stretch', md: 'flex-end' }
-            }}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 2,
+                mb: 2,
+                alignItems: { xs: 'stretch', md: 'flex-end' },
+              }}
+            >
               <TextField
                 label="Start Date"
                 type="date"
                 value={dateRange.start}
-                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                onChange={(event) => setDateRange((prev) => ({ ...prev, start: event.target.value }))}
                 InputLabelProps={{ shrink: true }}
                 sx={{ width: { xs: '100%', md: 'auto' } }}
               />
-              
+
               <TextField
                 label="End Date"
                 type="date"
                 value={dateRange.end}
-                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))}
                 InputLabelProps={{ shrink: true }}
                 inputProps={{ max: TODAY }}
                 sx={{ width: { xs: '100%', md: 'auto' } }}
               />
-              
-              <Button 
+
+              <Button
                 variant="contained"
                 onClick={handleFetch}
                 disabled={customPlayers.length === 0 || loading}
                 id="go-button"
-                sx={{ 
+                sx={{
                   height: '56px',
                   width: { xs: '100%', md: 'auto' },
-                  minWidth: '80px'
+                  minWidth: '80px',
                 }}
               >
                 GO
               </Button>
             </Box>
 
-            <CustomPlayerSelector 
+            <CustomPlayerSelector
               selectedPlayers={customPlayers}
               onPlayersChange={setCustomPlayers}
               label="Select Players for Analysis"
@@ -465,171 +665,107 @@ const TeamProfile = ({ isMobile }) => {
           </Box>
         )}
 
-        {loading && (
+        {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
           </Box>
-        )}
+        ) : null}
 
-        {/* Results Section */}
-        {(teamData || (isCustomMode && (phaseStats || bowlingPhaseStats || battingOrderData || bowlingOrderData))) && !loading && (
-          <Box sx={{ mt: 4 }}>
-            {/* Team Stats Cards - Only show in team mode */}
-            {!isCustomMode && teamData && metrics && (
-              <TeamStatsCards 
-                metrics={metrics}
-                teamName={displayName}
-                dateRange={dateRange}
-              />
+        {hasCustomResults ? (
+          <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {phaseStats ? (
+              <TeamPhasePerformanceRadar phaseStats={phaseStats} teamName="Custom Players" />
+            ) : (
+              <Alert severity="info">Batting phase stats are unavailable.</Alert>
             )}
-
-            {/* ELO Statistics - Only show in team mode */}
-            {!isCustomMode && eloStats && (
-              <Box sx={{ mt: 4 }}>
-                <EloStatsCard 
-                  eloStats={eloStats}
-                  teamName={displayName}
-                  dateRange={dateRange}
-                />
-              </Box>
+            {bowlingPhaseStats ? (
+              <TeamBowlingPhasePerformanceRadar bowlingPhaseStats={bowlingPhaseStats} teamName="Custom Players" />
+            ) : (
+              <Alert severity="info">Bowling phase stats are unavailable.</Alert>
             )}
-
-            {/* Phase Performance Radar Charts */}
-            <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {/* Batting Phase Stats */}
-              {phaseStats && (
-                <TeamPhasePerformanceRadar 
-                  phaseStats={phaseStats}
-                  teamName={isCustomMode ? 'Custom Players' : selectedTeam.abbreviated_name}
-                />
-              )}
-              
-              {/* Bowling Phase Stats */}
-              {bowlingPhaseStats && (
-                <TeamBowlingPhasePerformanceRadar 
-                  bowlingPhaseStats={bowlingPhaseStats}
-                  teamName={isCustomMode ? 'Custom Players' : selectedTeam.abbreviated_name}
-                />
-              )}
-            </Box>
-
-            {/* Batting Order */}
-            {battingOrderData && (
-              <Box sx={{ mt: 4 }}>
-                <TeamBattingOrderCard 
-                  battingOrderData={battingOrderData}
-                  teamName={isCustomMode ? 'Custom Players' : selectedTeam.abbreviated_name}
-                />
-              </Box>
+            {battingOrderData ? (
+              <TeamBattingOrderCard battingOrderData={battingOrderData} teamName="Custom Players" />
+            ) : (
+              <Alert severity="info">Batting order data is unavailable.</Alert>
             )}
-
-            {/* Bowling Order */}
-            {bowlingOrderData && (
-              <Box sx={{ mt: 4 }}>
-                <TeamBowlingOrderCard 
-                  bowlingOrderData={bowlingOrderData}
-                  teamName={isCustomMode ? 'Custom Players' : selectedTeam.abbreviated_name}
-                />
-              </Box>
-            )}
-
-            {/* Matches List - Only show in team mode */}
-            {!isCustomMode && teamData && (
-              <Card sx={{ mt: 4 }}>
-                <CardContent>
-                  <Typography variant="h5" gutterBottom>
-                    Recent Matches
-                  </Typography>
-                  
-                  {teamData.matches.length === 0 ? (
-                    <Typography variant="body1" color="text.secondary">
-                      No matches found for the selected date range.
-                    </Typography>
-                  ) : (
-                    <Box sx={{ mt: 2, maxHeight: '700px', overflowY: 'auto' }}>
-                      {teamData.matches.map((match, index) => (
-                        <Card 
-                          key={match.match_id} 
-                          variant="outlined" 
-                          sx={{ 
-                            mb: 2,
-                            border: match.result === 'W' ? '2px solid #4caf50' : 
-                                   match.result === 'L' ? '2px solid #f44336' : '1px solid #e0e0e0'
-                          }}
-                        >
-                          <CardContent sx={{ py: 2 }}>
-                            <Grid container spacing={2} alignItems="center">
-                              <Grid item xs={12} sm={2}>
-                                <Typography variant="body2" color="text.secondary">
-                                  {match.date}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  {match.venue}
-                                </Typography>
-                              </Grid>
-                              
-                              <Grid item xs={12} sm={6}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                  <Typography variant="h6">
-                                    {match.team} vs {match.opponent}
-                                  </Typography>
-                                  <Box sx={{
-                                    backgroundColor: match.result === 'W' ? '#4caf50' : 
-                                                   match.result === 'L' ? '#f44336' : '#ff9800',
-                                    color: 'white',
-                                    px: 1,
-                                    py: 0.5,
-                                    borderRadius: 1,
-                                    fontWeight: 'bold',
-                                    fontSize: '0.875rem'
-                                  }}>
-                                    {match.result}
-                                  </Box>
-                                </Box>
-                                <Typography variant="body2" color="text.secondary">
-                                  {match.competition} • {match.event_name}
-                                </Typography>
-                                {/* ELO Information */}
-                                {match.elo && (
-                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                    ELO: {match.team} ({match.elo.team_elo}) vs {match.opponent} ({match.elo.opponent_elo})
-                                    {match.elo.elo_difference && (
-                                      <span style={{ 
-                                        color: match.elo.elo_difference > 0 ? '#4caf50' : '#f44336',
-                                        fontWeight: 'bold',
-                                        marginLeft: '8px'
-                                      }}>
-                                        ({match.elo.elo_difference > 0 ? '+' : ''}{match.elo.elo_difference})
-                                      </span>
-                                    )}
-                                  </Typography>
-                                )}
-                              </Grid>
-                              
-                              <Grid item xs={12} sm={4}>
-                                <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-                                  <Typography variant="h6">
-                                    {match.batted_first ? match.team_score : match.opponent_score} vs {match.batted_first ? match.opponent_score : match.team_score}
-                                  </Typography>
-                                  <Typography variant="body2" color="text.secondary">
-                                    {match.toss_winner} won toss, chose to {match.toss_decision}
-                                  </Typography>
-                                  <Typography variant="body2" color="text.secondary">
-                                    {match.batted_first ? 'Batted First' : 'Fielded First'}
-                                  </Typography>
-                                </Box>
-                              </Grid>
-                            </Grid>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
+            {bowlingOrderData ? (
+              <TeamBowlingOrderCard bowlingOrderData={bowlingOrderData} teamName="Custom Players" />
+            ) : (
+              <Alert severity="info">Bowling order data is unavailable.</Alert>
             )}
           </Box>
-        )}
+        ) : null}
+
+        {hasTeamResults && sectionGroups.length ? (
+          <Box sx={{ mt: 4 }}>
+            {isMobile ? (
+              <>
+                <VenueSectionTabs
+                  sections={sectionGroups.map((section) => ({ id: section.id, label: section.label }))}
+                  activeSectionId={activeSectionId}
+                  onSectionSelect={handleSectionSelect}
+                />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, px: 1, pb: 2 }}>
+                  {sectionGroups.map((section) => (
+                    <Box
+                      key={section.id}
+                      ref={(element) => {
+                        sectionRefs.current[section.id] = element;
+                      }}
+                      data-section-id={section.id}
+                      sx={{ scrollMarginTop: '56px' }}
+                    >
+                      <VenueNotesCardShell
+                        groupLabel="Team Profile"
+                        cardLabel={section.label}
+                        metaText={selectedTeam?.abbreviated_name}
+                        isMobile
+                        fitContent
+                      >
+                        <Box sx={{ p: 1.5 }}>{section.content}</Box>
+                      </VenueNotesCardShell>
+                    </Box>
+                  ))}
+                </Box>
+              </>
+            ) : (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: '240px minmax(0, 1fr)',
+                  gap: 3,
+                  alignItems: 'start',
+                }}
+              >
+                <VenueNotesDesktopNav
+                  sections={sectionGroups.map((section) => ({ id: section.id, label: section.label }))}
+                  activeSectionId={activeSectionId}
+                  onSectionSelect={handleSectionSelect}
+                />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {sectionGroups.map((section) => (
+                    <Box
+                      key={section.id}
+                      ref={(element) => {
+                        sectionRefs.current[section.id] = element;
+                      }}
+                      data-section-id={section.id}
+                      sx={{ scrollMarginTop: '88px' }}
+                    >
+                      <VenueNotesCardShell
+                        groupLabel="Team Profile"
+                        cardLabel={section.label}
+                        metaText={selectedTeam?.abbreviated_name}
+                      >
+                        {section.content}
+                      </VenueNotesCardShell>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
+          </Box>
+        ) : null}
       </Box>
     </Container>
   );
