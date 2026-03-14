@@ -995,7 +995,11 @@ def _build_batting_rows(
                 continue
             final_mean = mean(values)
             final_std = _population_std(values)
-            final_params[param] = max(0.0, final_mean * (1.0 - VARIATION_ALPHA * final_std))
+            if final_mean <= 0:
+                final_params[param] = 0.0
+                continue
+            final_cv = final_std / final_mean
+            final_params[param] = max(0.0, final_mean * (1.0 - VARIATION_ALPHA * final_cv))
 
         quality_raw = (
             (final_params["sr"] ** 2)
@@ -1182,7 +1186,11 @@ def _build_bowling_rows(
                 continue
             final_mean = mean(values)
             final_std = _population_std(values)
-            final_params[param] = max(0.0, final_mean * (1.0 - VARIATION_ALPHA * final_std))
+            if final_mean <= 0:
+                final_params[param] = 0.0
+                continue
+            final_cv = final_std / final_mean
+            final_params[param] = max(0.0, final_mean * (1.0 - VARIATION_ALPHA * final_cv))
 
         quality_raw = (
             (final_params["econ_inv"] ** 2)
