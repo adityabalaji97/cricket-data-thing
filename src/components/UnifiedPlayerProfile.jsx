@@ -47,6 +47,7 @@ const GlobalT20RankSection = ({ mode, rankPayload, loading }) => {
     label: point.date ? point.date.slice(2, 7) : '--',
     score: point.quality_score,
   }));
+  const hasTrajectoryValues = trajectory.some((point) => point.score !== null && point.score !== undefined);
 
   if (loading) {
     return (
@@ -117,7 +118,7 @@ const GlobalT20RankSection = ({ mode, rankPayload, loading }) => {
           Last 12 Months
         </Typography>
         <Box sx={{ mt: 0.5, height: 120, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75 }}>
-          {trajectory.length ? (
+          {hasTrajectoryValues ? (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trajectory} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} />
@@ -288,6 +289,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         params.set('start_date', dateRange.start);
         params.set('end_date', dateRange.end);
         params.set('snapshots', '12');
+        params.set('mode', activeTab === 'bowling' ? 'bowling' : 'batting');
 
         const response = await fetch(
           `${config.API_URL}/rankings/player/${encodeURIComponent(selectedPlayer)}?${params.toString()}`,
@@ -305,7 +307,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
 
     fetchGlobalRanking();
     return () => { cancelled = true; };
-  }, [selectedPlayer, fetchTrigger, dateRange.start, dateRange.end]);
+  }, [selectedPlayer, fetchTrigger, dateRange.start, dateRange.end, activeTab]);
 
   const handleFetch = () => {
     if (!selectedPlayer) return;

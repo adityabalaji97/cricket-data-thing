@@ -169,6 +169,15 @@ def _normalize_bowl_kind(value: Optional[str]) -> str:
     return "all"
 
 
+def _normalize_player_mode(value: Optional[str]) -> str:
+    if not value:
+        return "all"
+    normalized = value.strip().lower()
+    if normalized in {"all", "batting", "bowling"}:
+        return normalized
+    raise HTTPException(status_code=400, detail="mode must be one of: all, batting, bowling")
+
+
 def _resolve_date_range(start_date: Optional[date], end_date: Optional[date]) -> Tuple[date, date]:
     end = end_date or date.today()
     start = start_date or (end - timedelta(days=730))
@@ -1560,6 +1569,7 @@ def get_player_rankings_service(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     bowl_kind: str = "all",
+    mode: str = "all",
     snapshots: int = 24,
     force_refresh: bool = False,
 ) -> Dict[str, Any]:
@@ -1568,6 +1578,7 @@ def get_player_rankings_service(
 
     start, end = _resolve_date_range(start_date, end_date)
     normalized_bowl_kind = _normalize_bowl_kind(bowl_kind)
+    normalized_mode = _normalize_player_mode(mode)
 
     names = get_player_names(player_name.strip(), db)
     player_candidates = [
@@ -1576,45 +1587,52 @@ def get_player_rankings_service(
         names.get("details_name", ""),
     ]
 
-    batting_payload = _build_rankings_payload(
-        db=db,
-        mode="batting",
-        start=start,
-        end=end,
-        bowl_kind=normalized_bowl_kind,
-        force_refresh=force_refresh,
-    )
-    bowling_payload = _build_rankings_payload(
-        db=db,
-        mode="bowling",
-        start=start,
-        end=end,
-        bowl_kind=normalized_bowl_kind,
-        force_refresh=force_refresh,
-    )
+    batting_payload: Optional[Dict[str, Any]] = None
+    bowling_payload: Optional[Dict[str, Any]] = None
+    batting_row: Optional[Dict[str, Any]] = None
+    bowling_row: Optional[Dict[str, Any]] = None
+    batting_trajectory: List[Dict[str, Any]] = []
+    bowling_trajectory: List[Dict[str, Any]] = []
 
-    batting_row = _find_player_row(batting_payload.get("rankings", []), player_candidates)
-    bowling_row = _find_player_row(bowling_payload.get("rankings", []), player_candidates)
+    if normalized_mode in {"all", "batting"}:
+        batting_payload = _build_rankings_payload(
+            db=db,
+            mode="batting",
+            start=start,
+            end=end,
+            bowl_kind=normalized_bowl_kind,
+            force_refresh=force_refresh,
+        )
+        batting_row = _find_player_row(batting_payload.get("rankings", []), player_candidates)
+        batting_trajectory = _build_player_trajectory(
+            db=db,
+            player_candidates=player_candidates,
+            mode="batting",
+            end_date=end,
+            bowl_kind=normalized_bowl_kind,
+            snapshots=snapshots,
+            force_refresh=force_refresh,
+        )
 
-    batting_trajectory = _build_player_trajectory(
-        db=db,
-        player_candidates=player_candidates,
-        mode="batting",
-        end_date=end,
-        bowl_kind=normalized_bowl_kind,
-        snapshots=snapshots,
-        force_refresh=force_refresh,
-    )
-
-    bowling_trajectory = _build_player_trajectory(
-        db=db,
-        player_candidates=player_candidates,
-        mode="bowling",
-        end_date=end,
-        bowl_kind=normalized_bowl_kind,
-        snapshots=snapshots,
-        force_refresh=force_refresh,
-    )
+    if normalized_mode in {"all", "bowling"}:
+        bowling_payload = _build_rankings_payload(
+            db=db,
+            mode="bowling",
+            start=start,
+            end=end,
+            bowl_kind=normalized_bowl_kind,
+            force_refresh=force_refresh,
+        )
+        bowling_row = _find_player_row(bowling_payload.get("rankings", []), player_candidates)
+        bowling_trajectory = _build_player_trajectory(
+            db=db,
+            player_candidates=player_candidates,
+            mode="bowling",
+            end_date=end,
+            bowl_kind=normalized_bowl_kind,
+            snapshots=snapshots,
+            force_refresh=force_refresh,
+        )
 
     return {
         "player": {
@@ -1627,6 +1645,7 @@ def get_player_rankings_service(
             "end": end.isoformat(),
         },
         "bowl_kind": normalized_bowl_kind,
+        "mode": normalized_mode,
         "batting": {
             "found": batting_row is not None,
             "ranking": batting_row,
@@ -1637,7 +1656,11 @@ def get_player_rankings_service(
             "ranking": bowling_row,
             "trajectory": bowling_trajectory,
         },
-        "competition_weights": batting_payload.get("competition_weights", {}),
+        "competition_weights": (
+            (batting_payload or {}).get("competition_weights")
+            or (bowling_payload or {}).get("competition_weights")
+            or {}
+        ),
     }
 
 

@@ -74,6 +74,7 @@ def get_player_rankings(
     start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
     bowl_kind: str = Query("all", description="One of: all, pace, spin"),
+    mode: str = Query("all", description="One of: all, batting, bowling"),
     snapshots: int = Query(24, ge=1, le=36, description="Monthly trajectory snapshots to return"),
     force_refresh: bool = Query(False, description="Bypass rankings cache"),
     db: Session = Depends(get_session),
@@ -85,6 +86,7 @@ def get_player_rankings(
             start_date=start_date,
             end_date=end_date,
             bowl_kind=bowl_kind,
+            mode=mode,
             snapshots=snapshots,
             force_refresh=force_refresh,
         )

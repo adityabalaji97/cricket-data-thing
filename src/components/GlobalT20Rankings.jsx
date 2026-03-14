@@ -382,6 +382,7 @@ const GlobalT20Rankings = () => {
       params.set('start_date', startDate);
       params.set('end_date', endDate);
       params.set('snapshots', '12');
+      params.set('mode', mode);
       if (bowlKind !== 'all') params.set('bowl_kind', bowlKind);
 
       const response = await fetch(`${config.API_URL}/rankings/player/${encodeURIComponent(playerName)}?${params.toString()}`);
