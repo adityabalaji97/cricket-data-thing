@@ -8,6 +8,7 @@ from services.teams_fixed import get_team_phase_stats_service_fixed, get_team_bo
 from services.teams_batting_order import get_team_batting_order_service
 from services.teams_bowling_order import get_team_bowling_order_service
 from services.elo import get_team_elo_stats_service, get_team_matches_with_elo_service, get_teams_elo_rankings_service, get_teams_elo_history_service
+from services.team_roster import get_team_roster_service
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -441,6 +442,26 @@ def get_teams_elo_history(
             },
             "elo_histories": team_histories
         }
-        
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{team_name}/roster")
+def get_team_roster(
+    team_name: str,
+    db: Session = Depends(get_session)
+):
+    """
+    Get current team roster. Uses recent match data if available,
+    otherwise falls back to pre-season hardcoded rosters.
+
+    Args:
+        team_name: Name of the team (full name or abbreviation)
+
+    Returns:
+        Player list with roles, display names, and roster source
+    """
+    try:
+        return get_team_roster_service(team_name=team_name, db=db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
