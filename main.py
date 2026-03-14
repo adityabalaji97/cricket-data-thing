@@ -50,6 +50,9 @@ from services.bowler_types import BOWLER_CATEGORY_SQL
 import math
 
 from dotenv import load_dotenv
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+import os
 
 # Load environment variables from .env file
 load_dotenv()
@@ -59,7 +62,7 @@ from utils.league_utils import expand_league_abbreviations
 
 logging.basicConfig(filename='venue_stats.log', level=logging.INFO)
 
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 app = FastAPI(title="Cricket Stats API")
 app.include_router(matchups_router)
@@ -87,6 +90,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+FRONTEND_BUILD_DIR = Path(__file__).resolve().parent / "build"
+FRONTEND_INDEX_FILE = FRONTEND_BUILD_DIR / "index.html"
+FRONTEND_APP_URL = os.getenv("FRONTEND_APP_URL", "https://cricket-data-thing.vercel.app")
+
+if (FRONTEND_BUILD_DIR / "static").exists():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD_DIR / "static")), name="frontend-static")
+
+
+def _serve_frontend_asset(file_name: str):
+    file_path = FRONTEND_BUILD_DIR / file_name
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Frontend asset not found: {file_name}")
+    return FileResponse(str(file_path))
 
 # Add a database connection error handling middleware
 @app.middleware("http")
@@ -124,6 +141,34 @@ def read_root():
     return {"message": "Welcome to the Cricket Data Thing API", 
             "documentation": "/docs",
             "version": "1.0"}
+
+
+@app.get("/ipl-predictions", include_in_schema=False)
+@app.get("/ipl-predictions/", include_in_schema=False)
+def serve_ipl_predictions_page():
+    if not FRONTEND_INDEX_FILE.exists():
+        return RedirectResponse(url=f"{FRONTEND_APP_URL}/ipl-predictions", status_code=307)
+    return FileResponse(str(FRONTEND_INDEX_FILE))
+
+
+@app.get("/asset-manifest.json", include_in_schema=False)
+def serve_asset_manifest():
+    return _serve_frontend_asset("asset-manifest.json")
+
+
+@app.get("/manifest.json", include_in_schema=False)
+def serve_manifest():
+    return _serve_frontend_asset("manifest.json")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def serve_favicon():
+    return _serve_frontend_asset("favicon.ico")
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def serve_robots():
+    return _serve_frontend_asset("robots.txt")
 
 # Modified simple competitions endpoint using direct SQLAlchemy
 @app.get("/competitions")

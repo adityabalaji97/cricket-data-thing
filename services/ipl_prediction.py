@@ -120,6 +120,38 @@ CATEGORY_METRIC_DEFS = {
 }
 
 
+MODEL_EXPLAINER = {
+    "version": "ipl-2026-preseason-v1",
+    "description": (
+        "Composite prediction model that percentile-normalizes team metrics "
+        "across all IPL teams and combines category scores using fixed weights."
+    ),
+    "steps": [
+        "Resolve squad names to canonical player identities.",
+        "Aggregate recent player performance into team-level category metrics.",
+        "Convert each metric to percentile scores across all IPL teams.",
+        "Average metric percentiles into category scores.",
+        "Compute weighted composite score and rank teams.",
+    ],
+    "recency_weighting": {
+        "last_180_days": 1.0,
+        "181_to_365_days": 0.75,
+        "366_to_730_days": 0.5,
+        "older": 0.3,
+    },
+    "data_sources": [
+        "matches",
+        "batting_stats",
+        "bowling_stats",
+        "deliveries",
+        "delivery_details",
+        "player_aliases",
+        "players",
+        "ipl_rosters",
+    ],
+}
+
+
 TEAM_HOME_VENUE_KEYWORDS = {
     "CSK": ["chennai", "chepauk", "m a chidambaram"],
     "MI": ["mumbai", "wankhede", "dy patil", "navi mumbai"],
@@ -654,11 +686,17 @@ def _compute_team_result_metrics(
         "league_win_pct": _safe_div(league_wins, league_decisions),
         "home_win_pct": _safe_div(home_wins, home_decisions),
         "away_win_pct": _safe_div(away_wins, away_decisions),
+        "league_matches_count": float(league_decisions),
+        "home_matches_count": float(home_decisions),
+        "away_matches_count": float(away_decisions),
     }
     situational_metrics = {
         "chasing_win_pct": _safe_div(chasing_wins, chasing_total),
         "defending_win_pct": _safe_div(defending_wins, defending_total),
         "close_win_pct": _safe_div(close_wins, close_total),
+        "chasing_matches_count": float(chasing_total),
+        "defending_matches_count": float(defending_total),
+        "close_matches_count": float(close_total),
     }
     return win_rate_metrics, situational_metrics
 
@@ -666,7 +704,7 @@ def _compute_team_result_metrics(
 def _compute_elo_metrics(match_rows: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
     elo_values = [row["team_elo"] for row in match_rows if row.get("team_elo") is not None]
     if not elo_values:
-        return {"peak_elo": None, "current_elo": None, "elo_trend": None}
+        return {"peak_elo": None, "current_elo": None, "elo_trend": None, "elo_matches_count": 0.0}
 
     current = float(elo_values[-1])
     peak = float(max(elo_values))
@@ -677,6 +715,7 @@ def _compute_elo_metrics(match_rows: List[Dict[str, Any]]) -> Dict[str, Optional
         "peak_elo": peak,
         "current_elo": current,
         "elo_trend": trend,
+        "elo_matches_count": float(len(elo_values)),
     }
 
 
@@ -1485,7 +1524,7 @@ def _fetch_batting_pace_spin_metrics(
     def _kind_stats(kind: str) -> Dict[str, Optional[float]]:
         row = kind_map.get(kind)
         if not row:
-            return {"sr": None, "avg": None, "boundary_pct": None, "dot_pct": None}
+            return {"sr": None, "avg": None, "boundary_pct": None, "dot_pct": None, "balls": 0.0}
         balls = float(row.balls or 0)
         runs = float(row.runs or 0)
         dismissals = float(row.dismissals or 0)
@@ -1496,6 +1535,7 @@ def _fetch_batting_pace_spin_metrics(
             "avg": _safe_div(runs, dismissals),
             "boundary_pct": _safe_pct(boundaries, balls),
             "dot_pct": _safe_pct(dots, balls),
+            "balls": balls,
         }
 
     pace = _kind_stats("pace")
@@ -1510,6 +1550,8 @@ def _fetch_batting_pace_spin_metrics(
         "bat_boundary_pct_vs_spin": spin["boundary_pct"],
         "bat_dot_pct_vs_pace": pace["dot_pct"],
         "bat_dot_pct_vs_spin": spin["dot_pct"],
+        "bat_balls_vs_pace": pace["balls"],
+        "bat_balls_vs_spin": spin["balls"],
     }
 
 
@@ -1562,13 +1604,14 @@ def _fetch_bowling_pace_spin_metrics(
     def _kind_stats(kind: str) -> Dict[str, Optional[float]]:
         row = kind_map.get(kind)
         if not row:
-            return {"economy": None, "sr": None}
+            return {"economy": None, "sr": None, "balls": 0.0}
         runs = float(row.runs or 0)
         balls = float(row.balls or 0)
         wickets = float(row.wickets or 0)
         return {
             "economy": _safe_economy(runs, balls),
             "sr": _safe_bowling_sr(balls, wickets),
+            "balls": balls,
         }
 
     pace = _kind_stats("pace")
@@ -1579,6 +1622,8 @@ def _fetch_bowling_pace_spin_metrics(
         "bowl_economy_spin": spin["economy"],
         "bowl_sr_pace": pace["sr"],
         "bowl_sr_spin": spin["sr"],
+        "bowl_balls_pace": pace["balls"],
+        "bowl_balls_spin": spin["balls"],
     }
 
 
@@ -1674,6 +1719,7 @@ def _fetch_venue_experience_metrics(
         "venue_bat_avg": _safe_div(float(bat_row.runs or 0), float(bat_row.dismissals or 0)),
         "venue_bowl_economy": _safe_economy(float(bowl_row.runs or 0), float(bowl_row.balls or 0)),
         "venue_coverage": coverage,
+        "venue_count": float(venue_count),
     }
 
 
@@ -1887,6 +1933,9 @@ def _fetch_squad_depth_metrics(
         "all_rounder_count": float(all_rounders),
         "bench_strength": float(experienced),
         "bench_experience_pct": _safe_div(experienced, squad_size),
+        "roster_size": float(squad_size),
+        "batting_contributor_count": float(len(batting_contributions)),
+        "bowling_contributor_count": float(len(bowling_contributions)),
     }
 
 
@@ -2051,6 +2100,10 @@ def _aggregate_pace_spin_from_precomputed(
         "bowl_economy_spin": spin_bowl["economy"],
         "bowl_sr_pace": pace_bowl["sr"],
         "bowl_sr_spin": spin_bowl["sr"],
+        "bat_balls_vs_pace": batting_totals["pace"]["balls"],
+        "bat_balls_vs_spin": batting_totals["spin"]["balls"],
+        "bowl_balls_pace": bowling_totals["pace"]["balls"],
+        "bowl_balls_spin": bowling_totals["spin"]["balls"],
     }
 
 
@@ -2091,6 +2144,7 @@ def _aggregate_venue_experience_from_precomputed(
         "venue_bat_avg": _safe_div(bat_runs, bat_dismissals),
         "venue_bowl_economy": _safe_economy(bowl_runs, bowl_balls),
         "venue_coverage": coverage,
+        "venue_count": float(venue_count),
     }
 
 
@@ -2129,6 +2183,9 @@ def _aggregate_squad_depth_from_precomputed(
         "all_rounder_count": float(all_rounders),
         "bench_strength": float(experienced),
         "bench_experience_pct": _safe_div(experienced, squad_size),
+        "roster_size": float(squad_size),
+        "batting_contributor_count": float(len(batting_contributions)),
+        "bowling_contributor_count": float(len(bowling_contributions)),
     }
 
 
@@ -2190,11 +2247,31 @@ def compute_team_metrics(
     batting_metrics.update(_phase_batting_metrics("pp", batting_agg))
     batting_metrics.update(_phase_batting_metrics("middle", batting_agg))
     batting_metrics.update(_phase_batting_metrics("death", batting_agg))
+    batting_metrics.update(
+        {
+            "pp_balls_used": batting_agg.get("pp_balls"),
+            "pp_wickets_used": batting_agg.get("pp_wickets"),
+            "middle_balls_used": batting_agg.get("middle_balls"),
+            "middle_wickets_used": batting_agg.get("middle_wickets"),
+            "death_balls_used": batting_agg.get("death_balls"),
+            "death_wickets_used": batting_agg.get("death_wickets"),
+        }
+    )
 
     bowling_metrics = {}
     bowling_metrics.update(_phase_bowling_metrics("pp", bowling_agg))
     bowling_metrics.update(_phase_bowling_metrics("middle", bowling_agg))
     bowling_metrics.update(_phase_bowling_metrics("death", bowling_agg))
+    bowling_metrics.update(
+        {
+            "pp_balls_used": bowling_agg.get("pp_balls"),
+            "pp_wickets_used": bowling_agg.get("pp_wickets"),
+            "middle_balls_used": bowling_agg.get("middle_balls"),
+            "middle_wickets_used": bowling_agg.get("middle_wickets"),
+            "death_balls_used": bowling_agg.get("death_balls"),
+            "death_wickets_used": bowling_agg.get("death_wickets"),
+        }
+    )
 
     if use_precomputed:
         pace_spin_metrics = _aggregate_pace_spin_from_precomputed(player_names, precomputed)
@@ -2386,6 +2463,14 @@ def compute_all_predictions(
         "generated_at": now.isoformat(),
         "date_range": {"start": start.isoformat(), "end": end.isoformat()},
         "total_teams": len(ranked_rows),
+        "model_explainer": {
+            **MODEL_EXPLAINER,
+            "category_weights": CATEGORY_WEIGHTS,
+            "category_metric_keys": {
+                category: [metric_def["key"] for metric_def in metric_defs]
+                for category, metric_defs in CATEGORY_METRIC_DEFS.items()
+            },
+        },
         "predictions": ranked_rows,
     }
     _PREDICTION_CACHE[key] = {"generated_at": now, "payload": payload}
@@ -2412,6 +2497,10 @@ def get_team_championship_score_service(
 
     for row in bundle["predictions"]:
         if row["team"] == team_abbrev:
-            return row
+            team_row = dict(row)
+            team_row["date_range"] = bundle.get("date_range")
+            team_row["generated_at"] = bundle.get("generated_at")
+            team_row["model_explainer"] = bundle.get("model_explainer")
+            return team_row
 
     raise ValueError(f"Prediction not found for team: {team_name}")

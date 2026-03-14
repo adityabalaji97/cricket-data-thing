@@ -27,6 +27,32 @@ import {
 import config from '../config';
 
 const TEAM_COLORS = ['#1976d2', '#ef6c00', '#2e7d32'];
+const DEFAULT_CATEGORY_WEIGHTS = {
+  win_rate: 0.12,
+  elo: 0.1,
+  batting: 0.18,
+  bowling: 0.18,
+  pace_spin: 0.12,
+  venue_adaptability: 0.1,
+  situational: 0.1,
+  squad_depth: 0.1,
+};
+const DEFAULT_EXPLAINER_STEPS = [
+  'Resolve squad names to canonical players from the roster file.',
+  'Aggregate player-level match data into team metrics by category.',
+  'Convert each metric to percentile scores across all IPL teams.',
+  'Average category metrics, apply weights, and rank teams by composite score.',
+];
+const DEFAULT_DATA_SOURCES = [
+  'matches',
+  'batting_stats',
+  'bowling_stats',
+  'deliveries',
+  'delivery_details',
+  'player_aliases',
+  'players',
+  'ipl_rosters',
+];
 
 const formatLabel = (value) =>
   value
@@ -96,9 +122,33 @@ const IPLPredictions = () => {
   }, []);
 
   const predictions = useMemo(() => payload?.predictions ?? [], [payload]);
+  const modelExplainer = useMemo(() => payload?.model_explainer ?? {}, [payload]);
+  const categoryWeights = useMemo(
+    () => modelExplainer.category_weights || DEFAULT_CATEGORY_WEIGHTS,
+    [modelExplainer],
+  );
+  const categoryMetricKeys = useMemo(
+    () => modelExplainer.category_metric_keys || {},
+    [modelExplainer],
+  );
+  const explainerSteps = useMemo(
+    () => modelExplainer.steps || DEFAULT_EXPLAINER_STEPS,
+    [modelExplainer],
+  );
+  const dataSources = useMemo(
+    () => modelExplainer.data_sources || DEFAULT_DATA_SOURCES,
+    [modelExplainer],
+  );
   const categoryKeys = useMemo(
     () => (predictions[0]?.category_scores ? Object.keys(predictions[0].category_scores) : []),
     [predictions],
+  );
+  const weightedCategories = useMemo(
+    () =>
+      Object.entries(categoryWeights).sort((left, right) => {
+        return right[1] - left[1];
+      }),
+    [categoryWeights],
   );
   const topThree = predictions.slice(0, 3);
 
@@ -131,8 +181,60 @@ const IPLPredictions = () => {
             label={`Date range: ${payload.date_range.start} to ${payload.date_range.end}`}
           />
           <Chip size="small" variant="outlined" label={`Teams: ${payload.total_teams || 0}`} />
+          {modelExplainer.version ? <Chip size="small" variant="outlined" label={`Model: ${modelExplainer.version}`} /> : null}
+          {payload.generated_at ? <Chip size="small" variant="outlined" label={`Generated: ${payload.generated_at.slice(0, 19)}Z`} /> : null}
         </Box>
       ) : null}
+
+      <Card sx={{ mb: 2 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 1 }}>
+            How This Prediction Is Calculated
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            {modelExplainer.description ||
+              'Composite model using recency-weighted player/team inputs, percentile normalization, and weighted category blending.'}
+          </Typography>
+
+          <Box sx={{ display: 'grid', gap: 0.5, mb: 1.5 }}>
+            {explainerSteps.map((step, index) => (
+              <Typography key={`step-${index}`} variant="body2" color="text.secondary">
+                {index + 1}. {step}
+              </Typography>
+            ))}
+          </Box>
+
+          <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+            Category Weights
+          </Typography>
+          <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, mb: 1.5 }}>
+            {weightedCategories.map(([categoryKey, weight]) => (
+              <Box key={`weight-${categoryKey}`}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="caption">{formatLabel(categoryKey)}</Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                    {(Number(weight) * 100).toFixed(0)}%
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.max(0, Math.min(100, Number(weight) * 100))}
+                  sx={{ height: 7, borderRadius: 8, mt: 0.4 }}
+                />
+              </Box>
+            ))}
+          </Box>
+
+          <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+            Data Sources Used
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+            {dataSources.map((source) => (
+              <Chip key={source} size="small" variant="outlined" label={source} />
+            ))}
+          </Box>
+        </CardContent>
+      </Card>
 
       {loading ? (
         <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
@@ -227,19 +329,43 @@ const IPLPredictions = () => {
                     {categoryKeys.map((categoryKey) => {
                       const category = team.category_scores?.[categoryKey] || {};
                       const raw = category.raw || {};
+                      const scoringKeySet = new Set(categoryMetricKeys[categoryKey] || []);
+                      const scoringEntries = Object.entries(raw).filter(([metricKey]) => scoringKeySet.has(metricKey));
+                      const supportEntries = Object.entries(raw).filter(([metricKey]) => !scoringKeySet.has(metricKey));
                       return (
                         <Card key={`${team.team}-${categoryKey}-detail`} variant="outlined">
                           <CardContent sx={{ py: 1.25 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.75 }}>
                               {formatLabel(categoryKey)}: {Number(category.score || 0).toFixed(1)}
                             </Typography>
-                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 0.35 }}>
-                              {Object.entries(raw).map(([metricKey, metricValue]) => (
-                                <Typography key={`${team.team}-${categoryKey}-${metricKey}`} variant="caption" color="text.secondary">
-                                  {formatLabel(metricKey)}: {formatMetricValue(metricValue)}
+                            {scoringEntries.length ? (
+                              <Box sx={{ mb: supportEntries.length ? 1 : 0 }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.35 }}>
+                                  Scoring Metrics
                                 </Typography>
-                              ))}
-                            </Box>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 0.35 }}>
+                                  {scoringEntries.map(([metricKey, metricValue]) => (
+                                    <Typography key={`${team.team}-${categoryKey}-${metricKey}`} variant="caption" color="text.secondary">
+                                      {formatLabel(metricKey)}: {formatMetricValue(metricValue)}
+                                    </Typography>
+                                  ))}
+                                </Box>
+                              </Box>
+                            ) : null}
+                            {supportEntries.length ? (
+                              <Box>
+                                <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.35 }}>
+                                  Data Used (Coverage / Volumes)
+                                </Typography>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 0.35 }}>
+                                  {supportEntries.map(([metricKey, metricValue]) => (
+                                    <Typography key={`${team.team}-${categoryKey}-${metricKey}`} variant="caption" color="text.secondary">
+                                      {formatLabel(metricKey)}: {formatMetricValue(metricValue)}
+                                    </Typography>
+                                  ))}
+                                </Box>
+                              </Box>
+                            ) : null}
                           </CardContent>
                         </Card>
                       );
