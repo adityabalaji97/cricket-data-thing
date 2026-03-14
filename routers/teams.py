@@ -10,6 +10,7 @@ from services.teams_bowling_order import get_team_bowling_order_service
 from services.elo import get_team_elo_stats_service, get_team_matches_with_elo_service, get_teams_elo_rankings_service, get_teams_elo_history_service
 from services.team_roster import get_team_roster_service
 from services.team_h2h import get_team_h2h_summary_service
+from services.ipl_prediction import compute_all_predictions, get_team_championship_score_service
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -478,6 +479,52 @@ def get_team_h2h_summary(
     """
     try:
         return get_team_h2h_summary_service(team_name=team_name, db=db)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ipl-predictions")
+def get_ipl_predictions(
+    start_date: Optional[date] = Query(None, description="Start date for player metrics (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End date for player metrics (YYYY-MM-DD)"),
+    force_refresh: bool = Query(False, description="Bypass prediction cache"),
+    db: Session = Depends(get_session)
+):
+    """
+    Get IPL title prediction leaderboard for all active IPL teams.
+    """
+    try:
+        return compute_all_predictions(
+            db=db,
+            start_date=start_date,
+            end_date=end_date,
+            force_refresh=force_refresh,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{team_name}/championship-score")
+def get_team_championship_score(
+    team_name: str,
+    start_date: Optional[date] = Query(None, description="Start date for player metrics (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End date for player metrics (YYYY-MM-DD)"),
+    force_refresh: bool = Query(False, description="Bypass prediction cache"),
+    db: Session = Depends(get_session)
+):
+    """
+    Get championship prediction scorecard for a single IPL team.
+    """
+    try:
+        return get_team_championship_score_service(
+            team_name=team_name,
+            db=db,
+            start_date=start_date,
+            end_date=end_date,
+            force_refresh=force_refresh,
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
