@@ -58,6 +58,7 @@ LENGTH_BUCKETS_SPIN_BOWLING = ("FULL", "GOOD_LENGTH", "SHORT_OF_GOOD")
 RANKINGS_CACHE_TTL_SECONDS = 60 * 60      # 1 hour
 COMP_WEIGHTS_CACHE_TTL_SECONDS = 24 * 60 * 60  # 24 hours
 TRAJECTORY_CACHE_TTL_SECONDS = 6 * 60 * 60     # 6 hours
+DELIVERY_SCHEMA_CACHE_TTL_SECONDS = 6 * 60 * 60  # 6 hours
 
 
 DEFAULT_COMPETITION_WEIGHTS: Dict[str, float] = {
@@ -77,6 +78,7 @@ DEFAULT_COMPETITION_WEIGHTS: Dict[str, float] = {
 _RANKINGS_CACHE: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
 _COMP_WEIGHTS_CACHE: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
 _TRAJECTORY_CACHE: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
+_DELIVERY_SCHEMA_CACHE: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
 
 
 LENGTH_BUCKET_SQL = """
@@ -258,6 +260,106 @@ def _logistic_squash(values: Sequence[float]) -> List[float]:
     return [100.0 * _sigmoid(k * (v - med)) for v in vals]
 
 
+def _coalesced_trim_expr(table_alias: str, columns: Sequence[str]) -> str:
+    parts = [f"NULLIF(TRIM({table_alias}.{col}), '')" for col in columns]
+    if len(parts) == 1:
+        return parts[0]
+    return f"COALESCE({', '.join(parts)})"
+
+
+def _get_delivery_schema_config(db: Session) -> Dict[str, Any]:
+    cache_key = ("delivery_details_schema",)
+    cached = _cache_get(_DELIVERY_SCHEMA_CACHE, cache_key, DELIVERY_SCHEMA_CACHE_TTL_SECONDS)
+    if cached is not None:
+        return cached
+
+    rows = db.execute(
+        text(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'delivery_details'
+              AND table_schema = ANY(current_schemas(false))
+            """
+        )
+    ).fetchall()
+    columns = {str(row[0]) for row in rows}
+
+    batter_cols = [col for col in ("batter", "bat") if col in columns]
+    bowler_cols = [col for col in ("bowler", "bowl") if col in columns]
+    date_cols = [col for col in ("date", "match_date") if col in columns]
+    has_year = "year" in columns
+
+    if not batter_cols:
+        raise HTTPException(
+            status_code=500,
+            detail="delivery_details schema missing batter/bat column required for rankings",
+        )
+    if not bowler_cols:
+        raise HTTPException(
+            status_code=500,
+            detail="delivery_details schema missing bowler/bowl column required for rankings",
+        )
+    if not date_cols and not has_year:
+        raise HTTPException(
+            status_code=500,
+            detail="delivery_details schema missing date/match_date/year required for rankings",
+        )
+
+    if len(date_cols) == 2:
+        date_expr = "COALESCE(dd.date, dd.match_date)"
+    elif len(date_cols) == 1:
+        date_expr = f"dd.{date_cols[0]}"
+    else:
+        date_expr = None
+
+    payload = {
+        "batter_expr": _coalesced_trim_expr("dd", batter_cols),
+        "bowler_expr": _coalesced_trim_expr("dd", bowler_cols),
+        "date_expr": date_expr,
+        "has_year": has_year,
+    }
+    _cache_set(_DELIVERY_SCHEMA_CACHE, cache_key, payload)
+    return payload
+
+
+def _build_delivery_date_filter(
+    schema_cfg: Dict[str, Any],
+    start: date,
+    end: date,
+) -> Tuple[str, Dict[str, Any]]:
+    date_expr = schema_cfg.get("date_expr")
+    has_year = bool(schema_cfg.get("has_year"))
+
+    if date_expr and has_year:
+        return (
+            f"""(
+                ({date_expr} IS NOT NULL AND {date_expr} >= :start_date AND {date_expr} <= :end_date)
+                OR ({date_expr} IS NULL AND dd.year >= :start_year AND dd.year <= :end_year)
+            )""",
+            {
+                "start_date": start,
+                "end_date": end,
+                "start_year": int(start.year),
+                "end_year": int(end.year),
+            },
+        )
+
+    if date_expr:
+        return (
+            f"{date_expr} >= :start_date AND {date_expr} <= :end_date",
+            {"start_date": start, "end_date": end},
+        )
+
+    if has_year:
+        return (
+            "dd.year >= :start_year AND dd.year <= :end_year",
+            {"start_year": int(start.year), "end_year": int(end.year)},
+        )
+
+    raise HTTPException(status_code=500, detail="Unable to build date filter for delivery_details")
+
+
 def _month_end(d: date) -> date:
     last_day = calendar.monthrange(d.year, d.month)[1]
     return date(d.year, d.month, last_day)
@@ -272,28 +374,29 @@ def _add_months(d: date, months: int) -> date:
 
 
 def _fetch_batting_cells(db: Session, start: date, end: date) -> List[Dict[str, Any]]:
+    schema_cfg = _get_delivery_schema_config(db)
+    date_filter_sql, date_filter_params = _build_delivery_date_filter(schema_cfg, start, end)
+
     query = text(
         f"""
         WITH normalized AS (
             SELECT
-                dd.batter,
+                {schema_cfg["batter_expr"]} AS batter_name,
                 dd.competition,
                 {LENGTH_BUCKET_SQL} AS length_bucket,
                 {BOWL_KIND_BUCKET_SQL} AS bowl_kind_bucket,
                 COALESCE(dd.score, 0)::float AS runs_scored,
                 CASE WHEN COALESCE(dd.control, 0) = 1 THEN 1 ELSE 0 END::float AS controlled_ball
             FROM delivery_details dd
-            WHERE dd.date >= :start_date
-              AND dd.date <= :end_date
+            WHERE {date_filter_sql}
               AND dd.length IS NOT NULL
-              AND dd.batter IS NOT NULL
-              AND TRIM(dd.batter) <> ''
+              AND {schema_cfg["batter_expr"]} IS NOT NULL
               AND dd.competition IS NOT NULL
               AND TRIM(dd.competition) <> ''
               AND (dd.wide IS NULL OR dd.wide = 0)
         )
         SELECT
-            batter AS player,
+            batter_name AS player,
             competition,
             length_bucket,
             bowl_kind_bucket,
@@ -303,19 +406,16 @@ def _fetch_batting_cells(db: Session, start: date, end: date) -> List[Dict[str, 
         FROM normalized
         WHERE length_bucket IS NOT NULL
           AND bowl_kind_bucket IS NOT NULL
-        GROUP BY batter, competition, length_bucket, bowl_kind_bucket
+        GROUP BY batter_name, competition, length_bucket, bowl_kind_bucket
         HAVING COUNT(*) >= :min_cell_balls
         """
     )
 
-    rows = db.execute(
-        query,
-        {
-            "start_date": start,
-            "end_date": end,
-            "min_cell_balls": MIN_CELL_BALLS,
-        },
-    ).fetchall()
+    params = {
+        **date_filter_params,
+        "min_cell_balls": MIN_CELL_BALLS,
+    }
+    rows = db.execute(query, params).fetchall()
 
     out: List[Dict[str, Any]] = []
     for row in rows:
@@ -335,6 +435,9 @@ def _fetch_batting_cells(db: Session, start: date, end: date) -> List[Dict[str, 
 
 
 def _fetch_batting_totals(db: Session, start: date, end: date) -> Dict[Tuple[str, str, str], Dict[str, float]]:
+    schema_cfg = _get_delivery_schema_config(db)
+    date_filter_sql, date_filter_params = _build_delivery_date_filter(schema_cfg, start, end)
+
     query = text(
         f"""
         WITH normalized AS (
@@ -345,8 +448,7 @@ def _fetch_batting_totals(db: Session, start: date, end: date) -> Dict[Tuple[str
                 COALESCE(dd.score, 0)::float AS runs_scored,
                 CASE WHEN COALESCE(dd.control, 0) = 1 THEN 1 ELSE 0 END::float AS controlled_ball
             FROM delivery_details dd
-            WHERE dd.date >= :start_date
-              AND dd.date <= :end_date
+            WHERE {date_filter_sql}
               AND dd.length IS NOT NULL
               AND dd.competition IS NOT NULL
               AND TRIM(dd.competition) <> ''
@@ -366,7 +468,7 @@ def _fetch_batting_totals(db: Session, start: date, end: date) -> Dict[Tuple[str
         """
     )
 
-    rows = db.execute(query, {"start_date": start, "end_date": end}).fetchall()
+    rows = db.execute(query, date_filter_params).fetchall()
     totals: Dict[Tuple[str, str, str], Dict[str, float]] = {}
     for row in rows:
         r = row._mapping
@@ -380,28 +482,29 @@ def _fetch_batting_totals(db: Session, start: date, end: date) -> Dict[Tuple[str
 
 
 def _fetch_bowling_cells(db: Session, start: date, end: date) -> List[Dict[str, Any]]:
+    schema_cfg = _get_delivery_schema_config(db)
+    date_filter_sql, date_filter_params = _build_delivery_date_filter(schema_cfg, start, end)
+
     query = text(
         f"""
         WITH normalized AS (
             SELECT
-                dd.bowler,
+                {schema_cfg["bowler_expr"]} AS bowler_name,
                 dd.competition,
                 {LENGTH_BUCKET_SQL} AS length_bucket,
                 {BOWL_KIND_BUCKET_SQL} AS bowl_kind_bucket,
                 COALESCE(dd.score, 0)::float AS runs_conceded,
                 CASE WHEN COALESCE(dd.score, 0) = 0 THEN 1 ELSE 0 END::float AS dot_ball
             FROM delivery_details dd
-            WHERE dd.date >= :start_date
-              AND dd.date <= :end_date
+            WHERE {date_filter_sql}
               AND dd.length IS NOT NULL
-              AND dd.bowler IS NOT NULL
-              AND TRIM(dd.bowler) <> ''
+              AND {schema_cfg["bowler_expr"]} IS NOT NULL
               AND dd.competition IS NOT NULL
               AND TRIM(dd.competition) <> ''
               AND (dd.wide IS NULL OR dd.wide = 0)
         )
         SELECT
-            bowler AS player,
+            bowler_name AS player,
             competition,
             length_bucket,
             bowl_kind_bucket,
@@ -411,19 +514,16 @@ def _fetch_bowling_cells(db: Session, start: date, end: date) -> List[Dict[str, 
         FROM normalized
         WHERE length_bucket IS NOT NULL
           AND bowl_kind_bucket IS NOT NULL
-        GROUP BY bowler, competition, length_bucket, bowl_kind_bucket
+        GROUP BY bowler_name, competition, length_bucket, bowl_kind_bucket
         HAVING COUNT(*) >= :min_cell_balls
         """
     )
 
-    rows = db.execute(
-        query,
-        {
-            "start_date": start,
-            "end_date": end,
-            "min_cell_balls": MIN_CELL_BALLS,
-        },
-    ).fetchall()
+    params = {
+        **date_filter_params,
+        "min_cell_balls": MIN_CELL_BALLS,
+    }
+    rows = db.execute(query, params).fetchall()
 
     out: List[Dict[str, Any]] = []
     for row in rows:
@@ -443,6 +543,9 @@ def _fetch_bowling_cells(db: Session, start: date, end: date) -> List[Dict[str, 
 
 
 def _fetch_bowling_totals(db: Session, start: date, end: date) -> Dict[Tuple[str, str, str], Dict[str, float]]:
+    schema_cfg = _get_delivery_schema_config(db)
+    date_filter_sql, date_filter_params = _build_delivery_date_filter(schema_cfg, start, end)
+
     query = text(
         f"""
         WITH normalized AS (
@@ -453,8 +556,7 @@ def _fetch_bowling_totals(db: Session, start: date, end: date) -> Dict[Tuple[str
                 COALESCE(dd.score, 0)::float AS runs_conceded,
                 CASE WHEN COALESCE(dd.score, 0) = 0 THEN 1 ELSE 0 END::float AS dot_ball
             FROM delivery_details dd
-            WHERE dd.date >= :start_date
-              AND dd.date <= :end_date
+            WHERE {date_filter_sql}
               AND dd.length IS NOT NULL
               AND dd.competition IS NOT NULL
               AND TRIM(dd.competition) <> ''
@@ -474,7 +576,7 @@ def _fetch_bowling_totals(db: Session, start: date, end: date) -> Dict[Tuple[str
         """
     )
 
-    rows = db.execute(query, {"start_date": start, "end_date": end}).fetchall()
+    rows = db.execute(query, date_filter_params).fetchall()
     totals: Dict[Tuple[str, str, str], Dict[str, float]] = {}
     for row in rows:
         r = row._mapping
