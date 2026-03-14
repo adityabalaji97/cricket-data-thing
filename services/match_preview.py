@@ -9,6 +9,7 @@ from sqlalchemy.sql import text
 
 from models import teams_mapping
 from services.delivery_data_service import get_match_scores, get_venue_match_stats, get_venue_phase_stats
+from services.global_t20_rankings import get_batting_rankings_service, get_bowling_rankings_service
 from services.matchups import get_all_team_name_variations, get_team_matchups_service
 
 
@@ -471,6 +472,151 @@ def _same_country_hint(venue: Optional[str], h2h_matches: List[Dict[str, Any]]) 
     return {"same_venue_matches": same_venue, "same_country_like_matches": same_country_like}
 
 
+def _normalize_player_key(name: Optional[str]) -> str:
+    return " ".join(str(name or "").strip().lower().split())
+
+
+def _fetch_all_rank_rows(fetch_fn, page_size: int = 500, max_rows: int = 50000) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    offset = 0
+    while len(rows) < max_rows:
+        payload = fetch_fn(limit=page_size, offset=offset)
+        page = payload.get("rankings", []) if isinstance(payload, dict) else []
+        if not page:
+            break
+        rows.extend(page)
+        if len(page) < page_size:
+            break
+        offset += page_size
+    return rows
+
+
+def _summarize_top_ranked_lineup_players(
+    db: Session,
+    lineup_players: Dict[str, List[str]],
+    start_date: Optional[date],
+    end_date: Optional[date],
+    top_n: int = 3,
+) -> Dict[str, Any]:
+    if not lineup_players:
+        return {"available": False, "teams": {}}
+
+    try:
+        batting_rows = _fetch_all_rank_rows(
+            lambda limit, offset: get_batting_rankings_service(
+                db=db,
+                start_date=start_date,
+                end_date=end_date,
+                limit=limit,
+                offset=offset,
+                bowl_kind="all",
+                force_refresh=False,
+            )
+        )
+        bowling_rows = _fetch_all_rank_rows(
+            lambda limit, offset: get_bowling_rankings_service(
+                db=db,
+                start_date=start_date,
+                end_date=end_date,
+                limit=limit,
+                offset=offset,
+                bowl_kind="all",
+                force_refresh=False,
+            )
+        )
+    except Exception:
+        return {"available": False, "teams": {}}
+
+    batting_lookup = {
+        _normalize_player_key(row.get("player")): row
+        for row in batting_rows
+        if _normalize_player_key(row.get("player"))
+    }
+    bowling_lookup = {
+        _normalize_player_key(row.get("player")): row
+        for row in bowling_rows
+        if _normalize_player_key(row.get("player"))
+    }
+
+    teams_payload: Dict[str, Any] = {}
+    has_any = False
+
+    for team_name, players in lineup_players.items():
+        unique_players = []
+        seen: set = set()
+        for player in players or []:
+            key = _normalize_player_key(player)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            unique_players.append(player)
+
+        top_overall: List[Dict[str, Any]] = []
+        top_batting: List[Dict[str, Any]] = []
+        top_bowling: List[Dict[str, Any]] = []
+
+        for player in unique_players:
+            key = _normalize_player_key(player)
+            bat = batting_lookup.get(key)
+            bowl = bowling_lookup.get(key)
+
+            if bat:
+                top_batting.append(
+                    {
+                        "player": player,
+                        "rank": int(bat.get("rank") or 0),
+                        "quality_score": round(float(bat.get("quality_score", 0) or 0), 1),
+                    }
+                )
+            if bowl:
+                top_bowling.append(
+                    {
+                        "player": player,
+                        "rank": int(bowl.get("rank") or 0),
+                        "quality_score": round(float(bowl.get("quality_score", 0) or 0), 1),
+                    }
+                )
+
+            if not bat and not bowl:
+                continue
+
+            bat_quality = float((bat or {}).get("quality_score", 0) or 0)
+            bowl_quality = float((bowl or {}).get("quality_score", 0) or 0)
+            is_batting_top = bat_quality >= bowl_quality
+            best_row = bat if is_batting_top else bowl
+
+            top_overall.append(
+                {
+                    "player": player,
+                    "discipline": "batting" if is_batting_top else "bowling",
+                    "rank": int((best_row or {}).get("rank") or 0),
+                    "quality_score": round(max(bat_quality, bowl_quality), 1),
+                    "batting_quality": round(bat_quality, 1) if bat else None,
+                    "bowling_quality": round(bowl_quality, 1) if bowl else None,
+                }
+            )
+
+        top_overall.sort(key=lambda x: (x.get("quality_score", 0), -x.get("rank", 9999)), reverse=True)
+        top_batting.sort(key=lambda x: (x.get("quality_score", 0), -x.get("rank", 9999)), reverse=True)
+        top_bowling.sort(key=lambda x: (x.get("quality_score", 0), -x.get("rank", 9999)), reverse=True)
+
+        team_result = {
+            "lineup_size": len(unique_players),
+            "top_overall": top_overall[:top_n],
+            "top_batting": top_batting[:top_n],
+            "top_bowling": top_bowling[:top_n],
+        }
+        if team_result["top_overall"]:
+            has_any = True
+        teams_payload[team_name] = team_result
+
+    return {
+        "available": has_any,
+        "top_n": top_n,
+        "teams": teams_payload,
+    }
+
+
 def _summarize_matchups_and_fantasy(
     db: Session,
     team1: str,
@@ -489,7 +635,7 @@ def _summarize_matchups_and_fantasy(
             db=db,
         )
     except Exception:
-        return {"available": False}
+        return {"available": False, "lineup_players": {}}
 
     fantasy = (matchup_data or {}).get("fantasy_analysis") or {}
     t1_name = ((matchup_data or {}).get("team1") or {}).get("name", team1)
@@ -549,8 +695,14 @@ def _summarize_matchups_and_fantasy(
         rows.sort(key=lambda x: (x["wickets"], -x["economy"], x["dot_percentage"]), reverse=True)
         return rows[:limit]
 
+    lineup_players = {
+        t1_name: sorted(set(((matchup_data or {}).get("team1") or {}).get("players") or [])),
+        t2_name: sorted(set(((matchup_data or {}).get("team2") or {}).get("players") or [])),
+    }
+
     return {
         "available": True,
+        "lineup_players": lineup_players,
         "fantasy_top": {
             t1_name: _top_fantasy("team1"),
             t2_name: _top_fantasy("team2"),
@@ -1479,6 +1631,13 @@ def gather_preview_context(
     venue_trend = _summarize_recent_venue_trend(match_history_bundle["venue_results"])
     h2h_relevance = _same_country_hint(venue, match_history_bundle["h2h_recent"])
     matchup_fantasy = _summarize_matchups_and_fantasy(db, team1, team2, start_date, end_date)
+    top_ranked_players = _summarize_top_ranked_lineup_players(
+        db=db,
+        lineup_players=(matchup_fantasy or {}).get("lineup_players") or {},
+        start_date=start_date,
+        end_date=end_date,
+        top_n=3,
+    )
     serialized_phase_stats = _serialize_phase_stats(phase_stats)
 
     h2h_team1_wins = sum(1 for m in h2h if m["winner"] == team1)
@@ -1531,6 +1690,7 @@ def gather_preview_context(
             team2: elo2,
             "delta_team1_minus_team2": (elo1 - elo2) if elo1 is not None and elo2 is not None else None,
         },
+        "top_ranked_players": top_ranked_players,
         "screen_story": {
             "match_results_distribution": {
                 "venue_toss_signal": {
@@ -1569,6 +1729,7 @@ def gather_preview_context(
             },
             "recent_matches_at_venue": venue_trend,
             "expected_fantasy_points": matchup_fantasy,
+            "top_ranked_players": top_ranked_players,
         },
     }
     context["screen_story"]["phase_wise_strategy"] = build_phase_wise_strategy_templates(context)

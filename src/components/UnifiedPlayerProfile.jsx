@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Box, Button, Typography, TextField, CircularProgress,
-  Alert, Autocomplete, ToggleButtonGroup, ToggleButton, Card,
+  Alert, Autocomplete, ToggleButtonGroup, ToggleButton, Card, Chip, LinearProgress,
   useMediaQuery, useTheme
 } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  LineChart, Line, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis,
+} from 'recharts';
 import CompetitionFilter from './CompetitionFilter';
 import TopInnings from './TopInnings';
 import BowlingMatchupMatrix from './BowlingMatchupMatrix';
@@ -23,6 +26,116 @@ import config from '../config';
 
 const DEFAULT_START_DATE = "2020-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
+
+const GlobalRankTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+      <Typography variant="caption" sx={{ display: 'block', fontWeight: 700 }}>{label}</Typography>
+      <Typography variant="caption" sx={{ display: 'block' }}>
+        Score: {payload[0].value ?? 'N/A'}
+      </Typography>
+    </Box>
+  );
+};
+
+const GlobalT20RankSection = ({ mode, rankPayload, loading }) => {
+  const modePayload = mode === 'bowling' ? rankPayload?.bowling : rankPayload?.batting;
+  const ranking = modePayload?.ranking;
+  const trajectory = (modePayload?.trajectory || []).slice(-12).map((point) => ({
+    ...point,
+    label: point.date ? point.date.slice(2, 7) : '--',
+    score: point.quality_score,
+  }));
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+        <CircularProgress size={20} />
+      </Box>
+    );
+  }
+
+  if (!ranking) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        No global ranking found for this player in the selected window.
+      </Typography>
+    );
+  }
+
+  return (
+    <Box sx={{ display: 'grid', gap: 1.25 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box
+          sx={{
+            width: 30,
+            height: 30,
+            borderRadius: '50%',
+            bgcolor: 'primary.main',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 700,
+            fontSize: '0.78rem',
+          }}
+        >
+          {ranking.rank}
+        </Box>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, flex: 1 }}>
+          Global T20 Rank
+        </Typography>
+        <Chip
+          size="small"
+          color="primary"
+          label={`Quality ${Number(ranking.quality_score || 0).toFixed(1)}`}
+          sx={{ fontWeight: 700 }}
+        />
+      </Box>
+
+      {[
+        { label: 'Quality', value: ranking.quality_score },
+        { label: 'Strike Factor', value: ranking.strike_factor },
+        { label: 'Control Factor', value: ranking.control_factor },
+      ].map((metric) => (
+        <Box key={metric.label}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="caption" color="text.secondary">{metric.label}</Typography>
+            <Typography variant="caption" sx={{ fontWeight: 700 }}>{Number(metric.value || 0).toFixed(1)}</Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={Math.max(0, Math.min(100, Number(metric.value || 0)))}
+            sx={{ height: 6, borderRadius: 999, mt: 0.25 }}
+          />
+        </Box>
+      ))}
+
+      <Box>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+          Last 12 Months
+        </Typography>
+        <Box sx={{ mt: 0.5, height: 120, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75 }}>
+          {trajectory.length ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trajectory} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                <YAxis hide domain={[0, 100]} />
+                <RechartsTooltip content={<GlobalRankTooltip />} />
+                <Line type="monotone" dataKey="score" stroke="#1976d2" strokeWidth={2} dot={false} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Typography variant="caption" color="text.secondary">No trajectory data</Typography>
+            </Box>
+          )}
+        </Box>
+      </Box>
+    </Box>
+  );
+};
 
 const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   const theme = useTheme();
@@ -52,6 +165,8 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [activeSectionId, setActiveSectionId] = useState('overview');
   const [fetchTrigger, setFetchTrigger] = useState(0);
+  const [globalRankPayload, setGlobalRankPayload] = useState(null);
+  const [globalRankLoading, setGlobalRankLoading] = useState(false);
 
   const sectionRefs = useRef({});
 
@@ -119,6 +234,10 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   }, [selectedPlayer, fetchPlayerType]);
 
   useEffect(() => {
+    setGlobalRankPayload(null);
+  }, [selectedPlayer]);
+
+  useEffect(() => {
     if (!playerType) return;
     if (!playerType.has_batting_data && playerType.has_bowling_data) {
       setActiveTab('bowling');
@@ -157,6 +276,37 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     }
   }, [shouldFetch, selectedPlayer, fetchAllData]);
 
+  useEffect(() => {
+    if (!selectedPlayer || fetchTrigger <= 0) return;
+
+    let cancelled = false;
+
+    const fetchGlobalRanking = async () => {
+      try {
+        setGlobalRankLoading(true);
+        const params = new URLSearchParams();
+        params.set('start_date', dateRange.start);
+        params.set('end_date', dateRange.end);
+        params.set('snapshots', '12');
+
+        const response = await fetch(
+          `${config.API_URL}/rankings/player/${encodeURIComponent(selectedPlayer)}?${params.toString()}`,
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (!cancelled) setGlobalRankPayload(data);
+      } catch (err) {
+        console.error('Failed to fetch global rank payload', err);
+        if (!cancelled) setGlobalRankPayload(null);
+      } finally {
+        if (!cancelled) setGlobalRankLoading(false);
+      }
+    };
+
+    fetchGlobalRanking();
+    return () => { cancelled = true; };
+  }, [selectedPlayer, fetchTrigger, dateRange.start, dateRange.end]);
+
   const handleFetch = () => {
     if (!selectedPlayer) return;
     setShouldFetch(true);
@@ -182,6 +332,17 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         id: 'overview',
         label: 'Overview',
         content: <OverviewSection stats={currentStats} mode={activeTab} />,
+      },
+      {
+        id: 'global-rank',
+        label: 'Global T20 Rank',
+        content: (
+          <GlobalT20RankSection
+            mode={activeTab}
+            rankPayload={globalRankPayload}
+            loading={globalRankLoading}
+          />
+        ),
       },
       {
         id: 'dna',
@@ -292,6 +453,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   }, [
     hasData, currentStats, currentDismissalStats, activeTab, battingStats,
     selectedPlayer, dateRange, selectedVenue, competitionFilters, isMobile, fetchTrigger,
+    globalRankPayload, globalRankLoading,
   ]);
 
   // Scroll to section handler

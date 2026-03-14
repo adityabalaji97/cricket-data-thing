@@ -317,6 +317,7 @@ def get_match_preview(
             "venue": venue,
             "team1": context["team1"],
             "team2": context["team2"],
+            "top_ranked_players": context.get("top_ranked_players") or {},
             "sections": sections,
             "preview": preview_text,
             "preview_mode": preview_mode,

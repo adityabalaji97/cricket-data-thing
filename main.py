@@ -41,6 +41,7 @@ from routers.fixtures import router as fixtures_router
 from routers.match_preview import router as match_preview_router
 from routers.landing import router as landing_router
 from routers.player_line_length import router as player_line_length_router
+from routers.rankings import router as rankings_router
 from services.delivery_data_service import (
     get_venue_match_stats,
     get_match_scores,
@@ -80,6 +81,7 @@ app.include_router(fixtures_router)
 app.include_router(match_preview_router)
 app.include_router(landing_router)
 app.include_router(player_line_length_router)
+app.include_router(rankings_router)
 
 # Add CORS middleware
 app.add_middleware(

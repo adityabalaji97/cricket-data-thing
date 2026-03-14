@@ -24,6 +24,7 @@ from sqlalchemy.sql import text
 
 from ipl_rosters import get_all_ipl_teams, get_ipl_roster, get_team_abbrev_from_name
 from services.bowler_types import BOWLER_CATEGORY_SQL
+from services.global_t20_rankings import get_batting_rankings_service, get_bowling_rankings_service
 from services.player_aliases import get_player_names
 from services.teams import get_all_team_name_variations
 
@@ -67,6 +68,10 @@ CATEGORY_METRIC_DEFS = {
         {"key": "death_boundary_pct", "higher_is_better": True},
         {"key": "death_dot_pct", "higher_is_better": False},
         {"key": "death_balls_per_six", "higher_is_better": False},
+        {"key": "global_batting_quality", "higher_is_better": True},
+        {"key": "global_batting_strike_factor", "higher_is_better": True},
+        {"key": "global_batting_control_factor", "higher_is_better": True},
+        {"key": "global_batting_coverage", "higher_is_better": True},
     ],
     "bowling": [
         {"key": "pp_economy", "higher_is_better": False},
@@ -81,6 +86,10 @@ CATEGORY_METRIC_DEFS = {
         {"key": "death_bowling_sr", "higher_is_better": False},
         {"key": "death_dot_pct", "higher_is_better": True},
         {"key": "death_boundary_pct_conceded", "higher_is_better": False},
+        {"key": "global_bowling_quality", "higher_is_better": True},
+        {"key": "global_bowling_strike_factor", "higher_is_better": True},
+        {"key": "global_bowling_control_factor", "higher_is_better": True},
+        {"key": "global_bowling_coverage", "higher_is_better": True},
     ],
     "pace_spin": [
         {"key": "bat_sr_vs_pace", "higher_is_better": True},
@@ -118,6 +127,10 @@ CATEGORY_METRIC_DEFS = {
         {"key": "bench_experience_pct", "higher_is_better": True},
     ],
 }
+
+
+GLOBAL_RANK_TOP_BATTERS = 7
+GLOBAL_RANK_TOP_BOWLERS = 6
 
 
 MODEL_EXPLAINER = {
@@ -283,6 +296,172 @@ def _normalize_name_key(value: Optional[str]) -> str:
     if not value:
         return ""
     return " ".join(value.strip().lower().split())
+
+
+def _fetch_all_global_rank_rows(
+    fetch_fn,
+    page_size: int = 500,
+    max_rows: int = 50000,
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    offset = 0
+    while len(rows) < max_rows:
+        payload = fetch_fn(limit=page_size, offset=offset)
+        page = payload.get("rankings", []) if isinstance(payload, dict) else []
+        if not page:
+            break
+        rows.extend(page)
+        if len(page) < page_size:
+            break
+        offset += page_size
+    return rows
+
+
+def _build_global_rankings_lookup(
+    db: Session,
+    date_range: Tuple[date, date],
+    force_refresh: bool = False,
+) -> Dict[str, Dict[str, Dict[str, float]]]:
+    start, end = date_range
+    try:
+        batting_rows = _fetch_all_global_rank_rows(
+            lambda limit, offset: get_batting_rankings_service(
+                db=db,
+                start_date=start,
+                end_date=end,
+                limit=limit,
+                offset=offset,
+                bowl_kind="all",
+                force_refresh=force_refresh,
+            )
+        )
+        bowling_rows = _fetch_all_global_rank_rows(
+            lambda limit, offset: get_bowling_rankings_service(
+                db=db,
+                start_date=start,
+                end_date=end,
+                limit=limit,
+                offset=offset,
+                bowl_kind="all",
+                force_refresh=force_refresh,
+            )
+        )
+    except Exception:
+        return {"batting": {}, "bowling": {}}
+
+    def _rows_to_lookup(source_rows: List[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+        out: Dict[str, Dict[str, float]] = {}
+        for row in source_rows:
+            player = row.get("player")
+            key = _normalize_name_key(player)
+            if not key:
+                continue
+            out[key] = {
+                "rank": float(row.get("rank") or 0),
+                "quality_score": float(row.get("quality_score") or 0),
+                "strike_factor": float(row.get("strike_factor") or 0),
+                "control_factor": float(row.get("control_factor") or 0),
+            }
+        return out
+
+    return {
+        "batting": _rows_to_lookup(batting_rows),
+        "bowling": _rows_to_lookup(bowling_rows),
+    }
+
+
+def _aggregate_global_rank_metrics(
+    roster: List[Dict[str, str]],
+    global_rankings: Optional[Dict[str, Dict[str, Dict[str, float]]]],
+) -> Dict[str, Dict[str, Optional[float]]]:
+    if not global_rankings:
+        return {
+            "batting": {
+                "global_batting_quality": None,
+                "global_batting_strike_factor": None,
+                "global_batting_control_factor": None,
+                "global_batting_coverage": None,
+            },
+            "bowling": {
+                "global_bowling_quality": None,
+                "global_bowling_strike_factor": None,
+                "global_bowling_control_factor": None,
+                "global_bowling_coverage": None,
+            },
+        }
+
+    batting_lookup = global_rankings.get("batting", {})
+    bowling_lookup = global_rankings.get("bowling", {})
+
+    batting_candidates: List[Dict[str, float]] = []
+    bowling_candidates: List[Dict[str, float]] = []
+    batting_eligible = 0
+    bowling_eligible = 0
+    batting_found = 0
+    bowling_found = 0
+
+    for player in roster:
+        role = (player.get("role") or "").strip().lower()
+        keys = [
+            _normalize_name_key(player.get("name")),
+            _normalize_name_key(player.get("display_name")),
+        ]
+        keys = [k for k in keys if k]
+
+        bat_row = next((batting_lookup.get(k) for k in keys if k in batting_lookup), None)
+        bowl_row = next((bowling_lookup.get(k) for k in keys if k in bowling_lookup), None)
+
+        is_batting_role = role in {"", "batter", "all-rounder", "wicket-keeper"}
+        is_bowling_role = role in {"", "bowler", "all-rounder"}
+
+        if is_batting_role:
+            batting_eligible += 1
+            if bat_row:
+                batting_candidates.append(bat_row)
+                batting_found += 1
+
+        if is_bowling_role:
+            bowling_eligible += 1
+            if bowl_row:
+                bowling_candidates.append(bowl_row)
+                bowling_found += 1
+
+    if batting_eligible == 0:
+        batting_eligible = len(roster)
+    if bowling_eligible == 0:
+        bowling_eligible = len(roster)
+
+    def _aggregate(candidates: List[Dict[str, float]], top_n: int) -> Dict[str, Optional[float]]:
+        if not candidates:
+            return {
+                "quality_score": None,
+                "strike_factor": None,
+                "control_factor": None,
+            }
+        sorted_rows = sorted(candidates, key=lambda x: x.get("quality_score", 0.0), reverse=True)[:top_n]
+        return {
+            "quality_score": sum(row.get("quality_score", 0.0) for row in sorted_rows) / len(sorted_rows),
+            "strike_factor": sum(row.get("strike_factor", 0.0) for row in sorted_rows) / len(sorted_rows),
+            "control_factor": sum(row.get("control_factor", 0.0) for row in sorted_rows) / len(sorted_rows),
+        }
+
+    batting_agg = _aggregate(batting_candidates, GLOBAL_RANK_TOP_BATTERS)
+    bowling_agg = _aggregate(bowling_candidates, GLOBAL_RANK_TOP_BOWLERS)
+
+    return {
+        "batting": {
+            "global_batting_quality": batting_agg["quality_score"],
+            "global_batting_strike_factor": batting_agg["strike_factor"],
+            "global_batting_control_factor": batting_agg["control_factor"],
+            "global_batting_coverage": _safe_div(batting_found, batting_eligible),
+        },
+        "bowling": {
+            "global_bowling_quality": bowling_agg["quality_score"],
+            "global_bowling_strike_factor": bowling_agg["strike_factor"],
+            "global_bowling_control_factor": bowling_agg["control_factor"],
+            "global_bowling_coverage": _safe_div(bowling_found, bowling_eligible),
+        },
+    }
 
 
 def _build_bulk_name_index(db: Session) -> Dict[str, Any]:
@@ -2226,6 +2405,7 @@ def compute_team_metrics(
     venue_archetypes: Optional[Dict[str, str]] = None,
     total_venues: Optional[int] = None,
     precomputed: Optional[Dict[str, Any]] = None,
+    global_rankings: Optional[Dict[str, Dict[str, Dict[str, float]]]] = None,
 ) -> Dict[str, Dict[str, Optional[float]]]:
     player_names = [player["name"] for player in roster if player.get("name")]
     if not player_names:
@@ -2257,6 +2437,8 @@ def compute_team_metrics(
             "death_wickets_used": batting_agg.get("death_wickets"),
         }
     )
+    global_rank_metrics = _aggregate_global_rank_metrics(roster, global_rankings)
+    batting_metrics.update(global_rank_metrics.get("batting", {}))
 
     bowling_metrics = {}
     bowling_metrics.update(_phase_bowling_metrics("pp", bowling_agg))
@@ -2272,6 +2454,7 @@ def compute_team_metrics(
             "death_wickets_used": bowling_agg.get("death_wickets"),
         }
     )
+    bowling_metrics.update(global_rank_metrics.get("bowling", {}))
 
     if use_precomputed:
         pace_spin_metrics = _aggregate_pace_spin_from_precomputed(player_names, precomputed)
@@ -2442,6 +2625,11 @@ def compute_all_predictions(
         }
     )
     precomputed = _build_precomputed_maps(all_players, (start, end), db)
+    global_rankings = _build_global_rankings_lookup(
+        db=db,
+        date_range=(start, end),
+        force_refresh=force_refresh,
+    )
 
     team_raw: Dict[str, Dict[str, Dict[str, Optional[float]]]] = {}
     venue_archetypes = _build_venue_archetypes(db, (start, end))
@@ -2456,6 +2644,7 @@ def compute_all_predictions(
             venue_archetypes=venue_archetypes,
             total_venues=venue_count,
             precomputed=precomputed,
+            global_rankings=global_rankings,
         )
 
     ranked_rows = _build_prediction_rows(team_raw)

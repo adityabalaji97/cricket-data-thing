@@ -34,6 +34,7 @@ import TeamProfile from './components/TeamProfile';
 import TeamComparison from './components/TeamComparison';
 import DoppelgangerLeaderboard from './components/DoppelgangerLeaderboard';
 import IPLPredictions from './components/IPLPredictions';
+import GlobalT20Rankings from './components/GlobalT20Rankings';
 import WrappedPage from './components/wrapped/WrappedPage';
 import { GoogleSearchLanding, SearchBar } from './components/search';
 import GuessInningsGame from './components/games/GuessInningsGame';
@@ -70,8 +71,9 @@ const AppContent = () => {
     path === '/team-comparison' ? 8 :
     path === '/doppelgangers' ? 9 :
     path === '/ipl-predictions' ? 10 :
-    path === '/games/guess-innings' ? 11 :
-    path === '/games/player-journeys' ? 12 :
+    path === '/rankings' ? 11 :
+    path === '/games/guess-innings' ? 12 :
+    path === '/games/player-journeys' ? 13 :
     path === '/credits' ? false :
     path.startsWith('/wrapped') ? false : 0
   );
@@ -88,6 +90,7 @@ const AppContent = () => {
     path === '/team-comparison' ? 'Team Comparison' :
     path === '/doppelgangers' ? 'Doppelgangers' :
     path === '/ipl-predictions' ? 'IPL Predictions' :
+    path === '/rankings' ? 'Global Rankings' :
     path === '/games/guess-innings' ? 'Guess the Innings' :
     path === '/games/player-journeys' ? 'Player Journeys' :
     path === '/credits' ? 'Credits & Acknowledgements' :
@@ -554,6 +557,9 @@ const AppContent = () => {
               <MenuItem onClick={() => handleNavigate('/ipl-predictions')}>
                 IPL Predictions
               </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/rankings')}>
+                Global Rankings
+              </MenuItem>
               <MenuItem onClick={() => handleNavigate('/games/guess-innings')}>
                 🎯 Guess the Innings
               </MenuItem>
@@ -594,6 +600,7 @@ const AppContent = () => {
               <Tab label="Team Comparison" component={Link} to="/team-comparison" />
               <Tab label="Doppelgangers" component={Link} to="/doppelgangers" />
               <Tab label="IPL Predictions" component={Link} to="/ipl-predictions" />
+              <Tab label="Global Rankings" component={Link} to="/rankings" />
               <Tab label="🎯 Guess the Innings" component={Link} to="/games/guess-innings" />
               <Tab label="🛤️ Player Journeys" component={Link} to="/games/player-journeys" />
             </Tabs>
@@ -620,6 +627,7 @@ const AppContent = () => {
         <Route path="/team-comparison" element={<TeamComparison />} />
         <Route path="/doppelgangers" element={<DoppelgangerLeaderboard />} />
         <Route path="/ipl-predictions" element={<IPLPredictions />} />
+        <Route path="/rankings" element={<GlobalT20Rankings />} />
         <Route path="/games/guess-innings" element={<GuessInningsGame isMobile={isMobile} />} />
         <Route path="/games/player-journeys" element={<PlayerJourneysGame isMobile={isMobile} />} />
         <Route path="/wrapped/2025" element={<WrappedPage />} />
