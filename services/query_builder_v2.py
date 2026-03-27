@@ -230,8 +230,11 @@ def get_legacy_grouping_columns_map():
         
         # Batter attributes (partial coverage in legacy)
         "bat_hand": "NULL",  # Not available
+        "striker_batter_type": "d.striker_batter_type",  # Backward-compatible alias
+        "non_striker_batter_type": "d.non_striker_batter_type",  # Backward-compatible alias
         # Normalize crease_combo: swap RHB_LHB -> LHB_RHB and lowercase
         "crease_combo": "LOWER(CASE WHEN d.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE d.crease_combo END)",
+        "ball_direction": "d.ball_direction",  # Backward-compatible alias
         
         # Bowler attributes
         "bowl_style": "NULL",  # Not available
@@ -1105,6 +1108,8 @@ def query_deliveries_service(
                 }
             }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in query_deliveries_service: {str(e)}")
         import traceback
@@ -1413,8 +1418,11 @@ def get_grouping_columns_map():
         
         # Batter attributes
         "bat_hand": "dd.bat_hand",
+        "striker_batter_type": "dd.bat_hand",  # Backward-compatible alias
+        "non_striker_batter_type": "NULL",  # Not available in delivery_details
         # Normalize crease_combo: RHB_LHB and LHB_RHB are both "mixed" - normalize to lowercase lhb_rhb
         "crease_combo": "LOWER(CASE WHEN dd.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE dd.crease_combo END)",
+        "ball_direction": "NULL",  # Not available in delivery_details
         
         # Bowler attributes
         "bowl_style": "dd.bowl_style",

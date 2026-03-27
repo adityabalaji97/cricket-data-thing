@@ -157,6 +157,12 @@ def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=No
 
         # Handle NaN
         df = df.where(pd.notnull(df), None)
+
+        # Normalize control to integer values (0/1).
+        # Some source rows provide strings like "0.0"/"1.0", which fail on INTEGER inserts.
+        if 'control' in df.columns:
+            control_numeric = pd.to_numeric(df['control'], errors='coerce')
+            df['control'] = control_numeric.apply(lambda value: int(value) if pd.notna(value) else None)
         
         if dry_run:
             total_inserted += len(df)

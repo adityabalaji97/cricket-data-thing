@@ -99,6 +99,8 @@ def query_deliveries(
     
     # Batter/Bowler attribute filters
     bat_hand: Optional[str] = Query(default=None, description="Filter by batting hand (LHB, RHB)"),
+    striker_batter_type: Optional[str] = Query(default=None, description="Backward-compatible alias for bat_hand"),
+    non_striker_batter_type: Optional[str] = Query(default=None, description="Backward-compatible alias (not available in delivery_details)"),
     bowl_style: List[str] = Query(default=[], description="Filter by bowling style (RF, RM, SLA, OB, etc.)"),
     bowl_kind: List[str] = Query(default=[], description="Filter by bowl kind (pace bowler, spin bowler, mixture/unknown)"),
     crease_combo: List[str] = Query(default=[], description="Filter by crease combo (RHB_RHB, RHB_LHB, LHB_RHB, LHB_LHB)"),
@@ -174,7 +176,11 @@ def query_deliveries(
         
         # Handle wagon_zone separately since it's List[int]
         wagon_zone = preprocess_int_list_param(wagon_zone)
-        
+
+        # Backward compatibility for older links and saved URLs.
+        if not bat_hand and striker_batter_type:
+            bat_hand = striker_batter_type
+
         result = query_deliveries_service(
             venue=venue,
             start_date=start_date,
@@ -212,6 +218,8 @@ def query_deliveries(
             db=db
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -279,7 +287,8 @@ def get_available_columns(db: Session = Depends(get_session)):
                 "venue", "country", "match_id", "competition", "year",
                 "batting_team", "bowling_team", "batter", "bowler",
                 "innings", "phase",
-                "bat_hand", "bowl_style", "bowl_kind", "crease_combo",
+                "bat_hand", "striker_batter_type",
+                "bowl_style", "bowl_kind", "crease_combo",
                 "line", "length", "shot", "control", "wagon_zone", "dismissal"
             ],
             
@@ -329,5 +338,7 @@ def get_available_columns(db: Session = Depends(get_session)):
                 "low": ["line", "length"]
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

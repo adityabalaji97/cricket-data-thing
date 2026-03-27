@@ -489,17 +489,17 @@ export const getBowlerContextualQueries = (playerName, context = {}) => {
       priority: 4,
     },
 
-    // Query 5: Ball Direction Analysis
+    // Query 5: Line Analysis
     {
-      question: `Where does ${shortName} get hit most? (by ball direction)`,
+      question: `Where does ${shortName} get hit most? (by line)`,
       url: buildQueryUrl(
         {
           ...baseFilters,
           min_balls: 20,
         },
-        ['ball_direction']
+        ['line']
       ),
-      tags: ['technique', 'ball_direction'],
+      tags: ['technique', 'line'],
       priority: 5,
     },
 
