@@ -217,7 +217,7 @@ const LandingPage = () => {
                       color="primary"
                       component={Link}
                       startIcon={<StadiumIcon />}
-                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1)}&team2=${encodeURIComponent(match.team2)}&includeInternational=true&topTeams=20&autoload=true`}
+                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1Abbr)}&team2=${encodeURIComponent(match.team2Abbr)}&includeInternational=true&topTeams=20&autoload=true`}
                     >
                       Venue
                     </Button>
@@ -350,7 +350,7 @@ const LandingPage = () => {
                       component={Link}
                       startIcon={<StadiumIcon />}
                       fullWidth
-                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1)}&team2=${encodeURIComponent(match.team2)}&includeInternational=true&topTeams=20&autoload=true`}
+                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1Abbr)}&team2=${encodeURIComponent(match.team2Abbr)}&includeInternational=true&topTeams=20&autoload=true`}
                     >
                       Venue Analysis
                     </Button>

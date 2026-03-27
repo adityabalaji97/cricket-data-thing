@@ -18,6 +18,53 @@ def get_all_team_name_variations(team_name):
         return reverse_mapping[abbrev]
     return [team_name]
 
+def _dedupe_player_names(players: List[str]) -> List[str]:
+    deduped: List[str] = []
+    seen = set()
+    for player in players or []:
+        if not player:
+            continue
+        cleaned = player.strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(cleaned)
+    return deduped
+
+def _canonicalize_players(players: List[str], db) -> List[str]:
+    deduped_players = _dedupe_player_names(players)
+    if not deduped_players:
+        return []
+
+    try:
+        alias_rows = db.execute(
+            text(
+                """
+                SELECT player_name, alias_name
+                FROM player_aliases
+                WHERE alias_name IS NOT NULL
+                """
+            )
+        ).fetchall()
+    except Exception:
+        return deduped_players
+
+    alias_lookup = {}
+    for row in alias_rows:
+        legacy_name = (row[0] or "").strip()
+        canonical_name = (row[1] or "").strip()
+        if not canonical_name:
+            continue
+        alias_lookup[canonical_name.lower()] = canonical_name
+        if legacy_name:
+            alias_lookup[legacy_name.lower()] = canonical_name
+
+    canonicalized = [alias_lookup.get(player.lower(), player) for player in deduped_players]
+    return _dedupe_player_names(canonicalized)
+
 def add_bowling_consolidated_rows(team1_batting, team2_batting, team1_players, team2_players):
     """
     Add consolidated rows for bowlers showing their performance against the opposing batting lineup
@@ -218,6 +265,9 @@ def get_team_matchups_service(
 ):
     try:
         use_custom_teams = len(team1_players) > 0 and len(team2_players) > 0
+        if use_custom_teams:
+            team1_players = _canonicalize_players(team1_players, db)
+            team2_players = _canonicalize_players(team2_players, db)
 
         if not use_custom_teams:
             team1_names = get_all_team_name_variations(team1)
@@ -233,47 +283,77 @@ def get_team_matchups_service(
                     ORDER BY date DESC
                     LIMIT 10
                 ),
+                alias_map AS (
+                    SELECT DISTINCT ON (name_key)
+                        name_key,
+                        canonical_name
+                    FROM (
+                        SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
+                        FROM player_aliases
+                        WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
+                        UNION ALL
+                        SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
+                        FROM player_aliases
+                        WHERE alias_name IS NOT NULL
+                    ) mapped_aliases
+                ),
                 team1_players AS (
-                    SELECT DISTINCT batter as player
+                    SELECT DISTINCT COALESCE(am.canonical_name, d.batter) AS player
                     FROM deliveries d
                     JOIN recent_matches rm ON d.match_id = rm.id
-                    WHERE batting_team = ANY(:team1_names)
+                    LEFT JOIN alias_map am ON LOWER(d.batter) = am.name_key
+                    WHERE d.batting_team = ANY(:team1_names)
+                      AND d.batter IS NOT NULL
                     UNION
-                    SELECT DISTINCT bowler
+                    SELECT DISTINCT COALESCE(am.canonical_name, d.bowler) AS player
                     FROM deliveries d
                     JOIN recent_matches rm ON d.match_id = rm.id
-                    WHERE bowling_team = ANY(:team1_names)
+                    LEFT JOIN alias_map am ON LOWER(d.bowler) = am.name_key
+                    WHERE d.bowling_team = ANY(:team1_names)
+                      AND d.bowler IS NOT NULL
                     UNION
-                    SELECT DISTINCT bat as player
+                    SELECT DISTINCT COALESCE(am.canonical_name, dd.bat) AS player
                     FROM delivery_details dd
                     JOIN recent_matches rm ON dd.p_match = rm.id
-                    WHERE team_bat = ANY(:team1_names)
+                    LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key
+                    WHERE dd.team_bat = ANY(:team1_names)
+                      AND dd.bat IS NOT NULL
                     UNION
-                    SELECT DISTINCT bowl
+                    SELECT DISTINCT COALESCE(am.canonical_name, dd.bowl) AS player
                     FROM delivery_details dd
                     JOIN recent_matches rm ON dd.p_match = rm.id
-                    WHERE team_bowl = ANY(:team1_names)
+                    LEFT JOIN alias_map am ON LOWER(dd.bowl) = am.name_key
+                    WHERE dd.team_bowl = ANY(:team1_names)
+                      AND dd.bowl IS NOT NULL
                 ),
                 team2_players AS (
-                    SELECT DISTINCT batter as player
+                    SELECT DISTINCT COALESCE(am.canonical_name, d.batter) AS player
                     FROM deliveries d
                     JOIN recent_matches rm ON d.match_id = rm.id
-                    WHERE batting_team = ANY(:team2_names)
+                    LEFT JOIN alias_map am ON LOWER(d.batter) = am.name_key
+                    WHERE d.batting_team = ANY(:team2_names)
+                      AND d.batter IS NOT NULL
                     UNION
-                    SELECT DISTINCT bowler
+                    SELECT DISTINCT COALESCE(am.canonical_name, d.bowler) AS player
                     FROM deliveries d
                     JOIN recent_matches rm ON d.match_id = rm.id
-                    WHERE bowling_team = ANY(:team2_names)
+                    LEFT JOIN alias_map am ON LOWER(d.bowler) = am.name_key
+                    WHERE d.bowling_team = ANY(:team2_names)
+                      AND d.bowler IS NOT NULL
                     UNION
-                    SELECT DISTINCT bat as player
+                    SELECT DISTINCT COALESCE(am.canonical_name, dd.bat) AS player
                     FROM delivery_details dd
                     JOIN recent_matches rm ON dd.p_match = rm.id
-                    WHERE team_bat = ANY(:team2_names)
+                    LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key
+                    WHERE dd.team_bat = ANY(:team2_names)
+                      AND dd.bat IS NOT NULL
                     UNION
-                    SELECT DISTINCT bowl
+                    SELECT DISTINCT COALESCE(am.canonical_name, dd.bowl) AS player
                     FROM delivery_details dd
                     JOIN recent_matches rm ON dd.p_match = rm.id
-                    WHERE team_bowl = ANY(:team2_names)
+                    LEFT JOIN alias_map am ON LOWER(dd.bowl) = am.name_key
+                    WHERE dd.team_bowl = ANY(:team2_names)
+                      AND dd.bowl IS NOT NULL
                 )
                 SELECT player, :team1 as team FROM team1_players
                 UNION ALL
@@ -287,14 +367,28 @@ def get_team_matchups_service(
                 "start_date": start_date,
                 "end_date": end_date
             }).fetchall()
-            team1_players = [row[0] for row in recent_players if row[1] == team1]
-            team2_players = [row[0] for row in recent_players if row[1] == team2]
+            team1_players = _dedupe_player_names([row[0] for row in recent_players if row[1] == team1])
+            team2_players = _dedupe_player_names([row[0] for row in recent_players if row[1] == team2])
 
         matchup_query = text("""
-            WITH raw_stats AS (
+            WITH alias_map AS (
+                SELECT DISTINCT ON (name_key)
+                    name_key,
+                    canonical_name
+                FROM (
+                    SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
+                    FROM player_aliases
+                    WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
+                    UNION ALL
+                    SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
+                    FROM player_aliases
+                    WHERE alias_name IS NOT NULL
+                ) mapped_aliases
+            ),
+            raw_stats AS (
                 SELECT
-                    d.batter,
-                    d.bowler,
+                    COALESCE(bat_alias.canonical_name, d.batter) AS batter,
+                    COALESCE(bowl_alias.canonical_name, d.bowler) AS bowler,
                     COUNT(*) as balls,
                     SUM(d.runs_off_bat + d.extras) as runs,
                     SUM(CASE WHEN d.wicket_type IS NOT NULL AND d.wicket_type != 'run out' THEN 1 ELSE 0 END) as wickets,
@@ -302,30 +396,38 @@ def get_team_matchups_service(
                     SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots
                 FROM deliveries d
                 JOIN matches m ON d.match_id = m.id
+                LEFT JOIN alias_map bat_alias ON LOWER(d.batter) = bat_alias.name_key
+                LEFT JOIN alias_map bowl_alias ON LOWER(d.bowler) = bowl_alias.name_key
                 WHERE
-                    (d.batter = ANY(:team1_players) AND d.bowler = ANY(:team2_players)
-                    OR d.batter = ANY(:team2_players) AND d.bowler = ANY(:team1_players))
+                    ((COALESCE(bat_alias.canonical_name, d.batter) = ANY(:team1_players)
+                      AND COALESCE(bowl_alias.canonical_name, d.bowler) = ANY(:team2_players))
+                     OR (COALESCE(bat_alias.canonical_name, d.batter) = ANY(:team2_players)
+                      AND COALESCE(bowl_alias.canonical_name, d.bowler) = ANY(:team1_players)))
                     AND (:start_date IS NULL OR m.date >= :start_date)
                     AND (:end_date IS NULL OR m.date <= :end_date)
-                GROUP BY d.batter, d.bowler
+                GROUP BY COALESCE(bat_alias.canonical_name, d.batter), COALESCE(bowl_alias.canonical_name, d.bowler)
 
                 UNION ALL
 
                 SELECT
-                    dd.bat as batter,
-                    dd.bowl as bowler,
+                    COALESCE(bat_alias.canonical_name, dd.bat) AS batter,
+                    COALESCE(bowl_alias.canonical_name, dd.bowl) AS bowler,
                     COUNT(*) as balls,
                     SUM(dd.score) as runs,
                     SUM(CASE WHEN dd.out::boolean = true THEN 1 ELSE 0 END) as wickets,
                     SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
                     SUM(CASE WHEN dd.score = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots
                 FROM delivery_details dd
+                LEFT JOIN alias_map bat_alias ON LOWER(dd.bat) = bat_alias.name_key
+                LEFT JOIN alias_map bowl_alias ON LOWER(dd.bowl) = bowl_alias.name_key
                 WHERE
-                    (dd.bat = ANY(:team1_players) AND dd.bowl = ANY(:team2_players)
-                    OR dd.bat = ANY(:team2_players) AND dd.bowl = ANY(:team1_players))
+                    ((COALESCE(bat_alias.canonical_name, dd.bat) = ANY(:team1_players)
+                      AND COALESCE(bowl_alias.canonical_name, dd.bowl) = ANY(:team2_players))
+                     OR (COALESCE(bat_alias.canonical_name, dd.bat) = ANY(:team2_players)
+                      AND COALESCE(bowl_alias.canonical_name, dd.bowl) = ANY(:team1_players)))
                     AND (:start_date IS NULL OR dd.match_date::date >= :start_date)
                     AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
-                GROUP BY dd.bat, dd.bowl
+                GROUP BY COALESCE(bat_alias.canonical_name, dd.bat), COALESCE(bowl_alias.canonical_name, dd.bowl)
             ),
             player_stats AS (
                 SELECT

@@ -45,6 +45,50 @@ import axios from 'axios';
 import config from './config';
 import { DEFAULT_START_DATE, TODAY } from './utils/dateDefaults';
 
+const TEAM_NAME_TO_ABBREVIATION = {
+  'chennai super kings': 'CSK',
+  'mumbai indians': 'MI',
+  'kolkata knight riders': 'KKR',
+  'gujarat titans': 'GT',
+  'lucknow super giants': 'LSG',
+  'punjab kings': 'PBKS',
+  'kings xi punjab': 'PBKS',
+  'royal challengers bangalore': 'RCB',
+  'royal challengers bengaluru': 'RCB',
+  'delhi capitals': 'DC',
+  'delhi daredevils': 'DC',
+  'sunrisers hyderabad': 'SRH',
+  'rajasthan royals': 'RR',
+  'rising pune supergiants': 'RPSG',
+  'rising pune supergiant': 'RPSG',
+  'gujarat lions': 'GL',
+  'deccan chargers': 'DCh',
+  'kochi tuskers kerala': 'KTK'
+};
+
+const normalizeTeamValue = (value) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const resolveTeamFromParam = (teamParam, sortedTeams) => {
+  if (!teamParam) return null;
+
+  const normalizedParam = normalizeTeamValue(teamParam);
+  const exactMatch = sortedTeams.find((team) =>
+    normalizeTeamValue(team.abbreviated_name) === normalizedParam ||
+    normalizeTeamValue(team.full_name) === normalizedParam
+  );
+  if (exactMatch) return exactMatch;
+
+  const mappedAbbreviation = TEAM_NAME_TO_ABBREVIATION[normalizedParam];
+  if (mappedAbbreviation) {
+    const mappedMatch = sortedTeams.find(
+      (team) => normalizeTeamValue(team.abbreviated_name) === normalizeTeamValue(mappedAbbreviation)
+    );
+    if (mappedMatch) return mappedMatch;
+  }
+
+  return null;
+};
+
 // Redirect /bowler?name=X&autoload=true to /player?name=X&tab=bowling&autoload=true
 const BowlerRedirect = () => {
   const location = useLocation();
@@ -209,9 +253,7 @@ const AppContent = () => {
           
           // Set team1 if found
           if (team1Param) {
-            const team1 = sortedTeams.find(team =>
-              team.abbreviated_name === team1Param || team.full_name === team1Param
-            );
+            const team1 = resolveTeamFromParam(team1Param, sortedTeams);
             if (team1) {
               setSelectedTeam1(team1);
             }
@@ -219,9 +261,7 @@ const AppContent = () => {
           
           // Set team2 if found
           if (team2Param) {
-            const team2 = sortedTeams.find(team =>
-              team.abbreviated_name === team2Param || team.full_name === team2Param
-            );
+            const team2 = resolveTeamFromParam(team2Param, sortedTeams);
             if (team2) {
               setSelectedTeam2(team2);
             }
