@@ -816,14 +816,17 @@ const MatchupMatrix = ({
     );
 };
 
-const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_players, isMobile }) => {
+const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_players, isMobile, enabled = true }) => {
     const [matchupData, setMatchupData] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
 
     React.useEffect(() => {
+        if (!enabled) return;
+
         const fetchMatchups = async () => {
             try {
+                setMatchupData(null);
                 setLoading(true);
                 setError(null);
 
@@ -858,8 +861,9 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
         };
 
         fetchMatchups();
-    }, [team1, team2, startDate, endDate, team1_players, team2_players]);
+    }, [enabled, team1, team2, startDate, endDate, team1_players, team2_players]);
 
+    if (!enabled) return null;
     if (loading) return <CircularProgress />;
     if (error) return <Alert severity="error">{error}</Alert>;
     if (!matchupData) return null;

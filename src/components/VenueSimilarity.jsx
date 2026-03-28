@@ -464,6 +464,7 @@ export const useVenueSimilarityData = ({
   leagues = [],
   includeInternational = false,
   topTeams = null,
+  enabled = true,
   zoneFilters,
 }) => {
   const [data, setData] = useState(null);
@@ -477,7 +478,7 @@ export const useVenueSimilarityData = ({
     const params = new URLSearchParams();
     if (startDate) params.append('start_date', startDate);
     if (endDate) params.append('end_date', endDate);
-    params.append('min_matches', '10');
+    params.append('min_matches', '5');
     params.append('top_n', '5');
     if (includeInternational !== null && includeInternational !== undefined) {
       params.append('include_international', String(includeInternational));
@@ -497,10 +498,11 @@ export const useVenueSimilarityData = ({
   // Effect 1: Fetch similar data (depends on core params + zone output filters)
   // Zone metric (boundary_pct vs run_pct) is display-only — both values are in the response
   useEffect(() => {
-    if (!venue) return;
+    if (!enabled || !venue) return;
     let cancelled = false;
 
     const fetchSimilar = async () => {
+      setData(null);
       setLoading(true);
       setError(null);
       try {
@@ -526,6 +528,7 @@ export const useVenueSimilarityData = ({
     fetchSimilar();
     return () => { cancelled = true; };
   }, [
+    enabled,
     venue,
     startDate,
     endDate,
@@ -539,7 +542,7 @@ export const useVenueSimilarityData = ({
 
   // Effect 2: Fetch tactical edges once similar data arrives (core params only, not zone filters)
   useEffect(() => {
-    if (!venue || !data?.most_similar || tacticalEdgesData) return;
+    if (!enabled || !venue || !data?.most_similar || tacticalEdgesData) return;
     let cancelled = false;
 
     const fetchEdges = async () => {
@@ -572,7 +575,7 @@ export const useVenueSimilarityData = ({
 
     fetchEdges();
     return () => { cancelled = true; };
-  }, [venue, startDate, endDate, includeInternational, topTeams, effectiveLeagues, data?.most_similar, tacticalEdgesData]);
+  }, [enabled, venue, startDate, endDate, includeInternational, topTeams, effectiveLeagues, data?.most_similar, tacticalEdgesData]);
 
   return { data, tacticalEdgesData, loading, error };
 };

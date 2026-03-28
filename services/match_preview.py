@@ -477,6 +477,12 @@ def _normalize_player_key(name: Optional[str]) -> str:
 
 
 def _fetch_all_rank_rows(fetch_fn, page_size: int = 500, max_rows: int = 50000) -> List[Dict[str, Any]]:
+    # Request a large page first to avoid dozens of paginated calls on cold preview builds.
+    payload = fetch_fn(limit=max_rows, offset=0)
+    if isinstance(payload, dict):
+        rankings = payload.get("rankings", []) or []
+        return rankings[:max_rows]
+
     rows: List[Dict[str, Any]] = []
     offset = 0
     while len(rows) < max_rows:

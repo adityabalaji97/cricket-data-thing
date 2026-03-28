@@ -17,6 +17,7 @@ const MatchPreviewCard = ({
   endDate,
   includeInternational = true,
   topTeams = 20,
+  enabled = true,
   isMobile = false,
 }) => {
   const [data, setData] = useState(null);
@@ -83,10 +84,11 @@ const MatchPreviewCard = ({
   }, [data?.team1, data?.team2, data?.top_ranked_players]);
 
   useEffect(() => {
-    if (!venue || !team1Identifier || !team2Identifier) return;
+    if (!enabled || !venue || !team1Identifier || !team2Identifier) return;
     let cancelled = false;
 
     const fetchPreview = async () => {
+      setData(null);
       setLoading(true);
       setError(null);
       try {
@@ -116,9 +118,9 @@ const MatchPreviewCard = ({
     return () => {
       cancelled = true;
     };
-  }, [requestKey, venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams]);
+  }, [enabled, requestKey, venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams]);
 
-  if (!venue || !team1Identifier || !team2Identifier) return null;
+  if (!enabled || !venue || !team1Identifier || !team2Identifier) return null;
 
   if (loading && !data) {
     return (

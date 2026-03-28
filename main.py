@@ -46,6 +46,7 @@ from services.delivery_data_service import (
     get_venue_match_stats,
     get_match_scores,
     get_venue_phase_stats,
+    get_venue_aliases,
 )
 from services.bowler_types import BOWLER_CATEGORY_SQL
 import math
@@ -913,16 +914,20 @@ def get_venue_stats(
     db: Session = Depends(get_session)
 ):
     try:
+        venue_aliases = []
+        if venue != "All Venues":
+            venue_aliases = get_venue_aliases(venue) or [venue]
+
         params = {
             "start_date": start_date,
             "end_date": end_date,
             "leagues": leagues,
             "full_names": list(teams_mapping.keys()),
-            "abbrev_names": list(teams_mapping.values())
+            "abbrev_names": list(teams_mapping.values()),
         }
 
-        if venue != "All Venues":
-            params["venue"] = venue
+        if venue_aliases:
+            params["venue_aliases"] = venue_aliases
 
         competition_conditions = []
         if leagues:
@@ -947,7 +952,7 @@ def get_venue_stats(
             competition_filter = ""
         else:
             competition_filter = " AND false"
-        venue_filter = "AND m.venue = :venue" if venue != "All Venues" else ""
+        venue_filter = "AND m.venue = ANY(:venue_aliases)" if venue_aliases else ""
 
         # Batting Query
         batting_query = text(f"""
@@ -1017,6 +1022,76 @@ def get_venue_stats(
 
         batting_leaders = db.execute(batting_query, params).fetchall()
         bowling_leaders = db.execute(bowling_query, params).fetchall()
+
+        # Fallback to delivery_details-derived leaders when batting/bowling summary tables
+        # are missing recent-season rows for the selected window.
+        if not batting_leaders and not bowling_leaders:
+            batting_fallback_query = text(f"""
+                WITH team_mapping AS (
+                    SELECT unnest(:full_names) as full_name,
+                        unnest(:abbrev_names) as abbreviated_name
+                ),
+                match_filter AS (
+                    SELECT m.id
+                    FROM matches m
+                    WHERE 1=1
+                        {venue_filter}
+                        AND (:start_date IS NULL OR m.date >= :start_date)
+                        AND (:end_date IS NULL OR m.date <= :end_date)
+                        {competition_filter}
+                )
+                SELECT
+                    dd.bat as name,
+                    string_agg(DISTINCT COALESCE(tm.abbreviated_name, dd.team_bat), '/') as batting_team,
+                    COUNT(DISTINCT dd.p_match) as innings,
+                    SUM(dd.batruns) as total_runs,
+                    CAST(SUM(dd.batruns)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as average,
+                    CAST((SUM(dd.batruns)::float * 100 / NULLIF(COUNT(*), 0)) AS DECIMAL(10,2)) as strike_rate,
+                    CAST(COUNT(*)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as balls_per_dismissal
+                FROM delivery_details dd
+                JOIN match_filter mf ON dd.p_match = mf.id
+                LEFT JOIN team_mapping tm ON dd.team_bat = tm.full_name
+                WHERE dd.bat IS NOT NULL
+                GROUP BY dd.bat
+                HAVING COUNT(*) >= 12
+                ORDER BY total_runs DESC
+                LIMIT 10
+            """)
+
+            bowling_fallback_query = text(f"""
+                WITH team_mapping AS (
+                    SELECT unnest(:full_names) as full_name,
+                        unnest(:abbrev_names) as abbreviated_name
+                ),
+                match_filter AS (
+                    SELECT m.id
+                    FROM matches m
+                    WHERE 1=1
+                        {venue_filter}
+                        AND (:start_date IS NULL OR m.date >= :start_date)
+                        AND (:end_date IS NULL OR m.date <= :end_date)
+                        {competition_filter}
+                )
+                SELECT
+                    dd.bowl as name,
+                    string_agg(DISTINCT COALESCE(tm.abbreviated_name, dd.team_bowl), '/') as bowling_team,
+                    COUNT(DISTINCT dd.p_match) as innings,
+                    SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END) as total_wickets,
+                    CAST(COUNT(*)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as strike_rate,
+                    CAST(SUM(dd.score)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as average,
+                    CAST((SUM(dd.score)::float * 6 / NULLIF(COUNT(*), 0)) AS DECIMAL(10,2)) as economy
+                FROM delivery_details dd
+                JOIN match_filter mf ON dd.p_match = mf.id
+                LEFT JOIN team_mapping tm ON dd.team_bowl = tm.full_name
+                WHERE dd.bowl IS NOT NULL
+                GROUP BY dd.bowl
+                HAVING COUNT(*) >= 12
+                ORDER BY total_wickets DESC, economy ASC
+                LIMIT 10
+            """)
+
+            batting_leaders = db.execute(batting_fallback_query, params).fetchall()
+            bowling_leaders = db.execute(bowling_fallback_query, params).fetchall()
 
         # Format the data as dictionaries
         batting_formatted = [
@@ -1353,22 +1428,30 @@ def get_match_history(
         # Get all possible name variations for both teams
         team1_names = get_all_team_name_variations(team1)
         team2_names = get_all_team_name_variations(team2)
+        venue_aliases = get_venue_aliases(venue) if venue != "All Venues" else []
+        if venue != "All Venues" and not venue_aliases:
+            venue_aliases = [venue]
+        venue_filter_clause = "AND m.venue = ANY(:venue_aliases)" if venue_aliases else ""
 
         # Log team names for debugging
         logging.info(f"Searching for matches between: {team1_names} and {team2_names}")
 
         # Get venue matches (simplified - just get match metadata)
         venue_matches = db.execute(
-            text("""
+            text(f"""
                 SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
                 FROM matches m
                 WHERE (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
-                AND m.venue = :venue
+                {venue_filter_clause}
                 ORDER BY m.date DESC
                 LIMIT 7
             """),
-            {"venue": venue, "start_date": start_date, "end_date": end_date}
+            {
+                "venue_aliases": venue_aliases,
+                "start_date": start_date,
+                "end_date": end_date,
+            }
         ).fetchall()
 
         # Get team1 matches

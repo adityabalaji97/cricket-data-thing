@@ -973,8 +973,15 @@ const VenueNotes = ({
   }) => {
 
     const [activeSectionId, setActiveSectionId] = useState('summary');
+    const [activatedSections, setActivatedSections] = useState(() => new Set(['summary']));
     const [similarZoneFilters, setSimilarZoneFilters] = useState(DEFAULT_SIMILAR_ZONE_FILTERS);
     const sectionRefs = useRef({});
+    const previewEnabled = activeSectionId === 'preview' || activatedSections.has('preview');
+    const teamsEnabled = activeSectionId === 'teams' || activatedSections.has('teams');
+    const similarEnabled = activeSectionId === 'similar'
+        || activeSectionId === 'venueTwins'
+        || activatedSections.has('similar')
+        || activatedSections.has('venueTwins');
 
     const {
         data: similarData,
@@ -988,6 +995,7 @@ const VenueNotes = ({
         leagues,
         includeInternational,
         topTeams,
+        enabled: similarEnabled,
         zoneFilters: similarZoneFilters,
     });
 
@@ -1021,6 +1029,7 @@ const VenueNotes = ({
                         endDate={endDate}
                         includeInternational
                         topTeams={20}
+                        enabled={previewEnabled}
                         isMobile={isMobile}
                     />
                 ),
@@ -1055,6 +1064,7 @@ const VenueNotes = ({
                             team2={selectedTeam2.full_name}
                             startDate={startDate}
                             endDate={endDate}
+                            enabled={teamsEnabled}
                             isMobile={isMobile}
                         />
                     </Box>
@@ -1166,6 +1176,8 @@ const VenueNotes = ({
         leagues,
         includeInternational,
         topTeams,
+        previewEnabled,
+        teamsEnabled,
         similarData,
         similarTacticalEdgesData,
         similarLoading,
@@ -1175,16 +1187,30 @@ const VenueNotes = ({
 
     const formattedDateRange = useMemo(() => formatVenueDateRange(startDate, endDate), [startDate, endDate]);
 
+    const markSectionActivated = useCallback((sectionId) => {
+        if (!sectionId) return;
+        setActivatedSections((previous) => {
+            if (previous.has(sectionId)) {
+                return previous;
+            }
+            const next = new Set(previous);
+            next.add(sectionId);
+            return next;
+        });
+    }, []);
+
     const handleSectionSelect = useCallback((sectionId) => {
+        markSectionActivated(sectionId);
         setActiveSectionId(sectionId);
         const sectionElement = sectionRefs.current[sectionId];
         if (sectionElement) {
             sectionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-    }, []);
+    }, [markSectionActivated]);
 
     useEffect(() => {
         setActiveSectionId('summary');
+        setActivatedSections(new Set(['summary']));
         setSimilarZoneFilters(DEFAULT_SIMILAR_ZONE_FILTERS);
     }, [selectedTeam1, selectedTeam2, venue]);
 
@@ -1202,6 +1228,7 @@ const VenueNotes = ({
                 }
                 if (entry.isIntersecting) {
                     visibleSections.set(sectionId, entry.intersectionRatio);
+                    markSectionActivated(sectionId);
                 } else {
                     visibleSections.delete(sectionId);
                 }
@@ -1224,7 +1251,33 @@ const VenueNotes = ({
         });
 
         return () => observer.disconnect();
-    }, [sectionGroups]);
+    }, [sectionGroups, markSectionActivated]);
+
+    const renderSectionContent = useCallback((section) => {
+        const shouldRender = section.id === 'summary'
+            || section.id === activeSectionId
+            || activatedSections.has(section.id);
+
+        if (shouldRender) {
+            return section.content;
+        }
+
+        return (
+            <Box
+                sx={{
+                    p: 2,
+                    border: '1px dashed',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    bgcolor: 'rgba(0,0,0,0.01)',
+                }}
+            >
+                <Typography variant="body2" color="text.secondary">
+                    Open this section to load data.
+                </Typography>
+            </Box>
+        );
+    }, [activeSectionId, activatedSections]);
 
 if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
 
@@ -1300,7 +1353,7 @@ return (
                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, px: 0.5 }}>
                                 {section.label}
                             </Typography>
-                            {section.content}
+                            {renderSectionContent(section)}
                         </Box>
                     ))}
                 </Box>
@@ -1341,7 +1394,7 @@ return (
                                 <Typography variant="h5" sx={{ mb: 2.5, fontWeight: 700 }}>
                                     {section.label}
                                 </Typography>
-                                {section.content}
+                                {renderSectionContent(section)}
                             </Card>
                         </Box>
                     ))}

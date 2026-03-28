@@ -171,8 +171,6 @@ const AppContent = () => {
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
 
-  const [venueFantasyStats, setVenueFantasyStats] = useState({ team1_players: [], team2_players: [] });
-  const [venuePlayerHistory, setVenuePlayerHistory] = useState({ players: [] });
   const hasFetchedRef = useRef(false);
 
   const handleMenuClick = (event) => {
@@ -325,8 +323,6 @@ const AppContent = () => {
       // Clear stale data before fetching
       setMatchHistory(null);
       setStatsData(null);
-      setVenueFantasyStats({ team1_players: [], team2_players: [] });
-      setVenuePlayerHistory({ players: [] });
 
       try {
         setLoading(true);
@@ -400,19 +396,11 @@ const AppContent = () => {
         // Only fetch team-specific data if both teams are selected
         if (selectedTeam1 && selectedTeam2) {
           try {
-            const [historyResponseResult, fantasyResponseResult, playerHistoryResponseResult] = await Promise.allSettled([
+            const [historyResponseResult] = await Promise.allSettled([
               axios.get(
                 `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/teams/${encodeURIComponent(selectedTeam1.full_name)}/${encodeURIComponent(selectedTeam2.full_name)}/history?${params.toString()}`,
                 { signal: abortController.signal }
               ),
-              axios.get(
-                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/teams/${encodeURIComponent(selectedTeam1.full_name)}/${encodeURIComponent(selectedTeam2.full_name)}/fantasy_stats?${params.toString()}`,
-                { signal: abortController.signal }
-              ),
-              axios.get(
-                `${config.API_URL}/venues/${encodeURIComponent(selectedVenue)}/players/fantasy_history?team1=${encodeURIComponent(selectedTeam1.full_name)}&team2=${encodeURIComponent(selectedTeam2.full_name)}&${params.toString()}`,
-                { signal: abortController.signal }
-              )
             ]);
 
             // Handle team-specific results individually
@@ -432,33 +420,15 @@ const AppContent = () => {
                 }
               });
             }
-
-            if (fantasyResponseResult.status === 'fulfilled') {
-              setVenueFantasyStats(fantasyResponseResult.value.data);
-            } else {
-              console.error('Error fetching fantasy stats:', fantasyResponseResult.reason);
-              setVenueFantasyStats({ team1_players: [], team2_players: [] });
-            }
-
-            if (playerHistoryResponseResult.status === 'fulfilled') {
-              setVenuePlayerHistory(playerHistoryResponseResult.value.data);
-            } else {
-              console.error('Error fetching player history:', playerHistoryResponseResult.reason);
-              setVenuePlayerHistory({ players: [] });
-            }
           } catch (error) {
             if (error.name === 'AbortError' || error.name === 'CanceledError') return;
             console.error('Error in team-specific API calls:', error);
             setError('Failed to load team data. Please try again.');
             setMatchHistory(null);
-            setVenueFantasyStats({ team1_players: [], team2_players: [] });
-            setVenuePlayerHistory({ players: [] });
           }
         } else {
           // Reset team-specific state if teams not selected
           setMatchHistory(null);
-          setVenueFantasyStats({ team1_players: [], team2_players: [] });
-          setVenuePlayerHistory({ players: [] });
         }
 
       } catch (error) {
@@ -829,8 +799,6 @@ const AppContent = () => {
                   statsData={statsData}
                   selectedTeam1={selectedTeam1} 
                   selectedTeam2={selectedTeam2} 
-                  venueFantasyStats={venueFantasyStats}
-                  venuePlayerHistory={venuePlayerHistory}
                   matchHistory={matchHistory}
                   filtersExpanded={filtersExpanded}
                   onToggleFilters={() => setFiltersExpanded((currentValue) => !currentValue)}
