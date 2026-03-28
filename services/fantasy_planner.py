@@ -110,8 +110,11 @@ def _resolve_player_price_entry(name: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _resolve_fantasy_role(name: str, roster_role: str) -> str:
-    price_entry = _resolve_player_price_entry(name)
+def _resolve_fantasy_role(name: str, roster_role: str, display_name: Optional[str] = None) -> str:
+    lookup_name = display_name or name
+    price_entry = _resolve_player_price_entry(lookup_name)
+    if not price_entry and lookup_name != name:
+        price_entry = _resolve_player_price_entry(name)
     if price_entry and price_entry.get("role"):
         return ROLE_MAP.get(price_entry["role"], "BAT")
     return ROLE_MAP.get(roster_role, "BAT")
@@ -171,7 +174,11 @@ def _get_team_players_for_projection(team_abbrev: str, db, lookback_days: int = 
         try:
             roster = get_team_roster_service(team_name=normalized_abbrev, db=db, lookback_days=lookback_days)
             if roster.get("players"):
-                players = [{"name": p.get("name"), "role": p.get("role", "batter")} for p in roster["players"] if p.get("name")]
+                players = [
+                    {"name": p.get("name"), "role": p.get("role", "batter"),
+                     "display_name": p.get("display_name", p.get("name"))}
+                    for p in roster["players"] if p.get("name")
+                ]
                 source = roster.get("source", "match_data")
         except Exception as exc:
             logger.warning("Roster service lookup failed for %s: %s", team_abbrev, exc)
@@ -435,6 +442,7 @@ def get_fantasy_recommendations(
         ]:
             for player in roster:
                 name = player["name"]
+                display_name = player.get("display_name", name)
                 roster_role = player.get("role", "batter")
                 projection = points_map.get(
                     name,
@@ -448,11 +456,12 @@ def get_fantasy_recommendations(
                 if name not in player_scores:
                     player_scores[name] = {
                         "name": name,
+                        "display_name": display_name,
                         "team": team_abbrev,
-                        "role": _resolve_fantasy_role(name, roster_role),
+                        "role": _resolve_fantasy_role(name, roster_role, display_name=display_name),
                         "roster_role": roster_role,
-                        "credits": get_player_credit(name),
-                        "is_overseas": is_overseas(name),
+                        "credits": get_player_credit(display_name),
+                        "is_overseas": is_overseas(display_name),
                         "total_expected": 0.0,
                         "match_count": 0,
                         "matches": [],
@@ -497,7 +506,7 @@ def get_fantasy_recommendations(
             p for p in all_players if p["name"].lower() in current_set_lower
         ]
 
-    recommended = _build_optimal_squad(all_players, locked_players=locked_players)
+    recommended = _build_optimal_squad(all_players, locked_players=locked_players, matches_ahead=len(upcoming))
 
     # Calculate transfers needed
     transfers_needed = 0
@@ -565,12 +574,14 @@ def get_fantasy_recommendations(
 def _build_optimal_squad(
     players: List[Dict],
     locked_players: Optional[List[Dict]] = None,
+    matches_ahead: int = 1,
 ) -> List[Dict]:
     """
     Greedy squad builder respecting fantasy constraints:
     - 11 players, 100 credit budget
     - Min 1 WK, 3 BAT, 1 AR, 3 BOWL
     - Max 7 per team, max 4 overseas
+    - Max N players whose primary match is the same fixture (diversification)
 
     If locked_players is provided, those are added first and the optimizer
     fills the remaining slots.
@@ -587,8 +598,21 @@ def _build_optimal_squad(
     squad_size = 11
     budget_limit = 100.0
 
+    # Per-match diversification: spread players across fixtures
+    matches_ahead = max(1, matches_ahead)
+    max_per_match = max(3, (squad_size + matches_ahead) // matches_ahead)
+
     overseas_count = 0
     selected_names: set = set()
+    match_player_count: Dict[int, int] = {}  # match_num -> count of selected players
+
+    def _primary_match(p: Dict) -> Optional[int]:
+        """Return the match_num where this player has the highest expected points."""
+        matches = p.get("matches") or []
+        if not matches:
+            return None
+        best = max(matches, key=lambda m: float(m.get("expected_points", 0.0) or 0.0))
+        return best.get("match_num")
 
     def _add(p: Dict):
         nonlocal budget_used, overseas_count
@@ -599,6 +623,9 @@ def _build_optimal_squad(
         budget_used += p.get("credits", 7.0)
         if p.get("is_overseas", False):
             overseas_count += 1
+        pm = _primary_match(p)
+        if pm is not None:
+            match_player_count[pm] = match_player_count.get(pm, 0) + 1
 
     def _can_add(p: Dict) -> bool:
         if p["name"] in selected_names:
@@ -610,6 +637,10 @@ def _build_optimal_squad(
         if budget_used + cost > budget_limit:
             return False
         if p.get("is_overseas", False) and overseas_count >= max_overseas:
+            return False
+        # Per-match diversification constraint
+        pm = _primary_match(p)
+        if pm is not None and match_player_count.get(pm, 0) >= max_per_match:
             return False
         return True
 
