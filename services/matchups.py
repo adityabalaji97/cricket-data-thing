@@ -265,7 +265,7 @@ def add_bowling_consolidated_rows(team1_batting, team2_batting, team1_players, t
     
     return team1_bowling_consolidated, team2_bowling_consolidated
 
-def calculate_fantasy_points_from_matchups(team1_batting, team2_batting, team1_bowling_consolidated, team2_bowling_consolidated, team1_players, team2_players):
+def calculate_fantasy_points_from_matchups(team1_batting, team2_batting, team1_bowling_consolidated, team2_bowling_consolidated, team1_players, team2_players, team1_name: str = "team1", team2_name: str = "team2"):
     """
     Calculate expected fantasy points using per-match normalized projections.
     Uses the same projection model as fantasy_planner for consistent numbers.
@@ -273,8 +273,8 @@ def calculate_fantasy_points_from_matchups(team1_batting, team2_batting, team1_b
     all_fantasy_players = []
 
     for team_label, batting, bowling_cons, players in [
-        ("team1", team1_batting, team1_bowling_consolidated, team1_players),
-        ("team2", team2_batting, team2_bowling_consolidated, team2_players),
+        (team1_name, team1_batting, team1_bowling_consolidated, team1_players),
+        (team2_name, team2_batting, team2_bowling_consolidated, team2_players),
     ]:
         player_map = {}
 
@@ -686,8 +686,8 @@ def get_team_matchups_service(
 
         # Calculate fantasy points from matchups
         fantasy_analysis = calculate_fantasy_points_from_matchups(
-            team1_batting, team2_batting, team1_bowling_consolidated, team2_bowling_consolidated, 
-            team1_players, team2_players
+            team1_batting, team2_batting, team1_bowling_consolidated, team2_bowling_consolidated,
+            team1_players, team2_players, team1_name=team1, team2_name=team2
         )
 
         return {

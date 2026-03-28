@@ -61,6 +61,11 @@ _MAX_MATCHES_AHEAD = 5
 # Point constants are imported from services.matchups
 
 
+def _default_matchup_start_date() -> date:
+    """Return Jan 1 of (current_year - 1), matching the venue page's date filter."""
+    return date(date.today().year - 1, 1, 1)
+
+
 def _load_player_prices() -> Dict[str, Dict]:
     """Load player prices from JSON, cached after first call."""
     global _PLAYER_PRICES
@@ -388,7 +393,7 @@ def get_fantasy_recommendations(
                 matchup_data = get_team_matchups_service(
                     team1=t1,
                     team2=t2,
-                    start_date=None,
+                    start_date=_default_matchup_start_date(),
                     end_date=None,
                     team1_players=t1_names,
                     team2_players=t2_names,
@@ -689,7 +694,7 @@ def get_player_outlook(
                 matchup_data = get_team_matchups_service(
                     team1=player_team,
                     team2=opponent,
-                    start_date=None,
+                    start_date=_default_matchup_start_date(),
                     end_date=None,
                     team1_players=[p["name"] for p in own_roster],
                     team2_players=[p["name"] for p in opp_roster],
