@@ -1,9 +1,17 @@
+import logging
+import time
 from sqlalchemy.sql import text
 from fastapi import HTTPException
 from typing import List, Optional, Dict
 from datetime import date
 from models import teams_mapping
 from fantasy_points_v2 import FantasyPointsCalculator
+
+logger = logging.getLogger(__name__)
+
+# Cache for player_aliases to avoid full table scan on every call
+_ALIAS_CACHE: Dict[str, str] = {}
+_ALIAS_CACHE_TIME: float = 0
 
 def get_all_team_name_variations(team_name):
     reverse_mapping = {}
@@ -34,10 +42,12 @@ def _dedupe_player_names(players: List[str]) -> List[str]:
         deduped.append(cleaned)
     return deduped
 
-def _canonicalize_players(players: List[str], db) -> List[str]:
-    deduped_players = _dedupe_player_names(players)
-    if not deduped_players:
-        return []
+def _get_alias_lookup(db) -> Dict[str, str]:
+    """Return cached alias lookup dict. Refreshes every hour."""
+    global _ALIAS_CACHE, _ALIAS_CACHE_TIME
+    now = time.time()
+    if _ALIAS_CACHE and (now - _ALIAS_CACHE_TIME) < 3600:
+        return _ALIAS_CACHE
 
     try:
         alias_rows = db.execute(
@@ -50,9 +60,9 @@ def _canonicalize_players(players: List[str], db) -> List[str]:
             )
         ).fetchall()
     except Exception:
-        return deduped_players
+        return _ALIAS_CACHE
 
-    alias_lookup = {}
+    alias_lookup: Dict[str, str] = {}
     for row in alias_rows:
         legacy_name = (row[0] or "").strip()
         canonical_name = (row[1] or "").strip()
@@ -61,6 +71,21 @@ def _canonicalize_players(players: List[str], db) -> List[str]:
         alias_lookup[canonical_name.lower()] = canonical_name
         if legacy_name:
             alias_lookup[legacy_name.lower()] = canonical_name
+
+    _ALIAS_CACHE = alias_lookup
+    _ALIAS_CACHE_TIME = now
+    logger.info("Refreshed player alias cache: %d entries", len(alias_lookup))
+    return alias_lookup
+
+
+def _canonicalize_players(players: List[str], db) -> List[str]:
+    deduped_players = _dedupe_player_names(players)
+    if not deduped_players:
+        return []
+
+    alias_lookup = _get_alias_lookup(db)
+    if not alias_lookup:
+        return deduped_players
 
     canonicalized = [alias_lookup.get(player.lower(), player) for player in deduped_players]
     return _dedupe_player_names(canonicalized)
@@ -284,17 +309,24 @@ def get_team_matchups_service(
                     team2_lineup_source = roster2.get("source", "match_data")
                 if team1_players and team2_players:
                     use_custom_teams = True
-                    team1_players = _canonicalize_players(team1_players, db)
-                    team2_players = _canonicalize_players(team2_players, db)
+                    # Canonicalize but keep originals as fallback if canon empties the list
+                    canon1 = _canonicalize_players(team1_players, db)
+                    canon2 = _canonicalize_players(team2_players, db)
+                    team1_players = canon1 if canon1 else team1_players
+                    team2_players = canon2 if canon2 else team2_players
+                logger.info(
+                    "Roster loaded: team1=%d players, team2=%d players, source1=%s, source2=%s",
+                    len(team1_players), len(team2_players), team1_lineup_source, team2_lineup_source,
+                )
             except ImportError:
                 pass
 
-        if use_custom_teams and not (len(team1_players) > 0 and len(team2_players) > 0):
-            use_custom_teams = False
-
-        if use_custom_teams:
-            team1_players = _canonicalize_players(team1_players, db)
-            team2_players = _canonicalize_players(team2_players, db)
+        # Canonicalize custom player lists (only for user-provided custom teams, not roster)
+        if use_custom_teams and not use_current_roster:
+            canon1 = _canonicalize_players(team1_players, db)
+            canon2 = _canonicalize_players(team2_players, db)
+            team1_players = canon1 if canon1 else team1_players
+            team2_players = canon2 if canon2 else team2_players
 
         if not use_custom_teams:
             team1_lineup_source = "recent_10"

@@ -575,7 +575,15 @@ def get_fantasy_recommendations(
     )
 
     # Build recommended squad using greedy selection with constraints
-    recommended = _build_optimal_squad(all_players)
+    # If user has a current team, lock those players and fill remaining slots
+    locked_players = None
+    if current_team:
+        current_set_lower = {n.strip().lower() for n in current_team}
+        locked_players = [
+            p for p in all_players if p["name"].lower() in current_set_lower
+        ]
+
+    recommended = _build_optimal_squad(all_players, locked_players=locked_players)
 
     # Calculate transfers needed
     transfers_needed = 0
@@ -640,14 +648,20 @@ def get_fantasy_recommendations(
     }
 
 
-def _build_optimal_squad(players: List[Dict]) -> List[Dict]:
+def _build_optimal_squad(
+    players: List[Dict],
+    locked_players: Optional[List[Dict]] = None,
+) -> List[Dict]:
     """
     Greedy squad builder respecting fantasy constraints:
     - 11 players, 100 credit budget
     - Min 1 WK, 3 BAT, 1 AR, 3 BOWL
     - Max 7 per team, max 4 overseas
+
+    If locked_players is provided, those are added first and the optimizer
+    fills the remaining slots.
     """
-    squad = []
+    squad: List[Dict] = []
     team_count: Dict[str, int] = {}
     role_count = {"BAT": 0, "BOWL": 0, "AR": 0, "WK": 0}
     budget_used = 0.0
@@ -662,8 +676,17 @@ def _build_optimal_squad(players: List[Dict]) -> List[Dict]:
     overseas_count = 0
     selected_names: set = set()
 
-    def _can_add(p: Dict) -> bool:
+    def _add(p: Dict):
         nonlocal budget_used, overseas_count
+        squad.append(p)
+        selected_names.add(p["name"])
+        role_count[p["role"]] = role_count.get(p["role"], 0) + 1
+        team_count[p["team"]] = team_count.get(p["team"], 0) + 1
+        budget_used += p.get("credits", 7.0)
+        if p.get("is_overseas", False):
+            overseas_count += 1
+
+    def _can_add(p: Dict) -> bool:
         if p["name"] in selected_names:
             return False
         tc = team_count.get(p["team"], 0)
@@ -676,15 +699,12 @@ def _build_optimal_squad(players: List[Dict]) -> List[Dict]:
             return False
         return True
 
-    def _add(p: Dict):
-        nonlocal budget_used, overseas_count
-        squad.append(p)
-        selected_names.add(p["name"])
-        role_count[p["role"]] = role_count.get(p["role"], 0) + 1
-        team_count[p["team"]] = team_count.get(p["team"], 0) + 1
-        budget_used += p.get("credits", 7.0)
-        if p.get("is_overseas", False):
-            overseas_count += 1
+    # Seed with locked players first
+    if locked_players:
+        for lp in locked_players:
+            if len(squad) >= squad_size:
+                break
+            _add(lp)
 
     # First pass: fill minimum role requirements
     for role in ["WK", "BAT", "AR", "BOWL"]:

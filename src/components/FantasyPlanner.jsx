@@ -36,89 +36,109 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recommendationsLoading }) => {
     if (!fixtures || fixtures.length === 0) return null;
 
+    const buildMatchPreviewUrl = (f) => {
+        const venue = encodeURIComponent(f.venue_db || f.venue || '');
+        return `/venue?venue=${venue}&team1=${f.team1}&team2=${f.team2}&includeInternational=true&topTeams=20&autoload=true`;
+    };
+
     return (
-        <Box sx={{ overflowX: 'auto', pb: 1 }}>
-            <Box sx={{ display: 'flex', gap: 1.5, minWidth: 'max-content', px: 1 }}>
-                {fixtures.map((f) => {
-                    const t1Count = (squadTeams || []).filter(t => t === f.team1).length;
-                    const t2Count = (squadTeams || []).filter(t => t === f.team2).length;
-                    const detail = (matchDetails || []).find((d) => d.match_num === f.match_num);
-                    const topPicks = [...(detail?.player_points || [])]
-                        .sort((a, b) => (b.expected_points || 0) - (a.expected_points || 0))
-                        .filter((p) => (p.expected_points || 0) > 0)
-                        .slice(0, 5);
-                    return (
-                        <Card
-                            key={f.match_num}
-                            sx={{
-                                minWidth: isMobile ? 180 : 220,
-                                p: 1.5,
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                borderRadius: 2,
-                                flexShrink: 0,
-                            }}
-                        >
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                                Match {f.match_num} &middot; {f.date}
+        <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+                xs: '1fr',
+                sm: 'repeat(2, 1fr)',
+                md: `repeat(${Math.min(fixtures.length, 3)}, 1fr)`,
+            },
+            gap: 2,
+            pb: 1,
+        }}>
+            {fixtures.map((f) => {
+                const t1Count = (squadTeams || []).filter(t => t === f.team1).length;
+                const t2Count = (squadTeams || []).filter(t => t === f.team2).length;
+                const detail = (matchDetails || []).find((d) => d.match_num === f.match_num);
+                const topPicks = [...(detail?.player_points || [])]
+                    .sort((a, b) => (b.expected_points || 0) - (a.expected_points || 0))
+                    .filter((p) => (p.expected_points || 0) > 0)
+                    .slice(0, 5);
+                return (
+                    <Card
+                        key={f.match_num}
+                        component="a"
+                        href={buildMatchPreviewUrl(f)}
+                        sx={{
+                            p: 2,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 2,
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            cursor: 'pointer',
+                            transition: 'box-shadow 0.15s, border-color 0.15s',
+                            '&:hover': {
+                                borderColor: 'primary.main',
+                                boxShadow: 2,
+                            },
+                        }}
+                    >
+                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                            Match {f.match_num} &middot; {f.date}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                            <Chip
+                                label={f.team1}
+                                size="small"
+                                sx={{
+                                    bgcolor: TEAM_COLORS[f.team1] || '#666',
+                                    color: ['CSK', 'LSG'].includes(f.team1) ? '#000' : '#fff',
+                                    fontWeight: 700,
+                                    fontSize: '0.7rem',
+                                }}
+                            />
+                            <Typography variant="caption" sx={{ fontWeight: 600 }}>vs</Typography>
+                            <Chip
+                                label={f.team2}
+                                size="small"
+                                sx={{
+                                    bgcolor: TEAM_COLORS[f.team2] || '#666',
+                                    color: ['CSK', 'LSG'].includes(f.team2) ? '#000' : '#fff',
+                                    fontWeight: 700,
+                                    fontSize: '0.7rem',
+                                }}
+                            />
+                        </Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
+                            {f.venue?.split(',')[0] || ''}
+                        </Typography>
+                        {(t1Count > 0 || t2Count > 0) && (
+                            <Typography variant="caption" sx={{ display: 'block', mt: 0.25, fontSize: '0.7rem', fontWeight: 600 }}>
+                                Your players: {t1Count + t2Count}
                             </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                                <Chip
-                                    label={f.team1}
-                                    size="small"
-                                    sx={{
-                                        bgcolor: TEAM_COLORS[f.team1] || '#666',
-                                        color: ['CSK', 'LSG'].includes(f.team1) ? '#000' : '#fff',
-                                        fontWeight: 700,
-                                        fontSize: '0.7rem',
-                                    }}
-                                />
-                                <Typography variant="caption" sx={{ fontWeight: 600 }}>vs</Typography>
-                                <Chip
-                                    label={f.team2}
-                                    size="small"
-                                    sx={{
-                                        bgcolor: TEAM_COLORS[f.team2] || '#666',
-                                        color: ['CSK', 'LSG'].includes(f.team2) ? '#000' : '#fff',
-                                        fontWeight: 700,
-                                        fontSize: '0.7rem',
-                                    }}
-                                />
-                            </Box>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontSize: '0.65rem' }}>
-                                {f.venue?.split(',')[0] || ''}
-                            </Typography>
-                            {(t1Count > 0 || t2Count > 0) && (
-                                <Typography variant="caption" sx={{ display: 'block', mt: 0.25, fontSize: '0.65rem', fontWeight: 600 }}>
-                                    Your players: {t1Count + t2Count}
+                        )}
+                        {topPicks.length > 0 && (
+                            <Box sx={{ mt: 1 }}>
+                                <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, fontSize: '0.7rem', mb: 0.25 }}>
+                                    Top 5 Picks
                                 </Typography>
-                            )}
-                            {topPicks.length > 0 && (
-                                <Box sx={{ mt: 0.75 }}>
-                                    <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, fontSize: '0.65rem' }}>
-                                        Top picks
+                                {topPicks.map((pick, idx) => (
+                                    <Typography
+                                        key={`${f.match_num}-${pick.name}`}
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ display: 'block', fontSize: '0.7rem', lineHeight: 1.4 }}
+                                    >
+                                        {idx + 1}. {pick.name} ({pick.team}) &mdash; {Number(pick.expected_points || 0).toFixed(1)} pts
                                     </Typography>
-                                    {topPicks.map((pick) => (
-                                        <Typography
-                                            key={`${f.match_num}-${pick.name}`}
-                                            variant="caption"
-                                            color="text.secondary"
-                                            sx={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.3 }}
-                                        >
-                                            {pick.name} {Number(pick.expected_points || 0).toFixed(1)}
-                                        </Typography>
-                                    ))}
-                                </Box>
-                            )}
-                            {topPicks.length === 0 && (
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontSize: '0.65rem' }}>
-                                    {recommendationsLoading ? 'Loading picks...' : 'No projection'}
-                                </Typography>
-                            )}
-                        </Card>
-                    );
-                })}
-            </Box>
+                                ))}
+                            </Box>
+                        )}
+                        {topPicks.length === 0 && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75, fontSize: '0.7rem' }}>
+                                {recommendationsLoading ? 'Loading picks...' : 'No projection data'}
+                            </Typography>
+                        )}
+                    </Card>
+                );
+            })}
         </Box>
     );
 };
