@@ -266,19 +266,22 @@ def get_team_matchups_service(
 ):
     try:
         use_custom_teams = len(team1_players) > 0 and len(team2_players) > 0
+        team1_lineup_source = "custom" if use_custom_teams else "recent_10"
+        team2_lineup_source = "custom" if use_custom_teams else "recent_10"
 
-        # When use_current_roster is True, populate player lists from ipl_rosters.py
+        # When use_current_roster is True, populate player lists from current roster service.
         if not use_custom_teams and use_current_roster:
             try:
-                from ipl_rosters import get_team_abbrev_from_name
                 from services.team_roster import get_team_roster_service
 
                 roster1 = get_team_roster_service(team1, db)
                 roster2 = get_team_roster_service(team2, db)
                 if roster1["players"]:
                     team1_players = [p["name"] for p in roster1["players"]]
+                    team1_lineup_source = roster1.get("source", "match_data")
                 if roster2["players"]:
                     team2_players = [p["name"] for p in roster2["players"]]
+                    team2_lineup_source = roster2.get("source", "match_data")
                 if team1_players and team2_players:
                     use_custom_teams = True
                     team1_players = _canonicalize_players(team1_players, db)
@@ -294,6 +297,8 @@ def get_team_matchups_service(
             team2_players = _canonicalize_players(team2_players, db)
 
         if not use_custom_teams:
+            team1_lineup_source = "recent_10"
+            team2_lineup_source = "recent_10"
             team1_names = get_all_team_name_variations(team1)
             team2_names = get_all_team_name_variations(team2)
             recent_matches_query = text("""
@@ -623,6 +628,10 @@ def get_team_matchups_service(
                 "players": team2_players,
                 "batting_matchups": team2_batting,
                 "bowling_consolidated": team2_bowling_consolidated
+            },
+            "lineup_sources": {
+                "team1": team1_lineup_source,
+                "team2": team2_lineup_source,
             },
             "fantasy_analysis": fantasy_analysis
         }

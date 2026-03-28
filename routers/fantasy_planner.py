@@ -42,7 +42,7 @@ def all_players():
 @router.get("/recommendations")
 def recommendations(
     current_team: Optional[str] = Query(None, description="Comma-separated current player names"),
-    matches_ahead: int = Query(3, ge=1, le=20),
+    matches_ahead: int = Query(3, ge=1, le=5),
     transfers_remaining: int = Query(160, ge=0),
     matches_played: int = Query(0, ge=0),
     from_date: Optional[str] = Query(None),

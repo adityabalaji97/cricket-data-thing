@@ -1,13 +1,14 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
-from main import app
 from database import get_session
 
 
 @pytest.fixture
 def client():
     """TestClient with mocked DB session."""
+    from main import app
+
     mock_session = MagicMock()
     app.dependency_overrides[get_session] = lambda: mock_session
     with TestClient(app) as c:

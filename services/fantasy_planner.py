@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ipl_rosters import get_ipl_roster, get_team_abbrev_from_name, IPL_2026_ROSTERS
 from services.matchups import get_team_matchups_service
+from services.team_roster import get_team_roster_service
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,34 @@ ROLE_MAP = {
 
 # Cached player prices {name_lower: {credits, role, team, is_overseas, ...}}
 _PLAYER_PRICES: Dict[str, Dict] = {}
+
+# Cached matchup payloads by fixture identity.
+_MATCHUP_CACHE: Dict[str, Dict[str, Any]] = {}
+_MATCHUP_CACHE_TTL_SECONDS = 600
+_MAX_MATCHES_AHEAD = 5
+
+# Batting points
+_RUN_POINT = 1
+_BOUNDARY_BONUS = 4
+_SIX_BONUS = 6
+_RUNS_25_BONUS = 4
+_RUNS_50_BONUS = 8
+_SR_ABOVE_170 = 6
+_SR_150_TO_170 = 4
+_SR_130_TO_150 = 2
+_SR_60_TO_70 = -2
+_SR_50_TO_60 = -4
+_SR_BELOW_50 = -6
+
+# Bowling points
+_DOT_BALL_POINT = 1
+_WICKET_POINT = 25
+_ECONOMY_BELOW_5 = 6
+_ECONOMY_5_TO_6 = 4
+_ECONOMY_6_TO_7 = 2
+_ECONOMY_10_TO_11 = -2
+_ECONOMY_11_TO_12 = -4
+_ECONOMY_ABOVE_12 = -6
 
 
 def _load_player_prices() -> Dict[str, Dict]:
@@ -72,6 +102,222 @@ def get_all_players() -> List[Dict[str, Any]]:
     ]
     players.sort(key=lambda p: (p["name"], p["team"]))
     return players
+
+
+def _clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
+def _resolve_player_price_entry(name: str) -> Optional[Dict[str, Any]]:
+    prices = _load_player_prices()
+    entry = prices.get(name.lower())
+    if entry:
+        return entry
+    for p in prices.values():
+        if p.get("name_fantasy", "").lower() == name.lower():
+            return p
+    return None
+
+
+def _resolve_fantasy_role(name: str, roster_role: str) -> str:
+    price_entry = _resolve_player_price_entry(name)
+    if price_entry and price_entry.get("role"):
+        return ROLE_MAP.get(price_entry["role"], "BAT")
+    return ROLE_MAP.get(roster_role, "BAT")
+
+
+def _matchup_cache_key(fixture: Dict[str, Any]) -> str:
+    return f"{fixture.get('match_num')}|{fixture.get('date')}|{fixture.get('team1')}|{fixture.get('team2')}"
+
+
+def _get_cached_matchup_payload(cache_key: str) -> Optional[Dict[str, Any]]:
+    item = _MATCHUP_CACHE.get(cache_key)
+    if not item:
+        return None
+    if time.time() - item.get("ts", 0) > _MATCHUP_CACHE_TTL_SECONDS:
+        _MATCHUP_CACHE.pop(cache_key, None)
+        return None
+    return item.get("data")
+
+
+def _set_cached_matchup_payload(cache_key: str, matchup_data: Dict[str, Any]) -> None:
+    _MATCHUP_CACHE[cache_key] = {
+        "ts": time.time(),
+        "data": matchup_data,
+    }
+
+
+def _lineup_source_rank(source: Optional[str]) -> int:
+    ranking = {
+        "none": 0,
+        "recent_10": 1,
+        "pre_season": 2,
+        "match_data": 3,
+        "custom": 4,
+    }
+    return ranking.get(source or "none", 0)
+
+
+def _merge_lineup_source(existing: Optional[str], new_value: Optional[str]) -> str:
+    if _lineup_source_rank(new_value) > _lineup_source_rank(existing):
+        return new_value or "none"
+    return existing or "none"
+
+
+def _get_team_players_for_projection(team_abbrev: str, db, lookback_days: int = 30) -> Dict[str, Any]:
+    """
+    Resolve team players for planner projections.
+
+    IPL teams use roster service first (match_data/pre_season fallback), then static roster.
+    """
+    source = "none"
+    players: List[Dict[str, str]] = []
+
+    normalized_abbrev = get_team_abbrev_from_name(team_abbrev) or team_abbrev
+    is_ipl_team = bool(get_ipl_roster(normalized_abbrev))
+
+    if is_ipl_team and db is not None:
+        try:
+            roster = get_team_roster_service(team_name=normalized_abbrev, db=db, lookback_days=lookback_days)
+            if roster.get("players"):
+                players = [{"name": p.get("name"), "role": p.get("role", "batter")} for p in roster["players"] if p.get("name")]
+                source = roster.get("source", "match_data")
+        except Exception as exc:
+            logger.warning("Roster service lookup failed for %s: %s", team_abbrev, exc)
+
+    if not players:
+        static_roster = get_ipl_roster(normalized_abbrev)
+        if static_roster and static_roster.get("players"):
+            players = static_roster["players"]
+            source = "pre_season"
+
+    return {
+        "players": players,
+        "source": source,
+    }
+
+
+def _infer_roster_from_matchup(team_data: Dict[str, Any]) -> List[Dict[str, str]]:
+    players = team_data.get("players") or []
+    batting = team_data.get("batting_matchups") or {}
+    bowling = team_data.get("bowling_consolidated") or {}
+    inferred: List[Dict[str, str]] = []
+    for name in players:
+        batting_stats = (batting.get(name) or {}).get("Overall") if isinstance(batting.get(name), dict) else None
+        bowling_stats = bowling.get(name) or {}
+        has_batting = bool(batting_stats)
+        has_bowling = float(bowling_stats.get("balls", 0) or 0.0) > 0 or float(bowling_stats.get("wickets", 0) or 0.0) > 0
+        role = "all-rounder" if has_batting and has_bowling else ("bowler" if has_bowling else "batter")
+        inferred.append({"name": name, "role": role})
+    return inferred
+
+
+def _calculate_batting_projection_points(overall_stats: Dict[str, Any]) -> Dict[str, float]:
+    if not overall_stats:
+        return {"points": 0.0, "confidence": 0.0}
+
+    runs = float(overall_stats.get("average") or overall_stats.get("runs") or 0.0)
+    balls_sample = float(overall_stats.get("balls") or 0.0)
+    strike_rate = float(overall_stats.get("strike_rate") or 0.0)
+    boundary_pct = float(overall_stats.get("boundary_percentage") or 0.0)
+
+    balls = runs * 100.0 / strike_rate if strike_rate > 0 else balls_sample
+    points = runs * _RUN_POINT
+
+    boundary_runs = runs * (boundary_pct / 100.0)
+    estimated_fours = boundary_runs * 0.7 / 4.0
+    estimated_sixes = boundary_runs * 0.3 / 6.0
+    points += estimated_fours * _BOUNDARY_BONUS
+    points += estimated_sixes * _SIX_BONUS
+
+    if runs >= 50:
+        points += _RUNS_50_BONUS
+    elif runs >= 25:
+        points += _RUNS_25_BONUS
+
+    if balls >= 10:
+        if strike_rate > 170:
+            points += _SR_ABOVE_170
+        elif 150 < strike_rate <= 170:
+            points += _SR_150_TO_170
+        elif 130 <= strike_rate <= 150:
+            points += _SR_130_TO_150
+        elif 60 <= strike_rate < 70:
+            points += _SR_60_TO_70
+        elif 50 <= strike_rate < 60:
+            points += _SR_50_TO_60
+        elif strike_rate < 50:
+            points += _SR_BELOW_50
+
+    confidence = _clamp(balls_sample / 50.0 if balls_sample else 0.0, 0.3, 0.9) if balls_sample else 0.0
+    return {"points": max(0.0, points), "confidence": confidence}
+
+
+def _calculate_bowling_projection_points(bowling_stats: Dict[str, Any]) -> Dict[str, float]:
+    if not bowling_stats:
+        return {"points": 0.0, "confidence": 0.0}
+
+    balls_sample = float(bowling_stats.get("balls") or 0.0)
+    runs = float(bowling_stats.get("runs") or 0.0)
+    wickets = float(bowling_stats.get("wickets") or 0.0)
+    dot_pct = float(bowling_stats.get("dot_percentage") or 0.0)
+
+    if balls_sample <= 0:
+        return {"points": 0.0, "confidence": 0.0}
+
+    normalized_runs = runs * (24.0 / max(balls_sample, 1.0))
+    normalized_wickets = wickets * (24.0 / max(balls_sample, 1.0))
+    normalized_dots = (dot_pct / 100.0) * 24.0
+    normalized_economy = normalized_runs / 4.0
+
+    points = (normalized_dots * _DOT_BALL_POINT) + (normalized_wickets * _WICKET_POINT)
+
+    if normalized_economy < 5:
+        points += _ECONOMY_BELOW_5
+    elif 5 <= normalized_economy < 6:
+        points += _ECONOMY_5_TO_6
+    elif 6 <= normalized_economy <= 7:
+        points += _ECONOMY_6_TO_7
+    elif 10 <= normalized_economy < 11:
+        points += _ECONOMY_10_TO_11
+    elif 11 <= normalized_economy < 12:
+        points += _ECONOMY_11_TO_12
+    elif normalized_economy >= 12:
+        points += _ECONOMY_ABOVE_12
+
+    confidence = _clamp(balls_sample / 30.0, 0.3, 0.9)
+    return {"points": max(0.0, points), "confidence": confidence}
+
+
+def _build_normalized_match_points(matchup_data: Dict[str, Any], team_key: str) -> Dict[str, Dict[str, float]]:
+    team_data = ((matchup_data or {}).get(team_key) or {})
+    players = team_data.get("players") or []
+    batting = team_data.get("batting_matchups") or {}
+    bowling = team_data.get("bowling_consolidated") or {}
+    fantasy_top = ((matchup_data or {}).get("fantasy_analysis") or {}).get("top_fantasy_picks") or []
+    raw_lookup = {
+        p.get("player_name"): float(p.get("expected_points", 0) or 0.0)
+        for p in fantasy_top
+        if p.get("team") == team_key and p.get("player_name")
+    }
+
+    projections: Dict[str, Dict[str, float]] = {}
+    for player in players:
+        overall_stats = ((batting.get(player) or {}).get("Overall")) if isinstance(batting.get(player), dict) else None
+        batting_result = _calculate_batting_projection_points(overall_stats or {})
+        bowling_result = _calculate_bowling_projection_points(bowling.get(player) or {})
+        total_points = batting_result["points"] + bowling_result["points"]
+
+        confidence_parts = [c for c in [batting_result["confidence"], bowling_result["confidence"]] if c > 0]
+        confidence = sum(confidence_parts) / len(confidence_parts) if confidence_parts else 0.0
+
+        projections[player] = {
+            "expected_points": round(total_points, 1),
+            "confidence": round(confidence, 2),
+            "expected_points_raw": round(raw_lookup.get(player, 0.0), 1),
+        }
+
+    return projections
 
 
 def get_player_credit(name: str) -> float:
@@ -163,10 +409,11 @@ def get_schedule_with_density(
 
 def _get_upcoming_fixtures(matches_ahead: int = 3, from_date: Optional[str] = None) -> List[Dict]:
     """Get the next N fixtures from today."""
+    bounded_matches = max(1, min(_MAX_MATCHES_AHEAD, int(matches_ahead or 3)))
     schedule = _load_schedule()
     today = from_date or date.today().isoformat()
     upcoming = [f for f in schedule if f["date"] >= today]
-    return upcoming[:matches_ahead]
+    return upcoming[:bounded_matches]
 
 
 def _get_team_players(team_abbrev: str) -> List[Dict[str, str]]:
@@ -200,38 +447,18 @@ def get_fantasy_recommendations(
     # Collect all players with expected points across matches
     player_scores: Dict[str, Dict[str, Any]] = {}
     match_details = []
+    lineup_sources: Dict[str, str] = {}
 
     for fixture in upcoming:
         t1 = fixture["team1"]
         t2 = fixture["team2"]
         venue = fixture.get("venue_db", fixture.get("venue", ""))
-
-        t1_roster = _get_team_players(t1)
-        t2_roster = _get_team_players(t2)
-
-        if not t1_roster or not t2_roster:
-            continue
-
-        t1_names = [p["name"] for p in t1_roster]
-        t2_names = [p["name"] for p in t2_roster]
-
-        # Get matchup-based fantasy analysis
-        try:
-            matchup_data = get_team_matchups_service(
-                team1=t1,
-                team2=t2,
-                start_date=None,
-                end_date=None,
-                team1_players=t1_names,
-                team2_players=t2_names,
-                db=db,
-            )
-        except Exception as e:
-            logger.warning("Matchup fetch failed for %s vs %s: %s", t1, t2, e)
-            matchup_data = None
-
-        fantasy = (matchup_data or {}).get("fantasy_analysis", {})
-        top_picks = fantasy.get("top_fantasy_picks", [])
+        t1_meta = _get_team_players_for_projection(t1, db)
+        t2_meta = _get_team_players_for_projection(t2, db)
+        t1_roster = t1_meta.get("players", [])
+        t2_roster = t2_meta.get("players", [])
+        lineup_sources[t1] = _merge_lineup_source(lineup_sources.get(t1), t1_meta.get("source", "none"))
+        lineup_sources[t2] = _merge_lineup_source(lineup_sources.get(t2), t2_meta.get("source", "none"))
 
         match_info = {
             "match_num": fixture["match_num"],
@@ -242,24 +469,74 @@ def get_fantasy_recommendations(
             "player_points": [],
         }
 
+        t1_names = [p["name"] for p in t1_roster]
+        t2_names = [p["name"] for p in t2_roster]
+
+        cache_key = _matchup_cache_key(fixture)
+        matchup_data = _get_cached_matchup_payload(cache_key)
+        if matchup_data is None:
+            try:
+                matchup_data = get_team_matchups_service(
+                    team1=t1,
+                    team2=t2,
+                    start_date=None,
+                    end_date=None,
+                    team1_players=t1_names,
+                    team2_players=t2_names,
+                    db=db,
+                )
+                if matchup_data:
+                    _set_cached_matchup_payload(cache_key, matchup_data)
+            except Exception as e:
+                logger.warning("Matchup fetch failed for %s vs %s: %s", t1, t2, e)
+                matchup_data = None
+
+        if not matchup_data:
+            match_details.append(match_info)
+            continue
+
+        matchup_lineup_sources = (matchup_data.get("lineup_sources") or {})
+        t1_matchup_source = matchup_lineup_sources.get("team1")
+        t2_matchup_source = matchup_lineup_sources.get("team2")
+        if t1_matchup_source and t1_matchup_source != "custom" and (lineup_sources.get(t1) in (None, "none")):
+            lineup_sources[t1] = _merge_lineup_source(lineup_sources.get(t1), t1_matchup_source)
+        if t2_matchup_source and t2_matchup_source != "custom" and (lineup_sources.get(t2) in (None, "none")):
+            lineup_sources[t2] = _merge_lineup_source(lineup_sources.get(t2), t2_matchup_source)
+
+        if not t1_roster:
+            t1_roster = _infer_roster_from_matchup((matchup_data or {}).get("team1") or {})
+        if not t2_roster:
+            t2_roster = _infer_roster_from_matchup((matchup_data or {}).get("team2") or {})
+        if not t1_roster or not t2_roster:
+            match_details.append(match_info)
+            continue
+
+        team1_points = _build_normalized_match_points(matchup_data, "team1")
+        team2_points = _build_normalized_match_points(matchup_data, "team2")
+
         # Process all players from both rosters
-        for team_abbrev, roster, team_key in [(t1, t1_roster, "team1"), (t2, t2_roster, "team2")]:
+        for team_abbrev, roster, team_key, points_map in [
+            (t1, t1_roster, "team1", team1_points),
+            (t2, t2_roster, "team2", team2_points),
+        ]:
             for player in roster:
                 name = player["name"]
-                role = player["role"]
-
-                # Find this player's expected points from matchup analysis
-                pick = next((p for p in top_picks if p["player_name"] == name), None)
-                expected = pick["expected_points"] if pick else 0.0
-                confidence = pick.get("confidence", 0) if pick else 0.0
+                roster_role = player.get("role", "batter")
+                projection = points_map.get(
+                    name,
+                    {"expected_points": 0.0, "confidence": 0.0, "expected_points_raw": 0.0},
+                )
+                expected = float(projection.get("expected_points", 0.0) or 0.0)
+                expected_raw = float(projection.get("expected_points_raw", 0.0) or 0.0)
+                confidence = float(projection.get("confidence", 0.0) or 0.0)
 
                 # Accumulate across matches
                 if name not in player_scores:
                     player_scores[name] = {
                         "name": name,
                         "team": team_abbrev,
-                        "role": ROLE_MAP.get(role, "BAT"),
-                        "roster_role": role,
+                        "role": _resolve_fantasy_role(name, roster_role),
+                        "roster_role": roster_role,
                         "credits": get_player_credit(name),
                         "is_overseas": is_overseas(name),
                         "total_expected": 0.0,
@@ -275,6 +552,7 @@ def get_fantasy_recommendations(
                     "vs": t2 if team_abbrev == t1 else t1,
                     "venue": venue,
                     "expected_points": round(expected, 1),
+                    "expected_points_raw": round(expected_raw, 1),
                     "confidence": round(confidence, 2),
                 })
                 if expected > player_scores[name]["best_match_points"]:
@@ -284,6 +562,7 @@ def get_fantasy_recommendations(
                     "name": name,
                     "team": team_abbrev,
                     "expected_points": round(expected, 1),
+                    "expected_points_raw": round(expected_raw, 1),
                 })
 
         match_details.append(match_info)
@@ -313,6 +592,7 @@ def get_fantasy_recommendations(
         vice_captain = max(non_captain, key=lambda p: p["best_match_points"]) if non_captain else None
 
     return {
+        "points_model": "per_match_normalized_v1",
         "upcoming_matches": [
             {
                 "match_num": f["match_num"],
@@ -355,6 +635,7 @@ def get_fantasy_recommendations(
             }
             for p in all_players[:50]
         ],
+        "lineup_sources": lineup_sources,
         "match_details": match_details,
     }
 
@@ -468,8 +749,10 @@ def get_player_outlook(
         venue = fixture.get("venue_db", fixture.get("venue", ""))
 
         # Get matchup data for this specific fixture
-        opp_roster = _get_team_players(opponent)
-        own_roster = _get_team_players(player_team)
+        opp_roster_meta = _get_team_players_for_projection(opponent, db)
+        own_roster_meta = _get_team_players_for_projection(player_team, db)
+        opp_roster = opp_roster_meta.get("players", [])
+        own_roster = own_roster_meta.get("players", [])
         expected_points = 0.0
 
         if opp_roster and own_roster:
@@ -483,9 +766,11 @@ def get_player_outlook(
                     team2_players=[p["name"] for p in opp_roster],
                     db=db,
                 )
-                picks = (matchup_data or {}).get("fantasy_analysis", {}).get("top_fantasy_picks", [])
-                pick = next((p for p in picks if p["player_name"] == player_name), None)
-                expected_points = pick["expected_points"] if pick else 0.0
+                team_key = "team1"
+                if ((matchup_data or {}).get("team1") or {}).get("name") != player_team:
+                    team_key = "team2"
+                normalized_points = _build_normalized_match_points(matchup_data, team_key)
+                expected_points = normalized_points.get(player_name, {}).get("expected_points", 0.0)
             except Exception:
                 pass
 

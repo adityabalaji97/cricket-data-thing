@@ -29,8 +29,11 @@ const TEAM_COLORS = {
     DC: '#004BC5', GT: '#01295B',
 };
 
+const RECOMMENDATION_RETRY_DELAYS_MS = process.env.NODE_ENV === 'test' ? [0, 1, 1] : [0, 1500, 4000];
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // ─── Fixture Calendar (Panel 1) ────────────────────────────────────────────
-const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams }) => {
+const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recommendationsLoading }) => {
     if (!fixtures || fixtures.length === 0) return null;
 
     return (
@@ -42,6 +45,7 @@ const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams }) => {
                     const detail = (matchDetails || []).find((d) => d.match_num === f.match_num);
                     const topPicks = [...(detail?.player_points || [])]
                         .sort((a, b) => (b.expected_points || 0) - (a.expected_points || 0))
+                        .filter((p) => (p.expected_points || 0) > 0)
                         .slice(0, 5);
                     return (
                         <Card
@@ -101,10 +105,15 @@ const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams }) => {
                                             color="text.secondary"
                                             sx={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.3 }}
                                         >
-                                            {pick.name} {pick.expected_points}
+                                            {pick.name} {Number(pick.expected_points || 0).toFixed(1)}
                                         </Typography>
                                     ))}
                                 </Box>
+                            )}
+                            {topPicks.length === 0 && (
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontSize: '0.65rem' }}>
+                                    {recommendationsLoading ? 'Loading picks...' : 'No projection'}
+                                </Typography>
                             )}
                         </Card>
                     );
@@ -271,7 +280,7 @@ const RecommendationsTable = ({ allPlayers, squad, onAddPlayer, isMobile }) => {
                                 sx={{ fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
                                 onClick={() => setSortBy('total_expected_points')}
                             >
-                                Exp Pts {sortBy === 'total_expected_points' ? '▼' : ''}
+                                Exp Pts (per match) {sortBy === 'total_expected_points' ? '▼' : ''}
                             </TableCell>
                             <TableCell
                                 align="right"
@@ -383,6 +392,7 @@ const TransferPlanView = ({ plan, isMobile }) => {
 // ─── Main Fantasy Planner Page ─────────────────────────────────────────────
 const FantasyPlanner = ({ isMobile }) => {
     const [loading, setLoading] = useState(false);
+    const [recommendationsLoading, setRecommendationsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [schedule, setSchedule] = useState(null);
     const [recommendations, setRecommendations] = useState(null);
@@ -391,16 +401,17 @@ const FantasyPlanner = ({ isMobile }) => {
     const [transferPlan, setTransferPlan] = useState(null);
     const [matchesAhead, setMatchesAhead] = useState(3);
     const [tab, setTab] = useState(0);
+    const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
     const upcomingFixtures = useMemo(() => {
         if (!schedule?.fixtures) return [];
         const today = new Date().toISOString().split('T')[0];
-        return schedule.fixtures.filter(f => f.date >= today).slice(0, 15);
-    }, [schedule]);
+        return schedule.fixtures.filter(f => f.date >= today).slice(0, matchesAhead);
+    }, [schedule, matchesAhead]);
 
     const squadTeams = useMemo(() => (squad || []).map(p => p.team), [squad]);
 
-    const fetchRecommendations = useCallback(async ({ currentNames, applyToSquad = false, existingSquad = [] } = {}) => {
+    const fetchRecommendations = useCallback(async ({ currentNames } = {}) => {
         const params = {
             matches_ahead: matchesAhead,
         };
@@ -409,44 +420,80 @@ const FantasyPlanner = ({ isMobile }) => {
         }
         const res = await axios.get(`${config.API_URL}/fantasy-planner/recommendations`, { params });
         setRecommendations(res.data);
-
-        if (applyToSquad && res.data.recommended_squad) {
-            if (!existingSquad.length) {
-                setSquad(res.data.recommended_squad);
-            } else {
-                const existingNames = new Set(existingSquad.map((p) => p.name));
-                const fillerPlayers = res.data.recommended_squad.filter((p) => !existingNames.has(p.name));
-                setSquad([...existingSquad, ...fillerPlayers].slice(0, 11));
-            }
-        }
+        return res.data;
     }, [matchesAhead]);
 
-    const handleFetchRankings = useCallback(async () => {
-        setError(null);
-        try {
-            await fetchRecommendations();
-        } catch (err) {
-            setError(err.response?.data?.detail || 'Failed to fetch recommendations');
+    const applyRecommendedSquad = useCallback((recommendedSquad, existingSquad = []) => {
+        if (!recommendedSquad) return;
+        if (!existingSquad.length) {
+            setSquad(recommendedSquad);
+            return;
         }
-    }, [fetchRecommendations]);
+        const existingNames = new Set(existingSquad.map((p) => p.name));
+        const fillerPlayers = recommendedSquad.filter((p) => !existingNames.has(p.name));
+        setSquad([...existingSquad, ...fillerPlayers].slice(0, 11));
+    }, []);
+
+    const fetchRecommendationsWithRetry = useCallback(async ({ currentNames, applyToSquad = false, existingSquad = [] } = {}) => {
+        setRecommendationsLoading(true);
+        setError(null);
+        let lastError = null;
+        for (let attempt = 0; attempt < RECOMMENDATION_RETRY_DELAYS_MS.length; attempt += 1) {
+            const delayMs = RECOMMENDATION_RETRY_DELAYS_MS[attempt];
+            if (delayMs > 0) {
+                await sleep(delayMs);
+            }
+            try {
+                const data = await fetchRecommendations({ currentNames });
+                if (applyToSquad && data?.recommended_squad) {
+                    applyRecommendedSquad(data.recommended_squad, existingSquad);
+                }
+                return data;
+            } catch (err) {
+                lastError = err;
+                const status = err?.response?.status;
+                const retryable = !status || status === 503 || status === 504;
+                const hasMoreAttempts = attempt < RECOMMENDATION_RETRY_DELAYS_MS.length - 1;
+                if (!retryable || !hasMoreAttempts) {
+                    break;
+                }
+            }
+        }
+
+        if (lastError) {
+            setError(lastError.response?.data?.detail || 'Failed to fetch recommendations');
+            throw lastError;
+        }
+        return null;
+    }, [applyRecommendedSquad, fetchRecommendations]);
+
+    const handleFetchRankings = useCallback(async () => {
+        try {
+            await fetchRecommendationsWithRetry();
+        } catch (err) {
+            // Error state already handled in retry wrapper.
+        } finally {
+            setRecommendationsLoading(false);
+        }
+    }, [fetchRecommendationsWithRetry]);
 
     const handleAutoPick = useCallback(async () => {
         const existingSquad = [...squad];
         const currentNames = existingSquad.map((p) => p.name).join(',') || undefined;
         setLoading(true);
-        setError(null);
         try {
-            await fetchRecommendations({
+            await fetchRecommendationsWithRetry({
                 currentNames,
                 applyToSquad: true,
                 existingSquad,
             });
         } catch (err) {
-            setError(err.response?.data?.detail || 'Failed to fetch recommendations');
+            // Error state already handled in retry wrapper.
         } finally {
             setLoading(false);
+            setRecommendationsLoading(false);
         }
-    }, [fetchRecommendations, squad]);
+    }, [fetchRecommendationsWithRetry, squad]);
 
     // Load schedule + player list on mount.
     useEffect(() => {
@@ -460,6 +507,7 @@ const FantasyPlanner = ({ isMobile }) => {
                 if (cancelled) return;
                 setSchedule(scheduleRes.data);
                 setAllAvailablePlayers(playersRes.data?.players || []);
+                setInitialDataLoaded(true);
             } catch (err) {
                 if (cancelled) return;
                 setError('Failed to load fantasy planner data');
@@ -472,10 +520,11 @@ const FantasyPlanner = ({ isMobile }) => {
         };
     }, []);
 
-    // Fetch rankings/match picks automatically (initial load + matchesAhead changes).
+    // Fetch rankings/match picks after initial data is ready.
     useEffect(() => {
+        if (!initialDataLoaded) return;
         handleFetchRankings();
-    }, [handleFetchRankings]);
+    }, [initialDataLoaded, handleFetchRankings]);
 
     const handleFetchTransferPlan = useCallback(async () => {
         if (!squad.length) return;
@@ -535,9 +584,9 @@ const FantasyPlanner = ({ isMobile }) => {
                         type="number"
                         size="small"
                         value={matchesAhead}
-                        onChange={(e) => setMatchesAhead(Math.max(1, Math.min(20, parseInt(e.target.value) || 3)))}
+                        onChange={(e) => setMatchesAhead(Math.max(1, Math.min(5, parseInt(e.target.value, 10) || 3)))}
                         sx={{ width: 120 }}
-                        inputProps={{ min: 1, max: 20 }}
+                        inputProps={{ min: 1, max: 5 }}
                     />
                 </Box>
                 <FixtureCalendar
@@ -545,6 +594,7 @@ const FantasyPlanner = ({ isMobile }) => {
                     matchDetails={recommendations?.match_details || []}
                     isMobile={isMobile}
                     squadTeams={squadTeams}
+                    recommendationsLoading={recommendationsLoading}
                 />
             </Card>
 
@@ -602,7 +652,7 @@ const FantasyPlanner = ({ isMobile }) => {
                         Captaincy Picks
                     </Typography>
                     <Typography variant="body2">
-                        Captain: <strong>{recommendations.captain}</strong> (highest single-match expected points)
+                        Captain: <strong>{recommendations.captain}</strong> (highest projected single-match points)
                     </Typography>
                     <Typography variant="body2">
                         Vice-captain: <strong>{recommendations.vice_captain}</strong>

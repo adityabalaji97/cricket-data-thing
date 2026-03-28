@@ -311,6 +311,7 @@ def get_match_preview(
             preview_text = generate_match_preview_fallback(context)
         decision_scores = score_preview_lean(context)
         phase_check = (((context.get("screen_story") or {}).get("phase_wise_strategy") or {}).get("consistency_check")) or {}
+        lineup_selection = context.get("lineup_selection") or {}
 
         result = {
             "success": True,
@@ -332,6 +333,7 @@ def get_match_preview(
             result["debug"] = {
                 "decision_scores": decision_scores,
                 "phase_template_consistency_check": phase_check,
+                "lineup_selection": lineup_selection,
             }
         preview_cache[key] = result
         return result

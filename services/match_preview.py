@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
+from ipl_rosters import get_team_abbrev_from_name
 from models import teams_mapping
 from services.delivery_data_service import get_match_scores, get_venue_match_stats, get_venue_phase_stats
 from services.global_t20_rankings import get_batting_rankings_service, get_bowling_rankings_service
@@ -58,6 +59,10 @@ def resolve_team_identifier(identifier: str) -> str:
         return identifier
     reverse = _reverse_team_mapping()
     return reverse.get(identifier.upper(), identifier)
+
+
+def _is_ipl_team(team_name: str) -> bool:
+    return bool(get_team_abbrev_from_name(team_name))
 
 
 def _serialize_phase_stats(phase_stats: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -709,10 +714,16 @@ def _summarize_matchups_and_fantasy(
         t1_name: sorted(set(((matchup_data or {}).get("team1") or {}).get("players") or [])),
         t2_name: sorted(set(((matchup_data or {}).get("team2") or {}).get("players") or [])),
     }
+    matchup_sources = (matchup_data or {}).get("lineup_sources") or {}
+    lineup_sources = {
+        t1_name: matchup_sources.get("team1"),
+        t2_name: matchup_sources.get("team2"),
+    }
 
     return {
         "available": True,
         "lineup_players": lineup_players,
+        "lineup_sources": lineup_sources,
         "fantasy_top": {
             t1_name: _top_fantasy("team1"),
             t2_name: _top_fantasy("team2"),
@@ -1640,7 +1651,16 @@ def gather_preview_context(
     )
     venue_trend = _summarize_recent_venue_trend(match_history_bundle["venue_results"])
     h2h_relevance = _same_country_hint(venue, match_history_bundle["h2h_recent"])
-    matchup_fantasy = _summarize_matchups_and_fantasy(db, team1, team2, start_date, end_date)
+    use_current_roster = _is_ipl_team(team1) and _is_ipl_team(team2)
+    matchup_fantasy = _summarize_matchups_and_fantasy(
+        db,
+        team1,
+        team2,
+        start_date,
+        end_date,
+        use_current_roster=use_current_roster,
+    )
+    lineup_sources = (matchup_fantasy or {}).get("lineup_sources") or {}
     top_ranked_players = _summarize_top_ranked_lineup_players(
         db=db,
         lineup_players=(matchup_fantasy or {}).get("lineup_players") or {},
@@ -1700,6 +1720,11 @@ def gather_preview_context(
             team2: elo2,
             "delta_team1_minus_team2": (elo1 - elo2) if elo1 is not None and elo2 is not None else None,
         },
+        "lineup_selection": {
+            "use_current_roster": use_current_roster,
+            "team1_source": lineup_sources.get(team1),
+            "team2_source": lineup_sources.get(team2),
+        },
         "top_ranked_players": top_ranked_players,
         "screen_story": {
             "match_results_distribution": {
@@ -1740,6 +1765,11 @@ def gather_preview_context(
             "recent_matches_at_venue": venue_trend,
             "expected_fantasy_points": matchup_fantasy,
             "top_ranked_players": top_ranked_players,
+            "lineup_selection": {
+                "use_current_roster": use_current_roster,
+                "team1_source": lineup_sources.get(team1),
+                "team2_source": lineup_sources.get(team2),
+            },
         },
     }
     context["screen_story"]["phase_wise_strategy"] = build_phase_wise_strategy_templates(context)
