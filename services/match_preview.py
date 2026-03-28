@@ -629,6 +629,9 @@ def _summarize_matchups_and_fantasy(
     team2: str,
     start_date: Optional[date],
     end_date: Optional[date],
+    team1_players: Optional[List[str]] = None,
+    team2_players: Optional[List[str]] = None,
+    use_current_roster: bool = False,
 ) -> Dict[str, Any]:
     try:
         matchup_data = get_team_matchups_service(
@@ -636,9 +639,10 @@ def _summarize_matchups_and_fantasy(
             team2=team2,
             start_date=start_date,
             end_date=end_date,
-            team1_players=[],
-            team2_players=[],
+            team1_players=team1_players or [],
+            team2_players=team2_players or [],
             db=db,
+            use_current_roster=use_current_roster,
         )
     except Exception:
         return {"available": False, "lineup_players": {}}

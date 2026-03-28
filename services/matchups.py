@@ -261,10 +261,34 @@ def get_team_matchups_service(
     end_date: Optional[date],
     team1_players: List[str],
     team2_players: List[str],
-    db
+    db,
+    use_current_roster: bool = False,
 ):
     try:
         use_custom_teams = len(team1_players) > 0 and len(team2_players) > 0
+
+        # When use_current_roster is True, populate player lists from ipl_rosters.py
+        if not use_custom_teams and use_current_roster:
+            try:
+                from ipl_rosters import get_team_abbrev_from_name
+                from services.team_roster import get_team_roster_service
+
+                roster1 = get_team_roster_service(team1, db)
+                roster2 = get_team_roster_service(team2, db)
+                if roster1["players"]:
+                    team1_players = [p["name"] for p in roster1["players"]]
+                if roster2["players"]:
+                    team2_players = [p["name"] for p in roster2["players"]]
+                if team1_players and team2_players:
+                    use_custom_teams = True
+                    team1_players = _canonicalize_players(team1_players, db)
+                    team2_players = _canonicalize_players(team2_players, db)
+            except ImportError:
+                pass
+
+        if use_custom_teams and not (len(team1_players) > 0 and len(team2_players) > 0):
+            use_custom_teams = False
+
         if use_custom_teams:
             team1_players = _canonicalize_players(team1_players, db)
             team2_players = _canonicalize_players(team2_players, db)

@@ -1214,6 +1214,18 @@ const VenueNotes = ({
         setSimilarZoneFilters(DEFAULT_SIMILAR_ZONE_FILTERS);
     }, [selectedTeam1, selectedTeam2, venue]);
 
+    // Staggered auto-activation: progressively activate sections after mount
+    useEffect(() => {
+        if (!sectionGroups.length) return;
+
+        const sectionIds = sectionGroups.map((g) => g.id).filter((id) => id !== 'summary');
+        const timers = sectionIds.map((id, index) =>
+            setTimeout(() => markSectionActivated(id), (index + 1) * 1000)
+        );
+
+        return () => timers.forEach(clearTimeout);
+    }, [sectionGroups, markSectionActivated]);
+
     useEffect(() => {
         if (!sectionGroups.length) {
             return undefined;
@@ -1239,7 +1251,7 @@ const VenueNotes = ({
                 setActiveSectionId(nextActive);
             }
         }, {
-            rootMargin: '-15% 0px -60% 0px',
+            rootMargin: '0px 0px 100% 0px',
             threshold: [0.1, 0.35, 0.6],
         });
 
@@ -1263,18 +1275,8 @@ const VenueNotes = ({
         }
 
         return (
-            <Box
-                sx={{
-                    p: 2,
-                    border: '1px dashed',
-                    borderColor: 'divider',
-                    borderRadius: 2,
-                    bgcolor: 'rgba(0,0,0,0.01)',
-                }}
-            >
-                <Typography variant="body2" color="text.secondary">
-                    Open this section to load data.
-                </Typography>
+            <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}>
+                <CircularProgress size={24} />
             </Box>
         );
     }, [activeSectionId, activatedSections]);

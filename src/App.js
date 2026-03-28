@@ -40,6 +40,7 @@ import { GoogleSearchLanding, SearchBar } from './components/search';
 import GuessInningsGame from './components/games/GuessInningsGame';
 import PlayerJourneysGame from './components/games/PlayerJourneysGame';
 import CreditsPage from './components/CreditsPage';
+import FantasyPlanner from './components/FantasyPlanner';
 import axios from 'axios';
 
 import config from './config';
@@ -118,6 +119,7 @@ const AppContent = () => {
     path === '/rankings' ? 11 :
     path === '/games/guess-innings' ? 12 :
     path === '/games/player-journeys' ? 13 :
+    path === '/fantasy-planner' ? 14 :
     path === '/credits' ? false :
     path.startsWith('/wrapped') ? false : 0
   );
@@ -137,6 +139,7 @@ const AppContent = () => {
     path === '/rankings' ? 'Global Rankings' :
     path === '/games/guess-innings' ? 'Guess the Innings' :
     path === '/games/player-journeys' ? 'Player Journeys' :
+    path === '/fantasy-planner' ? 'Fantasy Planner' :
     path === '/credits' ? 'Credits & Acknowledgements' :
     path.startsWith('/wrapped') ? '2025 Wrapped' : 'Home'
   );
@@ -576,6 +579,9 @@ const AppContent = () => {
               <MenuItem onClick={() => handleNavigate('/games/player-journeys')}>
                 🛤️ Player Journeys
               </MenuItem>
+              <MenuItem onClick={() => handleNavigate('/fantasy-planner')}>
+                Fantasy Planner
+              </MenuItem>
             </Menu>
             <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap' }}>
               {getPageTitle()}
@@ -613,6 +619,7 @@ const AppContent = () => {
               <Tab label="Global Rankings" component={Link} to="/rankings" />
               <Tab label="🎯 Guess the Innings" component={Link} to="/games/guess-innings" />
               <Tab label="🛤️ Player Journeys" component={Link} to="/games/player-journeys" />
+              <Tab label="Fantasy Planner" component={Link} to="/fantasy-planner" />
             </Tabs>
             <IconButton
               onClick={() => setSearchExpanded(true)}
@@ -643,6 +650,7 @@ const AppContent = () => {
         <Route path="/wrapped/2025" element={<WrappedPage />} />
         <Route path="/search" element={<GoogleSearchLanding />} />
         <Route path="/credits" element={<CreditsPage />} />
+        <Route path="/fantasy-planner" element={<FantasyPlanner isMobile={isMobile} />} />
         <Route path="/venue" element={
           <Box sx={{ my: { xs: 1.5, md: 3 } }}>
             {error && (
