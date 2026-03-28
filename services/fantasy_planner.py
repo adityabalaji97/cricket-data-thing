@@ -23,7 +23,17 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ipl_rosters import get_ipl_roster, get_team_abbrev_from_name, IPL_2026_ROSTERS
-from services.matchups import get_team_matchups_service
+from services.matchups import (
+    get_team_matchups_service,
+    _clamp,
+    _calculate_batting_projection_points,
+    _calculate_bowling_projection_points,
+    _RUN_POINT, _BOUNDARY_BONUS, _SIX_BONUS, _RUNS_25_BONUS, _RUNS_50_BONUS,
+    _SR_ABOVE_170, _SR_150_TO_170, _SR_130_TO_150, _SR_60_TO_70, _SR_50_TO_60, _SR_BELOW_50,
+    _DOT_BALL_POINT, _WICKET_POINT,
+    _ECONOMY_BELOW_5, _ECONOMY_5_TO_6, _ECONOMY_6_TO_7,
+    _ECONOMY_10_TO_11, _ECONOMY_11_TO_12, _ECONOMY_ABOVE_12,
+)
 from services.team_roster import get_team_roster_service
 
 logger = logging.getLogger(__name__)
@@ -47,28 +57,8 @@ _MATCHUP_CACHE: Dict[str, Dict[str, Any]] = {}
 _MATCHUP_CACHE_TTL_SECONDS = 600
 _MAX_MATCHES_AHEAD = 5
 
-# Batting points
-_RUN_POINT = 1
-_BOUNDARY_BONUS = 4
-_SIX_BONUS = 6
-_RUNS_25_BONUS = 4
-_RUNS_50_BONUS = 8
-_SR_ABOVE_170 = 6
-_SR_150_TO_170 = 4
-_SR_130_TO_150 = 2
-_SR_60_TO_70 = -2
-_SR_50_TO_60 = -4
-_SR_BELOW_50 = -6
 
-# Bowling points
-_DOT_BALL_POINT = 1
-_WICKET_POINT = 25
-_ECONOMY_BELOW_5 = 6
-_ECONOMY_5_TO_6 = 4
-_ECONOMY_6_TO_7 = 2
-_ECONOMY_10_TO_11 = -2
-_ECONOMY_11_TO_12 = -4
-_ECONOMY_ABOVE_12 = -6
+# Point constants are imported from services.matchups
 
 
 def _load_player_prices() -> Dict[str, Dict]:
@@ -102,10 +92,6 @@ def get_all_players() -> List[Dict[str, Any]]:
     ]
     players.sort(key=lambda p: (p["name"], p["team"]))
     return players
-
-
-def _clamp(value: float, lower: float, upper: float) -> float:
-    return max(lower, min(upper, value))
 
 
 def _resolve_player_price_entry(name: str) -> Optional[Dict[str, Any]]:
@@ -210,83 +196,6 @@ def _infer_roster_from_matchup(team_data: Dict[str, Any]) -> List[Dict[str, str]
         role = "all-rounder" if has_batting and has_bowling else ("bowler" if has_bowling else "batter")
         inferred.append({"name": name, "role": role})
     return inferred
-
-
-def _calculate_batting_projection_points(overall_stats: Dict[str, Any]) -> Dict[str, float]:
-    if not overall_stats:
-        return {"points": 0.0, "confidence": 0.0}
-
-    runs = float(overall_stats.get("average") or overall_stats.get("runs") or 0.0)
-    balls_sample = float(overall_stats.get("balls") or 0.0)
-    strike_rate = float(overall_stats.get("strike_rate") or 0.0)
-    boundary_pct = float(overall_stats.get("boundary_percentage") or 0.0)
-
-    balls = runs * 100.0 / strike_rate if strike_rate > 0 else balls_sample
-    points = runs * _RUN_POINT
-
-    boundary_runs = runs * (boundary_pct / 100.0)
-    estimated_fours = boundary_runs * 0.7 / 4.0
-    estimated_sixes = boundary_runs * 0.3 / 6.0
-    points += estimated_fours * _BOUNDARY_BONUS
-    points += estimated_sixes * _SIX_BONUS
-
-    if runs >= 50:
-        points += _RUNS_50_BONUS
-    elif runs >= 25:
-        points += _RUNS_25_BONUS
-
-    if balls >= 10:
-        if strike_rate > 170:
-            points += _SR_ABOVE_170
-        elif 150 < strike_rate <= 170:
-            points += _SR_150_TO_170
-        elif 130 <= strike_rate <= 150:
-            points += _SR_130_TO_150
-        elif 60 <= strike_rate < 70:
-            points += _SR_60_TO_70
-        elif 50 <= strike_rate < 60:
-            points += _SR_50_TO_60
-        elif strike_rate < 50:
-            points += _SR_BELOW_50
-
-    confidence = _clamp(balls_sample / 50.0 if balls_sample else 0.0, 0.3, 0.9) if balls_sample else 0.0
-    return {"points": max(0.0, points), "confidence": confidence}
-
-
-def _calculate_bowling_projection_points(bowling_stats: Dict[str, Any]) -> Dict[str, float]:
-    if not bowling_stats:
-        return {"points": 0.0, "confidence": 0.0}
-
-    balls_sample = float(bowling_stats.get("balls") or 0.0)
-    runs = float(bowling_stats.get("runs") or 0.0)
-    wickets = float(bowling_stats.get("wickets") or 0.0)
-    dot_pct = float(bowling_stats.get("dot_percentage") or 0.0)
-
-    if balls_sample <= 0:
-        return {"points": 0.0, "confidence": 0.0}
-
-    normalized_runs = runs * (24.0 / max(balls_sample, 1.0))
-    normalized_wickets = wickets * (24.0 / max(balls_sample, 1.0))
-    normalized_dots = (dot_pct / 100.0) * 24.0
-    normalized_economy = normalized_runs / 4.0
-
-    points = (normalized_dots * _DOT_BALL_POINT) + (normalized_wickets * _WICKET_POINT)
-
-    if normalized_economy < 5:
-        points += _ECONOMY_BELOW_5
-    elif 5 <= normalized_economy < 6:
-        points += _ECONOMY_5_TO_6
-    elif 6 <= normalized_economy <= 7:
-        points += _ECONOMY_6_TO_7
-    elif 10 <= normalized_economy < 11:
-        points += _ECONOMY_10_TO_11
-    elif 11 <= normalized_economy < 12:
-        points += _ECONOMY_11_TO_12
-    elif normalized_economy >= 12:
-        points += _ECONOMY_ABOVE_12
-
-    confidence = _clamp(balls_sample / 30.0, 0.3, 0.9)
-    return {"points": max(0.0, points), "confidence": confidence}
 
 
 def _build_normalized_match_points(matchup_data: Dict[str, Any], team_key: str) -> Dict[str, Dict[str, float]]:

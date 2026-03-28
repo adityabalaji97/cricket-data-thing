@@ -5,7 +5,6 @@ from fastapi import HTTPException
 from typing import List, Optional, Dict
 from datetime import date
 from models import teams_mapping
-from fantasy_points_v2 import FantasyPointsCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +89,114 @@ def _canonicalize_players(players: List[str], db) -> List[str]:
     canonicalized = [alias_lookup.get(player.lower(), player) for player in deduped_players]
     return _dedupe_player_names(canonicalized)
 
+# Fantasy point constants (shared with fantasy_planner)
+# Batting points
+_RUN_POINT = 1
+_BOUNDARY_BONUS = 4
+_SIX_BONUS = 6
+_RUNS_25_BONUS = 4
+_RUNS_50_BONUS = 8
+_SR_ABOVE_170 = 6
+_SR_150_TO_170 = 4
+_SR_130_TO_150 = 2
+_SR_60_TO_70 = -2
+_SR_50_TO_60 = -4
+_SR_BELOW_50 = -6
+
+# Bowling points
+_DOT_BALL_POINT = 1
+_WICKET_POINT = 25
+_ECONOMY_BELOW_5 = 6
+_ECONOMY_5_TO_6 = 4
+_ECONOMY_6_TO_7 = 2
+_ECONOMY_10_TO_11 = -2
+_ECONOMY_11_TO_12 = -4
+_ECONOMY_ABOVE_12 = -6
+
+
+def _clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
+def _calculate_batting_projection_points(overall_stats: Dict) -> Dict[str, float]:
+    """Per-match normalized batting projection points."""
+    if not overall_stats:
+        return {"points": 0.0, "confidence": 0.0}
+
+    runs = float(overall_stats.get("average") or overall_stats.get("runs") or 0.0)
+    balls_sample = float(overall_stats.get("balls") or 0.0)
+    strike_rate = float(overall_stats.get("strike_rate") or 0.0)
+    boundary_pct = float(overall_stats.get("boundary_percentage") or 0.0)
+
+    balls = runs * 100.0 / strike_rate if strike_rate > 0 else balls_sample
+    points = runs * _RUN_POINT
+
+    boundary_runs = runs * (boundary_pct / 100.0)
+    estimated_fours = boundary_runs * 0.7 / 4.0
+    estimated_sixes = boundary_runs * 0.3 / 6.0
+    points += estimated_fours * _BOUNDARY_BONUS
+    points += estimated_sixes * _SIX_BONUS
+
+    if runs >= 50:
+        points += _RUNS_50_BONUS
+    elif runs >= 25:
+        points += _RUNS_25_BONUS
+
+    if balls >= 10:
+        if strike_rate > 170:
+            points += _SR_ABOVE_170
+        elif 150 < strike_rate <= 170:
+            points += _SR_150_TO_170
+        elif 130 <= strike_rate <= 150:
+            points += _SR_130_TO_150
+        elif 60 <= strike_rate < 70:
+            points += _SR_60_TO_70
+        elif 50 <= strike_rate < 60:
+            points += _SR_50_TO_60
+        elif strike_rate < 50:
+            points += _SR_BELOW_50
+
+    confidence = _clamp(balls_sample / 50.0 if balls_sample else 0.0, 0.3, 0.9) if balls_sample else 0.0
+    return {"points": max(0.0, points), "confidence": confidence}
+
+
+def _calculate_bowling_projection_points(bowling_stats: Dict) -> Dict[str, float]:
+    """Per-match normalized bowling projection points (normalized to 24-ball spell)."""
+    if not bowling_stats:
+        return {"points": 0.0, "confidence": 0.0}
+
+    balls_sample = float(bowling_stats.get("balls") or 0.0)
+    runs = float(bowling_stats.get("runs") or 0.0)
+    wickets = float(bowling_stats.get("wickets") or 0.0)
+    dot_pct = float(bowling_stats.get("dot_percentage") or 0.0)
+
+    if balls_sample <= 0:
+        return {"points": 0.0, "confidence": 0.0}
+
+    normalized_runs = runs * (24.0 / max(balls_sample, 1.0))
+    normalized_wickets = wickets * (24.0 / max(balls_sample, 1.0))
+    normalized_dots = (dot_pct / 100.0) * 24.0
+    normalized_economy = normalized_runs / 4.0
+
+    points = (normalized_dots * _DOT_BALL_POINT) + (normalized_wickets * _WICKET_POINT)
+
+    if normalized_economy < 5:
+        points += _ECONOMY_BELOW_5
+    elif 5 <= normalized_economy < 6:
+        points += _ECONOMY_5_TO_6
+    elif 6 <= normalized_economy <= 7:
+        points += _ECONOMY_6_TO_7
+    elif 10 <= normalized_economy < 11:
+        points += _ECONOMY_10_TO_11
+    elif 11 <= normalized_economy < 12:
+        points += _ECONOMY_11_TO_12
+    elif normalized_economy >= 12:
+        points += _ECONOMY_ABOVE_12
+
+    confidence = _clamp(balls_sample / 30.0, 0.3, 0.9)
+    return {"points": max(0.0, points), "confidence": confidence}
+
+
 def add_bowling_consolidated_rows(team1_batting, team2_batting, team1_players, team2_players):
     """
     Add consolidated rows for bowlers showing their performance against the opposing batting lineup
@@ -160,123 +267,58 @@ def add_bowling_consolidated_rows(team1_batting, team2_batting, team1_players, t
 
 def calculate_fantasy_points_from_matchups(team1_batting, team2_batting, team1_bowling_consolidated, team2_bowling_consolidated, team1_players, team2_players):
     """
-    Calculate expected fantasy points for players based on their matchup data
-    
-    Args:
-        team1_batting (Dict): Team 1 batting matchups
-        team2_batting (Dict): Team 2 batting matchups
-        team1_bowling_consolidated (Dict): Team 1 bowling consolidated stats
-        team2_bowling_consolidated (Dict): Team 2 bowling consolidated stats
-        team1_players (List[str]): Team 1 player names
-        team2_players (List[str]): Team 2 player names
-    
-    Returns:
-        Dict: Fantasy points analysis for both teams
+    Calculate expected fantasy points using per-match normalized projections.
+    Uses the same projection model as fantasy_planner for consistent numbers.
     """
-    fantasy_calc = FantasyPointsCalculator()
-    
-    # Calculate batting fantasy points for team1
-    team1_batting_fantasy = {}
-    for batter in team1_players:
-        if batter in team1_batting and "Overall" in team1_batting[batter]:
-            overall_stats = team1_batting[batter]["Overall"]
-            fantasy_result = fantasy_calc.calculate_expected_batting_points_from_matchup(overall_stats)
-            team1_batting_fantasy[batter] = fantasy_result
-    
-    # Calculate batting fantasy points for team2
-    team2_batting_fantasy = {}
-    for batter in team2_players:
-        if batter in team2_batting and "Overall" in team2_batting[batter]:
-            overall_stats = team2_batting[batter]["Overall"]
-            fantasy_result = fantasy_calc.calculate_expected_batting_points_from_matchup(overall_stats)
-            team2_batting_fantasy[batter] = fantasy_result
-    
-    # Calculate bowling fantasy points for team1
-    team1_bowling_fantasy = {}
-    for bowler in team1_players:
-        if bowler in team1_bowling_consolidated:
-            bowling_stats = team1_bowling_consolidated[bowler]
-            fantasy_result = fantasy_calc.calculate_expected_bowling_points_from_matchup(bowling_stats)
-            team1_bowling_fantasy[bowler] = fantasy_result
-    
-    # Calculate bowling fantasy points for team2
-    team2_bowling_fantasy = {}
-    for bowler in team2_players:
-        if bowler in team2_bowling_consolidated:
-            bowling_stats = team2_bowling_consolidated[bowler]
-            fantasy_result = fantasy_calc.calculate_expected_bowling_points_from_matchup(bowling_stats)
-            team2_bowling_fantasy[bowler] = fantasy_result
-    
-    # Create fantasy recommendations
     all_fantasy_players = []
-    
-    # Add team1 batting fantasy points
-    for player, fantasy_data in team1_batting_fantasy.items():
-        all_fantasy_players.append({
-            "player_name": player,
-            "team": "team1",
-            "role": "batsman",
-            "expected_points": fantasy_data.get("expected_batting_points", 0),
-            "confidence": fantasy_data.get("confidence", 0),
-            "breakdown": fantasy_data.get("breakdown", {})
-        })
-    
-    # Add team1 bowling fantasy points
-    for player, fantasy_data in team1_bowling_fantasy.items():
-        existing_player = next((p for p in all_fantasy_players if p["player_name"] == player), None)
-        if existing_player:
-            # Player has both batting and bowling data - make them all-rounder
-            existing_player["role"] = "all-rounder"
-            existing_player["expected_points"] += fantasy_data.get("expected_bowling_points", 0)
-            existing_player["bowling_breakdown"] = fantasy_data.get("breakdown", {})
-        else:
-            all_fantasy_players.append({
-                "player_name": player,
-                "team": "team1",
-                "role": "bowler",
-                "expected_points": fantasy_data.get("expected_bowling_points", 0),
-                "confidence": fantasy_data.get("confidence", 0),
-                "breakdown": fantasy_data.get("breakdown", {})
-            })
-    
-    # Add team2 batting fantasy points
-    for player, fantasy_data in team2_batting_fantasy.items():
-        all_fantasy_players.append({
-            "player_name": player,
-            "team": "team2",
-            "role": "batsman",
-            "expected_points": fantasy_data.get("expected_batting_points", 0),
-            "confidence": fantasy_data.get("confidence", 0),
-            "breakdown": fantasy_data.get("breakdown", {})
-        })
-    
-    # Add team2 bowling fantasy points
-    for player, fantasy_data in team2_bowling_fantasy.items():
-        existing_player = next((p for p in all_fantasy_players if p["player_name"] == player), None)
-        if existing_player:
-            # Player has both batting and bowling data - make them all-rounder
-            existing_player["role"] = "all-rounder"
-            existing_player["expected_points"] += fantasy_data.get("expected_bowling_points", 0)
-            existing_player["bowling_breakdown"] = fantasy_data.get("breakdown", {})
-        else:
-            all_fantasy_players.append({
-                "player_name": player,
-                "team": "team2",
-                "role": "bowler",
-                "expected_points": fantasy_data.get("expected_bowling_points", 0),
-                "confidence": fantasy_data.get("confidence", 0),
-                "breakdown": fantasy_data.get("breakdown", {})
-            })
-    
-    # Sort by expected points descending
+
+    for team_label, batting, bowling_cons, players in [
+        ("team1", team1_batting, team1_bowling_consolidated, team1_players),
+        ("team2", team2_batting, team2_bowling_consolidated, team2_players),
+    ]:
+        player_map = {}
+
+        # Batting projections
+        for batter in players:
+            if batter in batting and "Overall" in batting[batter]:
+                overall_stats = batting[batter]["Overall"]
+                result = _calculate_batting_projection_points(overall_stats)
+                player_map[batter] = {
+                    "player_name": batter,
+                    "team": team_label,
+                    "role": "batsman",
+                    "expected_points": result["points"],
+                    "confidence": result["confidence"],
+                    "breakdown": {"batting": result["points"], "bowling": 0.0},
+                }
+
+        # Bowling projections
+        for bowler in players:
+            if bowler in bowling_cons:
+                result = _calculate_bowling_projection_points(bowling_cons[bowler])
+                if bowler in player_map:
+                    player_map[bowler]["role"] = "all-rounder"
+                    player_map[bowler]["expected_points"] += result["points"]
+                    player_map[bowler]["confidence"] = (
+                        player_map[bowler]["confidence"] + result["confidence"]
+                    ) / 2.0
+                    player_map[bowler]["breakdown"]["bowling"] = result["points"]
+                else:
+                    player_map[bowler] = {
+                        "player_name": bowler,
+                        "team": team_label,
+                        "role": "bowler",
+                        "expected_points": result["points"],
+                        "confidence": result["confidence"],
+                        "breakdown": {"batting": 0.0, "bowling": result["points"]},
+                    }
+
+        all_fantasy_players.extend(player_map.values())
+
     all_fantasy_players.sort(key=lambda x: x["expected_points"], reverse=True)
-    
+
     return {
-        "top_fantasy_picks": all_fantasy_players[:15],  # Top 15 picks
-        "team1_batting_fantasy": team1_batting_fantasy,
-        "team1_bowling_fantasy": team1_bowling_fantasy,
-        "team2_batting_fantasy": team2_batting_fantasy,
-        "team2_bowling_fantasy": team2_bowling_fantasy
+        "top_fantasy_picks": all_fantasy_players[:15],
     }
 
 def get_team_matchups_service(

@@ -848,6 +848,8 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
                     });
                 }
                 
+                params.append('use_current_roster', 'true');
+
                 // Get the matchups data
                 const matchupsResponse = await axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/${encodeURIComponent(team2)}/matchups?${params.toString()}`);
                 

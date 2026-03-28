@@ -16,6 +16,7 @@ def get_team_matchups(
     end_date: Optional[date] = None,
     team1_players: List[str] = Query(default=[]),
     team2_players: List[str] = Query(default=[]),
+    use_current_roster: bool = Query(default=False),
     db: Session = Depends(get_session)
 ):
     result = get_team_matchups_service(
@@ -25,6 +26,7 @@ def get_team_matchups(
         end_date=end_date,
         team1_players=team1_players,
         team2_players=team2_players,
-        db=db
+        db=db,
+        use_current_roster=use_current_roster,
     )
     return result
