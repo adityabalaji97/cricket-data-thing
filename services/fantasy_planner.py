@@ -57,6 +57,23 @@ def _load_player_prices() -> Dict[str, Dict]:
     return _PLAYER_PRICES
 
 
+def get_all_players() -> List[Dict[str, Any]]:
+    """Return all players from prices file for autocomplete."""
+    prices = _load_player_prices()
+    players = [
+        {
+            "name": p.get("name"),
+            "team": p.get("team"),
+            "role": ROLE_MAP.get(p.get("role", ""), "BAT"),
+            "credits": p.get("credits", 7.0),
+        }
+        for p in prices.values()
+        if p.get("name") and p.get("team")
+    ]
+    players.sort(key=lambda p: (p["name"], p["team"]))
+    return players
+
+
 def get_player_credit(name: str) -> float:
     """Get a player's fantasy credit value. Returns 7.0 as default."""
     prices = _load_player_prices()

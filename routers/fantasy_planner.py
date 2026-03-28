@@ -13,6 +13,7 @@ from database import get_session
 from services.fantasy_planner import (
     get_schedule_with_density,
     get_fantasy_recommendations,
+    get_all_players,
     get_player_outlook,
     get_transfer_plan,
 )
@@ -26,6 +27,16 @@ def schedule(
 ):
     """Full IPL 2026 schedule with per-team fixture density analysis."""
     return get_schedule_with_density(from_date=from_date)
+
+
+@router.get("/all-players")
+def all_players():
+    """All fantasy players from price data for squad autocomplete."""
+    players = get_all_players()
+    return {
+        "total": len(players),
+        "players": players,
+    }
 
 
 @router.get("/recommendations")

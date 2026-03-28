@@ -15,10 +15,9 @@ import {
     TableRow,
     TextField,
     IconButton,
-    useMediaQuery,
-    useTheme,
     Tabs,
     Tab,
+    Autocomplete,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
@@ -31,7 +30,7 @@ const TEAM_COLORS = {
 };
 
 // ─── Fixture Calendar (Panel 1) ────────────────────────────────────────────
-const FixtureCalendar = ({ fixtures, isMobile, squadTeams }) => {
+const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams }) => {
     if (!fixtures || fixtures.length === 0) return null;
 
     return (
@@ -40,11 +39,15 @@ const FixtureCalendar = ({ fixtures, isMobile, squadTeams }) => {
                 {fixtures.map((f) => {
                     const t1Count = (squadTeams || []).filter(t => t === f.team1).length;
                     const t2Count = (squadTeams || []).filter(t => t === f.team2).length;
+                    const detail = (matchDetails || []).find((d) => d.match_num === f.match_num);
+                    const topPicks = [...(detail?.player_points || [])]
+                        .sort((a, b) => (b.expected_points || 0) - (a.expected_points || 0))
+                        .slice(0, 5);
                     return (
                         <Card
                             key={f.match_num}
                             sx={{
-                                minWidth: isMobile ? 140 : 160,
+                                minWidth: isMobile ? 180 : 220,
                                 p: 1.5,
                                 border: '1px solid',
                                 borderColor: 'divider',
@@ -86,6 +89,23 @@ const FixtureCalendar = ({ fixtures, isMobile, squadTeams }) => {
                                     Your players: {t1Count + t2Count}
                                 </Typography>
                             )}
+                            {topPicks.length > 0 && (
+                                <Box sx={{ mt: 0.75 }}>
+                                    <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, fontSize: '0.65rem' }}>
+                                        Top picks
+                                    </Typography>
+                                    {topPicks.map((pick) => (
+                                        <Typography
+                                            key={`${f.match_num}-${pick.name}`}
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.3 }}
+                                        >
+                                            {pick.name} {pick.expected_points}
+                                        </Typography>
+                                    ))}
+                                </Box>
+                            )}
                         </Card>
                     );
                 })}
@@ -95,7 +115,8 @@ const FixtureCalendar = ({ fixtures, isMobile, squadTeams }) => {
 };
 
 // ─── Squad Builder (Panel 2) ───────────────────────────────────────────────
-const SquadBuilder = ({ squad, onRemovePlayer, onAutoPick, loading, transfersUsed, isMobile }) => {
+const SquadBuilder = ({ squad, onRemovePlayer, onAddPlayer, onAutoPick, loading, transfersUsed, isMobile, allAvailablePlayers }) => {
+    const [searchValue, setSearchValue] = useState(null);
     const roleGroups = useMemo(() => {
         const groups = { WK: [], BAT: [], AR: [], BOWL: [] };
         (squad || []).forEach((p) => {
@@ -105,6 +126,10 @@ const SquadBuilder = ({ squad, onRemovePlayer, onAutoPick, loading, transfersUse
         });
         return groups;
     }, [squad]);
+    const selectablePlayers = useMemo(() => {
+        const currentSquad = new Set((squad || []).map((p) => p.name));
+        return (allAvailablePlayers || []).filter((p) => !currentSquad.has(p.name));
+    }, [allAvailablePlayers, squad]);
 
     return (
         <Card sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
@@ -131,6 +156,29 @@ const SquadBuilder = ({ squad, onRemovePlayer, onAutoPick, loading, transfersUse
                     Budget: {(squad || []).reduce((sum, p) => sum + (p.credits || 0), 0).toFixed(1)}/100 cr
                 </Typography>
             </Box>
+
+            <Autocomplete
+                size="small"
+                value={searchValue}
+                onChange={(_, value) => {
+                    if (!value) return;
+                    onAddPlayer(value);
+                    setSearchValue(null);
+                }}
+                options={selectablePlayers}
+                disabled={(squad || []).length >= 11}
+                getOptionLabel={(option) => `${option.name} (${option.team}) - ${option.credits} cr`}
+                isOptionEqualToValue={(option, value) => option.name === value.name}
+                noOptionsText={(squad || []).length >= 11 ? 'Squad is full' : 'No players found'}
+                renderInput={(params) => (
+                    <TextField
+                        {...params}
+                        label="Add player"
+                        placeholder="Type player name"
+                    />
+                )}
+                sx={{ mb: 1.5 }}
+            />
 
             {Object.entries(roleGroups).map(([role, players]) => (
                 <Box key={role} sx={{ mb: 1.5 }}>
@@ -182,7 +230,7 @@ const SquadBuilder = ({ squad, onRemovePlayer, onAutoPick, loading, transfersUse
 
             {(!squad || squad.length === 0) && (
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-                    Click "Auto-pick" to generate a recommended squad
+                    Use search to add your real squad, or click "Auto-pick"
                 </Typography>
             )}
         </Card>
@@ -338,17 +386,11 @@ const FantasyPlanner = ({ isMobile }) => {
     const [error, setError] = useState(null);
     const [schedule, setSchedule] = useState(null);
     const [recommendations, setRecommendations] = useState(null);
+    const [allAvailablePlayers, setAllAvailablePlayers] = useState([]);
     const [squad, setSquad] = useState([]);
     const [transferPlan, setTransferPlan] = useState(null);
     const [matchesAhead, setMatchesAhead] = useState(3);
     const [tab, setTab] = useState(0);
-
-    // Load schedule on mount
-    useEffect(() => {
-        axios.get(`${config.API_URL}/fantasy-planner/schedule`)
-            .then((res) => setSchedule(res.data))
-            .catch((err) => console.error('Schedule fetch error:', err));
-    }, []);
 
     const upcomingFixtures = useMemo(() => {
         if (!schedule?.fixtures) return [];
@@ -358,27 +400,82 @@ const FantasyPlanner = ({ isMobile }) => {
 
     const squadTeams = useMemo(() => (squad || []).map(p => p.team), [squad]);
 
+    const fetchRecommendations = useCallback(async ({ currentNames, applyToSquad = false, existingSquad = [] } = {}) => {
+        const params = {
+            matches_ahead: matchesAhead,
+        };
+        if (currentNames) {
+            params.current_team = currentNames;
+        }
+        const res = await axios.get(`${config.API_URL}/fantasy-planner/recommendations`, { params });
+        setRecommendations(res.data);
+
+        if (applyToSquad && res.data.recommended_squad) {
+            if (!existingSquad.length) {
+                setSquad(res.data.recommended_squad);
+            } else {
+                const existingNames = new Set(existingSquad.map((p) => p.name));
+                const fillerPlayers = res.data.recommended_squad.filter((p) => !existingNames.has(p.name));
+                setSquad([...existingSquad, ...fillerPlayers].slice(0, 11));
+            }
+        }
+    }, [matchesAhead]);
+
+    const handleFetchRankings = useCallback(async () => {
+        setError(null);
+        try {
+            await fetchRecommendations();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Failed to fetch recommendations');
+        }
+    }, [fetchRecommendations]);
+
     const handleAutoPick = useCallback(async () => {
+        const existingSquad = [...squad];
+        const currentNames = existingSquad.map((p) => p.name).join(',') || undefined;
         setLoading(true);
         setError(null);
         try {
-            const currentNames = squad.map(p => p.name).join(',') || undefined;
-            const res = await axios.get(`${config.API_URL}/fantasy-planner/recommendations`, {
-                params: {
-                    matches_ahead: matchesAhead,
-                    current_team: currentNames,
-                },
+            await fetchRecommendations({
+                currentNames,
+                applyToSquad: true,
+                existingSquad,
             });
-            setRecommendations(res.data);
-            if (res.data.recommended_squad) {
-                setSquad(res.data.recommended_squad);
-            }
         } catch (err) {
             setError(err.response?.data?.detail || 'Failed to fetch recommendations');
         } finally {
             setLoading(false);
         }
-    }, [matchesAhead, squad]);
+    }, [fetchRecommendations, squad]);
+
+    // Load schedule + player list on mount.
+    useEffect(() => {
+        let cancelled = false;
+        const loadInitialData = async () => {
+            try {
+                const [scheduleRes, playersRes] = await Promise.all([
+                    axios.get(`${config.API_URL}/fantasy-planner/schedule`),
+                    axios.get(`${config.API_URL}/fantasy-planner/all-players`),
+                ]);
+                if (cancelled) return;
+                setSchedule(scheduleRes.data);
+                setAllAvailablePlayers(playersRes.data?.players || []);
+            } catch (err) {
+                if (cancelled) return;
+                setError('Failed to load fantasy planner data');
+                console.error('Initial fantasy planner fetch error:', err);
+            }
+        };
+        loadInitialData();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    // Fetch rankings/match picks automatically (initial load + matchesAhead changes).
+    useEffect(() => {
+        handleFetchRankings();
+    }, [handleFetchRankings]);
 
     const handleFetchTransferPlan = useCallback(async () => {
         if (!squad.length) return;
@@ -401,17 +498,20 @@ const FantasyPlanner = ({ isMobile }) => {
     }, []);
 
     const handleAddPlayer = useCallback((player) => {
-        if (squad.length >= 11) return;
-        if (squad.some(p => p.name === player.name)) return;
-        setSquad(prev => [...prev, {
-            name: player.name,
-            team: player.team,
-            role: player.role,
-            total_expected_points: player.total_expected_points,
-            match_count: player.match_count,
-            matches: [],
-        }]);
-    }, [squad]);
+        setSquad((prev) => {
+            if (prev.length >= 11) return prev;
+            if (prev.some((p) => p.name === player.name)) return prev;
+            return [...prev, {
+                name: player.name,
+                team: player.team,
+                role: player.role || 'BAT',
+                credits: player.credits || 0,
+                total_expected_points: player.total_expected_points || 0,
+                match_count: player.match_count || 0,
+                matches: player.matches || [],
+            }];
+        });
+    }, []);
 
     return (
         <Box sx={{ py: 2, px: { xs: 1, sm: 2 } }}>
@@ -442,6 +542,7 @@ const FantasyPlanner = ({ isMobile }) => {
                 </Box>
                 <FixtureCalendar
                     fixtures={upcomingFixtures}
+                    matchDetails={recommendations?.match_details || []}
                     isMobile={isMobile}
                     squadTeams={squadTeams}
                 />
@@ -458,10 +559,12 @@ const FantasyPlanner = ({ isMobile }) => {
                 <SquadBuilder
                     squad={squad}
                     onRemovePlayer={handleRemovePlayer}
+                    onAddPlayer={handleAddPlayer}
                     onAutoPick={handleAutoPick}
                     loading={loading}
                     transfersUsed={recommendations?.transfers_needed || 0}
                     isMobile={isMobile}
+                    allAvailablePlayers={allAvailablePlayers}
                 />
             )}
 
