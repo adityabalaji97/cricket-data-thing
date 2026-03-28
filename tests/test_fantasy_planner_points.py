@@ -177,3 +177,146 @@ def test_ipl_roster_lookup_uses_match_data_then_static_fallback(monkeypatch):
     assert result["lineup_sources"]["CSK"] == "pre_season"
     csk_names = {p["name"] for p in result["match_details"][0]["player_points"] if p["team"] == "CSK"}
     assert "CSK Static" in csk_names
+
+
+def test_recommendations_resolve_points_from_display_name(monkeypatch):
+    fantasy_planner._MATCHUP_CACHE.clear()
+    monkeypatch.setattr(
+        fantasy_planner,
+        "_get_upcoming_fixtures",
+        lambda matches_ahead, from_date: [_fixture(1, "RCB", "RR")],
+    )
+    monkeypatch.setattr(fantasy_planner, "get_player_credit", lambda _: 8.5)
+    monkeypatch.setattr(fantasy_planner, "is_overseas", lambda _: False)
+
+    def fake_team_players(team_abbrev: str, db, lookback_days: int = 30):
+        if team_abbrev == "RCB":
+            return {
+                "players": [{"name": "D Padikkal", "display_name": "Devdutt Padikkal", "role": "batter"}],
+                "source": "match_data",
+            }
+        return {
+            "players": [{"name": "R Parag", "display_name": "Riyan Parag", "role": "all-rounder"}],
+            "source": "match_data",
+        }
+
+    monkeypatch.setattr(fantasy_planner, "_get_team_players_for_projection", fake_team_players)
+
+    def fake_matchups(team1, team2, start_date, end_date, team1_players, team2_players, db):
+        return _build_matchup_payload(
+            team1,
+            team2,
+            ["Devdutt Padikkal"],
+            ["Riyan Parag"],
+        )
+
+    monkeypatch.setattr(fantasy_planner, "get_team_matchups_service", fake_matchups)
+
+    result = fantasy_planner.get_fantasy_recommendations(
+        db=object(),
+        matches_ahead=1,
+        from_date="2099-01-01",
+    )
+
+    padikkal_row = next(
+        row for row in result["match_details"][0]["player_points"]
+        if row["name"] == "D Padikkal"
+    )
+    assert padikkal_row["expected_points"] > 0
+    assert padikkal_row["expected_points_raw"] > 0
+
+
+def test_recommendations_fallback_to_unique_last_name_when_direct_lookup_misses(monkeypatch):
+    fantasy_planner._MATCHUP_CACHE.clear()
+    monkeypatch.setattr(
+        fantasy_planner,
+        "_get_upcoming_fixtures",
+        lambda matches_ahead, from_date: [_fixture(1, "RCB", "RR")],
+    )
+    monkeypatch.setattr(fantasy_planner, "get_player_credit", lambda _: 8.5)
+    monkeypatch.setattr(fantasy_planner, "is_overseas", lambda _: False)
+
+    def fake_team_players(team_abbrev: str, db, lookback_days: int = 30):
+        if team_abbrev == "RCB":
+            return {
+                "players": [{"name": "R Patidar", "display_name": "Rajat Patidar", "role": "batter"}],
+                "source": "match_data",
+            }
+        return {
+            "players": [{"name": "R Parag", "display_name": "Riyan Parag", "role": "all-rounder"}],
+            "source": "match_data",
+        }
+
+    monkeypatch.setattr(fantasy_planner, "_get_team_players_for_projection", fake_team_players)
+
+    def fake_matchups(team1, team2, start_date, end_date, team1_players, team2_players, db):
+        return _build_matchup_payload(
+            team1,
+            team2,
+            ["Rajat M Patidar"],
+            ["Riyan Parag"],
+        )
+
+    monkeypatch.setattr(fantasy_planner, "get_team_matchups_service", fake_matchups)
+
+    result = fantasy_planner.get_fantasy_recommendations(
+        db=object(),
+        matches_ahead=1,
+        from_date="2099-01-01",
+    )
+
+    patidar_row = next(
+        row for row in result["match_details"][0]["player_points"]
+        if row["name"] == "R Patidar"
+    )
+    assert patidar_row["expected_points"] > 0
+    assert patidar_row["expected_points_raw"] > 0
+
+
+def test_player_outlook_uses_display_name_to_resolve_matchup_points(monkeypatch):
+    fantasy_planner._MATCHUP_CACHE.clear()
+    monkeypatch.setattr(
+        fantasy_planner,
+        "IPL_2026_ROSTERS",
+        {
+            "RCB": {"players": [{"name": "D Padikkal", "role": "batter"}]},
+            "RR": {"players": [{"name": "Riyan Parag", "role": "all-rounder"}]},
+        },
+    )
+    monkeypatch.setattr(
+        fantasy_planner,
+        "_load_schedule",
+        lambda: [_fixture(1, "RCB", "RR")],
+    )
+
+    def fake_team_players(team_abbrev: str, db, lookback_days: int = 30):
+        if team_abbrev == "RCB":
+            return {
+                "players": [{"name": "D Padikkal", "display_name": "Devdutt Padikkal", "role": "batter"}],
+                "source": "match_data",
+            }
+        return {
+            "players": [{"name": "R Parag", "display_name": "Riyan Parag", "role": "all-rounder"}],
+            "source": "match_data",
+        }
+
+    monkeypatch.setattr(fantasy_planner, "_get_team_players_for_projection", fake_team_players)
+
+    def fake_matchups(team1, team2, start_date, end_date, team1_players, team2_players, db):
+        return _build_matchup_payload(
+            team1,
+            team2,
+            ["Devdutt Padikkal"],
+            ["Riyan Parag"],
+        )
+
+    monkeypatch.setattr(fantasy_planner, "get_team_matchups_service", fake_matchups)
+
+    result = fantasy_planner.get_player_outlook(
+        db=object(),
+        player_name="D Padikkal",
+        from_date="2099-01-01",
+    )
+
+    assert "error" not in result
+    assert result["upcoming_fixtures"][0]["expected_points"] > 0

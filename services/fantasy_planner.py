@@ -241,6 +241,63 @@ def _build_normalized_match_points(matchup_data: Dict[str, Any], team_key: str) 
     return projections
 
 
+def _last_name_key(name: Optional[str]) -> Optional[str]:
+    if not name:
+        return None
+    parts = [part for part in str(name).replace(".", " ").split() if part]
+    if not parts:
+        return None
+    return parts[-1].lower()
+
+
+def _build_last_name_lookup(names: List[str]) -> Dict[str, str]:
+    grouped: Dict[str, Dict[str, str]] = {}
+    for name in names:
+        key = _last_name_key(name)
+        if not key:
+            continue
+        normalized = name.strip()
+        if not normalized:
+            continue
+        grouped.setdefault(key, {})
+        grouped[key].setdefault(normalized.lower(), normalized)
+    return {
+        key: next(iter(value_map.values()))
+        for key, value_map in grouped.items()
+        if len(value_map) == 1
+    }
+
+
+def _zero_projection() -> Dict[str, float]:
+    return {
+        "expected_points": 0.0,
+        "confidence": 0.0,
+        "expected_points_raw": 0.0,
+    }
+
+
+def _resolve_player_projection(
+    points_map: Dict[str, Dict[str, float]],
+    name: str,
+    display_name: Optional[str] = None,
+    canonical_last_name_lookup: Optional[Dict[str, str]] = None,
+) -> Dict[str, float]:
+    for candidate_name in (display_name, name):
+        if candidate_name and candidate_name in points_map:
+            return points_map[candidate_name]
+
+    if canonical_last_name_lookup:
+        for candidate_name in (display_name, name):
+            candidate_last_name = _last_name_key(candidate_name)
+            if not candidate_last_name:
+                continue
+            canonical_name = canonical_last_name_lookup.get(candidate_last_name)
+            if canonical_name and canonical_name in points_map:
+                return points_map[canonical_name]
+
+    return _zero_projection()
+
+
 def get_player_credit(name: str) -> float:
     """Get a player's fantasy credit value. Returns 7.0 as default."""
     prices = _load_player_prices()
@@ -434,19 +491,23 @@ def get_fantasy_recommendations(
 
         team1_points = _build_normalized_match_points(matchup_data, "team1")
         team2_points = _build_normalized_match_points(matchup_data, "team2")
+        team1_last_name_lookup = _build_last_name_lookup(list(team1_points.keys()))
+        team2_last_name_lookup = _build_last_name_lookup(list(team2_points.keys()))
 
         # Process all players from both rosters
-        for team_abbrev, roster, team_key, points_map in [
-            (t1, t1_roster, "team1", team1_points),
-            (t2, t2_roster, "team2", team2_points),
+        for team_abbrev, roster, points_map, canonical_last_name_lookup in [
+            (t1, t1_roster, team1_points, team1_last_name_lookup),
+            (t2, t2_roster, team2_points, team2_last_name_lookup),
         ]:
             for player in roster:
                 name = player["name"]
                 display_name = player.get("display_name", name)
                 roster_role = player.get("role", "batter")
-                projection = points_map.get(
-                    name,
-                    {"expected_points": 0.0, "confidence": 0.0, "expected_points_raw": 0.0},
+                projection = _resolve_player_projection(
+                    points_map=points_map,
+                    name=name,
+                    display_name=display_name,
+                    canonical_last_name_lookup=canonical_last_name_lookup,
                 )
                 expected = float(projection.get("expected_points", 0.0) or 0.0)
                 expected_raw = float(projection.get("expected_points_raw", 0.0) or 0.0)
@@ -722,6 +783,13 @@ def get_player_outlook(
 
         if opp_roster and own_roster:
             try:
+                player_display_name = player_name
+                for p in own_roster:
+                    roster_name = (p.get("name") or "").strip().lower()
+                    roster_display_name = (p.get("display_name") or "").strip().lower()
+                    if player_name.lower() in {roster_name, roster_display_name}:
+                        player_display_name = p.get("display_name") or p.get("name") or player_name
+                        break
                 matchup_data = get_team_matchups_service(
                     team1=player_team,
                     team2=opponent,
@@ -735,7 +803,13 @@ def get_player_outlook(
                 if ((matchup_data or {}).get("team1") or {}).get("name") != player_team:
                     team_key = "team2"
                 normalized_points = _build_normalized_match_points(matchup_data, team_key)
-                expected_points = normalized_points.get(player_name, {}).get("expected_points", 0.0)
+                projection = _resolve_player_projection(
+                    points_map=normalized_points,
+                    name=player_name,
+                    display_name=player_display_name,
+                    canonical_last_name_lookup=_build_last_name_lookup(list(normalized_points.keys())),
+                )
+                expected_points = projection.get("expected_points", 0.0)
             except Exception:
                 pass
 
