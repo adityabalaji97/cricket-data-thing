@@ -298,23 +298,37 @@ def _resolve_player_projection(
     return _zero_projection()
 
 
+def _resolve_player_price_by_last_name(name: str) -> Optional[Dict[str, Any]]:
+    """Try to find a player price entry by last-name token, only if unique."""
+    prices = _load_player_prices()
+    last = _last_name_key(name)
+    if not last:
+        return None
+    matches = [p for p in prices.values() if _last_name_key(p.get("name")) == last]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
 def get_player_credit(name: str) -> float:
     """Get a player's fantasy credit value. Returns 7.0 as default."""
-    prices = _load_player_prices()
-    entry = prices.get(name.lower())
+    entry = _resolve_player_price_entry(name)
     if entry:
         return entry["credits"]
-    # Check fantasy_name variant
-    for p in prices.values():
-        if p.get("name_fantasy", "").lower() == name.lower():
-            return p["credits"]
+    # Last-name fallback
+    entry = _resolve_player_price_by_last_name(name)
+    if entry:
+        return entry["credits"]
     return 7.0  # default for unknown players
 
 
 def is_overseas(name: str) -> bool:
     """Check if a player is overseas using price data."""
-    prices = _load_player_prices()
-    entry = prices.get(name.lower())
+    entry = _resolve_player_price_entry(name)
+    if entry:
+        return entry.get("is_overseas", False)
+    # Last-name fallback
+    entry = _resolve_player_price_by_last_name(name)
     if entry:
         return entry.get("is_overseas", False)
     return False
@@ -558,16 +572,30 @@ def get_fantasy_recommendations(
         reverse=True,
     )
 
+    # Collect top picks per match as the candidate pool
+    top_pick_names: set = set()
+    for md in match_details:
+        sorted_pp = sorted(md["player_points"], key=lambda p: p["expected_points"], reverse=True)
+        for p in sorted_pp[:15]:  # top 15 per match to give optimizer enough room
+            if p["expected_points"] > 0:
+                top_pick_names.add(p["name"])
+
+    # Filter all_players to only top picks
+    candidate_players = [p for p in all_players if p["name"] in top_pick_names]
+    # Fall back to all_players if not enough candidates for a valid squad
+    if len(candidate_players) < 11:
+        candidate_players = all_players
+
     # Build recommended squad using greedy selection with constraints
     # If user has a current team, lock those players and fill remaining slots
     locked_players = None
     if current_team:
         current_set_lower = {n.strip().lower() for n in current_team}
         locked_players = [
-            p for p in all_players if p["name"].lower() in current_set_lower
+            p for p in candidate_players if p["name"].lower() in current_set_lower
         ]
 
-    recommended = _build_optimal_squad(all_players, locked_players=locked_players, matches_ahead=len(upcoming))
+    recommended = _build_optimal_squad(candidate_players, locked_players=locked_players, matches_ahead=len(upcoming))
 
     # Calculate transfers needed
     transfers_needed = 0

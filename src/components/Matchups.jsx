@@ -15,18 +15,12 @@ import {
     TableRow,
     Tooltip,
     Chip,
-    Grid,
-    Paper,
-    LinearProgress,
-    Divider,
-    Badge
 } from '@mui/material';
 
 import {
     Info as InfoIcon,
     Activity,
     Trophy,
-    Star
 } from 'lucide-react';
 
 
@@ -145,6 +139,7 @@ const MetricCell = ({ data, isMobile, bowler, isBowlingConsolidated = false }) =
 
 const FantasyAnalysisCard = ({ fantasyData, isMobile }) => {
     if (!fantasyData || !fantasyData.top_fantasy_picks) return null;
+
     const getRoleColor = (role) => {
         switch (role?.toLowerCase()) {
             case 'batting': return 'success';
@@ -161,6 +156,8 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile }) => {
         return 'error.main';
     };
 
+    const topPicks = fantasyData.top_fantasy_picks.slice(0, 5);
+
     return (
         <Card sx={{
             p: 2,
@@ -168,91 +165,42 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile }) => {
             backgroundColor: isMobile ? 'transparent' : undefined,
             boxShadow: isMobile ? 0 : undefined
         }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
                 <Trophy size={20} />
                 <Typography variant={isMobile ? "subtitle1" : "h6"}>
                     Fantasy Analysis - Top Picks
                 </Typography>
             </Box>
-            
-            <Grid container spacing={2}>
-                {fantasyData.top_fantasy_picks.slice(0, isMobile ? 6 : 10).map((player, index) => (
-                    <Grid item xs={12} sm={6} md={4} key={player.player_name}>
-                        <Paper 
-                            sx={{ 
-                                p: 2, 
-                                height: '100%',
-                                background: index < 3 ? `linear-gradient(135deg, ${
-                                    index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : '#CD7F32'
-                                }20, transparent)` : 'inherit'
-                            }}
-                        >
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                                <Typography variant="h6" sx={{ fontSize: isMobile ? '1rem' : '1.1rem' }}>
-                                    {index < 3 && <Star size={16} style={{ marginRight: 4 }} />}
-                                    #{index + 1}
-                                </Typography>
-                                <Chip 
-                                    label={player.role || 'Fielding'} 
-                                    size="small" 
-                                    color={getRoleColor(player.role)}
-                                />
-                            </Box>
-                            
-                            <Typography variant="subtitle1" fontWeight="bold" noWrap>
-                                {player.player_name}
-                            </Typography>
-                            
-                            <Box sx={{ my: 1 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Expected Points
-                                    </Typography>
-                                    <Typography variant="h6" color="primary">
-                                        {player.expected_points?.toFixed(1) || '0.0'}
-                                    </Typography>
-                                </Box>
-                                
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Confidence
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <LinearProgress 
-                                            variant="determinate" 
-                                            value={(player.confidence || 0) * 100} 
-                                            sx={{ 
-                                                width: 40, 
-                                                height: 6,
-                                                backgroundColor: 'grey.300',
-                                                '& .MuiLinearProgress-bar': {
-                                                    backgroundColor: getConfidenceColor(player.confidence || 0)
-                                                }
-                                            }}
-                                        />
-                                        <Typography 
-                                            variant="caption" 
-                                            sx={{ color: getConfidenceColor(player.confidence || 0) }}
-                                        >
-                                            {((player.confidence || 0) * 100).toFixed(0)}%
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            </Box>
-                            
-                            {player.breakdown && (
-                                <Box sx={{ mt: 1 }}>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Bat: {player.breakdown.batting?.toFixed(1) || '0.0'} | 
-                                        Bowl: {player.breakdown.bowling?.toFixed(1) || '0.0'} | 
-                                        Field: {player.breakdown.fielding?.toFixed(1) || '0.0'}
-                                    </Typography>
-                                </Box>
-                            )}
-                        </Paper>
-                    </Grid>
-                ))}
-            </Grid>
+            <TableContainer>
+                <Table size="small">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell sx={{ fontWeight: 'bold', py: 1 }}>#</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', py: 1 }}>Player</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', py: 1 }}>Role</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>Pts</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>Confidence</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {topPicks.map((player, index) => (
+                            <TableRow key={player.player_name}>
+                                <TableCell sx={{ py: 0.75 }}>{index + 1}</TableCell>
+                                <TableCell sx={{ py: 0.75, fontWeight: 'bold' }}>{player.player_name}</TableCell>
+                                <TableCell sx={{ py: 0.75 }}>
+                                    <Chip label={player.role || 'Fielding'} size="small" color={getRoleColor(player.role)} />
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 0.75, color: 'primary.main', fontWeight: 'bold' }}>
+                                    {player.expected_points?.toFixed(1) || '0.0'}
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 0.75, color: getConfidenceColor(player.confidence || 0) }}>
+                                    {((player.confidence || 0) * 100).toFixed(0)}%
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
         </Card>
     );
 };
