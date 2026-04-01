@@ -2,7 +2,7 @@ name: Refresh delivery details
 
 on:
   schedule:
-    - cron: "0 3 * * *"  # Daily, 3am UTC
+    - cron: "30 23 * * *"  # Daily, 5am IST (11:30pm UTC)
   workflow_dispatch:
 
 jobs:

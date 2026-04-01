@@ -156,8 +156,6 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile }) => {
         return 'error.main';
     };
 
-    const topPicks = fantasyData.top_fantasy_picks.slice(0, 5);
-
     return (
         <Card sx={{
             p: 2,
@@ -171,8 +169,8 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile }) => {
                     Fantasy Analysis - Top Picks
                 </Typography>
             </Box>
-            <TableContainer>
-                <Table size="small">
+            <TableContainer sx={{ maxHeight: 220, overflowY: 'auto' }}>
+                <Table size="small" stickyHeader>
                     <TableHead>
                         <TableRow>
                             <TableCell sx={{ fontWeight: 'bold', py: 1 }}>#</TableCell>
@@ -183,7 +181,7 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile }) => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {topPicks.map((player, index) => (
+                        {fantasyData.top_fantasy_picks.map((player, index) => (
                             <TableRow key={player.player_name}>
                                 <TableCell sx={{ py: 0.75 }}>{index + 1}</TableCell>
                                 <TableCell sx={{ py: 0.75, fontWeight: 'bold' }}>{player.player_name}</TableCell>

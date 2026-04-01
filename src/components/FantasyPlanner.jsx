@@ -58,8 +58,7 @@ const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recomme
                 const detail = (matchDetails || []).find((d) => d.match_num === f.match_num);
                 const topPicks = [...(detail?.player_points || [])]
                     .sort((a, b) => (b.expected_points || 0) - (a.expected_points || 0))
-                    .filter((p) => (p.expected_points || 0) > 0)
-                    .slice(0, 5);
+                    .filter((p) => (p.expected_points || 0) > 0);
                 return (
                     <Card
                         key={f.match_num}
@@ -117,8 +116,9 @@ const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recomme
                         {topPicks.length > 0 && (
                             <Box sx={{ mt: 1 }}>
                                 <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, fontSize: '0.7rem', mb: 0.25 }}>
-                                    Top 5 Picks
+                                    Top Picks
                                 </Typography>
+                                <Box sx={{ maxHeight: 100, overflowY: 'auto' }}>
                                 {topPicks.map((pick, idx) => (
                                     <Typography
                                         key={`${f.match_num}-${pick.name}`}
@@ -129,6 +129,7 @@ const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recomme
                                         {idx + 1}. {pick.name} ({pick.team}) &mdash; {Number(pick.expected_points || 0).toFixed(1)} pts
                                     </Typography>
                                 ))}
+                                </Box>
                             </Box>
                         )}
                         {topPicks.length === 0 && (
