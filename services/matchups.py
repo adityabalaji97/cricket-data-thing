@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from typing import List, Optional, Dict
 from datetime import date
 from models import teams_mapping
+from services.delivery_data_service import should_use_delivery_details
 
 logger = logging.getLogger(__name__)
 
@@ -332,6 +333,15 @@ def get_team_matchups_service(
     use_current_roster: bool = False,
 ):
     try:
+        table_routing = should_use_delivery_details(start_date, end_date)
+        use_deliveries = bool(table_routing.get("use_deliveries"))
+        use_delivery_details = bool(table_routing.get("use_delivery_details"))
+
+        deliveries_range = table_routing.get("deliveries_date_range") or (None, None)
+        delivery_details_range = table_routing.get("delivery_details_date_range") or (None, None)
+        deliveries_start_date, deliveries_end_date = deliveries_range
+        details_start_date, details_end_date = delivery_details_range
+
         use_custom_teams = len(team1_players) > 0 and len(team2_players) > 0
         team1_lineup_source = "custom" if use_custom_teams else "recent_10"
         team2_lineup_source = "custom" if use_custom_teams else "recent_10"
@@ -502,12 +512,14 @@ def get_team_matchups_service(
                 LEFT JOIN alias_map bat_alias ON LOWER(d.batter) = bat_alias.name_key
                 LEFT JOIN alias_map bowl_alias ON LOWER(d.bowler) = bowl_alias.name_key
                 WHERE
+                    :use_deliveries = true
+                    AND
                     ((COALESCE(bat_alias.canonical_name, d.batter) = ANY(:team1_players)
                       AND COALESCE(bowl_alias.canonical_name, d.bowler) = ANY(:team2_players))
                      OR (COALESCE(bat_alias.canonical_name, d.batter) = ANY(:team2_players)
                       AND COALESCE(bowl_alias.canonical_name, d.bowler) = ANY(:team1_players)))
-                    AND (:start_date IS NULL OR m.date >= :start_date)
-                    AND (:end_date IS NULL OR m.date <= :end_date)
+                    AND (:deliveries_start_date IS NULL OR m.date >= :deliveries_start_date)
+                    AND (:deliveries_end_date IS NULL OR m.date <= :deliveries_end_date)
                 GROUP BY COALESCE(bat_alias.canonical_name, d.batter), COALESCE(bowl_alias.canonical_name, d.bowler)
 
                 UNION ALL
@@ -524,12 +536,14 @@ def get_team_matchups_service(
                 LEFT JOIN alias_map bat_alias ON LOWER(dd.bat) = bat_alias.name_key
                 LEFT JOIN alias_map bowl_alias ON LOWER(dd.bowl) = bowl_alias.name_key
                 WHERE
+                    :use_delivery_details = true
+                    AND
                     ((COALESCE(bat_alias.canonical_name, dd.bat) = ANY(:team1_players)
                       AND COALESCE(bowl_alias.canonical_name, dd.bowl) = ANY(:team2_players))
                      OR (COALESCE(bat_alias.canonical_name, dd.bat) = ANY(:team2_players)
                       AND COALESCE(bowl_alias.canonical_name, dd.bowl) = ANY(:team1_players)))
-                    AND (:start_date IS NULL OR dd.match_date::date >= :start_date)
-                    AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+                    AND (:details_start_date IS NULL OR dd.match_date::date >= :details_start_date)
+                    AND (:details_end_date IS NULL OR dd.match_date::date <= :details_end_date)
                 GROUP BY COALESCE(bat_alias.canonical_name, dd.bat), COALESCE(bowl_alias.canonical_name, dd.bowl)
             ),
             player_stats AS (
@@ -578,8 +592,12 @@ def get_team_matchups_service(
         matchups = db.execute(matchup_query, {
             "team1_players": team1_players,
             "team2_players": team2_players,
-            "start_date": start_date,
-            "end_date": end_date
+            "use_deliveries": use_deliveries,
+            "use_delivery_details": use_delivery_details,
+            "deliveries_start_date": deliveries_start_date,
+            "deliveries_end_date": deliveries_end_date,
+            "details_start_date": details_start_date,
+            "details_end_date": details_end_date,
         }).fetchall()
 
         team1_batting = {}
