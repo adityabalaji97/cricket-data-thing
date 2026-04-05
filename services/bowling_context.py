@@ -68,7 +68,11 @@ def _fetch_bowler_rows_dd(
             dd.bowl AS bowler,
             COALESCE(dd.score, 0) AS total_runs,
             COALESCE(dd.batruns, 0) AS bat_runs,
-            CASE WHEN dd.out THEN 1 ELSE 0 END AS wicket,
+            CASE
+                WHEN LOWER(COALESCE(dd.out::text, '')) IN ('true', 't', '1', 'yes')
+                THEN 1
+                ELSE 0
+            END AS wicket,
             COALESCE(dd.wide, 0) AS wide,
             COALESCE(dd.noball, 0) AS noball,
             dd.inns_runs,
@@ -101,7 +105,13 @@ def _fetch_over_stats_dd(
             dd.over AS over_num,
             MIN(dd.bowl) AS bowler,
             SUM(COALESCE(dd.score, 0)) AS runs,
-            SUM(CASE WHEN dd.out THEN 1 ELSE 0 END) AS wickets,
+            SUM(
+                CASE
+                    WHEN LOWER(COALESCE(dd.out::text, '')) IN ('true', 't', '1', 'yes')
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS wickets,
             SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) AS legal_balls
         FROM delivery_details dd
         WHERE dd.p_match = ANY(:match_ids)
@@ -572,7 +582,11 @@ def _fetch_first_ball_agg_dd(
                 dd.{role_col} AS player,
                 COALESCE(dd.batruns, 0) AS bat_runs,
                 COALESCE(dd.score, 0) AS total_runs,
-                CASE WHEN dd.out THEN 1 ELSE 0 END AS wicket,
+                CASE
+                    WHEN LOWER(COALESCE(dd.out::text, '')) IN ('true', 't', '1', 'yes')
+                    THEN 1
+                    ELSE 0
+                END AS wicket,
                 ROW_NUMBER() OVER (PARTITION BY dd.p_match, dd.inns, dd.over ORDER BY dd.ball) AS rn
             FROM delivery_details dd
             WHERE 1=1
