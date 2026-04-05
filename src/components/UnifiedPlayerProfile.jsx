@@ -21,6 +21,7 @@ import DismissalSection from './playerProfile/sections/DismissalSection';
 import VisualizationsSection from './playerProfile/sections/VisualizationsSection';
 import ExploreSection from './playerProfile/sections/ExploreSection';
 import RecentFormStrip from './playerProfile/RecentFormStrip';
+import AdvancedBowlingAnalyticsSection from './playerProfile/AdvancedBowlingAnalyticsSection';
 import usePlayerData from '../hooks/usePlayerData';
 import config from '../config';
 
@@ -408,6 +409,27 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     }
 
     groups.push({
+      id: 'advanced-analytics',
+      label: 'Advanced Analytics',
+      content: (
+        activeTab === 'bowling' ? (
+          <AdvancedBowlingAnalyticsSection
+            playerName={selectedPlayer}
+            dateRange={dateRange}
+            selectedVenue={selectedVenue}
+            competitionFilters={competitionFilters}
+            isMobile={isMobile}
+            enabled={activeSectionId === 'advanced-analytics'}
+          />
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            Advanced analytics in this section are currently available for bowling view.
+          </Typography>
+        )
+      ),
+    });
+
+    groups.push({
       id: 'dismissals',
       label: activeTab === 'bowling' ? 'Wickets' : 'Dismissals',
       content: (
@@ -455,7 +477,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   }, [
     hasData, currentStats, currentDismissalStats, activeTab, battingStats,
     selectedPlayer, dateRange, selectedVenue, competitionFilters, isMobile, fetchTrigger,
-    globalRankPayload, globalRankLoading,
+    globalRankPayload, globalRankLoading, activeSectionId,
   ]);
 
   // Scroll to section handler

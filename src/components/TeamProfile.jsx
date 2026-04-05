@@ -25,12 +25,14 @@ import TeamH2HSection from './TeamH2HSection';
 import TeamPhasePerformanceRadar from './TeamPhasePerformanceRadar';
 import TeamSquadSection from './TeamSquadSection';
 import TeamStatsCards from './TeamStatsCards';
+import TeamRelativeMetricsSection from './TeamRelativeMetricsSection';
 import VenueNotesCardShell from './VenueNotesCardShell';
 import VenueNotesDesktopNav from './VenueNotesDesktopNav';
 import VenueSectionTabs from './VenueSectionTabs';
 import RecentFormStrip from './playerProfile/RecentFormStrip';
 import config from '../config';
 import { DEFAULT_START_DATE, TODAY } from '../utils/dateDefaults';
+import { fetchAnalyticsJson } from '../utils/analyticsApi';
 
 const OVERVIEW_SECTION_ID = 'overview';
 
@@ -64,6 +66,10 @@ const TeamProfile = ({ isMobile }) => {
   const [rosterData, setRosterData] = useState(null);
   const [h2hSummaryData, setH2HSummaryData] = useState(null);
   const [championshipData, setChampionshipData] = useState(null);
+  const [relativeMetricsData, setRelativeMetricsData] = useState(null);
+  const [relativeMetricsLoading, setRelativeMetricsLoading] = useState(false);
+  const [relativeMetricsError, setRelativeMetricsError] = useState(null);
+  const [relativeMetricsRetryToken, setRelativeMetricsRetryToken] = useState(0);
 
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -159,6 +165,10 @@ const TeamProfile = ({ isMobile }) => {
     setRosterData(null);
     setH2HSummaryData(null);
     setChampionshipData(null);
+    setRelativeMetricsData(null);
+    setRelativeMetricsLoading(false);
+    setRelativeMetricsError(null);
+    setRelativeMetricsRetryToken(0);
   }, []);
 
   const handleFetch = () => {
@@ -299,6 +309,45 @@ const TeamProfile = ({ isMobile }) => {
   }, [shouldFetch, selectedTeam, dateRange, isCustomMode, customPlayers]);
 
   useEffect(() => {
+    if (isCustomMode || !selectedTeam || activeSectionId !== 'relative-metrics') {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRelativeMetrics = async () => {
+      setRelativeMetricsLoading(true);
+      setRelativeMetricsError(null);
+      try {
+        const payload = await fetchAnalyticsJson(
+          `/relative-metrics/team/${encodeURIComponent(selectedTeam.abbreviated_name)}`,
+          {
+            benchmark_window_matches: 10,
+            start_date: dateRange.start,
+            end_date: dateRange.end,
+          },
+        );
+        if (!cancelled) {
+          setRelativeMetricsData(payload);
+        }
+      } catch (fetchError) {
+        if (cancelled) return;
+        console.error('Error loading team relative metrics:', fetchError);
+        setRelativeMetricsError('Failed to load relative metrics.');
+      } finally {
+        if (!cancelled) {
+          setRelativeMetricsLoading(false);
+        }
+      }
+    };
+
+    loadRelativeMetrics();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSectionId, dateRange.end, dateRange.start, isCustomMode, selectedTeam, relativeMetricsRetryToken]);
+
+  useEffect(() => {
     setActiveSectionId(OVERVIEW_SECTION_ID);
   }, [selectedTeam?.abbreviated_name, isCustomMode]);
 
@@ -437,6 +486,19 @@ const TeamProfile = ({ isMobile }) => {
         ),
       },
       {
+        id: 'relative-metrics',
+        label: 'Relative Metrics',
+        content: (
+          <TeamRelativeMetricsSection
+            data={relativeMetricsData}
+            loading={relativeMetricsLoading}
+            error={relativeMetricsError}
+            isMobile={isMobile}
+            onRetry={() => setRelativeMetricsRetryToken((prev) => prev + 1)}
+          />
+        ),
+      },
+      {
         id: 'batting',
         label: 'Batting',
         content: battingOrderData ? (
@@ -478,10 +540,14 @@ const TeamProfile = ({ isMobile }) => {
     rosterData,
     phaseStats,
     bowlingPhaseStats,
+    relativeMetricsData,
+    relativeMetricsLoading,
+    relativeMetricsError,
     battingOrderData,
     bowlingOrderData,
     h2hSummaryData,
     championshipData,
+    setRelativeMetricsRetryToken,
   ]);
 
   const handleSectionSelect = useCallback((sectionId) => {

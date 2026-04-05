@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import config from '../config';
+import { getFormFlagMeta } from '../utils/analyticsApi';
 
 const MatchPreviewCard = ({
   venue,
@@ -171,12 +172,20 @@ const MatchPreviewCard = ({
                 </Typography>
                 <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5, rowGap: 0.5 }}>
                   {entry.players.map((player) => (
-                    <Chip
-                      key={`${entry.team}-${player.player}`}
-                      size="small"
-                      variant="outlined"
-                      label={`${player.player} ${Number(player.quality_score || 0).toFixed(1)}`}
-                    />
+                    <Stack key={`${entry.team}-${player.player}`} direction="row" spacing={0.5} alignItems="center">
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={`${player.player} ${Number(player.quality_score || 0).toFixed(1)}`}
+                      />
+                      {player.form_flag && (
+                        <Chip
+                          size="small"
+                          label={getFormFlagMeta(player.form_flag).label}
+                          color={getFormFlagMeta(player.form_flag).color}
+                        />
+                      )}
+                    </Stack>
                   ))}
                 </Stack>
               </Box>
