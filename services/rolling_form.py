@@ -4,7 +4,7 @@ Rolling form metrics service.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -16,7 +16,22 @@ from services.analytics_common import (
     overs_float_to_balls,
     rolling_mean,
 )
+from services.delivery_data_service import (
+    build_competition_filter_delivery_details,
+    build_venue_filter_delivery_details,
+)
 from services.player_aliases import get_all_name_variants, get_player_names, resolve_to_legacy_name
+
+
+BOWLER_WICKET_TYPES = (
+    "bowled",
+    "caught",
+    "lbw",
+    "caught and bowled",
+    "stumped",
+    "hit wicket",
+)
+DELIVERY_DETAILS_AUGMENT_GAP_DAYS = 45
 
 
 def calculate_form_flag(
@@ -60,6 +75,316 @@ def _derive_recent_form_flag(values: List[Optional[float]], window: int) -> str:
     return calculate_form_flag(current_avg, baseline, higher_is_better=True, threshold=0.1)
 
 
+def _as_date(value) -> Optional[date]:
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except Exception:
+        return None
+
+
+def _latest_timeline_date(rows: List[Dict]) -> Optional[date]:
+    dates = [_as_date(row.get("date")) for row in rows]
+    dates = [d for d in dates if d]
+    return max(dates) if dates else None
+
+
+def _needs_delivery_details_augmentation(rows: List[Dict], end_date: Optional[date]) -> bool:
+    if not rows:
+        return True
+    if not end_date:
+        return False
+    latest = _latest_timeline_date(rows)
+    if not latest:
+        return True
+    return latest <= (end_date - timedelta(days=DELIVERY_DETAILS_AUGMENT_GAP_DAYS))
+
+
+def _timeline_key(row: Dict) -> tuple:
+    return (str(row.get("match_id") or ""), int(row.get("innings") or 0))
+
+
+def _merge_timeline_rows(primary_rows: List[Dict], augmented_rows: List[Dict]) -> List[Dict]:
+    merged: Dict[tuple, Dict] = {}
+    for row in primary_rows:
+        merged[_timeline_key(row)] = dict(row)
+
+    for row in augmented_rows:
+        key = _timeline_key(row)
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = dict(row)
+            continue
+        existing_date = _as_date(existing.get("date"))
+        new_date = _as_date(row.get("date"))
+        # Prefer fresher row if keys collide (should be rare).
+        if new_date and (not existing_date or new_date >= existing_date):
+            merged[key] = dict(row)
+
+    return sorted(
+        merged.values(),
+        key=lambda r: (
+            _as_date(r.get("date")) or date.min,
+            str(r.get("match_id") or ""),
+            int(r.get("innings") or 0),
+        ),
+    )
+
+
+def _compute_batting_fantasy_points(
+    *,
+    runs: int,
+    balls_faced: int,
+    fours: int,
+    sixes: int,
+    dismissed: bool,
+) -> float:
+    points = float(runs + (fours * 4) + (sixes * 6))
+
+    if runs >= 100:
+        points += 16
+    elif runs >= 75:
+        points += 12
+    elif runs >= 50:
+        points += 8
+    elif runs >= 25:
+        points += 4
+
+    if runs == 0 and dismissed:
+        points -= 2
+
+    if balls_faced >= 10:
+        sr = (runs * 100.0) / balls_faced if balls_faced else 0.0
+        if sr > 170:
+            points += 6
+        elif 150 < sr <= 170:
+            points += 4
+        elif 130 <= sr <= 150:
+            points += 2
+        elif 60 <= sr < 70:
+            points -= 2
+        elif 50 <= sr < 60:
+            points -= 4
+        elif sr < 50:
+            points -= 6
+    return round(points, 2)
+
+
+def _compute_bowling_fantasy_points(
+    *,
+    wickets: int,
+    dots: int,
+    overs: float,
+    economy: Optional[float],
+) -> float:
+    points = float((dots * 1) + (wickets * 25))
+
+    if wickets >= 5:
+        points += 12
+    elif wickets >= 4:
+        points += 8
+    elif wickets >= 3:
+        points += 4
+
+    if overs >= 2 and economy is not None:
+        if economy < 5:
+            points += 6
+        elif 5 <= economy < 6:
+            points += 4
+        elif 6 <= economy <= 7:
+            points += 2
+        elif 10 <= economy < 11:
+            points -= 2
+        elif 11 <= economy < 12:
+            points -= 4
+        elif economy >= 12:
+            points -= 6
+    return round(points, 2)
+
+
+def _discover_delivery_details_name_variants(
+    *,
+    db: Session,
+    seed_names: List[str],
+    role: str,
+    start_date: Optional[date],
+    end_date: Optional[date],
+    leagues: List[str],
+    include_international: bool,
+    venue: Optional[str],
+) -> List[str]:
+    role_col = "dd.bat" if role == "batting" else "dd.bowl"
+    params: Dict = {
+        "seed_names": [name for name in seed_names if name],
+        "start_date": start_date,
+        "end_date": end_date,
+        "leagues": leagues,
+    }
+    venue_filter = build_venue_filter_delivery_details(venue, params)
+    comp_filter = build_competition_filter_delivery_details(leagues, include_international, None, params)
+
+    if params["seed_names"]:
+        exact_query = text(
+            f"""
+            SELECT
+                {role_col} AS player_name,
+                COUNT(*) AS balls
+            FROM delivery_details dd
+            WHERE {role_col} = ANY(:seed_names)
+              AND (:start_date IS NULL OR dd.match_date::date >= :start_date)
+              AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+              {venue_filter}
+              {comp_filter}
+            GROUP BY {role_col}
+            ORDER BY balls DESC
+            """
+        )
+        exact_rows = db.execute(exact_query, params).mappings().all()
+        if exact_rows:
+            return [str(row["player_name"]) for row in exact_rows if row.get("player_name")]
+
+    candidates: Dict[str, Dict[str, int]] = {}
+    seeds = [str(name).strip() for name in seed_names if name]
+    for seed in seeds:
+        parts = [part for part in seed.split() if part]
+        if len(parts) != 2:
+            continue
+        initials = parts[0].strip()
+        tail = parts[1].strip().lower()
+        if not initials.isalpha() or initials.upper() != initials or len(initials) > 3 or len(tail) < 3:
+            continue
+
+        # Pattern A: "A Mhatre" -> "Ayush Mhatre"
+        if len(initials) == 1:
+            pattern_query = text(
+                f"""
+                WITH grouped AS (
+                    SELECT
+                        {role_col} AS player_name,
+                        COUNT(*) AS balls,
+                        LOWER(SPLIT_PART({role_col}, ' ', 1)) AS first_token,
+                        LOWER(REGEXP_REPLACE({role_col}, '^.*\\s', '')) AS last_token
+                    FROM delivery_details dd
+                    WHERE (:start_date IS NULL OR dd.match_date::date >= :start_date)
+                      AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+                      {venue_filter}
+                      {comp_filter}
+                    GROUP BY {role_col}
+                )
+                SELECT player_name, balls
+                FROM grouped
+                WHERE last_token = :tail
+                  AND first_token LIKE :first_initial_prefix
+                ORDER BY balls DESC
+                LIMIT 5
+                """
+            )
+            rows = db.execute(
+                pattern_query,
+                {
+                    **params,
+                    "tail": tail,
+                    "first_initial_prefix": initials.lower() + "%",
+                },
+            ).mappings().all()
+            for row in rows:
+                name = str(row["player_name"])
+                balls = int(row["balls"] or 0)
+                prev = candidates.get(name, {"score": 0, "balls": 0})
+                candidates[name] = {"score": max(prev["score"], 4), "balls": max(prev["balls"], balls)}
+            continue
+
+        # Pattern B: "CV Varun" -> "Varun Chakravarthy"
+        if len(initials) >= 2:
+            first_name_query = text(
+                f"""
+                WITH grouped AS (
+                    SELECT
+                        {role_col} AS player_name,
+                        COUNT(*) AS balls,
+                        LOWER(SPLIT_PART({role_col}, ' ', 1)) AS first_token,
+                        LOWER(REGEXP_REPLACE({role_col}, '^.*\\s', '')) AS last_token
+                    FROM delivery_details dd
+                    WHERE (:start_date IS NULL OR dd.match_date::date >= :start_date)
+                      AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+                      {venue_filter}
+                      {comp_filter}
+                    GROUP BY {role_col}
+                )
+                SELECT player_name, balls
+                FROM grouped
+                WHERE first_token = :tail
+                  AND LEFT(last_token, 1) = :surname_initial
+                  AND LEFT(first_token, 1) = :given_initial
+                ORDER BY balls DESC
+                LIMIT 5
+                """
+            )
+            rows = db.execute(
+                first_name_query,
+                {
+                    **params,
+                    "tail": tail,
+                    "surname_initial": initials[0].lower(),
+                    "given_initial": initials[-1].lower(),
+                },
+            ).mappings().all()
+            for row in rows:
+                name = str(row["player_name"])
+                balls = int(row["balls"] or 0)
+                prev = candidates.get(name, {"score": 0, "balls": 0})
+                candidates[name] = {"score": max(prev["score"], 6), "balls": max(prev["balls"], balls)}
+
+            # Pattern C: "YB Jaiswal" style legacy tokenization fallback
+            surname_query = text(
+                f"""
+                WITH grouped AS (
+                    SELECT
+                        {role_col} AS player_name,
+                        COUNT(*) AS balls,
+                        LOWER(SPLIT_PART({role_col}, ' ', 1)) AS first_token,
+                        LOWER(REGEXP_REPLACE({role_col}, '^.*\\s', '')) AS last_token
+                    FROM delivery_details dd
+                    WHERE (:start_date IS NULL OR dd.match_date::date >= :start_date)
+                      AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+                      {venue_filter}
+                      {comp_filter}
+                    GROUP BY {role_col}
+                )
+                SELECT player_name, balls
+                FROM grouped
+                WHERE last_token = :tail
+                  AND LEFT(first_token, 1) = :given_initial
+                ORDER BY balls DESC
+                LIMIT 5
+                """
+            )
+            rows = db.execute(
+                surname_query,
+                {
+                    **params,
+                    "tail": tail,
+                    "given_initial": initials[-1].lower(),
+                },
+            ).mappings().all()
+            for row in rows:
+                name = str(row["player_name"])
+                balls = int(row["balls"] or 0)
+                prev = candidates.get(name, {"score": 0, "balls": 0})
+                candidates[name] = {"score": max(prev["score"], 5), "balls": max(prev["balls"], balls)}
+
+    ranked = sorted(
+        candidates.items(),
+        key=lambda item: (item[1]["score"], item[1]["balls"]),
+        reverse=True,
+    )
+    # Keep only high-confidence candidates.
+    return [name for name, meta in ranked if meta["score"] >= 5 and meta["balls"] >= 12][:3]
+
+
 def _fetch_batting_timeline(
     *,
     db: Session,
@@ -84,6 +409,7 @@ def _fetch_batting_timeline(
         f"""
         SELECT
             bs.match_id,
+            bs.innings,
             m.date,
             m.competition,
             m.venue,
@@ -125,6 +451,7 @@ def _fetch_bowling_timeline(
         f"""
         SELECT
             bs.match_id,
+            bs.innings,
             m.date,
             m.competition,
             m.venue,
@@ -141,6 +468,176 @@ def _fetch_bowling_timeline(
         """
     )
     return [dict(row) for row in db.execute(query, params).mappings().all()]
+
+
+def _fetch_batting_timeline_dd(
+    *,
+    db: Session,
+    player_variants: List[str],
+    start_date: Optional[date],
+    end_date: Optional[date],
+    leagues: List[str],
+    include_international: bool,
+    venue: Optional[str],
+) -> List[Dict]:
+    if not player_variants:
+        return []
+
+    params: Dict = {
+        "player_variants": player_variants,
+        "start_date": start_date,
+        "end_date": end_date,
+        "leagues": leagues,
+    }
+    venue_filter = build_venue_filter_delivery_details(venue, params)
+    comp_filter = build_competition_filter_delivery_details(leagues, include_international, None, params)
+
+    query = text(
+        f"""
+        SELECT
+            dd.p_match AS match_id,
+            dd.inns AS innings,
+            m.date,
+            m.competition,
+            m.venue,
+            SUM(COALESCE(dd.batruns, 0)) AS runs,
+            SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 THEN 1 ELSE 0 END) AS balls_faced,
+            SUM(CASE WHEN COALESCE(dd.batruns, 0) = 4 THEN 1 ELSE 0 END) AS fours,
+            SUM(CASE WHEN COALESCE(dd.batruns, 0) = 6 THEN 1 ELSE 0 END) AS sixes,
+            SUM(
+                CASE
+                    WHEN LOWER(COALESCE(dd.out::text, '')) IN ('true', 't', '1', 'yes')
+                    THEN 1 ELSE 0
+                END
+            ) AS dismissals
+        FROM delivery_details dd
+        JOIN matches m ON m.id = dd.p_match
+        WHERE dd.bat = ANY(:player_variants)
+          AND (:start_date IS NULL OR dd.match_date::date >= :start_date)
+          AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+          {venue_filter}
+          {comp_filter}
+        GROUP BY dd.p_match, dd.inns, m.date, m.competition, m.venue
+        ORDER BY m.date, dd.p_match, dd.inns
+        """
+    )
+    rows = db.execute(query, params).mappings().all()
+    out: List[Dict] = []
+    for row in rows:
+        runs = int(row.get("runs") or 0)
+        balls_faced = int(row.get("balls_faced") or 0)
+        fours = int(row.get("fours") or 0)
+        sixes = int(row.get("sixes") or 0)
+        dismissals = int(row.get("dismissals") or 0)
+        strike_rate = (runs * 100.0 / balls_faced) if balls_faced > 0 else 0.0
+        fantasy_points = _compute_batting_fantasy_points(
+            runs=runs,
+            balls_faced=balls_faced,
+            fours=fours,
+            sixes=sixes,
+            dismissed=dismissals > 0,
+        )
+        out.append(
+            {
+                "match_id": str(row.get("match_id")),
+                "innings": int(row.get("innings") or 0),
+                "date": row.get("date"),
+                "competition": row.get("competition"),
+                "venue": row.get("venue"),
+                "runs": runs,
+                "balls_faced": balls_faced,
+                "strike_rate": round(strike_rate, 2),
+                "fantasy_points": fantasy_points,
+            }
+        )
+    return out
+
+
+def _fetch_bowling_timeline_dd(
+    *,
+    db: Session,
+    player_variants: List[str],
+    start_date: Optional[date],
+    end_date: Optional[date],
+    leagues: List[str],
+    include_international: bool,
+    venue: Optional[str],
+) -> List[Dict]:
+    if not player_variants:
+        return []
+
+    params: Dict = {
+        "player_variants": player_variants,
+        "start_date": start_date,
+        "end_date": end_date,
+        "leagues": leagues,
+        "bowler_wickets": list(BOWLER_WICKET_TYPES),
+    }
+    venue_filter = build_venue_filter_delivery_details(venue, params)
+    comp_filter = build_competition_filter_delivery_details(leagues, include_international, None, params)
+    query = text(
+        f"""
+        SELECT
+            dd.p_match AS match_id,
+            dd.inns AS innings,
+            m.date,
+            m.competition,
+            m.venue,
+            SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) AS legal_balls,
+            SUM(COALESCE(dd.score, 0)) AS runs_conceded,
+            SUM(
+                CASE
+                    WHEN LOWER(COALESCE(dd.dismissal, '')) = ANY(:bowler_wickets)
+                    THEN 1 ELSE 0
+                END
+            ) AS wickets,
+            SUM(
+                CASE
+                    WHEN COALESCE(dd.score, 0) = 0 AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0
+                    THEN 1 ELSE 0
+                END
+            ) AS dots
+        FROM delivery_details dd
+        JOIN matches m ON m.id = dd.p_match
+        WHERE dd.bowl = ANY(:player_variants)
+          AND (:start_date IS NULL OR dd.match_date::date >= :start_date)
+          AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+          {venue_filter}
+          {comp_filter}
+        GROUP BY dd.p_match, dd.inns, m.date, m.competition, m.venue
+        ORDER BY m.date, dd.p_match, dd.inns
+        """
+    )
+    rows = db.execute(query, params).mappings().all()
+    out: List[Dict] = []
+    for row in rows:
+        legal_balls = int(row.get("legal_balls") or 0)
+        runs_conceded = int(row.get("runs_conceded") or 0)
+        wickets = int(row.get("wickets") or 0)
+        dots = int(row.get("dots") or 0)
+        overs = legal_balls / 6.0
+        economy = (runs_conceded * 6.0 / legal_balls) if legal_balls > 0 else 0.0
+        fantasy_points = _compute_bowling_fantasy_points(
+            wickets=wickets,
+            dots=dots,
+            overs=overs,
+            economy=economy if legal_balls > 0 else None,
+        )
+        out.append(
+            {
+                "match_id": str(row.get("match_id")),
+                "innings": int(row.get("innings") or 0),
+                "date": row.get("date"),
+                "competition": row.get("competition"),
+                "venue": row.get("venue"),
+                "overs": round(overs, 1),
+                "runs_conceded": runs_conceded,
+                "wickets": wickets,
+                "economy": round(economy, 2) if legal_balls > 0 else 0.0,
+                "fantasy_points": fantasy_points,
+            }
+        )
+    return out
 
 
 def _with_batting_rolling(rows: List[Dict], window: int) -> List[Dict]:
@@ -216,9 +713,11 @@ def get_player_rolling_form(
         db,
     )
     leagues_expanded = normalize_leagues(leagues)
+    data_quality_notes: List[str] = []
 
     batting_rows: List[Dict] = []
     bowling_rows: List[Dict] = []
+    seed_names = list(dict.fromkeys([player_name, names["legacy_name"], names["details_name"]]))
 
     if role in {"batting", "all"}:
         batting_rows = _fetch_batting_timeline(
@@ -230,6 +729,33 @@ def get_player_rolling_form(
             include_international=include_international,
             venue=venue,
         )
+        if _needs_delivery_details_augmentation(batting_rows, end_date):
+            dd_name_variants = _discover_delivery_details_name_variants(
+                db=db,
+                seed_names=seed_names + variants,
+                role="batting",
+                start_date=start_date,
+                end_date=end_date,
+                leagues=leagues_expanded,
+                include_international=include_international,
+                venue=venue,
+            )
+            dd_batting_rows = _fetch_batting_timeline_dd(
+                db=db,
+                player_variants=dd_name_variants,
+                start_date=start_date,
+                end_date=end_date,
+                leagues=leagues_expanded,
+                include_international=include_international,
+                venue=venue,
+            )
+            if dd_batting_rows:
+                before = len(batting_rows)
+                batting_rows = _merge_timeline_rows(batting_rows, dd_batting_rows)
+                if len(batting_rows) > before:
+                    data_quality_notes.append(
+                        "Rolling batting form augmented from delivery_details for missing recent matches."
+                    )
         batting_rows = _with_batting_rolling(batting_rows, window)
 
     if role in {"bowling", "all"}:
@@ -242,6 +768,33 @@ def get_player_rolling_form(
             include_international=include_international,
             venue=venue,
         )
+        if _needs_delivery_details_augmentation(bowling_rows, end_date):
+            dd_name_variants = _discover_delivery_details_name_variants(
+                db=db,
+                seed_names=seed_names + variants,
+                role="bowling",
+                start_date=start_date,
+                end_date=end_date,
+                leagues=leagues_expanded,
+                include_international=include_international,
+                venue=venue,
+            )
+            dd_bowling_rows = _fetch_bowling_timeline_dd(
+                db=db,
+                player_variants=dd_name_variants,
+                start_date=start_date,
+                end_date=end_date,
+                leagues=leagues_expanded,
+                include_international=include_international,
+                venue=venue,
+            )
+            if dd_bowling_rows:
+                before = len(bowling_rows)
+                bowling_rows = _merge_timeline_rows(bowling_rows, dd_bowling_rows)
+                if len(bowling_rows) > before:
+                    data_quality_notes.append(
+                        "Rolling bowling form augmented from delivery_details for missing recent matches."
+                    )
         bowling_rows = _with_bowling_rolling(bowling_rows, window)
 
     batting_flag = _derive_recent_form_flag(
@@ -259,7 +812,7 @@ def get_player_rolling_form(
     elif "hot" in {batting_flag, bowling_flag} and "cold" not in {batting_flag, bowling_flag}:
         overall_flag = "hot"
 
-    return {
+    payload = {
         "player_name": player_name,
         "resolved_names": names,
         "window": window,
@@ -270,6 +823,9 @@ def get_player_rolling_form(
         "batting_innings": batting_rows,
         "bowling_innings": bowling_rows,
     }
+    if data_quality_notes:
+        payload["data_quality_note"] = " ".join(data_quality_notes)
+    return payload
 
 
 def get_form_flags_for_players(
