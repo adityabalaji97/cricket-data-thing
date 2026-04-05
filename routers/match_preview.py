@@ -19,6 +19,7 @@ from services.match_preview import (
     validate_llm_narrative,
     validate_llm_rewrite,
 )
+from services.rolling_form import get_form_flags_for_players
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,47 @@ PREVIEW_ENGINE_VERSION = "v3-narrative"
 DEFAULT_PREVIEW_MODE = "hybrid"
 
 preview_cache: Dict[str, Dict] = {}
+
+
+def _inject_form_flags(context: Dict, db: Session) -> None:
+    """Best-effort enrichment: add form_flag badges to top-ranked/fantasy player blocks."""
+    names = set()
+
+    top_ranked = (context.get("top_ranked_players") or {}).get("teams") or {}
+    for team_payload in top_ranked.values():
+        for key in ("top_overall", "top_batting", "top_bowling"):
+            for row in team_payload.get(key) or []:
+                player = row.get("player")
+                if player:
+                    names.add(player)
+
+    fantasy_top = (
+        ((context.get("screen_story") or {}).get("expected_fantasy_points") or {}).get("fantasy_top")
+        or {}
+    )
+    for rows in fantasy_top.values():
+        for row in rows or []:
+            player = row.get("player")
+            if player:
+                names.add(player)
+
+    if not names:
+        return
+
+    form_flags = get_form_flags_for_players(db=db, player_names=sorted(names), window=10)
+
+    for team_payload in top_ranked.values():
+        for key in ("top_overall", "top_batting", "top_bowling"):
+            for row in team_payload.get(key) or []:
+                player = row.get("player")
+                row["form_flag"] = form_flags.get(player, "neutral")
+
+    for rows in fantasy_top.values():
+        for row in rows or []:
+            player = row.get("player")
+            row["form_flag"] = form_flags.get(player, "neutral")
+
+    context["player_form_flags"] = form_flags
 
 
 def _is_gpt5_model() -> bool:
@@ -293,6 +335,10 @@ def get_match_preview(
             include_international=include_international,
             top_teams=top_teams,
         )
+        try:
+            _inject_form_flags(context, db)
+        except Exception as enrich_exc:
+            logger.warning("Failed to enrich match preview with form flags: %s", enrich_exc)
         sections = build_deterministic_preview_sections(context)
         canonical_markdown = serialize_sections_to_markdown(sections)
         llm_used = False

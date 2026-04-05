@@ -43,6 +43,7 @@ from routers.landing import router as landing_router
 from routers.player_line_length import router as player_line_length_router
 from routers.rankings import router as rankings_router
 from routers.fantasy_planner import router as fantasy_planner_router
+from routers.analytics import router as analytics_router
 from services.delivery_data_service import (
     get_venue_match_stats,
     get_match_scores,
@@ -86,6 +87,7 @@ app.include_router(landing_router)
 app.include_router(player_line_length_router)
 app.include_router(rankings_router)
 app.include_router(fantasy_planner_router)
+app.include_router(analytics_router)
 
 # Add CORS middleware
 app.add_middleware(

@@ -35,6 +35,7 @@ from services.matchups import (
     _ECONOMY_10_TO_11, _ECONOMY_11_TO_12, _ECONOMY_ABOVE_12,
 )
 from services.team_roster import get_team_roster_service
+from services.rolling_form import get_form_flags_for_players
 
 logger = logging.getLogger(__name__)
 
@@ -611,6 +612,9 @@ def get_fantasy_recommendations(
         non_captain = [p for p in recommended if p["name"] != (captain or {}).get("name")]
         vice_captain = max(non_captain, key=lambda p: p["best_match_points"]) if non_captain else None
 
+    form_flag_names = [p["name"] for p in recommended] + [p["name"] for p in all_players[:50]]
+    form_flags = get_form_flags_for_players(db=db, player_names=form_flag_names, window=10)
+
     return {
         "points_model": "per_match_normalized_v1",
         "upcoming_matches": [
@@ -635,6 +639,7 @@ def get_fantasy_recommendations(
                 "match_count": p["match_count"],
                 "best_match_points": round(p["best_match_points"], 1),
                 "matches": p["matches"],
+                "form_flag": form_flags.get(p["name"], "neutral"),
             }
             for p in recommended
         ],
@@ -652,6 +657,7 @@ def get_fantasy_recommendations(
                 "is_overseas": p.get("is_overseas", False),
                 "total_expected_points": round(p["total_expected"], 1),
                 "match_count": p["match_count"],
+                "form_flag": form_flags.get(p["name"], "neutral"),
             }
             for p in all_players[:50]
         ],
