@@ -317,8 +317,14 @@ def get_match_resource_benchmark(
     )
 
     overs = sorted({int(cp.get("over_num") or 0) for cp in checkpoints})
-    resource_rows = _get_venue_resource_rows(db, venue, overs)
-    if not resource_rows:
+    try:
+        resource_rows = _get_venue_resource_rows(db, venue, overs)
+    except Exception:
+        resource_rows = {}
+        data_quality_note.append(
+            "venue_resources table is unavailable in this environment; par curve unavailable."
+        )
+    if not resource_rows and not data_quality_note:
         data_quality_note.append("No venue_resources rows found for this venue; par curve unavailable.")
 
     par_curve = []
