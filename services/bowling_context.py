@@ -512,17 +512,15 @@ def get_bowling_context(
         "low_pressure": _finalize_over_bucket(pressure_agg.get("low_pressure", {})),
     }
 
+    avg_runs = mean([s["runs"] for s in entry_states if s["runs"] is not None])
+    avg_wickets = mean([s["wickets"] for s in entry_states if s["wickets"] is not None])
+    avg_run_rate = mean([s["run_rate"] for s in entry_states if s["run_rate"] is not None])
+
     state_on_entry = {
         "sample_innings": len(entry_states),
-        "average_runs": round(mean([s["runs"] for s in entry_states if s["runs"] is not None]), 2)
-        if entry_states
-        else None,
-        "average_wickets": round(mean([s["wickets"] for s in entry_states if s["wickets"] is not None]), 2)
-        if entry_states
-        else None,
-        "average_run_rate": round(mean([s["run_rate"] for s in entry_states if s["run_rate"] is not None]), 2)
-        if entry_states
-        else None,
+        "average_runs": round(avg_runs, 2) if avg_runs is not None else None,
+        "average_wickets": round(avg_wickets, 2) if avg_wickets is not None else None,
+        "average_run_rate": round(avg_run_rate, 2) if avg_run_rate is not None else None,
     }
 
     first_ball_last_ball_stats = {
