@@ -44,7 +44,12 @@ def _get_innings_totals_dd(db: Session, match_id: str) -> Dict[int, Dict]:
             dd.inns AS innings,
             MAX(COALESCE(dd.inns_runs, 0)) AS runs,
             MAX(COALESCE(dd.inns_wkts, 0)) AS wickets,
-            MAX(COALESCE(dd.target, 0)) AS target
+            MAX(
+                CASE
+                    WHEN dd.target ~ '^[0-9]+$' THEN dd.target::int
+                    ELSE 0
+                END
+            ) AS target
         FROM delivery_details dd
         WHERE dd.p_match = :match_id
           AND dd.inns IN (1, 2)
@@ -100,7 +105,10 @@ def _get_second_innings_checkpoints_dd(db: Session, match_id: str) -> List[Dict]
                 dd.ball AS ball_num,
                 COALESCE(dd.inns_runs, 0) AS inns_runs,
                 COALESCE(dd.inns_wkts, 0) AS inns_wkts,
-                COALESCE(dd.target, 0) AS target,
+                CASE
+                    WHEN dd.target ~ '^[0-9]+$' THEN dd.target::int
+                    ELSE 0
+                END AS target,
                 COALESCE(dd.inns_runs_rem, 0) AS runs_remaining,
                 COALESCE(dd.inns_balls_rem, 0) AS balls_remaining,
                 ROW_NUMBER() OVER (PARTITION BY dd.over ORDER BY dd.ball DESC) AS rn
@@ -385,4 +393,3 @@ def get_match_resource_benchmark(
     if data_quality_note:
         response["data_quality_note"] = " ".join(data_quality_note)
     return response
-
