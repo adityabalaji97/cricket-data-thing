@@ -1,5 +1,6 @@
 import config from '../config';
 
+const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
 const analyticsCache = new Map();
 
 const isPresent = (value) => value !== null && value !== undefined && value !== '';
@@ -43,7 +44,11 @@ export const fetchAnalyticsJson = (path, params = {}, options = {}) => {
   }
 
   if (analyticsCache.has(url)) {
-    return analyticsCache.get(url);
+    const cached = analyticsCache.get(url);
+    if (cached && (Date.now() - cached.createdAt) < ANALYTICS_CACHE_TTL_MS) {
+      return cached.promise;
+    }
+    analyticsCache.delete(url);
   }
 
   const request = fetch(url).then(async (response) => {
@@ -57,7 +62,7 @@ export const fetchAnalyticsJson = (path, params = {}, options = {}) => {
     throw error;
   });
 
-  analyticsCache.set(url, request);
+  analyticsCache.set(url, { promise: request, createdAt: Date.now() });
   return request;
 };
 
