@@ -109,14 +109,12 @@ def _get_second_innings_checkpoints_dd(db: Session, match_id: str) -> List[Dict]
                     WHEN dd.target ~ '^[0-9]+$' THEN dd.target::int
                     ELSE 0
                 END AS target,
-                COALESCE(dd.inns_runs_rem, 0) AS runs_remaining,
-                COALESCE(dd.inns_balls_rem, 0) AS balls_remaining,
                 ROW_NUMBER() OVER (PARTITION BY dd.over ORDER BY dd.ball DESC) AS rn
             FROM delivery_details dd
             WHERE dd.p_match = :match_id
               AND dd.inns = 2
         )
-        SELECT over_num, ball_num, inns_runs, inns_wkts, target, runs_remaining, balls_remaining
+        SELECT over_num, ball_num, inns_runs, inns_wkts, target
         FROM over_last
         WHERE rn = 1
         ORDER BY over_num
