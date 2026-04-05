@@ -18,7 +18,7 @@ const getBowlingColor = (wickets) => {
 const RecentFormStrip = ({ innings, mode, isMobile }) => {
   if (!innings || innings.length === 0) return null;
 
-  const recent = innings.slice(0, 5);
+  const recent = innings;
 
   return (
     <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mt: 1 }}>
@@ -28,7 +28,7 @@ const RecentFormStrip = ({ innings, mode, isMobile }) => {
       >
         Form
       </Typography>
-      <Box sx={{ display: 'flex', gap: 0.75 }}>
+      <Box sx={{ display: 'flex', gap: 0.75, overflowX: 'auto' }}>
         {recent.map((inn, i) => {
           if (mode === 'bowling') {
             const wickets = inn.wickets ?? 0;
@@ -36,7 +36,7 @@ const RecentFormStrip = ({ innings, mode, isMobile }) => {
             const overs = inn.overs ?? '?';
             const econ = inn.economy ?? (overs !== '?' && overs > 0 ? (runs / overs).toFixed(1) : '?');
             const figures = `${wickets}/${runs}`;
-            const opponent = inn.opponent || inn.opposition || '?';
+            const opponent = inn.opponent || inn.opposition || inn.batting_team || '?';
             const tooltipText = `${figures} (${overs} ov), Econ ${econ} vs ${opponent}`;
 
             return (
@@ -61,7 +61,7 @@ const RecentFormStrip = ({ innings, mode, isMobile }) => {
                     variant="caption"
                     sx={{ fontSize: '0.6rem', color: 'text.secondary', display: 'block', mt: 0.25 }}
                   >
-                    vs {(inn.opponent || inn.opposition || '?').slice(0, 3).toUpperCase()}
+                    vs {(inn.opponent || inn.opposition || inn.batting_team || '?').slice(0, 3).toUpperCase()}
                   </Typography>
                 </Box>
               </Tooltip>
@@ -72,7 +72,7 @@ const RecentFormStrip = ({ innings, mode, isMobile }) => {
           const runs = inn.runs ?? inn.score ?? 0;
           const balls = inn.balls ?? inn.balls_faced ?? '?';
           const sr = balls !== '?' && balls > 0 ? ((runs / balls) * 100).toFixed(1) : '?';
-          const opponent = inn.opponent || inn.opposition || '?';
+          const opponent = inn.opponent || inn.opposition || inn.bowling_team || '?';
           const tooltipText = `${runs}(${balls}) vs ${opponent}, SR ${sr}`;
 
           return (
@@ -97,7 +97,7 @@ const RecentFormStrip = ({ innings, mode, isMobile }) => {
                   variant="caption"
                   sx={{ fontSize: '0.6rem', color: 'text.secondary', display: 'block', mt: 0.25 }}
                 >
-                  vs {(inn.opponent || inn.opposition || '?').slice(0, 3).toUpperCase()}
+                  vs {(inn.opponent || inn.opposition || inn.bowling_team || '?').slice(0, 3).toUpperCase()}
                 </Typography>
               </Box>
             </Tooltip>

@@ -50,6 +50,7 @@ from services.delivery_data_service import (
     get_venue_aliases,
 )
 from services.bowler_types import BOWLER_CATEGORY_SQL
+from services.player_aliases import get_player_names
 import math
 
 from dotenv import load_dotenv
@@ -2106,8 +2107,12 @@ def get_player_stats(
 
         logger.info(f"Received params - start_date: {start_date}, end_date: {end_date}, leagues: {leagues}, include_international: {include_international}")
 
+        # Resolve player name aliases
+        names = get_player_names(player_name, db)
+        player_names = list(set(filter(None, [names.get('legacy_name'), names.get('details_name'), player_name])))
+
         params = {
-            "player_name": player_name,
+            "player_names": player_names,
             "start_date": start_date,
             "end_date": end_date,
             "venue": venue,
@@ -2116,7 +2121,7 @@ def get_player_stats(
             "top_teams": top_teams is not None,
             "top_team_list": INTERNATIONAL_TEAMS_RANKED[:top_teams] if top_teams else []
         }
-        
+
         # If leagues are provided, expand them to include full names
         if leagues:
             params["leagues"] = expand_league_abbreviations(leagues)
@@ -2149,7 +2154,7 @@ def get_player_stats(
                 CAST(SUM(bs.fours + bs.sixes) * 100.0 AS FLOAT) / NULLIF(SUM(bs.balls_faced), 0) as boundary_percentage
             FROM batting_stats bs
             JOIN matches m ON bs.match_id = m.id
-            WHERE bs.striker = :player_name
+            WHERE bs.striker = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
             AND (:venue IS NULL OR m.venue = :venue)
@@ -2177,7 +2182,7 @@ def get_player_stats(
                 SUM(bs.death_wickets) as death_wickets
             FROM batting_stats bs
             JOIN matches m ON bs.match_id = m.id
-            WHERE bs.striker = :player_name
+            WHERE bs.striker = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
             AND (:venue IS NULL OR m.venue = :venue)
@@ -2199,7 +2204,7 @@ def get_player_stats(
                 END as bowling_team
             FROM batting_stats bs
             JOIN matches m ON bs.match_id = m.id
-            WHERE bs.striker = :player_name
+            WHERE bs.striker = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
             AND (:venue IS NULL OR m.venue = :venue)
@@ -2253,7 +2258,7 @@ def get_player_stats(
             JOIN matches m ON d.match_id = m.id
             JOIN players p ON d.bowler = p.name
             JOIN BowlerTypes bt ON p.name = bt.name
-            WHERE d.batter = :player_name
+            WHERE d.batter = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
             AND (:venue IS NULL OR m.venue = :venue)
@@ -2299,7 +2304,7 @@ def get_player_stats(
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
             JOIN players p ON d.bowler = p.name
-            WHERE d.batter = :player_name
+            WHERE d.batter = ANY(:player_names)
             AND p.bowler_type IS NOT NULL
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
@@ -3508,8 +3513,12 @@ def get_player_bowling_stats(
     try:
         logger.info(f"Received params for bowling stats - start_date: {start_date}, end_date: {end_date}, leagues: {leagues}, include_international: {include_international}")
 
+        # Resolve player name aliases
+        names = get_player_names(player_name, db)
+        player_names = list(set(filter(None, [names.get('legacy_name'), names.get('details_name'), player_name])))
+
         params = {
-            "player_name": player_name,
+            "player_names": player_names,
             "start_date": start_date,
             "end_date": end_date,
             "venue": venue,
@@ -3541,20 +3550,17 @@ def get_player_bowling_stats(
         # SIMPLIFIED: Overall bowling stats using pre-calculated data + legal deliveries count
         overall_query = text(f"""
             WITH legal_balls_summary AS (
-                SELECT 
-                    bs.bowler,
-                    COUNT(*) as total_legal_balls,
-                    SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries
-                FROM bowling_stats bs
-                JOIN deliveries d ON bs.match_id = d.match_id AND bs.bowler = d.bowler AND bs.innings = d.innings
-                JOIN matches m ON bs.match_id = m.id
-                WHERE bs.bowler = :player_name
-                AND d.wides = 0 AND d.noballs = 0  -- Only legal deliveries
+                SELECT
+                    SUM(1) as total_legal_balls,
+                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+                FROM delivery_details dd
+                JOIN matches m ON dd.p_match = m.id
+                WHERE dd.bowl = ANY(:player_names)
+                AND dd.wide = 0 AND dd.noball = 0  -- Only legal deliveries
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 AND (:venue IS NULL OR m.venue = :venue)
                 {match_filter}
-                GROUP BY bs.bowler
             )
             SELECT
                 COUNT(DISTINCT bs.match_id) as matches,
@@ -3572,8 +3578,8 @@ def get_player_bowling_stats(
                 CAST(SUM(bs.dots) * 100.0 AS FLOAT) / NULLIF(lbs.total_legal_balls, 0) as dot_percentage
             FROM bowling_stats bs
             JOIN matches m ON bs.match_id = m.id
-            JOIN legal_balls_summary lbs ON bs.bowler = lbs.bowler
-            WHERE bs.bowler = :player_name
+            CROSS JOIN legal_balls_summary lbs
+            WHERE bs.bowler = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
             AND (:venue IS NULL OR m.venue = :venue)
@@ -3586,7 +3592,7 @@ def get_player_bowling_stats(
             SELECT COUNT(DISTINCT CONCAT(d.match_id, '_', d.innings, '_', d.over)) as maidens
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
-            WHERE d.bowler = :player_name
+            WHERE d.bowler = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
             AND (:venue IS NULL OR m.venue = :venue)
@@ -3595,7 +3601,7 @@ def get_player_bowling_stats(
                 -- Only complete overs with 6 legal balls and 0 runs
                 SELECT CONCAT(match_id, '_', innings, '_', over)
                 FROM deliveries
-                WHERE bowler = :player_name AND wides = 0 AND noballs = 0
+                WHERE bowler = ANY(:player_names) AND wides = 0 AND noballs = 0
                 GROUP BY match_id, innings, over
                 HAVING COUNT(*) = 6 AND SUM(runs_off_bat + extras) = 0
             )
@@ -3610,14 +3616,14 @@ def get_player_bowling_stats(
                     SUM(CASE WHEN d.over >= 15 THEN 1 ELSE 0 END) as death_legal_balls
                 FROM deliveries d
                 JOIN matches m ON d.match_id = m.id
-                WHERE d.bowler = :player_name
+                WHERE d.bowler = ANY(:player_names)
                 AND d.wides = 0 AND d.noballs = 0  -- Only legal deliveries
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 AND (:venue IS NULL OR m.venue = :venue)
                 {match_filter}
             )
-            SELECT 
+            SELECT
                 -- Use pre-calculated phase stats from bowling_stats
                 SUM(bs.pp_runs) as pp_runs,
                 SUM(bs.pp_wickets) as pp_wickets,
@@ -3641,7 +3647,7 @@ def get_player_bowling_stats(
             FROM bowling_stats bs
             JOIN matches m ON bs.match_id = m.id
             CROSS JOIN phase_legal_balls plb
-            WHERE bs.bowler = :player_name
+            WHERE bs.bowler = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
             AND (:venue IS NULL OR m.venue = :venue)
@@ -3664,7 +3670,7 @@ def get_player_bowling_stats(
                 COUNT(DISTINCT d.match_id) as matches_bowled_in
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
-            WHERE d.bowler = :player_name
+            WHERE d.bowler = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
             AND (:venue IS NULL OR m.venue = :venue)
@@ -3706,7 +3712,7 @@ def get_player_bowling_stats(
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
             JOIN players p ON d.batter = p.name
-            WHERE d.bowler = :player_name
+            WHERE d.bowler = ANY(:player_names)
             AND p.batting_hand IS NOT NULL
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
@@ -3728,7 +3734,7 @@ def get_player_bowling_stats(
                     COUNT(CASE WHEN d.over >= 6 AND d.over < 15 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as middle_legal_balls,
                     COUNT(CASE WHEN d.over >= 15 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as death_legal_balls
                 FROM deliveries d
-                WHERE d.bowler = :player_name
+                WHERE d.bowler = ANY(:player_names)
                 GROUP BY d.match_id, d.innings
             )
             SELECT 
@@ -3750,7 +3756,7 @@ def get_player_bowling_stats(
             FROM bowling_stats bs
             JOIN matches m ON bs.match_id = m.id
             JOIN innings_legal_balls ilb ON bs.match_id = ilb.match_id AND bs.innings = ilb.innings
-            WHERE bs.bowler = :player_name
+            WHERE bs.bowler = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
             AND (:venue IS NULL OR m.venue = :venue)
@@ -3766,7 +3772,7 @@ def get_player_bowling_stats(
                 COUNT(DISTINCT d.over) as maidens
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
-            WHERE d.bowler = :player_name
+            WHERE d.bowler = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
             AND (:venue IS NULL OR m.venue = :venue)
@@ -3774,7 +3780,7 @@ def get_player_bowling_stats(
             AND CONCAT(d.match_id, '_', d.innings, '_', d.over) IN (
                 SELECT CONCAT(match_id, '_', innings, '_', over)
                 FROM deliveries
-                WHERE bowler = :player_name AND wides = 0 AND noballs = 0
+                WHERE bowler = ANY(:player_names) AND wides = 0 AND noballs = 0
                 GROUP BY match_id, innings, over
                 HAVING COUNT(*) = 6 AND SUM(runs_off_bat + extras) = 0
             )
@@ -3795,7 +3801,7 @@ def get_player_bowling_stats(
                     THEN 1 ELSE 0 END) as wickets_in_over
                 FROM deliveries d
                 JOIN matches m ON d.match_id = m.id
-                WHERE d.bowler = :player_name
+                WHERE d.bowler = ANY(:player_names)
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 AND (:venue IS NULL OR m.venue = :venue)

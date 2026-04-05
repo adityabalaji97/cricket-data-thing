@@ -2,10 +2,10 @@ import config from '../../config';
 
 // Default search parameters
 const today = new Date();
-const lastYear = new Date(today.getFullYear() - 1, 0, 1);
+const startDate = `${today.getFullYear() - 1}-01-01`;
 
 export const DEFAULT_SEARCH_PARAMS = {
-  start_date: lastYear.toISOString().split('T')[0],
+  start_date: startDate,
   end_date: today.toISOString().split('T')[0],
   leagues: [],
   include_international: true,
