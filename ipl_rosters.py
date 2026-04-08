@@ -125,7 +125,7 @@ IPL_2026_ROSTERS = {
             {"name": "T Natarajan", "role": "bowler"},
             {"name": "Mukesh Kumar", "role": "bowler"},
             {"name": "Dushmantha Chameera", "role": "bowler"},
-            {"name": "Lungisani Ngidi", "role": "bowler"},
+            {"name": "Lungi Ngidi", "role": "bowler"},
             {"name": "Kyle Jamieson", "role": "bowler"},
             {"name": "Kuldeep Yadav", "role": "bowler"},
         ],

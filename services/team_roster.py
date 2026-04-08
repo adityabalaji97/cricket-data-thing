@@ -126,11 +126,28 @@ def get_team_roster_service(
     """
     # Try match data first
     players = _discover_roster_from_matches(team_name, db, lookback_days)
-    source = "match_data"
+    static_players = _get_static_roster(team_name)
 
-    if not players:
-        players = _get_static_roster(team_name)
+    if players:
+        source = "match_data"
+        # Merge static roster players not already in match data (alias-aware dedup)
+        if static_players:
+            match_names_lower = {p["name"].lower() for p in players}
+            for sp in static_players:
+                names = get_player_names(sp["name"], db)
+                legacy_lower = (names.get("legacy_name") or "").lower()
+                details_lower = (names.get("details_name") or "").lower()
+                sp_lower = sp["name"].lower()
+                if (sp_lower not in match_names_lower
+                        and legacy_lower not in match_names_lower
+                        and details_lower not in match_names_lower):
+                    players.append(sp)
+            source = "match_data_plus_roster"
+    elif static_players:
+        players = static_players
         source = "pre_season"
+    else:
+        players = None
 
     if not players:
         return {
