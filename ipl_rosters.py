@@ -97,7 +97,7 @@ IPL_2026_ROSTERS = {
             {"name": "Harshit Rana", "role": "bowler"},
             {"name": "Umran Malik", "role": "bowler"},
             {"name": "Sunil Narine", "role": "bowler"},
-            {"name": "Varun Chakravarthy", "role": "bowler"},
+            {"name": "Varun Chakaravarthy", "role": "bowler"},
         ],
     },
     "DC": {
