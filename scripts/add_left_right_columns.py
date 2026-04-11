@@ -126,12 +126,79 @@ def infer_non_striker(engine):
         
         result = conn.execute(text(sql))
         conn.commit()
-        print(f"  Inferred {result.rowcount:,} rows")
-        
+        print(f"  Inferred {result.rowcount:,} rows (from striker transitions)")
+
+        result = conn.execute(text("SELECT COUNT(*) FROM delivery_details WHERE non_striker IS NULL"))
+        still_missing = result.scalar()
+        print(f"  Still missing after transition inference: {still_missing:,}")
+
+        if still_missing > 0:
+            # Forward fill: carry last known non_striker value forward within innings
+            forward_fill_sql = """
+                WITH forward_filled AS (
+                    SELECT id, non_striker, bat,
+                        MAX(non_striker) OVER (
+                            PARTITION BY p_match, inns, grp
+                        ) as filled_ns
+                    FROM (
+                        SELECT id, p_match, inns, over, ball, bat, non_striker,
+                            COUNT(non_striker) OVER (
+                                PARTITION BY p_match, inns
+                                ORDER BY over, ball
+                                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                            ) as grp
+                        FROM delivery_details
+                    ) grouped
+                )
+                UPDATE delivery_details dd
+                SET non_striker = ff.filled_ns
+                FROM forward_filled ff
+                WHERE dd.id = ff.id
+                  AND dd.non_striker IS NULL
+                  AND ff.filled_ns IS NOT NULL
+                  AND ff.filled_ns != dd.bat
+            """
+            result = conn.execute(text(forward_fill_sql))
+            conn.commit()
+            print(f"  Forward-filled {result.rowcount:,} rows")
+
+        result = conn.execute(text("SELECT COUNT(*) FROM delivery_details WHERE non_striker IS NULL"))
+        still_missing = result.scalar()
+
+        if still_missing > 0:
+            # Backward fill: for early balls before first known non_striker
+            backward_fill_sql = """
+                WITH backward_filled AS (
+                    SELECT id, non_striker, bat,
+                        MAX(non_striker) OVER (
+                            PARTITION BY p_match, inns, grp_back
+                        ) as filled_ns
+                    FROM (
+                        SELECT id, p_match, inns, over, ball, bat, non_striker,
+                            COUNT(non_striker) OVER (
+                                PARTITION BY p_match, inns
+                                ORDER BY over DESC, ball DESC
+                                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                            ) as grp_back
+                        FROM delivery_details
+                    ) grouped
+                )
+                UPDATE delivery_details dd
+                SET non_striker = bf.filled_ns
+                FROM backward_filled bf
+                WHERE dd.id = bf.id
+                  AND dd.non_striker IS NULL
+                  AND bf.filled_ns IS NOT NULL
+                  AND bf.filled_ns != dd.bat
+            """
+            result = conn.execute(text(backward_fill_sql))
+            conn.commit()
+            print(f"  Backward-filled {result.rowcount:,} rows")
+
         result = conn.execute(text("SELECT COUNT(*) FROM delivery_details WHERE non_striker IS NULL"))
         still_missing = result.scalar()
         print(f"  Still missing: {still_missing:,}")
-    
+
     return result.rowcount
 
 
