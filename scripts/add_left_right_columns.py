@@ -222,11 +222,12 @@ def populate_striker_batter_type(engine):
 
 
 def populate_non_striker_batter_type(engine):
-    """Lookup non_striker batting hand from players table."""
+    """Lookup non_striker batting hand from players table, then from delivery_details."""
     print("\n" + "=" * 60)
-    print("STEP 5: Populating non_striker_batter_type from players...")
+    print("STEP 5: Populating non_striker_batter_type...")
     print("=" * 60)
-    
+
+    # 5a: From players table
     sql = """
         UPDATE delivery_details dd
         SET non_striker_batter_type = p.batting_hand
@@ -235,12 +236,29 @@ def populate_non_striker_batter_type(engine):
           AND dd.non_striker_batter_type IS NULL
           AND p.batting_hand IS NOT NULL
     """
-    
+
     with engine.connect() as conn:
         result = conn.execute(text(sql))
         conn.commit()
-        print(f"  Updated {result.rowcount:,} rows")
-        
+        print(f"  From players table: {result.rowcount:,} rows")
+
+        # 5b: Fallback — lookup bat_hand from rows where the non_striker was the striker
+        fallback_sql = """
+            UPDATE delivery_details dd
+            SET non_striker_batter_type = bh.bat_hand
+            FROM (
+                SELECT DISTINCT bat, bat_hand
+                FROM delivery_details
+                WHERE bat_hand IS NOT NULL
+                  AND bat_hand NOT IN ('', '-', 'NaN')
+            ) bh
+            WHERE dd.non_striker = bh.bat
+              AND dd.non_striker_batter_type IS NULL
+        """
+        result = conn.execute(text(fallback_sql))
+        conn.commit()
+        print(f"  From striker bat_hand fallback: {result.rowcount:,} rows")
+
         # Check coverage
         result = conn.execute(text("SELECT COUNT(*) FROM delivery_details WHERE non_striker_batter_type IS NOT NULL"))
         has_type = result.scalar()
