@@ -58,6 +58,9 @@ VENUE_STANDARDIZATION = {
     # Visakhapatnam
     'Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium, Visakhapatnam': 'Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium',
     
+    # Mullanpur / New Chandigarh (same stadium)
+    'Maharaja Yadavindra Singh International Cricket Stadium, New Chandigarh': 'Maharaja Yadavindra Singh International Cricket Stadium, Mullanpur',
+
     # UAE Venues
     'Sheikh Zayed Stadium': 'Zayed Cricket Stadium',
     'Sheikh Zayed Stadium, Abu Dhabi': 'Zayed Cricket Stadium',

@@ -39,14 +39,13 @@ import MatchPreviewCard from './MatchPreviewCard';
 import FeaturedInningsCards from './FeaturedInningsCards';
 import { DEFAULT_START_DATE as DEFAULT_ANALYSIS_START_DATE, TODAY } from '../utils/dateDefaults';
 
-// Check if a match date is within the next 24 hours (or currently live)
-const isWithin24Hours = (matchDate) => {
+// Check if a match falls on today's local date
+const isMatchToday = (matchDate, matchTime) => {
   try {
-    const match = new Date(matchDate);
-    const now = new Date();
-    const diffMs = match.getTime() - now.getTime();
-    // Window: -12 hours (already started) to +24 hours (upcoming)
-    return diffMs >= -12 * 60 * 60 * 1000 && diffMs <= 24 * 60 * 60 * 1000;
+    const utcStr = `${matchDate}T${matchTime || '12:00'}:00Z`;
+    const localDate = new Date(utcStr).toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const today = new Date().toLocaleDateString('en-CA');
+    return localDate === today;
   } catch {
     return false;
   }
@@ -141,12 +140,12 @@ const LandingPage = () => {
     loadUpcomingMatches();
   }, []);
 
-  // Determine today's matches (up to 2 that are live or within 24 hours)
+  // Determine today's matches: filter first, then slice
   const todaysMatches = upcomingMatches
-    .slice(0, 2)
-    .filter(m => m.isLive || isWithin24Hours(m.date));
+    .filter(m => m.isLive || isMatchToday(m.date, m.time))
+    .slice(0, 4);
 
-  const remainingMatches = upcomingMatches.slice(todaysMatches.length);
+  const remainingMatches = upcomingMatches.filter(m => !todaysMatches.includes(m));
 
   const hasLive = todaysMatches.some(m => m.isLive);
 

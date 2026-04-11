@@ -58,6 +58,7 @@ VENUE_NAME_MAP = {
     "Barsapara Cricket Stadium, Guwahati": "Barsapara Cricket Stadium",
     "Dr DY Patil Sports Academy, Mumbai": "Dr DY Patil Sports Academy",
     "Brabourne Stadium, Mumbai": "Brabourne Stadium",
+    "Maharaja Yadavindra Singh International Cricket Stadium, New Chandigarh": "Maharaja Yadavindra Singh International Cricket Stadium, Mullanpur",
 }
 
 _fixture_cache: Dict[str, Any] = {

@@ -86,6 +86,7 @@ def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float
               AND bat = :batter_name
               AND inns = :innings
               AND wagon_x IS NOT NULL
+              AND wagon_y IS NOT NULL
             ORDER BY over, ball
         """)
 
@@ -97,6 +98,19 @@ def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float
 
         # Skip innings with no wagon wheel data
         if not deliveries:
+            continue
+
+        # Skip innings where wagon wheel coverage is below 50%
+        total_query = text("""
+            SELECT COUNT(*) FROM delivery_details
+            WHERE p_match = :match_id AND bat = :batter_name AND inns = :innings
+        """)
+        total = db.execute(total_query, {
+            "match_id": row.match_id,
+            "batter_name": row.striker,
+            "innings": row.innings
+        }).scalar()
+        if total and len(deliveries) / total < 0.5:
             continue
 
         # Use accurate runs/balls from delivery_details (last delivery has cumulative stats)
