@@ -47,13 +47,13 @@ import { PitchMapContainer, getPitchMapMode } from './PitchMap';
 const ColumnFilter = ({ column, displayName, uniqueValues, selectedValues, onChange, onClear, isMobile }) => {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 200 }}>
-      <FormControl size="small" sx={{ minWidth: 150, maxWidth: 200 }}>
-        <InputLabel>{`Filter ${displayName}`}</InputLabel>
+      <FormControl size="small" sx={{ minWidth: isMobile ? 80 : 150, maxWidth: isMobile ? 120 : 200 }}>
+        <InputLabel sx={isMobile ? { fontSize: '0.75rem' } : {}}>{isMobile ? 'Filter' : `Filter ${displayName}`}</InputLabel>
         <Select
           multiple
           value={selectedValues || []}
           onChange={(e) => onChange(column, e.target.value)}
-          input={<OutlinedInput label={`Filter ${displayName}`} />}
+          input={<OutlinedInput label={isMobile ? 'Filter' : `Filter ${displayName}`} />}
           renderValue={(selected) => (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {selected.slice(0, isMobile ? 1 : 2).map((value) => (
