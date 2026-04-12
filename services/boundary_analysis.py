@@ -15,6 +15,8 @@ from typing import List, Literal, Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from services.visualizations import get_player_name_for_delivery_details
+
 
 PHASE_CASE_SQL = """CASE
     WHEN "over" >= 0 AND "over" < 6 THEN 'powerplay'
@@ -54,6 +56,10 @@ def get_boundary_analysis(
     Returns phase-wise and overall boundary stats grouped by the relevant
     dimension (pace/spin for venue/batter, bat_hand for bowler).
     """
+    # delivery_details uses 'bat'/'bowl' columns (not 'batter'/'bowler')
+    # and full names (e.g. "Virat Kohli" not "V Kohli")
+    needs_name_resolve = context in ("batter", "bowler")
+
     if context == "venue":
         filter_col = "ground"
         group_dim = "bowl_kind"
@@ -61,13 +67,13 @@ def get_boundary_analysis(
         group_by = "group_key, sub_group"
         extra_where = f"AND ({BOWL_KIND_CASE_SQL}) IS NOT NULL"
     elif context == "batter":
-        filter_col = "batter"
+        filter_col = "bat"
         group_dim = "bowl_kind"
         group_sql = f"({BOWL_KIND_CASE_SQL}) AS group_key, bowl_style AS sub_group"
         group_by = "group_key, sub_group"
         extra_where = f"AND ({BOWL_KIND_CASE_SQL}) IS NOT NULL"
     elif context == "bowler":
-        filter_col = "bowler"
+        filter_col = "bowl"
         group_dim = "bat_hand"
         group_sql = "bat_hand AS group_key, NULL AS sub_group"
         group_by = "group_key"
@@ -75,8 +81,13 @@ def get_boundary_analysis(
     else:
         raise ValueError(f"Invalid context: {context}")
 
-    where_clauses = [f"{filter_col} = :name"]
-    params: dict = {"name": name}
+    if needs_name_resolve:
+        player_names = get_player_name_for_delivery_details(db, name)
+        where_clauses = [f"{filter_col} = ANY(:names)"]
+        params: dict = {"names": player_names}
+    else:
+        where_clauses = [f"{filter_col} = :name"]
+        params: dict = {"name": name}
 
     if start_date:
         where_clauses.append("date >= :start_date")
