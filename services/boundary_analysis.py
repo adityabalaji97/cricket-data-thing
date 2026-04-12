@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from services.visualizations import get_player_name_for_delivery_details
 from services.delivery_data_service import build_competition_filter_delivery_details
+from services.analytics_common import normalize_leagues
 
 
 PHASE_CASE_SQL = """CASE
@@ -99,11 +100,11 @@ def get_boundary_analysis(
         params["end_date"] = end_date
 
     # Competition / international filter (uses dd.competition column)
-    # build_competition_filter_delivery_details expects params["leagues"] to be pre-set
-    if leagues:
-        params["leagues"] = leagues
+    expanded_leagues = normalize_leagues(leagues)
+    if expanded_leagues:
+        params["leagues"] = expanded_leagues
     comp_filter = build_competition_filter_delivery_details(
-        leagues or [], include_international, None, params
+        expanded_leagues, include_international, None, params
     )
 
     where_clauses.append("(dd.wide IS NULL OR dd.wide = 0)")
