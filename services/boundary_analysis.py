@@ -99,6 +99,9 @@ def get_boundary_analysis(
         params["end_date"] = end_date
 
     # Competition / international filter (uses dd.competition column)
+    # build_competition_filter_delivery_details expects params["leagues"] to be pre-set
+    if leagues:
+        params["leagues"] = leagues
     comp_filter = build_competition_filter_delivery_details(
         leagues or [], include_international, None, params
     )
