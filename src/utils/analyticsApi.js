@@ -66,6 +66,21 @@ export const fetchAnalyticsJson = (path, params = {}, options = {}) => {
   return request;
 };
 
+export const postAnalyticsJson = (path, body) => {
+  const url = `${config.API_URL}${path}`;
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(async (response) => {
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`Analytics POST failed (${response.status}): ${detail}`);
+    }
+    return response.json();
+  });
+};
+
 export const clearAnalyticsCache = () => {
   analyticsCache.clear();
 };

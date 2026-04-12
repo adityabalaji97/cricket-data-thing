@@ -22,9 +22,9 @@ import {
     Trophy,
 } from 'lucide-react';
 import {
-    fetchAnalyticsJson,
     getFormFlagMeta,
     normalizeAnalyticsName,
+    postAnalyticsJson,
 } from '../utils/analyticsApi';
 import { condenseName, getFormBorderColor } from '../utils/playerNameUtils';
 import { getTeamAbbr } from '../utils/teamAbbreviations';
@@ -507,26 +507,15 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
                     [...fantasyNames, ...matrixBatters, ...matrixBowlers].filter(Boolean),
                 )).slice(0, 80);
 
-                const formEntries = await Promise.all(formCandidates.map(async (name) => {
-                    try {
-                        const payload = await fetchAnalyticsJson(
-                            `/player/${encodeURIComponent(name)}/rolling-form`,
-                            {
-                                start_date: startDate,
-                                end_date: endDate,
-                                role: 'all',
-                                window: 10,
-                            },
-                        );
-                        return [name, payload?.form_flag || 'neutral'];
-                    } catch (fetchError) {
-                        return [name, 'neutral'];
-                    }
-                }));
+                const result = await postAnalyticsJson('/players/form-flags', {
+                    player_names: formCandidates,
+                    window: 10,
+                });
 
                 if (cancelled) return;
+                const serverFlags = result?.flags || {};
                 const nextFormFlags = {};
-                formEntries.forEach(([name, flag]) => {
+                Object.entries(serverFlags).forEach(([name, flag]) => {
                     nextFormFlags[name] = flag;
                     const normalized = normalizeAnalyticsName(name);
                     if (normalized) {

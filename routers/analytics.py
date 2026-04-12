@@ -13,6 +13,7 @@ from datetime import date
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_session
@@ -25,7 +26,7 @@ from services.relative_metrics import (
     get_team_relative_metrics,
 )
 from services.resource_benchmark import get_match_resource_benchmark
-from services.rolling_form import get_player_rolling_form
+from services.rolling_form import get_player_rolling_form, get_form_flags_for_players
 from services.boundary_vs_bowling_type import get_boundary_vs_bowling_type
 from services.boundary_analysis import get_boundary_analysis
 
@@ -212,6 +213,27 @@ def player_boundary_vs_bowling_type(
             status_code=500,
             detail=f"Failed to compute boundary vs bowling type: {exc}",
         )
+
+
+class FormFlagsRequest(BaseModel):
+    player_names: List[str]
+    window: int = 10
+
+
+@router.post("/players/form-flags")
+def batch_form_flags(
+    body: FormFlagsRequest,
+    db: Session = Depends(get_session),
+):
+    try:
+        flags = get_form_flags_for_players(
+            db=db,
+            player_names=body.player_names,
+            window=body.window,
+        )
+        return {"flags": flags}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to compute form flags: {exc}")
 
 
 @router.get("/boundary-analysis")

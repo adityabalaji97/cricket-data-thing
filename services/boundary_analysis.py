@@ -16,7 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from services.visualizations import get_player_name_for_delivery_details
-from services.delivery_data_service import build_competition_filter_delivery_details
+from services.delivery_data_service import build_competition_filter_delivery_details, get_venue_aliases
 from services.analytics_common import normalize_leagues
 
 
@@ -89,8 +89,9 @@ def get_boundary_analysis(
         where_clauses = [f"dd.{filter_col} = ANY(:names)"]
         params: dict = {"names": player_names}
     else:
-        where_clauses = [f"dd.{filter_col} = :name"]
-        params: dict = {"name": name}
+        venue_aliases = get_venue_aliases(name)
+        where_clauses = [f"dd.{filter_col} = ANY(:names)"]
+        params: dict = {"names": venue_aliases}
 
     if start_date:
         where_clauses.append("dd.match_date::date >= :start_date")
