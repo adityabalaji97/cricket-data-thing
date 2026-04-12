@@ -92,17 +92,19 @@ const StatCard = ({ group, isMobile }) => {
         px: 1, py: 0.25, borderRadius: 1,
         bgcolor: style.bgcolor, color: style.color,
       }}>
-        <Typography sx={{ fontWeight: 700, fontSize: isMobile ? '0.85rem' : '1rem' }}>
-          1 every {ballsPerBoundary} balls
+        <Typography sx={{ fontWeight: 700, fontSize: isMobile ? '0.9rem' : '1.1rem' }}>
+          {ballsPerBoundary} bpb
         </Typography>
       </Box>
 
-      {/* 4s × 6s (balls) */}
-      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
-        {group.fours}×4&nbsp;&nbsp;{group.sixes}×6&nbsp;&nbsp;
-        <Typography component="span" variant="body2" sx={{ color: designColors.neutral[400], fontSize: isMobile ? '0.7rem' : '0.8rem' }}>
-          ({group.total_balls} balls)
-        </Typography>
+      {/* 4s × 6s */}
+      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: isMobile ? '0.7rem' : '0.8rem' }}>
+        {group.fours}×4&nbsp;&nbsp;{group.sixes}×6
+      </Typography>
+
+      {/* Balls */}
+      <Typography variant="caption" sx={{ color: designColors.neutral[400], fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
+        {group.total_balls} balls
       </Typography>
 
       {/* Top 3 shots */}

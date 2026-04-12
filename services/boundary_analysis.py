@@ -152,8 +152,9 @@ def get_boundary_analysis(
             _accumulate_shot(group["shots"], shot, total_balls, total_runs, fours, sixes, boundaries)
 
             if sub_group and "styles" in group:
-                style_bucket = group["styles"].setdefault(sub_group, _empty_bucket())
+                style_bucket = group["styles"].setdefault(sub_group, {**_empty_bucket(), "shots": {}})
                 _accumulate(style_bucket, total_balls, total_runs, fours, sixes, boundaries)
+                _accumulate_shot(style_bucket["shots"], shot, total_balls, total_runs, fours, sixes, boundaries)
 
     # Finalize percentages
     for phase_groups in list(phases_data.values()) + [overall_data]:
@@ -164,6 +165,8 @@ def get_boundary_analysis(
             if "styles" in group:
                 for style_data in group["styles"].values():
                     _finalize(style_data)
+                    for shot_data in style_data.get("shots", {}).values():
+                        _finalize(shot_data)
 
     # Structure into final response
     result_phases = {}
