@@ -440,6 +440,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
           startDate={dateRange.start}
           endDate={dateRange.end}
           leagues={competitionFilters.leagues}
+          includeInternational={competitionFilters.international}
           isMobile={isMobile}
         />
       ),

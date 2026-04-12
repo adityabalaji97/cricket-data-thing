@@ -1119,6 +1119,7 @@ const VenueNotes = ({
                     startDate={startDate}
                     endDate={endDate}
                     leagues={leagues}
+                    includeInternational={includeInternational}
                     isMobile={isMobile}
                 />
             ),

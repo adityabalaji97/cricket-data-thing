@@ -104,7 +104,7 @@ const getTotalBalls = (data) => {
   return Object.values(data.overall.groups).reduce((sum, g) => sum + (g.total_balls || 0), 0);
 };
 
-const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, isMobile: isMobileProp }) => {
+const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeInternational, isMobile: isMobileProp }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -125,6 +125,7 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, isMobile
     if (startDate) params.start_date = startDate;
     if (endDate) params.end_date = endDate;
     if (leagues?.length) params.leagues = leagues;
+    if (includeInternational) params.include_international = true;
 
     fetchAnalyticsJson('/boundary-analysis', params)
       .then((result) => {
@@ -135,7 +136,7 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, isMobile
         setError(err.message);
         setLoading(false);
       });
-  }, [context, name, startDate, endDate, leagues]);
+  }, [context, name, startDate, endDate, leagues, includeInternational]);
 
   if (loading) {
     return (

@@ -16,25 +16,26 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from services.visualizations import get_player_name_for_delivery_details
+from services.delivery_data_service import build_competition_filter_delivery_details
 
 
 PHASE_CASE_SQL = """CASE
-    WHEN "over" >= 0 AND "over" < 6 THEN 'powerplay'
-    WHEN "over" >= 6 AND "over" < 15 THEN 'middle'
-    WHEN "over" >= 15 THEN 'death'
+    WHEN dd."over" >= 0 AND dd."over" < 6 THEN 'powerplay'
+    WHEN dd."over" >= 6 AND dd."over" < 15 THEN 'middle'
+    WHEN dd."over" >= 15 THEN 'death'
     ELSE 'other'
 END"""
 
 # Use bowl_kind column (values like 'pace bowler', 'spin bowler') with ILIKE,
 # matching the pattern used across the codebase (venue_similarity, wrapped cards, etc.)
 BOWL_KIND_CASE_SQL = """CASE
-    WHEN LOWER(COALESCE(bowl_kind, '')) LIKE '%pace%'
-      OR LOWER(COALESCE(bowl_kind, '')) LIKE '%fast%'
-      OR LOWER(COALESCE(bowl_kind, '')) LIKE '%seam%'
-      OR LOWER(COALESCE(bowl_kind, '')) LIKE '%medium%'
+    WHEN LOWER(COALESCE(dd.bowl_kind, '')) LIKE '%pace%'
+      OR LOWER(COALESCE(dd.bowl_kind, '')) LIKE '%fast%'
+      OR LOWER(COALESCE(dd.bowl_kind, '')) LIKE '%seam%'
+      OR LOWER(COALESCE(dd.bowl_kind, '')) LIKE '%medium%'
     THEN 'pace'
-    WHEN LOWER(COALESCE(bowl_kind, '')) LIKE '%spin%'
-      OR LOWER(COALESCE(bowl_kind, '')) LIKE '%slow%'
+    WHEN LOWER(COALESCE(dd.bowl_kind, '')) LIKE '%spin%'
+      OR LOWER(COALESCE(dd.bowl_kind, '')) LIKE '%slow%'
     THEN 'spin'
     ELSE NULL
 END"""
@@ -49,6 +50,7 @@ def get_boundary_analysis(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     leagues: Optional[List[str]] = None,
+    include_international: bool = False,
 ) -> dict:
     """
     Unified boundary analysis for venue, batter, or bowler context.
@@ -63,59 +65,62 @@ def get_boundary_analysis(
     if context == "venue":
         filter_col = "ground"
         group_dim = "bowl_kind"
-        group_sql = f"({BOWL_KIND_CASE_SQL}) AS group_key, bowl_style AS sub_group"
+        group_sql = f"({BOWL_KIND_CASE_SQL}) AS group_key, dd.bowl_style AS sub_group"
         group_by = "group_key, sub_group"
         extra_where = f"AND ({BOWL_KIND_CASE_SQL}) IS NOT NULL"
     elif context == "batter":
         filter_col = "bat"
         group_dim = "bowl_kind"
-        group_sql = f"({BOWL_KIND_CASE_SQL}) AS group_key, bowl_style AS sub_group"
+        group_sql = f"({BOWL_KIND_CASE_SQL}) AS group_key, dd.bowl_style AS sub_group"
         group_by = "group_key, sub_group"
         extra_where = f"AND ({BOWL_KIND_CASE_SQL}) IS NOT NULL"
     elif context == "bowler":
         filter_col = "bowl"
         group_dim = "bat_hand"
-        group_sql = "bat_hand AS group_key, NULL AS sub_group"
+        group_sql = "dd.bat_hand AS group_key, NULL AS sub_group"
         group_by = "group_key"
-        extra_where = "AND bat_hand IS NOT NULL AND bat_hand != ''"
+        extra_where = "AND dd.bat_hand IS NOT NULL AND dd.bat_hand != ''"
     else:
         raise ValueError(f"Invalid context: {context}")
 
     if needs_name_resolve:
         player_names = get_player_name_for_delivery_details(db, name)
-        where_clauses = [f"{filter_col} = ANY(:names)"]
+        where_clauses = [f"dd.{filter_col} = ANY(:names)"]
         params: dict = {"names": player_names}
     else:
-        where_clauses = [f"{filter_col} = :name"]
+        where_clauses = [f"dd.{filter_col} = :name"]
         params: dict = {"name": name}
 
     if start_date:
-        where_clauses.append("date >= :start_date")
+        where_clauses.append("dd.date >= :start_date")
         params["start_date"] = start_date
     if end_date:
-        where_clauses.append("date <= :end_date")
+        where_clauses.append("dd.date <= :end_date")
         params["end_date"] = end_date
-    if leagues:
-        where_clauses.append("competition = ANY(:leagues)")
-        params["leagues"] = leagues
 
-    where_clauses.append("(wide IS NULL OR wide = 0)")
+    # Competition / international filter (uses dd.competition column)
+    comp_filter = build_competition_filter_delivery_details(
+        leagues or [], include_international, None, params
+    )
+
+    where_clauses.append("(dd.wide IS NULL OR dd.wide = 0)")
     where_sql = " AND ".join(where_clauses)
 
     query = text(f"""
         SELECT
             {PHASE_CASE_SQL} AS phase,
             {group_sql},
-            shot,
+            dd.shot,
             COUNT(*) AS total_balls,
-            COALESCE(SUM(score), 0) AS total_runs,
-            SUM(CASE WHEN score = 4 THEN 1 ELSE 0 END) AS fours,
-            SUM(CASE WHEN score = 6 THEN 1 ELSE 0 END) AS sixes
-        FROM delivery_details
+            COALESCE(SUM(dd.score), 0) AS total_runs,
+            SUM(CASE WHEN dd.score = 4 THEN 1 ELSE 0 END) AS fours,
+            SUM(CASE WHEN dd.score = 6 THEN 1 ELSE 0 END) AS sixes
+        FROM delivery_details dd
         WHERE {where_sql}
+          {comp_filter}
           {extra_where}
-        GROUP BY phase, {group_by}, shot
-        ORDER BY phase, group_key, shot
+        GROUP BY phase, {group_by}, dd.shot
+        ORDER BY phase, group_key, dd.shot
     """)
 
     rows = db.execute(query, params).fetchall()

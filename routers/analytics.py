@@ -221,6 +221,7 @@ def boundary_analysis(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     leagues: List[str] = Query(default=[]),
+    include_international: bool = Query(default=False),
     db: Session = Depends(get_session),
 ):
     try:
@@ -231,6 +232,7 @@ def boundary_analysis(
             start_date=start_date,
             end_date=end_date,
             leagues=leagues if leagues else None,
+            include_international=include_international,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
