@@ -21,22 +21,21 @@ const formatShotName = (name) => {
     .join(' ');
 };
 
-const getBoundaryStyle = (pct) => {
-  if (pct >= 30) return { bgcolor: designColors.success[700], color: '#fff' };
-  if (pct >= 20) return { bgcolor: designColors.success[500], color: '#fff' };
-  if (pct >= 10) return { bgcolor: designColors.success[50], color: designColors.neutral[900] };
+const getBoundaryStyle = (ballsPerBoundary) => {
+  if (ballsPerBoundary <= 4) return { bgcolor: designColors.success[700], color: '#fff' };
+  if (ballsPerBoundary <= 6) return { bgcolor: designColors.success[500], color: '#fff' };
+  if (ballsPerBoundary <= 10) return { bgcolor: designColors.success[50], color: designColors.neutral[900] };
   return { bgcolor: designColors.neutral[200], color: designColors.neutral[900] };
 };
 
-const getTopShot = (shots) => {
-  if (!shots) return null;
-  let best = null;
-  Object.entries(shots).forEach(([name, data]) => {
-    if (!best || data.boundaries > best.boundaries) {
-      best = { name, ...data };
-    }
-  });
-  return best;
+const getTopShots = (shots, totalBoundaries) => {
+  if (!shots || totalBoundaries === 0) return [];
+  return Object.entries(shots)
+    .map(([name, data]) => ({ name, boundaries: data.boundaries || 0 }))
+    .filter((s) => s.boundaries > 0)
+    .sort((a, b) => b.boundaries - a.boundaries)
+    .slice(0, 3)
+    .map((s) => ({ ...s, pct: +(s.boundaries / totalBoundaries * 100).toFixed(0) }));
 };
 
 const getTotalBalls = (data) => {
@@ -56,7 +55,7 @@ const StatCard = ({ group, isMobile }) => {
   if (!group || group.total_balls === 0) {
     return (
       <Box sx={{
-        p: 1.5, borderRadius: 1, border: `1px solid ${designColors.neutral[200]}`,
+        p: isMobile ? 1 : 1.5, borderRadius: 1, border: `1px solid ${designColors.neutral[200]}`,
         bgcolor: designColors.neutral[50], minHeight: 80,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
@@ -65,51 +64,56 @@ const StatCard = ({ group, isMobile }) => {
     );
   }
 
-  const pct = group.boundary_pct ?? (group.total_balls > 0 ? +(group.boundaries / group.total_balls * 100).toFixed(1) : 0);
-  const style = getBoundaryStyle(pct);
-  const topShot = getTopShot(group.shots);
+  if (group.boundaries === 0) {
+    return (
+      <Box sx={{
+        p: isMobile ? 1 : 1.5, borderRadius: 1, border: `1px solid ${designColors.neutral[200]}`,
+        bgcolor: designColors.neutral[50], minHeight: 80,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Typography variant="caption" color="text.disabled">No boundaries</Typography>
+        <Typography variant="caption" color="text.disabled">({group.total_balls} balls)</Typography>
+      </Box>
+    );
+  }
+
+  const ballsPerBoundary = +(group.total_balls / group.boundaries).toFixed(1);
+  const style = getBoundaryStyle(ballsPerBoundary);
+  const topShots = getTopShots(group.shots, group.boundaries);
 
   return (
     <Box sx={{
-      p: 1.5, borderRadius: 1, border: `1px solid ${designColors.neutral[200]}`,
+      p: isMobile ? 1 : 1.5, borderRadius: 1, border: `1px solid ${designColors.neutral[200]}`,
       bgcolor: designColors.neutral[0], display: 'flex', flexDirection: 'column', gap: 0.5,
     }}>
-      {/* Boundary % badge */}
+      {/* Balls per boundary — primary metric */}
       <Box sx={{
         display: 'inline-flex', alignSelf: 'flex-start',
         px: 1, py: 0.25, borderRadius: 1,
         bgcolor: style.bgcolor, color: style.color,
       }}>
-        <Typography variant="body1" sx={{ fontWeight: 700, fontSize: isMobile ? '1rem' : '1.125rem' }}>
-          {pct.toFixed(1)}%
+        <Typography sx={{ fontWeight: 700, fontSize: isMobile ? '0.85rem' : '1rem' }}>
+          1 every {ballsPerBoundary} balls
         </Typography>
       </Box>
 
-      {/* 4s × 6s */}
-      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-        {group.fours}×4&nbsp;&nbsp;{group.sixes}×6
-      </Typography>
-
-      {/* Balls */}
-      <Typography variant="caption" color="text.secondary">
-        {group.total_balls} balls
-      </Typography>
-
-      {/* Top shot */}
-      {topShot && topShot.boundaries > 0 && (
-        <Typography variant="caption" sx={{ color: designColors.neutral[500], fontStyle: 'italic' }}>
-          {formatShotName(topShot.name)}
+      {/* 4s × 6s (balls) */}
+      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+        {group.fours}×4&nbsp;&nbsp;{group.sixes}×6&nbsp;&nbsp;
+        <Typography component="span" variant="body2" sx={{ color: designColors.neutral[400], fontSize: isMobile ? '0.7rem' : '0.8rem' }}>
+          ({group.total_balls} balls)
         </Typography>
-      )}
+      </Typography>
 
-      {/* Thin bar */}
-      <Box sx={{ mt: 0.5, height: 4, borderRadius: 2, bgcolor: designColors.neutral[100], overflow: 'hidden' }}>
-        <Box sx={{
-          height: '100%', borderRadius: 2,
-          width: `${Math.min(pct, 100)}%`,
-          bgcolor: pct >= 20 ? designColors.success[500] : pct >= 10 ? designColors.success[600] : designColors.neutral[400],
-        }} />
-      </Box>
+      {/* Top 3 shots */}
+      {topShots.map((shot) => (
+        <Typography key={shot.name} variant="caption" sx={{
+          color: designColors.neutral[600], fontSize: isMobile ? '0.65rem' : '0.75rem',
+          lineHeight: 1.3,
+        }}>
+          {formatShotName(shot.name)}&nbsp;&nbsp;{shot.pct}%
+        </Typography>
+      ))}
     </Box>
   );
 };
@@ -275,16 +279,17 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
       {gridRows.length > 0 && (
         <Box sx={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? 'auto 1fr 1fr' : 'auto 1fr 1fr 1fr',
-          gap: 1,
+          gridTemplateColumns: 'auto 1fr 1fr 1fr',
+          gap: isMobile ? 0.5 : 1,
           mb: 3,
         }}>
           {/* Column headers */}
           <Box />
-          {(isMobile ? PHASES.slice(0, 2) : PHASES).map((phase) => (
+          {PHASES.map((phase) => (
             <Typography key={phase} variant="caption" sx={{
               fontWeight: 600, textAlign: 'center', color: designColors.neutral[500],
               textTransform: 'uppercase', letterSpacing: '0.05em', pb: 0.5,
+              fontSize: isMobile ? '0.65rem' : undefined,
             }}>
               {PHASE_LABELS[phase]}
             </Typography>
@@ -295,43 +300,16 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
             <React.Fragment key={row.label}>
               <Box sx={{
                 display: 'flex', alignItems: 'center',
-                fontWeight: 600, fontSize: '0.8rem',
-                pr: 1, minWidth: isMobile ? 'auto' : 70,
+                fontWeight: 600, fontSize: isMobile ? '0.7rem' : '0.8rem',
+                pr: isMobile ? 0.5 : 1, minWidth: isMobile ? 'auto' : 70,
               }}>
                 {row.label}
               </Box>
-              {(isMobile ? PHASES.slice(0, 2) : PHASES).map((phase) => (
+              {PHASES.map((phase) => (
                 <StatCard key={phase} group={row.phaseData[phase]} isMobile={isMobile} />
               ))}
             </React.Fragment>
           ))}
-
-          {/* On mobile, show death phase as a separate row below */}
-          {isMobile && gridRows.length > 0 && (
-            <>
-              <Box />
-              <Typography variant="caption" sx={{
-                fontWeight: 600, textAlign: 'center', color: designColors.neutral[500],
-                textTransform: 'uppercase', letterSpacing: '0.05em', pt: 1, pb: 0.5,
-                gridColumn: 'span 2',
-              }}>
-                Death
-              </Typography>
-              {gridRows.map((row) => (
-                <React.Fragment key={`death-${row.label}`}>
-                  <Box sx={{
-                    display: 'flex', alignItems: 'center',
-                    fontWeight: 600, fontSize: '0.8rem', pr: 1,
-                  }}>
-                    {row.label}
-                  </Box>
-                  <Box sx={{ gridColumn: 'span 2' }}>
-                    <StatCard group={row.phaseData.death} isMobile={isMobile} />
-                  </Box>
-                </React.Fragment>
-              ))}
-            </>
-          )}
         </Box>
       )}
 
