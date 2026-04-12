@@ -94,7 +94,7 @@ const SearchBar = ({ onSelect, placeholder = "Search players, teams, or venues..
 
   return (
     <ClickAwayListener onClickAway={handleClickAway}>
-      <Box sx={{ position: 'relative', width: '100%', maxWidth: 600 }}>
+      <Box sx={{ position: 'relative', width: '100%', maxWidth: 600, zIndex: 1300 }}>
         <TextField
           fullWidth
           value={query}

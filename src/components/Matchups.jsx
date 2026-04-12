@@ -14,8 +14,6 @@ import {
     TableHead, 
     TableRow,
     Tooltip,
-    Chip,
-    Stack,
 } from '@mui/material';
 
 import {
@@ -28,6 +26,8 @@ import {
     getFormFlagMeta,
     normalizeAnalyticsName,
 } from '../utils/analyticsApi';
+import { condenseName, getFormBorderColor } from '../utils/playerNameUtils';
+import { getTeamAbbr } from '../utils/teamAbbreviations';
 
 const getPlayerFormFlag = (formFlagsByPlayer = {}, playerName = '') => (
     formFlagsByPlayer[playerName] || formFlagsByPlayer[normalizeAnalyticsName(playerName)] || null
@@ -154,16 +154,6 @@ const MetricCell = ({ data, isMobile, bowler, isBowlingConsolidated = false }) =
 const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer }) => {
     if (!fantasyData || !fantasyData.top_fantasy_picks) return null;
 
-    const getRoleColor = (role) => {
-        switch (role?.toLowerCase()) {
-            case 'batting': return 'success';
-            case 'bowling': return 'primary';
-            case 'all-round': return 'secondary';
-            case 'wicket-keeper': return 'warning';
-            default: return 'default';
-        }
-    };
-
     const getConfidenceColor = (confidence) => {
         if (confidence >= 0.8) return 'success.main';
         if (confidence >= 0.6) return 'warning.main';
@@ -187,33 +177,18 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer }) => {
                 <Table size="small" stickyHeader>
                     <TableHead>
                         <TableRow>
-                            <TableCell sx={{ fontWeight: 'bold', py: 1 }}>#</TableCell>
                             <TableCell sx={{ fontWeight: 'bold', py: 1 }}>Player</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', py: 1 }}>Role</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>Pts</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>xPoints</TableCell>
                             <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>Confidence</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {fantasyData.top_fantasy_picks.map((player, index) => {
+                        {fantasyData.top_fantasy_picks.map((player) => {
                             const formMeta = getPlayerFormMeta(formFlagsByPlayer, player.player_name);
                             return (
                                 <TableRow key={player.player_name}>
-                                <TableCell sx={{ py: 0.75 }}>{index + 1}</TableCell>
-                                <TableCell sx={{ py: 0.75, fontWeight: 'bold' }}>
-                                    <Stack direction="row" spacing={0.75} alignItems="center">
-                                        <span>{player.player_name}</span>
-                                        {formMeta && (
-                                            <Chip
-                                                size="small"
-                                                label={formMeta.label}
-                                                color={formMeta.color}
-                                            />
-                                        )}
-                                    </Stack>
-                                </TableCell>
-                                <TableCell sx={{ py: 0.75 }}>
-                                    <Chip label={player.role || 'Fielding'} size="small" color={getRoleColor(player.role)} />
+                                <TableCell sx={{ py: 0.75, fontWeight: 'bold', borderLeft: `3px solid ${getFormBorderColor(formMeta)}` }}>
+                                    {condenseName(player.player_name)}
                                 </TableCell>
                                 <TableCell align="right" sx={{ py: 0.75, color: 'primary.main', fontWeight: 'bold' }}>
                                     {player.expected_points?.toFixed(1) || '0.0'}
@@ -285,7 +260,7 @@ const MatchupMatrix = ({
         }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
                 <Typography variant={isMobile ? "subtitle1" : "h6"}>
-                    {decodeURIComponent(batting_team)} vs {decodeURIComponent(bowling_team)} Matchups
+                    {getTeamAbbr(decodeURIComponent(batting_team))} vs {getTeamAbbr(decodeURIComponent(bowling_team))} Matchups
                 </Typography>
                 <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
                     <InfoIcon size={16} />
@@ -339,7 +314,7 @@ const MatchupMatrix = ({
                                                 Consolidated
                                             </span>
                                         ) : (
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', borderBottom: `3px solid ${getFormBorderColor(formMeta)}` }}>
                                                 <a
                                                     href={`${window.location.origin}/player?${params.toString()}`}
                                                     target="_blank"
@@ -352,15 +327,8 @@ const MatchupMatrix = ({
                                                         height: '100%'
                                                     }}
                                                 >
-                                                    {bowler}
+                                                    {condenseName(bowler)}
                                                 </a>
-                                                {formMeta && (
-                                                    <Chip
-                                                        size="small"
-                                                        label={formMeta.label}
-                                                        color={formMeta.color}
-                                                    />
-                                                )}
                                             </Box>
                                         )}
                                     </TableCell>
@@ -374,49 +342,41 @@ const MatchupMatrix = ({
                             const formMeta = getPlayerFormMeta(formFlagsByPlayer, batter);
                             return (
                             <TableRow key={batter} onClick={() => handleBatterClick(batter)} style={{ cursor: 'pointer' }}>
-                                <TableCell 
-                                    component="th" 
+                                <TableCell
+                                    component="th"
                                     scope="row"
-                                    sx={{ 
+                                    sx={{
                                         fontWeight: 'bold',
                                         whiteSpace: 'nowrap',
                                         position: 'sticky',
                                         left: 0,
                                         backgroundColor: 'background.paper',
                                         zIndex: 1,
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        borderLeft: `3px solid ${getFormBorderColor(formMeta)}`
                                     }}
                                     onClick={() => handleBatterClick(batter)}
                                 >
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                        <a 
-                                            href={`${window.location.origin}/player?${new URLSearchParams({
-                                                name: batter,
-                                                ...(venue && venue !== "All Venues" ? { venue } : {}),
-                                                ...(startDate ? { start_date: startDate } : {}),
-                                                ...(endDate ? { end_date: endDate } : {}),
-                                                autoload: 'true'
-                                            }).toString()}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            style={{ 
-                                                textDecoration: 'none', 
-                                                color: 'inherit', 
-                                                display: 'block', 
-                                                width: '100%', 
-                                                height: '100%' 
-                                            }}
-                                        >
-                                            {batter}
-                                        </a>
-                                        {formMeta && (
-                                            <Chip
-                                                size="small"
-                                                label={formMeta.label}
-                                                color={formMeta.color}
-                                            />
-                                        )}
-                                    </Box>
+                                    <a
+                                        href={`${window.location.origin}/player?${new URLSearchParams({
+                                            name: batter,
+                                            ...(venue && venue !== "All Venues" ? { venue } : {}),
+                                            ...(startDate ? { start_date: startDate } : {}),
+                                            ...(endDate ? { end_date: endDate } : {}),
+                                            autoload: 'true'
+                                        }).toString()}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{
+                                            textDecoration: 'none',
+                                            color: 'inherit',
+                                            display: 'block',
+                                            width: '100%',
+                                            height: '100%'
+                                        }}
+                                    >
+                                        {condenseName(batter)}
+                                    </a>
                                 </TableCell>
                                 {bowlers.map(bowler => (
                                     <MetricCell 
@@ -445,9 +405,8 @@ const MatchupMatrix = ({
                                         zIndex: 1
                                     }}
                                 >
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <Activity size={16} />
-                                        Bowling vs Opposition
                                     </Box>
                                 </TableCell>
                                 {bowlers.map(bowler => {
@@ -477,114 +436,11 @@ const MatchupMatrix = ({
     );
 };
 
-const formatValue = (value, digits = 2) => (
-    value === null || value === undefined || Number.isNaN(Number(value))
-        ? '-'
-        : Number(value).toFixed(digits)
-);
-
-const BowlingContextWatchCard = ({ rows, loading, error, isMobile }) => {
-    if (loading) {
-        return (
-            <Card sx={{ p: 2, mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CircularProgress size={18} />
-                    <Typography variant="body2">Loading bowling context watch…</Typography>
-                </Box>
-            </Card>
-        );
-    }
-
-    if (error) {
-        return <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>;
-    }
-
-    if (!rows || rows.length === 0) {
-        return (
-            <Alert severity="info" sx={{ mb: 2 }}>
-                Bowling context watch unavailable for current lineup sample.
-            </Alert>
-        );
-    }
-
-    return (
-        <Card sx={{ p: 2, mb: 2 }}>
-            <Typography variant={isMobile ? 'subtitle1' : 'h6'} sx={{ fontWeight: 700, mb: 1 }}>
-                Bowling Context Watch
-            </Typography>
-            <Table size="small">
-                <TableHead>
-                    <TableRow>
-                        <TableCell>Bowler</TableCell>
-                        <TableCell align="right">High Econ</TableCell>
-                        <TableCell align="right">Low Econ</TableCell>
-                        <TableCell align="right">Δ Econ</TableCell>
-                        <TableCell align="right">1st Ball Bdry%</TableCell>
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {rows.map((row) => (
-                        <TableRow key={row.player}>
-                            <TableCell sx={{ fontWeight: 700 }}>{row.player}</TableCell>
-                            <TableCell align="right">{formatValue(row.highEcon)}</TableCell>
-                            <TableCell align="right">{formatValue(row.lowEcon)}</TableCell>
-                            <TableCell align="right">{formatValue(row.deltaEcon)}</TableCell>
-                            <TableCell align="right">{formatValue(row.firstBallBoundaryRate)}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </Card>
-    );
-};
-
-const FirstBallThreatsCard = ({ rows, isMobile }) => {
-    if (!rows || rows.length === 0) {
-        return (
-            <Alert severity="info" sx={{ mb: 2 }}>
-                First-ball threats: No qualified sample for current lineup intersection.
-            </Alert>
-        );
-    }
-
-    return (
-        <Card sx={{ p: 2, mb: 2 }}>
-            <Typography variant={isMobile ? 'subtitle1' : 'h6'} sx={{ fontWeight: 700, mb: 1 }}>
-                First-Ball Threats (Current Lineups)
-            </Typography>
-            <Table size="small">
-                <TableHead>
-                    <TableRow>
-                        <TableCell>Batter</TableCell>
-                        <TableCell align="right">Boundary %</TableCell>
-                        <TableCell align="right">Sample</TableCell>
-                        <TableCell align="right">Wicket %</TableCell>
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {rows.map((row) => (
-                        <TableRow key={row.player}>
-                            <TableCell sx={{ fontWeight: 700 }}>{row.player}</TableCell>
-                            <TableCell align="right">{formatValue(row.boundary_rate_pct)}</TableCell>
-                            <TableCell align="right">{row.first_balls ?? '-'}</TableCell>
-                            <TableCell align="right">{formatValue(row.wicket_rate_pct)}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </Card>
-    );
-};
-
 const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_players, isMobile, enabled = true }) => {
     const [matchupData, setMatchupData] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [formFlagsByPlayer, setFormFlagsByPlayer] = React.useState({});
-    const [firstBallThreatRows, setFirstBallThreatRows] = React.useState([]);
-    const [bowlingContextRows, setBowlingContextRows] = React.useState([]);
-    const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
-    const [analyticsError, setAnalyticsError] = React.useState(null);
 
     React.useEffect(() => {
         if (!enabled) return;
@@ -595,9 +451,6 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
                 setLoading(true);
                 setError(null);
                 setFormFlagsByPlayer({});
-                setFirstBallThreatRows([]);
-                setBowlingContextRows([]);
-                setAnalyticsError(null);
 
                 // Build URL parameters properly
                 const params = new URLSearchParams();
@@ -640,21 +493,7 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
         let cancelled = false;
 
         const loadAnalytics = async () => {
-            setAnalyticsLoading(true);
-            setAnalyticsError(null);
             try {
-                const lineupPlayers = [
-                    ...((matchupData.team1?.players || [])),
-                    ...((matchupData.team2?.players || [])),
-                ];
-                const lineupNameMap = new Map();
-                lineupPlayers.forEach((name) => {
-                    const normalized = normalizeAnalyticsName(name);
-                    if (normalized && !lineupNameMap.has(normalized)) {
-                        lineupNameMap.set(normalized, name);
-                    }
-                });
-
                 const fantasyNames = (matchupData?.fantasy_analysis?.top_fantasy_picks || []).map((row) => row.player_name);
                 const matrixBatters = [
                     ...Object.keys(matchupData?.team1?.batting_matchups || {}),
@@ -695,87 +534,9 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
                     }
                 });
                 setFormFlagsByPlayer(nextFormFlags);
-
-                const leaderboardPayload = await fetchAnalyticsJson('/leaderboards/first-ball-boundaries', {
-                    role: 'batter',
-                    start_date: startDate,
-                    end_date: endDate,
-                    include_international: false,
-                    min_balls: 60,
-                    limit: 200,
-                });
-
-                if (cancelled) return;
-                const threatRows = (leaderboardPayload?.leaderboard || [])
-                    .map((row) => {
-                        const normalized = normalizeAnalyticsName(row.player);
-                        if (!lineupNameMap.has(normalized)) return null;
-                        return {
-                            ...row,
-                            player: lineupNameMap.get(normalized),
-                        };
-                    })
-                    .filter(Boolean)
-                    .sort((a, b) => (b.boundary_rate_pct || 0) - (a.boundary_rate_pct || 0))
-                    .slice(0, 8);
-                setFirstBallThreatRows(threatRows);
-
-                const topBowlerCandidates = [
-                    ...Object.entries(matchupData?.team1?.bowling_consolidated || {}),
-                    ...Object.entries(matchupData?.team2?.bowling_consolidated || {}),
-                ]
-                    .map(([name, stats]) => ({
-                        name,
-                        balls: Number(stats?.balls || 0),
-                    }))
-                    .filter((row) => row.name && row.name !== 'Overall')
-                    .sort((a, b) => b.balls - a.balls);
-
-                const selectedBowlers = [];
-                const seenBowlers = new Set();
-                topBowlerCandidates.forEach((row) => {
-                    const normalized = normalizeAnalyticsName(row.name);
-                    if (!normalized || seenBowlers.has(normalized) || selectedBowlers.length >= 6) return;
-                    seenBowlers.add(normalized);
-                    selectedBowlers.push(row.name);
-                });
-
-                const contextRows = await Promise.all(selectedBowlers.map(async (bowler) => {
-                    try {
-                        const payload = await fetchAnalyticsJson(
-                            `/player/${encodeURIComponent(bowler)}/bowling-context`,
-                            {
-                                start_date: startDate,
-                                end_date: endDate,
-                                include_international: false,
-                                min_overs: 10,
-                                pressure_threshold: 10,
-                            },
-                        );
-                        const high = payload?.previous_over_pressure_stats?.high_pressure || {};
-                        const low = payload?.previous_over_pressure_stats?.low_pressure || {};
-                        return {
-                            player: bowler,
-                            highEcon: high.economy,
-                            lowEcon: low.economy,
-                            deltaEcon: (high.economy ?? 0) - (low.economy ?? 0),
-                            firstBallBoundaryRate: payload?.first_ball_last_ball_stats?.first_ball_boundary_rate_pct,
-                        };
-                    } catch (fetchError) {
-                        return null;
-                    }
-                }));
-
-                if (cancelled) return;
-                setBowlingContextRows(contextRows.filter(Boolean));
             } catch (fetchError) {
                 if (cancelled) return;
                 console.error('Error fetching matchup analytics overlays:', fetchError);
-                setAnalyticsError('Unable to load form/context overlays. Base matchup stats are still shown.');
-            } finally {
-                if (!cancelled) {
-                    setAnalyticsLoading(false);
-                }
             }
         };
 
@@ -824,14 +585,6 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
                 formFlagsByPlayer={formFlagsByPlayer}
             />
 
-            <FirstBallThreatsCard rows={firstBallThreatRows} isMobile={isMobile} />
-            <BowlingContextWatchCard
-                rows={bowlingContextRows}
-                loading={analyticsLoading}
-                error={analyticsError}
-                isMobile={isMobile}
-            />
-            
             {/* Team 1 vs Team 2 Matchups */}
             <MatchupMatrix 
                 batting_team={matchupData.team1.name}

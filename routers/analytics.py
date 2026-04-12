@@ -26,6 +26,7 @@ from services.relative_metrics import (
 )
 from services.resource_benchmark import get_match_resource_benchmark
 from services.rolling_form import get_player_rolling_form
+from services.boundary_vs_bowling_type import get_boundary_vs_bowling_type
 
 
 router = APIRouter(tags=["analytics"])
@@ -185,4 +186,29 @@ def match_resource_benchmark(
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to compute match resource benchmark: {exc}")
+
+
+@router.get("/player/{player_name}/boundary-vs-bowling-type")
+def player_boundary_vs_bowling_type(
+    player_name: str,
+    role: str = Query(default="batter", pattern="^(batter|bowler)$"),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    leagues: List[str] = Query(default=[]),
+    db: Session = Depends(get_session),
+):
+    try:
+        return get_boundary_vs_bowling_type(
+            db=db,
+            player_name=player_name,
+            role=role,
+            start_date=start_date,
+            end_date=end_date,
+            leagues=leagues if leagues else None,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to compute boundary vs bowling type: {exc}",
+        )
 

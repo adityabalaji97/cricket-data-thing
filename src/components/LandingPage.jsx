@@ -15,8 +15,7 @@ import {
   Stack,
   CircularProgress,
   IconButton,
-  Tooltip,
-  Collapse
+  Tooltip
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import SportsCricketIcon from '@mui/icons-material/SportsCricket';
@@ -29,15 +28,12 @@ import EventNoteIcon from '@mui/icons-material/EventNote';
 import PeopleIcon from '@mui/icons-material/People';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import SearchIcon from '@mui/icons-material/Search';
-import InfoIcon from '@mui/icons-material/Info';
 import { fetchUpcomingMatches, formatDate, formatVenue } from '../data/iplSchedule';
 import EloLeaderboard from './EloLeaderboard';
 import EloRacerChart from './EloRacerChart';
 import RecentMatchesSummaryCard from './RecentMatchesSummaryCard';
 import SearchBar from './search/SearchBar';
-import MatchPreviewCard from './MatchPreviewCard';
 import FeaturedInningsCards from './FeaturedInningsCards';
-import { DEFAULT_START_DATE as DEFAULT_ANALYSIS_START_DATE, TODAY } from '../utils/dateDefaults';
 
 // Check if a match falls on today's local date
 const isMatchToday = (matchDate, matchTime) => {
@@ -108,12 +104,8 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isMedium = useMediaQuery(theme.breakpoints.down('md'));
-  const defaultAnalysisStartDate = DEFAULT_ANALYSIS_START_DATE;
-  const defaultAnalysisEndDate = TODAY;
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [previewOpen, setPreviewOpen] = useState({});
-
   const handleSearchSelect = (item) => {
     if (item.type === 'player') {
       navigate(`/search?q=${encodeURIComponent(item.name)}`);
@@ -183,7 +175,6 @@ const LandingPage = () => {
 
         <Grid container spacing={2}>
           {todaysMatches.map((match) => {
-            const previewKey = `${match.team1Abbr}-${match.team2Abbr}-${match.venue}`;
             return (
               <Grid item xs={12} md={todaysMatches.length > 1 ? 6 : 12} key={match.matchNumber}>
                 <Box>
@@ -218,49 +209,9 @@ const LandingPage = () => {
                       startIcon={<StadiumIcon />}
                       to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1Abbr || match.team1)}&team2=${encodeURIComponent(match.team2Abbr || match.team2)}&includeInternational=true&topTeams=20&autoload=true`}
                     >
-                      Venue
-                    </Button>
-
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      color="secondary"
-                      component={Link}
-                      startIcon={<GroupsIcon />}
-                      to={`/matchups?team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
-                    >
-                      Matchups
-                    </Button>
-
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<InfoIcon />}
-                      onClick={() =>
-                        setPreviewOpen((prev) => ({
-                          ...prev,
-                          [previewKey]: !prev[previewKey]
-                        }))
-                      }
-                    >
-                      {previewOpen[previewKey] ? 'Hide Preview' : 'AI Preview'}
+                      Match Preview
                     </Button>
                   </Box>
-
-                  <Collapse in={Boolean(previewOpen[previewKey])} unmountOnExit>
-                    <Box sx={{ mt: 1.5 }}>
-                      <MatchPreviewCard
-                        venue={match.venue}
-                        team1Identifier={match.team1}
-                        team2Identifier={match.team2}
-                        startDate={defaultAnalysisStartDate}
-                        endDate={defaultAnalysisEndDate}
-                        includeInternational
-                        topTeams={20}
-                        isMobile={isMobile}
-                      />
-                    </Box>
-                  </Collapse>
                 </Box>
               </Grid>
             );
@@ -305,7 +256,6 @@ const LandingPage = () => {
               <Card sx={{ height: '100%' }}>
                 <CardContent>
                   {(() => {
-                    const previewKey = `${match.team1Abbr}-${match.team2Abbr}-${match.venue}`;
                     return (
                       <>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
@@ -351,51 +301,9 @@ const LandingPage = () => {
                       fullWidth
                       to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1Abbr || match.team1)}&team2=${encodeURIComponent(match.team2Abbr || match.team2)}&includeInternational=true&topTeams=20&autoload=true`}
                     >
-                      Venue Analysis
-                    </Button>
-
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      color="secondary"
-                      component={Link}
-                      startIcon={<GroupsIcon />}
-                      fullWidth
-                      to={`/matchups?team1=${match.team1Abbr}&team2=${match.team2Abbr}&autoload=true`}
-                    >
-                      Team Matchups
-                    </Button>
-
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<InfoIcon />}
-                      fullWidth
-                      onClick={() =>
-                        setPreviewOpen((prev) => ({
-                          ...prev,
-                          [previewKey]: !prev[previewKey]
-                        }))
-                      }
-                    >
-                      {previewOpen[previewKey] ? 'Hide AI Preview' : 'AI Preview'}
+                      Match Preview
                     </Button>
                   </Box>
-
-                  <Collapse in={Boolean(previewOpen[previewKey])} unmountOnExit>
-                    <Box sx={{ mt: 1.5 }}>
-                      <MatchPreviewCard
-                        venue={match.venue}
-                        team1Identifier={match.team1}
-                        team2Identifier={match.team2}
-                        startDate={defaultAnalysisStartDate}
-                        endDate={defaultAnalysisEndDate}
-                        includeInternational
-                        topTeams={20}
-                        isMobile={isMobile}
-                      />
-                    </Box>
-                  </Collapse>
                       </>
                     );
                   })()}
@@ -482,7 +390,7 @@ const LandingPage = () => {
           Search players, teams or venues to get started
         </Typography>
 
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2, minHeight: { xs: 180, md: 160 }, alignItems: 'flex-start', pt: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2, minHeight: { xs: 180, md: 160 }, alignItems: 'flex-start', pt: 1, position: 'relative', zIndex: 10 }}>
           <SearchBar
             onSelect={handleSearchSelect}
             placeholder="Search players, teams, or venues..."

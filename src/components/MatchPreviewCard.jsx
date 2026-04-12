@@ -73,17 +73,6 @@ const MatchPreviewCard = ({
     return sections;
   }, [data?.preview, data?.sections]);
 
-  const topRankedTeams = useMemo(() => {
-    const teamsMap = data?.top_ranked_players?.teams || {};
-    const orderedNames = [data?.team1, data?.team2].filter(Boolean);
-    return orderedNames
-      .map((teamName) => ({
-        team: teamName,
-        players: (teamsMap[teamName]?.top_overall || []).slice(0, 3),
-      }))
-      .filter((entry) => entry.players.length > 0);
-  }, [data?.team1, data?.team2, data?.top_ranked_players]);
-
   useEffect(() => {
     if (!enabled || !venue || !team1Identifier || !team2Identifier) return;
     let cancelled = false;
@@ -159,40 +148,6 @@ const MatchPreviewCard = ({
           )}
         </Stack>
       </Box>
-      {topRankedTeams.length > 0 && (
-        <Box sx={{ mb: 1.25, p: 1, borderRadius: 1.5, border: '1px solid rgba(25,118,210,0.2)', bgcolor: 'rgba(25,118,210,0.03)' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.75 }}>
-            Top Global-Ranked Players (Likely Lineups)
-          </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 0.75 }}>
-            {topRankedTeams.map((entry) => (
-              <Box key={entry.team}>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
-                  {entry.team}
-                </Typography>
-                <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5, rowGap: 0.5 }}>
-                  {entry.players.map((player) => (
-                    <Stack key={`${entry.team}-${player.player}`} direction="row" spacing={0.5} alignItems="center">
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        label={`${player.player} ${Number(player.quality_score || 0).toFixed(1)}`}
-                      />
-                      {player.form_flag && (
-                        <Chip
-                          size="small"
-                          label={getFormFlagMeta(player.form_flag).label}
-                          color={getFormFlagMeta(player.form_flag).color}
-                        />
-                      )}
-                    </Stack>
-                  ))}
-                </Stack>
-              </Box>
-            ))}
-          </Box>
-        </Box>
-      )}
       <Box>
         {(parsedPreview.length ? parsedPreview : [{ title: 'Preview', bullets: [], paragraphs: [String(data.preview)] }]).map((section) => (
           <Box key={section.title} sx={{ mb: 1.2 }}>
