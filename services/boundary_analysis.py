@@ -15,14 +15,26 @@ from typing import List, Literal, Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from services.bowler_types import BOWL_STYLE_CATEGORY_SQL
-
 
 PHASE_CASE_SQL = """CASE
     WHEN "over" >= 0 AND "over" < 6 THEN 'powerplay'
     WHEN "over" >= 6 AND "over" < 15 THEN 'middle'
     WHEN "over" >= 15 THEN 'death'
     ELSE 'other'
+END"""
+
+# Use bowl_kind column (values like 'pace bowler', 'spin bowler') with ILIKE,
+# matching the pattern used across the codebase (venue_similarity, wrapped cards, etc.)
+BOWL_KIND_CASE_SQL = """CASE
+    WHEN LOWER(COALESCE(bowl_kind, '')) LIKE '%pace%'
+      OR LOWER(COALESCE(bowl_kind, '')) LIKE '%fast%'
+      OR LOWER(COALESCE(bowl_kind, '')) LIKE '%seam%'
+      OR LOWER(COALESCE(bowl_kind, '')) LIKE '%medium%'
+    THEN 'pace'
+    WHEN LOWER(COALESCE(bowl_kind, '')) LIKE '%spin%'
+      OR LOWER(COALESCE(bowl_kind, '')) LIKE '%slow%'
+    THEN 'spin'
+    ELSE NULL
 END"""
 
 PHASE_ORDER = ["powerplay", "middle", "death"]
@@ -45,15 +57,15 @@ def get_boundary_analysis(
     if context == "venue":
         filter_col = "ground"
         group_dim = "bowl_kind"
-        group_sql = f"{BOWL_STYLE_CATEGORY_SQL} AS group_key, bowl_style AS sub_group"
+        group_sql = f"({BOWL_KIND_CASE_SQL}) AS group_key, bowl_style AS sub_group"
         group_by = "group_key, sub_group"
-        extra_where = f"AND ({BOWL_STYLE_CATEGORY_SQL}) IS NOT NULL"
+        extra_where = f"AND ({BOWL_KIND_CASE_SQL}) IS NOT NULL"
     elif context == "batter":
         filter_col = "batter"
         group_dim = "bowl_kind"
-        group_sql = f"{BOWL_STYLE_CATEGORY_SQL} AS group_key, bowl_style AS sub_group"
+        group_sql = f"({BOWL_KIND_CASE_SQL}) AS group_key, bowl_style AS sub_group"
         group_by = "group_key, sub_group"
-        extra_where = f"AND ({BOWL_STYLE_CATEGORY_SQL}) IS NOT NULL"
+        extra_where = f"AND ({BOWL_KIND_CASE_SQL}) IS NOT NULL"
     elif context == "bowler":
         filter_col = "bowler"
         group_dim = "bat_hand"
@@ -63,7 +75,7 @@ def get_boundary_analysis(
     else:
         raise ValueError(f"Invalid context: {context}")
 
-    where_clauses = [f'"{filter_col}" = :name']
+    where_clauses = [f"{filter_col} = :name"]
     params: dict = {"name": name}
 
     if start_date:
