@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { getTeamAbbr } from '../utils/teamAbbreviations';
 import {
   Box,
   Typography,
@@ -110,6 +111,7 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   const chartPanelRef = useRef(null);
   const [showCharts, setShowCharts] = useState(false);
   const [showPitchMap, setShowPitchMap] = useState(false);
+  const [selectedMetricColumns, setSelectedMetricColumns] = useState(['balls', 'runs', 'strike_rate']);
   
   // Extract data early to avoid hooks rule violation
   const data = results?.data || [];
@@ -211,6 +213,14 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
     return dataWithFlags;
   }, [dataWithPercentBalls, summaryData, hasSummaries, isGrouped, groupBy]);
   
+  // Available metric columns for mobile column selector
+  const availableMetricColumns = useMemo(() => {
+    if (displayData.length === 0 || !isGrouped) return [];
+    return Object.keys(displayData[0]).filter(col =>
+      !groupBy.includes(col) && !['is_summary', 'summary_level'].includes(col)
+    );
+  }, [displayData, isGrouped, groupBy]);
+
   // Apply column filters to displayData
   const filteredData = useMemo(() => {
     if (!columnFilters || Object.keys(columnFilters).length === 0) {
@@ -370,7 +380,11 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   
   const formatValue = (value, key) => {
     if (value === null || value === undefined) return 'N/A';
-    
+
+    if ((key === 'batting_team' || key === 'bowling_team') && typeof value === 'string') {
+      return getTeamAbbr(value);
+    }
+
     if (key.includes('percentage') || key === 'percent_balls') {
       return `${Number(value).toFixed(1)}%`;
     }
@@ -415,16 +429,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
     ).join(' ');
   };
   
-  const getCricketMetrics = () => {
-    if (!isGrouped || displayData.length === 0) return null;
-    
-    const sampleRow = displayData[0];
-    const cricketKeys = ['balls', 'runs', 'wickets', 'dots', 'boundaries', 'fours', 'sixes', 
-                         'average', 'strike_rate', 'balls_per_dismissal', 'dot_percentage', 'boundary_percentage'];
-    
-    return cricketKeys.filter(key => key in sampleRow);
-  };
-  
   const getGroupingColumns = () => {
     if (!isGrouped || displayData.length === 0) return [];
     
@@ -439,11 +443,7 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
     
     if (isMobile) {
       if (isGrouped) {
-        const baseColumns = [...getGroupingColumns(), 'balls', 'runs', 'strike_rate'];
-        if (hasSummaries && allColumns.includes('percent_balls')) {
-          baseColumns.push('percent_balls');
-        }
-        return baseColumns.filter(col => allColumns.includes(col));
+        return [...getGroupingColumns(), ...selectedMetricColumns].filter(col => allColumns.includes(col));
       } else {
         return ['batter', 'bowler', 'runs_off_bat', 'crease_combo'].filter(col => allColumns.includes(col));
       }
@@ -454,7 +454,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   
   const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const visibleColumns = getVisibleColumns();
-  const cricketMetrics = getCricketMetrics();
 
   return (
     <Box>
@@ -615,44 +614,46 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
         </Box>
       )}
       
-      {/* Cricket Metrics Summary (for grouped results) */}
-      {isGrouped && cricketMetrics && (
-        <Accordion defaultExpanded sx={{ mb: 2 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="h6">📊 Cricket Metrics Overview</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Grid container spacing={2}>
-              {sortedData.slice(0, 3).map((row, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                  <Card variant="outlined">
-                    <CardContent sx={{ py: 2 }}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        {getGroupingColumns().map(col => `${getColumnDisplayName(col)}: ${row[col]}`).join(' • ')}
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                        <Chip label={`${row.balls?.toLocaleString()} balls`} size="small" />
-                        <Chip label={`${row.runs?.toLocaleString()} runs`} size="small" color="primary" />
-                        {row.strike_rate && <Chip label={`SR: ${formatValue(row.strike_rate, 'strike_rate')}`} size="small" />}
-                        {row.dot_percentage && <Chip label={`Dot: ${formatValue(row.dot_percentage, 'dot_percentage')}`} size="small" />}
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </AccordionDetails>
-        </Accordion>
+      {/* Column Selector for Mobile Grouped Results */}
+      {isMobile && isGrouped && availableMetricColumns.length > 0 && (
+        <Box sx={{ mb: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+          {availableMetricColumns.map(col => (
+            <Chip
+              key={col}
+              label={getColumnDisplayName(col)}
+              size="small"
+              variant={selectedMetricColumns.includes(col) ? 'filled' : 'outlined'}
+              color={selectedMetricColumns.includes(col) ? 'primary' : 'default'}
+              onClick={() => {
+                setSelectedMetricColumns(prev =>
+                  prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]
+                );
+              }}
+            />
+          ))}
+        </Box>
       )}
-      
+
       {/* Data Table with Sorting */}
       <Paper>
         <TableContainer sx={{ maxHeight: isMobile ? 400 : 600 }}>
           <Table stickyHeader size={isMobile ? "small" : "medium"}>
             <TableHead>
               <TableRow>
-                {visibleColumns.map((column) => (
-                  <TableCell key={column} sx={{ fontWeight: 'bold' }}>
+                {visibleColumns.map((column, colIndex) => {
+                  const groupByIndex = groupBy.indexOf(column);
+                  const isGroupByCol = groupByIndex !== -1;
+                  return (
+                  <TableCell key={column} sx={{
+                    fontWeight: 'bold',
+                    ...(isGroupByCol && {
+                      position: 'sticky',
+                      left: groupByIndex === 0 ? 0 : 120,
+                      backgroundColor: 'background.paper',
+                      zIndex: 3,
+                      minWidth: 120,
+                    })
+                  }}>
                     <TableSortLabel
                       active={sortConfig.key === column}
                       direction={sortConfig.key === column ? sortConfig.direction : 'asc'}
@@ -673,7 +674,8 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                       {getColumnDisplayName(column)}
                     </TableSortLabel>
                   </TableCell>
-                ))}
+                  );
+                })}
               </TableRow>
               
               {showFilters && isGrouped && (
@@ -718,14 +720,26 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                     }
                   }}
                 >
-                  {visibleColumns.map((column) => (
-                    <TableCell key={column}>
-                      {row.is_summary && column !== groupBy[0] && groupBy.includes(column) ? 
-                        '— Total —' : 
+                  {visibleColumns.map((column) => {
+                    const groupByIndex = groupBy.indexOf(column);
+                    const isGroupByCol = groupByIndex !== -1;
+                    return (
+                    <TableCell key={column} sx={{
+                      ...(isGroupByCol && {
+                        position: 'sticky',
+                        left: groupByIndex === 0 ? 0 : 120,
+                        backgroundColor: row.is_summary ? 'grey.100' : 'background.paper',
+                        zIndex: 1,
+                        minWidth: 120,
+                      })
+                    }}>
+                      {row.is_summary && column !== groupBy[0] && groupBy.includes(column) ?
+                        '— Total —' :
                         formatValue(row[column], column)
                       }
                     </TableCell>
-                  ))}
+                    );
+                  })}
                 </TableRow>
               ))}
             </TableBody>
