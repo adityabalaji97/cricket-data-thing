@@ -634,6 +634,32 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
         </Box>
       )}
 
+      {/* Mobile Filters (above table to avoid pushing columns off-screen) */}
+      {isMobile && showFilters && isGrouped && (() => {
+        const filterableColumns = visibleColumns.filter(col =>
+          groupBy.includes(col) ||
+          ['crease_combo', 'ball_direction', 'bowl_style', 'bowl_kind', 'striker_batter_type', 'non_striker_batter_type', 'venue', 'batting_team', 'bowling_team', 'batter', 'bowler', 'competition'].includes(col)
+        );
+        return filterableColumns.length > 0 ? (
+          <Paper variant="outlined" sx={{ mb: 1, p: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {filterableColumns.map(col => (
+                <ColumnFilter
+                  key={col}
+                  column={col}
+                  displayName={getColumnDisplayName(col)}
+                  uniqueValues={getUniqueValuesForColumn(col)}
+                  selectedValues={columnFilters[col]}
+                  onChange={handleColumnFilter}
+                  onClear={clearColumnFilter}
+                  isMobile={isMobile}
+                />
+              ))}
+            </Box>
+          </Paper>
+        ) : null;
+      })()}
+
       {/* Data Table with Sorting */}
       <Paper>
         <TableContainer sx={{ maxHeight: isMobile ? 400 : 600 }}>
@@ -678,7 +704,7 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                 })}
               </TableRow>
               
-              {showFilters && isGrouped && (
+              {showFilters && isGrouped && !isMobile && (
                 <TableRow sx={{ backgroundColor: 'grey.50' }}>
                   {visibleColumns.map((column) => {
                     const isFilterableColumn = groupBy.includes(column) || 
