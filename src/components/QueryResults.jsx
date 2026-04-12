@@ -29,7 +29,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  OutlinedInput
+  OutlinedInput,
+  Popover
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GetAppIcon from '@mui/icons-material/GetApp';
@@ -105,7 +106,8 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   
   // Column filtering state
   const [columnFilters, setColumnFilters] = useState({});
-  const [showFilters, setShowFilters] = useState(false);
+  const [filterAnchorEl, setFilterAnchorEl] = useState(null);
+  const [filterColumn, setFilterColumn] = useState(null);
   
   // Chart panel ref to trigger chart additions
   const chartPanelRef = useRef(null);
@@ -333,7 +335,22 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
     setColumnFilters({});
     setPage(0);
   };
-  
+
+  const handleFilterClick = (event, column) => {
+    setFilterAnchorEl(event.currentTarget);
+    setFilterColumn(column);
+  };
+
+  const handleFilterClose = () => {
+    setFilterAnchorEl(null);
+    setFilterColumn(null);
+  };
+
+  const isFilterableColumn = (column) => {
+    return groupBy.includes(column) ||
+      ['crease_combo', 'ball_direction', 'bowl_style', 'bowl_kind', 'striker_batter_type', 'non_striker_batter_type', 'venue', 'batting_team', 'bowling_team', 'batter', 'bowler', 'competition'].includes(column);
+  };
+
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
   };
@@ -406,21 +423,22 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   
   const getColumnDisplayName = (key) => {
     const displayNames = {
-      'match_id': 'Match ID',
-      'crease_combo': 'Crease Combo',
-      'ball_direction': 'Ball Direction',
-      'bowl_style': 'Bowl Style',
-      'bowl_kind': 'Bowl Kind',
-      'striker_batter_type': 'Striker Type',
-      'non_striker_batter_type': 'Non-Striker Type',
-      'runs_off_bat': 'Runs off Bat',
-      'batting_team': 'Batting Team',
-      'bowling_team': 'Bowling Team',
-      'strike_rate': 'Strike Rate',
-      'dot_percentage': 'Dot %',
-      'boundary_percentage': 'Boundary %',
-      'percent_balls': '% Balls',
-      'balls_per_dismissal': 'Balls/Wicket',
+      'match_id': 'Match',
+      'crease_combo': 'Crease',
+      'ball_direction': 'Direction',
+      'bowl_style': 'Style',
+      'bowl_kind': 'Kind',
+      'striker_batter_type': 'Striker',
+      'non_striker_batter_type': 'Non-Striker',
+      'runs_off_bat': 'Runs',
+      'batting_team': 'Bat Team',
+      'bowling_team': 'Bowl Team',
+      'strike_rate': 'SR',
+      'dot_percentage': 'Dot%',
+      'boundary_percentage': 'Bndry%',
+      'percent_balls': '%Balls',
+      'balls_per_dismissal': 'B/W',
+      'control_percentage': 'Ctrl%',
       'year': 'Year'
     };
     
@@ -529,30 +547,16 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
             
             <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
-                {isGrouped && data.length > 0 && (
-                  <>
-                    <Button
-                      variant={showFilters ? "contained" : "outlined"}
-                      startIcon={showFilters ? <FilterListOffIcon /> : <FilterListIcon />}
-                      onClick={() => setShowFilters(!showFilters)}
-                      size="small"
-                      color={Object.keys(columnFilters).length > 0 ? "warning" : "primary"}
-                    >
-                      {showFilters ? 'Hide Filters' : 'Show Filters'}
-                    </Button>
-                    
-                    {Object.keys(columnFilters).length > 0 && (
-                      <Button
-                        variant="outlined"
-                        startIcon={<ClearIcon />}
-                        onClick={clearAllFilters}
-                        size="small"
-                        color="warning"
-                      >
-                        Clear Filters
-                      </Button>
-                    )}
-                  </>
+                {isGrouped && data.length > 0 && Object.keys(columnFilters).length > 0 && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<ClearIcon />}
+                    onClick={clearAllFilters}
+                    size="small"
+                    color="warning"
+                  >
+                    Clear Filters
+                  </Button>
                 )}
                 
                 {isGrouped && pitchMapMode && data.length > 0 && (
@@ -634,32 +638,6 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
         </Box>
       )}
 
-      {/* Mobile Filters (above table to avoid pushing columns off-screen) */}
-      {isMobile && showFilters && isGrouped && (() => {
-        const filterableColumns = visibleColumns.filter(col =>
-          groupBy.includes(col) ||
-          ['crease_combo', 'ball_direction', 'bowl_style', 'bowl_kind', 'striker_batter_type', 'non_striker_batter_type', 'venue', 'batting_team', 'bowling_team', 'batter', 'bowler', 'competition'].includes(col)
-        );
-        return filterableColumns.length > 0 ? (
-          <Paper variant="outlined" sx={{ mb: 1, p: 1 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {filterableColumns.map(col => (
-                <ColumnFilter
-                  key={col}
-                  column={col}
-                  displayName={getColumnDisplayName(col)}
-                  uniqueValues={getUniqueValuesForColumn(col)}
-                  selectedValues={columnFilters[col]}
-                  onChange={handleColumnFilter}
-                  onClear={clearColumnFilter}
-                  isMobile={isMobile}
-                />
-              ))}
-            </Box>
-          </Paper>
-        ) : null;
-      })()}
-
       {/* Data Table with Sorting */}
       <Paper>
         <TableContainer sx={{ maxHeight: isMobile ? 400 : 600 }}>
@@ -669,67 +647,66 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                 {visibleColumns.map((column, colIndex) => {
                   const groupByIndex = groupBy.indexOf(column);
                   const isGroupByCol = groupByIndex !== -1;
+                  const hasActiveFilter = columnFilters[column] && columnFilters[column].length > 0;
+                  const filterable = isGrouped && isFilterableColumn(column);
                   return (
                   <TableCell key={column} sx={{
-                    fontWeight: 'bold',
+                    fontWeight: 600,
+                    fontSize: isMobile ? '0.7rem' : '0.75rem',
+                    whiteSpace: 'nowrap',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.03em',
+                    color: 'text.secondary',
+                    py: isMobile ? 0.5 : 1,
+                    px: isMobile ? 0.75 : 1.5,
                     ...(isGroupByCol && {
                       position: 'sticky',
-                      left: groupByIndex === 0 ? 0 : 120,
+                      left: groupByIndex === 0 ? 0 : 'auto',
                       backgroundColor: 'background.paper',
-                      zIndex: 3,
-                      minWidth: 120,
+                      zIndex: groupByIndex === 0 ? 3 : 1,
                     })
                   }}>
-                    <TableSortLabel
-                      active={sortConfig.key === column}
-                      direction={sortConfig.key === column ? sortConfig.direction : 'asc'}
-                      onClick={() => handleSort(column)}
-                      hideSortIcon={sortConfig.key !== column}
-                      sx={{ 
-                        '& .MuiTableSortLabel-icon': {
-                          opacity: sortConfig.key === column ? 1 : 0
-                        },
-                        '&:hover .MuiTableSortLabel-icon': {
-                          opacity: 0.5
-                        },
-                        '&:hover': {
-                          color: 'primary.main'
-                        }
-                      }}
-                    >
-                      {getColumnDisplayName(column)}
-                    </TableSortLabel>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                      <TableSortLabel
+                        active={sortConfig.key === column}
+                        direction={sortConfig.key === column ? sortConfig.direction : 'asc'}
+                        onClick={() => handleSort(column)}
+                        hideSortIcon={sortConfig.key !== column}
+                        sx={{
+                          fontSize: 'inherit',
+                          '& .MuiTableSortLabel-icon': {
+                            opacity: sortConfig.key === column ? 1 : 0,
+                            fontSize: '0.875rem',
+                          },
+                          '&:hover .MuiTableSortLabel-icon': {
+                            opacity: 0.5
+                          },
+                          '&:hover': {
+                            color: 'primary.main'
+                          }
+                        }}
+                      >
+                        {getColumnDisplayName(column)}
+                      </TableSortLabel>
+                      {filterable && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleFilterClick(e, column)}
+                          sx={{
+                            p: 0.25,
+                            ml: 0.25,
+                            color: hasActiveFilter ? 'warning.main' : 'action.disabled',
+                            '&:hover': { color: hasActiveFilter ? 'warning.dark' : 'primary.main' },
+                          }}
+                        >
+                          <FilterListIcon sx={{ fontSize: '0.875rem' }} />
+                        </IconButton>
+                      )}
+                    </Box>
                   </TableCell>
                   );
                 })}
               </TableRow>
-              
-              {showFilters && isGrouped && !isMobile && (
-                <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                  {visibleColumns.map((column) => {
-                    const isFilterableColumn = groupBy.includes(column) || 
-                      ['crease_combo', 'ball_direction', 'bowl_style', 'bowl_kind', 'striker_batter_type', 'non_striker_batter_type', 'venue', 'batting_team', 'bowling_team', 'batter', 'bowler', 'competition'].includes(column);
-                    
-                    return (
-                      <TableCell key={column} sx={{ py: 1 }}>
-                        {isFilterableColumn ? (
-                          <ColumnFilter
-                            column={column}
-                            displayName={getColumnDisplayName(column)}
-                            uniqueValues={getUniqueValuesForColumn(column)}
-                            selectedValues={columnFilters[column]}
-                            onChange={handleColumnFilter}
-                            onClear={clearColumnFilter}
-                            isMobile={isMobile}
-                          />
-                        ) : (
-                          <Box sx={{ height: 40 }} />
-                        )}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              )}
             </TableHead>
             <TableBody>
               {paginatedData.map((row, index) => (
@@ -751,12 +728,12 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                     const isGroupByCol = groupByIndex !== -1;
                     return (
                     <TableCell key={column} sx={{
+                      whiteSpace: 'nowrap',
                       ...(isGroupByCol && {
                         position: 'sticky',
-                        left: groupByIndex === 0 ? 0 : 120,
+                        left: groupByIndex === 0 ? 0 : 'auto',
                         backgroundColor: row.is_summary ? 'grey.100' : 'background.paper',
-                        zIndex: 1,
-                        minWidth: 120,
+                        zIndex: groupByIndex === 0 ? 1 : 0,
                       })
                     }}>
                       {row.is_summary && column !== groupBy[0] && groupBy.includes(column) ?
@@ -782,7 +759,29 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </Paper>
-      
+
+      {/* Filter Popover */}
+      <Popover
+        open={Boolean(filterAnchorEl)}
+        anchorEl={filterAnchorEl}
+        onClose={handleFilterClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        slotProps={{ paper: { sx: { p: 1, minWidth: 200 } } }}
+      >
+        {filterColumn && (
+          <ColumnFilter
+            column={filterColumn}
+            displayName={getColumnDisplayName(filterColumn)}
+            uniqueValues={getUniqueValuesForColumn(filterColumn)}
+            selectedValues={columnFilters[filterColumn]}
+            onChange={handleColumnFilter}
+            onClear={clearColumnFilter}
+            isMobile={isMobile}
+          />
+        )}
+      </Popover>
+
       {/* Chart Panel */}
       <ChartPanel 
         ref={chartPanelRef}
