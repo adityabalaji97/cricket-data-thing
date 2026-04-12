@@ -22,6 +22,7 @@ import VisualizationsSection from './playerProfile/sections/VisualizationsSectio
 import ExploreSection from './playerProfile/sections/ExploreSection';
 import RecentFormStrip from './playerProfile/RecentFormStrip';
 import AdvancedBowlingAnalyticsSection from './playerProfile/AdvancedBowlingAnalyticsSection';
+import BoundaryAnalysis from './BoundaryAnalysis';
 import usePlayerData from '../hooks/usePlayerData';
 import config from '../config';
 
@@ -426,6 +427,21 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
             Advanced analytics in this section are currently available for bowling view.
           </Typography>
         )
+      ),
+    });
+
+    groups.push({
+      id: 'boundaries',
+      label: 'Boundaries',
+      content: (
+        <BoundaryAnalysis
+          context={activeTab === 'bowling' ? 'bowler' : 'batter'}
+          name={selectedPlayer}
+          startDate={dateRange.start}
+          endDate={dateRange.end}
+          leagues={competitionFilters.leagues}
+          isMobile={isMobile}
+        />
       ),
     });
 

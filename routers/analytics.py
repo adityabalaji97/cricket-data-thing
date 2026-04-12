@@ -27,6 +27,7 @@ from services.relative_metrics import (
 from services.resource_benchmark import get_match_resource_benchmark
 from services.rolling_form import get_player_rolling_form
 from services.boundary_vs_bowling_type import get_boundary_vs_bowling_type
+from services.boundary_analysis import get_boundary_analysis
 
 
 router = APIRouter(tags=["analytics"])
@@ -210,5 +211,32 @@ def player_boundary_vs_bowling_type(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to compute boundary vs bowling type: {exc}",
+        )
+
+
+@router.get("/boundary-analysis")
+def boundary_analysis(
+    context: str = Query(..., pattern="^(venue|batter|bowler)$"),
+    name: str = Query(...),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    leagues: List[str] = Query(default=[]),
+    db: Session = Depends(get_session),
+):
+    try:
+        return get_boundary_analysis(
+            db=db,
+            context=context,
+            name=name,
+            start_date=start_date,
+            end_date=end_date,
+            leagues=leagues if leagues else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to compute boundary analysis: {exc}",
         )
 

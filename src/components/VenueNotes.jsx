@@ -42,6 +42,7 @@ import VenueDismissalAnalytics from './VenueDismissalAnalytics';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 import VenueSectionTabs from './VenueSectionTabs';
 import VenueNotesDesktopNav from './VenueNotesDesktopNav';
+import BoundaryAnalysis from './BoundaryAnalysis';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -1102,6 +1103,22 @@ const VenueNotes = ({
                     leagues={leagues}
                     includeInternational={includeInternational}
                     topTeams={topTeams}
+                    isMobile={isMobile}
+                />
+            ),
+        });
+
+        // 5.5 BOUNDARIES
+        groups.push({
+            id: 'boundaries',
+            label: 'Boundaries',
+            content: (
+                <BoundaryAnalysis
+                    context="venue"
+                    name={venue}
+                    startDate={startDate}
+                    endDate={endDate}
+                    leagues={leagues}
                     isMobile={isMobile}
                 />
             ),
