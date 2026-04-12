@@ -96,11 +96,20 @@ module.exports = (req, res) => {
     res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
   });
 
-  // If there's a request body, write it to the proxied request
-  if (req.body) {
-    proxyReq.write(req.body);
+  // Forward the request body for POST/PUT/PATCH
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+    if (req.body) {
+      // Vercel may pre-parse body as object or provide as string/Buffer
+      const payload = typeof req.body === 'string' || Buffer.isBuffer(req.body)
+        ? req.body
+        : JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(payload));
+      proxyReq.end(payload);
+    } else {
+      // Stream raw body if not pre-parsed
+      req.pipe(proxyReq);
+    }
+  } else {
+    proxyReq.end();
   }
-  
-  // End the proxied request
-  proxyReq.end();
 };
