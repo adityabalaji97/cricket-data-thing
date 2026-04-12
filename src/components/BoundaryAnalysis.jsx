@@ -4,92 +4,44 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   useMediaQuery, useTheme,
 } from '@mui/material';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts';
 import Card from './ui/Card';
 import { fetchAnalyticsJson } from '../utils/analyticsApi';
 import { colors as designColors } from '../theme/designSystem';
 
 const MIN_BALLS = 30;
 
-const PHASE_OPTIONS = [
-  { value: 'overall', label: 'Overall' },
-  { value: 'powerplay', label: 'Powerplay' },
-  { value: 'middle', label: 'Middle' },
-  { value: 'death', label: 'Death' },
-];
+const PHASES = ['powerplay', 'middle', 'death'];
+const PHASE_LABELS = { powerplay: 'PP', middle: 'Mid', death: 'Death' };
 
-const GROUP_COLORS = {
-  pace: designColors.chart.blue,
-  spin: designColors.chart.orange,
-  RHB: designColors.chart.blue,
-  LHB: designColors.chart.green,
+const formatShotName = (name) => {
+  if (!name) return '';
+  return name
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
 };
 
-const CustomTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <Box sx={{ bgcolor: 'background.paper', p: 1, border: '1px solid #ccc', borderRadius: 1 }}>
-      <Typography variant="subtitle2">{label}</Typography>
-      {payload.map((entry) => (
-        entry.value != null && (
-          <Typography key={entry.name} variant="body2" sx={{ color: entry.color }}>
-            {entry.name}: {entry.value} ({entry.payload[`${entry.dataKey}_pct`]?.toFixed(1) ?? '-'}%)
-          </Typography>
-        )
-      ))}
-    </Box>
-  );
+const getBoundaryStyle = (pct) => {
+  if (pct >= 30) return { bgcolor: designColors.success[700], color: '#fff' };
+  if (pct >= 20) return { bgcolor: designColors.success[500], color: '#fff' };
+  if (pct >= 10) return { bgcolor: designColors.success[50], color: designColors.neutral[900] };
+  return { bgcolor: designColors.neutral[200], color: designColors.neutral[900] };
 };
 
-const buildChartData = (groups) => {
-  if (!groups || Object.keys(groups).length === 0) return [];
-
-  const groupKeys = Object.keys(groups);
-  const allShots = new Map();
-
-  groupKeys.forEach((gk) => {
-    const shots = groups[gk]?.shots || {};
-    Object.entries(shots).forEach(([shot, data]) => {
-      if (!allShots.has(shot)) {
-        allShots.set(shot, { shot, _totalBoundaries: 0 });
-      }
-      const entry = allShots.get(shot);
-      entry[gk] = data.boundaries;
-      entry[`${gk}_pct`] = data.boundary_pct;
-      entry._totalBoundaries += data.boundaries;
-    });
+const getTopShot = (shots) => {
+  if (!shots) return null;
+  let best = null;
+  Object.entries(shots).forEach(([name, data]) => {
+    if (!best || data.boundaries > best.boundaries) {
+      best = { name, ...data };
+    }
   });
-
-  return Array.from(allShots.values())
-    .filter((d) => d._totalBoundaries > 0)
-    .sort((a, b) => b._totalBoundaries - a._totalBoundaries)
-    .slice(0, 15);
+  return best;
 };
 
-const buildStyleChartData = (groups) => {
-  if (!groups || Object.keys(groups).length === 0) return [];
-
-  const allStyles = new Map();
-  Object.values(groups).forEach((group) => {
-    const styles = group?.styles || {};
-    Object.entries(styles).forEach(([style, data]) => {
-      if (!allStyles.has(style)) {
-        allStyles.set(style, { style, boundaries: 0, total_balls: 0, boundary_pct: 0 });
-      }
-      const entry = allStyles.get(style);
-      entry.boundaries += data.boundaries;
-      entry.total_balls += data.total_balls;
-    });
-  });
-
-  const result = Array.from(allStyles.values())
-    .filter((d) => d.boundaries > 0)
-    .map((d) => ({ ...d, boundary_pct: d.total_balls > 0 ? +(d.boundaries / d.total_balls * 100).toFixed(1) : 0 }))
-    .sort((a, b) => b.boundaries - a.boundaries);
-
-  return result;
+const getTotalBalls = (data) => {
+  if (!data?.overall?.groups) return 0;
+  return Object.values(data.overall.groups).reduce((sum, g) => sum + (g.total_balls || 0), 0);
 };
 
 const buildDetailRows = (groups) => {
@@ -99,16 +51,149 @@ const buildDetailRows = (groups) => {
     .map(([key, data]) => ({ key, ...data }));
 };
 
-const getTotalBalls = (data) => {
-  if (!data?.overall?.groups) return 0;
-  return Object.values(data.overall.groups).reduce((sum, g) => sum + (g.total_balls || 0), 0);
+/* ---------- Stat Card ---------- */
+const StatCard = ({ group, isMobile }) => {
+  if (!group || group.total_balls === 0) {
+    return (
+      <Box sx={{
+        p: 1.5, borderRadius: 1, border: `1px solid ${designColors.neutral[200]}`,
+        bgcolor: designColors.neutral[50], minHeight: 80,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Typography variant="caption" color="text.disabled">No data</Typography>
+      </Box>
+    );
+  }
+
+  const pct = group.boundary_pct ?? (group.total_balls > 0 ? +(group.boundaries / group.total_balls * 100).toFixed(1) : 0);
+  const style = getBoundaryStyle(pct);
+  const topShot = getTopShot(group.shots);
+
+  return (
+    <Box sx={{
+      p: 1.5, borderRadius: 1, border: `1px solid ${designColors.neutral[200]}`,
+      bgcolor: designColors.neutral[0], display: 'flex', flexDirection: 'column', gap: 0.5,
+    }}>
+      {/* Boundary % badge */}
+      <Box sx={{
+        display: 'inline-flex', alignSelf: 'flex-start',
+        px: 1, py: 0.25, borderRadius: 1,
+        bgcolor: style.bgcolor, color: style.color,
+      }}>
+        <Typography variant="body1" sx={{ fontWeight: 700, fontSize: isMobile ? '1rem' : '1.125rem' }}>
+          {pct.toFixed(1)}%
+        </Typography>
+      </Box>
+
+      {/* 4s × 6s */}
+      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+        {group.fours}×4&nbsp;&nbsp;{group.sixes}×6
+      </Typography>
+
+      {/* Balls */}
+      <Typography variant="caption" color="text.secondary">
+        {group.total_balls} balls
+      </Typography>
+
+      {/* Top shot */}
+      {topShot && topShot.boundaries > 0 && (
+        <Typography variant="caption" sx={{ color: designColors.neutral[500], fontStyle: 'italic' }}>
+          {formatShotName(topShot.name)}
+        </Typography>
+      )}
+
+      {/* Thin bar */}
+      <Box sx={{ mt: 0.5, height: 4, borderRadius: 2, bgcolor: designColors.neutral[100], overflow: 'hidden' }}>
+        <Box sx={{
+          height: '100%', borderRadius: 2,
+          width: `${Math.min(pct, 100)}%`,
+          bgcolor: pct >= 20 ? designColors.success[500] : pct >= 10 ? designColors.success[600] : designColors.neutral[400],
+        }} />
+      </Box>
+    </Box>
+  );
 };
 
+/* ---------- Row of cards for one group ---------- */
+const CardRow = ({ label, phaseData, isMobile }) => (
+  <Box sx={{ display: 'contents' }}>
+    {/* Row label */}
+    <Box sx={{
+      display: 'flex', alignItems: 'center',
+      fontWeight: 600, fontSize: '0.875rem',
+      pr: 1, minWidth: isMobile ? 'auto' : 70,
+    }}>
+      {label}
+    </Box>
+    {PHASES.map((phase) => (
+      <StatCard key={phase} group={phaseData[phase]} isMobile={isMobile} />
+    ))}
+  </Box>
+);
+
+/* ---------- Build grid data ---------- */
+const buildGridRows = (data, drillDown, context) => {
+  if (!data) return [];
+
+  const isBowler = context === 'bowler';
+
+  if (drillDown && !isBowler) {
+    // Bowl style drill-down: collect all styles across phases
+    const allStyles = new Set();
+    PHASES.forEach((phase) => {
+      const groups = data.phases?.[phase]?.groups;
+      if (!groups) return;
+      Object.values(groups).forEach((g) => {
+        if (g.styles) Object.keys(g.styles).forEach((s) => allStyles.add(s));
+      });
+    });
+
+    return Array.from(allStyles).sort().map((style) => {
+      const phaseData = {};
+      PHASES.forEach((phase) => {
+        const groups = data.phases?.[phase]?.groups;
+        let merged = { total_balls: 0, boundaries: 0, fours: 0, sixes: 0, total_runs: 0, shots: {} };
+        if (groups) {
+          Object.values(groups).forEach((g) => {
+            const s = g.styles?.[style];
+            if (s) {
+              merged.total_balls += s.total_balls || 0;
+              merged.boundaries += s.boundaries || 0;
+              merged.fours += s.fours || 0;
+              merged.sixes += s.sixes || 0;
+              merged.total_runs += s.total_runs || 0;
+              if (s.shots) {
+                Object.entries(s.shots).forEach(([shotName, shotData]) => {
+                  if (!merged.shots[shotName]) merged.shots[shotName] = { boundaries: 0 };
+                  merged.shots[shotName].boundaries += shotData.boundaries || 0;
+                });
+              }
+            }
+          });
+        }
+        merged.boundary_pct = merged.total_balls > 0 ? +(merged.boundaries / merged.total_balls * 100).toFixed(1) : 0;
+        phaseData[phase] = merged;
+      });
+      return { label: style, phaseData };
+    }).filter((row) => PHASES.some((p) => row.phaseData[p].total_balls > 0));
+  }
+
+  // Standard: pace/spin rows (or LHB/RHB for bowler)
+  const groupKeys = data.overall?.groups ? Object.keys(data.overall.groups) : [];
+  return groupKeys.map((gk) => {
+    const phaseData = {};
+    PHASES.forEach((phase) => {
+      phaseData[phase] = data.phases?.[phase]?.groups?.[gk] || null;
+    });
+    return { label: gk.toUpperCase(), phaseData };
+  });
+};
+
+/* ---------- Main component ---------- */
 const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeInternational, isMobile: isMobileProp }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedPhase, setSelectedPhase] = useState('overall');
   const [drillDown, setDrillDown] = useState(false);
 
   const theme = useTheme();
@@ -158,18 +243,12 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
 
   if (!data || getTotalBalls(data) < MIN_BALLS) return null;
 
-  const phaseGroups = selectedPhase === 'overall'
-    ? data.overall?.groups
-    : data.phases?.[selectedPhase]?.groups;
-
-  const groupKeys = phaseGroups ? Object.keys(phaseGroups) : [];
-  const chartData = buildChartData(phaseGroups);
-  const detailRows = buildDetailRows(phaseGroups);
-  const showStyleDrill = context !== 'bowler' && drillDown;
-  const styleData = showStyleDrill ? buildStyleChartData(phaseGroups) : [];
-
+  const gridRows = buildGridRows(data, drillDown, context);
   const isBowlerCtx = context === 'bowler';
   const dimLabel = isBowlerCtx ? 'Bat Hand' : 'Bowl Type';
+
+  // Detail rows from overall for the summary table
+  const detailRows = buildDetailRows(data.overall?.groups);
 
   return (
     <Card isMobile={isMobile}>
@@ -177,19 +256,9 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
         Boundary Analysis
       </Typography>
 
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, alignItems: 'center' }}>
-        <ToggleButtonGroup
-          value={selectedPhase}
-          exclusive
-          onChange={(_, v) => v && setSelectedPhase(v)}
-          size="small"
-        >
-          {PHASE_OPTIONS.map((p) => (
-            <ToggleButton key={p.value} value={p.value}>{p.label}</ToggleButton>
-          ))}
-        </ToggleButtonGroup>
-
-        {context !== 'bowler' && (
+      {/* Controls */}
+      {context !== 'bowler' && (
+        <Box sx={{ mb: 2 }}>
           <ToggleButtonGroup
             value={drillDown ? 'style' : 'type'}
             exclusive
@@ -199,65 +268,70 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
             <ToggleButton value="type">Pace / Spin</ToggleButton>
             <ToggleButton value="style">Bowl Style</ToggleButton>
           </ToggleButtonGroup>
-        )}
-      </Box>
-
-      {/* Grouped Bar Chart — Boundaries by Shot */}
-      {!showStyleDrill && chartData.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Boundaries by Shot Type
-          </Typography>
-          <ResponsiveContainer width="100%" height={isMobile ? 280 : 350}>
-            <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="shot"
-                tick={{ fontSize: isMobile ? 9 : 11 }}
-                interval={0}
-                angle={isMobile ? -45 : -30}
-                textAnchor="end"
-                height={isMobile ? 70 : 60}
-              />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              {groupKeys.map((gk) => (
-                <Bar key={gk} dataKey={gk} name={gk.toUpperCase()} fill={GROUP_COLORS[gk] || designColors.chart.purple} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
         </Box>
       )}
 
-      {/* Bowl Style Drill-Down Chart */}
-      {showStyleDrill && styleData.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Boundaries by Bowl Style
-          </Typography>
-          <ResponsiveContainer width="100%" height={isMobile ? 280 : 350}>
-            <BarChart data={styleData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="style"
-                tick={{ fontSize: isMobile ? 9 : 11 }}
-                interval={0}
-                angle={isMobile ? -45 : -30}
-                textAnchor="end"
-                height={isMobile ? 70 : 60}
-              />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-              <Tooltip
-                formatter={(value, _name, props) => {
-                  if (_name === 'boundary_pct') return `${value}%`;
-                  return `${value} (${props.payload.boundary_pct}%)`;
-                }}
-              />
-              <Legend />
-              <Bar dataKey="boundaries" name="Boundaries" fill={designColors.chart.indigo} />
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Card Grid */}
+      {gridRows.length > 0 && (
+        <Box sx={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? 'auto 1fr 1fr' : 'auto 1fr 1fr 1fr',
+          gap: 1,
+          mb: 3,
+        }}>
+          {/* Column headers */}
+          <Box />
+          {(isMobile ? PHASES.slice(0, 2) : PHASES).map((phase) => (
+            <Typography key={phase} variant="caption" sx={{
+              fontWeight: 600, textAlign: 'center', color: designColors.neutral[500],
+              textTransform: 'uppercase', letterSpacing: '0.05em', pb: 0.5,
+            }}>
+              {PHASE_LABELS[phase]}
+            </Typography>
+          ))}
+
+          {/* Data rows */}
+          {gridRows.map((row) => (
+            <React.Fragment key={row.label}>
+              <Box sx={{
+                display: 'flex', alignItems: 'center',
+                fontWeight: 600, fontSize: '0.8rem',
+                pr: 1, minWidth: isMobile ? 'auto' : 70,
+              }}>
+                {row.label}
+              </Box>
+              {(isMobile ? PHASES.slice(0, 2) : PHASES).map((phase) => (
+                <StatCard key={phase} group={row.phaseData[phase]} isMobile={isMobile} />
+              ))}
+            </React.Fragment>
+          ))}
+
+          {/* On mobile, show death phase as a separate row below */}
+          {isMobile && gridRows.length > 0 && (
+            <>
+              <Box />
+              <Typography variant="caption" sx={{
+                fontWeight: 600, textAlign: 'center', color: designColors.neutral[500],
+                textTransform: 'uppercase', letterSpacing: '0.05em', pt: 1, pb: 0.5,
+                gridColumn: 'span 2',
+              }}>
+                Death
+              </Typography>
+              {gridRows.map((row) => (
+                <React.Fragment key={`death-${row.label}`}>
+                  <Box sx={{
+                    display: 'flex', alignItems: 'center',
+                    fontWeight: 600, fontSize: '0.8rem', pr: 1,
+                  }}>
+                    {row.label}
+                  </Box>
+                  <Box sx={{ gridColumn: 'span 2' }}>
+                    <StatCard group={row.phaseData.death} isMobile={isMobile} />
+                  </Box>
+                </React.Fragment>
+              ))}
+            </>
+          )}
         </Box>
       )}
 
