@@ -93,10 +93,10 @@ def get_boundary_analysis(
         params: dict = {"name": name}
 
     if start_date:
-        where_clauses.append("dd.match_date >= :start_date")
+        where_clauses.append("dd.match_date::date >= :start_date")
         params["start_date"] = start_date
     if end_date:
-        where_clauses.append("dd.match_date <= :end_date")
+        where_clauses.append("dd.match_date::date <= :end_date")
         params["end_date"] = end_date
 
     # Competition / international filter (uses dd.competition column)
