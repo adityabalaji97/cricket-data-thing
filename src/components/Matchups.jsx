@@ -353,7 +353,7 @@ const MatchupMatrix = ({
                                         backgroundColor: 'background.paper',
                                         zIndex: 1,
                                         cursor: 'pointer',
-                                        borderLeft: `3px solid ${getFormBorderColor(formMeta)}`
+                                        boxShadow: `inset 3px 0 0 0 ${getFormBorderColor(formMeta)}`
                                     }}
                                     onClick={() => handleBatterClick(batter)}
                                 >
