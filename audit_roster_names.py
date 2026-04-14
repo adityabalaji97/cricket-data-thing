@@ -13,6 +13,7 @@ Statuses: OK, NO_DATA, WRONG_MATCH, NO_ALIAS
 
 import sys
 import os
+import argparse
 
 # Add the blah directory to path so imports work
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -156,11 +157,95 @@ def fuzzy_search_db(db, name: str) -> list:
     return [(r[0], r[1]) for r in results]
 
 
+def is_strong_fuzzy_match(roster_name: str, db_name: str) -> bool:
+    """
+    Check if a fuzzy match is strong enough to auto-insert an alias.
+    Requires: last name exact match AND first name/initial consistency.
+    """
+    roster_parts = roster_name.lower().split()
+    db_parts = db_name.lower().split()
+
+    if len(roster_parts) < 2 or len(db_parts) < 2:
+        return False
+
+    # Last name must match exactly
+    if roster_parts[-1] != db_parts[-1]:
+        return False
+
+    # First name/initial check
+    r_first = roster_parts[0].rstrip(".")
+    d_first = db_parts[0].rstrip(".")
+
+    # Exact first name match
+    if r_first == d_first:
+        return True
+
+    # Roster has full name, DB has initial (e.g., "Varun" vs "V")
+    if len(d_first) <= 2 and r_first.startswith(d_first):
+        return True
+
+    # Roster has initial, DB has full name (e.g., "V" vs "Varun")
+    if len(r_first) <= 2 and d_first.startswith(r_first):
+        return True
+
+    return False
+
+
+def insert_alias(db, player_name: str, alias_name: str) -> bool:
+    """Insert a player_aliases row. player_name=legacy DB name, alias_name=roster name."""
+    # Check if this exact mapping already exists
+    existing = db.execute(
+        text("SELECT id FROM player_aliases WHERE LOWER(player_name) = LOWER(:pn) AND LOWER(alias_name) = LOWER(:an)"),
+        {"pn": player_name, "an": alias_name},
+    ).fetchone()
+    if existing:
+        return False
+
+    db.execute(
+        text("INSERT INTO player_aliases (player_name, alias_name) VALUES (:pn, :an)"),
+        {"pn": player_name, "an": alias_name},
+    )
+    return True
+
+
+def auto_fix_player(db, roster_name: str, status: str) -> str:
+    """
+    Attempt to auto-fix a player by finding a strong fuzzy match and inserting an alias.
+    Returns a message describing what was done, or None if no fix was applied.
+    """
+    suggestions = fuzzy_search_db(db, roster_name)
+    if not suggestions:
+        return None
+
+    # Get unique DB names from suggestions
+    db_names = list(dict.fromkeys(s[0] for s in suggestions))
+
+    # Find strong matches
+    strong_matches = [n for n in db_names if is_strong_fuzzy_match(roster_name, n)]
+
+    if len(strong_matches) == 1:
+        db_name = strong_matches[0]
+        if insert_alias(db, db_name, roster_name):
+            return f"FIXED: inserted alias {db_name!r} -> {roster_name!r}"
+        else:
+            return f"SKIP: alias {db_name!r} -> {roster_name!r} already exists"
+    elif len(strong_matches) > 1:
+        return f"MANUAL: multiple strong matches: {strong_matches}"
+    else:
+        return None
+
+
 def main():
+    parser = argparse.ArgumentParser(description="Audit roster names against database")
+    parser.add_argument("--fix", action="store_true",
+                        help="Auto-insert player_aliases for unambiguous fuzzy matches")
+    args = parser.parse_args()
+    fix_mode = args.fix
     db = Session()
     try:
         issues = {"NO_DATA": [], "WRONG_MATCH": [], "NO_ALIAS": []}
         all_results = []
+        fixes_applied = []
 
         for team_abbrev, team_data in IPL_2026_ROSTERS.items():
             team_name = team_data["full_name"]
@@ -226,11 +311,11 @@ def main():
                     "status": status,
                 })
 
-            # For NO_DATA players, do fuzzy search to find possible DB names
-            no_data_players = [r for r in all_results if r["team"] == team_abbrev and r["status"] in ("NO_DATA",)]
-            if no_data_players:
-                print(f"\n  Fuzzy search for NO_DATA players:")
-                for r in no_data_players:
+            # For NO_DATA and NO_ALIAS players, do fuzzy search to find possible DB names
+            fixable_players = [r for r in all_results if r["team"] == team_abbrev and r["status"] in ("NO_DATA", "NO_ALIAS")]
+            if fixable_players:
+                print(f"\n  Fuzzy search for {', '.join(set(r['status'] for r in fixable_players))} players:")
+                for r in fixable_players:
                     suggestions = fuzzy_search_db(db, r["name"])
                     if suggestions:
                         print(f"    {r['name']}  →  possible matches:")
@@ -238,6 +323,12 @@ def main():
                             print(f"      - {s_name}  ({s_source})")
                     else:
                         print(f"    {r['name']}  →  no similar names found (likely uncapped/new)")
+
+                    if fix_mode and r["status"] in ("NO_DATA", "NO_ALIAS"):
+                        fix_result = auto_fix_player(db, r["name"], r["status"])
+                        if fix_result:
+                            print(f"    >> {fix_result}")
+                            fixes_applied.append((r["team"], r["name"], fix_result))
 
         # Summary
         print(f"\n{'='*90}")
@@ -265,6 +356,16 @@ def main():
             print(f"\n  NO_DATA players (may need name fix or are genuinely uncapped):")
             for team, name, role in issues["NO_DATA"]:
                 print(f"    [{team}] {name} ({role})")
+
+        if fix_mode and fixes_applied:
+            db.commit()
+            print(f"\n  {'='*90}")
+            print(f"  FIX MODE: {len(fixes_applied)} alias(es) inserted and committed")
+            print(f"  {'='*90}")
+            for team, name, msg in fixes_applied:
+                print(f"    [{team}] {name}: {msg}")
+        elif fix_mode:
+            print(f"\n  FIX MODE: no fixes needed")
 
     finally:
         db.close()

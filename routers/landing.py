@@ -5,7 +5,7 @@ Surfaces recent standout batting performances with wagon wheel data.
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import text
+from sqlalchemy.sql import text, bindparam
 import logging
 import time
 
@@ -13,6 +13,23 @@ from database import get_session
 
 router = APIRouter(prefix="/landing", tags=["landing"])
 logger = logging.getLogger(__name__)
+
+# Competitions eligible for the featured innings section
+FEATURED_COMPETITIONS = [
+    'Indian Premier League',
+    'Big Bash League',
+    'Pakistan Super League',
+    'Caribbean Premier League',
+    'SA20',
+    'International League T20',
+    'Bangladesh Premier League',
+    'Lanka Premier League',
+    'Vitality Blast',
+    'International Twenty20',
+    'Super Smash',
+    'The Hundred',
+    'Major League Cricket',
+]
 
 # Simple in-memory cache with 1-hour TTL
 _featured_cache = {"data": None, "timestamp": 0}
@@ -62,13 +79,15 @@ def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float
           AND bs.runs >= :min_runs
           AND bs.strike_rate >= :min_sr
           AND bs.balls_faced >= 15
+          AND (m.competition IN :competitions OR m.match_type = 'T20I')
         ORDER BY bs.runs DESC, bs.strike_rate DESC
         LIMIT 20
-    """)
+    """).bindparams(bindparam('competitions', expanding=True))
 
     innings_rows = db.execute(innings_query, {
         "min_runs": min_runs,
-        "min_sr": min_sr
+        "min_sr": min_sr,
+        "competitions": FEATURED_COMPETITIONS
     }).fetchall()
 
     results = []
