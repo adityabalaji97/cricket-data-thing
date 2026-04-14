@@ -25,12 +25,18 @@ FEATURED_COMPETITIONS = [
     'Bangladesh Premier League', 'BPL',
     'Lanka Premier League',
     'Vitality Blast', 'T20 Blast',
-    'International Twenty20', 'T20I',
     'Super Smash',
     'The Hundred', "Men's Hundred", "Men's 100",
     'Major League Cricket',
     'Syed Mushtaq Ali Trophy', 'SMAT',
 ]
+
+# ICC Full Member teams — T20Is only qualify if at least one team is a Full Member
+_FULL_MEMBER_TEAMS = {
+    'India', 'Australia', 'England', 'West Indies', 'New Zealand',
+    'South Africa', 'Pakistan', 'Sri Lanka', 'Bangladesh', 'Afghanistan',
+    'Ireland', 'Zimbabwe',
+}
 
 # Simple in-memory cache with 1-hour TTL
 _featured_cache = {"data": None, "timestamp": 0}
@@ -80,15 +86,21 @@ def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float
           AND bs.runs >= :min_runs
           AND bs.strike_rate >= :min_sr
           AND bs.balls_faced >= 15
-          AND (m.competition IN :competitions OR m.match_type = 'T20I')
+          AND (m.competition IN :competitions
+               OR (m.competition IN ('T20I', 'International Twenty20')
+                   AND (m.team1 IN :full_members OR m.team2 IN :full_members)))
         ORDER BY bs.runs DESC, bs.strike_rate DESC
         LIMIT 20
-    """).bindparams(bindparam('competitions', expanding=True))
+    """).bindparams(
+        bindparam('competitions', expanding=True),
+        bindparam('full_members', expanding=True),
+    )
 
     innings_rows = db.execute(innings_query, {
         "min_runs": min_runs,
         "min_sr": min_sr,
-        "competitions": FEATURED_COMPETITIONS
+        "competitions": FEATURED_COMPETITIONS,
+        "full_members": list(_FULL_MEMBER_TEAMS)
     }).fetchall()
 
     results = []
