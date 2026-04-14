@@ -14,21 +14,22 @@ from database import get_session
 router = APIRouter(prefix="/landing", tags=["landing"])
 logger = logging.getLogger(__name__)
 
-# Competitions eligible for the featured innings section
+# Competitions eligible for the featured innings section (both full and abbreviated DB values)
 FEATURED_COMPETITIONS = [
-    'Indian Premier League',
-    'Big Bash League',
-    'Pakistan Super League',
-    'Caribbean Premier League',
+    'Indian Premier League', 'IPL',
+    'Big Bash League', 'BBL',
+    'Pakistan Super League', 'PSL',
+    'Caribbean Premier League', 'CPL',
     'SA20',
-    'International League T20',
-    'Bangladesh Premier League',
+    'International League T20', 'ILT20',
+    'Bangladesh Premier League', 'BPL',
     'Lanka Premier League',
-    'Vitality Blast',
-    'International Twenty20',
+    'Vitality Blast', 'T20 Blast',
+    'International Twenty20', 'T20I',
     'Super Smash',
-    'The Hundred',
+    'The Hundred', "Men's Hundred", "Men's 100",
     'Major League Cricket',
+    'Syed Mushtaq Ali Trophy', 'SMAT',
 ]
 
 # Simple in-memory cache with 1-hour TTL
