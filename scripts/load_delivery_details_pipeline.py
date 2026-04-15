@@ -4,6 +4,7 @@ Unified pipeline for loading and enhancing delivery_details data.
 This script orchestrates the full data loading pipeline:
 1. Validate dataset (optional)
 2. Load new rows (with duplicate detection)
+2b. Backfill advanced data (line, length, shot, control, etc.)
 3. Populate non_striker and crease_combo columns
 4. Update players table with bat_hand/bowl_style
 5. Refresh query builder metadata
@@ -101,6 +102,22 @@ def step_load(csv_path, db_url, dry_run=False):
     print(f"  - {'Would insert' if dry_run else 'Inserted'}: {results['total_inserted']:,}")
     
     return results
+
+
+def step_backfill_advanced(csv_path, db_url, dry_run=False):
+    """Step 2b: Backfill advanced data columns from CSV."""
+    print_header("STEP 2b: BACKFILL ADVANCED DATA")
+
+    from backfill_advanced_data import backfill
+    from load_delivery_details_full import get_engine
+
+    engine = get_engine(db_url)
+    updated = backfill(csv_path, engine, dry_run=dry_run)
+
+    print(f"\n✓ Backfill complete")
+    print(f"  - {'Would update' if dry_run else 'Updated'}: {updated:,} rows")
+
+    return updated
 
 
 def step_populate_columns(db_url, dry_run=False):
@@ -206,6 +223,7 @@ def main():
 Steps:
   1. Validate dataset (sample check)
   2. Load new rows (with duplicate detection)
+  2b. Backfill advanced data (line, length, shot, control, etc.)
   3. Populate non_striker and crease_combo columns
   4. Update players table with bat_hand/bowl_style
   5. Refresh query builder metadata
@@ -227,6 +245,7 @@ Examples:
     parser.add_argument('--dry-run', action='store_true', help='Show what would happen without making changes')
     parser.add_argument('--skip-validation', action='store_true', help='Skip the validation step')
     parser.add_argument('--skip-load', action='store_true', help='Skip the data loading step')
+    parser.add_argument('--skip-backfill', action='store_true', help='Skip the advanced data backfill step')
     parser.add_argument('--skip-columns', action='store_true', help='Skip the column population step')
     parser.add_argument('--skip-players', action='store_true', help='Skip the players update step')
     parser.add_argument('--skip-metadata', action='store_true', help='Skip the metadata refresh step')
@@ -270,6 +289,12 @@ Examples:
         else:
             print("\n[SKIPPED] Step 2: Load Data")
         
+        # Step 2b: Backfill advanced data
+        if not args.skip_backfill:
+            step_backfill_advanced(args.csv, db_url, dry_run=args.dry_run)
+        else:
+            print("\n[SKIPPED] Step 2b: Backfill Advanced Data")
+
         # Step 3: Populate columns
         if not args.skip_columns:
             step_populate_columns(db_url, dry_run=args.dry_run)
