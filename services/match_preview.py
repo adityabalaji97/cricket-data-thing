@@ -177,21 +177,22 @@ def _get_recent_form(
 
 
 def _get_latest_elo(db: Session, team: str) -> Optional[int]:
-    query = text(
-        """
+    variations = get_all_team_name_variations(team)
+    placeholders = ", ".join(f":t{i}" for i in range(len(variations)))
+    query = text(f"""
         SELECT date, team1, team2, team1_elo, team2_elo
         FROM matches
-        WHERE (team1 = :team OR team2 = :team)
+        WHERE (team1 IN ({placeholders}) OR team2 IN ({placeholders}))
           AND (team1_elo IS NOT NULL OR team2_elo IS NOT NULL)
         ORDER BY date DESC
         LIMIT 20
-        """
-    )
-    rows = db.execute(query, {"team": team}).fetchall()
+    """)
+    params = {f"t{i}": v for i, v in enumerate(variations)}
+    rows = db.execute(query, params).fetchall()
     for r in rows:
-        if r.team1 == team and r.team1_elo is not None:
+        if r.team1 in variations and r.team1_elo is not None:
             return int(r.team1_elo)
-        if r.team2 == team and r.team2_elo is not None:
+        if r.team2 in variations and r.team2_elo is not None:
             return int(r.team2_elo)
     return None
 
