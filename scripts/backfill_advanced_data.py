@@ -50,7 +50,11 @@ def get_null_advanced_keys(engine):
 
 
 def backfill(csv_path, engine, dry_run=False):
-    """Backfill advanced columns from CSV into DB rows that have NULLs."""
+    """Backfill advanced columns from CSV into DB rows that have NULLs.
+
+    Uses a temp table + single bulk UPDATE with COALESCE to preserve existing
+    non-NULL values. Much faster than row-by-row updates.
+    """
 
     print("Finding deliveries with NULL advanced data...")
     null_keys = get_null_advanced_keys(engine)
@@ -58,9 +62,7 @@ def backfill(csv_path, engine, dry_run=False):
         print("  Nothing to backfill — all advanced columns are populated.")
         return 0
 
-    # Get the set of match IDs to filter CSV efficiently
     match_ids_needed = {k[0] for k in null_keys}
-    null_key_set = set(null_keys)
 
     print(f"  Matches with NULL advanced data: {len(match_ids_needed):,}")
     print(f"Loading CSV and filtering to relevant matches...")
@@ -71,8 +73,8 @@ def backfill(csv_path, engine, dry_run=False):
 
     # Keep only columns we need
     key_cols = ['p_match', 'inns', 'over', 'ball']
-    cols_to_keep = key_cols + [c for c in ADVANCED_COLS if c in df.columns]
-    df = df[[c for c in cols_to_keep if c in df.columns]].copy()
+    advanced_in_csv = [c for c in ADVANCED_COLS if c in df.columns]
+    df = df[key_cols + advanced_in_csv].copy()
 
     df['p_match'] = df['p_match'].astype(str)
     df['over'] = df['over'] - 1  # Same 1->0 index adjustment as loader
@@ -81,75 +83,74 @@ def backfill(csv_path, engine, dry_run=False):
     df = df[df['p_match'].isin(match_ids_needed)]
     print(f"  CSV rows for relevant matches: {len(df):,}")
 
-    # Replace "-" with None and handle NaN (same as loader)
-    df = df.replace('-', None)
-    df = df.where(pd.notnull(df), None)
+    # Replace "-" with NaN (treat as missing)
+    df = df.replace('-', pd.NA)
 
-    # Normalize control to int (same as loader)
+    # Normalize control to nullable int
     if 'control' in df.columns:
-        control_numeric = pd.to_numeric(df['control'], errors='coerce')
-        df['control'] = control_numeric.apply(lambda v: int(v) if pd.notna(v) else None)
+        df['control'] = pd.to_numeric(df['control'], errors='coerce').astype('Int64')
 
-    # Build lookup: (p_match, inns, over, ball) -> {col: value}
-    csv_lookup = {}
-    for _, row in df.iterrows():
-        key = (str(row['p_match']), int(row['inns']), int(row['over']), int(row['ball']))
-        if key in null_key_set:
-            vals = {}
-            for col in ADVANCED_COLS:
-                if col in row.index and row[col] is not None and not (isinstance(row[col], float) and pd.isna(row[col])):
-                    vals[col] = row[col]
-            if vals:
-                csv_lookup[key] = vals
+    # Convert NaN in string-typed cols to None (so to_sql inserts NULL, not 'NaN')
+    for col in ('line', 'length', 'shot'):
+        if col in df.columns:
+            df[col] = df[col].astype(object).where(pd.notna(df[col]), None)
 
-    print(f"  CSV rows with data to backfill: {len(csv_lookup):,}")
+    # Drop rows where ALL advanced cols are null (nothing to backfill for them)
+    if advanced_in_csv:
+        df = df.dropna(subset=advanced_in_csv, how='all')
+    print(f"  CSV rows with data to backfill: {len(df):,}")
 
-    if not csv_lookup:
-        print("  Nothing to backfill — CSV has no new data for these rows.")
+    if df.empty:
+        print("  Nothing to backfill — CSV has no data for these rows.")
         return 0
 
-    # Now fetch current DB values for these keys so we only update NULL->non-NULL
-    # Build batch updates
-    updates = []
-    for key, csv_vals in csv_lookup.items():
-        p_match, inns, over, ball = key
-        set_clauses = []
-        params = {'p_match': p_match, 'inns': inns, 'over': over, 'ball': ball}
-        for col, val in csv_vals.items():
-            # Use COALESCE-style: only set if DB value is NULL
-            set_clauses.append(f"{col} = CASE WHEN {col} IS NULL THEN :{col}_val ELSE {col} END")
-            params[f'{col}_val'] = val
-
-        if set_clauses:
-            updates.append((set_clauses, params))
-
-    total_to_update = len(updates)
-    print(f"\n  Rows to update: {total_to_update:,}")
-
     if dry_run:
-        print(f"  [DRY RUN] Would update {total_to_update:,} rows")
-        return total_to_update
+        print(f"  [DRY RUN] Would update up to {len(df):,} rows")
+        return len(df)
 
-    # Execute in batches
-    batch_size = 500
-    updated = 0
-    with engine.connect() as conn:
-        for i in range(0, len(updates), batch_size):
-            batch = updates[i:i + batch_size]
-            for set_clauses, params in batch:
-                sql = f"""
-                    UPDATE delivery_details
-                    SET {', '.join(set_clauses)}
-                    WHERE p_match = :p_match AND inns = :inns AND over = :over AND ball = :ball
-                """
-                conn.execute(text(sql), params)
-                updated += 1
+    # Upload to temp table and do a single bulk UPDATE
+    with engine.begin() as conn:
+        print("  Creating temp table...")
+        conn.execute(text("DROP TABLE IF EXISTS temp_backfill_advanced"))
 
-            print(f"  Updated {updated:,}/{total_to_update:,} rows...", end='\r')
+        print(f"  Uploading {len(df):,} rows to temp table...")
+        df.to_sql(
+            "temp_backfill_advanced",
+            conn,
+            if_exists="replace",
+            index=False,
+            method="multi",
+            chunksize=5000,
+        )
 
-        conn.commit()
+        # Index the temp table for fast join
+        print("  Indexing temp table...")
+        conn.execute(text(
+            "CREATE INDEX ix_temp_backfill_advanced_key "
+            "ON temp_backfill_advanced (p_match, inns, over, ball)"
+        ))
 
-    print(f"\n  Backfill complete: {updated:,} rows updated")
+        # COALESCE preserves existing non-NULL values; only NULLs get filled
+        set_clauses = ", ".join(
+            f"{col} = COALESCE(dd.{col}, t.{col})" for col in advanced_in_csv
+        )
+        update_sql = f"""
+            UPDATE delivery_details dd
+            SET {set_clauses}
+            FROM temp_backfill_advanced t
+            WHERE dd.p_match::text = t.p_match::text
+              AND dd.inns = t.inns
+              AND dd.over = t.over
+              AND dd.ball = t.ball
+        """
+
+        print("  Running bulk UPDATE...")
+        result = conn.execute(text(update_sql))
+        updated = result.rowcount
+
+        conn.execute(text("DROP TABLE IF EXISTS temp_backfill_advanced"))
+
+    print(f"  Backfill complete: {updated:,} rows updated")
     return updated
 
 
