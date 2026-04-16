@@ -97,7 +97,7 @@ def backfill(csv_path, engine, dry_run=False):
         if key in null_key_set:
             vals = {}
             for col in ADVANCED_COLS:
-                if col in row.index and row[col] is not None:
+                if col in row.index and row[col] is not None and not (isinstance(row[col], float) and pd.isna(row[col])):
                     vals[col] = row[col]
             if vals:
                 csv_lookup[key] = vals
