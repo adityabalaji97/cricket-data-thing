@@ -108,7 +108,7 @@ def backfill(csv_path, engine, dry_run=False):
         print(f"  [DRY RUN] Would update up to {len(df):,} rows")
         return len(df)
 
-    # Upload to temp table and do a single bulk UPDATE
+    # Upload to a temp table once
     with engine.begin() as conn:
         print("  Creating temp table...")
         conn.execute(text("DROP TABLE IF EXISTS temp_backfill_advanced"))
@@ -123,35 +123,53 @@ def backfill(csv_path, engine, dry_run=False):
             chunksize=5000,
         )
 
-        # Index the temp table for fast join
         print("  Indexing temp table...")
         conn.execute(text(
             "CREATE INDEX ix_temp_backfill_advanced_key "
             "ON temp_backfill_advanced (p_match, inns, over, ball)"
         ))
 
-        # COALESCE preserves existing non-NULL values; only NULLs get filled
-        set_clauses = ", ".join(
-            f"{col} = COALESCE(dd.{col}, t.{col})" for col in advanced_in_csv
+    # Run the UPDATE in batches of matches to keep each statement small enough
+    # that Postgres doesn't run out of memory / get killed.
+    set_clauses = ", ".join(
+        f"{col} = COALESCE(dd.{col}, t.{col})" for col in advanced_in_csv
+    )
+    null_filter = " OR ".join(f"dd.{col} IS NULL" for col in advanced_in_csv)
+
+    match_list = sorted(match_ids_needed)
+    BATCH_SIZE = 500
+    total_batches = (len(match_list) + BATCH_SIZE - 1) // BATCH_SIZE
+    total_updated = 0
+
+    print(f"  Running bulk UPDATE in {total_batches} batches of {BATCH_SIZE} matches...")
+    for i in range(0, len(match_list), BATCH_SIZE):
+        batch = match_list[i:i + BATCH_SIZE]
+        with engine.begin() as conn:
+            result = conn.execute(
+                text(f"""
+                    UPDATE delivery_details dd
+                    SET {set_clauses}
+                    FROM temp_backfill_advanced t
+                    WHERE dd.p_match::text = t.p_match::text
+                      AND dd.inns = t.inns
+                      AND dd.over = t.over
+                      AND dd.ball = t.ball
+                      AND dd.p_match::text = ANY(:batch)
+                      AND ({null_filter})
+                """),
+                {"batch": batch},
+            )
+            total_updated += result.rowcount
+        print(
+            f"    Batch {i // BATCH_SIZE + 1}/{total_batches}: "
+            f"updated {result.rowcount:,} rows (total: {total_updated:,})"
         )
-        update_sql = f"""
-            UPDATE delivery_details dd
-            SET {set_clauses}
-            FROM temp_backfill_advanced t
-            WHERE dd.p_match::text = t.p_match::text
-              AND dd.inns = t.inns
-              AND dd.over = t.over
-              AND dd.ball = t.ball
-        """
 
-        print("  Running bulk UPDATE...")
-        result = conn.execute(text(update_sql))
-        updated = result.rowcount
-
+    with engine.begin() as conn:
         conn.execute(text("DROP TABLE IF EXISTS temp_backfill_advanced"))
 
-    print(f"  Backfill complete: {updated:,} rows updated")
-    return updated
+    print(f"  Backfill complete: {total_updated:,} rows updated")
+    return total_updated
 
 
 def main():
