@@ -10,17 +10,12 @@ import {
   MenuItem,
   Chip,
   Typography,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   FormControlLabel,
   Switch,
   Slider,
-  Alert,
   Tooltip,
   IconButton
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoIcon from '@mui/icons-material/Info';
 import WarningIcon from '@mui/icons-material/Warning';
 
@@ -38,7 +33,6 @@ const InfoTooltip = ({ tooltip }) => (
 const CoverageWarning = ({ coverage, columnName }) => {
   if (coverage >= 80) return null;
   
-  const severity = coverage < 50 ? 'warning' : 'info';
   const color = coverage < 50 ? 'warning.main' : 'info.main';
   
   return (
@@ -54,10 +48,22 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
   // All dropdown data now comes from availableColumns (fetched from delivery_details)
   
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
+    setFilters(prev => {
+      const next = {
+        ...prev,
+        [key]: value
+      };
+
+      // Keep chase-outcome filters consistent with API rules.
+      if (key === 'is_chase' && value === false) {
+        next.chase_outcome = [];
+      }
+      if (key === 'innings' && value !== 2) {
+        next.chase_outcome = [];
+      }
+
+      return next;
+    });
   };
   
   const handleGroupByChange = (event, newValue) => {
@@ -71,6 +77,8 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
       </Box>
     );
   }
+
+  const chaseOutcomeDisabled = filters.is_chase === false || filters.innings === 1;
   
   return (
     <Box>
@@ -258,8 +266,94 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
             fullWidth
           />
         </Grid>
+
+        {/* Row 5: Advanced Match Context */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, mt: 1 }}>
+            Advanced Match Context
+          </Typography>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Autocomplete
+            multiple
+            value={filters.match_outcome || []}
+            onChange={(e, value) => handleFilterChange('match_outcome', value)}
+            options={availableColumns?.match_outcome_options || ['win', 'loss', 'tie', 'no_result']}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+              ))
+            }
+            renderInput={(params) => (
+              <TextField {...params} label="Match Outcome" size="small" />
+            )}
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Is Chase</InputLabel>
+            <Select
+              value={filters.is_chase === null || filters.is_chase === undefined ? '' : String(filters.is_chase)}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') {
+                  handleFilterChange('is_chase', null);
+                } else {
+                  handleFilterChange('is_chase', raw === 'true');
+                }
+              }}
+              label="Is Chase"
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="true">Yes (2nd innings)</MenuItem>
+              <MenuItem value="false">No (1st innings)</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Autocomplete
+            multiple
+            disabled={chaseOutcomeDisabled}
+            value={filters.chase_outcome || []}
+            onChange={(e, value) => handleFilterChange('chase_outcome', value)}
+            options={availableColumns?.chase_outcome_options || ['win', 'loss', 'tie', 'no_result']}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+              ))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Chase Outcome"
+                size="small"
+                helperText={chaseOutcomeDisabled ? 'Requires chase innings' : ''}
+              />
+            )}
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Autocomplete
+            multiple
+            value={filters.toss_decision || []}
+            onChange={(e, value) => handleFilterChange('toss_decision', value)}
+            options={availableColumns?.toss_decision_options || ['bat', 'field']}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+              ))
+            }
+            renderInput={(params) => (
+              <TextField {...params} label="Toss Decision" size="small" />
+            )}
+          />
+        </Grid>
         
-        {/* Row 5: Batter/Bowler Attributes */}
+        {/* Row 6: Batter/Bowler Attributes */}
         <Grid item xs={12} sm={4} md={3}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <FormControl size="small" fullWidth>
@@ -320,7 +414,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        {/* Row 6: Delivery Details - NEW */}
+        {/* Row 7: Delivery Details - NEW */}
         <Grid item xs={12}>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, mt: 1 }}>
             Delivery Analysis Filters
@@ -430,7 +524,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        {/* Row 7: Grouping - KEY FEATURE */}
+        {/* Row 8: Grouping - KEY FEATURE */}
         <Grid item xs={12}>
           <Box sx={{ 
             mt: 2, 
@@ -524,7 +618,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Grid>
         )}
         
-        {/* Row 8: Result Filtering */}
+        {/* Row 9: Result Filtering */}
         <Grid item xs={12} sm={6} md={3}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <TextField
@@ -576,7 +670,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           />
         </Grid>
         
-        {/* Row 9: Query Settings */}
+        {/* Row 10: Query Settings */}
         <Grid item xs={12} sm={6}>
           <Box>
             <Typography variant="body2" gutterBottom>Result Limit: {filters.limit}</Typography>

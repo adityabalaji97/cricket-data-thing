@@ -23,6 +23,7 @@ SYSTEM_PROMPT = """You are a cricket analytics query parser. Convert natural lan
 Return a JSON object with these fields:
 {
   "filters": { ... },
+  "query_mode": "delivery" | "batting_stats" | "bowling_stats",
   "group_by": [...],
   "explanation": "Human-readable explanation of what the query does",
   "confidence": "high" | "medium" | "low",
@@ -62,6 +63,16 @@ Return a JSON object with these fields:
 
 ### Innings filter
 - "innings": 1 or 2
+- "is_chase": true/false (true means innings=2 chases)
+- "match_outcome": list. Valid values: "win", "loss", "tie", "no_result" (always batting-side perspective)
+- "chase_outcome": list. Valid values: "win", "loss", "tie", "no_result" (applies to innings=2)
+- "toss_decision": list. Valid values: "bat", "field"
+
+### Query mode
+- "query_mode": "delivery" (default), "batting_stats", or "bowling_stats"
+- Use "batting_stats" for innings-level batter performance asks (e.g. "Kohli batting stats in chases")
+- Use "bowling_stats" for innings-level bowler performance asks (e.g. "Bumrah economy in wins")
+- If not explicitly stats-oriented, default to "delivery"
 
 ### Delivery detail filters
 - "line": list. Valid values: "ON_THE_STUMPS", "OUTSIDE_OFFSTUMP", "DOWN_LEG", "WIDE_OUTSIDE_OFFSTUMP", "WIDE_DOWN_LEG"
@@ -77,7 +88,7 @@ Return a JSON object with these fields:
 - "end_date": "YYYY-MM-DD" format
 
 ## Available group_by columns
-venue, country, match_id, competition, year, batting_team, bowling_team, batter, bowler, innings, phase, bat_hand, bowl_style, bowl_kind, crease_combo, line, length, shot, control, wagon_zone, dismissal
+venue, country, match_id, competition, year, batting_team, bowling_team, batter, bowler, innings, phase, match_outcome, chase_outcome, toss_decision, bat_hand, bowl_style, bowl_kind, crease_combo, line, length, shot, control, wagon_zone, dismissal
 
 ## Team Name Mappings (use full names in filters)
 - CSK → Chennai Super Kings
@@ -204,12 +215,15 @@ VALID_BAT_HAND = {"RHB", "LHB"}
 VALID_BOWL_STYLE = {"RF", "RFM", "RM", "LF", "LFM", "LM", "RO", "RL", "LO", "LC"}
 VALID_BOWL_KIND = {"pace bowler", "spin bowler", "mixture/unknown"}
 VALID_LEAGUES = {"IPL", "BBL", "PSL", "CPL", "SA20", "ILT20", "BPL", "LPL", "T20 Blast", "T20I"}
+VALID_QUERY_MODE = {"delivery", "batting_stats", "bowling_stats"}
+VALID_MATCH_OUTCOME = {"win", "loss", "tie", "no_result"}
+VALID_TOSS_DECISION = {"bat", "field"}
 VALID_GROUP_BY = {
     "venue", "country", "match_id", "competition", "year",
     "batting_team", "bowling_team", "batter", "bowler",
     "innings", "phase", "bat_hand", "bowl_style", "bowl_kind",
     "crease_combo", "line", "length", "shot", "control",
-    "wagon_zone", "dismissal"
+    "wagon_zone", "dismissal", "match_outcome", "chase_outcome", "toss_decision"
 }
 
 
@@ -217,6 +231,10 @@ def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and sanitize LLM output, stripping invalid values."""
     filters = parsed.get("filters", {})
     validated = {}
+
+    query_mode = parsed.get("query_mode") or filters.get("query_mode")
+    if isinstance(query_mode, str) and query_mode in VALID_QUERY_MODE:
+        validated["query_mode"] = query_mode
 
     # String list filters (pass through - player/team names can't be validated without DB)
     for key in ["batters", "bowlers", "players", "batting_teams", "bowling_teams", "teams"]:
@@ -265,6 +283,24 @@ def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
             validated["innings"] = val
         elif isinstance(val, list) and len(val) == 1 and val[0] in (1, 2):
             validated["innings"] = val[0]
+
+    if "is_chase" in filters:
+        validated["is_chase"] = bool(filters["is_chase"])
+
+    if "match_outcome" in filters and isinstance(filters["match_outcome"], list):
+        valid = [str(v).lower() for v in filters["match_outcome"] if str(v).lower() in VALID_MATCH_OUTCOME]
+        if valid:
+            validated["match_outcome"] = valid
+
+    if "chase_outcome" in filters and isinstance(filters["chase_outcome"], list):
+        valid = [str(v).lower() for v in filters["chase_outcome"] if str(v).lower() in VALID_MATCH_OUTCOME]
+        if valid:
+            validated["chase_outcome"] = valid
+
+    if "toss_decision" in filters and isinstance(filters["toss_decision"], list):
+        valid = [str(v).lower() for v in filters["toss_decision"] if str(v).lower() in VALID_TOSS_DECISION]
+        if valid:
+            validated["toss_decision"] = valid
 
     if "control" in filters:
         val = filters["control"]

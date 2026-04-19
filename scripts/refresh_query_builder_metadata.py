@@ -96,6 +96,29 @@ def refresh_metadata(engine):
             
             coverage_str = f"({coverage}% coverage)" if coverage else ""
             print(f"{len(values):,} values {coverage_str}")
+
+        # Toss decision options come from matches table (bat/field).
+        print("  Processing toss_decision...", end=" ")
+        toss_values_query = text("""
+            SELECT DISTINCT LOWER(toss_decision)
+            FROM matches
+            WHERE toss_decision IS NOT NULL AND toss_decision != ''
+            ORDER BY LOWER(toss_decision)
+        """)
+        toss_values = [row[0] for row in conn.execute(toss_values_query).fetchall()]
+        conn.execute(text("""
+            INSERT INTO query_builder_metadata (key, values, coverage_percent, distinct_count, updated_at)
+            VALUES ('toss_decision', :values, NULL, :distinct_count, NOW())
+            ON CONFLICT (key) DO UPDATE SET
+                values = :values,
+                coverage_percent = NULL,
+                distinct_count = :distinct_count,
+                updated_at = NOW()
+        """), {
+            "values": json.dumps(toss_values),
+            "distinct_count": len(toss_values),
+        })
+        print(f"{len(toss_values):,} values")
         
         # Store total count
         conn.execute(text("""

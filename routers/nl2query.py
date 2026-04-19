@@ -38,6 +38,7 @@ class NLQueryRequest(BaseModel):
 
 
 class NLQueryFilters(BaseModel):
+    query_mode: Optional[str] = None
     batters: Optional[List[str]] = None
     bowlers: Optional[List[str]] = None
     players: Optional[List[str]] = None
@@ -52,6 +53,10 @@ class NLQueryFilters(BaseModel):
     over_min: Optional[int] = None
     over_max: Optional[int] = None
     innings: Optional[int] = None
+    match_outcome: Optional[List[str]] = None
+    is_chase: Optional[bool] = None
+    chase_outcome: Optional[List[str]] = None
+    toss_decision: Optional[List[str]] = None
     line: Optional[List[str]] = None
     length: Optional[List[str]] = None
     shot: Optional[List[str]] = None

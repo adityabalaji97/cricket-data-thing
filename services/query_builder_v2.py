@@ -38,6 +38,118 @@ COMMON_COLUMNS = {
 # crease_combo: ~91% in delivery_details, lower in deliveries
 PARTIAL_COLUMNS = {'crease_combo'}
 
+VALID_QUERY_MODES = {"delivery", "batting_stats", "bowling_stats"}
+VALID_MATCH_OUTCOMES = {"win", "loss", "tie", "no_result"}
+VALID_TOSS_DECISIONS = {"bat", "field"}
+MATCH_CONTEXT_GROUP_BY_COLUMNS = {"match_outcome", "chase_outcome", "toss_decision"}
+
+# Normalize team names to canonical abbreviations for robust winner/team comparisons.
+TEAM_CANONICAL_MAP: Dict[str, str] = {}
+for full_name, abbrev in teams_mapping.items():
+    TEAM_CANONICAL_MAP[full_name.lower()] = abbrev.lower()
+    TEAM_CANONICAL_MAP[abbrev.lower()] = abbrev.lower()
+
+
+def _sql_quote(value: str) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def get_team_canonical_sql(column_expr: str) -> str:
+    cases = " ".join(
+        f"WHEN LOWER(COALESCE({column_expr}, '')) = {_sql_quote(name)} THEN {_sql_quote(canonical)}"
+        for name, canonical in TEAM_CANONICAL_MAP.items()
+    )
+    return f"(CASE {cases} ELSE LOWER(COALESCE({column_expr}, '')) END)"
+
+
+def get_match_outcome_sql(
+    batting_team_expr: str,
+    bowling_team_expr: str,
+    winner_expr: str,
+    outcome_json_expr: str
+) -> str:
+    winner_canonical = get_team_canonical_sql(winner_expr)
+    batting_canonical = get_team_canonical_sql(batting_team_expr)
+    bowling_canonical = get_team_canonical_sql(bowling_team_expr)
+
+    return f"""(
+        CASE
+            WHEN LOWER(COALESCE({outcome_json_expr}->>'result', '')) = 'tie' THEN 'tie'
+            WHEN LOWER(COALESCE({outcome_json_expr}->>'result', '')) = 'no result' THEN 'no_result'
+            WHEN COALESCE({winner_expr}, '') = '' THEN 'no_result'
+            WHEN {winner_canonical} = {batting_canonical} THEN 'win'
+            WHEN {winner_canonical} = {bowling_canonical} THEN 'loss'
+            ELSE 'no_result'
+        END
+    )"""
+
+
+def get_chase_outcome_sql(innings_expr: str, match_outcome_sql: str) -> str:
+    return f"(CASE WHEN {innings_expr} = 2 THEN {match_outcome_sql} ELSE NULL END)"
+
+
+def match_context_requested(
+    match_outcome: List[str],
+    is_chase: Optional[bool],
+    chase_outcome: List[str],
+    toss_decision: List[str],
+    group_by: List[str],
+) -> bool:
+    if match_outcome or chase_outcome or toss_decision or is_chase is not None:
+        return True
+    return bool(set(group_by or []) & MATCH_CONTEXT_GROUP_BY_COLUMNS)
+
+
+def validate_mode_filters(
+    query_mode: str,
+    bat_hand: Optional[str],
+    bowl_style: List[str],
+    bowl_kind: List[str],
+    crease_combo: List[str],
+    line: List[str],
+    length: List[str],
+    shot: List[str],
+    control: Optional[int],
+    wagon_zone: List[int],
+    dismissal: List[str],
+    over_min: Optional[int],
+    over_max: Optional[int],
+) -> None:
+    if query_mode == "delivery":
+        return
+
+    unsupported = []
+    if bat_hand:
+        unsupported.append("bat_hand")
+    if bowl_style:
+        unsupported.append("bowl_style")
+    if bowl_kind:
+        unsupported.append("bowl_kind")
+    if crease_combo:
+        unsupported.append("crease_combo")
+    if line:
+        unsupported.append("line")
+    if length:
+        unsupported.append("length")
+    if shot:
+        unsupported.append("shot")
+    if control is not None:
+        unsupported.append("control")
+    if wagon_zone:
+        unsupported.append("wagon_zone")
+    if dismissal:
+        unsupported.append("dismissal")
+    if over_min is not None:
+        unsupported.append("over_min")
+    if over_max is not None:
+        unsupported.append("over_max")
+
+    if unsupported:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported filters for query_mode={query_mode}: {unsupported}"
+        )
+
 
 def analyze_query_requirements(
     start_date: Optional[date],
@@ -206,6 +318,14 @@ def _expand_player_names(player_names: List[str], db) -> List[str]:
 
 def get_legacy_grouping_columns_map():
     """Map user-friendly group_by values to deliveries table column names."""
+    match_outcome_sql = get_match_outcome_sql(
+        batting_team_expr="d.batting_team",
+        bowling_team_expr="d.bowling_team",
+        winner_expr="m.winner",
+        outcome_json_expr="m.outcome",
+    )
+    chase_outcome_sql = get_chase_outcome_sql("d.innings", match_outcome_sql)
+
     return {
         # Location
         "venue": "m.venue",
@@ -247,12 +367,17 @@ def get_legacy_grouping_columns_map():
         "control": "NULL",
         "wagon_zone": "NULL",
         "dismissal": "d.wicket_type",
+        # Match context
+        "match_outcome": match_outcome_sql,
+        "chase_outcome": chase_outcome_sql,
+        "toss_decision": "LOWER(COALESCE(m.toss_decision, ''))",
     }
 
 
 def build_legacy_where_clause(
     venue, start_date, end_date, leagues, teams, batting_teams, bowling_teams,
     players, batters, bowlers, crease_combo, dismissal, innings, over_min, over_max,
+    match_outcome, is_chase, chase_outcome, toss_decision,
     include_international, top_teams, group_by, base_params, db
 ):
     """Build dynamic WHERE clause for legacy deliveries table."""
@@ -352,6 +477,32 @@ def build_legacy_where_clause(
     if dismissal:
         conditions.append("d.wicket_type = ANY(:dismissal)")
         params["dismissal"] = dismissal
+
+    match_outcome_sql = get_match_outcome_sql(
+        batting_team_expr="d.batting_team",
+        bowling_team_expr="d.bowling_team",
+        winner_expr="m.winner",
+        outcome_json_expr="m.outcome",
+    )
+    chase_outcome_sql = get_chase_outcome_sql("d.innings", match_outcome_sql)
+
+    if match_outcome:
+        conditions.append(f"{match_outcome_sql} = ANY(:match_outcome)")
+        params["match_outcome"] = match_outcome
+
+    if is_chase is True:
+        conditions.append("d.innings = 2")
+    elif is_chase is False:
+        conditions.append("d.innings != 2")
+
+    if chase_outcome:
+        conditions.append("d.innings = 2")
+        conditions.append(f"{chase_outcome_sql} = ANY(:chase_outcome)")
+        params["chase_outcome"] = chase_outcome
+
+    if toss_decision:
+        conditions.append("LOWER(COALESCE(m.toss_decision, '')) = ANY(:toss_decision)")
+        params["toss_decision"] = toss_decision
 
     # Grouping by dismissal should only include wicket deliveries
     if group_by and "dismissal" in group_by:
@@ -780,6 +931,712 @@ def merge_ungrouped_results(
     return combined
 
 
+def _normalize_lower_list(values: List[str]) -> List[str]:
+    return [str(v).strip().lower() for v in (values or []) if str(v).strip()]
+
+
+def _validate_enum_list(values: List[str], allowed: Set[str], field_name: str) -> List[str]:
+    normalized = _normalize_lower_list(values)
+    invalid = sorted({v for v in normalized if v not in allowed})
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Invalid {field_name} values: {invalid}")
+    return normalized
+
+
+def _expand_team_canonical_tokens(team_names: List[str]) -> List[str]:
+    tokens = set()
+    for team in team_names or []:
+        for variation in get_all_team_name_variations(team):
+            lowered = variation.lower()
+            tokens.add(TEAM_CANONICAL_MAP.get(lowered, lowered))
+        lowered_team = str(team).lower()
+        tokens.add(TEAM_CANONICAL_MAP.get(lowered_team, lowered_team))
+    return list(tokens)
+
+
+def _validate_chase_filter_consistency(
+    chase_outcome: List[str],
+    is_chase: Optional[bool],
+    innings: Optional[int],
+) -> None:
+    if not chase_outcome:
+        return
+    if is_chase is False:
+        raise HTTPException(
+            status_code=400,
+            detail="chase_outcome cannot be used when is_chase=false",
+        )
+    if innings is not None and innings != 2:
+        raise HTTPException(
+            status_code=400,
+            detail="chase_outcome requires innings=2 (or omit innings)",
+        )
+
+
+def _match_context_warning(match_context_used: bool) -> List[str]:
+    if not match_context_used:
+        return []
+    return [
+        "Team names are normalized for winner/batting/bowling comparison. Unresolved mismatches are classified as no_result."
+    ]
+
+
+def query_batting_stats_service(
+    venue: Optional[str],
+    start_date: Optional[date],
+    end_date: Optional[date],
+    leagues: List[str],
+    teams: List[str],
+    batting_teams: List[str],
+    bowling_teams: List[str],
+    players: List[str],
+    batters: List[str],
+    bowlers: List[str],
+    innings: Optional[int],
+    group_by: List[str],
+    min_balls: Optional[int],
+    max_balls: Optional[int],
+    min_runs: Optional[int],
+    max_runs: Optional[int],
+    limit: int,
+    offset: int,
+    include_international: bool,
+    top_teams: Optional[int],
+    match_outcome: List[str],
+    is_chase: Optional[bool],
+    chase_outcome: List[str],
+    toss_decision: List[str],
+    db,
+):
+    if bowlers:
+        raise HTTPException(status_code=400, detail="bowlers filter is unsupported for query_mode=batting_stats")
+
+    allowed_group_by = {
+        "venue", "competition", "year", "batting_team", "bowling_team",
+        "batter", "innings", "match_outcome", "chase_outcome", "toss_decision"
+    }
+    invalid_group_by = [c for c in group_by if c not in allowed_group_by]
+    if invalid_group_by:
+        raise HTTPException(status_code=400, detail=f"Invalid group_by columns for batting_stats: {invalid_group_by}")
+
+    _validate_chase_filter_consistency(chase_outcome, is_chase, innings)
+    match_outcome = _validate_enum_list(match_outcome, VALID_MATCH_OUTCOMES, "match_outcome")
+    chase_outcome = _validate_enum_list(chase_outcome, VALID_MATCH_OUTCOMES, "chase_outcome")
+    toss_decision = _validate_enum_list(toss_decision, VALID_TOSS_DECISIONS, "toss_decision")
+
+    batting_team_expr = "bs.batting_team"
+    bowling_team_expr = f"""(
+        CASE
+            WHEN {get_team_canonical_sql('bs.batting_team')} = {get_team_canonical_sql('m.team1')} THEN m.team2
+            WHEN {get_team_canonical_sql('bs.batting_team')} = {get_team_canonical_sql('m.team2')} THEN m.team1
+            ELSE NULL
+        END
+    )"""
+    match_outcome_sql = get_match_outcome_sql(
+        batting_team_expr=batting_team_expr,
+        bowling_team_expr=bowling_team_expr,
+        winner_expr="m.winner",
+        outcome_json_expr="m.outcome",
+    )
+    chase_outcome_sql = get_chase_outcome_sql("bs.innings", match_outcome_sql)
+
+    conditions = ["1=1"]
+    params = {"limit": min(limit, 10000), "offset": offset}
+
+    if venue:
+        conditions.append("m.venue = :venue")
+        params["venue"] = venue
+    if start_date:
+        conditions.append("m.date >= :start_date")
+        params["start_date"] = start_date
+    if end_date:
+        conditions.append("m.date <= :end_date")
+        params["end_date"] = end_date
+
+    competition_conditions = []
+    if leagues:
+        expanded_leagues = expand_league_abbreviations(leagues)
+        competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
+        params["leagues"] = expanded_leagues
+    if include_international:
+        if top_teams:
+            top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+            competition_conditions.append(
+                "(m.match_type = 'international' AND m.team1 = ANY(:top_teams) AND m.team2 = ANY(:top_teams))"
+            )
+            params["top_teams"] = top_team_list
+        else:
+            competition_conditions.append("m.match_type = 'international'")
+    if competition_conditions:
+        conditions.append("(" + " OR ".join(competition_conditions) + ")")
+
+    if teams:
+        params["teams_tokens"] = _expand_team_canonical_tokens(teams)
+        conditions.append(
+            f"({get_team_canonical_sql('bs.batting_team')} = ANY(:teams_tokens) OR {get_team_canonical_sql(bowling_team_expr)} = ANY(:teams_tokens))"
+        )
+    if batting_teams:
+        params["batting_teams_tokens"] = _expand_team_canonical_tokens(batting_teams)
+        conditions.append(f"{get_team_canonical_sql('bs.batting_team')} = ANY(:batting_teams_tokens)")
+    if bowling_teams:
+        params["bowling_teams_tokens"] = _expand_team_canonical_tokens(bowling_teams)
+        conditions.append(f"{get_team_canonical_sql(bowling_team_expr)} = ANY(:bowling_teams_tokens)")
+
+    if players:
+        params["players"] = _expand_player_names(players, db) if db else players
+        conditions.append("bs.striker = ANY(:players)")
+    if batters:
+        params["batters"] = _expand_player_names(batters, db) if db else batters
+        conditions.append("bs.striker = ANY(:batters)")
+
+    if innings:
+        conditions.append("bs.innings = :innings")
+        params["innings"] = innings
+    if is_chase is True:
+        conditions.append("bs.innings = 2")
+    elif is_chase is False:
+        conditions.append("bs.innings != 2")
+    if match_outcome:
+        conditions.append(f"{match_outcome_sql} = ANY(:match_outcome)")
+        params["match_outcome"] = match_outcome
+    if chase_outcome:
+        conditions.append("bs.innings = 2")
+        conditions.append(f"{chase_outcome_sql} = ANY(:chase_outcome)")
+        params["chase_outcome"] = chase_outcome
+    if toss_decision:
+        conditions.append("LOWER(COALESCE(m.toss_decision, '')) = ANY(:toss_decision)")
+        params["toss_decision"] = toss_decision
+
+    where_clause = "WHERE " + " AND ".join(conditions)
+    filters_applied = {
+        "query_mode": "batting_stats",
+        "venue": venue,
+        "start_date": start_date.isoformat() if start_date else None,
+        "end_date": end_date.isoformat() if end_date else None,
+        "leagues": leagues,
+        "teams": teams,
+        "batting_teams": batting_teams,
+        "bowling_teams": bowling_teams,
+        "players": players,
+        "batters": batters,
+        "innings": innings,
+        "is_chase": is_chase,
+        "match_outcome": match_outcome,
+        "chase_outcome": chase_outcome,
+        "toss_decision": toss_decision,
+        "group_by": group_by,
+    }
+    warnings = _match_context_warning(match_context_requested(match_outcome, is_chase, chase_outcome, toss_decision, group_by))
+
+    if not group_by:
+        main_query = f"""
+            SELECT
+                bs.match_id,
+                m.date,
+                m.venue,
+                m.competition,
+                bs.innings,
+                bs.striker AS batter,
+                bs.batting_team,
+                {bowling_team_expr} AS bowling_team,
+                bs.runs,
+                bs.balls_faced,
+                bs.wickets AS dismissals,
+                bs.fours,
+                bs.sixes,
+                bs.dots,
+                bs.strike_rate,
+                {match_outcome_sql} AS match_outcome,
+                {chase_outcome_sql} AS chase_outcome,
+                LOWER(COALESCE(m.toss_decision, '')) AS toss_decision
+            FROM batting_stats bs
+            JOIN matches m ON m.id = bs.match_id
+            {where_clause}
+            ORDER BY m.date DESC, bs.match_id
+            LIMIT :limit
+            OFFSET :offset
+        """
+        result = db.execute(text(main_query), params).fetchall()
+        formatted = [
+            {
+                "match_id": row[0],
+                "date": row[1].isoformat() if row[1] else None,
+                "venue": row[2],
+                "competition": row[3],
+                "innings": row[4],
+                "batter": row[5],
+                "batting_team": row[6],
+                "bowling_team": row[7],
+                "runs": row[8],
+                "balls_faced": row[9],
+                "dismissals": row[10],
+                "fours": row[11],
+                "sixes": row[12],
+                "dots": row[13],
+                "strike_rate": float(row[14]) if row[14] is not None else 0.0,
+                "match_outcome": row[15],
+                "chase_outcome": row[16],
+                "toss_decision": row[17],
+            }
+            for row in result
+        ]
+        count_query = f"""
+            SELECT COUNT(*)
+            FROM batting_stats bs
+            JOIN matches m ON m.id = bs.match_id
+            {where_clause}
+        """
+        count_params = {k: v for k, v in params.items() if k not in ["limit", "offset"]}
+        total_count = db.execute(text(count_query), count_params).scalar() or 0
+        return {
+            "data": formatted,
+            "metadata": {
+                "total_matching_rows": total_count,
+                "returned_rows": len(formatted),
+                "limit": limit,
+                "offset": offset,
+                "has_more": total_count > (offset + len(formatted)),
+                "filters_applied": filters_applied,
+                "query_mode_used": "batting_stats",
+                "data_source": "batting_stats",
+                "warnings": warnings,
+                "note": "Innings-level batting statistics",
+            }
+        }
+
+    grouping_columns = {
+        "venue": "m.venue",
+        "competition": "m.competition",
+        "year": "EXTRACT(YEAR FROM m.date)",
+        "batting_team": "bs.batting_team",
+        "bowling_team": bowling_team_expr,
+        "batter": "bs.striker",
+        "innings": "bs.innings",
+        "match_outcome": match_outcome_sql,
+        "chase_outcome": chase_outcome_sql,
+        "toss_decision": "LOWER(COALESCE(m.toss_decision, ''))",
+    }
+    group_cols = [grouping_columns[c] for c in group_by]
+    select_cols = [f"{grouping_columns[c]} AS {c}" for c in group_by]
+    group_by_clause = ", ".join(group_cols)
+    select_group_clause = ", ".join(select_cols)
+
+    having_conditions = []
+    if min_balls is not None:
+        having_conditions.append("SUM(bs.balls_faced) >= :min_balls")
+        params["min_balls"] = min_balls
+    if max_balls is not None:
+        having_conditions.append("SUM(bs.balls_faced) <= :max_balls")
+        params["max_balls"] = max_balls
+    if min_runs is not None:
+        having_conditions.append("SUM(bs.runs) >= :min_runs")
+        params["min_runs"] = min_runs
+    if max_runs is not None:
+        having_conditions.append("SUM(bs.runs) <= :max_runs")
+        params["max_runs"] = max_runs
+    having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
+
+    aggregation_query = f"""
+        SELECT
+            {select_group_clause},
+            COUNT(*) AS innings_count,
+            SUM(bs.runs) AS runs,
+            SUM(bs.balls_faced) AS balls_faced,
+            SUM(bs.wickets) AS dismissals,
+            SUM(bs.fours) AS fours,
+            SUM(bs.sixes) AS sixes,
+            SUM(bs.dots) AS dots,
+            CASE WHEN SUM(bs.balls_faced) > 0 THEN (SUM(bs.runs)::DECIMAL * 100.0) / SUM(bs.balls_faced) ELSE 0 END AS strike_rate,
+            CASE WHEN SUM(bs.wickets) > 0 THEN SUM(bs.runs)::DECIMAL / SUM(bs.wickets) ELSE NULL END AS average
+        FROM batting_stats bs
+        JOIN matches m ON m.id = bs.match_id
+        {where_clause}
+        GROUP BY {group_by_clause}
+        {having_clause}
+        ORDER BY innings_count DESC
+        LIMIT :limit
+        OFFSET :offset
+    """
+    result = db.execute(text(aggregation_query), params).fetchall()
+    formatted = []
+    for row in result:
+        payload = {col: row[i] for i, col in enumerate(group_by)}
+        s = len(group_by)
+        payload.update({
+            "innings_count": row[s],
+            "runs": row[s + 1],
+            "balls_faced": row[s + 2],
+            "dismissals": row[s + 3],
+            "fours": row[s + 4],
+            "sixes": row[s + 5],
+            "dots": row[s + 6],
+            "strike_rate": float(row[s + 7]) if row[s + 7] is not None else 0.0,
+            "average": float(row[s + 8]) if row[s + 8] is not None else None,
+        })
+        formatted.append(payload)
+
+    count_query = f"""
+        SELECT COUNT(*) FROM (
+            SELECT {group_by_clause}
+            FROM batting_stats bs
+            JOIN matches m ON m.id = bs.match_id
+            {where_clause}
+            GROUP BY {group_by_clause}
+            {having_clause}
+        ) grouped_count
+    """
+    count_params = {k: v for k, v in params.items() if k not in ["limit", "offset"]}
+    total_groups = db.execute(text(count_query), count_params).scalar() or 0
+    return {
+        "data": formatted,
+        "summary_data": None,
+        "percentages": None,
+        "metadata": {
+            "total_groups": total_groups,
+            "returned_groups": len(formatted),
+            "limit": limit,
+            "offset": offset,
+            "has_more": total_groups > (offset + len(formatted)),
+            "grouped_by": group_by,
+            "filters_applied": filters_applied,
+            "has_summaries": False,
+            "query_mode_used": "batting_stats",
+            "data_source": "batting_stats",
+            "warnings": warnings,
+            "note": "Grouped innings-level batting statistics",
+        },
+    }
+
+
+def query_bowling_stats_service(
+    venue: Optional[str],
+    start_date: Optional[date],
+    end_date: Optional[date],
+    leagues: List[str],
+    teams: List[str],
+    batting_teams: List[str],
+    bowling_teams: List[str],
+    players: List[str],
+    batters: List[str],
+    bowlers: List[str],
+    innings: Optional[int],
+    group_by: List[str],
+    min_balls: Optional[int],
+    max_balls: Optional[int],
+    min_runs: Optional[int],
+    max_runs: Optional[int],
+    limit: int,
+    offset: int,
+    include_international: bool,
+    top_teams: Optional[int],
+    match_outcome: List[str],
+    is_chase: Optional[bool],
+    chase_outcome: List[str],
+    toss_decision: List[str],
+    db,
+):
+    if batters:
+        raise HTTPException(status_code=400, detail="batters filter is unsupported for query_mode=bowling_stats")
+
+    allowed_group_by = {
+        "venue", "competition", "year", "batting_team", "bowling_team",
+        "bowler", "innings", "match_outcome", "chase_outcome", "toss_decision"
+    }
+    invalid_group_by = [c for c in group_by if c not in allowed_group_by]
+    if invalid_group_by:
+        raise HTTPException(status_code=400, detail=f"Invalid group_by columns for bowling_stats: {invalid_group_by}")
+
+    _validate_chase_filter_consistency(chase_outcome, is_chase, innings)
+    match_outcome = _validate_enum_list(match_outcome, VALID_MATCH_OUTCOMES, "match_outcome")
+    chase_outcome = _validate_enum_list(chase_outcome, VALID_MATCH_OUTCOMES, "chase_outcome")
+    toss_decision = _validate_enum_list(toss_decision, VALID_TOSS_DECISIONS, "toss_decision")
+
+    bowling_team_expr = "bs.bowling_team"
+    batting_team_expr = f"""(
+        CASE
+            WHEN {get_team_canonical_sql('bs.bowling_team')} = {get_team_canonical_sql('m.team1')} THEN m.team2
+            WHEN {get_team_canonical_sql('bs.bowling_team')} = {get_team_canonical_sql('m.team2')} THEN m.team1
+            ELSE NULL
+        END
+    )"""
+    match_outcome_sql = get_match_outcome_sql(
+        batting_team_expr=batting_team_expr,
+        bowling_team_expr=bowling_team_expr,
+        winner_expr="m.winner",
+        outcome_json_expr="m.outcome",
+    )
+    chase_outcome_sql = get_chase_outcome_sql("bs.innings", match_outcome_sql)
+
+    conditions = ["1=1"]
+    params = {"limit": min(limit, 10000), "offset": offset}
+
+    if venue:
+        conditions.append("m.venue = :venue")
+        params["venue"] = venue
+    if start_date:
+        conditions.append("m.date >= :start_date")
+        params["start_date"] = start_date
+    if end_date:
+        conditions.append("m.date <= :end_date")
+        params["end_date"] = end_date
+
+    competition_conditions = []
+    if leagues:
+        expanded_leagues = expand_league_abbreviations(leagues)
+        competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
+        params["leagues"] = expanded_leagues
+    if include_international:
+        if top_teams:
+            top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
+            competition_conditions.append(
+                "(m.match_type = 'international' AND m.team1 = ANY(:top_teams) AND m.team2 = ANY(:top_teams))"
+            )
+            params["top_teams"] = top_team_list
+        else:
+            competition_conditions.append("m.match_type = 'international'")
+    if competition_conditions:
+        conditions.append("(" + " OR ".join(competition_conditions) + ")")
+
+    if teams:
+        params["teams_tokens"] = _expand_team_canonical_tokens(teams)
+        conditions.append(
+            f"({get_team_canonical_sql('bs.bowling_team')} = ANY(:teams_tokens) OR {get_team_canonical_sql(batting_team_expr)} = ANY(:teams_tokens))"
+        )
+    if batting_teams:
+        params["batting_teams_tokens"] = _expand_team_canonical_tokens(batting_teams)
+        conditions.append(f"{get_team_canonical_sql(batting_team_expr)} = ANY(:batting_teams_tokens)")
+    if bowling_teams:
+        params["bowling_teams_tokens"] = _expand_team_canonical_tokens(bowling_teams)
+        conditions.append(f"{get_team_canonical_sql('bs.bowling_team')} = ANY(:bowling_teams_tokens)")
+
+    if players:
+        params["players"] = _expand_player_names(players, db) if db else players
+        conditions.append("bs.bowler = ANY(:players)")
+    if bowlers:
+        params["bowlers"] = _expand_player_names(bowlers, db) if db else bowlers
+        conditions.append("bs.bowler = ANY(:bowlers)")
+
+    if innings:
+        conditions.append("bs.innings = :innings")
+        params["innings"] = innings
+    if is_chase is True:
+        conditions.append("bs.innings = 2")
+    elif is_chase is False:
+        conditions.append("bs.innings != 2")
+    if match_outcome:
+        conditions.append(f"{match_outcome_sql} = ANY(:match_outcome)")
+        params["match_outcome"] = match_outcome
+    if chase_outcome:
+        conditions.append("bs.innings = 2")
+        conditions.append(f"{chase_outcome_sql} = ANY(:chase_outcome)")
+        params["chase_outcome"] = chase_outcome
+    if toss_decision:
+        conditions.append("LOWER(COALESCE(m.toss_decision, '')) = ANY(:toss_decision)")
+        params["toss_decision"] = toss_decision
+
+    where_clause = "WHERE " + " AND ".join(conditions)
+    filters_applied = {
+        "query_mode": "bowling_stats",
+        "venue": venue,
+        "start_date": start_date.isoformat() if start_date else None,
+        "end_date": end_date.isoformat() if end_date else None,
+        "leagues": leagues,
+        "teams": teams,
+        "batting_teams": batting_teams,
+        "bowling_teams": bowling_teams,
+        "players": players,
+        "bowlers": bowlers,
+        "innings": innings,
+        "is_chase": is_chase,
+        "match_outcome": match_outcome,
+        "chase_outcome": chase_outcome,
+        "toss_decision": toss_decision,
+        "group_by": group_by,
+    }
+    warnings = _match_context_warning(match_context_requested(match_outcome, is_chase, chase_outcome, toss_decision, group_by))
+
+    if not group_by:
+        main_query = f"""
+            SELECT
+                bs.match_id,
+                m.date,
+                m.venue,
+                m.competition,
+                bs.innings,
+                bs.bowler,
+                {batting_team_expr} AS batting_team,
+                bs.bowling_team,
+                bs.overs,
+                bs.runs_conceded,
+                bs.wickets,
+                bs.dots,
+                bs.fours_conceded,
+                bs.sixes_conceded,
+                bs.economy,
+                {match_outcome_sql} AS match_outcome,
+                {chase_outcome_sql} AS chase_outcome,
+                LOWER(COALESCE(m.toss_decision, '')) AS toss_decision
+            FROM bowling_stats bs
+            JOIN matches m ON m.id = bs.match_id
+            {where_clause}
+            ORDER BY m.date DESC, bs.match_id
+            LIMIT :limit
+            OFFSET :offset
+        """
+        result = db.execute(text(main_query), params).fetchall()
+        formatted = [
+            {
+                "match_id": row[0],
+                "date": row[1].isoformat() if row[1] else None,
+                "venue": row[2],
+                "competition": row[3],
+                "innings": row[4],
+                "bowler": row[5],
+                "batting_team": row[6],
+                "bowling_team": row[7],
+                "overs": float(row[8]) if row[8] is not None else 0.0,
+                "runs_conceded": row[9],
+                "wickets": row[10],
+                "dots": row[11],
+                "fours_conceded": row[12],
+                "sixes_conceded": row[13],
+                "economy": float(row[14]) if row[14] is not None else 0.0,
+                "match_outcome": row[15],
+                "chase_outcome": row[16],
+                "toss_decision": row[17],
+            }
+            for row in result
+        ]
+        count_query = f"""
+            SELECT COUNT(*)
+            FROM bowling_stats bs
+            JOIN matches m ON m.id = bs.match_id
+            {where_clause}
+        """
+        count_params = {k: v for k, v in params.items() if k not in ["limit", "offset"]}
+        total_count = db.execute(text(count_query), count_params).scalar() or 0
+        return {
+            "data": formatted,
+            "metadata": {
+                "total_matching_rows": total_count,
+                "returned_rows": len(formatted),
+                "limit": limit,
+                "offset": offset,
+                "has_more": total_count > (offset + len(formatted)),
+                "filters_applied": filters_applied,
+                "query_mode_used": "bowling_stats",
+                "data_source": "bowling_stats",
+                "warnings": warnings,
+                "note": "Innings-level bowling statistics",
+            }
+        }
+
+    grouping_columns = {
+        "venue": "m.venue",
+        "competition": "m.competition",
+        "year": "EXTRACT(YEAR FROM m.date)",
+        "batting_team": batting_team_expr,
+        "bowling_team": "bs.bowling_team",
+        "bowler": "bs.bowler",
+        "innings": "bs.innings",
+        "match_outcome": match_outcome_sql,
+        "chase_outcome": chase_outcome_sql,
+        "toss_decision": "LOWER(COALESCE(m.toss_decision, ''))",
+    }
+    group_cols = [grouping_columns[c] for c in group_by]
+    select_cols = [f"{grouping_columns[c]} AS {c}" for c in group_by]
+    group_by_clause = ", ".join(group_cols)
+    select_group_clause = ", ".join(select_cols)
+
+    having_conditions = []
+    if min_balls is not None:
+        having_conditions.append("(SUM(bs.overs) * 6.0) >= :min_balls")
+        params["min_balls"] = min_balls
+    if max_balls is not None:
+        having_conditions.append("(SUM(bs.overs) * 6.0) <= :max_balls")
+        params["max_balls"] = max_balls
+    if min_runs is not None:
+        having_conditions.append("SUM(bs.runs_conceded) >= :min_runs")
+        params["min_runs"] = min_runs
+    if max_runs is not None:
+        having_conditions.append("SUM(bs.runs_conceded) <= :max_runs")
+        params["max_runs"] = max_runs
+    having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
+
+    aggregation_query = f"""
+        SELECT
+            {select_group_clause},
+            COUNT(*) AS innings_count,
+            SUM(bs.overs) AS overs,
+            SUM(bs.runs_conceded) AS runs_conceded,
+            SUM(bs.wickets) AS wickets,
+            SUM(bs.dots) AS dots,
+            SUM(bs.fours_conceded) AS fours_conceded,
+            SUM(bs.sixes_conceded) AS sixes_conceded,
+            CASE WHEN SUM(bs.overs) > 0 THEN SUM(bs.runs_conceded)::DECIMAL / SUM(bs.overs) ELSE 0 END AS economy,
+            CASE WHEN SUM(bs.wickets) > 0 THEN SUM(bs.runs_conceded)::DECIMAL / SUM(bs.wickets) ELSE NULL END AS average,
+            CASE WHEN SUM(bs.wickets) > 0 THEN (SUM(bs.overs) * 6.0)::DECIMAL / SUM(bs.wickets) ELSE NULL END AS balls_per_wicket
+        FROM bowling_stats bs
+        JOIN matches m ON m.id = bs.match_id
+        {where_clause}
+        GROUP BY {group_by_clause}
+        {having_clause}
+        ORDER BY innings_count DESC
+        LIMIT :limit
+        OFFSET :offset
+    """
+    result = db.execute(text(aggregation_query), params).fetchall()
+    formatted = []
+    for row in result:
+        payload = {col: row[i] for i, col in enumerate(group_by)}
+        s = len(group_by)
+        payload.update({
+            "innings_count": row[s],
+            "overs": float(row[s + 1]) if row[s + 1] is not None else 0.0,
+            "runs_conceded": row[s + 2],
+            "wickets": row[s + 3],
+            "dots": row[s + 4],
+            "fours_conceded": row[s + 5],
+            "sixes_conceded": row[s + 6],
+            "economy": float(row[s + 7]) if row[s + 7] is not None else 0.0,
+            "average": float(row[s + 8]) if row[s + 8] is not None else None,
+            "balls_per_wicket": float(row[s + 9]) if row[s + 9] is not None else None,
+        })
+        formatted.append(payload)
+
+    count_query = f"""
+        SELECT COUNT(*) FROM (
+            SELECT {group_by_clause}
+            FROM bowling_stats bs
+            JOIN matches m ON m.id = bs.match_id
+            {where_clause}
+            GROUP BY {group_by_clause}
+            {having_clause}
+        ) grouped_count
+    """
+    count_params = {k: v for k, v in params.items() if k not in ["limit", "offset"]}
+    total_groups = db.execute(text(count_query), count_params).scalar() or 0
+    return {
+        "data": formatted,
+        "summary_data": None,
+        "percentages": None,
+        "metadata": {
+            "total_groups": total_groups,
+            "returned_groups": len(formatted),
+            "limit": limit,
+            "offset": offset,
+            "has_more": total_groups > (offset + len(formatted)),
+            "grouped_by": group_by,
+            "filters_applied": filters_applied,
+            "has_summaries": False,
+            "query_mode_used": "bowling_stats",
+            "data_source": "bowling_stats",
+            "warnings": warnings,
+            "note": "Grouped innings-level bowling statistics",
+        },
+    }
+
+
 def query_deliveries_service(
     # Basic filters
     venue: Optional[str],
@@ -811,6 +1668,10 @@ def query_deliveries_service(
     innings: Optional[int],
     over_min: Optional[int],
     over_max: Optional[int],
+    match_outcome: List[str],
+    is_chase: Optional[bool],
+    chase_outcome: List[str],
+    toss_decision: List[str],
     
     # Grouping and aggregation
     group_by: List[str],
@@ -829,6 +1690,7 @@ def query_deliveries_service(
     # Include international matches
     include_international: bool,
     top_teams: Optional[int],
+    query_mode: str,
     
     db
 ):
@@ -842,8 +1704,90 @@ def query_deliveries_service(
     For queries spanning both date ranges, results are merged with player name normalization.
     """
     try:
-        logger.info(f"Query deliveries service called with filters: venue={venue}, leagues={leagues}, group_by={group_by}")
+        logger.info(
+            f"Query deliveries service called with query_mode={query_mode}, venue={venue}, leagues={leagues}, group_by={group_by}"
+        )
         logger.info(f"Date range: {start_date} to {end_date}")
+
+        if query_mode not in VALID_QUERY_MODES:
+            raise HTTPException(status_code=400, detail=f"Invalid query_mode: {query_mode}")
+
+        match_outcome = _validate_enum_list(match_outcome, VALID_MATCH_OUTCOMES, "match_outcome")
+        chase_outcome = _validate_enum_list(chase_outcome, VALID_MATCH_OUTCOMES, "chase_outcome")
+        toss_decision = _validate_enum_list(toss_decision, VALID_TOSS_DECISIONS, "toss_decision")
+        _validate_chase_filter_consistency(chase_outcome, is_chase, innings)
+        validate_mode_filters(
+            query_mode=query_mode,
+            bat_hand=bat_hand,
+            bowl_style=bowl_style,
+            bowl_kind=bowl_kind,
+            crease_combo=crease_combo,
+            line=line,
+            length=length,
+            shot=shot,
+            control=control,
+            wagon_zone=wagon_zone,
+            dismissal=dismissal,
+            over_min=over_min,
+            over_max=over_max,
+        )
+
+        if query_mode == "batting_stats":
+            return query_batting_stats_service(
+                venue=venue,
+                start_date=start_date,
+                end_date=end_date,
+                leagues=leagues,
+                teams=teams,
+                batting_teams=batting_teams,
+                bowling_teams=bowling_teams,
+                players=players,
+                batters=batters,
+                bowlers=bowlers,
+                innings=innings,
+                group_by=group_by,
+                min_balls=min_balls,
+                max_balls=max_balls,
+                min_runs=min_runs,
+                max_runs=max_runs,
+                limit=limit,
+                offset=offset,
+                include_international=include_international,
+                top_teams=top_teams,
+                match_outcome=match_outcome,
+                is_chase=is_chase,
+                chase_outcome=chase_outcome,
+                toss_decision=toss_decision,
+                db=db,
+            )
+        if query_mode == "bowling_stats":
+            return query_bowling_stats_service(
+                venue=venue,
+                start_date=start_date,
+                end_date=end_date,
+                leagues=leagues,
+                teams=teams,
+                batting_teams=batting_teams,
+                bowling_teams=bowling_teams,
+                players=players,
+                batters=batters,
+                bowlers=bowlers,
+                innings=innings,
+                group_by=group_by,
+                min_balls=min_balls,
+                max_balls=max_balls,
+                min_runs=min_runs,
+                max_runs=max_runs,
+                limit=limit,
+                offset=offset,
+                include_international=include_international,
+                top_teams=top_teams,
+                match_outcome=match_outcome,
+                is_chase=is_chase,
+                chase_outcome=chase_outcome,
+                toss_decision=toss_decision,
+                db=db,
+            )
         
         # Prepare filters dict for routing analysis
         filters_for_routing = {
@@ -870,6 +1814,7 @@ def query_deliveries_service(
         
         # Prepare filters metadata
         filters_applied = {
+            "query_mode": query_mode,
             "venue": venue,
             "start_date": start_date.isoformat() if start_date else None,
             "end_date": end_date.isoformat() if end_date else None,
@@ -892,9 +1837,23 @@ def query_deliveries_service(
             "dismissal": dismissal,
             "innings": innings,
             "over_range": f"{over_min}-{over_max}" if over_min is not None or over_max is not None else None,
+            "match_outcome": match_outcome,
+            "is_chase": is_chase,
+            "chase_outcome": chase_outcome,
+            "toss_decision": toss_decision,
             "group_by": group_by
         }
         
+        match_context_used = match_context_requested(
+            match_outcome=match_outcome,
+            is_chase=is_chase,
+            chase_outcome=chase_outcome,
+            toss_decision=toss_decision,
+            group_by=group_by,
+        )
+        delivery_warnings = list(routing["warnings"]) + _match_context_warning(match_context_used)
+        join_new_matches = match_context_used
+
         has_batter_filters = bool(batters) or bool(players)
         data_sources = []
         
@@ -938,6 +1897,10 @@ def query_deliveries_service(
                 innings=innings,
                 over_min=over_min,
                 over_max=over_max,
+                match_outcome=match_outcome,
+                is_chase=is_chase,
+                chase_outcome=chase_outcome,
+                toss_decision=toss_decision,
                 include_international=include_international,
                 top_teams=top_teams,
                 group_by=group_by,
@@ -946,13 +1909,16 @@ def query_deliveries_service(
             )
             
             # Get total balls from new table
-            total_balls_query = f"SELECT COUNT(*) FROM delivery_details dd {new_where_clause}"
+            new_join_clause = "JOIN matches m ON m.id = dd.p_match" if join_new_matches else ""
+            total_balls_query = f"SELECT COUNT(*) FROM delivery_details dd {new_join_clause} {new_where_clause}"
             total_balls_params = {k: v for k, v in new_params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
             new_total_balls = db.execute(text(total_balls_query), total_balls_params).scalar() or 0
             
             if not group_by or len(group_by) == 0:
                 # Ungrouped query
-                result = handle_ungrouped_query(new_where_clause, new_params, limit, offset, db, filters_applied)
+                result = handle_ungrouped_query(
+                    new_where_clause, new_params, limit, offset, db, filters_applied, join_matches=join_new_matches
+                )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_matching_rows']
             else:
@@ -960,7 +1926,7 @@ def query_deliveries_service(
                 result = handle_grouped_query(
                     new_where_clause, new_params, group_by, min_balls, max_balls,
                     min_runs, max_runs, limit, offset, db, filters_applied,
-                    has_batter_filters, show_summary_rows
+                    has_batter_filters, show_summary_rows, join_matches=join_new_matches
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_groups']
@@ -999,6 +1965,10 @@ def query_deliveries_service(
                 innings=innings,
                 over_min=over_min,
                 over_max=over_max,
+                match_outcome=match_outcome,
+                is_chase=is_chase,
+                chase_outcome=chase_outcome,
+                toss_decision=toss_decision,
                 include_international=include_international,
                 top_teams=top_teams,
                 group_by=group_by,
@@ -1065,6 +2035,11 @@ def query_deliveries_service(
         # =====================================================================
         if not group_by or len(group_by) == 0:
             # Ungrouped response
+            data_source_label = (
+                "delivery_details+deliveries"
+                if len(data_sources) > 1
+                else ("delivery_details" if routing['use_new'] else "deliveries")
+            )
             return {
                 "data": merged_data,
                 "metadata": {
@@ -1075,7 +2050,9 @@ def query_deliveries_service(
                     "has_more": total_count > (offset + len(merged_data)),
                     "filters_applied": filters_applied,
                     "data_sources": data_sources,
-                    "warnings": routing['warnings'],
+                    "query_mode_used": query_mode,
+                    "data_source": data_source_label,
+                    "warnings": delivery_warnings,
                     "note": "Individual delivery records" + (" (merged from multiple sources)" if len(data_sources) > 1 else "")
                 }
             }
@@ -1087,6 +2064,12 @@ def query_deliveries_service(
             if show_summary_rows and len(group_by) >= 1 and routing['use_new'] and 'result' in dir():
                 summary_data = result.get('summary_data')
                 percentages = result.get('percentages')
+
+            data_source_label = (
+                "delivery_details+deliveries"
+                if len(data_sources) > 1
+                else ("delivery_details" if routing['use_new'] else "deliveries")
+            )
             
             return {
                 "data": merged_data,
@@ -1103,7 +2086,9 @@ def query_deliveries_service(
                     "filters_applied": filters_applied,
                     "has_summaries": summary_data is not None,
                     "data_sources": data_sources,
-                    "warnings": routing['warnings'],
+                    "query_mode_used": query_mode,
+                    "data_source": data_source_label,
+                    "warnings": delivery_warnings,
                     "note": "Grouped data with cricket aggregations" + (" (merged from multiple sources)" if len(data_sources) > 1 else "")
                 }
             }
@@ -1121,6 +2106,7 @@ def build_where_clause(
     venue, start_date, end_date, leagues, teams, batting_teams, bowling_teams,
     players, batters, bowlers, bat_hand, bowl_style, bowl_kind, crease_combo,
     line, length, shot, control, wagon_zone, dismissal, innings, over_min, over_max,
+    match_outcome, is_chase, chase_outcome, toss_decision,
     include_international, top_teams, group_by, base_params, db=None
 ):
     """Build dynamic WHERE clause for delivery_details table."""
@@ -1256,6 +2242,32 @@ def build_where_clause(
         conditions.append("dd.dismissal = ANY(:dismissal)")
         params["dismissal"] = dismissal
 
+    match_outcome_sql = get_match_outcome_sql(
+        batting_team_expr="dd.team_bat",
+        bowling_team_expr="dd.team_bowl",
+        winner_expr="m.winner",
+        outcome_json_expr="m.outcome",
+    )
+    chase_outcome_sql = get_chase_outcome_sql("dd.inns", match_outcome_sql)
+
+    if match_outcome:
+        conditions.append(f"{match_outcome_sql} = ANY(:match_outcome)")
+        params["match_outcome"] = match_outcome
+
+    if is_chase is True:
+        conditions.append("dd.inns = 2")
+    elif is_chase is False:
+        conditions.append("dd.inns != 2")
+
+    if chase_outcome:
+        conditions.append("dd.inns = 2")
+        conditions.append(f"{chase_outcome_sql} = ANY(:chase_outcome)")
+        params["chase_outcome"] = chase_outcome
+
+    if toss_decision:
+        conditions.append("LOWER(COALESCE(m.toss_decision, '')) = ANY(:toss_decision)")
+        params["toss_decision"] = toss_decision
+
     # Grouping by dismissal should only include wicket deliveries
     if group_by and "dismissal" in group_by:
         conditions.append("dd.dismissal IS NOT NULL AND dd.dismissal != ''")
@@ -1298,8 +2310,9 @@ def get_all_team_name_variations(team_name):
     return [team_name]
 
 
-def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
+def handle_ungrouped_query(where_clause, params, limit, offset, db, filters, join_matches=False):
     """Return individual delivery records from delivery_details."""
+    join_clause = "JOIN matches m ON m.id = dd.p_match" if join_matches else ""
     
     main_query = f"""
         SELECT 
@@ -1331,6 +2344,7 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
             dd.year,
             dd.outcome
         FROM delivery_details dd
+        {join_clause}
         {where_clause}
         ORDER BY dd.year DESC, dd.p_match, dd.inns, dd.over, dd.ball
         LIMIT :limit
@@ -1373,7 +2387,9 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
     
     # Count total
     count_query = f"""
-        SELECT COUNT(*) FROM delivery_details dd {where_clause}
+        SELECT COUNT(*) FROM delivery_details dd
+        {join_clause}
+        {where_clause}
     """
     count_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
     total_count = db.execute(text(count_query), count_params).scalar()
@@ -1394,6 +2410,14 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters):
 
 def get_grouping_columns_map():
     """Map user-friendly group_by values to delivery_details column names."""
+    match_outcome_sql = get_match_outcome_sql(
+        batting_team_expr="dd.team_bat",
+        bowling_team_expr="dd.team_bowl",
+        winner_expr="m.winner",
+        outcome_json_expr="m.outcome",
+    )
+    chase_outcome_sql = get_chase_outcome_sql("dd.inns", match_outcome_sql)
+
     return {
         # Location
         "venue": "dd.ground",
@@ -1435,17 +2459,22 @@ def get_grouping_columns_map():
         "control": "dd.control",
         "wagon_zone": "dd.wagon_zone",
         "dismissal": "dd.dismissal",
+        # Match context
+        "match_outcome": match_outcome_sql,
+        "chase_outcome": chase_outcome_sql,
+        "toss_decision": "LOWER(COALESCE(m.toss_decision, ''))",
     }
 
 
 def handle_grouped_query(
     where_clause, params, group_by, min_balls, max_balls, 
     min_runs, max_runs, limit, offset, db, filters_applied=None,
-    has_batter_filters=False, show_summary_rows=False
+    has_batter_filters=False, show_summary_rows=False, join_matches=False
 ):
     """Return aggregated cricket statistics grouped by specified columns."""
     
     grouping_columns = get_grouping_columns_map()
+    join_clause = "JOIN matches m ON m.id = dd.p_match" if join_matches else ""
     
     # Validate columns
     invalid_columns = [col for col in group_by if col not in grouping_columns]
@@ -1488,7 +2517,9 @@ def handle_grouped_query(
     
     # Get total balls matching the WHERE clause
     total_balls_query = f"""
-        SELECT COUNT(*) FROM delivery_details dd {where_clause}
+        SELECT COUNT(*) FROM delivery_details dd
+        {join_clause}
+        {where_clause}
     """
     total_balls_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
     total_balls = db.execute(text(total_balls_query), total_balls_params).scalar()
@@ -1501,6 +2532,7 @@ def handle_grouped_query(
         parent_query = f"""
             SELECT {first_db_col} as parent_key, COUNT(*) as parent_balls
             FROM delivery_details dd
+            {join_clause}
             {where_clause}
             GROUP BY {first_db_col}
         """
@@ -1552,6 +2584,7 @@ def handle_grouped_query(
                 ELSE NULL END as control_percentage
             
         FROM delivery_details dd
+        {join_clause}
         {where_clause}
         GROUP BY {group_by_clause}
         {having_clause}
@@ -1607,6 +2640,7 @@ def handle_grouped_query(
         SELECT COUNT(*) FROM (
             SELECT {group_by_clause}
             FROM delivery_details dd
+            {join_clause}
             {where_clause}
             GROUP BY {group_by_clause}
             {having_clause}
@@ -1619,7 +2653,9 @@ def handle_grouped_query(
     summary_data = None
     percentages = None
     if show_summary_rows and len(group_by) >= 1:
-        summary_data, percentages = generate_summary_data(where_clause, params, group_by, runs_calculation, db, total_balls)
+        summary_data, percentages = generate_summary_data(
+            where_clause, params, group_by, runs_calculation, db, total_balls, join_matches=join_matches
+        )
     
     return {
         "data": formatted_results,
@@ -1640,10 +2676,11 @@ def handle_grouped_query(
     }
 
 
-def generate_summary_data(where_clause, params, group_by, runs_calculation, db, total_balls):
+def generate_summary_data(where_clause, params, group_by, runs_calculation, db, total_balls, join_matches=False):
     """Generate hierarchical summary data for grouped queries with percent_balls."""
     try:
         grouping_columns = get_grouping_columns_map()
+        join_clause = "JOIN matches m ON m.id = dd.p_match" if join_matches else ""
         summaries = {}
         percentages = {}
         
@@ -1666,7 +2703,7 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
             
             summary_group_by_clause = ", ".join(summary_group_clause)
             summary_select_clause = ", ".join(summary_columns)
-            
+
             summary_query = f"""
                 SELECT 
                     {summary_select_clause},
@@ -1679,6 +2716,7 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
                         THEN (CAST({runs_calculation} AS DECIMAL) * 100.0) / COUNT(*)
                         ELSE 0 END as strike_rate
                 FROM delivery_details dd
+                {join_clause}
                 {where_clause}
                 GROUP BY {summary_group_by_clause}
                 ORDER BY total_balls DESC

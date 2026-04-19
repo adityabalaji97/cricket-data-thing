@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -7,11 +7,8 @@ import {
   Alert,
   CircularProgress,
   Tabs,
-  Tab,
-  useMediaQuery,
-  useTheme
+  Tab
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import QueryFilters from './QueryFilters';
 import QueryResults from './QueryResults';
 import NLQueryInput from './NLQueryInput';
@@ -19,60 +16,68 @@ import { useUrlParams, filtersToUrlParams } from '../utils/urlParamParser';
 import axios from 'axios';
 import config from '../config';
 
+const getDefaultFilters = () => ({
+  // Basic filters
+  venue: null,
+  start_date: null,
+  end_date: null,
+  leagues: [],
+  teams: [],
+  batting_teams: [],
+  bowling_teams: [],
+  players: [],
+  batters: [],
+  bowlers: [],
+
+  // Match context
+  innings: null,
+  over_min: null,
+  over_max: null,
+  match_outcome: [],
+  is_chase: null,
+  chase_outcome: [],
+  toss_decision: [],
+
+  // Query mode (default is fully backward-compatible delivery mode)
+  query_mode: 'delivery',
+
+  // Batter filters
+  bat_hand: null,
+
+  // Bowler filters
+  bowl_style: [],
+  bowl_kind: [],
+
+  // Delivery detail filters
+  line: [],
+  length: [],
+  shot: [],
+  control: null,
+  wagon_zone: [],
+  dismissal: [],
+
+  // Grouped result filters
+  min_balls: null,
+  max_balls: null,
+  min_runs: null,
+  max_runs: null,
+
+  // Pagination
+  limit: 1000,
+  offset: 0,
+
+  // International matches
+  include_international: false,
+  top_teams: 10,
+
+  // Summary rows
+  show_summary_rows: false
+});
+
 const QueryBuilder = ({ isMobile }) => {
-  const theme = useTheme();
-  const navigate = useNavigate();
   const { getFiltersFromUrl, getGroupByFromUrl, currentParams } = useUrlParams();
   
-  const [filters, setFilters] = useState({
-    // Basic filters
-    venue: null,
-    start_date: null,
-    end_date: null,
-    leagues: [],
-    teams: [],
-    batting_teams: [],
-    bowling_teams: [],
-    players: [],
-    batters: [],
-    bowlers: [],
-    
-    // Match context
-    innings: null,
-    over_min: null,
-    over_max: null,
-    
-    // Batter filters
-    bat_hand: null,
-    
-    // Bowler filters
-    bowl_style: [],
-    bowl_kind: [],
-    
-    // Delivery detail filters (NEW)
-    line: [],
-    length: [],
-    shot: [],
-    control: null,
-    wagon_zone: [],
-    
-    // Grouped result filters
-    min_balls: null,
-    max_balls: null,
-    min_runs: null,
-    max_runs: null,
-    
-    // Pagination
-    limit: 1000,
-    offset: 0,
-    
-    // International matches
-    include_international: false,
-    top_teams: 10,
-    
-    // Summary rows
-    show_summary_rows: false
-  });
+  const [filters, setFilters] = useState(getDefaultFilters);
   
   const [groupBy, setGroupBy] = useState([]);
   const [results, setResults] = useState(null);
@@ -80,7 +85,7 @@ const QueryBuilder = ({ isMobile }) => {
   const [error, setError] = useState(null);
   const [availableColumns, setAvailableColumns] = useState(null);
   const [queryTab, setQueryTab] = useState(0);
-  const [isAutoExecuting, setIsAutoExecuting] = useState(false);
+  const [, setIsAutoExecuting] = useState(false);
   const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false);
   const [nlExplanation, setNlExplanation] = useState(null);
   const executeQueryRef = useRef(null);
@@ -128,6 +133,9 @@ const QueryBuilder = ({ isMobile }) => {
       const params = new URLSearchParams();
       
       Object.entries(urlFilters).forEach(([key, value]) => {
+        if (key === 'query_mode' && value === 'delivery') {
+          return;
+        }
         if (value !== null && value !== undefined && value !== '') {
           if (Array.isArray(value)) {
             value.forEach(item => params.append(key, item));
@@ -160,6 +168,9 @@ const QueryBuilder = ({ isMobile }) => {
       const params = new URLSearchParams();
       
       Object.entries(filters).forEach(([key, value]) => {
+        if (key === 'query_mode' && value === 'delivery') {
+          return;
+        }
         if (value !== null && value !== undefined && value !== '') {
           if (Array.isArray(value)) {
             value.forEach(item => params.append(key, item));
@@ -192,38 +203,7 @@ const QueryBuilder = ({ isMobile }) => {
   executeQueryRef.current = executeQuery;
 
   const clearFilters = () => {
-    setFilters({
-      venue: null,
-      start_date: null,
-      end_date: null,
-      leagues: [],
-      teams: [],
-      batting_teams: [],
-      bowling_teams: [],
-      players: [],
-      batters: [],
-      bowlers: [],
-      innings: null,
-      over_min: null,
-      over_max: null,
-      bat_hand: null,
-      bowl_style: [],
-      bowl_kind: [],
-      line: [],
-      length: [],
-      shot: [],
-      control: null,
-      wagon_zone: [],
-      min_balls: null,
-      max_balls: null,
-      min_runs: null,
-      max_runs: null,
-      limit: 1000,
-      offset: 0,
-      include_international: false,
-      top_teams: 10,
-      show_summary_rows: false
-    });
+    setFilters(getDefaultFilters());
     setGroupBy([]);
     setResults(null);
     setQueryTab(0);
@@ -235,17 +215,7 @@ const QueryBuilder = ({ isMobile }) => {
   
   const handleNLFilters = ({ filters: nlFilters, groupBy: nlGroupBy, explanation, confidence }) => {
     // Reset to defaults then apply NL filters
-    const defaultFilters = {
-      venue: null, start_date: null, end_date: null,
-      leagues: [], teams: [], batting_teams: [], bowling_teams: [],
-      players: [], batters: [], bowlers: [],
-      innings: null, over_min: null, over_max: null,
-      bat_hand: null, bowl_style: [], bowl_kind: [],
-      line: [], length: [], shot: [], control: null, wagon_zone: [],
-      min_balls: null, max_balls: null, min_runs: null, max_runs: null,
-      limit: 1000, offset: 0,
-      include_international: false, top_teams: 10, show_summary_rows: false
-    };
+    const defaultFilters = getDefaultFilters();
 
     const newFilters = { ...defaultFilters, ...nlFilters };
     const newGroupBy = nlGroupBy || [];
@@ -274,7 +244,8 @@ const QueryBuilder = ({ isMobile }) => {
       'venue', 'start_date', 'end_date', 'leagues', 'teams', 'batting_teams', 'bowling_teams',
       'players', 'batters', 'bowlers', 'bat_hand', 'bowl_style', 'bowl_kind',
       'line', 'length', 'shot', 'control', 'wagon_zone',
-      'innings', 'over_min', 'over_max'
+      'innings', 'over_min', 'over_max',
+      'match_outcome', 'is_chase', 'chase_outcome', 'toss_decision'
     ];
     
     return filterKeys.some(key => {

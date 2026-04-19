@@ -34,6 +34,13 @@ export const parseUrlParams = (search) => {
     const value = params.get(key);
     return value !== null ? value === 'true' : defaultValue;
   };
+
+  // Helper to parse optional boolean parameters (null when omitted)
+  const getNullableBoolParam = (key) => {
+    const value = params.get(key);
+    if (value === null) return null;
+    return value === 'true';
+  };
   
   // Basic filters
   filters.venue = getSingleParam('venue');
@@ -54,6 +61,11 @@ export const parseUrlParams = (search) => {
   filters.innings = getIntParam('innings');
   filters.over_min = getIntParam('over_min');
   filters.over_max = getIntParam('over_max');
+  filters.match_outcome = getArrayParam('match_outcome');
+  filters.is_chase = getNullableBoolParam('is_chase');
+  filters.chase_outcome = getArrayParam('chase_outcome');
+  filters.toss_decision = getArrayParam('toss_decision');
+  filters.query_mode = getSingleParam('query_mode', 'delivery');
   
   // Batter filters
   filters.bat_hand = getSingleParam('bat_hand');
@@ -96,6 +108,9 @@ export const filtersToUrlParams = (filters, groupBy = []) => {
   
   // Add filters
   Object.entries(filters).forEach(([key, value]) => {
+    if (key === 'query_mode' && value === 'delivery') {
+      return;
+    }
     if (value !== null && value !== undefined && value !== '') {
       if (Array.isArray(value)) {
         value.forEach(item => params.append(key, item));

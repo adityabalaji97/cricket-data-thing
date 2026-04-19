@@ -7,7 +7,7 @@ grouping, and aggregation capabilities.
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import date
 from database import get_session
 from services.query_builder_v2 import query_deliveries_service
@@ -117,6 +117,10 @@ def query_deliveries(
     innings: Optional[int] = Query(default=None, description="Filter by innings (1 or 2)"),
     over_min: Optional[int] = Query(default=None, ge=0, le=19, description="Minimum over (0-19)"),
     over_max: Optional[int] = Query(default=None, ge=0, le=19, description="Maximum over (0-19)"),
+    match_outcome: List[str] = Query(default=[], description="Filter by batting-side outcome (win, loss, tie, no_result)"),
+    is_chase: Optional[bool] = Query(default=None, description="Filter to chase innings only (true) or non-chase innings only (false)"),
+    chase_outcome: List[str] = Query(default=[], description="Filter by batting-side chase outcome (win, loss, tie, no_result)"),
+    toss_decision: List[str] = Query(default=[], description="Filter by toss decision (bat, field)"),
     
     # Grouping and aggregation
     group_by: List[str] = Query(default=[], description="Group results by columns"),
@@ -135,6 +139,10 @@ def query_deliveries(
     # Include international matches
     include_international: bool = Query(default=False, description="Include international T20I matches"),
     top_teams: Optional[int] = Query(default=None, description="Include only top N international teams"),
+    query_mode: Literal["delivery", "batting_stats", "bowling_stats"] = Query(
+        default="delivery",
+        description="Query source mode: delivery (default), batting_stats, bowling_stats"
+    ),
     
     db: Session = Depends(get_session)
 ):
@@ -172,6 +180,9 @@ def query_deliveries(
         length = preprocess_list_param(length)
         shot = preprocess_list_param(shot)
         dismissal = preprocess_list_param(dismissal)
+        match_outcome = preprocess_list_param(match_outcome)
+        chase_outcome = preprocess_list_param(chase_outcome)
+        toss_decision = preprocess_list_param(toss_decision)
         group_by = preprocess_list_param(group_by)
         
         # Handle wagon_zone separately since it's List[int]
@@ -205,6 +216,10 @@ def query_deliveries(
             innings=innings,
             over_min=over_min,
             over_max=over_max,
+            match_outcome=match_outcome,
+            is_chase=is_chase,
+            chase_outcome=chase_outcome,
+            toss_decision=toss_decision,
             group_by=group_by,
             show_summary_rows=show_summary_rows,
             min_balls=min_balls,
@@ -215,6 +230,7 @@ def query_deliveries(
             offset=offset,
             include_international=include_international,
             top_teams=top_teams,
+            query_mode=query_mode,
             db=db
         )
         return result
@@ -277,6 +293,7 @@ def get_available_columns(db: Session = Depends(get_session)):
             "filter_columns": {
                 "basic": ["venue", "start_date", "end_date", "leagues", "teams", "batting_teams", "bowling_teams", "players", "batters", "bowlers"],
                 "match": ["innings", "over_min", "over_max"],
+                "match_context": ["match_outcome", "is_chase", "chase_outcome", "toss_decision"],
                 "batter": ["bat_hand", "crease_combo"],
                 "bowler": ["bowl_style", "bowl_kind"],
                 "delivery": ["line", "length", "shot", "control", "wagon_zone", "dismissal"],
@@ -287,10 +304,16 @@ def get_available_columns(db: Session = Depends(get_session)):
                 "venue", "country", "match_id", "competition", "year",
                 "batting_team", "bowling_team", "batter", "bowler",
                 "innings", "phase",
+                "match_outcome", "chase_outcome", "toss_decision",
                 "bat_hand", "striker_batter_type",
                 "bowl_style", "bowl_kind", "crease_combo",
                 "line", "length", "shot", "control", "wagon_zone", "dismissal"
             ],
+
+            "query_mode_options": ["delivery", "batting_stats", "bowling_stats"],
+            "match_outcome_options": ["win", "loss", "tie", "no_result"],
+            "chase_outcome_options": ["win", "loss", "tie", "no_result"],
+            "toss_decision_options": get_values("toss_decision") or ["bat", "field"],
             
             # Options with coverage info
             "line_options": get_values("line"),
