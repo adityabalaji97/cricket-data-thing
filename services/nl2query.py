@@ -9,6 +9,7 @@ import time
 import logging
 from typing import Dict, Any, Optional, List
 from openai import OpenAI
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,8 @@ venue, country, match_id, competition, year, batting_team, bowling_team, batter,
 6. If the query mentions a league (IPL, BBL, etc.), add it to "leagues".
 7. If the query is not about cricket or is too vague, set confidence to "low" and add helpful suggestions.
 8. Return ONLY valid JSON, no extra text.
+9. If the user wants to compare LHB vs RHB (e.g. "vs lhb/rhb"), do NOT set bat_hand as a filter. Instead, add "bat_hand" to group_by.
+10. Use the player's full first and last name when possible (e.g. "Jasprit Bumrah" not "J Bumrah", "Virat Kohli" not "V Kohli", "Varun Chakravarthy" not "V Chakravarthy"). The system will resolve names to the database format automatically.
 """
 
 EXAMPLE_QUERIES = [
@@ -221,8 +224,15 @@ def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
             validated[key] = filters[key]
 
     # Validated enum filters
-    if "bat_hand" in filters and filters["bat_hand"] in VALID_BAT_HAND:
-        validated["bat_hand"] = filters["bat_hand"]
+    # Track if bat_hand should become a group_by (when LLM returns a list like ["RHB", "LHB"])
+    _bat_hand_to_group_by = False
+    if "bat_hand" in filters:
+        val = filters["bat_hand"]
+        if isinstance(val, str) and val in VALID_BAT_HAND:
+            validated["bat_hand"] = val
+        elif isinstance(val, list):
+            # Multiple values means "compare by bat_hand" — use group_by, not filter
+            _bat_hand_to_group_by = True
 
     if "bowl_style" in filters and isinstance(filters["bowl_style"], list):
         valid = [v for v in filters["bowl_style"] if v in VALID_BOWL_STYLE]
@@ -249,11 +259,19 @@ def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
     if "over_max" in filters and filters["over_max"] is not None:
         validated["over_max"] = max(0, min(19, int(filters["over_max"])))
 
-    if "innings" in filters and filters["innings"] in (1, 2):
-        validated["innings"] = filters["innings"]
+    if "innings" in filters:
+        val = filters["innings"]
+        if isinstance(val, int) and val in (1, 2):
+            validated["innings"] = val
+        elif isinstance(val, list) and len(val) == 1 and val[0] in (1, 2):
+            validated["innings"] = val[0]
 
-    if "control" in filters and filters["control"] in (0, 1):
-        validated["control"] = filters["control"]
+    if "control" in filters:
+        val = filters["control"]
+        if isinstance(val, int) and val in (0, 1):
+            validated["control"] = val
+        elif isinstance(val, list) and len(val) == 1 and val[0] in (0, 1):
+            validated["control"] = val[0]
 
     # List filters for delivery details
     for key in ["line", "length", "shot", "dismissal"]:
@@ -281,6 +299,10 @@ def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
     else:
         group_by = []
 
+    # If bat_hand was a list (e.g. "vs lhb/rhb"), add it to group_by
+    if _bat_hand_to_group_by and "bat_hand" not in group_by:
+        group_by.append("bat_hand")
+
     return {
         "filters": validated,
         "group_by": group_by,
@@ -290,7 +312,30 @@ def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def parse_nl_query(query: str) -> Dict[str, Any]:
+def resolve_player_names(names: List[str], db: Session) -> List[str]:
+    """Resolve LLM-generated player names against the database.
+
+    Uses search_players_with_aliases for fuzzy matching, returning the
+    display_name (delivery_details format) for each matched player.
+    Falls back to the original name if no match is found.
+    """
+    from services.player_aliases import search_players_with_aliases
+
+    resolved = []
+    for name in names:
+        try:
+            results = search_players_with_aliases(name, db, limit=1)
+            if results:
+                resolved.append(results[0]["display_name"])
+            else:
+                resolved.append(name)
+        except Exception as e:
+            logger.warning(f"Failed to resolve player name '{name}': {e}")
+            resolved.append(name)
+    return resolved
+
+
+def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
     """Parse a natural language query into structured filters.
 
     Returns validated filters, group_by, explanation, confidence, and suggestions.
@@ -314,6 +359,14 @@ def parse_nl_query(query: str) -> Dict[str, Any]:
     try:
         raw = call_openai(query)
         result = validate_filters(raw)
+
+        # Resolve player names against DB if session available
+        if db is not None:
+            filters = result["filters"]
+            for key in ["batters", "bowlers", "players"]:
+                if key in filters and isinstance(filters[key], list):
+                    filters[key] = resolve_player_names(filters[key], db)
+
         result["success"] = True
 
         _set_cache(query, result)
