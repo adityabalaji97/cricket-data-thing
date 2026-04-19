@@ -9,11 +9,7 @@ import {
   Tabs,
   Tab,
   useMediaQuery,
-  useTheme,
-  Card,
-  CardContent,
-  Grid,
-  Chip
+  useTheme
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import QueryFilters from './QueryFilters';
@@ -22,113 +18,6 @@ import NLQueryInput from './NLQueryInput';
 import { useUrlParams, filtersToUrlParams } from '../utils/urlParamParser';
 import axios from 'axios';
 import config from '../config';
-import { getSeasonStartDate } from '../utils/dateDefaults';
-
-const currentSeasonStart = getSeasonStartDate(new Date(), 0);
-const recentSeasonsStart = getSeasonStartDate(new Date(), 1);
-
-// Prefilled query examples showcasing new delivery_details features
-const PREFILLED_QUERIES = [
-  {
-    title: `Chennai Super Kings batters by phase in ${new Date().getFullYear()}`,
-    description: "Analyze CSK batting performance across different match phases",
-    filters: {
-      batting_teams: ["Chennai Super Kings"],
-      start_date: currentSeasonStart,
-      leagues: ["IPL"],
-      min_balls: 30
-    },
-    groupBy: ["batter", "phase"],
-    tags: ["IPL", "CSK", "Batting", "Phase"]
-  },
-  {
-    title: "Short ball response - shot distribution",
-    description: "See what shots batters play to short length deliveries",
-    filters: {
-      length: ["SHORT"],
-      min_balls: 100
-    },
-    groupBy: ["shot"],
-    tags: ["Length", "Shot", "Short Ball"]
-  },
-  {
-    title: "Spin bowling by line and length",
-    description: "Analyze spin bowler strategies by line and length combinations",
-    filters: {
-      bowl_kind: ["spin bowler"],
-      min_balls: 50
-    },
-    groupBy: ["line", "length"],
-    tags: ["Spin", "Line", "Length"]
-  },
-  {
-    title: "Controlled vs uncontrolled shots by wagon zone",
-    description: "Where do batters hit with control vs without control?",
-    filters: {
-      min_balls: 100
-    },
-    groupBy: ["control", "wagon_zone"],
-    tags: ["Control", "Wagon Wheel", "Shot Quality"]
-  },
-  {
-    title: "Powerplay pace bowling analysis",
-    description: "Study pace bowling strategies in powerplay overs",
-    filters: {
-      leagues: ["IPL"],
-      start_date: recentSeasonsStart,
-      over_min: 0,
-      over_max: 5,
-      bowl_kind: ["pace bowler"],
-      min_balls: 50
-    },
-    groupBy: ["bowl_style", "length"],
-    tags: ["Powerplay", "Pace", "IPL"]
-  },
-  {
-    title: "LHB vs RHB performance against spin",
-    description: "Compare left and right hand batters against spin bowling",
-    filters: {
-      bowl_kind: ["spin bowler"],
-      min_balls: 100
-    },
-    groupBy: ["bat_hand", "bowl_style"],
-    tags: ["LHB", "RHB", "Spin", "Matchup"]
-  }
-];
-
-const PrefilledQueryCard = ({ query, onSelect }) => (
-  <Card 
-    sx={{ 
-      cursor: 'pointer', 
-      transition: 'all 0.2s',
-      '&:hover': {
-        transform: 'translateY(-2px)',
-        boxShadow: 3
-      }
-    }}
-    onClick={() => onSelect(query)}
-  >
-    <CardContent sx={{ p: 2 }}>
-      <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 600, mb: 1 }}>
-        {query.title}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        {query.description}
-      </Typography>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-        {query.tags.map((tag, index) => (
-          <Chip 
-            key={index} 
-            label={tag} 
-            size="small" 
-            variant="outlined" 
-            sx={{ fontSize: '0.7rem', height: 20 }}
-          />
-        ))}
-      </Box>
-    </CardContent>
-  </Card>
-);
 
 const QueryBuilder = ({ isMobile }) => {
   const theme = useTheme();
@@ -191,7 +80,6 @@ const QueryBuilder = ({ isMobile }) => {
   const [error, setError] = useState(null);
   const [availableColumns, setAvailableColumns] = useState(null);
   const [queryTab, setQueryTab] = useState(0);
-  const [showPrefilledQueries, setShowPrefilledQueries] = useState(true);
   const [isAutoExecuting, setIsAutoExecuting] = useState(false);
   const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false);
   const [nlExplanation, setNlExplanation] = useState(null);
@@ -208,7 +96,6 @@ const QueryBuilder = ({ isMobile }) => {
         ...urlFilters
       }));
       setGroupBy(urlGroupBy);
-      setShowPrefilledQueries(false);
       setHasLoadedFromUrl(true);
       setIsAutoExecuting(true);
       
@@ -255,8 +142,7 @@ const QueryBuilder = ({ isMobile }) => {
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
       setQueryTab(1);
-      setShowPrefilledQueries(false);
-      
+
     } catch (error) {
       console.error('Error executing query from URL:', error);
       setError(error.response?.data?.detail || 'Failed to execute query');
@@ -284,17 +170,15 @@ const QueryBuilder = ({ isMobile }) => {
       });
       
       groupBy.forEach(col => params.append('group_by', col));
-      
-      if (!isAutoExecuting) {
-        const newParams = filtersToUrlParams(filters, groupBy);
-        const newUrl = `${window.location.pathname}?${newParams}`;
-        window.history.replaceState({}, '', newUrl);
-      }
+
+      // Always update URL so queries are shareable
+      const newParams = filtersToUrlParams(filters, groupBy);
+      const newUrl = `${window.location.pathname}?${newParams}`;
+      window.history.replaceState({}, '', newUrl);
 
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
       setQueryTab(1);
-      setShowPrefilledQueries(false);
       
     } catch (error) {
       console.error('Error executing query:', error);
@@ -343,23 +227,10 @@ const QueryBuilder = ({ isMobile }) => {
     setGroupBy([]);
     setResults(null);
     setQueryTab(0);
-    setShowPrefilledQueries(true);
     setHasLoadedFromUrl(false);
     setIsAutoExecuting(false);
     setNlExplanation(null);
     window.history.replaceState({}, '', window.location.pathname);
-  };
-  
-  const selectPrefilledQuery = (query) => {
-    setFilters(prevFilters => ({
-      ...prevFilters,
-      ...query.filters
-    }));
-    setGroupBy(query.groupBy);
-    setShowPrefilledQueries(false);
-    setQueryTab(0);
-    setHasLoadedFromUrl(false);
-    setIsAutoExecuting(false);
   };
   
   const handleNLFilters = ({ filters: nlFilters, groupBy: nlGroupBy, explanation, confidence }) => {
@@ -376,12 +247,18 @@ const QueryBuilder = ({ isMobile }) => {
       include_international: false, top_teams: 10, show_summary_rows: false
     };
 
-    setFilters({ ...defaultFilters, ...nlFilters });
-    setGroupBy(nlGroupBy || []);
+    const newFilters = { ...defaultFilters, ...nlFilters };
+    const newGroupBy = nlGroupBy || [];
+    setFilters(newFilters);
+    setGroupBy(newGroupBy);
     setNlExplanation(explanation);
-    setShowPrefilledQueries(false);
     setQueryTab(0);
     setHasLoadedFromUrl(false);
+
+    // Update URL immediately so the query is shareable even before execution
+    const newParams = filtersToUrlParams(newFilters, newGroupBy);
+    const newUrl = `${window.location.pathname}?${newParams}`;
+    window.history.replaceState({}, '', newUrl);
 
     // Auto-execute for high confidence, just populate for medium/low
     if (confidence === 'high') {
@@ -437,28 +314,6 @@ const QueryBuilder = ({ isMobile }) => {
         </Alert>
       )}
 
-      {/* Prefilled Query Cards */}
-      {showPrefilledQueries && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            🚀 Quick Start Queries
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Click on any query below to get started:
-          </Typography>
-          <Grid container spacing={2}>
-            {PREFILLED_QUERIES.map((query, index) => (
-              <Grid item xs={12} sm={6} md={4} key={index}>
-                <PrefilledQueryCard 
-                  query={query} 
-                  onSelect={selectPrefilledQuery}
-                />
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-      )}
-      
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -545,16 +400,6 @@ const QueryBuilder = ({ isMobile }) => {
               Clear All
             </Button>
             
-            {!showPrefilledQueries && (
-              <Button 
-                variant="text"
-                onClick={() => setShowPrefilledQueries(true)}
-                disabled={loading}
-                sx={{ minWidth: 120 }}
-              >
-                Show Quick Queries
-              </Button>
-            )}
           </Box>
           
           <Typography variant="caption" color="text.secondary" sx={{ 
