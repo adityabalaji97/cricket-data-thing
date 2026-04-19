@@ -411,6 +411,9 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
     if (key === 'average' || key === 'balls_per_dismissal') {
       return Number(value).toFixed(2);
     }
+    if (key === 'economy' || key === 'overs' || key === 'balls_per_wicket') {
+      return Number(value).toFixed(2);
+    }
     if (key === 'year') {
       return value;
     }
@@ -439,7 +442,15 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       'percent_balls': '%Balls',
       'balls_per_dismissal': 'B/W',
       'control_percentage': 'Ctrl%',
-      'year': 'Year'
+      'year': 'Year',
+      'runs_conceded': 'Runs',
+      'fours_conceded': 'Fours',
+      'sixes_conceded': 'Sixes',
+      'economy': 'Economy',
+      'balls_per_wicket': 'B/W',
+      'overs': 'Overs',
+      'innings_count': 'Innings',
+      'balls_faced': 'Balls'
     };
     
     return displayNames[key] || key.split('_').map(word => 

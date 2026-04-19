@@ -1283,6 +1283,7 @@ def query_batting_stats_service(
     if max_runs is not None:
         having_conditions.append("SUM(bs.runs) <= :max_runs")
         params["max_runs"] = max_runs
+    having_conditions.append("(SUM(bs.runs) > 0 OR SUM(bs.balls_faced) > 0)")
     having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
 
     aggregation_query = f"""
@@ -1319,8 +1320,8 @@ def query_batting_stats_service(
             "fours": row[s + 4],
             "sixes": row[s + 5],
             "dots": row[s + 6],
-            "strike_rate": float(row[s + 7]) if row[s + 7] is not None else 0.0,
-            "average": float(row[s + 8]) if row[s + 8] is not None else None,
+            "strike_rate": round(float(row[s + 7]), 2) if row[s + 7] is not None else 0.0,
+            "average": round(float(row[s + 8]), 2) if row[s + 8] is not None else None,
         })
         formatted.append(payload)
 
@@ -1674,15 +1675,15 @@ def query_bowling_stats_service(
         s = len(group_by)
         payload.update({
             "innings_count": row[s],
-            "overs": float(row[s + 1]) if row[s + 1] is not None else 0.0,
+            "overs": round(float(row[s + 1]), 2) if row[s + 1] is not None else 0.0,
             "runs_conceded": row[s + 2],
             "wickets": row[s + 3],
             "dots": row[s + 4],
             "fours_conceded": row[s + 5],
             "sixes_conceded": row[s + 6],
-            "economy": float(row[s + 7]) if row[s + 7] is not None else 0.0,
-            "average": float(row[s + 8]) if row[s + 8] is not None else None,
-            "balls_per_wicket": float(row[s + 9]) if row[s + 9] is not None else None,
+            "economy": round(float(row[s + 7]), 2) if row[s + 7] is not None else 0.0,
+            "average": round(float(row[s + 8]), 2) if row[s + 8] is not None else None,
+            "balls_per_wicket": round(float(row[s + 9]), 2) if row[s + 9] is not None else None,
         })
         formatted.append(payload)
 

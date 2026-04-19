@@ -78,9 +78,10 @@ Return a JSON object with these fields:
 
 ### Query mode
 - "query_mode": "delivery" (default), "batting_stats", or "bowling_stats"
-- Use "batting_stats" for innings-level batter performance asks (e.g. "Kohli batting stats in chases")
-- Use "bowling_stats" for innings-level bowler performance asks (e.g. "Bumrah economy in wins")
-- If not explicitly stats-oriented, default to "delivery"
+- Default to "delivery" for almost all queries — it provides the richest aggregated stats (control%, dot%, boundary%, balls_per_dismissal).
+- Only use "batting_stats" when the query explicitly needs match-level batting results (e.g. "100+ scores", "fifties list", "team wins while chasing grouped by match").
+- Only use "bowling_stats" when the query explicitly needs match-level bowling results (e.g. "5-wicket hauls", "wicketless games").
+- For general player/team performance queries (e.g. "bumrah by competition", "kohli in powerplay"), always use "delivery".
 
 ### Delivery detail filters
 - "line": list. Valid values: "ON_THE_STUMPS", "OUTSIDE_OFFSTUMP", "DOWN_LEG", "WIDE_OUTSIDE_OFFSTUMP", "WIDE_DOWN_LEG"
@@ -133,6 +134,7 @@ venue, country, match_id, competition, year, batting_team, bowling_team, batter,
 9. If the user wants to compare LHB vs RHB (e.g. "vs lhb/rhb"), do NOT set bat_hand as a filter. Instead, add "bat_hand" to group_by.
 10. Use the player's full first and last name when possible (e.g. "Jasprit Bumrah" not "J Bumrah", "Virat Kohli" not "V Kohli", "Varun Chakravarthy" not "V Chakravarthy"). The system will resolve names to the database format automatically.
 11. When the user asks about toss impact on winning (e.g. "toss decision vs match outcome"), use group_by: ["toss_decision", "toss_match_outcome"] with query_mode: "batting_stats". Do NOT use "match_outcome" for toss analysis — use "toss_match_outcome" instead.
+12. For team match-level queries (e.g. "CSK in chasing wins"), group by match_id, batting_team, bowling_team, and year. This shows individual match results rather than aggregated totals.
 """
 
 EXAMPLE_QUERIES = [
@@ -161,11 +163,11 @@ EXAMPLE_QUERIES = [
         "category": "Group by competition"
     },
     {
-        "text": "top batters by toss decision in IPL",
-        "category": "Toss context"
+        "text": "shubman gill batting in first innings vs second innings",
+        "category": "Innings comparison"
     },
     {
-        "text": "bowling stats for rashid khan by year",
+        "text": "rashid khan bowling by year",
         "category": "Bowling stats"
     }
 ]
@@ -521,6 +523,19 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
         elif since_year_match:
             filters["start_date"] = f"{since_year_match.group(1)}-01-01"
         filters.pop("end_date", None)
+
+    # Prefer delivery mode when group_by contains delivery-only columns
+    DELIVERY_ONLY_GROUP_BY = {"bat_hand", "bowl_style", "bowl_kind", "line", "length", "shot", "control", "wagon_zone", "phase", "dismissal"}
+    if filters.get("query_mode") in ("batting_stats", "bowling_stats"):
+        if any(c in DELIVERY_ONLY_GROUP_BY for c in group_by):
+            filters["query_mode"] = "delivery"
+
+    # Chase/win team queries: add match-level grouping
+    if re.search(r"\bchas(e|ing)\b", q_lower) and re.search(r"\b(win|loss|won|lost)\b", q_lower):
+        if filters.get("batting_teams") or filters.get("teams"):
+            group_by = _append_group_by(group_by, "match_id")
+            group_by = _append_group_by(group_by, "batting_team")
+            group_by = _append_group_by(group_by, "bowling_team")
 
     # Keep query_mode default if absent.
     filters["query_mode"] = filters.get("query_mode", "delivery")

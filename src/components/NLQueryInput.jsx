@@ -25,10 +25,10 @@ const EXAMPLE_QUERIES = [
   "csk in chasing wins since 2018",
   "varun chakravarthy vs lhb/rhb",
   "bumrah in 2026 grouped by competition",
-  "top batters by toss decision in IPL",
-  "bowling stats for rashid khan by year",
+  "shubman gill batting in first innings vs second innings",
+  "rashid khan bowling by year",
   "line and length patterns by phase for arshdeep singh",
-  "dismissal type by match outcome for RCB"
+  "rohit sharma dismissal types vs each bowling type since 2018"
 ];
 
 const QUERY_TIPS = `Try queries like:
