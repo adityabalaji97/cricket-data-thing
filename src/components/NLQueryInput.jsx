@@ -45,15 +45,16 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleSubmit = async () => {
-    if (!query.trim() || loading) return;
+  const submitQuery = async (queryText) => {
+    const q = (queryText || query).trim();
+    if (!q || loading) return;
 
     setLoading(true);
     setError(null);
 
     try {
       const response = await axios.post(`${config.API_URL}/nl2query/parse`, {
-        query: query.trim()
+        query: q
       });
 
       const data = response.data;
@@ -76,6 +77,8 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
     }
   };
 
+  const handleSubmit = () => submitQuery();
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -86,6 +89,7 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
   const handleChipClick = (exampleQuery) => {
     setQuery(exampleQuery);
     setError(null);
+    submitQuery(exampleQuery);
   };
 
   return (

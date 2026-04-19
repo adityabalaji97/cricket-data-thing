@@ -530,8 +530,19 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
         if any(c in DELIVERY_ONLY_GROUP_BY for c in group_by):
             filters["query_mode"] = "delivery"
 
-    # Chase/win team queries: add match-level grouping
-    if re.search(r"\bchas(e|ing)\b", q_lower) and re.search(r"\b(win|loss|won|lost)\b", q_lower):
+    # Chase/win team queries: add match-level grouping and ensure filters
+    chase_match = re.search(r"\bchas(e|ing)\b", q_lower)
+    win_loss_match = re.search(r"\b(wins?|won|loss(?:es)?|lost)\b", q_lower)
+    if chase_match and win_loss_match:
+        if not filters.get("is_chase"):
+            filters["is_chase"] = True
+        # Set match_outcome if not already set
+        if not filters.get("match_outcome"):
+            wl = win_loss_match.group(1)
+            if wl in ("win", "wins", "won"):
+                filters["match_outcome"] = ["win"]
+            elif wl in ("loss", "losses", "lost"):
+                filters["match_outcome"] = ["loss"]
         if filters.get("batting_teams") or filters.get("teams"):
             group_by = _append_group_by(group_by, "match_id")
             group_by = _append_group_by(group_by, "batting_team")
