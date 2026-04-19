@@ -165,17 +165,18 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
       )}
 
       <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 1 }}>
-        Tap an example to autofill
+        Tap an example to search
       </Typography>
 
       <Box
         sx={{
           display: 'flex',
-          flexWrap: isMobile ? 'nowrap' : 'wrap',
+          flexWrap: isMobile ? 'wrap' : 'wrap',
           gap: 0.75,
-          overflowX: isMobile ? 'auto' : 'visible',
+          maxHeight: isMobile ? 140 : 'none',
+          overflowY: isMobile ? 'auto' : 'visible',
           pb: isMobile ? 0.5 : 0,
-          '::-webkit-scrollbar': { height: isMobile ? 6 : 0 }
+          '::-webkit-scrollbar': { width: isMobile ? 4 : 0 }
         }}
       >
         {EXAMPLE_QUERIES.map((example, index) => (
@@ -189,7 +190,6 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
               bgcolor: 'rgba(255,255,255,0.15)',
               color: 'white',
               fontSize: '0.75rem',
-              flexShrink: 0,
               cursor: 'pointer',
               '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
               '&.Mui-disabled': { opacity: 0.5 }
