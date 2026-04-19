@@ -42,7 +42,7 @@ PARTIAL_COLUMNS = {'crease_combo'}
 VALID_QUERY_MODES = {"delivery", "batting_stats", "bowling_stats"}
 VALID_MATCH_OUTCOMES = {"win", "loss", "tie", "no_result"}
 VALID_TOSS_DECISIONS = {"bat", "field"}
-MATCH_CONTEXT_GROUP_BY_COLUMNS = {"match_outcome", "chase_outcome", "toss_decision"}
+MATCH_CONTEXT_GROUP_BY_COLUMNS = {"match_outcome", "chase_outcome", "toss_decision", "toss_match_outcome"}
 
 # Normalize team names to canonical abbreviations for robust winner/team comparisons.
 TEAM_CANONICAL_MAP: Dict[str, str] = {}
@@ -87,6 +87,26 @@ def get_match_outcome_sql(
 
 def get_chase_outcome_sql(innings_expr: str, match_outcome_sql: str) -> str:
     return f"(CASE WHEN {innings_expr} = 2 THEN {match_outcome_sql} ELSE NULL END)"
+
+
+def get_toss_match_outcome_sql(
+    toss_winner_expr: str,
+    winner_expr: str,
+    outcome_json_expr: str
+) -> str:
+    """Match outcome from the toss-winning team's perspective."""
+    toss_canonical = get_team_canonical_sql(toss_winner_expr)
+    winner_canonical = get_team_canonical_sql(winner_expr)
+    return f"""(
+        CASE
+            WHEN LOWER(COALESCE({outcome_json_expr}->>'result', '')) = 'tie' THEN 'tie'
+            WHEN LOWER(COALESCE({outcome_json_expr}->>'result', '')) = 'no result' THEN 'no_result'
+            WHEN COALESCE({toss_winner_expr}, '') = '' THEN 'no_result'
+            WHEN COALESCE({winner_expr}, '') = '' THEN 'no_result'
+            WHEN {winner_canonical} = {toss_canonical} THEN 'win'
+            ELSE 'loss'
+        END
+    )"""
 
 
 def match_context_requested(
@@ -391,6 +411,7 @@ def get_legacy_grouping_columns_map():
         "match_outcome": match_outcome_sql,
         "chase_outcome": chase_outcome_sql,
         "toss_decision": "LOWER(COALESCE(m.toss_decision, ''))",
+        "toss_match_outcome": get_toss_match_outcome_sql("m.toss_winner", "m.winner", "m.outcome"),
     }
 
 
@@ -1037,7 +1058,8 @@ def query_batting_stats_service(
 
     allowed_group_by = {
         "venue", "competition", "year", "batting_team", "bowling_team",
-        "batter", "innings", "match_outcome", "chase_outcome", "toss_decision"
+        "batter", "innings", "match_outcome", "chase_outcome", "toss_decision",
+        "match_id", "toss_match_outcome"
     }
     invalid_group_by = [c for c in group_by if c not in allowed_group_by]
     if invalid_group_by:
@@ -1237,9 +1259,11 @@ def query_batting_stats_service(
         "bowling_team": bowling_team_expr,
         "batter": "bs.striker",
         "innings": "bs.innings",
+        "match_id": "bs.match_id",
         "match_outcome": match_outcome_sql,
         "chase_outcome": chase_outcome_sql,
         "toss_decision": "LOWER(COALESCE(m.toss_decision, ''))",
+        "toss_match_outcome": get_toss_match_outcome_sql("m.toss_winner", "m.winner", "m.outcome"),
     }
     group_cols = [grouping_columns[c] for c in group_by]
     select_cols = [f"{grouping_columns[c]} AS {c}" for c in group_by]
@@ -1379,7 +1403,8 @@ def query_bowling_stats_service(
 
     allowed_group_by = {
         "venue", "competition", "year", "batting_team", "bowling_team",
-        "bowler", "innings", "match_outcome", "chase_outcome", "toss_decision"
+        "bowler", "innings", "match_outcome", "chase_outcome", "toss_decision",
+        "match_id", "toss_match_outcome"
     }
     invalid_group_by = [c for c in group_by if c not in allowed_group_by]
     if invalid_group_by:
@@ -1588,9 +1613,11 @@ def query_bowling_stats_service(
         "bowling_team": "bs.bowling_team",
         "bowler": "bs.bowler",
         "innings": "bs.innings",
+        "match_id": "bs.match_id",
         "match_outcome": match_outcome_sql,
         "chase_outcome": chase_outcome_sql,
         "toss_decision": "LOWER(COALESCE(m.toss_decision, ''))",
+        "toss_match_outcome": get_toss_match_outcome_sql("m.toss_winner", "m.winner", "m.outcome"),
     }
     group_cols = [grouping_columns[c] for c in group_by]
     select_cols = [f"{grouping_columns[c]} AS {c}" for c in group_by]
@@ -2565,6 +2592,7 @@ def get_grouping_columns_map():
         "match_outcome": match_outcome_sql,
         "chase_outcome": chase_outcome_sql,
         "toss_decision": "LOWER(COALESCE(m.toss_decision, ''))",
+        "toss_match_outcome": get_toss_match_outcome_sql("m.toss_winner", "m.winner", "m.outcome"),
     }
 
 

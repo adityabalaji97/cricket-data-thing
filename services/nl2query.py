@@ -73,6 +73,8 @@ Return a JSON object with these fields:
 - "match_outcome": list. Valid values: "win", "loss", "tie", "no_result" (always batting-side perspective)
 - "chase_outcome": list. Valid values: "win", "loss", "tie", "no_result" (applies to innings=2)
 - "toss_decision": list. Valid values: "bat", "field"
+- "toss_match_outcome": group_by only. Values: "win", "loss", "tie", "no_result".
+  Shows match outcome from the TOSS-WINNING team's perspective.
 
 ### Query mode
 - "query_mode": "delivery" (default), "batting_stats", or "bowling_stats"
@@ -98,7 +100,7 @@ Return a JSON object with these fields:
 - "end_date": "YYYY-MM-DD" format
 
 ## Available group_by columns
-venue, country, match_id, competition, year, batting_team, bowling_team, batter, bowler, innings, phase, match_outcome, chase_outcome, toss_decision, bat_hand, bowl_style, bowl_kind, crease_combo, line, length, shot, control, wagon_zone, dismissal
+venue, country, match_id, competition, year, batting_team, bowling_team, batter, bowler, innings, phase, match_outcome, chase_outcome, toss_decision, toss_match_outcome, bat_hand, bowl_style, bowl_kind, crease_combo, line, length, shot, control, wagon_zone, dismissal
 
 ## Team Name Mappings (use full names in filters)
 - CSK → Chennai Super Kings
@@ -130,6 +132,7 @@ venue, country, match_id, competition, year, batting_team, bowling_team, batter,
 8. Return ONLY valid JSON, no extra text.
 9. If the user wants to compare LHB vs RHB (e.g. "vs lhb/rhb"), do NOT set bat_hand as a filter. Instead, add "bat_hand" to group_by.
 10. Use the player's full first and last name when possible (e.g. "Jasprit Bumrah" not "J Bumrah", "Virat Kohli" not "V Kohli", "Varun Chakravarthy" not "V Chakravarthy"). The system will resolve names to the database format automatically.
+11. When the user asks about toss impact on winning (e.g. "toss decision vs match outcome"), use group_by: ["toss_decision", "toss_match_outcome"] with query_mode: "batting_stats". Do NOT use "match_outcome" for toss analysis — use "toss_match_outcome" instead.
 """
 
 EXAMPLE_QUERIES = [
@@ -233,7 +236,8 @@ VALID_GROUP_BY = {
     "batting_team", "bowling_team", "batter", "bowler",
     "innings", "phase", "bat_hand", "bowl_style", "bowl_kind",
     "crease_combo", "line", "length", "shot", "control",
-    "wagon_zone", "dismissal", "match_outcome", "chase_outcome", "toss_decision"
+    "wagon_zone", "dismissal", "match_outcome", "chase_outcome", "toss_decision",
+    "toss_match_outcome"
 }
 
 
@@ -501,6 +505,12 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
         )
         if not explicit_venue_grouping:
             group_by = [col for col in group_by if col != "venue"]
+
+    # Toss analysis: replace match_outcome with toss_match_outcome when toss context detected.
+    if "toss" in q_lower and "match_outcome" in group_by:
+        group_by = [("toss_match_outcome" if c == "match_outcome" else c) for c in group_by]
+        if filters.get("query_mode") == "delivery":
+            filters["query_mode"] = "batting_stats"
 
     # Since-date normalization: keep start_date, drop end_date unless explicitly bounded.
     if "since" in q_lower and not _contains_explicit_end_bound(query):

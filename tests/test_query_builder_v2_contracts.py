@@ -23,7 +23,15 @@ class TestQueryBuilderV2Contracts:
         assert r.status_code == 400
         assert "Unsupported filters for query_mode=batting_stats" in r.text
 
+    def test_non_bowling_mode_rejects_wicket_threshold_filters(self, client):
+        r = client.get("/query/deliveries?query_mode=batting_stats&min_wickets=1")
+        assert r.status_code == 400
+        assert "Unsupported filters for query_mode=batting_stats" in r.text
+
     def test_columns_endpoint_still_responds(self, client):
         r = client.get("/query/deliveries/columns")
         _assert_not_500(r, "GET /query/deliveries/columns")
-
+        payload = r.json()
+        assert "grouped_filters" in payload["filter_columns"]
+        assert "min_wickets" in payload["filter_columns"]["grouped_filters"]
+        assert "max_wickets" in payload["filter_columns"]["grouped_filters"]
