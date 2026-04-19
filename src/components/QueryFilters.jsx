@@ -82,7 +82,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
   
   return (
     <Box>
-      <Grid container spacing={2}>
+      <Grid container spacing={isMobile ? 1.5 : 2}>
         {/* Row 1: Date Range & Venue */}
         <Grid item xs={12} sm={4} md={3}>
           <TextField
@@ -527,8 +527,8 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         {/* Row 8: Grouping - KEY FEATURE */}
         <Grid item xs={12}>
           <Box sx={{ 
-            mt: 2, 
-            p: 2, 
+            mt: isMobile ? 1.5 : 2, 
+            p: isMobile ? 1.5 : 2, 
             borderRadius: 2, 
             border: '2px solid',
             borderColor: 'primary.main',
@@ -537,6 +537,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           }}>
             {/* Key insight badge */}
             <Box sx={{ 
+              display: isMobile ? 'none' : 'flex',
               position: 'absolute', 
               top: -12, 
               left: 16, 
@@ -547,18 +548,19 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               borderRadius: 1,
               fontSize: '0.7rem',
               fontWeight: 'bold',
-              display: 'flex',
               alignItems: 'center',
               gap: 0.5
             }}>
               🔑 KEY INSIGHT
             </Box>
             
-            <Typography variant="subtitle2" color="primary.dark" sx={{ mb: 1, mt: 0.5, fontWeight: 'bold' }}>
-              Group By — This changes everything!
+            <Typography variant="subtitle2" color="primary.dark" sx={{ mb: 0.75, mt: isMobile ? 0 : 0.5, fontWeight: 'bold' }}>
+              {isMobile ? 'Group By (Insight Mode)' : 'Group By — This changes everything!'}
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-              Choose how to slice your data. Try "batter + phase" or "bowl_style + length" for powerful insights.
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: isMobile ? 1 : 1.5 }}>
+              {isMobile
+                ? 'Pick dimensions like batter, phase, competition, or match_outcome.'
+                : 'Choose how to slice your data. Try "batter + phase" or "bowl_style + length" for powerful insights.'}
             </Typography>
             
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

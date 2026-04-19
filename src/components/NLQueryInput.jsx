@@ -9,7 +9,9 @@ import {
   CircularProgress,
   Alert,
   Tooltip,
-  IconButton
+  IconButton,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
@@ -17,24 +19,28 @@ import axios from 'axios';
 import config from '../config';
 
 const EXAMPLE_QUERIES = [
-  "Kohli vs spin in death overs in IPL",
-  "CSK powerplay batting this season",
-  "Left arm spinners in middle overs",
-  "Top batters against short balls",
-  "Yorker effectiveness in death overs",
-  "Uncontrolled shots by wagon zone",
-  "RCB vs MI head to head batting",
-  "Bowled dismissals by length"
+  "kohli vs spin since 2023",
+  "csk powerplay batting over the years",
+  "MS Dhoni in winning vs losing chases in IPL",
+  "csk in chasing wins since 2018",
+  "varun chakravarthy vs lhb/rhb",
+  "bumrah in 2026 grouped by competition",
+  "top batters by toss decision in IPL",
+  "bowling stats for rashid khan by year",
+  "line and length patterns by phase for arshdeep singh",
+  "dismissal type by match outcome for RCB"
 ];
 
 const QUERY_TIPS = `Try queries like:
-- "[Player] vs [bowling type] in [phase]"
-- "[Team] batting in [phase] in [league]"
-- "[Bowling style] analysis by [grouping]"
-- "[Dismissal type] by [grouping]"
-- "[Shot type] against [bowling type]"`;
+- Delivery-level asks: "line/length/shot/wagon zone analysis for [player/team]"
+- Batting stats asks: "[batter] batting stats by [year/competition/match_outcome/chase_outcome]"
+- Bowling stats asks: "[bowler] economy/wickets by [year/competition/team]"
+- Grouping: include "grouped by [competition/year/batter/bowler/bat_hand/bowl_style/match_outcome/toss_decision]"
+- Context filters: use phrases like "in chases", "winning vs losing", "toss decision bat/field", "since 2023"`;
 
 const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -86,7 +92,7 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
     <Paper
       elevation={2}
       sx={{
-        p: 3,
+        p: isMobile ? 2 : 3,
         mb: 3,
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         color: 'white'
@@ -103,17 +109,17 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
         </Tooltip>
       </Box>
 
-      <Typography variant="body2" sx={{ mb: 2, opacity: 0.9 }}>
-        Describe what you want to analyze in plain English
+      <Typography variant="body2" sx={{ mb: 2, opacity: 0.9, fontSize: isMobile ? '0.82rem' : '0.9rem' }}>
+        Describe what you want to analyze in plain English across delivery details, batting stats, or bowling stats
       </Typography>
 
-      <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexDirection: isMobile ? 'column' : 'row' }}>
         <TextField
           fullWidth
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="e.g. Kohli vs spin in death overs in IPL"
+          placeholder={isMobile ? 'e.g. dhoni in winning chases' : 'e.g. MS Dhoni in winning vs losing chases in IPL'}
           disabled={loading || disabled}
           variant="outlined"
           size="small"
@@ -134,7 +140,7 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
           sx={{
             bgcolor: 'rgba(255,255,255,0.2)',
             color: 'white',
-            minWidth: 100,
+            minWidth: isMobile ? '100%' : 100,
             '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' },
             '&.Mui-disabled': { color: 'rgba(255,255,255,0.5)' }
           }}
@@ -154,7 +160,20 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
         </Alert>
       )}
 
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+      <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 1 }}>
+        Tap an example to autofill
+      </Typography>
+
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: isMobile ? 'nowrap' : 'wrap',
+          gap: 0.75,
+          overflowX: isMobile ? 'auto' : 'visible',
+          pb: isMobile ? 0.5 : 0,
+          '::-webkit-scrollbar': { height: isMobile ? 6 : 0 }
+        }}
+      >
         {EXAMPLE_QUERIES.map((example, index) => (
           <Chip
             key={index}
@@ -166,6 +185,7 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
               bgcolor: 'rgba(255,255,255,0.15)',
               color: 'white',
               fontSize: '0.75rem',
+              flexShrink: 0,
               cursor: 'pointer',
               '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
               '&.Mui-disabled': { opacity: 0.5 }

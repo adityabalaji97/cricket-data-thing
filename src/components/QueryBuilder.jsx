@@ -256,14 +256,17 @@ const QueryBuilder = ({ isMobile }) => {
       return value !== null && value !== undefined && value !== '';
     });
   };
+
+  const canExecute = !!availableColumns && hasValidFilters() && !loading;
+  const showMobileActionBar = isMobile && queryTab === 0;
   
   return (
-    <Box sx={{ my: 3 }}>
-      <Typography variant="h4" gutterBottom>
+    <Box sx={{ my: isMobile ? 2 : 3 }}>
+      <Typography variant={isMobile ? "h5" : "h4"} gutterBottom>
         🏏 Query Builder
       </Typography>
       
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography variant={isMobile ? "body2" : "body1"} color="text.secondary" sx={{ mb: 2.5 }}>
         Build custom queries to analyze ball-by-ball cricket data.
         Filter by line, length, shot type, wagon wheel zones, and more.
       </Typography>
@@ -313,7 +316,7 @@ const QueryBuilder = ({ isMobile }) => {
           />
         </Tabs>
         
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: isMobile ? 2 : 3, pb: showMobileActionBar ? 10 : (isMobile ? 2 : 3) }}>
           {queryTab === 0 && (
             <QueryFilters
               filters={filters}
@@ -335,6 +338,7 @@ const QueryBuilder = ({ isMobile }) => {
           )}
         </Box>
         
+        {!showMobileActionBar && (
         <Box sx={{ 
           p: 2, 
           bgcolor: 'grey.50', 
@@ -355,7 +359,7 @@ const QueryBuilder = ({ isMobile }) => {
             <Button 
               variant="contained"
               onClick={executeQuery}
-              disabled={loading || !hasValidFilters() || !availableColumns}
+              disabled={!canExecute}
               startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
               sx={{ minWidth: 120 }}
             >
@@ -382,7 +386,50 @@ const QueryBuilder = ({ isMobile }) => {
             {groupBy.length > 0 && ` • Grouping by: ${groupBy.join(', ')}`}
           </Typography>
         </Box>
+        )}
       </Paper>
+
+      {showMobileActionBar && (
+        <Box
+          sx={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1200,
+            px: 1.5,
+            pb: 'max(10px, env(safe-area-inset-bottom))',
+            pt: 1,
+            bgcolor: 'rgba(255,255,255,0.97)',
+            borderTop: 1,
+            borderColor: 'divider',
+            backdropFilter: 'blur(6px)'
+          }}
+        >
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="contained"
+              onClick={executeQuery}
+              disabled={!canExecute}
+              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : null}
+              sx={{ flex: 1 }}
+            >
+              {loading ? 'Querying...' : 'Execute'}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={clearFilters}
+              disabled={loading}
+              sx={{ minWidth: 96 }}
+            >
+              Clear
+            </Button>
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 0.5 }}>
+            {!hasValidFilters() ? 'Add at least one filter' : 'Ready to run'}
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 };

@@ -124,36 +124,36 @@ venue, country, match_id, competition, year, batting_team, bowling_team, batter,
 
 EXAMPLE_QUERIES = [
     {
-        "text": "Kohli vs spin in death overs in IPL",
-        "category": "Player matchup"
-    },
-    {
-        "text": "CSK powerplay batting this season",
-        "category": "Team analysis"
-    },
-    {
-        "text": "Left arm spinners in the middle overs",
-        "category": "Bowling analysis"
-    },
-    {
-        "text": "Top batters against short balls",
-        "category": "Shot analysis"
-    },
-    {
-        "text": "Bowled dismissals by length",
-        "category": "Dismissal patterns"
-    },
-    {
-        "text": "RCB vs MI head to head batting",
-        "category": "Team matchup"
-    },
-    {
-        "text": "Yorker effectiveness in death overs",
+        "text": "kohli vs spin since 2023",
         "category": "Delivery analysis"
     },
     {
-        "text": "Uncontrolled shots by wagon zone",
-        "category": "Shot quality"
+        "text": "csk powerplay batting over the years",
+        "category": "Batting stats"
+    },
+    {
+        "text": "MS Dhoni in winning vs losing chases in IPL",
+        "category": "Match context"
+    },
+    {
+        "text": "csk in chasing wins since 2018",
+        "category": "Team context"
+    },
+    {
+        "text": "varun chakravarthy vs lhb/rhb",
+        "category": "Group by bat_hand"
+    },
+    {
+        "text": "bumrah in 2026 grouped by competition",
+        "category": "Group by competition"
+    },
+    {
+        "text": "top batters by toss decision in IPL",
+        "category": "Toss context"
+    },
+    {
+        "text": "bowling stats for rashid khan by year",
+        "category": "Bowling stats"
     }
 ]
 
