@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -18,6 +18,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import QueryFilters from './QueryFilters';
 import QueryResults from './QueryResults';
+import NLQueryInput from './NLQueryInput';
 import { useUrlParams, filtersToUrlParams } from '../utils/urlParamParser';
 import axios from 'axios';
 import config from '../config';
@@ -193,7 +194,9 @@ const QueryBuilder = ({ isMobile }) => {
   const [showPrefilledQueries, setShowPrefilledQueries] = useState(true);
   const [isAutoExecuting, setIsAutoExecuting] = useState(false);
   const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false);
-  
+  const [nlExplanation, setNlExplanation] = useState(null);
+  const executeQueryRef = useRef(null);
+
   // Load filters from URL on mount
   useEffect(() => {
     const urlFilters = getFiltersFromUrl();
@@ -300,7 +303,10 @@ const QueryBuilder = ({ isMobile }) => {
       setLoading(false);
     }
   };
-  
+
+  // Keep ref current for async callbacks
+  executeQueryRef.current = executeQuery;
+
   const clearFilters = () => {
     setFilters({
       venue: null,
@@ -340,6 +346,7 @@ const QueryBuilder = ({ isMobile }) => {
     setShowPrefilledQueries(true);
     setHasLoadedFromUrl(false);
     setIsAutoExecuting(false);
+    setNlExplanation(null);
     window.history.replaceState({}, '', window.location.pathname);
   };
   
@@ -355,6 +362,36 @@ const QueryBuilder = ({ isMobile }) => {
     setIsAutoExecuting(false);
   };
   
+  const handleNLFilters = ({ filters: nlFilters, groupBy: nlGroupBy, explanation, confidence }) => {
+    // Reset to defaults then apply NL filters
+    const defaultFilters = {
+      venue: null, start_date: null, end_date: null,
+      leagues: [], teams: [], batting_teams: [], bowling_teams: [],
+      players: [], batters: [], bowlers: [],
+      innings: null, over_min: null, over_max: null,
+      bat_hand: null, bowl_style: [], bowl_kind: [],
+      line: [], length: [], shot: [], control: null, wagon_zone: [],
+      min_balls: null, max_balls: null, min_runs: null, max_runs: null,
+      limit: 1000, offset: 0,
+      include_international: false, top_teams: 10, show_summary_rows: false
+    };
+
+    setFilters({ ...defaultFilters, ...nlFilters });
+    setGroupBy(nlGroupBy || []);
+    setNlExplanation(explanation);
+    setShowPrefilledQueries(false);
+    setQueryTab(0);
+    setHasLoadedFromUrl(false);
+
+    // Auto-execute for high confidence, just populate for medium/low
+    if (confidence === 'high') {
+      setIsAutoExecuting(true);
+      setTimeout(() => {
+        executeQueryRef.current();
+      }, 300);
+    }
+  };
+
   const hasValidFilters = () => {
     const filterKeys = [
       'venue', 'start_date', 'end_date', 'leagues', 'teams', 'batting_teams', 'bowling_teams',
@@ -379,10 +416,27 @@ const QueryBuilder = ({ isMobile }) => {
       </Typography>
       
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Build custom queries to analyze ball-by-ball cricket data. 
+        Build custom queries to analyze ball-by-ball cricket data.
         Filter by line, length, shot type, wagon wheel zones, and more.
       </Typography>
-      
+
+      <NLQueryInput
+        onFiltersGenerated={handleNLFilters}
+        disabled={loading}
+      />
+
+      {nlExplanation && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          onClose={() => setNlExplanation(null)}
+        >
+          <Typography variant="body2">
+            <strong>AI interpretation:</strong> {nlExplanation}
+          </Typography>
+        </Alert>
+      )}
+
       {/* Prefilled Query Cards */}
       {showPrefilledQueries && (
         <Box sx={{ mb: 3 }}>
