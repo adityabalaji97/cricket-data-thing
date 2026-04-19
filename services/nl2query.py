@@ -7,9 +7,14 @@ import os
 import json
 import time
 import logging
+import re
 from typing import Dict, Any, Optional, List
 from openai import OpenAI
 from sqlalchemy.orm import Session
+try:
+    from venue_standardization import VENUE_STANDARDIZATION
+except Exception:  # pragma: no cover - defensive fallback
+    VENUE_STANDARDIZATION = {}
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +46,7 @@ Return a JSON object with these fields:
 - "batting_teams": list of full team names
 - "bowling_teams": list of full team names
 - "teams": list of full team names (when batting/bowling context unclear)
+- "venue": a single venue/ground string (e.g. "Eden Gardens")
 
 ### League/competition filters
 - "leagues": list of league abbreviations. Valid values: "IPL", "BBL", "PSL", "CPL", "SA20", "ILT20", "BPL", "LPL", "T20 Blast", "T20I"
@@ -84,6 +90,10 @@ Return a JSON object with these fields:
 
 ### Result filters
 - "min_balls": minimum number of balls (for meaningful samples, suggest 20-50)
+- "min_runs": minimum runs threshold for grouped/stat queries
+- "max_runs": maximum runs threshold for grouped/stat queries
+- "min_wickets": minimum wickets threshold (bowling_stats mode)
+- "max_wickets": maximum wickets threshold (bowling_stats mode)
 - "start_date": "YYYY-MM-DD" format
 - "end_date": "YYYY-MM-DD" format
 
@@ -227,6 +237,102 @@ VALID_GROUP_BY = {
 }
 
 
+def _normalize_text(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()
+
+
+def _build_venue_lookup() -> Dict[str, str]:
+    lookup: Dict[str, str] = {}
+    candidates: Dict[str, str] = {}
+    for alias, canonical in (VENUE_STANDARDIZATION or {}).items():
+        if alias and canonical:
+            candidates[alias] = canonical
+            candidates[canonical] = canonical
+    # Ensure key venues are always available even if mapping import fails.
+    candidates.setdefault("Eden Gardens", "Eden Gardens")
+    candidates.setdefault("Eden Gardens, Kolkata", "Eden Gardens")
+    for raw_name, canonical in candidates.items():
+        normalized = _normalize_text(raw_name)
+        # Avoid very short fragments that cause false matches.
+        if len(normalized) < 8 and len(normalized.split()) < 2:
+            continue
+        if normalized not in lookup:
+            lookup[normalized] = canonical
+    return lookup
+
+
+VENUE_LOOKUP = _build_venue_lookup()
+
+
+def _infer_venue_from_query(query: str) -> Optional[str]:
+    normalized_query = f" {_normalize_text(query)} "
+    best_match = None
+    best_len = -1
+    for venue_text, canonical in VENUE_LOOKUP.items():
+        token = f" {venue_text} "
+        if token in normalized_query and len(venue_text) > best_len:
+            best_match = canonical
+            best_len = len(venue_text)
+    return best_match
+
+
+def _contains_explicit_end_bound(query: str) -> bool:
+    q = (query or "").lower()
+    return bool(
+        re.search(r"\bbetween\b.+\band\b", q)
+        or re.search(r"\bfrom\b.+\bto\b", q)
+        or re.search(r"\b(until|till|through|thru|upto|up to|before|ending)\b", q)
+    )
+
+
+def _append_group_by(group_by: List[str], column: str) -> List[str]:
+    if column in group_by:
+        return group_by
+    return [*group_by, column]
+
+
+def _build_explanation(filters: Dict[str, Any], group_by: List[str]) -> str:
+    mode = filters.get("query_mode", "delivery")
+    mode_text = {
+        "delivery": "delivery-level data",
+        "batting_stats": "innings-level batting stats",
+        "bowling_stats": "innings-level bowling stats",
+    }.get(mode, "delivery-level data")
+
+    scope_bits = []
+    if filters.get("batters"):
+        scope_bits.append(f"batters {', '.join(filters['batters'])}")
+    if filters.get("bowlers"):
+        scope_bits.append(f"bowlers {', '.join(filters['bowlers'])}")
+    if filters.get("teams"):
+        scope_bits.append(f"teams {', '.join(filters['teams'])}")
+    if filters.get("venue"):
+        scope_bits.append(f"venue {filters['venue']}")
+
+    constraints = []
+    if filters.get("min_runs") is not None:
+        constraints.append(f"min runs {filters['min_runs']}")
+    if filters.get("max_runs") is not None:
+        constraints.append(f"max runs {filters['max_runs']}")
+    if filters.get("min_wickets") is not None:
+        constraints.append(f"min wickets {filters['min_wickets']}")
+    if filters.get("max_wickets") is not None:
+        constraints.append(f"max wickets {filters['max_wickets']}")
+    if filters.get("start_date"):
+        constraints.append(f"from {filters['start_date']}")
+    if filters.get("end_date"):
+        constraints.append(f"to {filters['end_date']}")
+
+    parts = [f"This query retrieves {mode_text}"]
+    if scope_bits:
+        parts.append(f"for {', '.join(scope_bits)}")
+    if constraints:
+        parts.append(f"with {', '.join(constraints)}")
+    if group_by:
+        parts.append(f"grouped by {', '.join(group_by)}")
+    return " ".join(parts).strip() + "."
+
+
 def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and sanitize LLM output, stripping invalid values."""
     filters = parsed.get("filters", {})
@@ -240,6 +346,8 @@ def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
     for key in ["batters", "bowlers", "players", "batting_teams", "bowling_teams", "teams"]:
         if key in filters and isinstance(filters[key], list) and len(filters[key]) > 0:
             validated[key] = filters[key]
+    if "venue" in filters and isinstance(filters["venue"], str) and filters["venue"].strip():
+        validated["venue"] = VENUE_STANDARDIZATION.get(filters["venue"].strip(), filters["venue"].strip())
 
     # Validated enum filters
     # Track if bat_hand should become a group_by (when LLM returns a list like ["RHB", "LHB"])
@@ -322,6 +430,14 @@ def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
     # Result filters
     if "min_balls" in filters and filters["min_balls"] is not None:
         validated["min_balls"] = max(1, int(filters["min_balls"]))
+    if "min_runs" in filters and filters["min_runs"] is not None:
+        validated["min_runs"] = max(0, int(filters["min_runs"]))
+    if "max_runs" in filters and filters["max_runs"] is not None:
+        validated["max_runs"] = max(0, int(filters["max_runs"]))
+    if "min_wickets" in filters and filters["min_wickets"] is not None:
+        validated["min_wickets"] = max(0, int(filters["min_wickets"]))
+    if "max_wickets" in filters and filters["max_wickets"] is not None:
+        validated["max_wickets"] = max(0, int(filters["max_wickets"]))
 
     # Date filters
     for key in ["start_date", "end_date"]:
@@ -346,6 +462,68 @@ def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
         "confidence": parsed.get("confidence", "medium"),
         "suggestions": parsed.get("suggestions", [])
     }
+
+
+def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    filters = result.get("filters", {}) or {}
+    group_by = result.get("group_by", []) or []
+    q_lower = (query or "").lower()
+
+    # Milestone batting rules, e.g. "virat kohli 100+ scores".
+    runs_plus_match = re.search(r"\b(\d+)\s*\+\s*(?:score|scores|run|runs)\b", q_lower)
+    if runs_plus_match:
+        filters["query_mode"] = "batting_stats"
+        filters["min_runs"] = max(0, int(runs_plus_match.group(1)))
+        group_by = _append_group_by(group_by, "match_id")
+
+    # Bowling milestone rules, including wicketless asks.
+    wickets_plus_match = re.search(r"\b(\d+)\s*\+\s*wickets?\b", q_lower)
+    if wickets_plus_match:
+        filters["query_mode"] = "bowling_stats"
+        filters["min_wickets"] = max(0, int(wickets_plus_match.group(1)))
+        group_by = _append_group_by(group_by, "match_id")
+
+    if re.search(r"\b(wicketless|0\s*wickets?|without\s+a\s+wicket)\b", q_lower):
+        filters["query_mode"] = "bowling_stats"
+        filters["max_wickets"] = 0
+        group_by = _append_group_by(group_by, "match_id")
+
+    # Venue inference and canonicalization.
+    inferred_venue = _infer_venue_from_query(query)
+    if inferred_venue:
+        filters["venue"] = VENUE_STANDARDIZATION.get(inferred_venue, inferred_venue)
+        explicit_venue_grouping = bool(
+            ("grouped by" in q_lower and "venue" in q_lower)
+            or ("group by" in q_lower and "venue" in q_lower)
+            or
+            re.search(r"\b(group(?:ed)?\s+by|by)\s+venue\b", q_lower)
+            or re.search(r"\bvenue[-\s]?wise\b", q_lower)
+        )
+        if not explicit_venue_grouping:
+            group_by = [col for col in group_by if col != "venue"]
+
+    # Since-date normalization: keep start_date, drop end_date unless explicitly bounded.
+    if "since" in q_lower and not _contains_explicit_end_bound(query):
+        since_date_match = re.search(r"\bsince\s+(\d{4}-\d{2}-\d{2})\b", q_lower)
+        since_year_match = re.search(r"\bsince\s+(20\d{2})\b", q_lower)
+        if since_date_match:
+            filters["start_date"] = since_date_match.group(1)
+        elif since_year_match:
+            filters["start_date"] = f"{since_year_match.group(1)}-01-01"
+        filters.pop("end_date", None)
+
+    # Keep query_mode default if absent.
+    filters["query_mode"] = filters.get("query_mode", "delivery")
+
+    # Guardrail for wicket filters.
+    if filters.get("query_mode") != "bowling_stats":
+        filters.pop("min_wickets", None)
+        filters.pop("max_wickets", None)
+
+    result["filters"] = filters
+    result["group_by"] = group_by
+    result["explanation"] = _build_explanation(filters, group_by)
+    return result
 
 
 def resolve_player_names(names: List[str], db: Session) -> List[str]:
@@ -403,6 +581,7 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
                 if key in filters and isinstance(filters[key], list):
                     filters[key] = resolve_player_names(filters[key], db)
 
+        result = _post_process_result(query, result)
         result["success"] = True
 
         _set_cache(query, result)

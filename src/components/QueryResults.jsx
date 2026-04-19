@@ -518,6 +518,14 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
                     />
                   </>
                 )}
+
+                {metadata.total_innings_in_query !== undefined && metadata.total_innings_in_query !== null && (
+                  <Chip
+                    label={`${Number(metadata.total_innings_in_query).toLocaleString()} total innings`}
+                    variant="outlined"
+                    size="small"
+                  />
+                )}
                 
                 {sortConfig.key && (
                   <Chip 

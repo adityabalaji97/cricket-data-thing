@@ -45,6 +45,7 @@ class NLQueryFilters(BaseModel):
     batting_teams: Optional[List[str]] = None
     bowling_teams: Optional[List[str]] = None
     teams: Optional[List[str]] = None
+    venue: Optional[str] = None
     leagues: Optional[List[str]] = None
     include_international: Optional[bool] = None
     bat_hand: Optional[str] = None
@@ -64,6 +65,10 @@ class NLQueryFilters(BaseModel):
     wagon_zone: Optional[List[int]] = None
     dismissal: Optional[List[str]] = None
     min_balls: Optional[int] = None
+    min_runs: Optional[int] = None
+    max_runs: Optional[int] = None
+    min_wickets: Optional[int] = None
+    max_wickets: Optional[int] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
 

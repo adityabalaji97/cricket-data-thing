@@ -87,6 +87,8 @@ export const parseUrlParams = (search) => {
   filters.max_balls = getIntParam('max_balls');
   filters.min_runs = getIntParam('min_runs');
   filters.max_runs = getIntParam('max_runs');
+  filters.min_wickets = getIntParam('min_wickets');
+  filters.max_wickets = getIntParam('max_wickets');
   
   // Pagination
   filters.limit = getIntParam('limit', 1000);

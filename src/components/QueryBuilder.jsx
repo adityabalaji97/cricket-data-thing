@@ -61,6 +61,8 @@ const getDefaultFilters = () => ({
   max_balls: null,
   min_runs: null,
   max_runs: null,
+  min_wickets: null,
+  max_wickets: null,
 
   // Pagination
   limit: 1000,
@@ -245,7 +247,8 @@ const QueryBuilder = ({ isMobile }) => {
       'players', 'batters', 'bowlers', 'bat_hand', 'bowl_style', 'bowl_kind',
       'line', 'length', 'shot', 'control', 'wagon_zone',
       'innings', 'over_min', 'over_max',
-      'match_outcome', 'is_chase', 'chase_outcome', 'toss_decision'
+      'match_outcome', 'is_chase', 'chase_outcome', 'toss_decision',
+      'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets'
     ];
     
     return filterKeys.some(key => {

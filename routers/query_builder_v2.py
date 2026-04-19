@@ -11,6 +11,10 @@ from typing import List, Optional, Literal
 from datetime import date
 from database import get_session
 from services.query_builder_v2 import query_deliveries_service
+try:
+    from venue_standardization import VENUE_STANDARDIZATION
+except Exception:  # pragma: no cover - defensive fallback
+    VENUE_STANDARDIZATION = {}
 
 router = APIRouter(prefix="/query", tags=["query_builder"])
 
@@ -131,6 +135,8 @@ def query_deliveries(
     max_balls: Optional[int] = Query(default=None, ge=1, description="Maximum balls for grouped results"),
     min_runs: Optional[int] = Query(default=None, ge=0, description="Minimum runs for grouped results"),
     max_runs: Optional[int] = Query(default=None, ge=0, description="Maximum runs for grouped results"),
+    min_wickets: Optional[int] = Query(default=None, ge=0, description="Minimum wickets for bowling grouped/innings results"),
+    max_wickets: Optional[int] = Query(default=None, ge=0, description="Maximum wickets for bowling grouped/innings results"),
     
     # Pagination and limits
     limit: int = Query(default=1000, le=10000, description="Maximum results (max 10,000)"),
@@ -226,6 +232,8 @@ def query_deliveries(
             max_balls=max_balls,
             min_runs=min_runs,
             max_runs=max_runs,
+            min_wickets=min_wickets,
+            max_wickets=max_wickets,
             limit=limit,
             offset=offset,
             include_international=include_international,
@@ -286,6 +294,12 @@ def get_available_columns(db: Session = Depends(get_session)):
         batting_teams = get_values("batting_teams")
         bowling_teams = get_values("bowling_teams")
         all_teams = sorted(list(set(batting_teams + bowling_teams)))
+        raw_venues = get_values("venues")
+        canonical_venues = sorted({
+            VENUE_STANDARDIZATION.get(v, v)
+            for v in raw_venues
+            if v
+        })
         
         return {
             "total_deliveries": total_count,
@@ -297,7 +311,7 @@ def get_available_columns(db: Session = Depends(get_session)):
                 "batter": ["bat_hand", "crease_combo"],
                 "bowler": ["bowl_style", "bowl_kind"],
                 "delivery": ["line", "length", "shot", "control", "wagon_zone", "dismissal"],
-                "grouped_filters": ["min_balls", "max_balls", "min_runs", "max_runs"]
+                "grouped_filters": ["min_balls", "max_balls", "min_runs", "max_runs", "min_wickets", "max_wickets"]
             },
             
             "group_by_columns": [
@@ -346,7 +360,7 @@ def get_available_columns(db: Session = Depends(get_session)):
             "innings_options": [1, 2],
             
             # Basic filter options
-            "venues": get_values("venues"),
+            "venues": canonical_venues,
             "batters": get_values("batters"),
             "bowlers": get_values("bowlers"),
             "teams": all_teams,

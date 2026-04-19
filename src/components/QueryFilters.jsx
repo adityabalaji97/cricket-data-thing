@@ -79,6 +79,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
   }
 
   const chaseOutcomeDisabled = filters.is_chase === false || filters.innings === 1;
+  const wicketFiltersDisabled = filters.query_mode !== 'bowling_stats';
   
   return (
     <Box>
@@ -134,6 +135,23 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               <TextField {...params} label="Leagues" size="small" />
             )}
           />
+        </Grid>
+
+        <Grid item xs={12} sm={4} md={3}>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Query Mode</InputLabel>
+            <Select
+              value={filters.query_mode || 'delivery'}
+              onChange={(e) => handleFilterChange('query_mode', e.target.value || 'delivery')}
+              label="Query Mode"
+            >
+              {(availableColumns?.query_mode_options || ['delivery', 'batting_stats', 'bowling_stats']).map((mode) => (
+                <MenuItem key={mode} value={mode}>
+                  {mode}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Grid>
         
         {/* Row 2: Teams */}
@@ -669,6 +687,34 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
             inputProps={{ min: 0 }}
             size="small"
             fullWidth
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <TextField
+            label="Min Wickets"
+            type="number"
+            value={filters.min_wickets ?? ''}
+            onChange={(e) => handleFilterChange('min_wickets', e.target.value ? parseInt(e.target.value, 10) : null)}
+            inputProps={{ min: 0 }}
+            size="small"
+            fullWidth
+            disabled={wicketFiltersDisabled}
+            helperText={wicketFiltersDisabled ? 'Bowling stats mode only' : ''}
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <TextField
+            label="Max Wickets"
+            type="number"
+            value={filters.max_wickets ?? ''}
+            onChange={(e) => handleFilterChange('max_wickets', e.target.value ? parseInt(e.target.value, 10) : null)}
+            inputProps={{ min: 0 }}
+            size="small"
+            fullWidth
+            disabled={wicketFiltersDisabled}
+            helperText={wicketFiltersDisabled ? 'Bowling stats mode only' : ''}
           />
         </Grid>
         

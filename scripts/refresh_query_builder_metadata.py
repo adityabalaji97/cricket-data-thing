@@ -17,6 +17,10 @@ from datetime import datetime
 from sqlalchemy import create_engine, text
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+    from venue_standardization import VENUE_STANDARDIZATION
+except Exception:  # pragma: no cover - defensive fallback
+    VENUE_STANDARDIZATION = {}
 
 
 def get_engine(db_url):
@@ -66,6 +70,12 @@ def refresh_metadata(engine):
                 ORDER BY {column}
             """)
             values = [row[0] for row in conn.execute(values_query).fetchall()]
+            if key == "venues":
+                values = sorted({
+                    VENUE_STANDARDIZATION.get(v, v)
+                    for v in values
+                    if v
+                })
             
             # Calculate coverage if needed
             coverage = None

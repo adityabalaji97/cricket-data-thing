@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import date
 from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
+from services.delivery_data_service import get_venue_aliases
 import logging
 
 logger = logging.getLogger(__name__)
@@ -148,6 +149,25 @@ def validate_mode_filters(
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported filters for query_mode={query_mode}: {unsupported}"
+        )
+
+
+def validate_wicket_filters(
+    query_mode: str,
+    min_wickets: Optional[int],
+    max_wickets: Optional[int],
+) -> None:
+    if min_wickets is None and max_wickets is None:
+        return
+    if query_mode != "bowling_stats":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported filters for query_mode={query_mode}: ['min_wickets', 'max_wickets']",
+        )
+    if min_wickets is not None and max_wickets is not None and min_wickets > max_wickets:
+        raise HTTPException(
+            status_code=400,
+            detail="min_wickets cannot be greater than max_wickets",
         )
 
 
@@ -386,8 +406,8 @@ def build_legacy_where_clause(
     
     # Venue filter
     if venue:
-        conditions.append("m.venue = :venue")
-        params["venue"] = venue
+        params["venue_aliases"] = get_venue_aliases(venue)
+        conditions.append("m.venue = ANY(:venue_aliases)")
     
     # Date filters
     if start_date:
@@ -642,7 +662,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
     use_runs_off_bat_only = batter_grouping or has_batter_filters
     runs_calculation = "SUM(d.runs_off_bat)" if use_runs_off_bat_only else "SUM(d.runs_off_bat + d.extras)"
     
-    query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
+    query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
     
     # Get total balls for percentage calculation
     if total_balls_override is None:
@@ -677,6 +697,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
         SELECT 
             {select_group_clause},
             COUNT(*) as balls,
+            COUNT(DISTINCT (d.match_id, d.innings)) as innings_count,
             {runs_calculation} as runs,
             SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) as wickets,
             SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
@@ -704,12 +725,13 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
         # Get raw stats
         stats_start = len(group_by)
         balls = row[stats_start] or 0
-        runs = row[stats_start + 1] or 0
-        wickets = row[stats_start + 2] or 0
-        dots = row[stats_start + 3] or 0
-        boundaries = row[stats_start + 4] or 0
-        fours = row[stats_start + 5] or 0
-        sixes = row[stats_start + 6] or 0
+        innings_count = row[stats_start + 1] or 0
+        runs = row[stats_start + 2] or 0
+        wickets = row[stats_start + 3] or 0
+        dots = row[stats_start + 4] or 0
+        boundaries = row[stats_start + 5] or 0
+        fours = row[stats_start + 6] or 0
+        sixes = row[stats_start + 7] or 0
         
         # Calculate percent_balls relative to parent group (for multi-level) or total (for single-level)
         if len(group_by) > 1 and parent_totals:
@@ -722,6 +744,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
         # Calculate all derived metrics
         row_dict.update({
             "balls": balls,
+            "innings_count": innings_count,
             "runs": runs,
             "wickets": wickets,
             "dots": dots,
@@ -750,7 +773,7 @@ def get_legacy_total_balls(where_clause, params, db):
         JOIN matches m ON d.match_id = m.id
         {where_clause}
     """
-    count_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
+    count_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
     return db.execute(text(count_query), count_params).scalar()
 
 
@@ -849,6 +872,7 @@ def merge_grouped_results(
             # Combine raw counts
             existing = merged[key]
             existing['balls'] = (existing.get('balls') or 0) + (row.get('balls') or 0)
+            existing['innings_count'] = (existing.get('innings_count') or 0) + (row.get('innings_count') or 0)
             existing['runs'] = (existing.get('runs') or 0) + (row.get('runs') or 0)
             existing['wickets'] = (existing.get('wickets') or 0) + (row.get('wickets') or 0)
             existing['dots'] = (existing.get('dots') or 0) + (row.get('dots') or 0)
@@ -1044,8 +1068,8 @@ def query_batting_stats_service(
     params = {"limit": min(limit, 10000), "offset": offset}
 
     if venue:
-        conditions.append("m.venue = :venue")
-        params["venue"] = venue
+        params["venue_aliases"] = get_venue_aliases(venue)
+        conditions.append("m.venue = ANY(:venue_aliases)")
     if start_date:
         conditions.append("m.date >= :start_date")
         params["start_date"] = start_date
@@ -1192,6 +1216,7 @@ def query_batting_stats_service(
             "data": formatted,
             "metadata": {
                 "total_matching_rows": total_count,
+                "total_innings_in_query": total_count,
                 "returned_rows": len(formatted),
                 "limit": limit,
                 "offset": offset,
@@ -1287,12 +1312,24 @@ def query_batting_stats_service(
     """
     count_params = {k: v for k, v in params.items() if k not in ["limit", "offset"]}
     total_groups = db.execute(text(count_query), count_params).scalar() or 0
+    innings_total_query = f"""
+        SELECT COALESCE(SUM(innings_count), 0) FROM (
+            SELECT COUNT(*) AS innings_count
+            FROM batting_stats bs
+            JOIN matches m ON m.id = bs.match_id
+            {where_clause}
+            GROUP BY {group_by_clause}
+            {having_clause}
+        ) grouped_innings
+    """
+    total_innings_in_query = db.execute(text(innings_total_query), count_params).scalar() or 0
     return {
         "data": formatted,
         "summary_data": None,
         "percentages": None,
         "metadata": {
             "total_groups": total_groups,
+            "total_innings_in_query": total_innings_in_query,
             "returned_groups": len(formatted),
             "limit": limit,
             "offset": offset,
@@ -1325,6 +1362,8 @@ def query_bowling_stats_service(
     max_balls: Optional[int],
     min_runs: Optional[int],
     max_runs: Optional[int],
+    min_wickets: Optional[int],
+    max_wickets: Optional[int],
     limit: int,
     offset: int,
     include_international: bool,
@@ -1371,8 +1410,8 @@ def query_bowling_stats_service(
     params = {"limit": min(limit, 10000), "offset": offset}
 
     if venue:
-        conditions.append("m.venue = :venue")
-        params["venue"] = venue
+        params["venue_aliases"] = get_venue_aliases(venue)
+        conditions.append("m.venue = ANY(:venue_aliases)")
     if start_date:
         conditions.append("m.date >= :start_date")
         params["start_date"] = start_date
@@ -1433,6 +1472,13 @@ def query_bowling_stats_service(
     if toss_decision:
         conditions.append("LOWER(COALESCE(m.toss_decision, '')) = ANY(:toss_decision)")
         params["toss_decision"] = toss_decision
+    if not group_by:
+        if min_wickets is not None:
+            conditions.append("bs.wickets >= :min_wickets")
+            params["min_wickets"] = min_wickets
+        if max_wickets is not None:
+            conditions.append("bs.wickets <= :max_wickets")
+            params["max_wickets"] = max_wickets
 
     where_clause = "WHERE " + " AND ".join(conditions)
     filters_applied = {
@@ -1451,6 +1497,8 @@ def query_bowling_stats_service(
         "match_outcome": match_outcome,
         "chase_outcome": chase_outcome,
         "toss_decision": toss_decision,
+        "min_wickets": min_wickets,
+        "max_wickets": max_wickets,
         "group_by": group_by,
     }
     warnings = _match_context_warning(match_context_requested(match_outcome, is_chase, chase_outcome, toss_decision, group_by))
@@ -1519,6 +1567,7 @@ def query_bowling_stats_service(
             "data": formatted,
             "metadata": {
                 "total_matching_rows": total_count,
+                "total_innings_in_query": total_count,
                 "returned_rows": len(formatted),
                 "limit": limit,
                 "offset": offset,
@@ -1561,6 +1610,12 @@ def query_bowling_stats_service(
     if max_runs is not None:
         having_conditions.append("SUM(bs.runs_conceded) <= :max_runs")
         params["max_runs"] = max_runs
+    if min_wickets is not None:
+        having_conditions.append("SUM(bs.wickets) >= :group_min_wickets")
+        params["group_min_wickets"] = min_wickets
+    if max_wickets is not None:
+        having_conditions.append("SUM(bs.wickets) <= :group_max_wickets")
+        params["group_max_wickets"] = max_wickets
     having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
 
     aggregation_query = f"""
@@ -1616,12 +1671,24 @@ def query_bowling_stats_service(
     """
     count_params = {k: v for k, v in params.items() if k not in ["limit", "offset"]}
     total_groups = db.execute(text(count_query), count_params).scalar() or 0
+    innings_total_query = f"""
+        SELECT COALESCE(SUM(innings_count), 0) FROM (
+            SELECT COUNT(*) AS innings_count
+            FROM bowling_stats bs
+            JOIN matches m ON m.id = bs.match_id
+            {where_clause}
+            GROUP BY {group_by_clause}
+            {having_clause}
+        ) grouped_innings
+    """
+    total_innings_in_query = db.execute(text(innings_total_query), count_params).scalar() or 0
     return {
         "data": formatted,
         "summary_data": None,
         "percentages": None,
         "metadata": {
             "total_groups": total_groups,
+            "total_innings_in_query": total_innings_in_query,
             "returned_groups": len(formatted),
             "limit": limit,
             "offset": offset,
@@ -1682,6 +1749,8 @@ def query_deliveries_service(
     max_balls: Optional[int],
     min_runs: Optional[int],
     max_runs: Optional[int],
+    min_wickets: Optional[int],
+    max_wickets: Optional[int],
     
     # Pagination and limits
     limit: int,
@@ -1731,6 +1800,11 @@ def query_deliveries_service(
             over_min=over_min,
             over_max=over_max,
         )
+        validate_wicket_filters(
+            query_mode=query_mode,
+            min_wickets=min_wickets,
+            max_wickets=max_wickets,
+        )
 
         if query_mode == "batting_stats":
             return query_batting_stats_service(
@@ -1778,6 +1852,8 @@ def query_deliveries_service(
                 max_balls=max_balls,
                 min_runs=min_runs,
                 max_runs=max_runs,
+                min_wickets=min_wickets,
+                max_wickets=max_wickets,
                 limit=limit,
                 offset=offset,
                 include_international=include_international,
@@ -1841,6 +1917,8 @@ def query_deliveries_service(
             "is_chase": is_chase,
             "chase_outcome": chase_outcome,
             "toss_decision": toss_decision,
+            "min_wickets": min_wickets,
+            "max_wickets": max_wickets,
             "group_by": group_by
         }
         
@@ -1863,6 +1941,7 @@ def query_deliveries_service(
         new_results = []
         new_total_count = 0
         new_total_balls = 0
+        new_total_innings = 0
         
         if routing['use_new']:
             new_date_range = routing['new_date_range']
@@ -1911,8 +1990,10 @@ def query_deliveries_service(
             # Get total balls from new table
             new_join_clause = "JOIN matches m ON m.id = dd.p_match" if join_new_matches else ""
             total_balls_query = f"SELECT COUNT(*) FROM delivery_details dd {new_join_clause} {new_where_clause}"
-            total_balls_params = {k: v for k, v in new_params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
+            total_balls_params = {k: v for k, v in new_params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
             new_total_balls = db.execute(text(total_balls_query), total_balls_params).scalar() or 0
+            total_innings_query = f"SELECT COUNT(DISTINCT (dd.p_match, dd.inns)) FROM delivery_details dd {new_join_clause} {new_where_clause}"
+            new_total_innings = db.execute(text(total_innings_query), total_balls_params).scalar() or 0
             
             if not group_by or len(group_by) == 0:
                 # Ungrouped query
@@ -1930,6 +2011,7 @@ def query_deliveries_service(
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_groups']
+                new_total_innings = result.get("metadata", {}).get("total_innings_in_query", new_total_innings)
             
             data_sources.append(f"delivery_details ({new_start.year}-{new_end.year})")
         
@@ -1939,6 +2021,7 @@ def query_deliveries_service(
         legacy_results = []
         legacy_total_count = 0
         legacy_total_balls = 0
+        legacy_total_innings = 0
         
         if routing['use_legacy']:
             legacy_date_range = routing['legacy_date_range']
@@ -1977,6 +2060,14 @@ def query_deliveries_service(
             )
             
             legacy_total_balls = get_legacy_total_balls(legacy_where_clause, legacy_params, db) or 0
+            legacy_count_params = {k: v for k, v in legacy_params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
+            legacy_total_innings_query = f"""
+                SELECT COUNT(DISTINCT (d.match_id, d.innings))
+                FROM deliveries d
+                JOIN matches m ON d.match_id = m.id
+                {legacy_where_clause}
+            """
+            legacy_total_innings = db.execute(text(legacy_total_innings_query), legacy_count_params).scalar() or 0
             
             if not group_by or len(group_by) == 0:
                 # Ungrouped query
@@ -1989,6 +2080,7 @@ def query_deliveries_service(
                     legacy_where_clause, legacy_params, group_by, db, has_batter_filters
                 )
                 legacy_total_count = len(legacy_results)
+                legacy_total_innings = sum(int(r.get("innings_count") or 0) for r in legacy_results)
             
             data_sources.append(f"deliveries ({legacy_start.year}-{legacy_end.year})")
         
@@ -1996,6 +2088,7 @@ def query_deliveries_service(
         # MERGE RESULTS
         # =====================================================================
         total_balls = new_total_balls + legacy_total_balls
+        total_innings_in_query = 0
         
         if routing['use_new'] and routing['use_legacy']:
             # Load player aliases for merging
@@ -2004,6 +2097,7 @@ def query_deliveries_service(
             if not group_by or len(group_by) == 0:
                 # Merge ungrouped results
                 merged_data = merge_ungrouped_results(new_results, legacy_results, player_aliases_map)
+                total_innings_in_query = new_total_innings + legacy_total_innings
                 # Apply pagination to merged results
                 merged_data = merged_data[offset:offset + limit]
                 total_count = new_total_count + legacy_total_count
@@ -2021,7 +2115,7 @@ def query_deliveries_service(
                     merged_data = [r for r in merged_data if r.get('runs', 0) >= min_runs]
                 if max_runs is not None:
                     merged_data = [r for r in merged_data if r.get('runs', 0) <= max_runs]
-                
+                total_innings_in_query = sum(int(r.get("innings_count") or 0) for r in merged_data)
                 total_count = len(merged_data)
                 # Apply pagination
                 merged_data = merged_data[offset:offset + limit]
@@ -2029,6 +2123,12 @@ def query_deliveries_service(
             # Single source - no merge needed
             merged_data = new_results if routing['use_new'] else legacy_results
             total_count = new_total_count if routing['use_new'] else legacy_total_count
+            if not group_by or len(group_by) == 0:
+                total_innings_in_query = new_total_innings if routing['use_new'] else legacy_total_innings
+            elif routing['use_new']:
+                total_innings_in_query = result.get("metadata", {}).get("total_innings_in_query", 0)
+            else:
+                total_innings_in_query = sum(int(r.get("innings_count") or 0) for r in legacy_results)
         
         # =====================================================================
         # BUILD RESPONSE
@@ -2044,6 +2144,7 @@ def query_deliveries_service(
                 "data": merged_data,
                 "metadata": {
                     "total_matching_rows": total_count,
+                    "total_innings_in_query": total_innings_in_query,
                     "returned_rows": len(merged_data),
                     "limit": limit,
                     "offset": offset,
@@ -2077,6 +2178,7 @@ def query_deliveries_service(
                 "percentages": percentages,
                 "metadata": {
                     "total_groups": total_count,
+                    "total_innings_in_query": total_innings_in_query,
                     "returned_groups": len(merged_data),
                     "total_balls_in_query": total_balls,
                     "limit": limit,
@@ -2115,8 +2217,8 @@ def build_where_clause(
     
     # Venue filter (ground in delivery_details)
     if venue:
-        conditions.append("dd.ground = :venue")
-        params["venue"] = venue
+        params["venue_aliases"] = get_venue_aliases(venue)
+        conditions.append("dd.ground = ANY(:venue_aliases)")
     
     # Date filters (using year column for efficiency, can add date parsing if needed)
     if start_date:
@@ -2521,7 +2623,7 @@ def handle_grouped_query(
         {join_clause}
         {where_clause}
     """
-    total_balls_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
+    total_balls_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
     total_balls = db.execute(text(total_balls_query), total_balls_params).scalar()
     
     # For multi-level grouping, get parent group totals (first column)
@@ -2545,6 +2647,7 @@ def handle_grouped_query(
         SELECT 
             {select_group_clause},
             COUNT(*) as balls,
+            COUNT(DISTINCT (dd.p_match, dd.inns)) as innings_count,
             {runs_calculation} as runs,
             SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
             SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
@@ -2607,6 +2710,7 @@ def handle_grouped_query(
         # Add statistics
         stats_start = len(group_by)
         balls = row[stats_start]
+        innings_count = row[stats_start + 1]
         
         # Calculate percent_balls relative to parent group (for multi-level) or total (for single-level)
         if len(group_by) > 1 and parent_totals:
@@ -2618,18 +2722,19 @@ def handle_grouped_query(
         
         row_dict.update({
             "balls": balls,
-            "runs": row[stats_start + 1],
-            "wickets": row[stats_start + 2],
-            "dots": row[stats_start + 3],
-            "boundaries": row[stats_start + 4],
-            "fours": row[stats_start + 5],
-            "sixes": row[stats_start + 6],
-            "average": float(row[stats_start + 7]) if row[stats_start + 7] is not None else None,
-            "strike_rate": float(row[stats_start + 8]) if row[stats_start + 8] is not None else 0,
-            "balls_per_dismissal": float(row[stats_start + 9]) if row[stats_start + 9] is not None else None,
-            "dot_percentage": float(row[stats_start + 10]) if row[stats_start + 10] is not None else 0,
-            "boundary_percentage": float(row[stats_start + 11]) if row[stats_start + 11] is not None else 0,
-            "control_percentage": float(row[stats_start + 12]) if row[stats_start + 12] is not None else None,
+            "innings_count": innings_count,
+            "runs": row[stats_start + 2],
+            "wickets": row[stats_start + 3],
+            "dots": row[stats_start + 4],
+            "boundaries": row[stats_start + 5],
+            "fours": row[stats_start + 6],
+            "sixes": row[stats_start + 7],
+            "average": float(row[stats_start + 8]) if row[stats_start + 8] is not None else None,
+            "strike_rate": float(row[stats_start + 9]) if row[stats_start + 9] is not None else 0,
+            "balls_per_dismissal": float(row[stats_start + 10]) if row[stats_start + 10] is not None else None,
+            "dot_percentage": float(row[stats_start + 11]) if row[stats_start + 11] is not None else 0,
+            "boundary_percentage": float(row[stats_start + 12]) if row[stats_start + 12] is not None else 0,
+            "control_percentage": float(row[stats_start + 13]) if row[stats_start + 13] is not None else None,
             "percent_balls": percent_balls
         })
         
@@ -2648,6 +2753,17 @@ def handle_grouped_query(
     """
     count_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
     total_groups = db.execute(text(count_query), count_params).scalar()
+    innings_total_query = f"""
+        SELECT COALESCE(SUM(innings_count), 0) FROM (
+            SELECT COUNT(DISTINCT (dd.p_match, dd.inns)) AS innings_count
+            FROM delivery_details dd
+            {join_clause}
+            {where_clause}
+            GROUP BY {group_by_clause}
+            {having_clause}
+        ) grouped_innings
+    """
+    total_innings_in_query = db.execute(text(innings_total_query), count_params).scalar() or 0
     
     # Generate summary data if requested
     summary_data = None
@@ -2663,6 +2779,7 @@ def handle_grouped_query(
         "percentages": percentages,
         "metadata": {
             "total_groups": total_groups,
+            "total_innings_in_query": total_innings_in_query,
             "returned_groups": len(formatted_results),
             "total_balls_in_query": total_balls,
             "limit": limit,
@@ -2722,7 +2839,7 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
                 ORDER BY total_balls DESC
             """
             
-            summary_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs']}
+            summary_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
             summary_result = db.execute(text(summary_query), summary_params).fetchall()
             
             formatted_summaries = []
