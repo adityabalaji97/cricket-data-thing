@@ -14,6 +14,9 @@ from services.nl2query import (
     get_cache_size,
     log_nl_query_event_background,
     update_nl_query_feedback,
+    get_monthly_usage,
+    MODEL_PRIMARY,
+    MODEL_FALLBACK,
 )
 from database import get_session
 import os
@@ -194,6 +197,12 @@ def get_examples():
     return get_example_queries()
 
 
+@router.get("/usage")
+def get_usage(db: Session = Depends(get_session)):
+    """Return current month's NL query LLM spend summary."""
+    return get_monthly_usage(db)
+
+
 @router.get("/health")
 def health_check():
     """Check NL query service health."""
@@ -201,5 +210,7 @@ def health_check():
     return {
         "status": "ok",
         "openai_configured": bool(api_key),
-        "cache_size": get_cache_size()
+        "cache_size": get_cache_size(),
+        "primary_model": MODEL_PRIMARY,
+        "fallback_model": MODEL_FALLBACK,
     }

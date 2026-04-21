@@ -62,7 +62,7 @@ def test_parse_nl_query_passes_few_shot_examples_to_openai(monkeypatch):
     assert result["recommended_chart"]["type"] == "scatter"
     assert captured["query"] == "kohli vs spin"
     assert captured["few_shot_examples"] == expected_examples
-    assert captured["model"] == nl2query.DEFAULT_NL2QUERY_MODEL
+    assert captured["model"] == nl2query.MODEL_PRIMARY
 
 
 def test_persist_nl_query_log_inserts_and_returns_id():

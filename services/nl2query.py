@@ -23,8 +23,17 @@ logger = logging.getLogger(__name__)
 # In-memory cache with TTL
 _cache: Dict[str, Dict[str, Any]] = {}
 CACHE_TTL = 86400  # 24 hours
-DEFAULT_NL2QUERY_MODEL = "gpt-4o-mini"
+MODEL_PRIMARY = "gpt-4o"
+MODEL_FALLBACK = "gpt-4o-mini"
+DEFAULT_NL2QUERY_MODEL = MODEL_FALLBACK  # kept for backward compat in tests
+MONTHLY_COST_CAP = 15.0  # USD — leaves $5 buffer on $20/mo subscription
 MAX_FEW_SHOT_EXAMPLES = 5
+
+# Approximate per-token costs (USD) as of April 2026
+MODEL_COSTS = {
+    "gpt-4o": {"prompt": 2.50 / 1_000_000, "completion": 10.00 / 1_000_000},
+    "gpt-4o-mini": {"prompt": 0.15 / 1_000_000, "completion": 0.60 / 1_000_000},
+}
 ALLOWED_RECOMMENDED_COLUMNS = {
     "balls",
     "balls_faced",
@@ -407,12 +416,94 @@ def get_few_shot_examples(query: str, db: Optional[Session], limit: int = MAX_FE
     return selected[:limit]
 
 
+def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
+    """Estimate USD cost for a single API call."""
+    costs = MODEL_COSTS.get(model, MODEL_COSTS[MODEL_FALLBACK])
+    return (prompt_tokens * costs["prompt"]) + (completion_tokens * costs["completion"])
+
+
+def select_model(db: Optional[Session] = None) -> str:
+    """Pick GPT-4o if under monthly spend cap, otherwise fall back to 4o-mini."""
+    if db is None:
+        try:
+            from database import SessionLocal
+            db = SessionLocal()
+            owns_session = True
+        except Exception:
+            return MODEL_PRIMARY
+    else:
+        owns_session = False
+
+    try:
+        from datetime import datetime
+        month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        row = db.execute(
+            text(
+                "SELECT COALESCE(SUM(estimated_cost_usd), 0) AS total "
+                "FROM nl_query_log WHERE created_at >= :month_start"
+            ),
+            {"month_start": month_start},
+        ).fetchone()
+        total_spend = float(row[0]) if row else 0.0
+        return MODEL_PRIMARY if total_spend < MONTHLY_COST_CAP else MODEL_FALLBACK
+    except Exception as exc:
+        logger.warning("select_model fallback due to: %s", exc)
+        return MODEL_PRIMARY
+    finally:
+        if owns_session:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+
+def get_monthly_usage(db: Session) -> Dict[str, Any]:
+    """Return current month's NL query spend summary."""
+    from datetime import datetime
+    month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    row = db.execute(
+        text(
+            """
+            SELECT
+                COUNT(*) AS total_queries,
+                COALESCE(SUM(estimated_cost_usd), 0) AS total_cost,
+                COALESCE(SUM(prompt_tokens), 0) AS total_prompt_tokens,
+                COALESCE(SUM(completion_tokens), 0) AS total_completion_tokens,
+                COALESCE(SUM(CASE WHEN model_used = :primary THEN 1 ELSE 0 END), 0) AS primary_queries,
+                COALESCE(SUM(CASE WHEN model_used = :fallback THEN 1 ELSE 0 END), 0) AS fallback_queries
+            FROM nl_query_log
+            WHERE created_at >= :month_start
+            """
+        ),
+        {"month_start": month_start, "primary": MODEL_PRIMARY, "fallback": MODEL_FALLBACK},
+    ).fetchone()
+
+    total_cost = float(row[1]) if row else 0.0
+    return {
+        "month": month_start.strftime("%Y-%m"),
+        "total_queries": int(row[0]) if row else 0,
+        "total_cost_usd": round(total_cost, 4),
+        "monthly_cap_usd": MONTHLY_COST_CAP,
+        "remaining_usd": round(max(MONTHLY_COST_CAP - total_cost, 0), 4),
+        "total_prompt_tokens": int(row[2]) if row else 0,
+        "total_completion_tokens": int(row[3]) if row else 0,
+        "primary_model": MODEL_PRIMARY,
+        "fallback_model": MODEL_FALLBACK,
+        "primary_queries": int(row[4]) if row else 0,
+        "fallback_queries": int(row[5]) if row else 0,
+        "active_model": MODEL_PRIMARY if total_cost < MONTHLY_COST_CAP else MODEL_FALLBACK,
+    }
+
+
 def call_openai(
     query: str,
     few_shot_examples: Optional[List[Dict[str, Any]]] = None,
     model: str = DEFAULT_NL2QUERY_MODEL,
 ) -> Dict[str, Any]:
-    """Call OpenAI to parse a natural language cricket query."""
+    """Call OpenAI to parse a natural language cricket query.
+
+    Returns a dict with the parsed JSON plus _meta with token usage.
+    """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY not configured")
@@ -437,7 +528,26 @@ def call_openai(
     )
 
     content = response.choices[0].message.content
-    return json.loads(content)
+    parsed = json.loads(content)
+
+    # Attach token usage metadata (non-serialized, stripped before caching)
+    usage = response.usage
+    if usage:
+        parsed["_meta"] = {
+            "model_used": model,
+            "prompt_tokens": usage.prompt_tokens,
+            "completion_tokens": usage.completion_tokens,
+            "estimated_cost_usd": estimate_cost(model, usage.prompt_tokens, usage.completion_tokens),
+        }
+    else:
+        parsed["_meta"] = {
+            "model_used": model,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "estimated_cost_usd": 0.0,
+        }
+
+    return parsed
 
 
 # Valid values for validation
@@ -1194,6 +1304,16 @@ def persist_nl_query_log(
     row_count = parse_result.get("result_row_count")
     row_count = int(row_count) if isinstance(row_count, int) else None
 
+    # Token usage from _meta
+    api_meta = parse_result.get("_meta") or {}
+    actual_model = api_meta.get("model_used") or model_used
+    prompt_tokens = api_meta.get("prompt_tokens")
+    prompt_tokens = int(prompt_tokens) if prompt_tokens is not None else None
+    completion_tokens = api_meta.get("completion_tokens")
+    completion_tokens = int(completion_tokens) if completion_tokens is not None else None
+    estimated_cost = api_meta.get("estimated_cost_usd")
+    estimated_cost = float(estimated_cost) if estimated_cost is not None else None
+
     try:
         insert_result = session.execute(
             text(
@@ -1209,7 +1329,10 @@ def persist_nl_query_log(
                     execution_success,
                     result_row_count,
                     ip_hash,
-                    execution_time_ms
+                    execution_time_ms,
+                    prompt_tokens,
+                    completion_tokens,
+                    estimated_cost_usd
                 )
                 VALUES (
                     :query_text,
@@ -1222,7 +1345,10 @@ def persist_nl_query_log(
                     :execution_success,
                     :result_row_count,
                     :ip_hash,
-                    :execution_time_ms
+                    :execution_time_ms,
+                    :prompt_tokens,
+                    :completion_tokens,
+                    :estimated_cost_usd
                 )
                 RETURNING id
                 """
@@ -1234,11 +1360,14 @@ def persist_nl_query_log(
                 "group_by": group_by_json,
                 "explanation": explanation,
                 "confidence": confidence,
-                "model_used": model_used,
+                "model_used": actual_model,
                 "execution_success": success,
                 "result_row_count": row_count,
                 "ip_hash": _hash_ip(ip_address),
                 "execution_time_ms": int(execution_time_ms) if execution_time_ms is not None else None,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "estimated_cost_usd": estimated_cost,
             },
         )
         new_row = insert_result.fetchone()
@@ -1402,16 +1531,26 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
         if db is not None:
             few_shot_examples = get_few_shot_examples(query, db=db, limit=MAX_FEW_SHOT_EXAMPLES)
 
+        # Select model based on monthly spend
+        chosen_model = select_model(db)
+
         try:
             raw = call_openai(
                 query,
                 few_shot_examples=few_shot_examples,
-                model=DEFAULT_NL2QUERY_MODEL,
+                model=chosen_model,
             )
         except TypeError:
             # Backward-compatible fallback for tests that monkeypatch call_openai(query).
             raw = call_openai(query)
+
+        # Extract and preserve _meta from OpenAI response before validation strips it
+        api_meta = raw.pop("_meta", None) or {}
+
         result = validate_filters(raw, query=query)
+
+        # Attach _meta for logging downstream
+        result["_meta"] = api_meta
 
         # Resolve player names against DB if session available
         if db is not None:
