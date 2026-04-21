@@ -134,6 +134,7 @@ const QueryBuilder = ({ isMobile }) => {
   const [nlConfidence, setNlConfidence] = useState('medium');
   const [nlSourceQuery, setNlSourceQuery] = useState('');
   const [nlRawFilters, setNlRawFilters] = useState({});
+  const [nlRecommendedColumns, setNlRecommendedColumns] = useState([]);
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const executeQueryRef = useRef(null);
   const nlInputRef = useRef(null);
@@ -261,6 +262,7 @@ const QueryBuilder = ({ isMobile }) => {
     setNlConfidence('medium');
     setNlSourceQuery('');
     setNlRawFilters({});
+    setNlRecommendedColumns([]);
     window.history.replaceState({}, '', window.location.pathname);
   };
   
@@ -271,6 +273,7 @@ const QueryBuilder = ({ isMobile }) => {
     explanation,
     confidence,
     suggestions,
+    recommendedColumns,
     interpretation,
   }) => {
     // Reset to defaults then apply NL filters
@@ -290,6 +293,7 @@ const QueryBuilder = ({ isMobile }) => {
     setNlConfidence(confidence || 'medium');
     setNlSourceQuery((queryText || '').trim());
     setNlRawFilters(nlFilters || {});
+    setNlRecommendedColumns(Array.isArray(recommendedColumns) ? recommendedColumns : []);
     setQueryTab(0);
     setHasLoadedFromUrl(false);
 
@@ -426,6 +430,7 @@ const QueryBuilder = ({ isMobile }) => {
               results={results}
               groupBy={groupBy}
               filters={filters}
+              recommendedColumns={nlRecommendedColumns}
               isMobile={isMobile}
             />
           )}

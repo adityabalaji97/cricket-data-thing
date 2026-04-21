@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import CondensedName from './common/CondensedName';
 import {
   Box,
@@ -129,7 +129,38 @@ const isPlayerNameColumn = (key) => {
   return PLAYER_NAME_KEYS.has(normalized) || normalized.endsWith('_player');
 };
 
-const QueryResults = ({ results, groupBy, filters, isMobile }) => {
+const DEFAULT_SELECTED_METRIC_COLUMNS = ['balls', 'runs', 'strike_rate'];
+
+const buildInitialMetricColumns = ({ allColumns, groupBy, recommendedColumns }) => {
+  const metricColumns = allColumns.filter(col =>
+    !groupBy.includes(col) && !['is_summary', 'summary_level'].includes(col)
+  );
+
+  if (metricColumns.length === 0) {
+    return [];
+  }
+
+  const normalizedRecommended = Array.isArray(recommendedColumns) ? recommendedColumns : [];
+  const preferred = normalizedRecommended
+    .map(col => String(col || '').trim())
+    .filter(Boolean)
+    .filter((col, index, arr) => arr.indexOf(col) === index)
+    .filter(col => metricColumns.includes(col))
+    .slice(0, 6);
+
+  if (preferred.length > 0) {
+    return preferred;
+  }
+
+  const defaultColumns = DEFAULT_SELECTED_METRIC_COLUMNS.filter(col => metricColumns.includes(col));
+  if (defaultColumns.length > 0) {
+    return defaultColumns;
+  }
+
+  return metricColumns.slice(0, 3);
+};
+
+const QueryResults = ({ results, groupBy, filters, recommendedColumns, isMobile }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
   
@@ -148,7 +179,7 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   const chartPanelRef = useRef(null);
   const [showCharts, setShowCharts] = useState(false);
   const [showPitchMap, setShowPitchMap] = useState(false);
-  const [selectedMetricColumns, setSelectedMetricColumns] = useState(['balls', 'runs', 'strike_rate']);
+  const [selectedMetricColumns, setSelectedMetricColumns] = useState(DEFAULT_SELECTED_METRIC_COLUMNS);
   
   // Extract data early to avoid hooks rule violation
   const data = results?.data || [];
@@ -257,6 +288,19 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
       !groupBy.includes(col) && !['is_summary', 'summary_level'].includes(col)
     );
   }, [displayData, isGrouped, groupBy]);
+
+  useEffect(() => {
+    if (!isGrouped || displayData.length === 0) {
+      return;
+    }
+
+    const initialColumns = buildInitialMetricColumns({
+      allColumns: Object.keys(displayData[0]),
+      groupBy,
+      recommendedColumns,
+    });
+    setSelectedMetricColumns(initialColumns);
+  }, [results, isGrouped, displayData, groupBy, recommendedColumns]);
 
   // Apply column filters to displayData
   const filteredData = useMemo(() => {

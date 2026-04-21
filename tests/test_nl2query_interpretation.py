@@ -45,3 +45,48 @@ def test_invalid_confidence_defaults_to_medium(monkeypatch):
 
     assert result["success"] is True
     assert result["confidence"] == "medium"
+
+
+def test_recommended_columns_defaults_for_bowling_query(monkeypatch):
+    nl2query._cache.clear()
+    monkeypatch.setattr(
+        nl2query,
+        "call_openai",
+        lambda _q: {
+            "filters": {"bowlers": ["Jasprit Bumrah"], "query_mode": "bowling_stats"},
+            "group_by": ["bowler", "competition"],
+            "explanation": "bumrah bowling split",
+            "confidence": "high",
+            "suggestions": [],
+        },
+    )
+
+    result = nl2query.parse_nl_query("bumrah economy death overs")
+
+    assert result["success"] is True
+    assert len(result["recommended_columns"]) >= 4
+    assert "economy" in result["recommended_columns"]
+    assert "wickets" in result["recommended_columns"]
+
+
+def test_recommended_columns_are_sanitized_and_deduped(monkeypatch):
+    nl2query._cache.clear()
+    monkeypatch.setattr(
+        nl2query,
+        "call_openai",
+        lambda _q: {
+            "filters": {"batters": ["Virat Kohli"], "query_mode": "delivery"},
+            "group_by": ["batter"],
+            "explanation": "kohli metrics",
+            "confidence": "high",
+            "suggestions": [],
+            "recommended_columns": ["runs", "foo", "strike_rate", "runs", "dot_percentage"],
+        },
+    )
+
+    result = nl2query.parse_nl_query("kohli against spin")
+
+    assert result["success"] is True
+    assert "foo" not in result["recommended_columns"]
+    assert result["recommended_columns"].count("runs") == 1
+    assert "strike_rate" in result["recommended_columns"]

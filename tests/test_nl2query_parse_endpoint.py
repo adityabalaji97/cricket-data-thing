@@ -12,6 +12,7 @@ def test_parse_endpoint_includes_structured_interpretation(client, monkeypatch):
             'explanation': 'Showing Kohli batting analysis',
             'confidence': 'high',
             'suggestions': ['grouped by venue'],
+            'recommended_columns': ['balls', 'runs', 'strike_rate', 'boundary_percentage'],
             'interpretation': {
                 'summary': 'Showing Kohli batting analysis',
                 'parsed_entities': [
@@ -30,3 +31,4 @@ def test_parse_endpoint_includes_structured_interpretation(client, monkeypatch):
     assert payload['success'] is True
     assert payload['interpretation']['summary'] == 'Showing Kohli batting analysis'
     assert payload['interpretation']['parsed_entities'][0]['type'] == 'player'
+    assert payload['recommended_columns'][0] == 'balls'

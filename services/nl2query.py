@@ -25,6 +25,28 @@ _cache: Dict[str, Dict[str, Any]] = {}
 CACHE_TTL = 86400  # 24 hours
 DEFAULT_NL2QUERY_MODEL = "gpt-4o-mini"
 MAX_FEW_SHOT_EXAMPLES = 5
+ALLOWED_RECOMMENDED_COLUMNS = {
+    "balls",
+    "balls_faced",
+    "runs",
+    "runs_conceded",
+    "strike_rate",
+    "average",
+    "wickets",
+    "dots",
+    "boundaries",
+    "fours",
+    "sixes",
+    "dot_percentage",
+    "boundary_percentage",
+    "economy",
+    "control_percentage",
+    "percent_balls",
+    "balls_per_dismissal",
+    "balls_per_wicket",
+    "overs",
+    "innings_count",
+}
 
 SYSTEM_PROMPT = """You are a cricket analytics query parser. Convert natural language queries about cricket into structured JSON filters for a ball-by-ball cricket statistics database.
 
@@ -37,6 +59,7 @@ Return a JSON object with these fields:
   "explanation": "Human-readable explanation of what the query does",
   "confidence": "high" | "medium" | "low",
   "suggestions": ["optional improvement suggestions"],
+  "recommended_columns": ["4-6 metric columns to prioritize in results display"],
   "interpretation": {
     "summary": "One-line summary of what will be queried",
     "parsed_entities": [
@@ -110,6 +133,13 @@ Return a JSON object with these fields:
 - "max_wickets": maximum wickets threshold (bowling_stats mode)
 - "start_date": "YYYY-MM-DD" format
 - "end_date": "YYYY-MM-DD" format
+
+## Recommended metric columns
+Also return "recommended_columns": a list of 4-6 metric columns most relevant to this query.
+Available metrics: balls, runs, strike_rate, average, wickets, dots, boundaries, fours, sixes,
+dot_percentage, boundary_percentage, economy, control_percentage, percent_balls, runs_conceded,
+balls_per_dismissal, balls_per_wicket, overs, innings_count, balls_faced.
+Choose columns that best answer the user's question.
 
 ## Available group_by columns
 venue, country, match_id, competition, year, batting_team, bowling_team, batter, bowler, innings, phase, match_outcome, chase_outcome, toss_decision, toss_match_outcome, bat_hand, bowl_style, bowl_kind, crease_combo, line, length, shot, control, wagon_zone, dismissal
@@ -228,6 +258,11 @@ def _serialize_few_shot_output(example: Dict[str, Any]) -> str:
     parsed_filters = example.get("parsed_filters") if isinstance(example.get("parsed_filters"), dict) else {}
     suggestions = example.get("suggestions") if isinstance(example.get("suggestions"), list) else []
     interpretation_payload = example.get("interpretation") if isinstance(example.get("interpretation"), dict) else {}
+    recommended_columns = (
+        example.get("recommended_columns")
+        if isinstance(example.get("recommended_columns"), list)
+        else []
+    )
     payload = {
         "filters": parsed_filters,
         "query_mode": example.get("query_mode") or parsed_filters.get("query_mode") or "delivery",
@@ -235,6 +270,7 @@ def _serialize_few_shot_output(example: Dict[str, Any]) -> str:
         "explanation": example.get("explanation") or "",
         "confidence": example.get("confidence") or "high",
         "suggestions": suggestions,
+        "recommended_columns": recommended_columns,
         "interpretation": {
             "summary": interpretation_payload.get("summary") or example.get("explanation") or "",
             "parsed_entities": interpretation_payload.get("parsed_entities")
@@ -522,6 +558,61 @@ def _sanitize_suggestions(raw_suggestions: Any, limit: int = 5) -> List[str]:
     return suggestions
 
 
+def _sanitize_recommended_columns(raw_columns: Any, limit: int = 6) -> List[str]:
+    if not isinstance(raw_columns, list):
+        return []
+
+    columns: List[str] = []
+    seen = set()
+    for item in raw_columns:
+        column = str(item or "").strip().lower()
+        if not column or column not in ALLOWED_RECOMMENDED_COLUMNS:
+            continue
+        if column in seen:
+            continue
+        seen.add(column)
+        columns.append(column)
+        if len(columns) >= limit:
+            break
+    return columns
+
+
+def _default_recommended_columns(query: str, filters: Dict[str, Any]) -> List[str]:
+    q = (query or "").lower()
+    mode = (filters.get("query_mode") or "delivery").lower()
+
+    if any(token in q for token in ["boundary", "boundaries", "four", "fours", "six", "sixes"]):
+        return ["balls", "runs", "boundaries", "fours", "sixes", "boundary_percentage"]
+
+    if mode == "bowling_stats" or any(token in q for token in ["economy", "bowling", "wicket", "wickets", "dot"]):
+        return ["balls", "runs_conceded", "wickets", "economy", "dots", "dot_percentage"]
+
+    if mode == "batting_stats":
+        return ["balls", "runs", "average", "strike_rate", "boundaries", "boundary_percentage"]
+
+    if any(token in q for token in ["control", "controlled", "uncontrolled"]):
+        return ["balls", "runs", "control_percentage", "strike_rate", "dot_percentage", "boundary_percentage"]
+
+    return ["balls", "runs", "strike_rate", "average", "dot_percentage", "boundary_percentage"]
+
+
+def _resolve_recommended_columns(raw_columns: Any, query: str, filters: Dict[str, Any]) -> List[str]:
+    chosen = _sanitize_recommended_columns(raw_columns, limit=6)
+    fallback = _sanitize_recommended_columns(_default_recommended_columns(query, filters), limit=6)
+
+    merged: List[str] = []
+    seen = set()
+    for column in [*chosen, *fallback]:
+        if column in seen:
+            continue
+        seen.add(column)
+        merged.append(column)
+        if len(merged) >= 6:
+            break
+
+    return merged
+
+
 def _match_query_fragment(query: str, value: str) -> Optional[str]:
     normalized_query = _normalize_text(query)
     normalized_value = _normalize_text(value)
@@ -776,6 +867,11 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
     explanation = str(parsed.get("explanation") or "").strip()
     confidence = _sanitize_confidence(parsed.get("confidence"), default="medium")
     suggestions = _sanitize_suggestions(parsed.get("suggestions"))
+    recommended_columns = _resolve_recommended_columns(
+        raw_columns=parsed.get("recommended_columns"),
+        query=query,
+        filters=validated,
+    )
     interpretation = _sanitize_interpretation(
         parsed=parsed,
         query=query,
@@ -794,6 +890,7 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
         "explanation": explanation,
         "confidence": confidence,
         "suggestions": suggestions,
+        "recommended_columns": recommended_columns,
         "interpretation": interpretation,
     }
 
@@ -900,11 +997,17 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
     interpretation["suggestions"] = _sanitize_suggestions(
         interpretation.get("suggestions") or result.get("suggestions")
     )
+    recommended_columns = _resolve_recommended_columns(
+        raw_columns=result.get("recommended_columns"),
+        query=query,
+        filters=filters,
+    )
 
     result["filters"] = filters
     result["group_by"] = group_by
     result["explanation"] = summary
     result["suggestions"] = interpretation["suggestions"]
+    result["recommended_columns"] = recommended_columns
     result["interpretation"] = interpretation
     return result
 
@@ -1153,7 +1256,7 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
     """Parse a natural language query into structured filters.
 
     Returns validated filters, group_by, explanation, confidence, suggestions,
-    and a structured interpretation payload.
+    recommended columns, and a structured interpretation payload.
     """
     if not query or not query.strip():
         return {
@@ -1164,6 +1267,7 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
             "explanation": "",
             "confidence": "low",
             "suggestions": ["Try a query like 'Kohli vs spin in death overs'"],
+            "recommended_columns": [],
             "interpretation": {
                 "summary": "",
                 "parsed_entities": [],
@@ -1215,6 +1319,7 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
             "explanation": "",
             "confidence": "low",
             "suggestions": ["Try rephrasing your query"],
+            "recommended_columns": [],
             "interpretation": {
                 "summary": "",
                 "parsed_entities": [],
@@ -1231,6 +1336,7 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
             "explanation": "",
             "confidence": "low",
             "suggestions": ["Try rephrasing your query"],
+            "recommended_columns": [],
             "interpretation": {
                 "summary": "",
                 "parsed_entities": [],

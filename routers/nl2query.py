@@ -93,11 +93,12 @@ class NLInterpretation(BaseModel):
 
 class NLQueryResponse(BaseModel):
     success: bool
-    filters: Dict[str, Any] = {}
-    group_by: List[str] = []
+    filters: Dict[str, Any] = Field(default_factory=dict)
+    group_by: List[str] = Field(default_factory=list)
     explanation: str = ""
     confidence: str = "medium"
-    suggestions: List[str] = []
+    suggestions: List[str] = Field(default_factory=list)
+    recommended_columns: List[str] = Field(default_factory=list)
     interpretation: NLInterpretation = Field(default_factory=NLInterpretation)
     error: Optional[str] = None
 
