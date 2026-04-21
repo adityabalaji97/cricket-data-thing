@@ -439,15 +439,28 @@ class FantasyPointsCalculator:
             }
         
         # Extract stats
-        runs = matchup_stats.get('runs', 0)
-        balls = matchup_stats.get('balls', 0)
-        wickets = matchup_stats.get('wickets', 0)
-        boundaries = matchup_stats.get('boundaries', 0)
+        runs = float(matchup_stats.get('runs', 0) or 0)
+        balls = float(matchup_stats.get('balls', 0) or 0)
+        wickets = float(matchup_stats.get('wickets', 0) or 0)
+        boundaries = float(matchup_stats.get('boundaries', 0) or 0)
         strike_rate = matchup_stats.get('strike_rate', 0)
-        
+        avg_balls_per_innings = matchup_stats.get('avg_balls_per_innings')
+
+        # Cap projected balls to prevent inflated batting projections from large matchup samples.
+        default_cap = 30.0
+        balls_cap = float(avg_balls_per_innings) if avg_balls_per_innings not in (None, 0) else default_cap
+        balls_cap = max(1.0, balls_cap)
+        matchup_balls = balls
+        capped_balls = min(matchup_balls, balls_cap) if matchup_balls > 0 else balls_cap
+        scale = (capped_balls / matchup_balls) if matchup_balls > 0 else 1.0
+
+        runs *= scale
+        boundaries *= scale
+        wickets *= scale
+
         # Estimate fours and sixes (simplified assumption: 70% fours, 30% sixes)
-        estimated_fours = int(boundaries * 0.7)
-        estimated_sixes = int(boundaries * 0.3)
+        estimated_fours = boundaries * 0.7
+        estimated_sixes = boundaries * 0.3
         
         points = 0
         breakdown = {}
@@ -490,10 +503,10 @@ class FantasyPointsCalculator:
             duck_points = self.DUCK_PENALTY
             points += duck_points
         breakdown['duck_points'] = duck_points
-        
+
         # Strike rate points (min 10 balls)
         sr_points = 0
-        if balls >= 10:
+        if capped_balls >= 10:
             if strike_rate > 170:
                 sr_points = self.SR_ABOVE_170
                 breakdown['sr_category'] = '>170'
@@ -515,14 +528,22 @@ class FantasyPointsCalculator:
         
         points += sr_points
         breakdown['sr_points'] = sr_points
+
+        breakdown['matchup_balls'] = round(matchup_balls, 2)
+        breakdown['capped_balls'] = round(capped_balls, 2)
+        breakdown['balls_cap'] = round(balls_cap, 2)
+        breakdown['balls_cap_source'] = 'avg_balls_per_innings' if avg_balls_per_innings not in (None, 0) else 'default_30'
         
         # Calculate confidence based on sample size
-        confidence = min(balls / 30.0, 1.0)  # Full confidence at 30+ balls
+        confidence = min(capped_balls / 30.0, 1.0)  # Full confidence at 30 balls after capping
         
         return {
             'expected_batting_points': round(points, 2),
             'confidence': round(confidence, 2),
-            'breakdown': breakdown
+            'projected_balls': round(capped_balls, 2),
+            'balls_cap': round(balls_cap, 2),
+            'uncapped_balls': round(matchup_balls, 2),
+            'breakdown': breakdown,
         }
     
     def calculate_expected_bowling_points_from_matchup(self, matchup_stats: Dict) -> Dict:

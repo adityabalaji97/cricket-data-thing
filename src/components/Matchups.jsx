@@ -160,6 +160,34 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer }) => {
         return 'error.main';
     };
 
+    const renderProjectedBalls = (player) => {
+        const projectedBalls = Number(player?.projected_balls);
+        const ballsCap = Number(player?.balls_cap);
+        const uncappedBalls = Number(player?.uncapped_balls);
+
+        if (!Number.isFinite(projectedBalls) || !Number.isFinite(ballsCap) || ballsCap <= 0) {
+            return '-';
+        }
+
+        const displayValue = `${projectedBalls.toFixed(1)}/${ballsCap.toFixed(1)}`;
+
+        return (
+            <Tooltip
+                title={
+                    <Box>
+                        <Typography variant="body2">
+                            Projected balls: {projectedBalls.toFixed(1)}<br />
+                            Balls cap used: {ballsCap.toFixed(1)}<br />
+                            Raw matchup balls: {Number.isFinite(uncappedBalls) ? uncappedBalls.toFixed(1) : '-'}
+                        </Typography>
+                    </Box>
+                }
+            >
+                <Box component="span">{displayValue}</Box>
+            </Tooltip>
+        );
+    };
+
     return (
         <Card sx={{
             p: 2,
@@ -179,6 +207,11 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer }) => {
                         <TableRow>
                             <TableCell sx={{ fontWeight: 'bold', py: 1 }}>Player</TableCell>
                             <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>xPoints</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>
+                                <Tooltip title="Projected balls used for xPoints / cap applied">
+                                    <Box component="span">Balls (cap)</Box>
+                                </Tooltip>
+                            </TableCell>
                             <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>Confidence</TableCell>
                         </TableRow>
                     </TableHead>
@@ -192,6 +225,9 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer }) => {
                                 </TableCell>
                                 <TableCell align="right" sx={{ py: 0.75, color: 'primary.main', fontWeight: 'bold' }}>
                                     {player.expected_points?.toFixed(1) || '0.0'}
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 0.75 }}>
+                                    {renderProjectedBalls(player)}
                                 </TableCell>
                                 <TableCell align="right" sx={{ py: 0.75, color: getConfidenceColor(player.confidence || 0) }}>
                                     {((player.confidence || 0) * 100).toFixed(0)}%

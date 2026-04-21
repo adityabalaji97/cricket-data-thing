@@ -103,6 +103,7 @@ _SR_130_TO_150 = 2
 _SR_60_TO_70 = -2
 _SR_50_TO_60 = -4
 _SR_BELOW_50 = -6
+_DEFAULT_BATTER_BALLS_CAP = 30.0
 
 # Bowling points
 _DOT_BALL_POINT = 1
@@ -119,17 +120,95 @@ def _clamp(value: float, lower: float, upper: float) -> float:
     return max(lower, min(upper, value))
 
 
+def _build_batter_avg_balls_lookup(
+    db,
+    batter_names: List[str],
+    start_date: Optional[date],
+    end_date: Optional[date],
+) -> Dict[str, float]:
+    unique_batters = _dedupe_player_names(batter_names)
+    if not unique_batters:
+        return {}
+
+    avg_balls_query = text(
+        """
+        WITH alias_map AS (
+            SELECT DISTINCT ON (name_key)
+                name_key,
+                canonical_name
+            FROM (
+                SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
+                FROM player_aliases
+                WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
+                UNION ALL
+                SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
+                FROM player_aliases
+                WHERE alias_name IS NOT NULL
+            ) mapped_aliases
+        )
+        SELECT
+            COALESCE(am.canonical_name, bs.striker) AS batter,
+            AVG(bs.balls_faced::numeric) AS avg_balls_per_innings
+        FROM batting_stats bs
+        JOIN matches m ON bs.match_id = m.id
+        LEFT JOIN alias_map am ON LOWER(bs.striker) = am.name_key
+        WHERE COALESCE(am.canonical_name, bs.striker) = ANY(:batters)
+          AND bs.balls_faced IS NOT NULL
+          AND bs.balls_faced > 0
+          AND (:start_date IS NULL OR m.date >= :start_date)
+          AND (:end_date IS NULL OR m.date <= :end_date)
+        GROUP BY COALESCE(am.canonical_name, bs.striker)
+        """
+    )
+
+    rows = db.execute(
+        avg_balls_query,
+        {
+            "batters": unique_batters,
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+    ).fetchall()
+
+    return {
+        str(row[0]): float(row[1])
+        for row in rows
+        if row[0] and row[1] is not None
+    }
+
+
 def _calculate_batting_projection_points(overall_stats: Dict) -> Dict[str, float]:
     """Per-match normalized batting projection points."""
     if not overall_stats:
-        return {"points": 0.0, "confidence": 0.0}
+        return {
+            "points": 0.0,
+            "confidence": 0.0,
+            "projected_balls": 0.0,
+            "balls_cap": _DEFAULT_BATTER_BALLS_CAP,
+            "uncapped_balls": 0.0,
+        }
 
-    runs = float(overall_stats.get("average") or overall_stats.get("runs") or 0.0)
+    runs_base = float(overall_stats.get("average") or overall_stats.get("runs") or 0.0)
     balls_sample = float(overall_stats.get("balls") or 0.0)
     strike_rate = float(overall_stats.get("strike_rate") or 0.0)
     boundary_pct = float(overall_stats.get("boundary_percentage") or 0.0)
+    avg_balls_per_innings = overall_stats.get("avg_balls_per_innings")
 
-    balls = runs * 100.0 / strike_rate if strike_rate > 0 else balls_sample
+    matchup_balls = runs_base * 100.0 / strike_rate if strike_rate > 0 else balls_sample
+    if matchup_balls <= 0:
+        matchup_balls = balls_sample
+
+    balls_cap = (
+        float(avg_balls_per_innings)
+        if avg_balls_per_innings not in (None, 0)
+        else _DEFAULT_BATTER_BALLS_CAP
+    )
+    balls_cap = max(1.0, balls_cap)
+
+    projected_balls = min(matchup_balls, balls_cap) if matchup_balls > 0 else balls_cap
+    balls_scale = projected_balls / matchup_balls if matchup_balls > 0 else 1.0
+
+    runs = runs_base * balls_scale if runs_base > 0 else 0.0
     points = runs * _RUN_POINT
 
     boundary_runs = runs * (boundary_pct / 100.0)
@@ -143,7 +222,7 @@ def _calculate_batting_projection_points(overall_stats: Dict) -> Dict[str, float
     elif runs >= 25:
         points += _RUNS_25_BONUS
 
-    if balls >= 10:
+    if projected_balls >= 10:
         if strike_rate > 170:
             points += _SR_ABOVE_170
         elif 150 < strike_rate <= 170:
@@ -158,7 +237,13 @@ def _calculate_batting_projection_points(overall_stats: Dict) -> Dict[str, float
             points += _SR_BELOW_50
 
     confidence = _clamp(balls_sample / 50.0 if balls_sample else 0.0, 0.3, 0.9) if balls_sample else 0.0
-    return {"points": max(0.0, points), "confidence": confidence}
+    return {
+        "points": max(0.0, points),
+        "confidence": confidence,
+        "projected_balls": round(projected_balls, 2),
+        "balls_cap": round(balls_cap, 2),
+        "uncapped_balls": round(matchup_balls, 2),
+    }
 
 
 def _calculate_bowling_projection_points(bowling_stats: Dict) -> Dict[str, float]:
@@ -290,7 +375,16 @@ def calculate_fantasy_points_from_matchups(team1_batting, team2_batting, team1_b
                     "role": "batsman",
                     "expected_points": result["points"],
                     "confidence": result["confidence"],
-                    "breakdown": {"batting": result["points"], "bowling": 0.0},
+                    "projected_balls": result.get("projected_balls", 0.0),
+                    "balls_cap": result.get("balls_cap", _DEFAULT_BATTER_BALLS_CAP),
+                    "uncapped_balls": result.get("uncapped_balls", 0.0),
+                    "breakdown": {
+                        "batting": result["points"],
+                        "bowling": 0.0,
+                        "projected_balls": result.get("projected_balls", 0.0),
+                        "balls_cap": result.get("balls_cap", _DEFAULT_BATTER_BALLS_CAP),
+                        "uncapped_balls": result.get("uncapped_balls", 0.0),
+                    },
                 }
 
         # Bowling projections
@@ -624,6 +718,13 @@ def get_team_matchups_service(
                     team2_batting[row[0]] = {}
                 team2_batting[row[0]][row[1]] = matchup_data
 
+        batter_avg_balls_lookup = _build_batter_avg_balls_lookup(
+            db=db,
+            batter_names=list(team1_batting.keys()) + list(team2_batting.keys()),
+            start_date=start_date,
+            end_date=end_date,
+        )
+
         # Add "Overall" entry for each batter in team1_batting
         for batter, bowler_stats in team1_batting.items():
             if not bowler_stats:
@@ -658,7 +759,8 @@ def get_team_matchups_service(
                 "average": overall_average,
                 "strike_rate": overall_strike_rate,
                 "dot_percentage": overall_dot_percentage,
-                "boundary_percentage": overall_boundary_percentage
+                "boundary_percentage": overall_boundary_percentage,
+                "avg_balls_per_innings": batter_avg_balls_lookup.get(batter),
             }
 
         # Add "Overall" entry for each batter in team2_batting
@@ -694,7 +796,8 @@ def get_team_matchups_service(
                 "average": overall_average,
                 "strike_rate": overall_strike_rate,
                 "dot_percentage": overall_dot_percentage,
-                "boundary_percentage": overall_boundary_percentage
+                "boundary_percentage": overall_boundary_percentage,
+                "avg_balls_per_innings": batter_avg_balls_lookup.get(batter),
             }
 
         # Calculate bowling consolidated rows

@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 
 import Matchups from '../Matchups';
-import { fetchAnalyticsJson } from '../../utils/analyticsApi';
+import { postAnalyticsJson } from '../../utils/analyticsApi';
 
 jest.mock('axios', () => ({
   __esModule: true,
@@ -15,7 +15,7 @@ jest.mock('../../utils/analyticsApi', () => {
   const actual = jest.requireActual('../../utils/analyticsApi');
   return {
     ...actual,
-    fetchAnalyticsJson: jest.fn(),
+    postAnalyticsJson: jest.fn(),
   };
 });
 const mockedAxios = require('axios').default;
@@ -105,6 +105,9 @@ const matchupPayload = {
         role: 'batting',
         expected_points: 58.4,
         confidence: 0.86,
+        projected_balls: 22,
+        balls_cap: 24,
+        uncapped_balls: 37,
       },
       {
         player_name: 'Bowler Y',
@@ -129,35 +132,12 @@ const buildRollingFormPayload = (playerName) => {
 describe('Matchups analytics overlays', () => {
   beforeEach(() => {
     mockedAxios.get.mockResolvedValue({ data: matchupPayload });
-    fetchAnalyticsJson.mockImplementation(async (path) => {
-      if (path.includes('/rolling-form')) {
-        const name = decodeURIComponent(path.split('/')[2]);
-        return buildRollingFormPayload(name);
-      }
-      if (path === '/leaderboards/first-ball-boundaries') {
-        return {
-          leaderboard: [
-            {
-              player: 'Batter A',
-              boundary_rate_pct: 32.5,
-              wicket_rate_pct: 4.2,
-              first_balls: 68,
-            },
-          ],
-        };
-      }
-      if (path.includes('/bowling-context')) {
-        return {
-          previous_over_pressure_stats: {
-            high_pressure: { economy: 8.7 },
-            low_pressure: { economy: 6.2 },
-          },
-          first_ball_last_ball_stats: {
-            first_ball_boundary_rate_pct: 17.5,
-          },
-        };
-      }
-      return {};
+    postAnalyticsJson.mockImplementation(async (_path, payload) => {
+      const flags = {};
+      (payload?.player_names || []).forEach((name) => {
+        flags[name] = buildRollingFormPayload(name).form_flag;
+      });
+      return { flags };
     });
   });
 
@@ -181,19 +161,17 @@ describe('Matchups analytics overlays', () => {
       expect(screen.getByText(/Fantasy Analysis - Top Picks/i)).toBeInTheDocument();
     });
 
-    expect(await screen.findByText(/First-Ball Threats \(Current Lineups\)/i)).toBeInTheDocument();
-    expect(await screen.findByText(/Bowling Context Watch/i)).toBeInTheDocument();
-
-    expect(screen.getAllByText('HOT').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('COLD').length).toBeGreaterThan(0);
+    expect(screen.getByText('22.0/24.0')).toBeInTheDocument();
 
     const bowlerLink = screen.getByRole('link', { name: 'Bowler Y' });
     expect(bowlerLink.getAttribute('href')).toContain('/player?');
     expect(bowlerLink.getAttribute('href')).toContain('tab=bowling');
 
-    expect(fetchAnalyticsJson).toHaveBeenCalledWith(
-      '/leaderboards/first-ball-boundaries',
-      expect.objectContaining({ role: 'batter' }),
+    expect(postAnalyticsJson).toHaveBeenCalledWith(
+      '/players/form-flags',
+      expect.objectContaining({
+        player_names: expect.arrayContaining(['Batter A', 'Bowler Y']),
+      }),
     );
   });
 });
