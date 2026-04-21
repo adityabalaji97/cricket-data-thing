@@ -161,7 +161,7 @@ describe('Matchups analytics overlays', () => {
       expect(screen.getByText(/Fantasy Analysis - Top Picks/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByText('22.0/24.0')).toBeInTheDocument();
+    expect(screen.queryByText('22.0/24.0')).not.toBeInTheDocument();
 
     const bowlerLink = screen.getByRole('link', { name: 'Bowler Y' });
     expect(bowlerLink.getAttribute('href')).toContain('/player?');

@@ -560,41 +560,54 @@ class FantasyPointsCalculator:
             return {
                 'expected_bowling_points': 0,
                 'confidence': 0,
+                'projected_balls': 0,
+                'balls_cap': 18.0,
+                'uncapped_balls': 0,
                 'breakdown': {}
             }
         
         # Extract stats
-        runs = matchup_stats.get('runs', 0)
-        balls = matchup_stats.get('balls', 0)
-        wickets = matchup_stats.get('wickets', 0)
-        dots = matchup_stats.get('dots', 0)
-        economy = matchup_stats.get('economy', 0)
-        
-        # Calculate overs
-        overs = balls / 6.0
+        runs = float(matchup_stats.get('runs', 0) or 0)
+        balls = float(matchup_stats.get('balls', 0) or 0)
+        wickets = float(matchup_stats.get('wickets', 0) or 0)
+        dots = float(matchup_stats.get('dots', 0) or 0)
+        avg_balls_per_innings = matchup_stats.get('avg_balls_per_innings')
+
+        default_cap = 18.0
+        max_cap = 24.0
+        balls_cap = float(avg_balls_per_innings) if avg_balls_per_innings not in (None, 0) else default_cap
+        balls_cap = max(6.0, min(max_cap, balls_cap))
+
+        projected_balls = min(balls, balls_cap) if balls > 0 else balls_cap
+        projection_scale = projected_balls / balls if balls > 0 else 1.0
+        projected_runs = runs * projection_scale
+        projected_wickets = wickets * projection_scale
+        projected_dots = dots * projection_scale
+        projected_overs = projected_balls / 6.0
+        projected_economy = projected_runs / projected_overs if projected_overs > 0 else 0.0
         
         points = 0
         breakdown = {}
         
         # Dot ball points
-        dot_points = dots * self.DOT_BALL_POINT
+        dot_points = projected_dots * self.DOT_BALL_POINT
         points += dot_points
         breakdown['dot_points'] = dot_points
         
         # Wicket points
-        wicket_points = wickets * self.WICKET_POINT
+        wicket_points = projected_wickets * self.WICKET_POINT
         points += wicket_points
         breakdown['wicket_points'] = wicket_points
         
         # Wicket milestones
         milestone_points = 0
-        if wickets >= 5:
+        if projected_wickets >= 5:
             milestone_points = self.WICKETS_5_BONUS
             breakdown['milestone'] = '5_wickets'
-        elif wickets >= 4:
+        elif projected_wickets >= 4:
             milestone_points = self.WICKETS_4_BONUS
             breakdown['milestone'] = '4_wickets'
-        elif wickets >= 3:
+        elif projected_wickets >= 3:
             milestone_points = self.WICKETS_3_BONUS
             breakdown['milestone'] = '3_wickets'
         
@@ -603,34 +616,42 @@ class FantasyPointsCalculator:
         
         # Economy rate points (min 2 overs)
         economy_points = 0
-        if overs >= 2:
-            if economy < 5:
+        if projected_overs >= 2:
+            if projected_economy < 5:
                 economy_points = self.ECONOMY_BELOW_5
                 breakdown['economy_category'] = '<5'
-            elif 5 <= economy < 6:
+            elif 5 <= projected_economy < 6:
                 economy_points = self.ECONOMY_5_TO_6
                 breakdown['economy_category'] = '5-6'
-            elif 6 <= economy <= 7:
+            elif 6 <= projected_economy <= 7:
                 economy_points = self.ECONOMY_6_TO_7
                 breakdown['economy_category'] = '6-7'
-            elif 10 <= economy < 11:
+            elif 10 <= projected_economy < 11:
                 economy_points = self.ECONOMY_10_TO_11
                 breakdown['economy_category'] = '10-11'
-            elif 11 <= economy < 12:
+            elif 11 <= projected_economy < 12:
                 economy_points = self.ECONOMY_11_TO_12
                 breakdown['economy_category'] = '11-12'
-            elif economy >= 12:
+            elif projected_economy >= 12:
                 economy_points = self.ECONOMY_ABOVE_12
                 breakdown['economy_category'] = '>12'
         
         points += economy_points
         breakdown['economy_points'] = economy_points
+        breakdown['matchup_balls'] = round(balls, 2)
+        breakdown['projected_balls'] = round(projected_balls, 2)
+        breakdown['balls_cap'] = round(balls_cap, 2)
+        breakdown['balls_cap_source'] = 'avg_balls_per_innings' if avg_balls_per_innings not in (None, 0) else 'default_18'
         
         # Calculate confidence based on sample size
-        confidence = min(balls / 24.0, 1.0)  # Full confidence at 24+ balls (4 overs)
+        confidence = min(balls / max(balls_cap, 1.0), 1.0)
+        confidence = max(0.25, min(confidence, 0.9))
         
         return {
             'expected_bowling_points': round(points, 2),
             'confidence': round(confidence, 2),
+            'projected_balls': round(projected_balls, 2),
+            'balls_cap': round(balls_cap, 2),
+            'uncapped_balls': round(balls, 2),
             'breakdown': breakdown
         }

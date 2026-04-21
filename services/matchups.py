@@ -104,6 +104,8 @@ _SR_60_TO_70 = -2
 _SR_50_TO_60 = -4
 _SR_BELOW_50 = -6
 _DEFAULT_BATTER_BALLS_CAP = 30.0
+_DEFAULT_BOWLER_BALLS_CAP = 18.0
+_MAX_BOWLER_BALLS_CAP = 24.0
 
 # Bowling points
 _DOT_BALL_POINT = 1
@@ -165,6 +167,68 @@ def _build_batter_avg_balls_lookup(
         avg_balls_query,
         {
             "batters": unique_batters,
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+    ).fetchall()
+
+    return {
+        str(row[0]): float(row[1])
+        for row in rows
+        if row[0] and row[1] is not None
+    }
+
+
+def _build_bowler_avg_balls_lookup(
+    db,
+    bowler_names: List[str],
+    start_date: Optional[date],
+    end_date: Optional[date],
+) -> Dict[str, float]:
+    unique_bowlers = _dedupe_player_names(bowler_names)
+    if not unique_bowlers:
+        return {}
+
+    avg_balls_query = text(
+        """
+        WITH alias_map AS (
+            SELECT DISTINCT ON (name_key)
+                name_key,
+                canonical_name
+            FROM (
+                SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
+                FROM player_aliases
+                WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
+                UNION ALL
+                SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
+                FROM player_aliases
+                WHERE alias_name IS NOT NULL
+            ) mapped_aliases
+        )
+        SELECT
+            COALESCE(am.canonical_name, bw.bowler) AS bowler,
+            AVG(
+                (
+                    FLOOR(bw.overs)::numeric * 6
+                    + ROUND((bw.overs - FLOOR(bw.overs)) * 10)::numeric
+                )
+            ) AS avg_balls_per_innings
+        FROM bowling_stats bw
+        JOIN matches m ON bw.match_id = m.id
+        LEFT JOIN alias_map am ON LOWER(bw.bowler) = am.name_key
+        WHERE COALESCE(am.canonical_name, bw.bowler) = ANY(:bowlers)
+          AND bw.overs IS NOT NULL
+          AND bw.overs > 0
+          AND (:start_date IS NULL OR m.date >= :start_date)
+          AND (:end_date IS NULL OR m.date <= :end_date)
+        GROUP BY COALESCE(am.canonical_name, bw.bowler)
+        """
+    )
+
+    rows = db.execute(
+        avg_balls_query,
+        {
+            "bowlers": unique_bowlers,
             "start_date": start_date,
             "end_date": end_date,
         },
@@ -247,43 +311,81 @@ def _calculate_batting_projection_points(overall_stats: Dict) -> Dict[str, float
 
 
 def _calculate_bowling_projection_points(bowling_stats: Dict) -> Dict[str, float]:
-    """Per-match normalized bowling projection points (normalized to 24-ball spell)."""
+    """Per-match bowling projection points with bowler workload capping."""
     if not bowling_stats:
-        return {"points": 0.0, "confidence": 0.0}
+        return {
+            "points": 0.0,
+            "confidence": 0.0,
+            "projected_balls": 0.0,
+            "balls_cap": _DEFAULT_BOWLER_BALLS_CAP,
+            "uncapped_balls": 0.0,
+        }
 
     balls_sample = float(bowling_stats.get("balls") or 0.0)
     runs = float(bowling_stats.get("runs") or 0.0)
     wickets = float(bowling_stats.get("wickets") or 0.0)
     dot_pct = float(bowling_stats.get("dot_percentage") or 0.0)
+    avg_balls_per_innings = bowling_stats.get("avg_balls_per_innings")
 
     if balls_sample <= 0:
-        return {"points": 0.0, "confidence": 0.0}
+        return {
+            "points": 0.0,
+            "confidence": 0.0,
+            "projected_balls": 0.0,
+            "balls_cap": _DEFAULT_BOWLER_BALLS_CAP,
+            "uncapped_balls": 0.0,
+        }
 
-    normalized_runs = runs * (24.0 / max(balls_sample, 1.0))
-    normalized_wickets = wickets * (24.0 / max(balls_sample, 1.0))
-    normalized_dots = (dot_pct / 100.0) * 24.0
-    normalized_economy = normalized_runs / 4.0
+    balls_cap = (
+        float(avg_balls_per_innings)
+        if avg_balls_per_innings not in (None, 0)
+        else _DEFAULT_BOWLER_BALLS_CAP
+    )
+    balls_cap = _clamp(balls_cap, 6.0, _MAX_BOWLER_BALLS_CAP)
 
-    points = (normalized_dots * _DOT_BALL_POINT) + (normalized_wickets * _WICKET_POINT)
+    projected_balls = min(balls_sample, balls_cap)
+    projection_scale = projected_balls / max(balls_sample, 1.0)
 
-    if normalized_economy < 5:
-        points += _ECONOMY_BELOW_5
-    elif 5 <= normalized_economy < 6:
-        points += _ECONOMY_5_TO_6
-    elif 6 <= normalized_economy <= 7:
-        points += _ECONOMY_6_TO_7
-    elif 10 <= normalized_economy < 11:
-        points += _ECONOMY_10_TO_11
-    elif 11 <= normalized_economy < 12:
-        points += _ECONOMY_11_TO_12
-    elif normalized_economy >= 12:
-        points += _ECONOMY_ABOVE_12
+    projected_runs = runs * projection_scale
+    projected_wickets = wickets * projection_scale
+    projected_dots = (dot_pct / 100.0) * projected_balls
+    projected_overs = projected_balls / 6.0
+    projected_economy = projected_runs / projected_overs if projected_overs > 0 else 0.0
 
-    confidence = _clamp(balls_sample / 30.0, 0.3, 0.9)
-    return {"points": max(0.0, points), "confidence": confidence}
+    points = (projected_dots * _DOT_BALL_POINT) + (projected_wickets * _WICKET_POINT)
+
+    if projected_balls >= 12:
+        if projected_economy < 5:
+            points += _ECONOMY_BELOW_5
+        elif 5 <= projected_economy < 6:
+            points += _ECONOMY_5_TO_6
+        elif 6 <= projected_economy <= 7:
+            points += _ECONOMY_6_TO_7
+        elif 10 <= projected_economy < 11:
+            points += _ECONOMY_10_TO_11
+        elif 11 <= projected_economy < 12:
+            points += _ECONOMY_11_TO_12
+        elif projected_economy >= 12:
+            points += _ECONOMY_ABOVE_12
+
+    confidence_base = min(balls_sample / max(balls_cap, 1.0), 1.0)
+    confidence = _clamp(confidence_base, 0.25, 0.9)
+    return {
+        "points": max(0.0, points),
+        "confidence": confidence,
+        "projected_balls": round(projected_balls, 2),
+        "balls_cap": round(balls_cap, 2),
+        "uncapped_balls": round(balls_sample, 2),
+    }
 
 
-def add_bowling_consolidated_rows(team1_batting, team2_batting, team1_players, team2_players):
+def add_bowling_consolidated_rows(
+    team1_batting,
+    team2_batting,
+    team1_players,
+    team2_players,
+    bowler_avg_balls_lookup: Optional[Dict[str, float]] = None,
+):
     """
     Add consolidated rows for bowlers showing their performance against the opposing batting lineup
     
@@ -321,6 +423,11 @@ def add_bowling_consolidated_rows(team1_batting, team2_batting, team1_players, t
             consolidated_stats["dot_percentage"] = (consolidated_stats["dots"] * 100) / consolidated_stats["balls"] if consolidated_stats["balls"] > 0 else 0
             consolidated_stats["boundary_percentage"] = (consolidated_stats["boundaries"] * 100) / consolidated_stats["balls"] if consolidated_stats["balls"] > 0 else 0
             
+            consolidated_stats["avg_balls_per_innings"] = (
+                bowler_avg_balls_lookup.get(bowler)
+                if bowler_avg_balls_lookup
+                else None
+            )
             team1_bowling_consolidated[bowler] = consolidated_stats
     
     # For team2 bowlers vs team1 batters
@@ -347,6 +454,11 @@ def add_bowling_consolidated_rows(team1_batting, team2_batting, team1_players, t
             consolidated_stats["dot_percentage"] = (consolidated_stats["dots"] * 100) / consolidated_stats["balls"] if consolidated_stats["balls"] > 0 else 0
             consolidated_stats["boundary_percentage"] = (consolidated_stats["boundaries"] * 100) / consolidated_stats["balls"] if consolidated_stats["balls"] > 0 else 0
             
+            consolidated_stats["avg_balls_per_innings"] = (
+                bowler_avg_balls_lookup.get(bowler)
+                if bowler_avg_balls_lookup
+                else None
+            )
             team2_bowling_consolidated[bowler] = consolidated_stats
     
     return team1_bowling_consolidated, team2_bowling_consolidated
@@ -398,6 +510,8 @@ def calculate_fantasy_points_from_matchups(team1_batting, team2_batting, team1_b
                         player_map[bowler]["confidence"] + result["confidence"]
                     ) / 2.0
                     player_map[bowler]["breakdown"]["bowling"] = result["points"]
+                    player_map[bowler]["breakdown"]["bowling_projected_balls"] = result.get("projected_balls", 0.0)
+                    player_map[bowler]["breakdown"]["bowling_balls_cap"] = result.get("balls_cap", _DEFAULT_BOWLER_BALLS_CAP)
                 else:
                     player_map[bowler] = {
                         "player_name": bowler,
@@ -405,7 +519,15 @@ def calculate_fantasy_points_from_matchups(team1_batting, team2_batting, team1_b
                         "role": "bowler",
                         "expected_points": result["points"],
                         "confidence": result["confidence"],
-                        "breakdown": {"batting": 0.0, "bowling": result["points"]},
+                        "projected_balls": result.get("projected_balls", 0.0),
+                        "balls_cap": result.get("balls_cap", _DEFAULT_BOWLER_BALLS_CAP),
+                        "uncapped_balls": result.get("uncapped_balls", 0.0),
+                        "breakdown": {
+                            "batting": 0.0,
+                            "bowling": result["points"],
+                            "bowling_projected_balls": result.get("projected_balls", 0.0),
+                            "bowling_balls_cap": result.get("balls_cap", _DEFAULT_BOWLER_BALLS_CAP),
+                        },
                     }
 
         all_fantasy_players.extend(player_map.values())
@@ -724,6 +846,12 @@ def get_team_matchups_service(
             start_date=start_date,
             end_date=end_date,
         )
+        bowler_avg_balls_lookup = _build_bowler_avg_balls_lookup(
+            db=db,
+            bowler_names=team1_players + team2_players,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
         # Add "Overall" entry for each batter in team1_batting
         for batter, bowler_stats in team1_batting.items():
@@ -802,7 +930,11 @@ def get_team_matchups_service(
 
         # Calculate bowling consolidated rows
         team1_bowling_consolidated, team2_bowling_consolidated = add_bowling_consolidated_rows(
-            team1_batting, team2_batting, team1_players, team2_players
+            team1_batting,
+            team2_batting,
+            team1_players,
+            team2_players,
+            bowler_avg_balls_lookup=bowler_avg_balls_lookup,
         )
 
         # Calculate fantasy points from matchups
