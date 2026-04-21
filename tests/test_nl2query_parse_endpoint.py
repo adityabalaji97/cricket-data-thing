@@ -13,6 +13,12 @@ def test_parse_endpoint_includes_structured_interpretation(client, monkeypatch):
             'confidence': 'high',
             'suggestions': ['grouped by venue'],
             'recommended_columns': ['balls', 'runs', 'strike_rate', 'boundary_percentage'],
+            'recommended_chart': {
+                'type': 'bar',
+                'x_axis': 'batter',
+                'y_axis': 'runs',
+                'reason': 'Compares grouped batters by run output.',
+            },
             'interpretation': {
                 'summary': 'Showing Kohli batting analysis',
                 'parsed_entities': [
@@ -32,3 +38,4 @@ def test_parse_endpoint_includes_structured_interpretation(client, monkeypatch):
     assert payload['interpretation']['summary'] == 'Showing Kohli batting analysis'
     assert payload['interpretation']['parsed_entities'][0]['type'] == 'player'
     assert payload['recommended_columns'][0] == 'balls'
+    assert payload['recommended_chart']['type'] == 'bar'

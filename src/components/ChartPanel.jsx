@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useMemo, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
 import {
   Box,
   Card,
@@ -34,37 +34,98 @@ import { getDataPointColor, getFallbackColor, hasTeamGrouping } from '../utils/t
 import ZoomableChart from './common/ZoomableChart';
 import { getAutoscaledDomain } from '../utils/chartDomainUtils';
 
-const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = false }, ref) => {
+const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialRecommendation = null, isMobile = false }, ref) => {
   const [charts, setCharts] = useState([]);
   const [nextChartId, setNextChartId] = useState(1);
   const [selectedPoints, setSelectedPoints] = useState({}); // Track selected points per chart: { chartId: payload }
+  const lastAppliedRecommendationKeyRef = useRef(null);
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
     addBarChart,
-    addScatterChart
+    addScatterChart,
+    applyRecommendedChart,
   }));
 
   // Chart management functions
-  const addBarChart = () => {
+  const pickPreferredMetric = (candidates, metricKeys, fallback = null) => {
+    for (const candidate of candidates) {
+      const normalized = String(candidate || '').trim().toLowerCase();
+      if (normalized && metricKeys.includes(normalized)) {
+        return normalized;
+      }
+    }
+    return fallback;
+  };
+
+  const addBarChart = (config = {}) => {
+    const metricKeys = availableMetrics.map(metric => metric.key);
+    if (metricKeys.length === 0) {
+      return false;
+    }
+
+    const fallbackMetric = metricKeys.includes('runs') ? 'runs' : metricKeys[0];
+    const selectedMetric = pickPreferredMetric(
+      [config.selectedMetric, config.yMetric, config.y_axis, config.xMetric, config.x_axis],
+      metricKeys,
+      fallbackMetric,
+    );
+    if (!selectedMetric) {
+      return false;
+    }
+
     const newChart = {
       id: nextChartId,
       type: 'bar',
-      selectedMetric: 'runs'
+      selectedMetric,
     };
     setCharts(prev => [...prev, newChart]);
     setNextChartId(prev => prev + 1);
+    return true;
   };
 
-  const addScatterChart = () => {
+  const addScatterChart = (config = {}) => {
+    const metricKeys = availableMetrics.map(metric => metric.key);
+    if (metricKeys.length < 2) {
+      return false;
+    }
+
+    const xMetric = pickPreferredMetric(
+      [config.xMetric, config.x_axis, 'runs', 'balls', metricKeys[0]],
+      metricKeys,
+      metricKeys[0],
+    );
+    const yMetric = pickPreferredMetric(
+      [config.yMetric, config.y_axis, 'strike_rate', 'average', metricKeys.find(metric => metric !== xMetric)],
+      metricKeys.filter(metric => metric !== xMetric),
+      metricKeys.find(metric => metric !== xMetric),
+    );
+    if (!xMetric || !yMetric || xMetric === yMetric) {
+      return false;
+    }
+
     const newChart = {
       id: nextChartId,
       type: 'scatter',
-      xMetric: 'runs',
-      yMetric: 'strike_rate'
+      xMetric,
+      yMetric,
     };
     setCharts(prev => [...prev, newChart]);
     setNextChartId(prev => prev + 1);
+    return true;
+  };
+
+  const applyRecommendedChart = (recommendation = null) => {
+    if (!recommendation || !recommendation.type) {
+      return false;
+    }
+    if (recommendation.type === 'bar') {
+      return addBarChart(recommendation);
+    }
+    if (recommendation.type === 'scatter') {
+      return addScatterChart(recommendation);
+    }
+    return false;
   };
 
   const removeChart = (chartId) => {
@@ -270,6 +331,21 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
 
     return [...availableFromPredefined, ...dynamicMetrics];
   }, [data, groupBy]);
+
+  useEffect(() => {
+    const recommendationKey = initialRecommendation?.key;
+    if (!isVisible || !recommendationKey) {
+      return;
+    }
+    if (lastAppliedRecommendationKeyRef.current === recommendationKey) {
+      return;
+    }
+
+    const applied = applyRecommendedChart(initialRecommendation);
+    if (applied) {
+      lastAppliedRecommendationKeyRef.current = recommendationKey;
+    }
+  }, [isVisible, initialRecommendation, availableMetrics, applyRecommendedChart]);
 
   // Prepare chart data
   const chartData = useMemo(() => {

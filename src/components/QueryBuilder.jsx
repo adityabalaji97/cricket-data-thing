@@ -135,6 +135,7 @@ const QueryBuilder = ({ isMobile }) => {
   const [nlSourceQuery, setNlSourceQuery] = useState('');
   const [nlRawFilters, setNlRawFilters] = useState({});
   const [nlRecommendedColumns, setNlRecommendedColumns] = useState([]);
+  const [nlRecommendedChart, setNlRecommendedChart] = useState(null);
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const executeQueryRef = useRef(null);
   const nlInputRef = useRef(null);
@@ -263,6 +264,7 @@ const QueryBuilder = ({ isMobile }) => {
     setNlSourceQuery('');
     setNlRawFilters({});
     setNlRecommendedColumns([]);
+    setNlRecommendedChart(null);
     window.history.replaceState({}, '', window.location.pathname);
   };
   
@@ -274,6 +276,7 @@ const QueryBuilder = ({ isMobile }) => {
     confidence,
     suggestions,
     recommendedColumns,
+    recommendedChart,
     interpretation,
   }) => {
     // Reset to defaults then apply NL filters
@@ -294,6 +297,7 @@ const QueryBuilder = ({ isMobile }) => {
     setNlSourceQuery((queryText || '').trim());
     setNlRawFilters(nlFilters || {});
     setNlRecommendedColumns(Array.isArray(recommendedColumns) ? recommendedColumns : []);
+    setNlRecommendedChart(recommendedChart || null);
     setQueryTab(0);
     setHasLoadedFromUrl(false);
 
@@ -431,6 +435,7 @@ const QueryBuilder = ({ isMobile }) => {
               groupBy={groupBy}
               filters={filters}
               recommendedColumns={nlRecommendedColumns}
+              recommendedChart={nlRecommendedChart}
               isMobile={isMobile}
             />
           )}

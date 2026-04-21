@@ -160,7 +160,29 @@ const buildInitialMetricColumns = ({ allColumns, groupBy, recommendedColumns }) 
   return metricColumns.slice(0, 3);
 };
 
-const QueryResults = ({ results, groupBy, filters, recommendedColumns, isMobile }) => {
+const normalizeRecommendedChart = (recommendedChart) => {
+  if (!recommendedChart || typeof recommendedChart !== 'object') {
+    return null;
+  }
+
+  const chartType = String(recommendedChart.type || '').trim().toLowerCase();
+  if (!['bar', 'scatter'].includes(chartType)) {
+    return null;
+  }
+
+  const xAxis = String(recommendedChart.x_axis || '').trim().toLowerCase();
+  const yAxis = String(recommendedChart.y_axis || '').trim().toLowerCase();
+  const reason = String(recommendedChart.reason || '').trim();
+
+  return {
+    type: chartType,
+    x_axis: xAxis,
+    y_axis: yAxis,
+    reason,
+  };
+};
+
+const QueryResults = ({ results, groupBy, filters, recommendedColumns, recommendedChart, isMobile }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
   
@@ -177,8 +199,10 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, isMobile 
   
   // Chart panel ref to trigger chart additions
   const chartPanelRef = useRef(null);
+  const lastAutoChartKeyRef = useRef(null);
   const [showCharts, setShowCharts] = useState(false);
   const [showPitchMap, setShowPitchMap] = useState(false);
+  const [aiChartReason, setAiChartReason] = useState(null);
   const [selectedMetricColumns, setSelectedMetricColumns] = useState(DEFAULT_SELECTED_METRIC_COLUMNS);
   
   // Extract data early to avoid hooks rule violation
@@ -186,6 +210,10 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, isMobile 
   const summaryData = results?.summary_data || null;
   const metadata = results?.metadata || {};
   const isGrouped = groupBy && groupBy.length > 0;
+  const normalizedRecommendedChart = useMemo(
+    () => normalizeRecommendedChart(recommendedChart),
+    [recommendedChart]
+  );
   const hasSummaries = metadata.has_summaries || false;
   const pitchMapMode = useMemo(() => getPitchMapMode(groupBy || []), [groupBy]);
   
@@ -301,6 +329,61 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, isMobile 
     });
     setSelectedMetricColumns(initialColumns);
   }, [results, isGrouped, displayData, groupBy, recommendedColumns]);
+
+  const autoChartRecommendation = useMemo(() => {
+    if (!normalizedRecommendedChart || !isGrouped) {
+      return null;
+    }
+
+    const rowCount = Array.isArray(data) ? data.length : 0;
+    if (rowCount < 3 || rowCount > 50) {
+      return null;
+    }
+
+    return normalizedRecommendedChart;
+  }, [normalizedRecommendedChart, isGrouped, data]);
+
+  const autoChartRecommendationKey = useMemo(() => {
+    if (!autoChartRecommendation) {
+      return null;
+    }
+    const rowCount = Array.isArray(data) ? data.length : 0;
+    return [
+      autoChartRecommendation.type,
+      autoChartRecommendation.x_axis || '',
+      autoChartRecommendation.y_axis || '',
+      groupBy.join('|'),
+      rowCount,
+      JSON.stringify(metadata.filters_applied || {}),
+    ].join('::');
+  }, [autoChartRecommendation, groupBy, data, metadata]);
+
+  const initialChartRecommendation = useMemo(() => {
+    if (!autoChartRecommendation || !autoChartRecommendationKey) {
+      return null;
+    }
+    return {
+      ...autoChartRecommendation,
+      key: autoChartRecommendationKey,
+    };
+  }, [autoChartRecommendation, autoChartRecommendationKey]);
+
+  useEffect(() => {
+    if (!initialChartRecommendation) {
+      setAiChartReason(null);
+      return;
+    }
+    if (lastAutoChartKeyRef.current === initialChartRecommendation.key) {
+      return;
+    }
+
+    lastAutoChartKeyRef.current = initialChartRecommendation.key;
+    setShowCharts(true);
+    setAiChartReason(
+      initialChartRecommendation.reason ||
+      'it best fits the grouped metrics returned for this query'
+    );
+  }, [initialChartRecommendation]);
 
   // Apply column filters to displayData
   const filteredData = useMemo(() => {
@@ -649,6 +732,16 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, isMobile 
                   {metadata.note}
                 </Typography>
               )}
+
+              {aiChartReason && (
+                <Alert
+                  severity="info"
+                  sx={{ mt: 1.25 }}
+                  onClose={() => setAiChartReason(null)}
+                >
+                  {`AI suggested this chart because: ${aiChartReason}`}
+                </Alert>
+              )}
             </Grid>
             
             <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
@@ -893,6 +986,7 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, isMobile 
         ref={chartPanelRef}
         data={sortedData.filter(row => !row.is_summary)}
         groupBy={groupBy}
+        initialRecommendation={initialChartRecommendation}
         isVisible={showCharts && isGrouped}
         onToggle={() => setShowCharts(!showCharts)}
         isMobile={isMobile}

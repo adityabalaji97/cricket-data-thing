@@ -12,6 +12,12 @@ def _mock_llm_response():
         "confidence": "high",
         "suggestions": [],
         "recommended_columns": ["balls", "runs", "strike_rate", "dot_percentage"],
+        "recommended_chart": {
+            "type": "scatter",
+            "x_axis": "runs",
+            "y_axis": "strike_rate",
+            "reason": "Shows run volume against scoring speed.",
+        },
         "interpretation": {
             "summary": "Showing Kohli stats",
             "parsed_entities": [
@@ -53,6 +59,7 @@ def test_parse_nl_query_passes_few_shot_examples_to_openai(monkeypatch):
     assert isinstance(result["interpretation"]["parsed_entities"], list)
     assert isinstance(result["recommended_columns"], list)
     assert "balls" in result["recommended_columns"]
+    assert result["recommended_chart"]["type"] == "scatter"
     assert captured["query"] == "kohli vs spin"
     assert captured["few_shot_examples"] == expected_examples
     assert captured["model"] == nl2query.DEFAULT_NL2QUERY_MODEL

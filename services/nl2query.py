@@ -47,6 +47,7 @@ ALLOWED_RECOMMENDED_COLUMNS = {
     "overs",
     "innings_count",
 }
+VALID_RECOMMENDED_CHART_TYPES = {"bar", "scatter"}
 
 SYSTEM_PROMPT = """You are a cricket analytics query parser. Convert natural language queries about cricket into structured JSON filters for a ball-by-ball cricket statistics database.
 
@@ -60,6 +61,12 @@ Return a JSON object with these fields:
   "confidence": "high" | "medium" | "low",
   "suggestions": ["optional improvement suggestions"],
   "recommended_columns": ["4-6 metric columns to prioritize in results display"],
+  "recommended_chart": {
+    "type": "bar" | "scatter" | null,
+    "x_axis": "column_name",
+    "y_axis": "column_name",
+    "reason": "brief explanation"
+  },
   "interpretation": {
     "summary": "One-line summary of what will be queried",
     "parsed_entities": [
@@ -140,6 +147,17 @@ Available metrics: balls, runs, strike_rate, average, wickets, dots, boundaries,
 dot_percentage, boundary_percentage, economy, control_percentage, percent_balls, runs_conceded,
 balls_per_dismissal, balls_per_wicket, overs, innings_count, balls_faced.
 Choose columns that best answer the user's question.
+
+## Recommended chart
+If the query groups data and would benefit from a chart, return:
+"recommended_chart": {
+  "type": "bar" | "scatter" | null,
+  "x_axis": "column_name",
+  "y_axis": "column_name",
+  "reason": "brief explanation"
+}
+Return null if the data isn't suitable for charting (for example, ungrouped or single-row output).
+Bar charts work well for comparing grouped categories. Scatter plots work for showing relationships between two metrics.
 
 ## Available group_by columns
 venue, country, match_id, competition, year, batting_team, bowling_team, batter, bowler, innings, phase, match_outcome, chase_outcome, toss_decision, toss_match_outcome, bat_hand, bowl_style, bowl_kind, crease_combo, line, length, shot, control, wagon_zone, dismissal
@@ -263,6 +281,11 @@ def _serialize_few_shot_output(example: Dict[str, Any]) -> str:
         if isinstance(example.get("recommended_columns"), list)
         else []
     )
+    recommended_chart = (
+        example.get("recommended_chart")
+        if isinstance(example.get("recommended_chart"), dict)
+        else None
+    )
     payload = {
         "filters": parsed_filters,
         "query_mode": example.get("query_mode") or parsed_filters.get("query_mode") or "delivery",
@@ -271,6 +294,7 @@ def _serialize_few_shot_output(example: Dict[str, Any]) -> str:
         "confidence": example.get("confidence") or "high",
         "suggestions": suggestions,
         "recommended_columns": recommended_columns,
+        "recommended_chart": recommended_chart,
         "interpretation": {
             "summary": interpretation_payload.get("summary") or example.get("explanation") or "",
             "parsed_entities": interpretation_payload.get("parsed_entities")
@@ -613,6 +637,82 @@ def _resolve_recommended_columns(raw_columns: Any, query: str, filters: Dict[str
     return merged
 
 
+def _sanitize_recommended_chart(
+    raw_chart: Any,
+    query: str,
+    filters: Dict[str, Any],
+    group_by: List[str],
+    recommended_columns: List[str],
+) -> Optional[Dict[str, str]]:
+    if raw_chart is None:
+        return None
+    if not isinstance(raw_chart, dict):
+        return None
+
+    chart_type = str(raw_chart.get("type") or "").strip().lower()
+    if chart_type in {"", "none", "null"}:
+        return None
+    if chart_type not in VALID_RECOMMENDED_CHART_TYPES:
+        return None
+
+    metric_candidates = [
+        col for col in (recommended_columns or _default_recommended_columns(query, filters))
+        if col in ALLOWED_RECOMMENDED_COLUMNS
+    ]
+    if not metric_candidates:
+        metric_candidates = ["runs", "strike_rate"]
+
+    reason = str(raw_chart.get("reason") or "").strip()
+    if not reason:
+        reason = (
+            "Compares grouped categories clearly."
+            if chart_type == "bar"
+            else "Shows relationship between two key metrics."
+        )
+    reason = reason[:240]
+
+    x_axis_raw = str(raw_chart.get("x_axis") or "").strip().lower()
+    y_axis_raw = str(raw_chart.get("y_axis") or "").strip().lower()
+
+    if chart_type == "bar":
+        selected_metric = None
+        if y_axis_raw in ALLOWED_RECOMMENDED_COLUMNS:
+            selected_metric = y_axis_raw
+        elif x_axis_raw in ALLOWED_RECOMMENDED_COLUMNS:
+            selected_metric = x_axis_raw
+        else:
+            selected_metric = metric_candidates[0]
+
+        if selected_metric not in ALLOWED_RECOMMENDED_COLUMNS:
+            return None
+
+        x_axis = x_axis_raw or (group_by[0] if group_by else "")
+        return {
+            "type": "bar",
+            "x_axis": x_axis,
+            "y_axis": selected_metric,
+            "reason": reason,
+        }
+
+    x_metric = x_axis_raw if x_axis_raw in ALLOWED_RECOMMENDED_COLUMNS else None
+    y_metric = y_axis_raw if y_axis_raw in ALLOWED_RECOMMENDED_COLUMNS else None
+
+    if x_metric is None:
+        x_metric = metric_candidates[0]
+    if y_metric is None or y_metric == x_metric:
+        y_metric = next((col for col in metric_candidates if col != x_metric), None)
+
+    if not x_metric or not y_metric or x_metric == y_metric:
+        return None
+
+    return {
+        "type": "scatter",
+        "x_axis": x_metric,
+        "y_axis": y_metric,
+        "reason": reason,
+    }
+
+
 def _match_query_fragment(query: str, value: str) -> Optional[str]:
     normalized_query = _normalize_text(query)
     normalized_value = _normalize_text(value)
@@ -872,6 +972,13 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
         query=query,
         filters=validated,
     )
+    recommended_chart = _sanitize_recommended_chart(
+        raw_chart=parsed.get("recommended_chart"),
+        query=query,
+        filters=validated,
+        group_by=group_by,
+        recommended_columns=recommended_columns,
+    )
     interpretation = _sanitize_interpretation(
         parsed=parsed,
         query=query,
@@ -891,6 +998,7 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
         "confidence": confidence,
         "suggestions": suggestions,
         "recommended_columns": recommended_columns,
+        "recommended_chart": recommended_chart,
         "interpretation": interpretation,
     }
 
@@ -1002,12 +1110,20 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
         query=query,
         filters=filters,
     )
+    recommended_chart = _sanitize_recommended_chart(
+        raw_chart=result.get("recommended_chart"),
+        query=query,
+        filters=filters,
+        group_by=group_by,
+        recommended_columns=recommended_columns,
+    )
 
     result["filters"] = filters
     result["group_by"] = group_by
     result["explanation"] = summary
     result["suggestions"] = interpretation["suggestions"]
     result["recommended_columns"] = recommended_columns
+    result["recommended_chart"] = recommended_chart
     result["interpretation"] = interpretation
     return result
 
@@ -1256,7 +1372,7 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
     """Parse a natural language query into structured filters.
 
     Returns validated filters, group_by, explanation, confidence, suggestions,
-    recommended columns, and a structured interpretation payload.
+    recommended columns, recommended chart, and a structured interpretation payload.
     """
     if not query or not query.strip():
         return {
@@ -1268,6 +1384,7 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
             "confidence": "low",
             "suggestions": ["Try a query like 'Kohli vs spin in death overs'"],
             "recommended_columns": [],
+            "recommended_chart": None,
             "interpretation": {
                 "summary": "",
                 "parsed_entities": [],
@@ -1320,6 +1437,7 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
             "confidence": "low",
             "suggestions": ["Try rephrasing your query"],
             "recommended_columns": [],
+            "recommended_chart": None,
             "interpretation": {
                 "summary": "",
                 "parsed_entities": [],
@@ -1337,6 +1455,7 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
             "confidence": "low",
             "suggestions": ["Try rephrasing your query"],
             "recommended_columns": [],
+            "recommended_chart": None,
             "interpretation": {
                 "summary": "",
                 "parsed_entities": [],

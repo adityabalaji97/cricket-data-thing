@@ -90,3 +90,54 @@ def test_recommended_columns_are_sanitized_and_deduped(monkeypatch):
     assert "foo" not in result["recommended_columns"]
     assert result["recommended_columns"].count("runs") == 1
     assert "strike_rate" in result["recommended_columns"]
+
+
+def test_recommended_chart_is_sanitized_when_valid(monkeypatch):
+    nl2query._cache.clear()
+    monkeypatch.setattr(
+        nl2query,
+        "call_openai",
+        lambda _q: {
+            "filters": {"batters": ["Virat Kohli"], "query_mode": "delivery"},
+            "group_by": ["batter"],
+            "explanation": "kohli by batter",
+            "confidence": "high",
+            "suggestions": [],
+            "recommended_columns": ["runs", "strike_rate", "balls"],
+            "recommended_chart": {
+                "type": "scatter",
+                "x_axis": "runs",
+                "y_axis": "strike_rate",
+                "reason": "Compares output and scoring speed.",
+            },
+        },
+    )
+
+    result = nl2query.parse_nl_query("kohli grouped by batter")
+
+    assert result["success"] is True
+    assert result["recommended_chart"]["type"] == "scatter"
+    assert result["recommended_chart"]["x_axis"] == "runs"
+    assert result["recommended_chart"]["y_axis"] == "strike_rate"
+
+
+def test_recommended_chart_invalid_type_becomes_none(monkeypatch):
+    nl2query._cache.clear()
+    monkeypatch.setattr(
+        nl2query,
+        "call_openai",
+        lambda _q: {
+            "filters": {"batters": ["Virat Kohli"], "query_mode": "delivery"},
+            "group_by": ["batter"],
+            "explanation": "kohli grouped by batter",
+            "confidence": "high",
+            "suggestions": [],
+            "recommended_columns": ["runs", "strike_rate", "balls"],
+            "recommended_chart": {"type": "heatmap", "x_axis": "runs", "y_axis": "strike_rate"},
+        },
+    )
+
+    result = nl2query.parse_nl_query("kohli grouped by batter")
+
+    assert result["success"] is True
+    assert result["recommended_chart"] is None

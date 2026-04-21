@@ -68,6 +68,7 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled }, ref) =>
           confidence: data.confidence,
           suggestions: data.suggestions || [],
           recommendedColumns: data.recommended_columns || [],
+          recommendedChart: data.recommended_chart || null,
           interpretation: data.interpretation || null,
         });
         return data;

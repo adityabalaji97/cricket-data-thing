@@ -91,6 +91,13 @@ class NLInterpretation(BaseModel):
     suggestions: List[str] = Field(default_factory=list)
 
 
+class NLRecommendedChart(BaseModel):
+    type: Optional[Literal["bar", "scatter"]] = None
+    x_axis: Optional[str] = None
+    y_axis: Optional[str] = None
+    reason: Optional[str] = None
+
+
 class NLQueryResponse(BaseModel):
     success: bool
     filters: Dict[str, Any] = Field(default_factory=dict)
@@ -99,6 +106,7 @@ class NLQueryResponse(BaseModel):
     confidence: str = "medium"
     suggestions: List[str] = Field(default_factory=list)
     recommended_columns: List[str] = Field(default_factory=list)
+    recommended_chart: Optional[NLRecommendedChart] = None
     interpretation: NLInterpretation = Field(default_factory=NLInterpretation)
     error: Optional[str] = None
 
