@@ -13,6 +13,7 @@ import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
 import { EmptyState } from './ui';
 import { spacing } from '../theme/designSystem';
+import CondensedName from './common/CondensedName';
 
 const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }) => {
   const [viewMode, setViewMode] = useState('topScoring');
@@ -178,7 +179,7 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
                 </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: isMobile ? 60 : 'auto' }}>
                   <Typography variant={isMobile ? 'caption' : 'body2'}>
-                    {isMobile ? inning.bowling_team.substring(0, 3).toUpperCase() : inning.bowling_team}
+                    <CondensedName name={inning.bowling_team} type="team" />
                   </Typography>
                 </TableCell>
                 <TableCell align="right">
@@ -205,7 +206,13 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
                 )}
                 {!isMobile && (
                   <TableCell align="right">
-                    <Typography variant="body2">{inning.winner}</Typography>
+                    <Typography variant="body2">
+                      {inning.winner === inning.bowling_team || inning.winner === inning.batting_team ? (
+                        <CondensedName name={inning.winner} type="team" />
+                      ) : (
+                        inning.winner
+                      )}
+                    </Typography>
                   </TableCell>
                 )}
               </TableRow>

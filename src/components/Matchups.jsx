@@ -26,8 +26,8 @@ import {
     normalizeAnalyticsName,
     postAnalyticsJson,
 } from '../utils/analyticsApi';
-import { condenseName, getFormBorderColor } from '../utils/playerNameUtils';
-import { getTeamAbbr } from '../utils/teamAbbreviations';
+import { getFormBorderColor } from '../utils/playerNameUtils';
+import CondensedName from './common/CondensedName';
 
 const getPlayerFormFlag = (formFlagsByPlayer = {}, playerName = '') => (
     formFlagsByPlayer[playerName] || formFlagsByPlayer[normalizeAnalyticsName(playerName)] || null
@@ -188,7 +188,7 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer }) => {
                             return (
                                 <TableRow key={player.player_name}>
                                 <TableCell sx={{ py: 0.75, fontWeight: 'bold', borderLeft: `3px solid ${getFormBorderColor(formMeta)}` }}>
-                                    {condenseName(player.player_name)}
+                                    <CondensedName name={player.player_name} type="player" />
                                 </TableCell>
                                 <TableCell align="right" sx={{ py: 0.75, color: 'primary.main', fontWeight: 'bold' }}>
                                     {player.expected_points?.toFixed(1) || '0.0'}
@@ -260,7 +260,7 @@ const MatchupMatrix = ({
         }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
                 <Typography variant={isMobile ? "subtitle1" : "h6"}>
-                    {getTeamAbbr(decodeURIComponent(batting_team))} vs {getTeamAbbr(decodeURIComponent(bowling_team))} Matchups
+                    <CondensedName name={decodeURIComponent(batting_team)} type="team" /> vs <CondensedName name={decodeURIComponent(bowling_team)} type="team" /> Matchups
                 </Typography>
                 <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
                     <InfoIcon size={16} />
@@ -327,7 +327,7 @@ const MatchupMatrix = ({
                                                         height: '100%'
                                                     }}
                                                 >
-                                                    {condenseName(bowler)}
+                                                    <CondensedName name={bowler} type="player" />
                                                 </a>
                                             </Box>
                                         )}
@@ -375,7 +375,7 @@ const MatchupMatrix = ({
                                             height: '100%'
                                         }}
                                     >
-                                        {condenseName(batter)}
+                                        <CondensedName name={batter} type="player" />
                                     </a>
                                 </TableCell>
                                 {bowlers.map(bowler => (

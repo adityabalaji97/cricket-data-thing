@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import config from '../config';
-import { getFormFlagMeta } from '../utils/analyticsApi';
+import CondensedName from './common/CondensedName';
 
 const MatchPreviewCard = ({
   venue,
@@ -136,9 +136,14 @@ const MatchPreviewCard = ({
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.08)' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
-        <Typography variant={isMobile ? 'subtitle1' : 'h6'}>
-          AI Match Preview
-        </Typography>
+        <Box>
+          <Typography variant={isMobile ? 'subtitle1' : 'h6'}>
+            AI Match Preview
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            <CondensedName name={team1Identifier} type="team" /> vs <CondensedName name={team2Identifier} type="team" />
+          </Typography>
+        </Box>
         <Stack direction="row" spacing={0.5} alignItems="center">
           {data?.preview_mode && (
             <Chip size="small" label={data.preview_mode} variant="outlined" />

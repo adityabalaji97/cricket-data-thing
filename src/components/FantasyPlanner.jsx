@@ -22,6 +22,8 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
 import config from '../config';
+import CondensedName from './common/CondensedName';
+import { getTeamAbbr } from '../utils/teamAbbreviations';
 
 const TEAM_COLORS = {
     CSK: '#eff542', MI: '#42a7f5', RCB: '#f54242', RR: '#FF2AA8',
@@ -31,6 +33,7 @@ const TEAM_COLORS = {
 
 const RECOMMENDATION_RETRY_DELAYS_MS = process.env.NODE_ENV === 'test' ? [0, 1, 1] : [0, 1500, 4000];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const getTeamCode = (team) => getTeamAbbr(team || '');
 
 // ─── Fixture Calendar (Panel 1) ────────────────────────────────────────────
 const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recommendationsLoading }) => {
@@ -53,8 +56,10 @@ const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recomme
             pb: 1,
         }}>
             {fixtures.map((f) => {
-                const t1Count = (squadTeams || []).filter(t => t === f.team1).length;
-                const t2Count = (squadTeams || []).filter(t => t === f.team2).length;
+                const team1Code = getTeamCode(f.team1);
+                const team2Code = getTeamCode(f.team2);
+                const t1Count = (squadTeams || []).filter(t => getTeamCode(t) === team1Code).length;
+                const t2Count = (squadTeams || []).filter(t => getTeamCode(t) === team2Code).length;
                 const detail = (matchDetails || []).find((d) => d.match_num === f.match_num);
                 const topPicks = [...(detail?.player_points || [])]
                     .sort((a, b) => (b.expected_points || 0) - (a.expected_points || 0))
@@ -84,22 +89,22 @@ const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recomme
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                             <Chip
-                                label={f.team1}
+                                label={<CondensedName name={f.team1} type="team" />}
                                 size="small"
                                 sx={{
-                                    bgcolor: TEAM_COLORS[f.team1] || '#666',
-                                    color: ['CSK', 'LSG'].includes(f.team1) ? '#000' : '#fff',
+                                    bgcolor: TEAM_COLORS[team1Code] || '#666',
+                                    color: ['CSK', 'LSG'].includes(team1Code) ? '#000' : '#fff',
                                     fontWeight: 700,
                                     fontSize: '0.7rem',
                                 }}
                             />
                             <Typography variant="caption" sx={{ fontWeight: 600 }}>vs</Typography>
                             <Chip
-                                label={f.team2}
+                                label={<CondensedName name={f.team2} type="team" />}
                                 size="small"
                                 sx={{
-                                    bgcolor: TEAM_COLORS[f.team2] || '#666',
-                                    color: ['CSK', 'LSG'].includes(f.team2) ? '#000' : '#fff',
+                                    bgcolor: TEAM_COLORS[team2Code] || '#666',
+                                    color: ['CSK', 'LSG'].includes(team2Code) ? '#000' : '#fff',
                                     fontWeight: 700,
                                     fontSize: '0.7rem',
                                 }}
@@ -126,7 +131,7 @@ const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recomme
                                         color="text.secondary"
                                         sx={{ display: 'block', fontSize: '0.7rem', lineHeight: 1.4 }}
                                     >
-                                        {idx + 1}. {pick.name} ({pick.team}) &mdash; {Number(pick.expected_points || 0).toFixed(1)} pts
+                                        {idx + 1}. <CondensedName name={pick.name} type="player" /> (<CondensedName name={pick.team} type="team" />) &mdash; {Number(pick.expected_points || 0).toFixed(1)} pts
                                     </Typography>
                                 ))}
                                 </Box>
@@ -197,7 +202,7 @@ const SquadBuilder = ({ squad, onRemovePlayer, onAddPlayer, onAutoPick, loading,
                 }}
                 options={selectablePlayers}
                 disabled={(squad || []).length >= 11}
-                getOptionLabel={(option) => `${option.name} (${option.team}) - ${option.credits} cr`}
+                getOptionLabel={(option) => `${option.name} (${getTeamCode(option.team)}) - ${option.credits} cr`}
                 isOptionEqualToValue={(option, value) => option.name === value.name}
                 noOptionsText={(squad || []).length >= 11 ? 'Squad is full' : 'No players found'}
                 renderInput={(params) => (
@@ -215,7 +220,9 @@ const SquadBuilder = ({ squad, onRemovePlayer, onAddPlayer, onAutoPick, loading,
                     <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>
                         {role === 'WK' ? 'Wicket-keepers' : role === 'BAT' ? 'Batters' : role === 'BOWL' ? 'Bowlers' : 'All-rounders'} ({players.length})
                     </Typography>
-                    {players.map((p) => (
+                    {players.map((p) => {
+                        const teamCode = getTeamCode(p.team);
+                        return (
                         <Box
                             key={p.name}
                             sx={{
@@ -229,16 +236,16 @@ const SquadBuilder = ({ squad, onRemovePlayer, onAddPlayer, onAutoPick, loading,
                         >
                             <Box>
                                 <Typography variant="body2" sx={{ fontWeight: 600, fontSize: isMobile ? '0.8rem' : '0.875rem' }}>
-                                    {p.name}
+                                    <CondensedName name={p.name} type="player" />
                                 </Typography>
                                 <Chip
-                                    label={p.team}
+                                    label={<CondensedName name={p.team} type="team" />}
                                     size="small"
                                     sx={{
                                         height: 18,
                                         fontSize: '0.6rem',
-                                        bgcolor: TEAM_COLORS[p.team] || '#666',
-                                        color: ['CSK', 'LSG'].includes(p.team) ? '#000' : '#fff',
+                                        bgcolor: TEAM_COLORS[teamCode] || '#666',
+                                        color: ['CSK', 'LSG'].includes(teamCode) ? '#000' : '#fff',
                                     }}
                                 />
                             </Box>
@@ -254,7 +261,8 @@ const SquadBuilder = ({ squad, onRemovePlayer, onAddPlayer, onAutoPick, loading,
                                 </IconButton>
                             </Box>
                         </Box>
-                    ))}
+                        );
+                    })}
                 </Box>
             ))}
 
@@ -314,20 +322,22 @@ const RecommendationsTable = ({ allPlayers, squad, onAddPlayer, isMobile }) => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {sorted.map((p) => (
+                        {sorted.map((p) => {
+                            const teamCode = getTeamCode(p.team);
+                            return (
                             <TableRow key={p.name} sx={{ bgcolor: squadNames.has(p.name) ? 'action.selected' : 'inherit' }}>
                                 <TableCell sx={{ fontSize: '0.8rem', fontWeight: squadNames.has(p.name) ? 700 : 400 }}>
-                                    {p.name}
+                                    <CondensedName name={p.name} type="player" />
                                 </TableCell>
                                 <TableCell>
                                     <Chip
-                                        label={p.team}
+                                        label={<CondensedName name={p.team} type="team" />}
                                         size="small"
                                         sx={{
                                             height: 18,
                                             fontSize: '0.6rem',
-                                            bgcolor: TEAM_COLORS[p.team] || '#666',
-                                            color: ['CSK', 'LSG'].includes(p.team) ? '#000' : '#fff',
+                                            bgcolor: TEAM_COLORS[teamCode] || '#666',
+                                            color: ['CSK', 'LSG'].includes(teamCode) ? '#000' : '#fff',
                                         }}
                                     />
                                 </TableCell>
@@ -354,7 +364,8 @@ const RecommendationsTable = ({ allPlayers, squad, onAddPlayer, isMobile }) => {
                                     )}
                                 </TableCell>
                             </TableRow>
-                        ))}
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </TableContainer>
@@ -363,6 +374,17 @@ const RecommendationsTable = ({ allPlayers, squad, onAddPlayer, isMobile }) => {
 };
 
 // ─── Transfer Plan View ────────────────────────────────────────────────────
+const PlayerNameList = ({ names = [] }) => (
+    <>
+        {names.map((name, idx) => (
+            <React.Fragment key={`${name}-${idx}`}>
+                {idx > 0 ? ', ' : ''}
+                <CondensedName name={name} type="player" />
+            </React.Fragment>
+        ))}
+    </>
+);
+
 const TransferPlanView = ({ plan, isMobile }) => {
     if (!plan || !plan.plan || plan.plan.length === 0) {
         return (
@@ -388,20 +410,20 @@ const TransferPlanView = ({ plan, isMobile }) => {
                     {gw.transfers_in.length > 0 && (
                         <Box sx={{ mt: 1 }}>
                             <Typography variant="caption" sx={{ fontWeight: 600, color: 'success.main' }}>
-                                IN: {gw.transfers_in.join(', ')}
+                                IN: <PlayerNameList names={gw.transfers_in} />
                             </Typography>
                         </Box>
                     )}
                     {gw.transfers_out.length > 0 && (
                         <Box>
                             <Typography variant="caption" sx={{ fontWeight: 600, color: 'error.main' }}>
-                                OUT: {gw.transfers_out.join(', ')}
+                                OUT: <PlayerNameList names={gw.transfers_out} />
                             </Typography>
                         </Box>
                     )}
                     {gw.captain && (
                         <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                            C: {gw.captain} &middot; VC: {gw.vice_captain}
+                            C: <CondensedName name={gw.captain} type="player" /> &middot; VC: <CondensedName name={gw.vice_captain} type="player" />
                         </Typography>
                     )}
                 </Card>

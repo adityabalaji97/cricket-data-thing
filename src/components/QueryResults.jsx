@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { getTeamAbbr } from '../utils/teamAbbreviations';
+import CondensedName from './common/CondensedName';
 import {
   Box,
   Typography,
@@ -92,6 +92,41 @@ const ColumnFilter = ({ column, displayName, uniqueValues, selectedValues, onCha
       )}
     </Box>
   );
+};
+
+const TEAM_NAME_KEYS = new Set([
+  'batting_team',
+  'bowling_team',
+  'team',
+  'team1',
+  'team2',
+  'winner',
+  'loser',
+  'opposition',
+  'opponent_team',
+  'toss_winner',
+]);
+
+const PLAYER_NAME_KEYS = new Set([
+  'batter',
+  'bowler',
+  'striker',
+  'non_striker',
+  'player',
+  'player_name',
+  'player_of_match',
+  'captain',
+  'vice_captain',
+]);
+
+const isTeamNameColumn = (key) => {
+  const normalized = String(key || '').toLowerCase();
+  return TEAM_NAME_KEYS.has(normalized) || normalized.endsWith('_team');
+};
+
+const isPlayerNameColumn = (key) => {
+  const normalized = String(key || '').toLowerCase();
+  return PLAYER_NAME_KEYS.has(normalized) || normalized.endsWith('_player');
 };
 
 const QueryResults = ({ results, groupBy, filters, isMobile }) => {
@@ -398,8 +433,16 @@ const QueryResults = ({ results, groupBy, filters, isMobile }) => {
   const formatValue = (value, key) => {
     if (value === null || value === undefined) return 'N/A';
 
-    if ((key === 'batting_team' || key === 'bowling_team') && typeof value === 'string') {
-      return getTeamAbbr(value);
+    if (typeof value === 'string' && isTeamNameColumn(key)) {
+      const normalized = value.trim().toLowerCase();
+      if (['no result', 'tie', 'draw', 'abandoned', 'n/a'].includes(normalized)) {
+        return value;
+      }
+      return <CondensedName name={value} type="team" />;
+    }
+
+    if (typeof value === 'string' && isPlayerNameColumn(key)) {
+      return <CondensedName name={value} type="player" />;
     }
 
     if (key.includes('percentage') || key === 'percent_balls') {

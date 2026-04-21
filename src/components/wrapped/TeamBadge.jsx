@@ -1,13 +1,11 @@
 import React from 'react';
-import { getTeamAbbr } from '../../utils/teamAbbreviations';
+import CondensedName from '../common/CondensedName';
 
 /**
  * Small badge showing abbreviated team name
  */
 const TeamBadge = ({ team, size = 'small' }) => {
   if (!team) return null;
-  
-  const abbr = getTeamAbbr(team);
   
   const sizeStyles = {
     small: {
@@ -23,7 +21,10 @@ const TeamBadge = ({ team, size = 'small' }) => {
   const style = sizeStyles[size] || sizeStyles.small;
   
   return (
-    <span
+    <CondensedName
+      name={team}
+      type="team"
+      component="span"
       style={{
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         color: '#888',
@@ -33,9 +34,7 @@ const TeamBadge = ({ team, size = 'small' }) => {
         whiteSpace: 'nowrap',
         ...style
       }}
-    >
-      {abbr}
-    </span>
+    />
   );
 };
 

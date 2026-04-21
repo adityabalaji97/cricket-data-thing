@@ -16,6 +16,7 @@ import {
   ButtonGroup
 } from '@mui/material';
 import { spacing, colors, borderRadius } from '../theme/designSystem';
+import CondensedName from './common/CondensedName';
 
 const BowlingInningsTable = ({ stats, isMobile = false, wrapInCard = true }) => {
   const [displayMode, setDisplayMode] = useState('topWickets');
@@ -203,7 +204,7 @@ const BowlingInningsTable = ({ stats, isMobile = false, wrapInCard = true }) => 
                   hover
                 >
                   <TableCell>{inning.formattedDate}</TableCell>
-                  <TableCell>{inning.batting_team}</TableCell>
+                  <TableCell><CondensedName name={inning.batting_team} type="team" /></TableCell>
                   <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {inning.venue}
                   </TableCell>
