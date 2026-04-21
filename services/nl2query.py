@@ -750,6 +750,13 @@ def persist_nl_query_log(
 
     filters = parse_result.get("filters") if isinstance(parse_result.get("filters"), dict) else {}
     group_by = parse_result.get("group_by") if isinstance(parse_result.get("group_by"), list) else []
+    # Serialize JSON fields explicitly for raw text(...) SQL + psycopg2 compatibility.
+    parsed_filters_json = json.dumps(filters, ensure_ascii=True)
+    group_by_json = json.dumps(group_by, ensure_ascii=True)
+    query_mode = parse_result.get("query_mode") or filters.get("query_mode")
+    query_mode = str(query_mode).strip() if query_mode is not None else None
+    if not query_mode:
+        query_mode = None
     confidence = parse_result.get("confidence")
     confidence = str(confidence) if confidence is not None else None
     explanation = parse_result.get("explanation")
@@ -777,9 +784,9 @@ def persist_nl_query_log(
                 )
                 VALUES (
                     :query_text,
-                    :parsed_filters,
+                    CAST(:parsed_filters AS JSONB),
                     :query_mode,
-                    :group_by,
+                    CAST(:group_by AS JSONB),
                     :explanation,
                     :confidence,
                     :model_used,
@@ -793,9 +800,9 @@ def persist_nl_query_log(
             ),
             {
                 "query_text": query_text.strip(),
-                "parsed_filters": filters,
-                "query_mode": filters.get("query_mode"),
-                "group_by": group_by,
+                "parsed_filters": parsed_filters_json,
+                "query_mode": query_mode,
+                "group_by": group_by_json,
                 "explanation": explanation,
                 "confidence": confidence,
                 "model_used": model_used,
@@ -811,7 +818,7 @@ def persist_nl_query_log(
             return None
         return int(new_row[0])
     except Exception as exc:
-        logger.debug("Skipping nl_query_log insert: %s", exc)
+        logger.warning("Skipping nl_query_log insert due to write error: %s", exc)
         try:
             session.rollback()
         except Exception:

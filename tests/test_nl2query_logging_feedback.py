@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+import json
 
 from services import nl2query
 
@@ -67,6 +68,15 @@ def test_persist_nl_query_log_inserts_and_returns_id():
 
     assert log_id == 42
     assert mock_db.commit.called
+    execute_call = mock_db.execute.call_args
+    params = execute_call[0][1]
+    assert isinstance(params["parsed_filters"], str)
+    assert isinstance(params["group_by"], str)
+    assert json.loads(params["parsed_filters"]) == {
+        "query_mode": "delivery",
+        "batters": ["Virat Kohli"],
+    }
+    assert json.loads(params["group_by"]) == ["batter"]
 
 
 def test_update_nl_query_feedback_updates_latest_match():
