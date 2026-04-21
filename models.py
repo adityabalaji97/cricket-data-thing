@@ -1,6 +1,7 @@
 # models.py
-from sqlalchemy import create_engine, Column, Integer, String, Date, JSON, ForeignKey, Float, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Date, JSON, ForeignKey, Float, Boolean, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import func
 
 Base = declarative_base()
 
@@ -377,3 +378,24 @@ class DeliveryDetails(Base):
     striker_batter_type = Column(String(10))  # RHB/LHB
     non_striker_batter_type = Column(String(10))  # RHB/LHB
     crease_combo = Column(String(20))  # e.g., RHB_LHB, LHB_LHB
+
+
+class NLQueryLog(Base):
+    """Persistent logs for NL query parsing, feedback, and learning."""
+    __tablename__ = "nl_query_log"
+
+    id = Column(Integer, primary_key=True)
+    query_text = Column(Text, nullable=False)
+    parsed_filters = Column(JSON, nullable=True)
+    query_mode = Column(String(50), nullable=True)
+    group_by = Column(JSON, nullable=True)
+    explanation = Column(Text, nullable=True)
+    confidence = Column(String(20), nullable=True)
+    model_used = Column(String(50), nullable=True)
+    execution_success = Column(Boolean, nullable=True)
+    result_row_count = Column(Integer, nullable=True)
+    user_feedback = Column(String(20), nullable=True)  # good | bad | refined
+    refined_query_text = Column(Text, nullable=True)
+    ip_hash = Column(String(64), nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    execution_time_ms = Column(Integer, nullable=True)

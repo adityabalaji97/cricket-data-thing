@@ -14,7 +14,7 @@
 | 1 | Name Condensing + Tooltips | [x] | 2026-04-21 |
 | 2 | Scatter Plot Zoom | [ ] | — |
 | 3 | xPoints Balls Fix | [x] | 2026-04-21 |
-| 4 | NL Query Logging | [ ] | — |
+| 4 | NL Query Logging | [x] | 2026-04-21 |
 | 5 | Enhanced AI Interpretation | [ ] | — |
 | 6 | Intelligent Columns | [ ] | — |
 | 7 | Auto-Chart from NL | [ ] | — |

@@ -4,11 +4,17 @@ Provides endpoints for parsing natural language cricket queries.
 """
 import time
 from collections import defaultdict
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, HTTPException, Request, Depends, BackgroundTasks
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from sqlalchemy.orm import Session
-from services.nl2query import parse_nl_query, get_example_queries, get_cache_size
+from services.nl2query import (
+    parse_nl_query,
+    get_example_queries,
+    get_cache_size,
+    log_nl_query_event_background,
+    update_nl_query_feedback,
+)
 from database import get_session
 import os
 
@@ -83,19 +89,81 @@ class NLQueryResponse(BaseModel):
     error: Optional[str] = None
 
 
+class NLQueryFeedbackRequest(BaseModel):
+    query_text: str = Field(..., min_length=1, max_length=500)
+    feedback: Literal["good", "bad", "refined"]
+    refined_query_text: Optional[str] = Field(default=None, max_length=500)
+    execution_success: Optional[bool] = None
+    result_row_count: Optional[int] = Field(default=None, ge=0)
+
+
+class NLQueryFeedbackResponse(BaseModel):
+    success: bool
+    query_log_id: int
+    feedback: Literal["good", "bad", "refined"]
+
+
 class ExampleQuery(BaseModel):
     text: str
     category: str
 
 
 @router.post("/parse", response_model=NLQueryResponse)
-def parse_query(request: NLQueryRequest, req: Request, db: Session = Depends(get_session)):
+def parse_query(
+    request: NLQueryRequest,
+    req: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_session),
+):
     """Parse a natural language cricket query into structured filters."""
     client_ip = req.client.host if req.client else "unknown"
     _check_rate_limit(client_ip)
 
+    started_at = time.time()
     result = parse_nl_query(request.query, db=db)
+    execution_time_ms = int((time.time() - started_at) * 1000)
+
+    background_tasks.add_task(
+        log_nl_query_event_background,
+        query_text=request.query,
+        parse_result=result,
+        ip_address=client_ip,
+        execution_time_ms=execution_time_ms,
+    )
+
     return NLQueryResponse(**result)
+
+
+@router.post("/feedback", response_model=NLQueryFeedbackResponse)
+def submit_feedback(
+    request: NLQueryFeedbackRequest,
+    req: Request,
+    db: Session = Depends(get_session),
+):
+    """Capture user feedback for a previously parsed NL query."""
+    client_ip = req.client.host if req.client else "unknown"
+    _check_rate_limit(f"{client_ip}:feedback")
+
+    if request.feedback == "refined" and not (request.refined_query_text or "").strip():
+        raise HTTPException(status_code=400, detail="refined_query_text is required when feedback='refined'")
+
+    updated = update_nl_query_feedback(
+        query_text=request.query_text,
+        feedback=request.feedback,
+        ip_address=client_ip,
+        db=db,
+        refined_query_text=request.refined_query_text,
+        execution_success=request.execution_success,
+        result_row_count=request.result_row_count,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Matching NL query log entry not found")
+
+    return NLQueryFeedbackResponse(
+        success=True,
+        query_log_id=int(updated["query_log_id"]),
+        feedback=updated["feedback"],
+    )
 
 
 @router.get("/examples", response_model=List[ExampleQuery])

@@ -8,9 +8,11 @@ import json
 import time
 import logging
 import re
+import hashlib
 from typing import Dict, Any, Optional, List
 from openai import OpenAI
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 try:
     from venue_standardization import VENUE_STANDARDIZATION
 except Exception:  # pragma: no cover - defensive fallback
@@ -21,6 +23,8 @@ logger = logging.getLogger(__name__)
 # In-memory cache with TTL
 _cache: Dict[str, Dict[str, Any]] = {}
 CACHE_TTL = 86400  # 24 hours
+DEFAULT_NL2QUERY_MODEL = "gpt-4o-mini"
+MAX_FEW_SHOT_EXAMPLES = 5
 
 SYSTEM_PROMPT = """You are a cricket analytics query parser. Convert natural language queries about cricket into structured JSON filters for a ball-by-ball cricket statistics database.
 
@@ -202,20 +206,153 @@ def get_cache_size() -> int:
     return len(_cache)
 
 
-def call_openai(query: str) -> Dict[str, Any]:
-    """Call OpenAI GPT-4o-mini to parse a natural language cricket query."""
+def _infer_query_mode_hint(query: str) -> str:
+    q = (query or "").lower()
+    bowling_markers = {"wicketless", "wickets", "economy", "bowling", "bowler", "5-wicket", "five wicket"}
+    batting_markers = {"batting", "scores", "score", "fifties", "fifty", "century", "hundred", "innings"}
+    if any(marker in q for marker in bowling_markers):
+        return "bowling_stats"
+    if any(marker in q for marker in batting_markers):
+        return "batting_stats"
+    return "delivery"
+
+
+def _serialize_few_shot_output(example: Dict[str, Any]) -> str:
+    parsed_filters = example.get("parsed_filters") if isinstance(example.get("parsed_filters"), dict) else {}
+    payload = {
+        "filters": parsed_filters,
+        "query_mode": example.get("query_mode") or parsed_filters.get("query_mode") or "delivery",
+        "group_by": example.get("group_by") if isinstance(example.get("group_by"), list) else [],
+        "explanation": example.get("explanation") or "",
+        "confidence": example.get("confidence") or "high",
+        "suggestions": [],
+    }
+    return json.dumps(payload, ensure_ascii=True)
+
+
+def get_few_shot_examples(query: str, db: Optional[Session], limit: int = MAX_FEW_SHOT_EXAMPLES) -> List[Dict[str, Any]]:
+    """Fetch top successful historical queries to use as few-shot examples."""
+    if db is None:
+        return []
+
+    normalized_query = _normalize_text(query)
+    query_tokens = set(token for token in normalized_query.split() if token)
+    if not query_tokens:
+        return []
+
+    try:
+        rows = (
+            db.execute(
+                text(
+                    """
+                    SELECT
+                        query_text,
+                        parsed_filters,
+                        query_mode,
+                        group_by,
+                        explanation,
+                        confidence,
+                        created_at
+                    FROM nl_query_log
+                    WHERE user_feedback = 'good'
+                      AND execution_success IS TRUE
+                      AND parsed_filters IS NOT NULL
+                    ORDER BY created_at DESC
+                    LIMIT 200
+                    """
+                )
+            )
+            .mappings()
+            .all()
+        )
+    except Exception as exc:
+        logger.debug("Skipping few-shot retrieval; nl_query_log unavailable: %s", exc)
+        return []
+
+    if not rows:
+        return []
+
+    mode_hint = _infer_query_mode_hint(query)
+    ranked: List[Dict[str, Any]] = []
+
+    for row in rows:
+        candidate_query = str(row.get("query_text") or "").strip()
+        if not candidate_query:
+            continue
+
+        candidate_tokens = set(token for token in _normalize_text(candidate_query).split() if token)
+        overlap = len(query_tokens.intersection(candidate_tokens))
+        union = len(query_tokens.union(candidate_tokens))
+        lexical_score = (overlap / union) if union else 0.0
+
+        candidate_mode = row.get("query_mode") or "delivery"
+        mode_score = 0.35 if candidate_mode == mode_hint else 0.0
+
+        parsed_filters = row.get("parsed_filters")
+        parsed_filters = parsed_filters if isinstance(parsed_filters, dict) else {}
+        created_at_value = row.get("created_at")
+        created_at_epoch = created_at_value.timestamp() if hasattr(created_at_value, "timestamp") else 0.0
+
+        ranked.append(
+            {
+                "query_text": candidate_query,
+                "parsed_filters": parsed_filters,
+                "query_mode": candidate_mode,
+                "group_by": row.get("group_by") if isinstance(row.get("group_by"), list) else [],
+                "explanation": row.get("explanation") or "",
+                "confidence": row.get("confidence") or "high",
+                "created_at_epoch": created_at_epoch,
+                "_score": lexical_score + mode_score,
+            }
+        )
+
+    if not ranked:
+        return []
+
+    ranked.sort(key=lambda item: (item.get("_score", 0.0), item.get("created_at_epoch", 0.0)), reverse=True)
+    selected = [item for item in ranked if item.get("_score", 0.0) > 0][:limit]
+
+    if len(selected) < limit:
+        seen_queries = {item["query_text"] for item in selected}
+        fallback = [item for item in ranked if item["query_text"] not in seen_queries and item.get("query_mode") == mode_hint]
+        selected.extend(fallback[: max(0, limit - len(selected))])
+
+    if len(selected) < limit:
+        seen_queries = {item["query_text"] for item in selected}
+        fallback = [item for item in ranked if item["query_text"] not in seen_queries]
+        selected.extend(fallback[: max(0, limit - len(selected))])
+
+    for item in selected:
+        item.pop("_score", None)
+        item.pop("created_at_epoch", None)
+
+    return selected[:limit]
+
+
+def call_openai(
+    query: str,
+    few_shot_examples: Optional[List[Dict[str, Any]]] = None,
+    model: str = DEFAULT_NL2QUERY_MODEL,
+) -> Dict[str, Any]:
+    """Call OpenAI to parse a natural language cricket query."""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY not configured")
 
     client = OpenAI(api_key=api_key)
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    for example in few_shot_examples or []:
+        query_text = str(example.get("query_text") or "").strip()
+        if not query_text:
+            continue
+        messages.append({"role": "user", "content": query_text})
+        messages.append({"role": "assistant", "content": _serialize_few_shot_output(example)})
+    messages.append({"role": "user", "content": query})
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": query}
-        ],
+        model=model,
+        messages=messages,
         response_format={"type": "json_object"},
         temperature=0.1,
         max_tokens=1000
@@ -585,6 +722,216 @@ def resolve_player_names(names: List[str], db: Session) -> List[str]:
     return resolved
 
 
+def _hash_ip(ip_address: Optional[str]) -> Optional[str]:
+    if not ip_address:
+        return None
+    salt = os.getenv("NL_QUERY_IP_SALT", "")
+    return hashlib.sha256(f"{salt}:{ip_address}".encode("utf-8")).hexdigest()
+
+
+def persist_nl_query_log(
+    query_text: str,
+    parse_result: Dict[str, Any],
+    ip_address: Optional[str],
+    execution_time_ms: Optional[int],
+    model_used: str = DEFAULT_NL2QUERY_MODEL,
+    db: Optional[Session] = None,
+) -> Optional[int]:
+    """Persist one NL query parse log row. Never raises to caller."""
+    owns_session = db is None
+    session = db
+    if session is None:
+        try:
+            from database import SessionLocal  # local import to avoid tight startup coupling
+            session = SessionLocal()
+        except Exception as exc:
+            logger.warning("Unable to open DB session for NL query logging: %s", exc)
+            return None
+
+    filters = parse_result.get("filters") if isinstance(parse_result.get("filters"), dict) else {}
+    group_by = parse_result.get("group_by") if isinstance(parse_result.get("group_by"), list) else []
+    confidence = parse_result.get("confidence")
+    confidence = str(confidence) if confidence is not None else None
+    explanation = parse_result.get("explanation")
+    explanation = str(explanation) if explanation is not None else None
+    success = bool(parse_result.get("success"))
+    row_count = parse_result.get("result_row_count")
+    row_count = int(row_count) if isinstance(row_count, int) else None
+
+    try:
+        insert_result = session.execute(
+            text(
+                """
+                INSERT INTO nl_query_log (
+                    query_text,
+                    parsed_filters,
+                    query_mode,
+                    group_by,
+                    explanation,
+                    confidence,
+                    model_used,
+                    execution_success,
+                    result_row_count,
+                    ip_hash,
+                    execution_time_ms
+                )
+                VALUES (
+                    :query_text,
+                    :parsed_filters,
+                    :query_mode,
+                    :group_by,
+                    :explanation,
+                    :confidence,
+                    :model_used,
+                    :execution_success,
+                    :result_row_count,
+                    :ip_hash,
+                    :execution_time_ms
+                )
+                RETURNING id
+                """
+            ),
+            {
+                "query_text": query_text.strip(),
+                "parsed_filters": filters,
+                "query_mode": filters.get("query_mode"),
+                "group_by": group_by,
+                "explanation": explanation,
+                "confidence": confidence,
+                "model_used": model_used,
+                "execution_success": success,
+                "result_row_count": row_count,
+                "ip_hash": _hash_ip(ip_address),
+                "execution_time_ms": int(execution_time_ms) if execution_time_ms is not None else None,
+            },
+        )
+        new_row = insert_result.fetchone()
+        session.commit()
+        if new_row is None:
+            return None
+        return int(new_row[0])
+    except Exception as exc:
+        logger.debug("Skipping nl_query_log insert: %s", exc)
+        try:
+            session.rollback()
+        except Exception:
+            pass
+        return None
+    finally:
+        if owns_session and session is not None:
+            try:
+                session.close()
+            except Exception:
+                pass
+
+
+def log_nl_query_event_background(
+    query_text: str,
+    parse_result: Dict[str, Any],
+    ip_address: Optional[str],
+    execution_time_ms: Optional[int],
+) -> None:
+    """Background task wrapper for non-blocking query logging."""
+    persist_nl_query_log(
+        query_text=query_text,
+        parse_result=parse_result,
+        ip_address=ip_address,
+        execution_time_ms=execution_time_ms,
+        model_used=DEFAULT_NL2QUERY_MODEL,
+        db=None,
+    )
+
+
+def update_nl_query_feedback(
+    query_text: str,
+    feedback: str,
+    ip_address: Optional[str],
+    db: Session,
+    refined_query_text: Optional[str] = None,
+    execution_success: Optional[bool] = None,
+    result_row_count: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """Update feedback fields on the latest matching log row."""
+    normalized_query = (query_text or "").strip()
+    if not normalized_query:
+        return None
+
+    feedback_value = (feedback or "").strip().lower()
+    if feedback_value not in {"good", "bad", "refined"}:
+        return None
+
+    ip_hash = _hash_ip(ip_address)
+    target_row = None
+
+    try:
+        if ip_hash:
+            target_row = db.execute(
+                text(
+                    """
+                    SELECT id
+                    FROM nl_query_log
+                    WHERE query_text = :query_text
+                      AND ip_hash = :ip_hash
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"query_text": normalized_query, "ip_hash": ip_hash},
+            ).fetchone()
+
+        if target_row is None:
+            target_row = db.execute(
+                text(
+                    """
+                    SELECT id
+                    FROM nl_query_log
+                    WHERE query_text = :query_text
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"query_text": normalized_query},
+            ).fetchone()
+
+        if target_row is None:
+            return None
+
+        query_log_id = int(target_row[0])
+        db.execute(
+            text(
+                """
+                UPDATE nl_query_log
+                SET
+                    user_feedback = :user_feedback,
+                    refined_query_text = COALESCE(:refined_query_text, refined_query_text),
+                    execution_success = COALESCE(:execution_success, execution_success),
+                    result_row_count = COALESCE(:result_row_count, result_row_count)
+                WHERE id = :id
+                """
+            ),
+            {
+                "id": query_log_id,
+                "user_feedback": feedback_value,
+                "refined_query_text": refined_query_text.strip() if refined_query_text else None,
+                "execution_success": execution_success,
+                "result_row_count": int(result_row_count) if isinstance(result_row_count, int) else None,
+            },
+        )
+        db.commit()
+
+        return {
+            "query_log_id": query_log_id,
+            "feedback": feedback_value,
+        }
+    except Exception as exc:
+        logger.debug("Failed to update nl_query_log feedback: %s", exc)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return None
+
+
 def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
     """Parse a natural language query into structured filters.
 
@@ -607,7 +954,19 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
         return cached
 
     try:
-        raw = call_openai(query)
+        few_shot_examples: List[Dict[str, Any]] = []
+        if db is not None:
+            few_shot_examples = get_few_shot_examples(query, db=db, limit=MAX_FEW_SHOT_EXAMPLES)
+
+        try:
+            raw = call_openai(
+                query,
+                few_shot_examples=few_shot_examples,
+                model=DEFAULT_NL2QUERY_MODEL,
+            )
+        except TypeError:
+            # Backward-compatible fallback for tests that monkeypatch call_openai(query).
+            raw = call_openai(query)
         result = validate_filters(raw)
 
         # Resolve player names against DB if session available
