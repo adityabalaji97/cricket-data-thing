@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useImperativeHandle, useState } from 'react';
 import {
   Box,
   Paper,
@@ -38,7 +38,7 @@ const QUERY_TIPS = `Try queries like:
 - Grouping: include "grouped by [competition/year/batter/bowler/bat_hand/bowl_style/match_outcome/toss_decision]"
 - Context filters: use phrases like "in chases", "winning vs losing", "toss decision bat/field", "since 2023"`;
 
-const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
+const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled }, ref) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [query, setQuery] = useState('');
@@ -47,7 +47,7 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
 
   const submitQuery = async (queryText) => {
     const q = (queryText || query).trim();
-    if (!q || loading) return;
+    if (!q || loading) return null;
 
     setLoading(true);
     setError(null);
@@ -61,21 +61,38 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
 
       if (data.success) {
         onFiltersGenerated({
+          queryText: q,
           filters: data.filters,
           groupBy: data.group_by,
           explanation: data.explanation,
-          confidence: data.confidence
+          confidence: data.confidence,
+          suggestions: data.suggestions || [],
+          interpretation: data.interpretation || null,
         });
+        return data;
       } else {
         setError(data.error || 'Failed to parse query');
+        return null;
       }
     } catch (err) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : 'Failed to parse query. Please try again.');
+      return null;
     } finally {
       setLoading(false);
     }
   };
+
+  const runQuery = (queryText) => {
+    if (queryText) {
+      setQuery(queryText);
+    }
+    return submitQuery(queryText);
+  };
+
+  useImperativeHandle(ref, () => ({
+    runQuery,
+  }));
 
   const handleSubmit = () => submitQuery();
 
@@ -89,7 +106,7 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
   const handleChipClick = (exampleQuery) => {
     setQuery(exampleQuery);
     setError(null);
-    submitQuery(exampleQuery);
+    runQuery(exampleQuery);
   };
 
   return (
@@ -199,6 +216,8 @@ const NLQueryInput = ({ onFiltersGenerated, disabled }) => {
       </Box>
     </Paper>
   );
-};
+});
+
+NLQueryInput.displayName = 'NLQueryInput';
 
 export default NLQueryInput;

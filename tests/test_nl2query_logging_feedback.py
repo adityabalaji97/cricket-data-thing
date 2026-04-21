@@ -11,6 +11,13 @@ def _mock_llm_response():
         "explanation": "mock explanation",
         "confidence": "high",
         "suggestions": [],
+        "interpretation": {
+            "summary": "Showing Kohli stats",
+            "parsed_entities": [
+                {"type": "player", "value": "Virat Kohli", "matched_from": "kohli"}
+            ],
+            "suggestions": ["Add grouped by venue"],
+        },
     }
 
 
@@ -41,6 +48,8 @@ def test_parse_nl_query_passes_few_shot_examples_to_openai(monkeypatch):
     result = nl2query.parse_nl_query("kohli vs spin", db=object())
 
     assert result["success"] is True
+    assert result["interpretation"]["summary"]
+    assert isinstance(result["interpretation"]["parsed_entities"], list)
     assert captured["query"] == "kohli vs spin"
     assert captured["few_shot_examples"] == expected_examples
     assert captured["model"] == nl2query.DEFAULT_NL2QUERY_MODEL

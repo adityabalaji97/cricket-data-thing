@@ -12,6 +12,7 @@ import {
 import QueryFilters from './QueryFilters';
 import QueryResults from './QueryResults';
 import NLQueryInput from './NLQueryInput';
+import NLInterpretation from './NLInterpretation';
 import { useUrlParams, filtersToUrlParams } from '../utils/urlParamParser';
 import axios from 'axios';
 import config from '../config';
@@ -76,6 +77,46 @@ const getDefaultFilters = () => ({
   show_summary_rows: false
 });
 
+const parseSuggestionFragment = (suggestion) => {
+  const text = String(suggestion || '').trim();
+  if (!text) {
+    return '';
+  }
+
+  const quotedMatch = text.match(/["']([^"']+)["']/);
+  if (quotedMatch?.[1]) {
+    return quotedMatch[1].trim();
+  }
+
+  const lowered = text
+    .replace(/^try\s+(adding|using|including)\s+/i, '')
+    .replace(/^add\s+/i, '')
+    .replace(/^include\s+/i, '')
+    .replace(/^group(?:ed)?\s+by\s+/i, 'grouped by ')
+    .replace(/\s+to\s+see\b.*$/i, '')
+    .replace(/\s+to\s+compare\b.*$/i, '')
+    .replace(/\s+for\s+more\b.*$/i, '')
+    .trim();
+
+  return lowered.replace(/\.$/, '');
+};
+
+const buildRefinedQuery = (baseQuery, suggestion) => {
+  const fragment = parseSuggestionFragment(suggestion);
+  const source = String(baseQuery || '').trim();
+
+  if (!fragment) {
+    return source;
+  }
+  if (!source) {
+    return fragment;
+  }
+  if (source.toLowerCase().includes(fragment.toLowerCase())) {
+    return source;
+  }
+  return `${source} ${fragment}`.trim();
+};
+
 const QueryBuilder = ({ isMobile }) => {
   const { getFiltersFromUrl, getGroupByFromUrl, currentParams } = useUrlParams();
   
@@ -89,8 +130,13 @@ const QueryBuilder = ({ isMobile }) => {
   const [queryTab, setQueryTab] = useState(0);
   const [, setIsAutoExecuting] = useState(false);
   const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false);
-  const [nlExplanation, setNlExplanation] = useState(null);
+  const [nlInterpretation, setNlInterpretation] = useState(null);
+  const [nlConfidence, setNlConfidence] = useState('medium');
+  const [nlSourceQuery, setNlSourceQuery] = useState('');
+  const [nlRawFilters, setNlRawFilters] = useState({});
+  const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const executeQueryRef = useRef(null);
+  const nlInputRef = useRef(null);
 
   // Load filters from URL on mount
   useEffect(() => {
@@ -211,19 +257,39 @@ const QueryBuilder = ({ isMobile }) => {
     setQueryTab(0);
     setHasLoadedFromUrl(false);
     setIsAutoExecuting(false);
-    setNlExplanation(null);
+    setNlInterpretation(null);
+    setNlConfidence('medium');
+    setNlSourceQuery('');
+    setNlRawFilters({});
     window.history.replaceState({}, '', window.location.pathname);
   };
   
-  const handleNLFilters = ({ filters: nlFilters, groupBy: nlGroupBy, explanation, confidence }) => {
+  const handleNLFilters = ({
+    queryText,
+    filters: nlFilters,
+    groupBy: nlGroupBy,
+    explanation,
+    confidence,
+    suggestions,
+    interpretation,
+  }) => {
     // Reset to defaults then apply NL filters
     const defaultFilters = getDefaultFilters();
 
-    const newFilters = { ...defaultFilters, ...nlFilters };
+    const newFilters = { ...defaultFilters, ...(nlFilters || {}) };
     const newGroupBy = nlGroupBy || [];
+    const interpretationPayload = interpretation || {
+      summary: explanation || '',
+      parsed_entities: [],
+      suggestions: suggestions || [],
+    };
+
     setFilters(newFilters);
     setGroupBy(newGroupBy);
-    setNlExplanation(explanation);
+    setNlInterpretation(interpretationPayload);
+    setNlConfidence(confidence || 'medium');
+    setNlSourceQuery((queryText || '').trim());
+    setNlRawFilters(nlFilters || {});
     setQueryTab(0);
     setHasLoadedFromUrl(false);
 
@@ -238,6 +304,30 @@ const QueryBuilder = ({ isMobile }) => {
       setTimeout(() => {
         executeQueryRef.current();
       }, 300);
+    }
+  };
+
+  const dismissInterpretation = () => {
+    setNlInterpretation(null);
+    setNlRawFilters({});
+  };
+
+  const applySuggestion = async (suggestion) => {
+    if (!nlInputRef.current?.runQuery) {
+      return;
+    }
+
+    const refinedQuery = buildRefinedQuery(nlSourceQuery, suggestion);
+    if (!refinedQuery) {
+      return;
+    }
+
+    try {
+      setIsApplyingSuggestion(true);
+      setError(null);
+      await nlInputRef.current.runQuery(refinedQuery);
+    } finally {
+      setIsApplyingSuggestion(false);
     }
   };
 
@@ -260,7 +350,7 @@ const QueryBuilder = ({ isMobile }) => {
     });
   };
 
-  const canExecute = !!availableColumns && hasValidFilters() && !loading;
+  const canExecute = !!availableColumns && hasValidFilters() && !loading && !isApplyingSuggestion;
   const showMobileActionBar = isMobile && queryTab === 0;
   
   return (
@@ -275,20 +365,20 @@ const QueryBuilder = ({ isMobile }) => {
       </Typography>
 
       <NLQueryInput
+        ref={nlInputRef}
         onFiltersGenerated={handleNLFilters}
-        disabled={loading}
+        disabled={loading || isApplyingSuggestion}
       />
 
-      {nlExplanation && (
-        <Alert
-          severity="info"
-          sx={{ mb: 2 }}
-          onClose={() => setNlExplanation(null)}
-        >
-          <Typography variant="body2">
-            <strong>AI interpretation:</strong> {nlExplanation}
-          </Typography>
-        </Alert>
+      {nlInterpretation && (
+        <NLInterpretation
+          interpretation={nlInterpretation}
+          confidence={nlConfidence}
+          rawFilters={nlRawFilters}
+          onSuggestionClick={applySuggestion}
+          onClose={dismissInterpretation}
+          disabled={loading || isApplyingSuggestion}
+        />
       )}
 
       {error && (

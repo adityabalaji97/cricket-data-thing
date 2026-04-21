@@ -36,7 +36,14 @@ Return a JSON object with these fields:
   "group_by": [...],
   "explanation": "Human-readable explanation of what the query does",
   "confidence": "high" | "medium" | "low",
-  "suggestions": ["optional improvement suggestions"]
+  "suggestions": ["optional improvement suggestions"],
+  "interpretation": {
+    "summary": "One-line summary of what will be queried",
+    "parsed_entities": [
+      {"type": "player" | "team" | "filter", "value": "resolved value", "matched_from": "text fragment from user query"}
+    ],
+    "suggestions": ["query refinement suggestions as short phrases or prompts"]
+  }
 }
 
 ## Available Filters
@@ -219,13 +226,24 @@ def _infer_query_mode_hint(query: str) -> str:
 
 def _serialize_few_shot_output(example: Dict[str, Any]) -> str:
     parsed_filters = example.get("parsed_filters") if isinstance(example.get("parsed_filters"), dict) else {}
+    suggestions = example.get("suggestions") if isinstance(example.get("suggestions"), list) else []
+    interpretation_payload = example.get("interpretation") if isinstance(example.get("interpretation"), dict) else {}
     payload = {
         "filters": parsed_filters,
         "query_mode": example.get("query_mode") or parsed_filters.get("query_mode") or "delivery",
         "group_by": example.get("group_by") if isinstance(example.get("group_by"), list) else [],
         "explanation": example.get("explanation") or "",
         "confidence": example.get("confidence") or "high",
-        "suggestions": [],
+        "suggestions": suggestions,
+        "interpretation": {
+            "summary": interpretation_payload.get("summary") or example.get("explanation") or "",
+            "parsed_entities": interpretation_payload.get("parsed_entities")
+            if isinstance(interpretation_payload.get("parsed_entities"), list)
+            else [],
+            "suggestions": interpretation_payload.get("suggestions")
+            if isinstance(interpretation_payload.get("suggestions"), list)
+            else suggestions,
+        },
     }
     return json.dumps(payload, ensure_ascii=True)
 
@@ -370,6 +388,7 @@ VALID_LEAGUES = {"IPL", "BBL", "PSL", "CPL", "SA20", "ILT20", "BPL", "LPL", "T20
 VALID_QUERY_MODE = {"delivery", "batting_stats", "bowling_stats"}
 VALID_MATCH_OUTCOME = {"win", "loss", "tie", "no_result"}
 VALID_TOSS_DECISION = {"bat", "field"}
+VALID_CONFIDENCE = {"high", "medium", "low"}
 VALID_GROUP_BY = {
     "venue", "country", "match_id", "competition", "year",
     "batting_team", "bowling_team", "batter", "bowler",
@@ -476,7 +495,163 @@ def _build_explanation(filters: Dict[str, Any], group_by: List[str]) -> str:
     return " ".join(parts).strip() + "."
 
 
-def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
+def _sanitize_confidence(value: Any, default: str = "medium") -> str:
+    candidate = str(value).strip().lower() if value is not None else ""
+    if candidate in VALID_CONFIDENCE:
+        return candidate
+    return default
+
+
+def _sanitize_suggestions(raw_suggestions: Any, limit: int = 5) -> List[str]:
+    if not isinstance(raw_suggestions, list):
+        return []
+
+    suggestions: List[str] = []
+    seen = set()
+    for item in raw_suggestions:
+        suggestion = str(item).strip()
+        if not suggestion:
+            continue
+        key = suggestion.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        suggestions.append(suggestion[:200])
+        if len(suggestions) >= limit:
+            break
+    return suggestions
+
+
+def _match_query_fragment(query: str, value: str) -> Optional[str]:
+    normalized_query = _normalize_text(query)
+    normalized_value = _normalize_text(value)
+    if not normalized_query or not normalized_value:
+        return None
+
+    query_tokens = set(token for token in normalized_query.split() if token)
+    value_tokens = [token for token in normalized_value.split() if token]
+    for token in value_tokens:
+        if token in query_tokens and len(token) >= 3:
+            return token
+
+    if normalized_value in normalized_query:
+        return normalized_value
+    return None
+
+
+def _derive_entities_from_filters(filters: Dict[str, Any], query: str) -> List[Dict[str, str]]:
+    entities: List[Dict[str, str]] = []
+    seen = set()
+
+    def _add(entity_type: str, value: Any):
+        text_value = str(value).strip()
+        if not text_value:
+            return
+        key = (entity_type, text_value.lower())
+        if key in seen:
+            return
+        seen.add(key)
+        matched = _match_query_fragment(query, text_value)
+        payload = {"type": entity_type, "value": text_value}
+        if matched:
+            payload["matched_from"] = matched
+        entities.append(payload)
+
+    for key in ["batters", "bowlers", "players"]:
+        for value in filters.get(key, []) if isinstance(filters.get(key), list) else []:
+            _add("player", value)
+
+    for key in ["teams", "batting_teams", "bowling_teams"]:
+        for value in filters.get(key, []) if isinstance(filters.get(key), list) else []:
+            _add("team", value)
+
+    if filters.get("venue"):
+        _add("filter", f"venue: {filters['venue']}")
+
+    for key in ["leagues", "bowl_kind", "bowl_style", "match_outcome", "chase_outcome", "toss_decision"]:
+        values = filters.get(key)
+        if isinstance(values, list):
+            for value in values:
+                _add("filter", value)
+
+    for key in ["bat_hand", "innings", "start_date", "end_date", "min_balls", "min_runs", "max_runs", "min_wickets", "max_wickets"]:
+        if filters.get(key) is not None:
+            _add("filter", f"{key}: {filters[key]}")
+
+    over_min = filters.get("over_min")
+    over_max = filters.get("over_max")
+    if over_min is not None or over_max is not None:
+        if over_min is not None and over_max is not None:
+            _add("filter", f"overs {over_min}-{over_max}")
+        elif over_min is not None:
+            _add("filter", f"from over {over_min}")
+        elif over_max is not None:
+            _add("filter", f"up to over {over_max}")
+
+    if filters.get("query_mode"):
+        _add("filter", f"mode: {filters['query_mode']}")
+
+    return entities[:12]
+
+
+def _sanitize_interpretation(
+    parsed: Dict[str, Any],
+    query: str,
+    filters: Dict[str, Any],
+    fallback_summary: str,
+    fallback_suggestions: List[str],
+) -> Dict[str, Any]:
+    interpretation = parsed.get("interpretation") if isinstance(parsed.get("interpretation"), dict) else {}
+    summary = str(interpretation.get("summary") or parsed.get("explanation") or fallback_summary or "").strip()
+    if not summary:
+        summary = fallback_summary
+
+    parsed_entities: List[Dict[str, str]] = []
+    seen = set()
+    raw_entities = interpretation.get("parsed_entities") if isinstance(interpretation.get("parsed_entities"), list) else []
+    for entity in raw_entities:
+        if not isinstance(entity, dict):
+            continue
+        entity_type = str(entity.get("type") or "").strip().lower()
+        value = str(entity.get("value") or "").strip()
+        matched_from = str(entity.get("matched_from") or "").strip()
+        if not value:
+            continue
+
+        if entity_type in {"player", "batter", "bowler"}:
+            entity_type = "player"
+        elif entity_type in {"team", "batting_team", "bowling_team"}:
+            entity_type = "team"
+        else:
+            entity_type = "filter"
+
+        key = (entity_type, value.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+
+        payload = {"type": entity_type, "value": value}
+        if matched_from:
+            payload["matched_from"] = matched_from
+        parsed_entities.append(payload)
+
+    if not parsed_entities:
+        parsed_entities = _derive_entities_from_filters(filters, query)
+
+    suggestions = _sanitize_suggestions(interpretation.get("suggestions"))
+    if not suggestions:
+        suggestions = _sanitize_suggestions(parsed.get("suggestions"))
+    if not suggestions:
+        suggestions = _sanitize_suggestions(fallback_suggestions)
+
+    return {
+        "summary": summary,
+        "parsed_entities": parsed_entities,
+        "suggestions": suggestions,
+    }
+
+
+def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
     """Validate and sanitize LLM output, stripping invalid values."""
     filters = parsed.get("filters", {})
     validated = {}
@@ -598,12 +773,28 @@ def validate_filters(parsed: Dict[str, Any]) -> Dict[str, Any]:
     if _bat_hand_to_group_by and "bat_hand" not in group_by:
         group_by.append("bat_hand")
 
+    explanation = str(parsed.get("explanation") or "").strip()
+    confidence = _sanitize_confidence(parsed.get("confidence"), default="medium")
+    suggestions = _sanitize_suggestions(parsed.get("suggestions"))
+    interpretation = _sanitize_interpretation(
+        parsed=parsed,
+        query=query,
+        filters=validated,
+        fallback_summary=explanation,
+        fallback_suggestions=suggestions,
+    )
+
+    if interpretation.get("summary"):
+        explanation = interpretation["summary"]
+    suggestions = interpretation.get("suggestions", suggestions)
+
     return {
         "filters": validated,
         "group_by": group_by,
-        "explanation": parsed.get("explanation", ""),
-        "confidence": parsed.get("confidence", "medium"),
-        "suggestions": parsed.get("suggestions", [])
+        "explanation": explanation,
+        "confidence": confidence,
+        "suggestions": suggestions,
+        "interpretation": interpretation,
     }
 
 
@@ -693,9 +884,28 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
         filters.pop("min_wickets", None)
         filters.pop("max_wickets", None)
 
+    summary = _build_explanation(filters, group_by)
+    interpretation = result.get("interpretation") if isinstance(result.get("interpretation"), dict) else {}
+    if not interpretation:
+        interpretation = _sanitize_interpretation(
+            parsed={},
+            query=query,
+            filters=filters,
+            fallback_summary=summary,
+            fallback_suggestions=_sanitize_suggestions(result.get("suggestions")),
+        )
+    interpretation["summary"] = summary
+    if not isinstance(interpretation.get("parsed_entities"), list) or not interpretation.get("parsed_entities"):
+        interpretation["parsed_entities"] = _derive_entities_from_filters(filters, query)
+    interpretation["suggestions"] = _sanitize_suggestions(
+        interpretation.get("suggestions") or result.get("suggestions")
+    )
+
     result["filters"] = filters
     result["group_by"] = group_by
-    result["explanation"] = _build_explanation(filters, group_by)
+    result["explanation"] = summary
+    result["suggestions"] = interpretation["suggestions"]
+    result["interpretation"] = interpretation
     return result
 
 
@@ -942,7 +1152,8 @@ def update_nl_query_feedback(
 def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
     """Parse a natural language query into structured filters.
 
-    Returns validated filters, group_by, explanation, confidence, and suggestions.
+    Returns validated filters, group_by, explanation, confidence, suggestions,
+    and a structured interpretation payload.
     """
     if not query or not query.strip():
         return {
@@ -952,7 +1163,12 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
             "group_by": [],
             "explanation": "",
             "confidence": "low",
-            "suggestions": ["Try a query like 'Kohli vs spin in death overs'"]
+            "suggestions": ["Try a query like 'Kohli vs spin in death overs'"],
+            "interpretation": {
+                "summary": "",
+                "parsed_entities": [],
+                "suggestions": ["Try a query like 'Kohli vs spin in death overs'"],
+            },
         }
 
     # Check cache
@@ -974,7 +1190,7 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
         except TypeError:
             # Backward-compatible fallback for tests that monkeypatch call_openai(query).
             raw = call_openai(query)
-        result = validate_filters(raw)
+        result = validate_filters(raw, query=query)
 
         # Resolve player names against DB if session available
         if db is not None:
@@ -998,7 +1214,12 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
             "group_by": [],
             "explanation": "",
             "confidence": "low",
-            "suggestions": ["Try rephrasing your query"]
+            "suggestions": ["Try rephrasing your query"],
+            "interpretation": {
+                "summary": "",
+                "parsed_entities": [],
+                "suggestions": ["Try rephrasing your query"],
+            },
         }
     except Exception as e:
         logger.error(f"NL query parsing error: {e}")
@@ -1009,7 +1230,12 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
             "group_by": [],
             "explanation": "",
             "confidence": "low",
-            "suggestions": ["Try rephrasing your query"]
+            "suggestions": ["Try rephrasing your query"],
+            "interpretation": {
+                "summary": "",
+                "parsed_entities": [],
+                "suggestions": ["Try rephrasing your query"],
+            },
         }
 
 

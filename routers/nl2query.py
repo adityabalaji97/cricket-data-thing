@@ -79,6 +79,18 @@ class NLQueryFilters(BaseModel):
     end_date: Optional[str] = None
 
 
+class NLParsedEntity(BaseModel):
+    type: str
+    value: str
+    matched_from: Optional[str] = None
+
+
+class NLInterpretation(BaseModel):
+    summary: str = ""
+    parsed_entities: List[NLParsedEntity] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
+
+
 class NLQueryResponse(BaseModel):
     success: bool
     filters: Dict[str, Any] = {}
@@ -86,6 +98,7 @@ class NLQueryResponse(BaseModel):
     explanation: str = ""
     confidence: str = "medium"
     suggestions: List[str] = []
+    interpretation: NLInterpretation = Field(default_factory=NLInterpretation)
     error: Optional[str] = None
 
 
