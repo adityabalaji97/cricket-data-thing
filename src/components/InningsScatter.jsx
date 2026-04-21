@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Typography, Box, useMediaQuery, useTheme } from '@mui/material';
 import {
   ScatterChart,
@@ -14,6 +14,8 @@ import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
 import { EmptyState } from './ui';
 import { colors as designColors } from '../theme/designSystem';
+import ZoomableChart from './common/ZoomableChart';
+import { getAutoscaledDomain } from '../utils/chartDomainUtils';
 
 const InningsScatter = ({ innings, wrapInCard = true, shareView = false }) => {
   const [xMetric, setXMetric] = useState('balls');
@@ -50,19 +52,46 @@ const InningsScatter = ({ innings, wrapInCard = true, shareView = false }) => {
     team_sr: inning.team_comparison.team_sr_excl_batter
   }));
 
-  const xAxisMetrics = {
+  const xAxisMetrics = useMemo(() => ({
     balls: { key: 'balls', label: isMobile ? 'Balls' : 'Balls Faced' },
     position: { key: 'position', label: isMobile ? 'Position' : 'Batting Position' },
     entry: { key: 'entry_over', label: isMobile ? 'Entry' : 'Entry Point (overs)' },
     phase: { key: 'phase', label: isMobile ? 'Phase' : 'Entry Phase' }
-  };
+  }), [isMobile]);
 
-  const yAxisMetrics = {
+  const yAxisMetrics = useMemo(() => ({
     runs: { key: 'runs', label: 'Runs' },
     strike_rate: { key: 'strike_rate', label: isMobile ? 'SR' : 'Strike Rate' },
     sr_diff: { key: 'sr_diff', label: isMobile ? 'SR vs Team' : 'SR vs Team' },
     average: { key: 'average', label: isMobile ? 'Avg' : 'Average' }
-  };
+  }), [isMobile]);
+
+  const xMetricDomain = useMemo(() => {
+    if (xMetric === 'phase') return [-0.5, 3.5];
+    return getAutoscaledDomain(
+      data.map((inning) => inning[xAxisMetrics[xMetric].key]),
+      {
+        paddingRatio: 0.1,
+        stdDevThreshold: 2,
+        clampMin: ['balls', 'position', 'entry'].includes(xMetric) ? 0 : undefined,
+        fallbackDomain: [0, 20],
+      },
+    );
+  }, [data, xMetric, xAxisMetrics]);
+
+  const yMetricDomain = useMemo(
+    () =>
+      getAutoscaledDomain(
+        data.map((inning) => inning[yAxisMetrics[yMetric].key]),
+        {
+          paddingRatio: 0.1,
+          stdDevThreshold: 2,
+          clampMin: ['runs', 'strike_rate', 'average'].includes(yMetric) ? 0 : undefined,
+          fallbackDomain: [0, 150],
+        },
+      ),
+    [data, yMetric, yAxisMetrics],
+  );
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
@@ -96,20 +125,6 @@ const InningsScatter = ({ innings, wrapInCard = true, shareView = false }) => {
       );
     }
     return null;
-  };
-
-  const getAxisProps = (metric) => {
-    if (metric === 'phase') {
-      return {
-        type: 'number',
-        domain: [-0.5, 3.5],
-        ticks: [0, 1, 2, 3],
-        tickFormatter: (value) => ['0-6', '6-10', '10-15', '15-20'][value]
-      };
-    }
-    return {
-      type: 'number'
-    };
   };
 
   // Responsive height calculation - fits in mobile viewport for screenshots
@@ -167,45 +182,51 @@ const InningsScatter = ({ innings, wrapInCard = true, shareView = false }) => {
       </Box>
 
       <Box sx={{ height: chartHeight, width: '100%' }}>
-        <ResponsiveContainer>
-          <ScatterChart margin={{
-            top: 10,
-            right: isMobile ? 5 : 20,
-            bottom: isMobile ? 30 : 45,
-            left: isMobile ? 10 : 50
-          }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              {...getAxisProps(xMetric)}
-              dataKey={xAxisMetrics[xMetric].key}
-              name={xAxisMetrics[xMetric].label}
-              label={isMobile ? undefined : { value: xAxisMetrics[xMetric].label, position: 'bottom', offset: 0 }}
-              tick={{ fontSize: isCompact ? 8 : 12, fill: designColors.neutral[800] }}
-            />
-            <YAxis
-              type="number"
-              dataKey={yAxisMetrics[yMetric].key}
-              name={yAxisMetrics[yMetric].label}
-              label={isMobile ? undefined : {
-                value: yAxisMetrics[yMetric].label,
-                angle: -90,
-                position: 'insideLeft',
-                offset: 10
-              }}
-              tick={{ fontSize: isCompact ? 8 : 12, fill: designColors.neutral[800] }}
-            />
-            {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke={designColors.neutral[500]} strokeDasharray="3 3" />}
-            {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke={designColors.neutral[500]} strokeDasharray="3 3" />}
-            <Tooltip content={<CustomTooltip />} />
-            <Scatter
-              name="Innings"
-              data={data}
-              fill={designColors.chart.blue}
-              opacity={0.6}
-              r={isCompact ? 4.5 : 6}
-            />
-          </ScatterChart>
-        </ResponsiveContainer>
+        <ZoomableChart isMobile={isCompact}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{
+              top: 10,
+              right: isMobile ? 5 : 20,
+              bottom: isMobile ? 30 : 45,
+              left: isMobile ? 10 : 50
+            }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                type="number"
+                dataKey={xAxisMetrics[xMetric].key}
+                name={xAxisMetrics[xMetric].label}
+                domain={xMetricDomain}
+                ticks={xMetric === 'phase' ? [0, 1, 2, 3] : undefined}
+                tickFormatter={xMetric === 'phase' ? (value) => ['0-6', '6-10', '10-15', '15-20'][value] : undefined}
+                label={isMobile ? undefined : { value: xAxisMetrics[xMetric].label, position: 'bottom', offset: 0 }}
+                tick={{ fontSize: isCompact ? 8 : 12, fill: designColors.neutral[800] }}
+              />
+              <YAxis
+                type="number"
+                dataKey={yAxisMetrics[yMetric].key}
+                name={yAxisMetrics[yMetric].label}
+                domain={yMetricDomain}
+                label={isMobile ? undefined : {
+                  value: yAxisMetrics[yMetric].label,
+                  angle: -90,
+                  position: 'insideLeft',
+                  offset: 10
+                }}
+                tick={{ fontSize: isCompact ? 8 : 12, fill: designColors.neutral[800] }}
+              />
+              {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke={designColors.neutral[500]} strokeDasharray="3 3" />}
+              {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke={designColors.neutral[500]} strokeDasharray="3 3" />}
+              <Tooltip content={<CustomTooltip />} />
+              <Scatter
+                name="Innings"
+                data={data}
+                fill={designColors.chart.blue}
+                opacity={0.6}
+                r={isCompact ? 4.5 : 6}
+              />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </ZoomableChart>
       </Box>
     </Wrapper>
   );

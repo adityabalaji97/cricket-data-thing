@@ -21,6 +21,8 @@ import {
   ReferenceLine,
   Legend
 } from 'recharts';
+import ZoomableChart from './common/ZoomableChart';
+import { getAutoscaledDomain } from '../utils/chartDomainUtils';
 
 const ComparisonInningsScatter = ({ batters }) => {
   const [xMetric, setXMetric] = useState('balls_faced');
@@ -81,19 +83,24 @@ const ComparisonInningsScatter = ({ batters }) => {
     );
   }, [batters, playerColors]);
 
-  const xAxisMetrics = {
+  const xAxisMetrics = useMemo(() => ({
     balls_faced: { key: 'balls', label: 'Balls Faced' },
     position: { key: 'position', label: 'Batting Position' },
     entry: { key: 'entry_over', label: 'Entry Point (overs)' },
     phase: { key: 'phase', label: 'Entry Phase' }
-  };
+  }), []);
 
-  const yAxisMetrics = {
+  const yAxisMetrics = useMemo(() => ({
     runs: { key: 'runs', label: 'Runs' },
     strike_rate: { key: 'strike_rate', label: 'Strike Rate' },
     sr_diff: { key: 'sr_diff', label: 'SR vs Team' },
     average: { key: 'average', label: 'Average' }
-  };
+  }), []);
+
+  const visibleScatterData = useMemo(
+    () => processedData.filter((row) => visiblePlayers.includes(row.playerId)),
+    [processedData, visiblePlayers],
+  );
 
   const togglePlayer = (playerId) => {
     setVisiblePlayers(prev => 
@@ -151,19 +158,32 @@ const ComparisonInningsScatter = ({ batters }) => {
     return null;
   };
 
-  const getAxisProps = (metric) => {
-    if (metric === 'phase') {
-      return {
-        type: 'number',
-        domain: [-0.5, 3.5],
-        ticks: [0, 1, 2, 3],
-        tickFormatter: (value) => ['0-6', '6-10', '10-15', '15-20'][value]
-      };
-    }
-    return {
-      type: 'number'
-    };
-  };
+  const xMetricDomain = useMemo(() => {
+    if (xMetric === 'phase') return [-0.5, 3.5];
+    return getAutoscaledDomain(
+      visibleScatterData.map((row) => row[xAxisMetrics[xMetric].key]),
+      {
+        paddingRatio: 0.1,
+        stdDevThreshold: 2,
+        clampMin: ['balls_faced', 'position', 'entry'].includes(xMetric) ? 0 : undefined,
+        fallbackDomain: [0, 20],
+      },
+    );
+  }, [visibleScatterData, xMetric, xAxisMetrics]);
+
+  const yMetricDomain = useMemo(
+    () =>
+      getAutoscaledDomain(
+        visibleScatterData.map((row) => row[yAxisMetrics[yMetric].key]),
+        {
+          paddingRatio: 0.1,
+          stdDevThreshold: 2,
+          clampMin: ['runs', 'strike_rate', 'average'].includes(yMetric) ? 0 : undefined,
+          fallbackDomain: [0, 150],
+        },
+      ),
+    [visibleScatterData, yMetric, yAxisMetrics],
+  );
 
   // Get data for each visible player
   const getPlayerData = (playerId) => {
@@ -256,52 +276,58 @@ const ComparisonInningsScatter = ({ batters }) => {
         </Box>
 
         <div style={{ height: 500, width: '100%' }}>
-          <ResponsiveContainer>
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 80, left: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                {...getAxisProps(xMetric)}
-                dataKey={xAxisMetrics[xMetric].key}
-                name={xAxisMetrics[xMetric].label}
-                label={{ value: xAxisMetrics[xMetric].label, position: 'bottom', offset: -5 }}
-              />
-              <YAxis 
-                type="number"
-                dataKey={yAxisMetrics[yMetric].key}
-                name={yAxisMetrics[yMetric].label}
-                label={{ 
-                  value: yAxisMetrics[yMetric].label,
-                  angle: -90, 
-                  position: 'left' 
-                }}
-              />
-              {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke="#666" strokeDasharray="3 3" />}
-              {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />}
-              <Tooltip content={<CustomTooltip />} />
-              
-              {/* Render one Scatter per player */}
-              {batters.map(batter => {
-                const playerData = getPlayerData(batter.id);
-                if (playerData.length === 0) return null;
-                
-                return (
-                  <Scatter
-                    key={batter.id}
-                    name={batter.label}
-                    data={playerData}
-                    fill={playerColors[batter.id]}
-                    opacity={0.7}
-                  />
-                );
-              })}
-              
-              <Legend 
-                verticalAlign="bottom" 
-                height={36}
-                wrapperStyle={{ paddingTop: '20px' }}
-              />
-            </ScatterChart>
-          </ResponsiveContainer>
+          <ZoomableChart>
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 80, left: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  domain={xMetricDomain}
+                  ticks={xMetric === 'phase' ? [0, 1, 2, 3] : undefined}
+                  tickFormatter={xMetric === 'phase' ? (value) => ['0-6', '6-10', '10-15', '15-20'][value] : undefined}
+                  dataKey={xAxisMetrics[xMetric].key}
+                  name={xAxisMetrics[xMetric].label}
+                  label={{ value: xAxisMetrics[xMetric].label, position: 'bottom', offset: -5 }}
+                />
+                <YAxis
+                  type="number"
+                  domain={yMetricDomain}
+                  dataKey={yAxisMetrics[yMetric].key}
+                  name={yAxisMetrics[yMetric].label}
+                  label={{
+                    value: yAxisMetrics[yMetric].label,
+                    angle: -90,
+                    position: 'left'
+                  }}
+                />
+                {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke="#666" strokeDasharray="3 3" />}
+                {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />}
+                <Tooltip content={<CustomTooltip />} />
+
+                {/* Render one Scatter per player */}
+                {batters.map(batter => {
+                  const playerData = getPlayerData(batter.id);
+                  if (playerData.length === 0) return null;
+
+                  return (
+                    <Scatter
+                      key={batter.id}
+                      name={batter.label}
+                      data={playerData}
+                      fill={playerColors[batter.id]}
+                      opacity={0.7}
+                    />
+                  );
+                })}
+
+                <Legend
+                  verticalAlign="bottom"
+                  height={36}
+                  wrapperStyle={{ paddingTop: '20px' }}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </ZoomableChart>
         </div>
 
         {/* Summary Info */}

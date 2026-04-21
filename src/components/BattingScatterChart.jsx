@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
     Box, 
     Card, 
@@ -20,6 +20,8 @@ import {
     ReferenceLine,
     ReferenceArea
 } from 'recharts';
+import ZoomableChart from './common/ZoomableChart';
+import { getAutoscaledDomain } from '../utils/chartDomainUtils';
 
 const BattingScatterChart = ({ data, isMobile = false }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -150,33 +152,32 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
     const displayData = filteredData.slice(0, maxPlayers);
 
     const metrics = getAxesData();
+    const { xDomain, yDomain } = useMemo(() => {
+        const xValues = displayData.map((row) => row[metrics.xKey]);
+        const yValues = displayData.map((row) => row[metrics.yKey]);
 
-    // Calculate domain boundaries from the display data
-    const axisData = displayData.length > 0
-        ? displayData.map(d => ({
-            x: d[metrics.xKey],
-            y: d[metrics.yKey]
-          }))
-        : [{x: 0, y: 0}]; // Default if no data
-    
-    // Add Average Batter data point to ensure it's included in the domain
-    if (avgBatter) {
-        axisData.push({
-            x: avgBatter[metrics.xKey],
-            y: avgBatter[metrics.yKey]
-        });
-    }
-    
-    const padding = 0.1; // Increase padding to create more space
-    
-    // Calculate min/max values safely with fallbacks
-    const allXValues = axisData.map(d => d.x).filter(val => !isNaN(val) && val !== undefined);
-    const allYValues = axisData.map(d => d.y).filter(val => !isNaN(val) && val !== undefined);
-    
-    const minX = allXValues.length > 0 ? Math.floor(Math.min(...allXValues) * (1 - padding)) : 0;
-    const maxX = allXValues.length > 0 ? Math.ceil(Math.max(...allXValues) * (1 + padding)) : 50;
-    const minY = allYValues.length > 0 ? Math.floor(Math.min(...allYValues) * (1 - padding)) : 0;
-    const maxY = allYValues.length > 0 ? Math.ceil(Math.max(...allYValues) * (1 + padding)) : 150;
+        if (avgBatter) {
+            xValues.push(avgBatter[metrics.xKey]);
+            yValues.push(avgBatter[metrics.yKey]);
+        }
+
+        return {
+            xDomain: getAutoscaledDomain(xValues, {
+                paddingRatio: 0.1,
+                stdDevThreshold: 2,
+                clampMin: 0,
+                fallbackDomain: [0, 50],
+            }),
+            yDomain: getAutoscaledDomain(yValues, {
+                paddingRatio: 0.1,
+                stdDevThreshold: 2,
+                clampMin: 0,
+                fallbackDomain: [0, 150],
+            }),
+        };
+    }, [displayData, avgBatter, metrics.xKey, metrics.yKey]);
+    const [minX, maxX] = xDomain;
+    const [minY, maxY] = yDomain;
 
     // Responsive height calculation - fits in mobile viewport for screenshots
     const chartHeight = isMobile ?
@@ -257,166 +258,168 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
             </Stack>
 
             <Box sx={{ width: '100%', height: chartHeight, mt: isMobile ? 1 : 2, mb: 0 }}>
-                <ResponsiveContainer>
-                    <ScatterChart margin={{
-                        top: 10,
-                        right: isMobile ? 10 : 20,
-                        bottom: 0,
-                        left: isMobile ? -25 : 0
-                    }}>
-                        {plotType === 'avgsr' ? (
-                            <>
-                                <ReferenceArea
-                                    x1={avgBatter[metrics.xKey]}
-                                    x2={maxX}
-                                    y1={avgBatter[metrics.yKey]}
-                                    y2={maxY}
-                                    fill="#77DD77"
-                                    fillOpacity={0.3}
-                                />
-                                <ReferenceArea
-                                    x1={avgBatter[metrics.xKey]}
-                                    x2={maxX}
-                                    y1={minY}
-                                    y2={avgBatter[metrics.yKey]}
-                                    fill="#FFB347"
-                                    fillOpacity={0.3}
-                                />
-                                <ReferenceArea
-                                    x1={minX}
-                                    x2={avgBatter[metrics.xKey]}
-                                    y1={avgBatter[metrics.yKey]}
-                                    y2={maxY}
-                                    fill="#FFB347"
-                                    fillOpacity={0.3}
-                                />
-                                <ReferenceArea
-                                    x1={minX}
-                                    x2={avgBatter[metrics.xKey]}
-                                    y1={minY}
-                                    y2={avgBatter[metrics.yKey]}
-                                    fill="#FF6961"
-                                    fillOpacity={0.3}
-                                />
-                            </>
-                        ) : (
-                            <>
-                                <ReferenceArea
-                                    x1={minX}
-                                    x2={avgBatter[metrics.xKey]}
-                                    y1={avgBatter[metrics.yKey]}
-                                    y2={maxY}
-                                    fill="#77DD77"
-                                    fillOpacity={0.3}
-                                />
-                                <ReferenceArea
-                                    x1={minX}
-                                    x2={avgBatter[metrics.xKey]}
-                                    y1={minY}
-                                    y2={avgBatter[metrics.yKey]}
-                                    fill="#FFB347"
-                                    fillOpacity={0.3}
-                                />
-                                <ReferenceArea
-                                    x1={avgBatter[metrics.xKey]}
-                                    x2={maxX}
-                                    y1={avgBatter[metrics.yKey]}
-                                    y2={maxY}
-                                    fill="#FFB347"
-                                    fillOpacity={0.3}
-                                />
-                                <ReferenceArea
-                                    x1={avgBatter[metrics.xKey]}
-                                    x2={maxX}
-                                    y1={minY}
-                                    y2={avgBatter[metrics.yKey]}
-                                    fill="#FF6961"
-                                    fillOpacity={0.3}
-                                />
-                            </>
-                        )}
-                        <XAxis
-                            type="number"
-                            dataKey={metrics.xKey}
-                            domain={[minX, maxX]}
-                            axisLine={{ strokeWidth: 1 }}
-                            tickSize={4}
-                            dy={0}
-                            padding={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                            tick={{ fontSize: isMobile ? 9 : 12 }}
-                        />
-                        <YAxis
-                            type="number"
-                            dataKey={metrics.yKey}
-                            domain={[minY, maxY]}
-                            axisLine={{ strokeWidth: 1 }}
-                            tickSize={4}
-                            dx={0}
-                            padding={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                            tick={{ fontSize: isMobile ? 9 : 12 }}
-                        />
-
-                        <ReferenceLine x={avgBatter[metrics.xKey]} stroke="#666" strokeDasharray="3 3" />
-                        <ReferenceLine y={avgBatter[metrics.yKey]} stroke="#666" strokeDasharray="3 3" />
-
-                        <Tooltip content={<CustomTooltip />} />
-
-                        <Scatter
-                            name="Players"
-                            data={displayData}
-                            fill="#8884d8"
-                            shape={(props) => {
-                                const { cx, cy, fill, payload } = props;
-                                // Extract last name for label
-                                const nameParts = payload.name?.split(' ') || [];
-                                const label = nameParts.length > 1
-                                    ? nameParts[nameParts.length - 1]
-                                    : nameParts[0] || '';
-
-                                return (
-                                    <g>
-                                        <circle
-                                            cx={cx}
-                                            cy={cy}
-                                            r={isMobile ? 5 : 6}
-                                            fill={fill || '#8884d8'}
-                                            stroke="#fff"
-                                            strokeWidth={isMobile ? 1 : 1}
-                                        />
-                                        <text
-                                            x={cx}
-                                            y={cy + (isMobile ? 13 : 18)}
-                                            textAnchor="middle"
-                                            fill="#333"
-                                            fontSize={isMobile ? 7 : 8}
-                                            fontWeight="600"
-                                        >
-                                            {label}
-                                        </text>
-                                    </g>
-                                );
-                            }}
-                        />
-
-                        <Scatter
-                            name="Average Batter"
-                            data={[avgBatter]}
-                            fill="#000"
-                            shape={(props) => {
-                                const { cx, cy } = props;
-                                const size = isMobile ? 6 : 8;
-                                return (
-                                    <polygon
-                                        points={`${cx},${cy-size} ${cx+size},${cy} ${cx},${cy+size} ${cx-size},${cy}`}
-                                        fill="#000"
-                                        stroke="#fff"
-                                        strokeWidth={1.5}
+                <ZoomableChart isMobile={isMobile}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <ScatterChart margin={{
+                            top: 10,
+                            right: isMobile ? 10 : 20,
+                            bottom: 0,
+                            left: isMobile ? -25 : 0
+                        }}>
+                            {plotType === 'avgsr' ? (
+                                <>
+                                    <ReferenceArea
+                                        x1={avgBatter[metrics.xKey]}
+                                        x2={maxX}
+                                        y1={avgBatter[metrics.yKey]}
+                                        y2={maxY}
+                                        fill="#77DD77"
+                                        fillOpacity={0.3}
                                     />
-                                );
-                            }}
-                        />
-                    </ScatterChart>
-                </ResponsiveContainer>
+                                    <ReferenceArea
+                                        x1={avgBatter[metrics.xKey]}
+                                        x2={maxX}
+                                        y1={minY}
+                                        y2={avgBatter[metrics.yKey]}
+                                        fill="#FFB347"
+                                        fillOpacity={0.3}
+                                    />
+                                    <ReferenceArea
+                                        x1={minX}
+                                        x2={avgBatter[metrics.xKey]}
+                                        y1={avgBatter[metrics.yKey]}
+                                        y2={maxY}
+                                        fill="#FFB347"
+                                        fillOpacity={0.3}
+                                    />
+                                    <ReferenceArea
+                                        x1={minX}
+                                        x2={avgBatter[metrics.xKey]}
+                                        y1={minY}
+                                        y2={avgBatter[metrics.yKey]}
+                                        fill="#FF6961"
+                                        fillOpacity={0.3}
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <ReferenceArea
+                                        x1={minX}
+                                        x2={avgBatter[metrics.xKey]}
+                                        y1={avgBatter[metrics.yKey]}
+                                        y2={maxY}
+                                        fill="#77DD77"
+                                        fillOpacity={0.3}
+                                    />
+                                    <ReferenceArea
+                                        x1={minX}
+                                        x2={avgBatter[metrics.xKey]}
+                                        y1={minY}
+                                        y2={avgBatter[metrics.yKey]}
+                                        fill="#FFB347"
+                                        fillOpacity={0.3}
+                                    />
+                                    <ReferenceArea
+                                        x1={avgBatter[metrics.xKey]}
+                                        x2={maxX}
+                                        y1={avgBatter[metrics.yKey]}
+                                        y2={maxY}
+                                        fill="#FFB347"
+                                        fillOpacity={0.3}
+                                    />
+                                    <ReferenceArea
+                                        x1={avgBatter[metrics.xKey]}
+                                        x2={maxX}
+                                        y1={minY}
+                                        y2={avgBatter[metrics.yKey]}
+                                        fill="#FF6961"
+                                        fillOpacity={0.3}
+                                    />
+                                </>
+                            )}
+                            <XAxis
+                                type="number"
+                                dataKey={metrics.xKey}
+                                domain={xDomain}
+                                axisLine={{ strokeWidth: 1 }}
+                                tickSize={4}
+                                dy={0}
+                                padding={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                                tick={{ fontSize: isMobile ? 9 : 12 }}
+                            />
+                            <YAxis
+                                type="number"
+                                dataKey={metrics.yKey}
+                                domain={yDomain}
+                                axisLine={{ strokeWidth: 1 }}
+                                tickSize={4}
+                                dx={0}
+                                padding={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                                tick={{ fontSize: isMobile ? 9 : 12 }}
+                            />
+
+                            <ReferenceLine x={avgBatter[metrics.xKey]} stroke="#666" strokeDasharray="3 3" />
+                            <ReferenceLine y={avgBatter[metrics.yKey]} stroke="#666" strokeDasharray="3 3" />
+
+                            <Tooltip content={<CustomTooltip />} />
+
+                            <Scatter
+                                name="Players"
+                                data={displayData}
+                                fill="#8884d8"
+                                shape={(props) => {
+                                    const { cx, cy, fill, payload } = props;
+                                    // Extract last name for label
+                                    const nameParts = payload.name?.split(' ') || [];
+                                    const label = nameParts.length > 1
+                                        ? nameParts[nameParts.length - 1]
+                                        : nameParts[0] || '';
+
+                                    return (
+                                        <g>
+                                            <circle
+                                                cx={cx}
+                                                cy={cy}
+                                                r={isMobile ? 5 : 6}
+                                                fill={fill || '#8884d8'}
+                                                stroke="#fff"
+                                                strokeWidth={isMobile ? 1 : 1}
+                                            />
+                                            <text
+                                                x={cx}
+                                                y={cy + (isMobile ? 13 : 18)}
+                                                textAnchor="middle"
+                                                fill="#333"
+                                                fontSize={isMobile ? 7 : 8}
+                                                fontWeight="600"
+                                            >
+                                                {label}
+                                            </text>
+                                        </g>
+                                    );
+                                }}
+                            />
+
+                            <Scatter
+                                name="Average Batter"
+                                data={[avgBatter]}
+                                fill="#000"
+                                shape={(props) => {
+                                    const { cx, cy } = props;
+                                    const size = isMobile ? 6 : 8;
+                                    return (
+                                        <polygon
+                                            points={`${cx},${cy-size} ${cx+size},${cy} ${cx},${cy+size} ${cx-size},${cy}`}
+                                            fill="#000"
+                                            stroke="#fff"
+                                            strokeWidth={1.5}
+                                        />
+                                    );
+                                }}
+                            />
+                        </ScatterChart>
+                    </ResponsiveContainer>
+                </ZoomableChart>
             </Box>
         </Card>
     );

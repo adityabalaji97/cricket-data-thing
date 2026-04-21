@@ -31,6 +31,8 @@ import ScatterPlotIcon from '@mui/icons-material/ScatterPlot';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import { getDataPointColor, getFallbackColor, hasTeamGrouping } from '../utils/teamColors';
+import ZoomableChart from './common/ZoomableChart';
+import { getAutoscaledDomain } from '../utils/chartDomainUtils';
 
 const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = false }, ref) => {
   const [charts, setCharts] = useState([]);
@@ -186,11 +188,41 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
     
     return [paddedMin, paddedMax];
   };
-  
-  // Generate nice tick arrays for both axes
-  const getAxisTicks = (dataKey) => {
-    const [min, max] = getDataDomain(dataKey);
-    return generateNiceTicks(min, max, 5);
+
+  const getScatterDomain = (dataKey) => {
+    const values = chartData
+      .map((row) => row[dataKey])
+      .filter((value) => !isNaN(value) && value !== undefined && value !== null);
+
+    const isNonNegativeMetric =
+      dataKey.includes('percentage') ||
+      [
+        'percent_balls',
+        'wickets',
+        'runs',
+        'balls',
+        'fours',
+        'sixes',
+        'dots',
+        'boundaries',
+        'average',
+        'strike_rate',
+        'economy',
+        'economy_rate',
+        'balls_per_dismissal',
+        'balls_per_wicket',
+      ].includes(dataKey);
+
+    const fallbackDomain = dataKey.includes('percentage') || dataKey === 'percent_balls'
+      ? [0, 100]
+      : [0, 10];
+
+    return getAutoscaledDomain(values, {
+      paddingRatio: 0.1,
+      stdDevThreshold: 2,
+      clampMin: isNonNegativeMetric ? 0 : undefined,
+      fallbackDomain,
+    });
   };
 
   // Get available metrics from the data
@@ -424,8 +456,8 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
     const xMetricData = availableMetrics.find(m => m.key === chart.xMetric);
     const yMetricData = availableMetrics.find(m => m.key === chart.yMetric);
     
-    const xDomain = getDataDomain(chart.xMetric);
-    const yDomain = getDataDomain(chart.yMetric);
+    const xDomain = getScatterDomain(chart.xMetric);
+    const yDomain = getScatterDomain(chart.yMetric);
 
     // Get selected point for this chart from component-level state
     const selectedPoint = selectedPoints[chart.id] || null;
@@ -519,92 +551,94 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, isMobile = 
 
           {/* Scatter Chart */}
           <Box sx={{ width: '100%', height: isMobile ? 350 : 500 }}>
-            <ResponsiveContainer>
-              <ScatterChart
-                data={chartData}
-                margin={{
-                  top: 10,
-                  right: isMobile ? 5 : 30,
-                  left: isMobile ? -15 : 20,
-                  bottom: isMobile ? 20 : 40
-                }}
-                onClick={() => isMobile && setSelectedPoint(null)} // Clear selection when tapping empty area
-              >
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis 
-                  type="number"
-                  dataKey={chart.xMetric}
-                  name={xMetricData?.label}
-                  domain={xDomain}
-                  ticks={getAxisTicks(chart.xMetric)}
-                  tickFormatter={(value) => formatAxisTick(value, chart.xMetric)}
-                  fontSize={isMobile ? 10 : 12}
-                  tick={{ fontSize: isMobile ? 10 : 12 }}
-                />
-                <YAxis 
-                  type="number"
-                  dataKey={chart.yMetric}
-                  name={yMetricData?.label}
-                  domain={yDomain}
-                  ticks={getAxisTicks(chart.yMetric)}
-                  tickFormatter={(value) => formatAxisTick(value, chart.yMetric)}
-                  fontSize={isMobile ? 10 : 12}
-                  tick={{ fontSize: isMobile ? 10 : 12 }}
-                  width={isMobile ? 35 : 60}
-                />
-                {!isMobile && (
-                  <Tooltip content={(props) => <CustomTooltip {...props} chartConfig={chart} />} />
-                )}
-                <Scatter 
-                  data={chartData} 
-                  shape={(props) => {
-                    const { cx, cy, payload } = props;
-                    const isSelected = selectedPoint && selectedPoint.displayIndex === payload.displayIndex;
-                    return (
-                      <g 
-                        style={{ cursor: 'pointer' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isMobile) {
-                            setSelectedPoint(isSelected ? null : payload);
-                          }
-                        }}
-                      >
-                        {/* Invisible larger touch target for mobile */}
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={24}
-                          fill="transparent"
-                          stroke="none"
-                        />
-                        {/* Visible point */}
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={7}
-                          fill={payload.teamColor || '#8884d8'}
-                          stroke={isSelected ? '#000' : '#fff'}
-                          strokeWidth={isSelected ? 3 : 2}
-                        />
-                        {!isMobile && (
-                          <text
-                            x={cx}
-                            y={cy + 18}
-                            textAnchor="middle"
-                            fontSize={10}
-                            fontWeight="500"
-                            fill="#333"
-                          >
-                            {payload.shortName || payload.name}
-                          </text>
-                        )}
-                      </g>
-                    );
+            <ZoomableChart isMobile={isMobile}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart
+                  data={chartData}
+                  margin={{
+                    top: 10,
+                    right: isMobile ? 5 : 30,
+                    left: isMobile ? -15 : 20,
+                    bottom: isMobile ? 20 : 40
                   }}
-                />
-              </ScatterChart>
-            </ResponsiveContainer>
+                  onClick={() => isMobile && setSelectedPoint(null)} // Clear selection when tapping empty area
+                >
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis
+                    type="number"
+                    dataKey={chart.xMetric}
+                    name={xMetricData?.label}
+                    domain={xDomain}
+                    ticks={generateNiceTicks(xDomain[0], xDomain[1], 5)}
+                    tickFormatter={(value) => formatAxisTick(value, chart.xMetric)}
+                    fontSize={isMobile ? 10 : 12}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
+                  />
+                  <YAxis
+                    type="number"
+                    dataKey={chart.yMetric}
+                    name={yMetricData?.label}
+                    domain={yDomain}
+                    ticks={generateNiceTicks(yDomain[0], yDomain[1], 5)}
+                    tickFormatter={(value) => formatAxisTick(value, chart.yMetric)}
+                    fontSize={isMobile ? 10 : 12}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
+                    width={isMobile ? 35 : 60}
+                  />
+                  {!isMobile && (
+                    <Tooltip content={(props) => <CustomTooltip {...props} chartConfig={chart} />} />
+                  )}
+                  <Scatter
+                    data={chartData}
+                    shape={(props) => {
+                      const { cx, cy, payload } = props;
+                      const isSelected = selectedPoint && selectedPoint.displayIndex === payload.displayIndex;
+                      return (
+                        <g
+                          style={{ cursor: 'pointer' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isMobile) {
+                              setSelectedPoint(isSelected ? null : payload);
+                            }
+                          }}
+                        >
+                          {/* Invisible larger touch target for mobile */}
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={24}
+                            fill="transparent"
+                            stroke="none"
+                          />
+                          {/* Visible point */}
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={7}
+                            fill={payload.teamColor || '#8884d8'}
+                            stroke={isSelected ? '#000' : '#fff'}
+                            strokeWidth={isSelected ? 3 : 2}
+                          />
+                          {!isMobile && (
+                            <text
+                              x={cx}
+                              y={cy + 18}
+                              textAnchor="middle"
+                              fontSize={10}
+                              fontWeight="500"
+                              fill="#333"
+                            >
+                              {payload.shortName || payload.name}
+                            </text>
+                          )}
+                        </g>
+                      );
+                    }}
+                  />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </ZoomableChart>
           </Box>
         </CardContent>
       </Card>
