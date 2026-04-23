@@ -247,6 +247,8 @@ def predict_match(
     # Extract features using local cache
     engineer = FeatureEngineer(cache_session, fast_mode=False)
     engineer._league_competitions = competitions
+    # Preload batch caches (delivery_details DataFrame, team phase stats, etc.)
+    engineer._preload_batch_caches(competitions=competitions)
 
     match_row = {
         "date": match_date,
