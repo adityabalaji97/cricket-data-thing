@@ -71,3 +71,7 @@ data_exports/
 
 .vercel
 .env
+
+# ML model artifacts (trained locally, not deployed)
+*.joblib
+ml/models/

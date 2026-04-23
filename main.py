@@ -45,6 +45,7 @@ from routers.rankings import router as rankings_router
 from routers.fantasy_planner import router as fantasy_planner_router
 from routers.analytics import router as analytics_router
 from routers.nl2query import router as nl2query_router
+from routers.ml_predictions import router as ml_predictions_router
 from services.delivery_data_service import (
     get_venue_match_stats,
     get_match_scores,
@@ -90,6 +91,7 @@ app.include_router(rankings_router)
 app.include_router(fantasy_planner_router)
 app.include_router(analytics_router)
 app.include_router(nl2query_router)
+app.include_router(ml_predictions_router)
 
 # Add CORS middleware
 app.add_middleware(

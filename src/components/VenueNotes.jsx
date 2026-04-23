@@ -43,6 +43,7 @@ import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 import VenueSectionTabs from './VenueSectionTabs';
 import VenueNotesDesktopNav from './VenueNotesDesktopNav';
 import BoundaryAnalysis from './BoundaryAnalysis';
+import ForesightCard from './ForesightCard';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -977,6 +978,7 @@ const VenueNotes = ({
     const [activatedSections, setActivatedSections] = useState(() => new Set(['summary']));
     const [similarZoneFilters, setSimilarZoneFilters] = useState(DEFAULT_SIMILAR_ZONE_FILTERS);
     const sectionRefs = useRef({});
+    const foresightEnabled = activeSectionId === 'foresight' || activatedSections.has('foresight');
     const previewEnabled = activeSectionId === 'preview' || activatedSections.has('preview');
     const teamsEnabled = activeSectionId === 'teams' || activatedSections.has('teams');
     const similarEnabled = activeSectionId === 'similar'
@@ -1016,7 +1018,24 @@ const VenueNotes = ({
             },
         ];
 
-        // 2. AI PREVIEW (only when both teams selected)
+        // 2. ML FORESIGHT (only when both teams selected)
+        if (selectedTeam1 && selectedTeam2) {
+            groups.push({
+                id: 'foresight',
+                label: 'Foresight',
+                content: (
+                    <ForesightCard
+                        venue={venue}
+                        team1={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
+                        team2={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
+                        enabled={foresightEnabled}
+                        isMobile={isMobile}
+                    />
+                ),
+            });
+        }
+
+        // 3. AI PREVIEW (only when both teams selected)
         if (selectedTeam1 && selectedTeam2) {
             groups.push({
                 id: 'preview',
@@ -1194,6 +1213,7 @@ const VenueNotes = ({
         leagues,
         includeInternational,
         topTeams,
+        foresightEnabled,
         previewEnabled,
         teamsEnabled,
         similarData,

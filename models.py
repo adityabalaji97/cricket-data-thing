@@ -1,5 +1,18 @@
 # models.py
-from sqlalchemy import create_engine, Column, Integer, String, Date, JSON, ForeignKey, Float, Boolean, DateTime, Text
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Date,
+    JSON,
+    ForeignKey,
+    Float,
+    Boolean,
+    DateTime,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 
@@ -399,3 +412,76 @@ class NLQueryLog(Base):
     ip_hash = Column(String(64), nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     execution_time_ms = Column(Integer, nullable=True)
+
+
+class MatchPrediction(Base):
+    """Stores pre-match ML predictions for later hindsight evaluation."""
+    __tablename__ = "match_predictions"
+
+    id = Column(Integer, primary_key=True)
+    match_id = Column(String, ForeignKey("matches.id"), nullable=False)
+    prediction_date = Column(DateTime, server_default=func.now(), nullable=False)
+    model_version = Column(String(50), nullable=False)
+    league = Column(String(255), nullable=True)
+
+    # Match winner prediction
+    predicted_winner = Column(String(255), nullable=True)
+    win_probability = Column(Float, nullable=True)
+    team1 = Column(String(255), nullable=True)
+    team2 = Column(String(255), nullable=True)
+    team1_win_prob = Column(Float, nullable=True)
+    team2_win_prob = Column(Float, nullable=True)
+
+    # Score predictions
+    predicted_1st_innings_score_low = Column(Integer, nullable=True)
+    predicted_1st_innings_score_high = Column(Integer, nullable=True)
+    predicted_1st_innings_score_mean = Column(Float, nullable=True)
+    predicted_2nd_innings_score_low = Column(Integer, nullable=True)
+    predicted_2nd_innings_score_high = Column(Integer, nullable=True)
+    predicted_2nd_innings_score_mean = Column(Float, nullable=True)
+
+    # Top contributing features (JSON array)
+    top_features = Column(JSON, nullable=True)
+
+    # Structured prediction payloads
+    predicted_phase_performance = Column(JSON, nullable=True)
+    predicted_player_performance = Column(JSON, nullable=True)
+    feature_snapshot = Column(JSON, nullable=True)
+
+    # Model metadata
+    gates_passed = Column(String(10), nullable=True)
+
+    # Legacy/rule-engine preview signal
+    preview_lean_score = Column(Integer, nullable=True)
+    preview_lean_direction = Column(String(50), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("match_id", "model_version", name="uq_match_predictions_match_model"),
+    )
+
+
+class HindsightComparison(Base):
+    """Stores prediction-vs-actual comparison results for completed matches."""
+    __tablename__ = "hindsight_comparisons"
+
+    id = Column(Integer, primary_key=True)
+    match_id = Column(String, ForeignKey("matches.id"), nullable=False)
+    prediction_id = Column(Integer, ForeignKey("match_predictions.id"), nullable=False)
+    computed_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    # Outcome accuracy
+    winner_correct = Column(Boolean, nullable=True)
+    score_1st_innings_actual = Column(Integer, nullable=True)
+    score_1st_innings_error = Column(Float, nullable=True)
+    score_2nd_innings_actual = Column(Integer, nullable=True)
+    score_2nd_innings_error = Column(Float, nullable=True)
+
+    # Detailed category-level accuracy payloads
+    phase_accuracy = Column(JSON, nullable=True)
+    player_accuracy = Column(JSON, nullable=True)
+    metric_accuracies = Column(JSON, nullable=True)
+    calibration_score = Column(Float, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("match_id", "prediction_id", name="uq_hindsight_match_prediction"),
+    )
