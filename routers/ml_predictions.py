@@ -33,7 +33,8 @@ def get_prediction(
             predicted_1st_innings_score_mean,
             predicted_2nd_innings_score_mean,
             top_features, model_version, gates_passed,
-            prediction_date, predicted_winner
+            prediction_date, predicted_winner,
+            narrative_insights
         FROM match_predictions
         WHERE (
             (team1 ILIKE :t1 AND team2 ILIKE :t2)
@@ -58,13 +59,21 @@ def get_prediction(
         db_team1, db_team2 = db_team2, db_team1
 
     # Parse top_features — stored as JSON
+    import json
     top_features = row[7]
     if isinstance(top_features, str):
-        import json
         try:
             top_features = json.loads(top_features)
         except (json.JSONDecodeError, TypeError):
             top_features = []
+
+    # Parse narrative_insights — stored as JSON
+    narrative_insights = row[12]
+    if isinstance(narrative_insights, str):
+        try:
+            narrative_insights = json.loads(narrative_insights)
+        except (json.JSONDecodeError, TypeError):
+            narrative_insights = []
 
     return {
         "available": True,
@@ -80,4 +89,5 @@ def get_prediction(
         "gates_passed": row[9],
         "prediction_date": row[10].isoformat() if row[10] else None,
         "predicted_winner": row[11],
+        "narrative_insights": narrative_insights or [],
     }

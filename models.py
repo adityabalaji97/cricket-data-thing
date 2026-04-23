@@ -448,6 +448,9 @@ class MatchPrediction(Base):
     predicted_player_performance = Column(JSON, nullable=True)
     feature_snapshot = Column(JSON, nullable=True)
 
+    # LLM-generated narrative insights (list of cricket commentary strings)
+    narrative_insights = Column(JSON, nullable=True)
+
     # Model metadata
     gates_passed = Column(String(10), nullable=True)
 

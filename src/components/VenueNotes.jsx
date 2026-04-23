@@ -1018,24 +1018,7 @@ const VenueNotes = ({
             },
         ];
 
-        // 2. ML FORESIGHT (only when both teams selected)
-        if (selectedTeam1 && selectedTeam2) {
-            groups.push({
-                id: 'foresight',
-                label: 'Foresight',
-                content: (
-                    <ForesightCard
-                        venue={venue}
-                        team1={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
-                        team2={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
-                        enabled={foresightEnabled}
-                        isMobile={isMobile}
-                    />
-                ),
-            });
-        }
-
-        // 3. AI PREVIEW (only when both teams selected)
+        // 2. AI PREVIEW (only when both teams selected)
         if (selectedTeam1 && selectedTeam2) {
             groups.push({
                 id: 'preview',
@@ -1056,7 +1039,7 @@ const VenueNotes = ({
             });
         }
 
-        // 3. TEAMS (H2H + history + matchups — only when both teams)
+        // 3. TEAMS (H2H + history + matchups — only when both teams selected)
         if (selectedTeam1 && selectedTeam2) {
             groups.push({
                 id: 'teams',
@@ -1184,7 +1167,7 @@ const VenueNotes = ({
             ),
         });
 
-        // 8. VENUE TWINS (cards only, moved to the very end)
+        // 8. VENUE TWINS (cards only)
         groups.push({
             id: 'venueTwins',
             label: 'Venue Twins',
@@ -1198,6 +1181,23 @@ const VenueNotes = ({
                 />
             ),
         });
+
+        // 9. ML FORESIGHT (last section, only when both teams selected)
+        if (selectedTeam1 && selectedTeam2) {
+            groups.push({
+                id: 'foresight',
+                label: 'Foresight',
+                content: (
+                    <ForesightCard
+                        venue={venue}
+                        team1={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
+                        team2={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
+                        enabled={foresightEnabled}
+                        isMobile={isMobile}
+                    />
+                ),
+            });
+        }
 
         return groups;
     }, [

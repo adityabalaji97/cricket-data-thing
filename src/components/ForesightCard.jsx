@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
-  Chip,
   LinearProgress,
-  Stack,
   Typography,
 } from '@mui/material';
 import axios from 'axios';
@@ -57,7 +55,7 @@ const ForesightCard = ({
   const t2Prob = data.team2_win_prob ? (data.team2_win_prob * 100) : 50;
   const score1st = data.predicted_1st_innings_score ? Math.round(data.predicted_1st_innings_score) : null;
   const score2nd = data.predicted_2nd_innings_score ? Math.round(data.predicted_2nd_innings_score) : null;
-  const topFeatures = data.top_features || [];
+  const narrativeInsights = data.narrative_insights || [];
 
   return (
     <Box sx={{
@@ -66,21 +64,6 @@ const ForesightCard = ({
       bgcolor: 'rgba(156, 39, 176, 0.04)',
       border: '1px solid rgba(156, 39, 176, 0.15)',
     }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-        <Typography variant={isMobile ? 'subtitle1' : 'h6'} sx={{ fontWeight: 700 }}>
-          ML Foresight
-        </Typography>
-        <Stack direction="row" spacing={0.5}>
-          {data.gates_passed && (
-            <Chip size="small" label={`${data.gates_passed} gates`} variant="outlined" color="secondary" />
-          )}
-          {data.model_version && (
-            <Chip size="small" label={data.model_version} variant="outlined" />
-          )}
-        </Stack>
-      </Box>
-
       {/* Win probability bar */}
       <Box sx={{ mb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
@@ -130,17 +113,17 @@ const ForesightCard = ({
         </Box>
       )}
 
-      {/* Key factors */}
-      {topFeatures.length > 0 && (
-        <Box sx={{ mb: 1 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-            Key factors:
-          </Typography>
-          {topFeatures.slice(0, 5).map((f, idx) => (
-            <Typography key={idx} variant="body2" sx={{ lineHeight: 1.4, color: 'text.secondary' }}>
-              {f.direction === 'positive' ? '\u25B2' : '\u25BC'}{' '}
-              {f.team === 'team1' ? data.team1 : f.team === 'team2' ? data.team2 : ''}{' '}
-              {f.feature}
+      {/* Narrative insights */}
+      {narrativeInsights.length > 0 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          {narrativeInsights.map((insight, idx) => (
+            <Typography key={idx} variant="body2" sx={{
+              lineHeight: 1.5,
+              color: 'text.secondary',
+              pl: 1.5,
+              borderLeft: '2px solid rgba(156, 39, 176, 0.3)',
+            }}>
+              {insight}
             </Typography>
           ))}
         </Box>

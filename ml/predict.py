@@ -89,6 +89,174 @@ def _humanize_feature(name: str) -> str:
     return name.replace("_", " ").replace("  ", " ").strip().capitalize()
 
 
+def _curate_feature_snapshot(
+    feature_snapshot: Dict[str, Any],
+    team1: str,
+    team2: str,
+) -> Dict[str, str]:
+    """Select the most interpretable features from the snapshot and label them."""
+    curated = {}
+    _CURATED_KEYS = [
+        # Phase stats
+        ("team1_pp_avg_runs", f"{team1} avg powerplay runs"),
+        ("team2_pp_avg_runs", f"{team2} avg powerplay runs"),
+        ("team1_middle_avg_runs", f"{team1} avg middle-overs runs"),
+        ("team2_middle_avg_runs", f"{team2} avg middle-overs runs"),
+        ("team1_death_avg_runs", f"{team1} avg death-overs runs"),
+        ("team2_death_avg_runs", f"{team2} avg death-overs runs"),
+        ("team1_pp_avg_wickets_lost", f"{team1} avg powerplay wickets lost"),
+        ("team2_pp_avg_wickets_lost", f"{team2} avg powerplay wickets lost"),
+        ("team1_death_avg_wickets_lost", f"{team1} avg death-overs wickets lost"),
+        ("team2_death_avg_wickets_lost", f"{team2} avg death-overs wickets lost"),
+        # Venue
+        ("venue_bat_first_win_pct", "Venue bat-first win %"),
+        ("venue_avg_1st_innings_score", "Venue avg 1st innings score"),
+        ("venue_avg_2nd_innings_score", "Venue avg 2nd innings score"),
+        ("venue_pace_spin_economy_ratio", "Venue pace/spin economy ratio"),
+        # H2H
+        ("h2h_team1_wins", f"H2H wins for {team1}"),
+        ("h2h_team2_wins", f"H2H wins for {team2}"),
+        # Elo
+        ("team1_elo", f"{team1} Elo rating"),
+        ("team2_elo", f"{team2} Elo rating"),
+        ("elo_delta", "Elo rating gap"),
+        # Bowling
+        ("team1_spin_attack_economy", f"{team1} spin attack economy"),
+        ("team2_spin_attack_economy", f"{team2} spin attack economy"),
+        ("team1_pace_attack_economy", f"{team1} pace attack economy"),
+        ("team2_pace_attack_economy", f"{team2} pace attack economy"),
+        # Form
+        ("team1_recent_form", f"{team1} recent form (win %)"),
+        ("team2_recent_form", f"{team2} recent form (win %)"),
+        # Venue-specific
+        ("team1_control_pct_at_venue", f"{team1} control % at this venue"),
+        ("team2_control_pct_at_venue", f"{team2} control % at this venue"),
+        ("team1_boundary_pct_at_venue", f"{team1} boundary % at this venue"),
+        ("team2_boundary_pct_at_venue", f"{team2} boundary % at this venue"),
+    ]
+    for key, label in _CURATED_KEYS:
+        val = feature_snapshot.get(key)
+        if val is not None and val != 0:
+            curated[label] = round(float(val), 2) if isinstance(val, (int, float)) else val
+    return curated
+
+
+def _generate_narrative_insights(
+    team1: str,
+    team2: str,
+    venue: str,
+    team1_win_prob: float,
+    team2_win_prob: float,
+    predicted_1st: float,
+    predicted_2nd: float,
+    top_features: List[Dict],
+    feature_snapshot: Dict,
+) -> List[str]:
+    """Generate natural cricket commentary for a prediction using GPT-4o-mini.
+
+    Falls back to template-based insights if the OpenAI call fails.
+    """
+    curated = _curate_feature_snapshot(feature_snapshot, team1, team2)
+
+    predicted_winner = team1 if team1_win_prob > 0.5 else team2
+    win_pct = max(team1_win_prob, team2_win_prob) * 100
+
+    # Build the prompt
+    system_msg = (
+        "You are a cricket analyst writing concise pre-match insights for a data-driven cricket app. "
+        "Write 5-7 short bullet points (one sentence each) explaining WHY the ML model predicts this outcome. "
+        "Use the feature data provided. Be specific with numbers. No preamble."
+    )
+    user_msg = (
+        f"Prediction: {predicted_winner} to win ({win_pct:.1f}% probability) at {venue}.\n"
+        f"Predicted 1st innings score: {predicted_1st:.0f}. Predicted 2nd innings score: {predicted_2nd:.0f}.\n\n"
+        f"Top model features (by importance):\n"
+    )
+    for f in top_features[:10]:
+        user_msg += f"  - {f['feature']}: value={f['value']}, importance={f['importance']}\n"
+    user_msg += f"\nDetailed stats:\n"
+    for label, val in curated.items():
+        user_msg += f"  - {label}: {val}\n"
+
+    try:
+        from openai import OpenAI
+        client = OpenAI()  # uses OPENAI_API_KEY env var
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            max_tokens=500,
+            temperature=0.7,
+        )
+        raw = response.choices[0].message.content.strip()
+        # Parse bullet points — lines starting with - or * or numbered
+        insights = []
+        for line in raw.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            # Strip leading bullet markers
+            for prefix in ("- ", "* ", "• "):
+                if line.startswith(prefix):
+                    line = line[len(prefix):]
+                    break
+            # Strip numbered prefixes like "1. " or "1) "
+            if len(line) > 2 and line[0].isdigit() and line[1] in (".", ")"):
+                line = line[2:].strip()
+            elif len(line) > 3 and line[:2].isdigit() and line[2] in (".", ")"):
+                line = line[3:].strip()
+            if line:
+                insights.append(line)
+        if insights:
+            print(f"[predict] Generated {len(insights)} narrative insights via GPT-4o-mini")
+            return insights[:7]
+    except Exception as e:
+        print(f"[predict] OpenAI narrative generation failed ({e}), using template fallback")
+
+    # Template fallback
+    return _template_insights(
+        team1, team2, venue, team1_win_prob, team2_win_prob,
+        predicted_1st, predicted_2nd, top_features, feature_snapshot,
+    )
+
+
+def _template_insights(
+    team1: str, team2: str, venue: str,
+    team1_win_prob: float, team2_win_prob: float,
+    predicted_1st: float, predicted_2nd: float,
+    top_features: List[Dict], feature_snapshot: Dict,
+) -> List[str]:
+    """Simple f-string templates for the top features when LLM is unavailable."""
+    predicted_winner = team1 if team1_win_prob > 0.5 else team2
+    win_pct = max(team1_win_prob, team2_win_prob) * 100
+    insights = [
+        f"Model gives {predicted_winner} a {win_pct:.0f}% chance of winning at {venue}.",
+    ]
+
+    elo1 = feature_snapshot.get("team1_elo")
+    elo2 = feature_snapshot.get("team2_elo")
+    if elo1 and elo2:
+        stronger = team1 if elo1 > elo2 else team2
+        insights.append(f"{stronger} hold the higher Elo rating ({max(elo1, elo2):.0f} vs {min(elo1, elo2):.0f}).")
+
+    form1 = feature_snapshot.get("team1_recent_form")
+    form2 = feature_snapshot.get("team2_recent_form")
+    if form1 is not None and form2 is not None:
+        better = team1 if form1 > form2 else team2
+        insights.append(f"{better} come in with stronger recent form ({max(form1, form2)*100:.0f}% win rate).")
+
+    bat_first_pct = feature_snapshot.get("venue_bat_first_win_pct")
+    if bat_first_pct is not None:
+        side = "batting first" if bat_first_pct > 0.5 else "chasing"
+        insights.append(f"This venue favours {side} (bat-first win rate: {bat_first_pct*100:.0f}%).")
+
+    insights.append(f"Predicted 1st innings score: {predicted_1st:.0f}, 2nd innings: {predicted_2nd:.0f}.")
+
+    return insights[:5]
+
+
 def _infer_team(feature_name: str) -> Optional[str]:
     """Infer which team a feature belongs to, or None for venue/neutral features."""
     if feature_name.startswith("team1_"):
@@ -162,13 +330,9 @@ def _compute_top_features(
     # Get feature values for this prediction (already prepared)
     values = feature_values[feature_cols].iloc[0].values if len(feature_values) > 0 else np.zeros(len(feature_cols))
 
-    # Compute z-scores (magnitude of deviation from 0 — features are already median-filled)
-    abs_values = np.abs(values.astype(float))
-    # Contribution = importance * |value| (larger deviation + higher importance = bigger contribution)
-    contributions = importances * abs_values
-
-    # Sort by contribution
-    top_indices = np.argsort(contributions)[::-1][:n]
+    # Rank by model importance alone (the old importance * |value| formula was broken —
+    # Elo's large magnitude always dominated regardless of actual predictive contribution)
+    top_indices = np.argsort(importances)[::-1][:n]
 
     results = []
     for idx in top_indices:
@@ -181,7 +345,7 @@ def _compute_top_features(
             "direction": "positive" if val > 0 else "negative",
             "importance": round(float(importances[idx]), 6),
             "value": round(val, 4),
-            "contribution": round(float(contributions[idx]), 6),
+            "contribution": round(float(importances[idx]), 6),
         })
 
     return results
@@ -327,7 +491,17 @@ def predict_match(
     predicted_2nd = float(score2_model["model"].predict(X_score2)[0])
 
     # --- Top contributing features ---
-    top_features = _compute_top_features(winner_model, X_winner, n=5)
+    top_features = _compute_top_features(winner_model, X_winner, n=10)
+
+    # --- Generate narrative insights ---
+    feature_snapshot_raw = {k: (float(v) if isinstance(v, (int, float, np.floating, np.integer)) else v)
+                            for k, v in features.items() if v is not None}
+    narrative_insights = _generate_narrative_insights(
+        team1=team1, team2=team2, venue=venue,
+        team1_win_prob=team1_win_prob, team2_win_prob=team2_win_prob,
+        predicted_1st=predicted_1st, predicted_2nd=predicted_2nd,
+        top_features=top_features, feature_snapshot=feature_snapshot_raw,
+    )
 
     # --- Look up match_id from matches table (if exists) ---
     match_id = None
@@ -351,8 +525,7 @@ def predict_match(
         match_id = _generate_match_id(venue, team1, team2, match_date)
 
     # --- Store in RDS ---
-    feature_snapshot = {k: (float(v) if isinstance(v, (int, float, np.floating, np.integer)) else v)
-                        for k, v in features.items() if v is not None}
+    feature_snapshot = feature_snapshot_raw
 
     upsert_sql = text("""
         INSERT INTO match_predictions (
@@ -360,13 +533,13 @@ def predict_match(
             predicted_winner, win_probability,
             team1, team2, team1_win_prob, team2_win_prob,
             predicted_1st_innings_score_mean, predicted_2nd_innings_score_mean,
-            top_features, feature_snapshot, gates_passed
+            top_features, feature_snapshot, gates_passed, narrative_insights
         ) VALUES (
             :match_id, :model_version, :league,
             :predicted_winner, :win_probability,
             :team1, :team2, :team1_win_prob, :team2_win_prob,
             :predicted_1st, :predicted_2nd,
-            :top_features, :feature_snapshot, :gates_passed
+            :top_features, :feature_snapshot, :gates_passed, :narrative_insights
         )
         ON CONFLICT ON CONSTRAINT uq_match_predictions_match_model
         DO UPDATE SET
@@ -381,6 +554,7 @@ def predict_match(
             top_features = EXCLUDED.top_features,
             feature_snapshot = EXCLUDED.feature_snapshot,
             gates_passed = EXCLUDED.gates_passed,
+            narrative_insights = EXCLUDED.narrative_insights,
             prediction_date = NOW()
     """)
 
@@ -399,6 +573,7 @@ def predict_match(
         "top_features": json.dumps(top_features),
         "feature_snapshot": json.dumps(feature_snapshot),
         "gates_passed": gates_passed,
+        "narrative_insights": json.dumps(narrative_insights),
     })
     rds_session.commit()
 
@@ -420,6 +595,7 @@ def predict_match(
         "predicted_1st_innings_score": round(predicted_1st, 1),
         "predicted_2nd_innings_score": round(predicted_2nd, 1),
         "top_features": top_features,
+        "narrative_insights": narrative_insights,
         "model_version": version,
         "gates_passed": gates_passed,
     }
