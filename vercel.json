@@ -1,5 +1,7 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/proxy.js" },
     { "src": "/(.*)", "dest": "/$1" }

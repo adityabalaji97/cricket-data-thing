@@ -12,7 +12,6 @@ import {
 import QueryFilters from './QueryFilters';
 import QueryResults from './QueryResults';
 import NLQueryInput from './NLQueryInput';
-import NLInterpretation from './NLInterpretation';
 import { useUrlParams, filtersToUrlParams } from '../utils/urlParamParser';
 import axios from 'axios';
 import config from '../config';
@@ -378,17 +377,6 @@ const QueryBuilder = ({ isMobile }) => {
         disabled={loading || isApplyingSuggestion}
       />
 
-      {nlInterpretation && (
-        <NLInterpretation
-          interpretation={nlInterpretation}
-          confidence={nlConfidence}
-          rawFilters={nlRawFilters}
-          onSuggestionClick={applySuggestion}
-          onClose={dismissInterpretation}
-          disabled={loading || isApplyingSuggestion}
-        />
-      )}
-
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -436,6 +424,13 @@ const QueryBuilder = ({ isMobile }) => {
               filters={filters}
               recommendedColumns={nlRecommendedColumns}
               recommendedChart={nlRecommendedChart}
+              nlInterpretation={nlInterpretation}
+              nlConfidence={nlConfidence}
+              nlRawFilters={nlRawFilters}
+              nlSourceQuery={nlSourceQuery}
+              onSuggestionClick={applySuggestion}
+              onDismissInterpretation={dismissInterpretation}
+              interpretationDisabled={loading || isApplyingSuggestion}
               isMobile={isMobile}
             />
           )}

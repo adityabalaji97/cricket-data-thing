@@ -204,6 +204,7 @@ venue, country, match_id, competition, year, batting_team, bowling_team, batter,
 11. When the user asks about toss impact on winning (e.g. "toss decision vs match outcome"), use group_by: ["toss_decision", "toss_match_outcome"] with query_mode: "batting_stats". Do NOT use "match_outcome" for toss analysis — use "toss_match_outcome" instead.
 12. For team match-level queries (e.g. "CSK in chasing wins"), group by match_id, batting_team, bowling_team, and year. This shows individual match results rather than aggregated totals.
 13. When a query needs both bowling style filters (bowl_kind/bowl_style) AND per-match bowling stats (e.g. "spinners with 4+ wickets"), use query_mode: "delivery" with group_by: ["bowler", "match_id"] and min_wickets filter. Do NOT use bowling_stats mode when bowl_kind or bowl_style filters are needed — those columns only exist in delivery_details.
+14. When a query says a bowler "conceded", "conceding", or "gave away" runs (e.g. "Bumrah conceding 30+ runs"), treat it as bowling analysis: use "bowlers" (not "players") and bowling-focused thresholds in bowling_stats mode.
 """
 
 EXAMPLE_QUERIES = [
@@ -1169,9 +1170,26 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
         filters.pop("end_date", None)
 
     # Prefer delivery mode when group_by contains delivery-only columns
+    # or when delivery-only filters are present in filters.
     DELIVERY_ONLY_GROUP_BY = {"bat_hand", "bowl_style", "bowl_kind", "line", "length", "shot", "control", "wagon_zone", "phase", "dismissal"}
+    DELIVERY_ONLY_FILTERS = {"bat_hand", "bowl_style", "bowl_kind", "line", "length", "shot", "control", "wagon_zone", "dismissal"}
+
+    def _has_filter_value(value: Any) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return value.strip() != ""
+        if isinstance(value, (list, tuple, set, dict)):
+            return len(value) > 0
+        return True
+
     if filters.get("query_mode") in ("batting_stats", "bowling_stats"):
         if any(c in DELIVERY_ONLY_GROUP_BY for c in group_by):
+            filters["query_mode"] = "delivery"
+        elif any(
+            key in DELIVERY_ONLY_FILTERS and _has_filter_value(value)
+            for key, value in filters.items()
+        ):
             filters["query_mode"] = "delivery"
 
     # Chase/win team queries: add match-level grouping and ensure filters

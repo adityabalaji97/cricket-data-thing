@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import CondensedName from './common/CondensedName';
+import NLInterpretation from './NLInterpretation';
+import axios from 'axios';
 import {
   Box,
   Typography,
@@ -21,7 +23,6 @@ import {
   AccordionSummary,
   AccordionDetails,
   TableSortLabel,
-  Autocomplete,
   TextField,
   IconButton,
   Tooltip,
@@ -31,20 +32,21 @@ import {
   MenuItem,
   OutlinedInput,
   Popover,
-  Collapse
+  Collapse,
+  Stack
 } from '@mui/material';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GetAppIcon from '@mui/icons-material/GetApp';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import ScatterPlotIcon from '@mui/icons-material/ScatterPlot';
 import AddIcon from '@mui/icons-material/Add';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
 import MapIcon from '@mui/icons-material/Map';
-import FilterListOffIcon from '@mui/icons-material/FilterListOff';
+import ThumbUpAltOutlinedIcon from '@mui/icons-material/ThumbUpAltOutlined';
+import ThumbDownAltOutlinedIcon from '@mui/icons-material/ThumbDownAltOutlined';
 import ChartPanel from './ChartPanel';
 import { PitchMapContainer, getPitchMapMode } from './PitchMap';
+import config from '../config';
 
 // Column Filter Component
 const ColumnFilter = ({ column, displayName, uniqueValues, selectedValues, onChange, onClear, isMobile }) => {
@@ -184,7 +186,21 @@ const normalizeRecommendedChart = (recommendedChart) => {
   };
 };
 
-const QueryResults = ({ results, groupBy, filters, recommendedColumns, recommendedChart, isMobile }) => {
+const QueryResults = ({
+  results,
+  groupBy,
+  filters,
+  recommendedColumns,
+  recommendedChart,
+  nlInterpretation,
+  nlConfidence,
+  nlRawFilters,
+  nlSourceQuery,
+  onSuggestionClick,
+  onDismissInterpretation,
+  interpretationDisabled = false,
+  isMobile,
+}) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
   
@@ -207,6 +223,11 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, recommend
   const [aiChartReason, setAiChartReason] = useState(null);
   const [selectedMetricColumns, setSelectedMetricColumns] = useState(DEFAULT_SELECTED_METRIC_COLUMNS);
   const [headerCollapsed, setHeaderCollapsed] = useState(isMobile);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSelection, setFeedbackSelection] = useState(null);
+  const [feedbackNote, setFeedbackNote] = useState('');
+  const [feedbackError, setFeedbackError] = useState(null);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
   // Extract data early to avoid hooks rule violation
   const data = results?.data || [];
@@ -219,6 +240,15 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, recommend
   );
   const hasSummaries = metadata.has_summaries || false;
   const pitchMapMode = useMemo(() => getPitchMapMode(groupBy || []), [groupBy]);
+  const resultRowCount = useMemo(() => {
+    if (typeof metadata.returned_groups === 'number') {
+      return metadata.returned_groups;
+    }
+    if (typeof metadata.total_matching_rows === 'number') {
+      return metadata.total_matching_rows;
+    }
+    return Array.isArray(data) ? data.length : 0;
+  }, [metadata, data]);
   
   // Add percent_balls to data (for pitch map and charts, without summary rows)
   const dataWithPercentBalls = useMemo(() => {
@@ -387,6 +417,14 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, recommend
       'it best fits the grouped metrics returned for this query'
     );
   }, [initialChartRecommendation]);
+
+  useEffect(() => {
+    setFeedbackSubmitting(false);
+    setFeedbackSelection(null);
+    setFeedbackNote('');
+    setFeedbackError(null);
+    setFeedbackSuccess(false);
+  }, [nlSourceQuery, metadata.total_matching_rows, metadata.returned_groups]);
 
   // Apply column filters to displayData
   const filteredData = useMemo(() => {
@@ -558,6 +596,66 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, recommend
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const submitFeedback = async ({ feedback, refinedQueryText = null }) => {
+    const normalizedQuery = String(nlSourceQuery || '').trim();
+    if (!normalizedQuery) {
+      setFeedbackError('Feedback is available only for natural-language queries.');
+      return false;
+    }
+
+    try {
+      setFeedbackSubmitting(true);
+      setFeedbackError(null);
+
+      const payload = {
+        query_text: normalizedQuery,
+        feedback,
+        execution_success: true,
+        result_row_count: Number.isInteger(resultRowCount) ? resultRowCount : 0,
+      };
+
+      if (refinedQueryText) {
+        payload.refined_query_text = refinedQueryText;
+      }
+
+      await axios.post(`${config.API_URL}/nl2query/feedback`, payload);
+      setFeedbackSuccess(true);
+      return true;
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setFeedbackError(typeof detail === 'string' ? detail : 'Failed to submit feedback. Please try again.');
+      return false;
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
+
+  const handleThumbsUp = async () => {
+    setFeedbackSelection('good');
+    const ok = await submitFeedback({ feedback: 'good' });
+    if (!ok) {
+      setFeedbackSelection(null);
+    }
+  };
+
+  const handleThumbsDown = () => {
+    setFeedbackSelection('bad');
+    setFeedbackSuccess(false);
+    setFeedbackError(null);
+  };
+
+  const handleBadFeedbackSubmit = async () => {
+    const note = feedbackNote.trim();
+    const ok = await submitFeedback({
+      feedback: 'bad',
+      refinedQueryText: note || null,
+    });
+    if (!ok) {
+      return;
+    }
+    setFeedbackSelection('submitted');
   };
   
   const formatValue = (value, key) => {
@@ -1057,6 +1155,92 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, recommend
             </Grid>
           </AccordionDetails>
         </Accordion>
+      )}
+
+      {nlInterpretation && (
+        <Box sx={{ mt: 2 }}>
+          <NLInterpretation
+            interpretation={nlInterpretation}
+            confidence={nlConfidence}
+            rawFilters={nlRawFilters}
+            onSuggestionClick={onSuggestionClick}
+            onClose={onDismissInterpretation}
+            disabled={interpretationDisabled}
+          />
+        </Box>
+      )}
+
+      {String(nlSourceQuery || '').trim() && (
+        <Paper
+          elevation={0}
+          sx={{
+            mt: 2,
+            p: 1.5,
+            border: 1,
+            borderColor: 'divider',
+            bgcolor: 'background.default',
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              Was this helpful?
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={handleThumbsUp}
+              disabled={feedbackSubmitting || feedbackSuccess}
+              color={feedbackSelection === 'good' || feedbackSuccess ? 'success' : 'default'}
+              aria-label="Helpful"
+            >
+              <ThumbUpAltOutlinedIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={handleThumbsDown}
+              disabled={feedbackSubmitting || feedbackSuccess}
+              color={feedbackSelection === 'bad' ? 'error' : 'default'}
+              aria-label="Not helpful"
+            >
+              <ThumbDownAltOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+
+          {feedbackSelection === 'bad' && !feedbackSuccess && (
+            <Box sx={{ mt: 1 }}>
+              <TextField
+                size="small"
+                fullWidth
+                label="What went wrong?"
+                placeholder="e.g. wrong player, should use batting mode"
+                value={feedbackNote}
+                onChange={(event) => setFeedbackNote(event.target.value)}
+                disabled={feedbackSubmitting}
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleBadFeedbackSubmit}
+                  disabled={feedbackSubmitting || !feedbackNote.trim()}
+                >
+                  {feedbackSubmitting ? 'Submitting...' : 'Submit feedback'}
+                </Button>
+              </Box>
+            </Box>
+          )}
+
+          {feedbackSuccess && (
+            <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 0.75 }}>
+              Thanks! Feedback recorded.
+            </Typography>
+          )}
+
+          {feedbackError && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {feedbackError}
+            </Alert>
+          )}
+        </Paper>
       )}
     </Box>
   );
