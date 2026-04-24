@@ -145,8 +145,8 @@ Return a JSON object with these fields:
 - "min_balls": minimum number of balls (for meaningful samples, suggest 20-50)
 - "min_runs": minimum runs threshold for grouped/stat queries
 - "max_runs": maximum runs threshold for grouped/stat queries
-- "min_wickets": minimum wickets threshold (bowling_stats mode)
-- "max_wickets": maximum wickets threshold (bowling_stats mode)
+- "min_wickets": minimum wickets threshold (bowling_stats or delivery mode with bowler grouping)
+- "max_wickets": maximum wickets threshold (bowling_stats or delivery mode with bowler grouping)
 - "start_date": "YYYY-MM-DD" format
 - "end_date": "YYYY-MM-DD" format
 
@@ -203,6 +203,7 @@ venue, country, match_id, competition, year, batting_team, bowling_team, batter,
 10. Use the player's full first and last name when possible (e.g. "Jasprit Bumrah" not "J Bumrah", "Virat Kohli" not "V Kohli", "Varun Chakravarthy" not "V Chakravarthy"). The system will resolve names to the database format automatically.
 11. When the user asks about toss impact on winning (e.g. "toss decision vs match outcome"), use group_by: ["toss_decision", "toss_match_outcome"] with query_mode: "batting_stats". Do NOT use "match_outcome" for toss analysis — use "toss_match_outcome" instead.
 12. For team match-level queries (e.g. "CSK in chasing wins"), group by match_id, batting_team, bowling_team, and year. This shows individual match results rather than aggregated totals.
+13. When a query needs both bowling style filters (bowl_kind/bowl_style) AND per-match bowling stats (e.g. "spinners with 4+ wickets"), use query_mode: "delivery" with group_by: ["bowler", "match_id"] and min_wickets filter. Do NOT use bowling_stats mode when bowl_kind or bowl_style filters are needed — those columns only exist in delivery_details.
 """
 
 EXAMPLE_QUERIES = [

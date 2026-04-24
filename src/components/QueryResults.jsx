@@ -30,8 +30,10 @@ import {
   Select,
   MenuItem,
   OutlinedInput,
-  Popover
+  Popover,
+  Collapse
 } from '@mui/material';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GetAppIcon from '@mui/icons-material/GetApp';
 import BarChartIcon from '@mui/icons-material/BarChart';
@@ -204,7 +206,8 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, recommend
   const [showPitchMap, setShowPitchMap] = useState(false);
   const [aiChartReason, setAiChartReason] = useState(null);
   const [selectedMetricColumns, setSelectedMetricColumns] = useState(DEFAULT_SELECTED_METRIC_COLUMNS);
-  
+  const [headerCollapsed, setHeaderCollapsed] = useState(isMobile);
+
   // Extract data early to avoid hooks rule violation
   const data = results?.data || [];
   const summaryData = results?.summary_data || null;
@@ -658,151 +661,189 @@ const QueryResults = ({ results, groupBy, filters, recommendedColumns, recommend
     <Box>
       {/* Results Summary */}
       <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={8}>
-              <Typography variant="h6" gutterBottom>
+        <CardContent sx={{ pb: headerCollapsed ? '12px !important' : undefined }}>
+          {/* Compact summary pill — always visible */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+            }}
+            onClick={() => setHeaderCollapsed(prev => !prev)}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Typography variant="h6" sx={{ fontSize: headerCollapsed ? '0.95rem' : undefined }}>
                 Query Results
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
-                {isGrouped ? (
-                  <>
-                    <Chip 
-                      label={`${metadata.total_groups || metadata.returned_groups} groups`} 
-                      color="primary" 
-                      size="small" 
-                    />
-                    <Chip 
-                      label={`Grouped by: ${groupBy.join(', ')}`} 
-                      variant="outlined" 
-                      size="small" 
-                    />
-                    {hasSummaries && (
-                      <Chip 
-                        label="With Summary Rows" 
-                        color="secondary" 
-                        size="small" 
-                      />
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <Chip 
-                      label={`${(metadata.total_matching_rows || 0).toLocaleString()} total deliveries`} 
-                      color="primary" 
-                      size="small" 
-                    />
-                    <Chip 
-                      label={`Showing ${sortedData.length}`} 
-                      variant="outlined" 
-                      size="small" 
-                    />
-                  </>
-                )}
-
-                {metadata.total_innings_in_query !== undefined && metadata.total_innings_in_query !== null && (
+              {headerCollapsed && (
+                <>
                   <Chip
-                    label={`${Number(metadata.total_innings_in_query).toLocaleString()} total innings`}
-                    variant="outlined"
+                    label={isGrouped
+                      ? `${metadata.total_groups || metadata.returned_groups} rows`
+                      : `${(metadata.total_matching_rows || 0).toLocaleString()} deliveries`}
+                    color="primary"
                     size="small"
                   />
-                )}
-                
-                {sortConfig.key && (
-                  <Chip 
-                    label={`Sorted by: ${getColumnDisplayName(sortConfig.key)} (${sortConfig.direction})`} 
-                    variant="outlined" 
-                    size="small"
-                    color="secondary"
-                  />
-                )}
-                
-                {Object.keys(columnFilters).length > 0 && (
-                  <Chip 
-                    label={`${Object.keys(columnFilters).length} column filter${Object.keys(columnFilters).length > 1 ? 's' : ''} active`} 
-                    color="warning" 
-                    size="small"
-                    icon={<FilterListIcon />}
-                  />
-                )}
-              </Box>
-              
-              {metadata.filters_applied && (
-                <Typography variant="body2" color="text.secondary">
-                  {metadata.note}
-                </Typography>
+                  {isGrouped && (
+                    <Chip
+                      label={`Grouped by ${groupBy.join(', ')}`}
+                      variant="outlined"
+                      size="small"
+                    />
+                  )}
+                </>
               )}
+            </Box>
+            <IconButton size="small">
+              {headerCollapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+            </IconButton>
+          </Box>
 
-              {aiChartReason && (
-                <Alert
-                  severity="info"
-                  sx={{ mt: 1.25 }}
-                  onClose={() => setAiChartReason(null)}
-                >
-                  {`AI suggested this chart because: ${aiChartReason}`}
-                </Alert>
-              )}
-            </Grid>
-            
-            <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
-                {isGrouped && data.length > 0 && Object.keys(columnFilters).length > 0 && (
+          {/* Full header content — collapsible */}
+          <Collapse in={!headerCollapsed}>
+            <Grid container spacing={2} alignItems="center" sx={{ mt: 0.5 }}>
+              <Grid item xs={12} sm={8}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                  {isGrouped ? (
+                    <>
+                      <Chip
+                        label={`${metadata.total_groups || metadata.returned_groups} groups`}
+                        color="primary"
+                        size="small"
+                      />
+                      <Chip
+                        label={`Grouped by: ${groupBy.join(', ')}`}
+                        variant="outlined"
+                        size="small"
+                      />
+                      {hasSummaries && (
+                        <Chip
+                          label="With Summary Rows"
+                          color="secondary"
+                          size="small"
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Chip
+                        label={`${(metadata.total_matching_rows || 0).toLocaleString()} total deliveries`}
+                        color="primary"
+                        size="small"
+                      />
+                      <Chip
+                        label={`Showing ${sortedData.length}`}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </>
+                  )}
+
+                  {metadata.total_innings_in_query !== undefined && metadata.total_innings_in_query !== null && (
+                    <Chip
+                      label={`${Number(metadata.total_innings_in_query).toLocaleString()} total innings`}
+                      variant="outlined"
+                      size="small"
+                    />
+                  )}
+
+                  {sortConfig.key && (
+                    <Chip
+                      label={`Sorted by: ${getColumnDisplayName(sortConfig.key)} (${sortConfig.direction})`}
+                      variant="outlined"
+                      size="small"
+                      color="secondary"
+                    />
+                  )}
+
+                  {Object.keys(columnFilters).length > 0 && (
+                    <Chip
+                      label={`${Object.keys(columnFilters).length} column filter${Object.keys(columnFilters).length > 1 ? 's' : ''} active`}
+                      color="warning"
+                      size="small"
+                      icon={<FilterListIcon />}
+                    />
+                  )}
+                </Box>
+
+                {metadata.filters_applied && (
+                  <Typography variant="body2" color="text.secondary">
+                    {metadata.note}
+                  </Typography>
+                )}
+
+                {aiChartReason && (
+                  <Alert
+                    severity="info"
+                    sx={{ mt: 1.25 }}
+                    onClose={() => setAiChartReason(null)}
+                  >
+                    {`AI suggested this chart because: ${aiChartReason}`}
+                  </Alert>
+                )}
+              </Grid>
+
+              <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                  {isGrouped && data.length > 0 && Object.keys(columnFilters).length > 0 && (
+                    <Button
+                      variant="outlined"
+                      startIcon={<ClearIcon />}
+                      onClick={clearAllFilters}
+                      size="small"
+                      color="warning"
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+
+                  {isGrouped && pitchMapMode && data.length > 0 && (
+                    <Button
+                      variant={showPitchMap ? "contained" : "outlined"}
+                      startIcon={<MapIcon />}
+                      onClick={() => setShowPitchMap(!showPitchMap)}
+                      size="small"
+                      color="success"
+                    >
+                      {showPitchMap ? 'Hide Pitch Map' : 'Show Pitch Map'}
+                    </Button>
+                  )}
+
+                  {isGrouped && data.length > 0 && (
+                    <>
+                      <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={handleAddBarChart}
+                        size="small"
+                        sx={{ mr: 1 }}
+                      >
+                        Add Bar Chart
+                      </Button>
+                      <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={handleAddScatterChart}
+                        size="small"
+                      >
+                        Add Scatter Plot
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="outlined"
-                    startIcon={<ClearIcon />}
-                    onClick={clearAllFilters}
+                    startIcon={<GetAppIcon />}
+                    onClick={exportToCSV}
+                    disabled={!data || data.length === 0}
                     size="small"
-                    color="warning"
                   >
-                    Clear Filters
+                    Export CSV
                   </Button>
-                )}
-                
-                {isGrouped && pitchMapMode && data.length > 0 && (
-                  <Button
-                    variant={showPitchMap ? "contained" : "outlined"}
-                    startIcon={<MapIcon />}
-                    onClick={() => setShowPitchMap(!showPitchMap)}
-                    size="small"
-                    color="success"
-                  >
-                    {showPitchMap ? 'Hide Pitch Map' : 'Show Pitch Map'}
-                  </Button>
-                )}
-                
-                {isGrouped && data.length > 0 && (
-                  <>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={handleAddBarChart}
-                      size="small"
-                      sx={{ mr: 1 }}
-                    >
-                      Add Bar Chart
-                    </Button>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={handleAddScatterChart}
-                      size="small"
-                    >
-                      Add Scatter Plot
-                    </Button>
-                  </>
-                )}
-                <Button
-                  variant="outlined"
-                  startIcon={<GetAppIcon />}
-                  onClick={exportToCSV}
-                  disabled={!data || data.length === 0}
-                  size="small"
-                >
-                  Export CSV
-                </Button>
-              </Box>
+                </Box>
+              </Grid>
             </Grid>
-          </Grid>
+          </Collapse>
         </CardContent>
       </Card>
       

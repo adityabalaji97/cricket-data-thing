@@ -10,11 +10,14 @@ import {
   Alert,
   Tooltip,
   IconButton,
+  Collapse,
   useMediaQuery,
   useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import axios from 'axios';
 import config from '../config';
 
@@ -38,12 +41,16 @@ const QUERY_TIPS = `Try queries like:
 - Grouping: include "grouped by [competition/year/batter/bowler/bat_hand/bowl_style/match_outcome/toss_decision]"
 - Context filters: use phrases like "in chases", "winning vs losing", "toss decision bat/field", "since 2023"`;
 
-const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled }, ref) => {
+const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesCollapsed: externalCollapsed }, ref) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showExamples, setShowExamples] = useState(true);
+
+  // Allow parent to collapse examples via prop
+  const examplesVisible = showExamples && !externalCollapsed;
 
   const submitQuery = async (queryText) => {
     const q = (queryText || query).trim();
@@ -60,6 +67,8 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled }, ref) =>
       const data = response.data;
 
       if (data.success) {
+        // Collapse examples after successful query
+        setShowExamples(false);
         onFiltersGenerated({
           queryText: q,
           filters: data.filters,
@@ -183,39 +192,59 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled }, ref) =>
         </Alert>
       )}
 
-      <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 1 }}>
-        Tap an example to search
-      </Typography>
-
-      <Box
-        sx={{
-          display: 'flex',
-          flexWrap: isMobile ? 'wrap' : 'wrap',
-          gap: 0.75,
-          maxHeight: isMobile ? 140 : 'none',
-          overflowY: isMobile ? 'auto' : 'visible',
-          pb: isMobile ? 0.5 : 0,
-          '::-webkit-scrollbar': { width: isMobile ? 4 : 0 }
-        }}
-      >
-        {EXAMPLE_QUERIES.map((example, index) => (
-          <Chip
-            key={index}
-            label={example}
-            size="small"
-            onClick={() => handleChipClick(example)}
-            disabled={loading}
-            sx={{
-              bgcolor: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
-              '&.Mui-disabled': { opacity: 0.5 }
-            }}
-          />
-        ))}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            opacity: 0.9,
+            cursor: 'pointer',
+            userSelect: 'none',
+            '&:hover': { opacity: 1 }
+          }}
+          onClick={() => setShowExamples(prev => !prev)}
+        >
+          {examplesVisible ? 'Hide examples' : 'Show examples'}
+        </Typography>
+        <IconButton
+          size="small"
+          onClick={() => setShowExamples(prev => !prev)}
+          sx={{ color: 'rgba(255,255,255,0.8)', p: 0 }}
+        >
+          {examplesVisible ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+        </IconButton>
       </Box>
+
+      <Collapse in={examplesVisible}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 0.75,
+            maxHeight: isMobile ? 140 : 'none',
+            overflowY: isMobile ? 'auto' : 'visible',
+            pb: isMobile ? 0.5 : 0,
+            '::-webkit-scrollbar': { width: isMobile ? 4 : 0 }
+          }}
+        >
+          {EXAMPLE_QUERIES.map((example, index) => (
+            <Chip
+              key={index}
+              label={example}
+              size="small"
+              onClick={() => handleChipClick(example)}
+              disabled={loading}
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.15)',
+                color: 'white',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+                '&.Mui-disabled': { opacity: 0.5 }
+              }}
+            />
+          ))}
+        </Box>
+      </Collapse>
     </Paper>
   );
 });

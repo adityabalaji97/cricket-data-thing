@@ -39,6 +39,10 @@ COMMON_COLUMNS = {
 # crease_combo: ~91% in delivery_details, lower in deliveries
 PARTIAL_COLUMNS = {'crease_combo'}
 
+# Bowl-style sets used to infer bowl_kind when the column is NULL
+SPIN_STYLES = {"SLA", "SLO", "OB", "LB", "LBG", "LWS", "RAS", "SLW", "OS"}
+PACE_STYLES = {"RF", "RFM", "RM", "RMF", "LF", "LFM", "LM", "LMF"}
+
 VALID_QUERY_MODES = {"delivery", "batting_stats", "bowling_stats"}
 VALID_MATCH_OUTCOMES = {"win", "loss", "tie", "no_result"}
 VALID_TOSS_DECISIONS = {"bat", "field"}
@@ -179,7 +183,7 @@ def validate_wicket_filters(
 ) -> None:
     if min_wickets is None and max_wickets is None:
         return
-    if query_mode != "bowling_stats":
+    if query_mode not in ("bowling_stats", "delivery"):
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported filters for query_mode={query_mode}: ['min_wickets', 'max_wickets']",
@@ -2035,7 +2039,8 @@ def query_deliveries_service(
                 result = handle_grouped_query(
                     new_where_clause, new_params, group_by, min_balls, max_balls,
                     min_runs, max_runs, limit, offset, db, filters_applied,
-                    has_batter_filters, show_summary_rows, join_matches=join_new_matches
+                    has_batter_filters, show_summary_rows, join_matches=join_new_matches,
+                    min_wickets=min_wickets, max_wickets=max_wickets,
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_groups']
@@ -2332,7 +2337,20 @@ def build_where_clause(
         params["bowl_style"] = bowl_style
     
     if bowl_kind:
-        conditions.append("dd.bowl_kind = ANY(:bowl_kind)")
+        kind_conditions = ["dd.bowl_kind = ANY(:bowl_kind)"]
+        # Fallback: when bowl_kind is NULL, infer from bowl_style
+        fallback_styles = set()
+        for k in bowl_kind:
+            if "spin" in k.lower():
+                fallback_styles.update(SPIN_STYLES)
+            elif "pace" in k.lower() or "fast" in k.lower():
+                fallback_styles.update(PACE_STYLES)
+        if fallback_styles:
+            kind_conditions.append(
+                "(dd.bowl_kind IS NULL AND dd.bowl_style = ANY(:bowl_kind_fallback_styles))"
+            )
+            params["bowl_kind_fallback_styles"] = sorted(fallback_styles)
+        conditions.append("(" + " OR ".join(kind_conditions) + ")")
         params["bowl_kind"] = bowl_kind
     
     # Crease combo filter - expand LHB_RHB to include RHB_LHB (mixed combos are equivalent)
@@ -2598,9 +2616,10 @@ def get_grouping_columns_map():
 
 
 def handle_grouped_query(
-    where_clause, params, group_by, min_balls, max_balls, 
+    where_clause, params, group_by, min_balls, max_balls,
     min_runs, max_runs, limit, offset, db, filters_applied=None,
-    has_batter_filters=False, show_summary_rows=False, join_matches=False
+    has_batter_filters=False, show_summary_rows=False, join_matches=False,
+    min_wickets=None, max_wickets=None,
 ):
     """Return aggregated cricket statistics grouped by specified columns."""
     
@@ -2643,7 +2662,17 @@ def handle_grouped_query(
     if max_runs is not None:
         having_conditions.append(f"{runs_calculation} <= :max_runs")
         params["max_runs"] = max_runs
-    
+    if min_wickets is not None:
+        having_conditions.append(
+            "SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) >= :min_wickets"
+        )
+        params["min_wickets"] = min_wickets
+    if max_wickets is not None:
+        having_conditions.append(
+            "SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) <= :max_wickets"
+        )
+        params["max_wickets"] = max_wickets
+
     having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
     
     # Get total balls matching the WHERE clause

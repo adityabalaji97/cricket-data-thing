@@ -38,15 +38,35 @@ for _alias, _canonical in (VENUE_STANDARDIZATION or {}).items():
 
 
 def get_venue_aliases(venue: Optional[str]) -> List[str]:
-    """Return canonical venue plus known aliases for cross-table matching."""
+    """Return canonical venue plus known aliases for cross-table matching.
+
+    Follows the standardization chain transitively so that overwritten
+    mappings (e.g. A→B in one dict, B→C in another) still collect all
+    aliases from every group in the chain.
+    """
     if not venue or venue == "All Venues":
         return []
 
-    canonical = VENUE_STANDARDIZATION.get(venue, venue)
-    aliases = set(_CANONICAL_TO_VENUE_ALIASES.get(canonical, set()))
-    aliases.add(canonical)
-    aliases.add(venue)
-    return sorted(a for a in aliases if a)
+    # Forward-chase: venue → canonical → canonical's canonical → ...
+    aliases = {venue}
+    current = venue
+    while current in VENUE_STANDARDIZATION:
+        canonical = VENUE_STANDARDIZATION[current]
+        if canonical in aliases:
+            break  # avoid infinite loop
+        aliases.add(canonical)
+        current = canonical
+
+    # Reverse: for each alias found so far, pull in all keys that share
+    # the same canonical group in _CANONICAL_TO_VENUE_ALIASES.
+    expanded = set(aliases)
+    for alias in aliases:
+        for k, v in _CANONICAL_TO_VENUE_ALIASES.items():
+            if alias in v or alias == k:
+                expanded.update(v)
+                expanded.add(k)
+
+    return sorted(a for a in expanded if a)
 
 
 def should_use_delivery_details(start_date: Optional[date], end_date: Optional[date]) -> Dict[str, bool]:
