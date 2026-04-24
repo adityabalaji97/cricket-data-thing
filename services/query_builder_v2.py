@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import date
 from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
 from services.delivery_data_service import get_venue_aliases
+from services.bowler_types import PACE_TYPES as ALL_KNOWN_PACE_TYPES, SPIN_TYPES as ALL_KNOWN_SPIN_TYPES
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,9 +40,20 @@ COMMON_COLUMNS = {
 # crease_combo: ~91% in delivery_details, lower in deliveries
 PARTIAL_COLUMNS = {'crease_combo'}
 
-# Bowl-style sets used to infer bowl_kind when the column is NULL
-SPIN_STYLES = {"SLA", "SLO", "OB", "LB", "LBG", "LWS", "RAS", "SLW", "OS"}
-PACE_STYLES = {"RF", "RFM", "RM", "RMF", "LF", "LFM", "LM", "LMF"}
+# Bowl-style sets used to infer bowl_kind when the column is NULL.
+# Include legacy aliases (RO/RL/LO/LC, etc.) via shared bowler-types mapping.
+SPIN_STYLES = set(ALL_KNOWN_SPIN_TYPES) | {"SLO", "OS", "RAS", "SLW"}
+PACE_STYLES = set(ALL_KNOWN_PACE_TYPES)
+
+# Canonicalize legacy short-hands to modern style labels used across the app.
+LEGACY_BOWL_STYLE_CANONICAL_MAP = {
+    "RO": "OB",    # Right-arm offbreak
+    "RL": "LB",    # Right-arm legbreak
+    "LO": "SLA",   # Left-arm orthodox spin
+    "LC": "LWS",   # Left-arm chinaman / wrist-spin
+    "NAN": "UNKNOWN",
+    "-": "UNKNOWN",
+}
 
 VALID_QUERY_MODES = {"delivery", "batting_stats", "bowling_stats"}
 VALID_MATCH_OUTCOMES = {"win", "loss", "tie", "no_result"}
@@ -126,7 +138,18 @@ def get_legacy_bowler_style_sql() -> str:
             NULLIF(TRIM(p.bowl_type), '')
         )
     """
-    return f"(UPPER({style_source_sql}))"
+    normalized_style_sql = f"UPPER({style_source_sql})"
+    canonical_cases = " ".join(
+        f"WHEN {normalized_style_sql} = {_sql_quote(raw)} THEN {_sql_quote(canonical)}"
+        for raw, canonical in LEGACY_BOWL_STYLE_CANONICAL_MAP.items()
+    )
+    return f"""(
+        CASE
+            WHEN {normalized_style_sql} IS NULL OR {normalized_style_sql} = '' THEN NULL
+            {canonical_cases}
+            ELSE {normalized_style_sql}
+        END
+    )"""
 
 
 def get_legacy_bowl_kind_sql(legacy_bowler_style_sql: Optional[str] = None) -> str:
@@ -554,7 +577,13 @@ def build_legacy_where_clause(
     legacy_bowl_kind_sql = get_legacy_bowl_kind_sql(legacy_bowler_style_sql)
 
     if bowl_style:
-        params["bowl_style"] = [str(v).strip().upper() for v in bowl_style if str(v).strip()]
+        normalized_styles = []
+        for value in bowl_style:
+            token = str(value).strip().upper()
+            if not token:
+                continue
+            normalized_styles.append(LEGACY_BOWL_STYLE_CANONICAL_MAP.get(token, token))
+        params["bowl_style"] = sorted(set(normalized_styles))
         conditions.append(f"{legacy_bowler_style_sql} = ANY(:bowl_style)")
 
     if bowl_kind:

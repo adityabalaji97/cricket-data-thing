@@ -83,6 +83,54 @@ def test_legacy_grouping_map_uses_derived_bowl_fields():
     assert "mixture/unknown" in grouping_map["bowl_kind"]
 
 
+def test_legacy_style_alias_codes_are_mapped_to_spin_equivalents():
+    assert qb.LEGACY_BOWL_STYLE_CANONICAL_MAP["RO"] == "OB"
+    assert qb.LEGACY_BOWL_STYLE_CANONICAL_MAP["RL"] == "LB"
+    assert qb.LEGACY_BOWL_STYLE_CANONICAL_MAP["LO"] == "SLA"
+    assert qb.LEGACY_BOWL_STYLE_CANONICAL_MAP["LC"] == "LWS"
+    assert "RO" in qb.SPIN_STYLES
+    assert "RL" in qb.SPIN_STYLES
+    assert "LO" in qb.SPIN_STYLES
+    assert "LC" in qb.SPIN_STYLES
+    assert "RS" in qb.PACE_STYLES
+    assert "LS" in qb.PACE_STYLES
+
+
+def test_legacy_where_clause_normalizes_style_alias_filter_input():
+    where_clause, params = qb.build_legacy_where_clause(
+        venue=None,
+        start_date=date(2008, 1, 1),
+        end_date=date(2014, 12, 31),
+        leagues=[],
+        teams=[],
+        batting_teams=[],
+        bowling_teams=[],
+        players=[],
+        batters=[],
+        bowlers=[],
+        bowl_style=["RO", "rl", " OB "],
+        bowl_kind=[],
+        crease_combo=[],
+        dismissal=[],
+        innings=None,
+        over_min=None,
+        over_max=None,
+        match_outcome=[],
+        is_chase=None,
+        chase_outcome=[],
+        toss_decision=[],
+        include_international=False,
+        top_teams=None,
+        group_by=[],
+        base_params={"limit": 100, "offset": 0},
+        db=None,
+    )
+
+    assert "ANY(:bowl_style)" in where_clause
+    # RO->OB and RL->LB are canonicalized.
+    assert sorted(params["bowl_style"]) == ["LB", "OB"]
+
+
 def test_legacy_only_service_response_normalizes_alias_names(monkeypatch):
     monkeypatch.setattr(
         qb,
