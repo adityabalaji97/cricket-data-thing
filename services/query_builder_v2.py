@@ -25,7 +25,7 @@ DELIVERY_DETAILS_START_DATE = date(2015, 1, 1)
 # Columns only available in delivery_details (2015+)
 ADVANCED_COLUMNS = {
     'line', 'length', 'shot', 'control', 'wagon_zone', 'wagon_x', 'wagon_y',
-    'bat_hand', 'bowl_style', 'bowl_kind'
+    'bat_hand'
 }
 
 # Columns available in both tables (can be queried across full date range)
@@ -109,6 +109,39 @@ def get_toss_match_outcome_sql(
             WHEN COALESCE({winner_expr}, '') = '' THEN 'no_result'
             WHEN {winner_canonical} = {toss_canonical} THEN 'win'
             ELSE 'loss'
+        END
+    )"""
+
+
+def get_legacy_bowler_style_sql() -> str:
+    """
+    Build normalized legacy bowler style from delivery + players fallback sources.
+    Precedence: deliveries.bowler_type -> players.bowler_type -> players.bowling_type -> players.bowl_type.
+    """
+    style_source_sql = """
+        COALESCE(
+            NULLIF(TRIM(d.bowler_type), ''),
+            NULLIF(TRIM(p.bowler_type), ''),
+            NULLIF(TRIM(p.bowling_type), ''),
+            NULLIF(TRIM(p.bowl_type), '')
+        )
+    """
+    return f"(UPPER({style_source_sql}))"
+
+
+def get_legacy_bowl_kind_sql(legacy_bowler_style_sql: Optional[str] = None) -> str:
+    """
+    Classify legacy bowl kind from normalized style code.
+    Unknown/missing styles are intentionally mapped to 'mixture/unknown'.
+    """
+    normalized_style_sql = legacy_bowler_style_sql or get_legacy_bowler_style_sql()
+    spin_styles_sql = ", ".join(_sql_quote(v) for v in sorted(SPIN_STYLES))
+    pace_styles_sql = ", ".join(_sql_quote(v) for v in sorted(PACE_STYLES))
+    return f"""(
+        CASE
+            WHEN {normalized_style_sql} IN ({spin_styles_sql}) THEN 'spin bowler'
+            WHEN {normalized_style_sql} IN ({pace_styles_sql}) THEN 'pace bowler'
+            ELSE 'mixture/unknown'
         END
     )"""
 
@@ -265,7 +298,15 @@ def analyze_query_requirements(
             result['use_legacy'] = True
             legacy_end = min(query_end, date(2014, 12, 31))
             result['legacy_date_range'] = (query_start, legacy_end)
-    
+
+    # bowl_style/bowl_kind are supported on legacy data via inferred classification.
+    inferred_legacy_columns_used = columns_in_query & {'bowl_style', 'bowl_kind'}
+    if result['use_legacy'] and inferred_legacy_columns_used:
+        result['warnings'].append(
+            "Legacy bowl classification is inferred using deliveries.bowler_type "
+            "with players-table fallback; unknown styles are grouped as mixture/unknown."
+        )
+
     return result
 
 
@@ -362,6 +403,8 @@ def _expand_player_names(player_names: List[str], db) -> List[str]:
 
 def get_legacy_grouping_columns_map():
     """Map user-friendly group_by values to deliveries table column names."""
+    legacy_bowler_style_sql = get_legacy_bowler_style_sql()
+    legacy_bowl_kind_sql = get_legacy_bowl_kind_sql(legacy_bowler_style_sql)
     match_outcome_sql = get_match_outcome_sql(
         batting_team_expr="d.batting_team",
         bowling_team_expr="d.bowling_team",
@@ -401,8 +444,8 @@ def get_legacy_grouping_columns_map():
         "ball_direction": "d.ball_direction",  # Backward-compatible alias
         
         # Bowler attributes
-        "bowl_style": "NULL",  # Not available
-        "bowl_kind": "NULL",   # Not available
+        "bowl_style": legacy_bowler_style_sql,
+        "bowl_kind": legacy_bowl_kind_sql,
         
         # Delivery details - NOT available in legacy, return NULL
         "line": "NULL",
@@ -421,7 +464,7 @@ def get_legacy_grouping_columns_map():
 
 def build_legacy_where_clause(
     venue, start_date, end_date, leagues, teams, batting_teams, bowling_teams,
-    players, batters, bowlers, crease_combo, dismissal, innings, over_min, over_max,
+    players, batters, bowlers, bowl_style, bowl_kind, crease_combo, dismissal, innings, over_min, over_max,
     match_outcome, is_chase, chase_outcome, toss_decision,
     include_international, top_teams, group_by, base_params, db
 ):
@@ -506,6 +549,17 @@ def build_legacy_where_clause(
         bowler_variants = get_all_player_variants(bowlers, db)
         conditions.append("d.bowler = ANY(:bowlers)")
         params["bowlers"] = bowler_variants
+
+    legacy_bowler_style_sql = get_legacy_bowler_style_sql()
+    legacy_bowl_kind_sql = get_legacy_bowl_kind_sql(legacy_bowler_style_sql)
+
+    if bowl_style:
+        params["bowl_style"] = [str(v).strip().upper() for v in bowl_style if str(v).strip()]
+        conditions.append(f"{legacy_bowler_style_sql} = ANY(:bowl_style)")
+
+    if bowl_kind:
+        params["bowl_kind"] = [str(v).strip().lower() for v in bowl_kind if str(v).strip()]
+        conditions.append(f"LOWER({legacy_bowl_kind_sql}) = ANY(:bowl_kind)")
     
     # Crease combo filter (partial coverage in legacy)
     if crease_combo:
@@ -572,6 +626,8 @@ def build_legacy_where_clause(
 
 def query_legacy_ungrouped(where_clause, params, limit, offset, db):
     """Query legacy deliveries table for individual records."""
+    legacy_bowler_style_sql = get_legacy_bowler_style_sql()
+    legacy_bowl_kind_sql = get_legacy_bowl_kind_sql(legacy_bowler_style_sql)
     
     main_query = f"""
         SELECT 
@@ -586,8 +642,8 @@ def query_legacy_ungrouped(where_clause, params, limit, offset, db):
             d.batting_team,
             d.bowling_team,
             NULL as bat_hand,
-            NULL as bowl_style,
-            NULL as bowl_kind,
+            {legacy_bowler_style_sql} as bowl_style,
+            {legacy_bowl_kind_sql} as bowl_kind,
             LOWER(CASE WHEN d.crease_combo = 'RHB_LHB' THEN 'LHB_RHB' ELSE d.crease_combo END) as crease_combo,
             NULL as line,
             NULL as length,
@@ -604,6 +660,7 @@ def query_legacy_ungrouped(where_clause, params, limit, offset, db):
             NULL as outcome
         FROM deliveries d
         JOIN matches m ON d.match_id = m.id
+        LEFT JOIN players p ON p.name = d.bowler
         {where_clause}
         ORDER BY m.date DESC, d.over, d.ball
         LIMIT :limit
@@ -649,6 +706,7 @@ def query_legacy_ungrouped(where_clause, params, limit, offset, db):
         SELECT COUNT(*) 
         FROM deliveries d
         JOIN matches m ON d.match_id = m.id
+        LEFT JOIN players p ON p.name = d.bowler
         {where_clause}
     """
     count_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
@@ -695,6 +753,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
             SELECT COUNT(*) 
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
+            LEFT JOIN players p ON p.name = d.bowler
             {where_clause}
         """
         total_balls = db.execute(text(total_balls_query), query_params).scalar() or 0
@@ -711,6 +770,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
                 SELECT {first_db_col} as parent_key, COUNT(*) as parent_balls
                 FROM deliveries d
                 JOIN matches m ON d.match_id = m.id
+                LEFT JOIN players p ON p.name = d.bowler
                 {where_clause}
                 GROUP BY {first_db_col}
             """
@@ -731,6 +791,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
             SUM(CASE WHEN d.runs_off_bat = 6 THEN 1 ELSE 0 END) as sixes
         FROM deliveries d
         JOIN matches m ON d.match_id = m.id
+        LEFT JOIN players p ON p.name = d.bowler
         {where_clause}
         GROUP BY {group_by_clause}
         ORDER BY COUNT(*) DESC
@@ -796,6 +857,7 @@ def get_legacy_total_balls(where_clause, params, db):
         SELECT COUNT(*) 
         FROM deliveries d
         JOIN matches m ON d.match_id = m.id
+        LEFT JOIN players p ON p.name = d.bowler
         {where_clause}
     """
     count_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
@@ -2076,6 +2138,8 @@ def query_deliveries_service(
                 players=players,
                 batters=batters,
                 bowlers=bowlers,
+                bowl_style=bowl_style,
+                bowl_kind=bowl_kind,
                 crease_combo=crease_combo,
                 dismissal=dismissal,
                 innings=innings,
@@ -2098,6 +2162,7 @@ def query_deliveries_service(
                 SELECT COUNT(DISTINCT (d.match_id, d.innings))
                 FROM deliveries d
                 JOIN matches m ON d.match_id = m.id
+                LEFT JOIN players p ON p.name = d.bowler
                 {legacy_where_clause}
             """
             legacy_total_innings = db.execute(text(legacy_total_innings_query), legacy_count_params).scalar() or 0
@@ -2156,6 +2221,13 @@ def query_deliveries_service(
             # Single source - no merge needed
             merged_data = new_results if routing['use_new'] else legacy_results
             total_count = new_total_count if routing['use_new'] else legacy_total_count
+            if routing['use_legacy'] and not routing['use_new']:
+                player_aliases_map = load_player_aliases_for_merge(db)
+                for row in merged_data:
+                    if row.get('batter'):
+                        row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
+                    if row.get('bowler'):
+                        row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
             if not group_by or len(group_by) == 0:
                 total_innings_in_query = new_total_innings if routing['use_new'] else legacy_total_innings
             elif routing['use_new']:
