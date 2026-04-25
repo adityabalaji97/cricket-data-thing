@@ -774,88 +774,74 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
     runs_calculation = "SUM(d.runs_off_bat)" if use_runs_off_bat_only else "SUM(d.runs_off_bat + d.extras)"
     
     query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
-    
-    # Get total balls for percentage calculation
-    if total_balls_override is None:
-        total_balls_query = f"""
-            SELECT COUNT(*) 
+
+    # Single combined CTE — replaces total_balls_query + parent_query +
+    # aggregation_query with one scan of `deliveries`. universe_balls and
+    # parent_balls come from window functions in the same pass. No HAVING /
+    # LIMIT applies here (route merges + filters downstream).
+    if len(group_by) > 1:
+        parent_partition_sql = f"SUM(g.balls) OVER (PARTITION BY g.{group_by[0]})"
+    else:
+        parent_partition_sql = "NULL::bigint"
+    final_select_groups = ", ".join(f"g.{col} as {col}" for col in group_by)
+
+    combined_query = f"""
+        WITH all_groups AS (
+            SELECT
+                {select_group_clause},
+                COUNT(*) as balls,
+                COUNT(DISTINCT (d.match_id, d.innings)) as innings_count,
+                {runs_calculation} as runs,
+                SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) as wickets,
+                SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
+                SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+                SUM(CASE WHEN d.runs_off_bat = 4 THEN 1 ELSE 0 END) as fours,
+                SUM(CASE WHEN d.runs_off_bat = 6 THEN 1 ELSE 0 END) as sixes
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
             LEFT JOIN players p ON p.name = d.bowler
             {where_clause}
-        """
-        total_balls = db.execute(text(total_balls_query), query_params).scalar() or 0
-    else:
-        total_balls = total_balls_override
-    
-    # For multi-level grouping, get parent group totals (first column)
-    parent_totals = {}
-    if len(group_by) > 1:
-        first_col = group_by[0]
-        first_db_col = grouping_columns.get(first_col)
-        if first_db_col and first_db_col != "NULL":
-            parent_query = f"""
-                SELECT {first_db_col} as parent_key, COUNT(*) as parent_balls
-                FROM deliveries d
-                JOIN matches m ON d.match_id = m.id
-                LEFT JOIN players p ON p.name = d.bowler
-                {where_clause}
-                GROUP BY {first_db_col}
-            """
-            parent_result = db.execute(text(parent_query), query_params).fetchall()
-            for row in parent_result:
-                parent_totals[str(row[0])] = row[1]
-    
-    aggregation_query = f"""
-        SELECT 
-            {select_group_clause},
-            COUNT(*) as balls,
-            COUNT(DISTINCT (d.match_id, d.innings)) as innings_count,
-            {runs_calculation} as runs,
-            SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) as wickets,
-            SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
-            SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-            SUM(CASE WHEN d.runs_off_bat = 4 THEN 1 ELSE 0 END) as fours,
-            SUM(CASE WHEN d.runs_off_bat = 6 THEN 1 ELSE 0 END) as sixes
-        FROM deliveries d
-        JOIN matches m ON d.match_id = m.id
-        LEFT JOIN players p ON p.name = d.bowler
-        {where_clause}
-        GROUP BY {group_by_clause}
-        ORDER BY COUNT(*) DESC
+            GROUP BY {group_by_clause}
+        )
+        SELECT
+            {final_select_groups},
+            g.balls, g.innings_count, g.runs, g.wickets,
+            g.dots, g.boundaries, g.fours, g.sixes,
+            SUM(g.balls) OVER () as universe_balls,
+            {parent_partition_sql} as parent_balls
+        FROM all_groups g
+        ORDER BY g.balls DESC
     """
-    
-    result = db.execute(text(aggregation_query), query_params).fetchall()
-    
-    # Format results with fully calculated metrics
+
+    result = db.execute(text(combined_query), query_params).fetchall()
+
     formatted_results = []
+    universe_balls = 0
+    n = len(group_by)
     for row in result:
-        row_dict = {}
-        
-        # Add grouping columns
-        for i, col in enumerate(group_by):
-            row_dict[col] = row[i]
-        
-        # Get raw stats
-        stats_start = len(group_by)
-        balls = row[stats_start] or 0
-        innings_count = row[stats_start + 1] or 0
-        runs = row[stats_start + 2] or 0
-        wickets = row[stats_start + 3] or 0
-        dots = row[stats_start + 4] or 0
-        boundaries = row[stats_start + 5] or 0
-        fours = row[stats_start + 6] or 0
-        sixes = row[stats_start + 7] or 0
-        
-        # Calculate percent_balls relative to parent group (for multi-level) or total (for single-level)
-        if len(group_by) > 1 and parent_totals:
-            parent_key = str(row[0])  # First column value is the parent
-            parent_balls = parent_totals.get(parent_key, total_balls)
-            percent_balls = round((balls / parent_balls) * 100, 2) if parent_balls > 0 else 0
+        row_dict = {col: row[i] for i, col in enumerate(group_by)}
+        balls = row[n] or 0
+        innings_count = row[n + 1] or 0
+        runs = row[n + 2] or 0
+        wickets = row[n + 3] or 0
+        dots = row[n + 4] or 0
+        boundaries = row[n + 5] or 0
+        fours = row[n + 6] or 0
+        sixes = row[n + 7] or 0
+        universe_balls = row[n + 8] or 0
+        parent_balls = row[n + 9]
+
+        # total_balls_override (if supplied) wins for percent_balls denom —
+        # caller may want a different universe than this query's WHERE.
+        denominator = total_balls_override if total_balls_override is not None else universe_balls
+
+        if len(group_by) > 1 and parent_balls is not None and parent_balls > 0:
+            percent_balls = round((balls / parent_balls) * 100, 2)
+        elif denominator > 0:
+            percent_balls = round((balls / denominator) * 100, 2)
         else:
-            percent_balls = round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
-        
-        # Calculate all derived metrics
+            percent_balls = 0
+
         row_dict.update({
             "balls": balls,
             "innings_count": innings_count,
@@ -871,11 +857,23 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
             "dot_percentage": round((dots * 100.0) / balls, 2) if balls > 0 else 0,
             "boundary_percentage": round((boundaries * 100.0) / balls, 2) if balls > 0 else 0,
             "percent_balls": percent_balls,
-            # control_percentage not available in legacy - don't include it
+            # control_percentage intentionally omitted — not in legacy schema
         })
-        
         formatted_results.append(row_dict)
-    
+
+    # Empty result: window functions had no rows to evaluate. Fallback only
+    # when caller didn't supply an override.
+    if not formatted_results and total_balls_override is None:
+        fallback_query = f"""
+            SELECT COUNT(*)
+            FROM deliveries d
+            JOIN matches m ON d.match_id = m.id
+            LEFT JOIN players p ON p.name = d.bowler
+            {where_clause}
+        """
+        universe_balls = db.execute(text(fallback_query), query_params).scalar() or 0
+
+    total_balls = total_balls_override if total_balls_override is not None else universe_balls
     return formatted_results, total_balls
 
 
