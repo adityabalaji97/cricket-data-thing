@@ -316,7 +316,8 @@ def get_available_columns(db: Session = Depends(get_session)):
             
             "group_by_columns": [
                 "venue", "country", "match_id", "competition", "year",
-                "batting_team", "bowling_team", "batter", "bowler",
+                "batting_team", "bowling_team",
+                "batter", "bowler", "non_striker", "partnership", "batting_position",
                 "innings", "phase",
                 "match_outcome", "chase_outcome", "toss_decision",
                 "bat_hand", "striker_batter_type",

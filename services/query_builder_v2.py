@@ -452,7 +452,22 @@ def get_legacy_grouping_columns_map():
         # Players
         "batter": "d.batter",
         "bowler": "d.bowler",
-        
+        # Canonicalize legacy short-form names via player_aliases. pa_*
+        # joins are conditionally added by query_legacy_grouped.
+        "non_striker": "COALESCE(pa_ns.alias_name, d.non_striker)",
+        # Bidirectional pair: (Kohli, ABD) and (ABD, Kohli) collapse to one row.
+        "partnership": (
+            "(LEAST("
+            "COALESCE(pa_bat.alias_name, d.batter, ''), "
+            "COALESCE(pa_ns.alias_name, d.non_striker, '')"
+            ") || ' & ' || GREATEST("
+            "COALESCE(pa_bat.alias_name, d.batter, ''), "
+            "COALESCE(pa_ns.alias_name, d.non_striker, '')"
+            "))"
+        ),
+        # Wired by the bat_pos CTE in query_legacy_grouped.
+        "batting_position": "bp.pos",
+
         # Innings/Phase
         "innings": "d.innings",
         "phase": "CASE WHEN d.over < 6 THEN 'powerplay' WHEN d.over < 15 THEN 'middle' ELSE 'death' END",
@@ -785,8 +800,30 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
         parent_partition_sql = "NULL::bigint"
     final_select_groups = ", ".join(f"g.{col} as {col}" for col in group_by)
 
+    needs_bat_pos = "batting_position" in group_by
+    bat_pos_cte = ""
+    bat_pos_join = ""
+    if needs_bat_pos:
+        bat_pos_cte = """bat_pos AS (
+            SELECT match_id, innings, batter,
+                   DENSE_RANK() OVER (PARTITION BY match_id, innings ORDER BY MIN(over*6 + ball)) AS pos
+            FROM deliveries
+            WHERE batter IS NOT NULL
+            GROUP BY match_id, innings, batter
+        ),
+        """
+        bat_pos_join = "LEFT JOIN bat_pos bp ON bp.match_id = d.match_id AND bp.innings = d.innings AND bp.batter = d.batter"
+
+    needs_partner_canon = ("partnership" in group_by) or ("non_striker" in group_by)
+    pa_join = ""
+    if needs_partner_canon:
+        pa_join = (
+            "LEFT JOIN player_aliases pa_bat ON pa_bat.player_name = d.batter "
+            "LEFT JOIN player_aliases pa_ns  ON pa_ns.player_name = d.non_striker"
+        )
+
     combined_query = f"""
-        WITH all_groups AS (
+        WITH {bat_pos_cte}all_groups AS (
             SELECT
                 {select_group_clause},
                 COUNT(*) as balls,
@@ -800,6 +837,8 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
             LEFT JOIN players p ON p.name = d.bowler
+            {bat_pos_join}
+            {pa_join}
             {where_clause}
             GROUP BY {group_by_clause}
         )
@@ -920,6 +959,24 @@ def normalize_player_name_for_merge(name: str, player_aliases_map: Dict[str, str
     return player_aliases_map.get(name, name)
 
 
+def normalize_partnership_for_merge(value: str, player_aliases_map: Dict[str, str]) -> str:
+    """
+    Normalize a "X & Y" partnership string by canonicalizing each side and
+    sorting alphabetically so (Kohli, ABD) and (ABD, Kohli) collapse to one
+    group. Also handles the legacy/new name split: a partnership with a
+    legacy name on either side is brought into the canonical form.
+    """
+    if not value or '&' not in value:
+        return value
+    parts = [p.strip() for p in value.split('&', 1)]
+    if len(parts) != 2:
+        return value
+    a = normalize_player_name_for_merge(parts[0], player_aliases_map)
+    b = normalize_player_name_for_merge(parts[1], player_aliases_map)
+    a, b = sorted([a, b])
+    return f"{a} & {b}"
+
+
 def merge_grouped_results(
     new_results: List[Dict], 
     legacy_results: List[Dict], 
@@ -934,50 +991,48 @@ def merge_grouped_results(
     """
     if not legacy_results:
         return new_results
+    def _normalize_row(row: Dict) -> None:
+        if 'batter' in row and row.get('batter'):
+            row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
+        if 'bowler' in row and row.get('bowler'):
+            row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
+        if 'non_striker' in row and row.get('non_striker'):
+            row['non_striker'] = normalize_player_name_for_merge(row['non_striker'], player_aliases_map)
+        if 'partnership' in row and row.get('partnership'):
+            row['partnership'] = normalize_partnership_for_merge(row['partnership'], player_aliases_map)
+        if 'crease_combo' in row and row.get('crease_combo'):
+            row['crease_combo'] = row['crease_combo'].lower()
+
     if not new_results:
-        # Normalize legacy player names and crease_combo
         for row in legacy_results:
-            if 'batter' in row and row.get('batter'):
-                row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
-            if 'bowler' in row and row.get('bowler'):
-                row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
-            if 'crease_combo' in row and row.get('crease_combo'):
-                row['crease_combo'] = row['crease_combo'].lower()
+            _normalize_row(row)
         return legacy_results
-    
+
     # Build a lookup by group key
     merged = {}
-    
+
     def make_group_key(row: Dict) -> tuple:
         """Create a hashable key from grouping columns."""
         key_parts = []
         for col in group_by:
             val = row.get(col)
-            # Normalize player names for key matching
-            if col == 'batter' and val:
+            if col in ('batter', 'bowler', 'non_striker') and val:
                 val = normalize_player_name_for_merge(val, player_aliases_map)
-            elif col == 'bowler' and val:
-                val = normalize_player_name_for_merge(val, player_aliases_map)
-            # Normalize crease_combo to lowercase
+            elif col == 'partnership' and val:
+                val = normalize_partnership_for_merge(val, player_aliases_map)
             elif col == 'crease_combo' and val:
                 val = val.lower()
             key_parts.append(str(val) if val is not None else '')
         return tuple(key_parts)
-    
+
     # Add new results first
     for row in new_results:
         key = make_group_key(row)
         merged[key] = row.copy()
-    
+
     # Merge legacy results
     for row in legacy_results:
-        # Normalize player names and crease_combo in the row
-        if 'batter' in row and row.get('batter'):
-            row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
-        if 'bowler' in row and row.get('bowler'):
-            row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
-        if 'crease_combo' in row and row.get('crease_combo'):
-            row['crease_combo'] = row['crease_combo'].lower()
+        _normalize_row(row)
         
         key = make_group_key(row)
         
@@ -1052,6 +1107,8 @@ def merge_ungrouped_results(
             row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
         if row.get('bowler'):
             row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
+        if row.get('non_striker'):
+            row['non_striker'] = normalize_player_name_for_merge(row['non_striker'], player_aliases_map)
     
     # Combine and sort by year desc, then match/innings/over/ball
     combined = new_results + legacy_results
@@ -2681,7 +2738,24 @@ def get_grouping_columns_map():
         # Players
         "batter": "dd.bat",
         "bowler": "dd.bowl",
-        
+        # delivery_details.non_striker is mostly stored in legacy short-form
+        # ("V Kohli") while dd.bat is canonical. Use player_aliases to project
+        # to canonical, so non_striker / partnership groupings collapse the
+        # name variants. pa_ns/pa_bat joins are added by handle_grouped_query.
+        "non_striker": "COALESCE(pa_ns.alias_name, dd.non_striker)",
+        # Bidirectional pair: (Kohli, ABD) and (ABD, Kohli) collapse to one row.
+        "partnership": (
+            "(LEAST("
+            "COALESCE(pa_bat.alias_name, dd.bat, ''), "
+            "COALESCE(pa_ns.alias_name, dd.non_striker, '')"
+            ") || ' & ' || GREATEST("
+            "COALESCE(pa_bat.alias_name, dd.bat, ''), "
+            "COALESCE(pa_ns.alias_name, dd.non_striker, '')"
+            "))"
+        ),
+        # Wired by the bat_pos CTE in handle_grouped_query.
+        "batting_position": "bp.pos",
+
         # Innings/Phase
         "innings": "dd.inns",
         "phase": "CASE WHEN dd.over < 6 THEN 'powerplay' WHEN dd.over < 15 THEN 'middle' ELSE 'death' END",
@@ -2739,6 +2813,33 @@ def handle_grouped_query(
     if invalid_columns:
         raise HTTPException(status_code=400, detail=f"Invalid group_by columns: {invalid_columns}")
 
+    # batting_position needs an aux CTE that ranks batters by first-ball order
+    # within each innings. Compute it once over the full table and LEFT JOIN.
+    needs_bat_pos = "batting_position" in group_by
+    bat_pos_cte = ""
+    bat_pos_join = ""
+    if needs_bat_pos:
+        bat_pos_cte = """bat_pos AS (
+            SELECT p_match, inns, bat,
+                   DENSE_RANK() OVER (PARTITION BY p_match, inns ORDER BY MIN(over*6 + ball)) AS pos
+            FROM delivery_details
+            WHERE bat IS NOT NULL
+            GROUP BY p_match, inns, bat
+        ),
+        """
+        bat_pos_join = "LEFT JOIN bat_pos bp ON bp.p_match = dd.p_match AND bp.inns = dd.inns AND bp.bat = dd.bat"
+
+    # Partnership / non_striker grouping: player_aliases JOIN canonicalizes
+    # the legacy-form non_striker/bat values to alias_name (the canonical
+    # form), so name variants for the same player collapse to one row.
+    needs_partner_canon = ("partnership" in group_by) or ("non_striker" in group_by)
+    pa_join = ""
+    if needs_partner_canon:
+        pa_join = (
+            "LEFT JOIN player_aliases pa_bat ON pa_bat.player_name = dd.bat "
+            "LEFT JOIN player_aliases pa_ns  ON pa_ns.player_name = dd.non_striker"
+        )
+
     group_columns = [grouping_columns[col] for col in group_by]
     select_group_clause = ", ".join(f"{db_col} as {col}" for col, db_col in zip(group_by, group_columns))
     group_by_clause = ", ".join(group_columns)
@@ -2780,19 +2881,19 @@ def handle_grouped_query(
     else:
         parent_partition_sql = "NULL::bigint"
 
-    # Stage 2 join: re-evaluate each group_by expression on dd/m and match
-    # against the value carried in the qualifying CTE. CASE expressions are
-    # re-evaluated per row but only over the small Stage 2 row set.
+    # Stage 2 join: compute grouping expressions once in stage2_source (with
+    # the same joins/filters as Stage 1), then match against qualifying groups.
+    # Use IS NOT DISTINCT FROM so NULL-group keys still join correctly.
     stage2_join_conditions = " AND ".join(
-        f"({db_col}) = q.{col}"
-        for col, db_col in zip(group_by, group_columns)
+        f"s.{col} IS NOT DISTINCT FROM q.{col}"
+        for col in group_by
     )
 
     final_select_groups = ", ".join(f"q.{col} as {col}" for col in group_by)
     final_group_by_carry = ", ".join(f"q.{col}" for col in group_by)
 
     combined_query = f"""
-        WITH all_groups AS (
+        WITH {bat_pos_cte}all_groups AS (
             SELECT
                 {select_group_clause},
                 COUNT(*) as balls,
@@ -2800,6 +2901,8 @@ def handle_grouped_query(
                 {runs_calculation} as runs,
                 SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
             FROM delivery_details dd
+            {bat_pos_join}
+            {pa_join}
             {join_clause}
             {where_clause}
             GROUP BY {group_by_clause}
@@ -2818,33 +2921,44 @@ def handle_grouped_query(
             {having_where_clause}
             ORDER BY balls DESC
             LIMIT :limit OFFSET :offset
+        ),
+        stage2_source AS (
+            SELECT
+                {select_group_clause},
+                dd.batruns,
+                dd.wide,
+                dd.noball,
+                dd.control
+            FROM delivery_details dd
+            {bat_pos_join}
+            {pa_join}
+            {join_clause}
+            {where_clause}
         )
         SELECT
             {final_select_groups},
             q.balls, q.innings_count, q.runs, q.wickets,
             q.universe_balls, q.parent_balls,
             q.total_groups_after_having, q.total_innings_after_having,
-            SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
-            SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-            SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) as fours,
-            SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) as sixes,
+            SUM(CASE WHEN s.batruns = 0 AND s.wide = 0 AND s.noball = 0 THEN 1 ELSE 0 END) as dots,
+            SUM(CASE WHEN s.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+            SUM(CASE WHEN s.batruns = 4 THEN 1 ELSE 0 END) as fours,
+            SUM(CASE WHEN s.batruns = 6 THEN 1 ELSE 0 END) as sixes,
             CASE WHEN q.wickets > 0 THEN CAST(q.runs AS DECIMAL) / q.wickets ELSE NULL END as average,
             CASE WHEN q.balls > 0 THEN (CAST(q.runs AS DECIMAL) * 100.0) / q.balls ELSE 0 END as strike_rate,
             CASE WHEN q.wickets > 0 THEN CAST(q.balls AS DECIMAL) / q.wickets ELSE NULL END as balls_per_dismissal,
             CASE WHEN q.balls > 0
-                THEN (CAST(SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / q.balls
+                THEN (CAST(SUM(CASE WHEN s.batruns = 0 AND s.wide = 0 AND s.noball = 0 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / q.balls
                 ELSE 0 END as dot_percentage,
             CASE WHEN q.balls > 0
-                THEN (CAST(SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / q.balls
+                THEN (CAST(SUM(CASE WHEN s.batruns IN (4, 6) THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / q.balls
                 ELSE 0 END as boundary_percentage,
-            CASE WHEN SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END) > 0
-                THEN (CAST(SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) /
-                      SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END)
+            CASE WHEN SUM(CASE WHEN s.control IS NOT NULL THEN 1 ELSE 0 END) > 0
+                THEN (CAST(SUM(CASE WHEN s.control = 1 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) /
+                      SUM(CASE WHEN s.control IS NOT NULL THEN 1 ELSE 0 END)
                 ELSE NULL END as control_percentage
         FROM qualifying q
-        JOIN delivery_details dd ON {stage2_join_conditions}
-        {join_clause}
-        {where_clause}
+        JOIN stage2_source s ON {stage2_join_conditions}
         GROUP BY {final_group_by_carry}, q.balls, q.innings_count, q.runs, q.wickets,
                  q.universe_balls, q.parent_balls,
                  q.total_groups_after_having, q.total_innings_after_having
@@ -2913,7 +3027,7 @@ def handle_grouped_query(
     if not formatted_results:
         fallback_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
         fallback_query = f"""
-            WITH all_groups AS (
+            WITH {bat_pos_cte}all_groups AS (
                 SELECT
                     {select_group_clause},
                     COUNT(*) as balls,
@@ -2921,6 +3035,8 @@ def handle_grouped_query(
                     {runs_calculation} as runs,
                     SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
                 FROM delivery_details dd
+                {bat_pos_join}
+                {pa_join}
                 {join_clause}
                 {where_clause}
                 GROUP BY {group_by_clause}
@@ -2991,8 +3107,30 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
             
             summary_group_by_clause = ", ".join(summary_group_clause)
             summary_select_clause = ", ".join(summary_columns)
+            summary_needs_bat_pos = "batting_position" in summary_group_by
+            summary_bat_pos_cte = ""
+            summary_bat_pos_join = ""
+            if summary_needs_bat_pos:
+                summary_bat_pos_cte = """WITH bat_pos AS (
+                    SELECT p_match, inns, bat,
+                           DENSE_RANK() OVER (PARTITION BY p_match, inns ORDER BY MIN(over*6 + ball)) AS pos
+                    FROM delivery_details
+                    WHERE bat IS NOT NULL
+                    GROUP BY p_match, inns, bat
+                )
+                """
+                summary_bat_pos_join = "LEFT JOIN bat_pos bp ON bp.p_match = dd.p_match AND bp.inns = dd.inns AND bp.bat = dd.bat"
+
+            summary_needs_partner_canon = ("partnership" in summary_group_by) or ("non_striker" in summary_group_by)
+            summary_pa_join = ""
+            if summary_needs_partner_canon:
+                summary_pa_join = (
+                    "LEFT JOIN player_aliases pa_bat ON pa_bat.player_name = dd.bat "
+                    "LEFT JOIN player_aliases pa_ns  ON pa_ns.player_name = dd.non_striker"
+                )
 
             summary_query = f"""
+                {summary_bat_pos_cte}
                 SELECT 
                     {summary_select_clause},
                     COUNT(*) as total_balls,
@@ -3004,6 +3142,8 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
                         THEN (CAST({runs_calculation} AS DECIMAL) * 100.0) / COUNT(*)
                         ELSE 0 END as strike_rate
                 FROM delivery_details dd
+                {summary_bat_pos_join}
+                {summary_pa_join}
                 {join_clause}
                 {where_clause}
                 GROUP BY {summary_group_by_clause}

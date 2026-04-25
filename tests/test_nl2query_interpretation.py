@@ -53,7 +53,7 @@ def test_recommended_columns_defaults_for_bowling_query(monkeypatch):
         nl2query,
         "call_openai",
         lambda _q: {
-            "filters": {"bowlers": ["Jasprit Bumrah"], "query_mode": "bowling_stats"},
+            "filters": {"bowlers": ["Jasprit Bumrah"], "query_mode": "delivery"},
             "group_by": ["bowler", "competition"],
             "explanation": "bumrah bowling split",
             "confidence": "high",

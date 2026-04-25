@@ -64,7 +64,7 @@ SYSTEM_PROMPT = """You are a cricket analytics query parser. Convert natural lan
 Return a JSON object with these fields:
 {
   "filters": { ... },
-  "query_mode": "delivery" | "batting_stats" | "bowling_stats",
+  "query_mode": "delivery",
   "group_by": [...],
   "explanation": "Human-readable explanation of what the query does",
   "confidence": "high" | "medium" | "low",
@@ -127,11 +127,7 @@ Return a JSON object with these fields:
   Shows match outcome from the TOSS-WINNING team's perspective.
 
 ### Query mode
-- "query_mode": "delivery" (default), "batting_stats", or "bowling_stats"
-- Default to "delivery" for almost all queries — it provides the richest aggregated stats (control%, dot%, boundary%, balls_per_dismissal).
-- Only use "batting_stats" when the query explicitly needs match-level batting results (e.g. "100+ scores", "fifties list", "team wins while chasing grouped by match").
-- Only use "bowling_stats" when the query explicitly needs match-level bowling results (e.g. "5-wicket hauls", "wicketless games").
-- For general player/team performance queries (e.g. "bumrah by competition", "kohli in powerplay"), always use "delivery".
+- "query_mode": always "delivery". Per-innings batting/bowling questions (e.g. "100+ scores", "5-wicket hauls", "wicketless games", "fifties list") are answered by grouping delivery data by ["match_id", "innings", "batter"] (or "bowler") plus the appropriate min_runs/min_wickets threshold — this aggregates deliveries with canonical names and the most accurate feed.
 
 ### Delivery detail filters
 - "line": list. Valid values: "ON_THE_STUMPS", "OUTSIDE_OFFSTUMP", "DOWN_LEG", "WIDE_OUTSIDE_OFFSTUMP", "WIDE_DOWN_LEG"
@@ -145,8 +141,8 @@ Return a JSON object with these fields:
 - "min_balls": minimum number of balls (for meaningful samples, suggest 20-50)
 - "min_runs": minimum runs threshold for grouped/stat queries
 - "max_runs": maximum runs threshold for grouped/stat queries
-- "min_wickets": minimum wickets threshold (bowling_stats or delivery mode with bowler grouping)
-- "max_wickets": maximum wickets threshold (bowling_stats or delivery mode with bowler grouping)
+- "min_wickets": minimum wickets threshold (use with bowler grouping, e.g. group_by=["match_id","innings","bowler"])
+- "max_wickets": maximum wickets threshold (use with bowler grouping)
 - "start_date": "YYYY-MM-DD" format
 - "end_date": "YYYY-MM-DD" format
 
@@ -169,7 +165,11 @@ Return null if the data isn't suitable for charting (for example, ungrouped or s
 Bar charts work well for comparing grouped categories. Scatter plots work for showing relationships between two metrics.
 
 ## Available group_by columns
-venue, country, match_id, competition, year, batting_team, bowling_team, batter, bowler, innings, phase, match_outcome, chase_outcome, toss_decision, toss_match_outcome, bat_hand, bowl_style, bowl_kind, crease_combo, line, length, shot, control, wagon_zone, dismissal
+venue, country, match_id, competition, year, batting_team, bowling_team, batter, bowler, non_striker, partnership, batting_position, innings, phase, match_outcome, chase_outcome, toss_decision, toss_match_outcome, bat_hand, bowl_style, bowl_kind, crease_combo, line, length, shot, control, wagon_zone, dismissal
+
+- "non_striker": directional grouping by non-striker batter name.
+- "partnership": bidirectional pair grouping — (Kohli, ABD) and (ABD, Kohli) collapse to one row labelled "AB de Villiers & Virat Kohli". Use for partnership analysis.
+- "batting_position": 1-11, derived from batter's first-ball order in the innings.
 
 ## Team Name Mappings (use full names in filters)
 - CSK → Chennai Super Kings
@@ -201,10 +201,11 @@ venue, country, match_id, competition, year, batting_team, bowling_team, batter,
 8. Return ONLY valid JSON, no extra text.
 9. If the user wants to compare LHB vs RHB (e.g. "vs lhb/rhb"), do NOT set bat_hand as a filter. Instead, add "bat_hand" to group_by.
 10. Use the player's full first and last name when possible (e.g. "Jasprit Bumrah" not "J Bumrah", "Virat Kohli" not "V Kohli", "Varun Chakravarthy" not "V Chakravarthy"). The system will resolve names to the database format automatically.
-11. When the user asks about toss impact on winning (e.g. "toss decision vs match outcome"), use group_by: ["toss_decision", "toss_match_outcome"] with query_mode: "batting_stats". Do NOT use "match_outcome" for toss analysis — use "toss_match_outcome" instead.
+11. When the user asks about toss impact on winning (e.g. "toss decision vs match outcome"), use group_by: ["toss_decision", "toss_match_outcome"]. Do NOT use "match_outcome" for toss analysis — use "toss_match_outcome" instead.
 12. For team match-level queries (e.g. "CSK in chasing wins"), group by match_id, batting_team, bowling_team, and year. This shows individual match results rather than aggregated totals.
-13. When a query needs both bowling style filters (bowl_kind/bowl_style) AND per-match bowling stats (e.g. "spinners with 4+ wickets"), use query_mode: "delivery" with group_by: ["bowler", "match_id"] and min_wickets filter. Do NOT use bowling_stats mode when bowl_kind or bowl_style filters are needed — those columns only exist in delivery_details.
-14. When a query says a bowler "conceded", "conceding", or "gave away" runs (e.g. "Bumrah conceding 30+ runs"), treat it as bowling analysis: use "bowlers" (not "players") and bowling-focused thresholds in bowling_stats mode.
+13. For per-match bowling queries (e.g. "spinners with 4+ wickets", "5-wicket hauls"), group_by ["match_id", "innings", "bowler"] with the appropriate min_wickets filter. Bowl_kind/bowl_style filters work in this mode too.
+14. When a query says a bowler "conceded", "conceding", or "gave away" runs (e.g. "Bumrah conceding 30+ runs"), use "bowlers" (not "players") and group_by ["match_id", "innings", "bowler"] with min_runs/max_runs as the bowling-side threshold.
+15. For per-match batting queries (e.g. "centuries", "fifties", "100+ scores"), group_by ["match_id", "innings", "batter"] with the appropriate min_runs filter.
 """
 
 EXAMPLE_QUERIES = [
@@ -270,17 +271,6 @@ def get_cache_size() -> int:
     for k in expired:
         del _cache[k]
     return len(_cache)
-
-
-def _infer_query_mode_hint(query: str) -> str:
-    q = (query or "").lower()
-    bowling_markers = {"wicketless", "wickets", "economy", "bowling", "bowler", "5-wicket", "five wicket"}
-    batting_markers = {"batting", "scores", "score", "fifties", "fifty", "century", "hundred", "innings"}
-    if any(marker in q for marker in bowling_markers):
-        return "bowling_stats"
-    if any(marker in q for marker in batting_markers):
-        return "batting_stats"
-    return "delivery"
 
 
 def _serialize_few_shot_output(example: Dict[str, Any]) -> str:
@@ -361,7 +351,6 @@ def get_few_shot_examples(query: str, db: Optional[Session], limit: int = MAX_FE
     if not rows:
         return []
 
-    mode_hint = _infer_query_mode_hint(query)
     ranked: List[Dict[str, Any]] = []
 
     for row in rows:
@@ -374,9 +363,6 @@ def get_few_shot_examples(query: str, db: Optional[Session], limit: int = MAX_FE
         union = len(query_tokens.union(candidate_tokens))
         lexical_score = (overlap / union) if union else 0.0
 
-        candidate_mode = row.get("query_mode") or "delivery"
-        mode_score = 0.35 if candidate_mode == mode_hint else 0.0
-
         parsed_filters = row.get("parsed_filters")
         parsed_filters = parsed_filters if isinstance(parsed_filters, dict) else {}
         created_at_value = row.get("created_at")
@@ -386,12 +372,12 @@ def get_few_shot_examples(query: str, db: Optional[Session], limit: int = MAX_FE
             {
                 "query_text": candidate_query,
                 "parsed_filters": parsed_filters,
-                "query_mode": candidate_mode,
+                "query_mode": row.get("query_mode") or "delivery",
                 "group_by": row.get("group_by") if isinstance(row.get("group_by"), list) else [],
                 "explanation": row.get("explanation") or "",
                 "confidence": row.get("confidence") or "high",
                 "created_at_epoch": created_at_epoch,
-                "_score": lexical_score + mode_score,
+                "_score": lexical_score,
             }
         )
 
@@ -400,11 +386,6 @@ def get_few_shot_examples(query: str, db: Optional[Session], limit: int = MAX_FE
 
     ranked.sort(key=lambda item: (item.get("_score", 0.0), item.get("created_at_epoch", 0.0)), reverse=True)
     selected = [item for item in ranked if item.get("_score", 0.0) > 0][:limit]
-
-    if len(selected) < limit:
-        seen_queries = {item["query_text"] for item in selected}
-        fallback = [item for item in ranked if item["query_text"] not in seen_queries and item.get("query_mode") == mode_hint]
-        selected.extend(fallback[: max(0, limit - len(selected))])
 
     if len(selected) < limit:
         seen_queries = {item["query_text"] for item in selected}
@@ -564,6 +545,7 @@ VALID_CONFIDENCE = {"high", "medium", "low"}
 VALID_GROUP_BY = {
     "venue", "country", "match_id", "competition", "year",
     "batting_team", "bowling_team", "batter", "bowler",
+    "non_striker", "partnership", "batting_position",
     "innings", "phase", "bat_hand", "bowl_style", "bowl_kind",
     "crease_combo", "line", "length", "shot", "control",
     "wagon_zone", "dismissal", "match_outcome", "chase_outcome", "toss_decision",
@@ -626,12 +608,7 @@ def _append_group_by(group_by: List[str], column: str) -> List[str]:
 
 
 def _build_explanation(filters: Dict[str, Any], group_by: List[str]) -> str:
-    mode = filters.get("query_mode", "delivery")
-    mode_text = {
-        "delivery": "delivery-level data",
-        "batting_stats": "innings-level batting stats",
-        "bowling_stats": "innings-level bowling stats",
-    }.get(mode, "delivery-level data")
+    mode_text = "delivery-level data"
 
     scope_bits = []
     if filters.get("batters"):
@@ -715,16 +692,12 @@ def _sanitize_recommended_columns(raw_columns: Any, limit: int = 6) -> List[str]
 
 def _default_recommended_columns(query: str, filters: Dict[str, Any]) -> List[str]:
     q = (query or "").lower()
-    mode = (filters.get("query_mode") or "delivery").lower()
 
     if any(token in q for token in ["boundary", "boundaries", "four", "fours", "six", "sixes"]):
         return ["balls", "runs", "boundaries", "fours", "sixes", "boundary_percentage"]
 
-    if mode == "bowling_stats" or any(token in q for token in ["economy", "bowling", "wicket", "wickets", "dot"]):
+    if any(token in q for token in ["economy", "bowling", "wicket", "wickets", "dot"]):
         return ["balls", "runs_conceded", "wickets", "economy", "dots", "dot_percentage"]
-
-    if mode == "batting_stats":
-        return ["balls", "runs", "average", "strike_rate", "boundaries", "boundary_percentage"]
 
     if any(token in q for token in ["control", "controlled", "uncontrolled"]):
         return ["balls", "runs", "control_percentage", "strike_rate", "dot_percentage", "boundary_percentage"]
@@ -891,9 +864,6 @@ def _derive_entities_from_filters(filters: Dict[str, Any], query: str) -> List[D
         elif over_max is not None:
             _add("filter", f"up to over {over_max}")
 
-    if filters.get("query_mode"):
-        _add("filter", f"mode: {filters['query_mode']}")
-
     return entities[:12]
 
 
@@ -959,9 +929,10 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
     filters = parsed.get("filters", {})
     validated = {}
 
-    query_mode = parsed.get("query_mode") or filters.get("query_mode")
-    if isinstance(query_mode, str) and query_mode in VALID_QUERY_MODE:
-        validated["query_mode"] = query_mode
+    # Force-normalize: batting_stats/bowling_stats are deprecated. Any LLM
+    # output that still emits them gets coerced to "delivery" so downstream
+    # services always hit the delivery aggregate path.
+    validated["query_mode"] = "delivery"
 
     # String list filters (pass through - player/team names can't be validated without DB)
     for key in ["batters", "bowlers", "players", "batting_teams", "bowling_teams", "teams"]:
@@ -1121,23 +1092,24 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
     q_lower = (query or "").lower()
 
     # Milestone batting rules, e.g. "virat kohli 100+ scores".
+    # Per-innings totals come from grouping deliveries by (match_id, innings, batter).
     runs_plus_match = re.search(r"\b(\d+)\s*\+\s*(?:score|scores|run|runs)\b", q_lower)
     if runs_plus_match:
-        filters["query_mode"] = "batting_stats"
         filters["min_runs"] = max(0, int(runs_plus_match.group(1)))
-        group_by = _append_group_by(group_by, "match_id")
+        for col in ("match_id", "innings", "batter"):
+            group_by = _append_group_by(group_by, col)
 
     # Bowling milestone rules, including wicketless asks.
     wickets_plus_match = re.search(r"\b(\d+)\s*\+\s*wickets?\b", q_lower)
     if wickets_plus_match:
-        filters["query_mode"] = "bowling_stats"
         filters["min_wickets"] = max(0, int(wickets_plus_match.group(1)))
-        group_by = _append_group_by(group_by, "match_id")
+        for col in ("match_id", "innings", "bowler"):
+            group_by = _append_group_by(group_by, col)
 
     if re.search(r"\b(wicketless|0\s*wickets?|without\s+a\s+wicket)\b", q_lower):
-        filters["query_mode"] = "bowling_stats"
         filters["max_wickets"] = 0
-        group_by = _append_group_by(group_by, "match_id")
+        for col in ("match_id", "innings", "bowler"):
+            group_by = _append_group_by(group_by, col)
 
     # Venue inference and canonicalization.
     inferred_venue = _infer_venue_from_query(query)
@@ -1156,8 +1128,6 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
     # Toss analysis: replace match_outcome with toss_match_outcome when toss context detected.
     if "toss" in q_lower and "match_outcome" in group_by:
         group_by = [("toss_match_outcome" if c == "match_outcome" else c) for c in group_by]
-        if filters.get("query_mode") == "delivery":
-            filters["query_mode"] = "batting_stats"
 
     # Since-date normalization: keep start_date, drop end_date unless explicitly bounded.
     if "since" in q_lower and not _contains_explicit_end_bound(query):
@@ -1168,29 +1138,6 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
         elif since_year_match:
             filters["start_date"] = f"{since_year_match.group(1)}-01-01"
         filters.pop("end_date", None)
-
-    # Prefer delivery mode when group_by contains delivery-only columns
-    # or when delivery-only filters are present in filters.
-    DELIVERY_ONLY_GROUP_BY = {"bat_hand", "bowl_style", "bowl_kind", "line", "length", "shot", "control", "wagon_zone", "phase", "dismissal"}
-    DELIVERY_ONLY_FILTERS = {"bat_hand", "bowl_style", "bowl_kind", "line", "length", "shot", "control", "wagon_zone", "dismissal"}
-
-    def _has_filter_value(value: Any) -> bool:
-        if value is None:
-            return False
-        if isinstance(value, str):
-            return value.strip() != ""
-        if isinstance(value, (list, tuple, set, dict)):
-            return len(value) > 0
-        return True
-
-    if filters.get("query_mode") in ("batting_stats", "bowling_stats"):
-        if any(c in DELIVERY_ONLY_GROUP_BY for c in group_by):
-            filters["query_mode"] = "delivery"
-        elif any(
-            key in DELIVERY_ONLY_FILTERS and _has_filter_value(value)
-            for key, value in filters.items()
-        ):
-            filters["query_mode"] = "delivery"
 
     # Chase/win team queries: add match-level grouping and ensure filters
     chase_match = re.search(r"\bchas(e|ing)\b", q_lower)
@@ -1210,13 +1157,15 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
             group_by = _append_group_by(group_by, "batting_team")
             group_by = _append_group_by(group_by, "bowling_team")
 
-    # Keep query_mode default if absent.
-    filters["query_mode"] = filters.get("query_mode", "delivery")
+    # batting_stats/bowling_stats are deprecated — always delivery mode now.
+    filters["query_mode"] = "delivery"
 
-    # Guardrail for wicket filters.
-    if filters.get("query_mode") != "bowling_stats":
-        filters.pop("min_wickets", None)
-        filters.pop("max_wickets", None)
+    # Wicket filters require bowler grouping (delivery mode aggregates wickets
+    # per group; without a bowler-level group they don't make sense).
+    if filters.get("min_wickets") is not None or filters.get("max_wickets") is not None:
+        if "bowler" not in group_by:
+            filters.pop("min_wickets", None)
+            filters.pop("max_wickets", None)
 
     summary = _build_explanation(filters, group_by)
     interpretation = result.get("interpretation") if isinstance(result.get("interpretation"), dict) else {}
