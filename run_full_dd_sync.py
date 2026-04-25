@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def run_sync_pipeline(confirm=False, limit=None, skip_elo=False, dry_run=False):
     start_time = datetime.now()
-    total_steps = 5 if skip_elo else 6
+    total_steps = 6 if skip_elo else 7
     results = {}
     
     print("\n" + "=" * 60)
@@ -78,19 +78,28 @@ def run_sync_pipeline(confirm=False, limit=None, skip_elo=False, dry_run=False):
         print("  ✅ Done")
     except Exception as e:
         print(f"  ⚠️  {e}")
-    
-    # Step 5: League names
-    print(f"\n[5/{total_steps}] Fixing league names...")
+
+    # Step 5: Team standardization
+    print(f"\n[5/{total_steps}] Standardizing teams...")
+    try:
+        from team_standardization import standardize_teams
+        standardize_teams()
+        print("  ✅ Done")
+    except Exception as e:
+        print(f"  ⚠️  {e}")
+
+    # Step 6: League names
+    print(f"\n[6/{total_steps}] Fixing league names...")
     try:
         from fix_league_names import fix_league_names
         fix_league_names()
         print("  ✅ Done")
     except Exception as e:
         print(f"  ⚠️  {e}")
-    
-    # Step 6: ELO
+
+    # Step 7: ELO
     if not skip_elo:
-        print(f"\n[6/{total_steps}] Calculating ELO...")
+        print(f"\n[7/{total_steps}] Calculating ELO...")
         try:
             from elo_update_service import ELOUpdateService
             elo_service = ELOUpdateService()

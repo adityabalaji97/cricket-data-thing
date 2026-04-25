@@ -37,6 +37,8 @@ INDEXES = [
     ("idx_dd_ground_line_length", "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_dd_ground_line_length ON delivery_details(ground, line, length)"),
     ("idx_dd_ground_wagon_zone", "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_dd_ground_wagon_zone ON delivery_details(ground, wagon_zone)"),
     ("idx_dd_match_date", "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_dd_match_date ON delivery_details(match_date)"),
+    # Composite for query-builder Stage-2 join (group_by batter+venue) — see handle_grouped_query in services/query_builder_v2.py
+    ("idx_dd_bat_ground", "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_dd_bat_ground ON delivery_details(bat, ground)"),
 ]
 
 

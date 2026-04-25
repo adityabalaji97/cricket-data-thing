@@ -60,7 +60,10 @@ VALID_MATCH_OUTCOMES = {"win", "loss", "tie", "no_result"}
 VALID_TOSS_DECISIONS = {"bat", "field"}
 MATCH_CONTEXT_GROUP_BY_COLUMNS = {"match_outcome", "chase_outcome", "toss_decision", "toss_match_outcome"}
 
-# Normalize team names to canonical abbreviations for robust winner/team comparisons.
+# Team names are canonicalised at write-time by team_standardization.py
+# (see standardize_teams()), so the query layer can compare directly. The
+# CASE-based normaliser this used to emit was 8.7K chars per call and
+# was the dominant cost in match_outcome / chase_outcome filters.
 TEAM_CANONICAL_MAP: Dict[str, str] = {}
 for full_name, abbrev in teams_mapping.items():
     TEAM_CANONICAL_MAP[full_name.lower()] = abbrev.lower()
@@ -72,11 +75,7 @@ def _sql_quote(value: str) -> str:
 
 
 def get_team_canonical_sql(column_expr: str) -> str:
-    cases = " ".join(
-        f"WHEN LOWER(COALESCE({column_expr}, '')) = {_sql_quote(name)} THEN {_sql_quote(canonical)}"
-        for name, canonical in TEAM_CANONICAL_MAP.items()
-    )
-    return f"(CASE {cases} ELSE LOWER(COALESCE({column_expr}, '')) END)"
+    return f"LOWER(COALESCE({column_expr}, ''))"
 
 
 def get_match_outcome_sql(
@@ -2722,216 +2721,231 @@ def handle_grouped_query(
     has_batter_filters=False, show_summary_rows=False, join_matches=False,
     min_wickets=None, max_wickets=None,
 ):
-    """Return aggregated cricket statistics grouped by specified columns."""
-    
+    """Return aggregated cricket statistics grouped by specified columns.
+
+    Single-statement plan with two scans of delivery_details:
+      Stage 1 (CTE all_groups): cheap aggregates per group (balls, innings,
+        runs, wickets) — needed to evaluate HAVING and the metadata window
+        functions (universe_balls, parent_balls, total_groups, total_innings).
+      Stage 2 (final SELECT): rich aggregates (dots, boundaries, fours,
+        sixes, control_pct) computed only for the LIMIT-survivor groups.
+    Replaces five separate queries (total_balls + parent_totals + main agg +
+    count + innings_total) with one combined CTE plus a cheap fallback for
+    the empty-result case.
+    """
+
     grouping_columns = get_grouping_columns_map()
     join_clause = "JOIN matches m ON m.id = dd.p_match" if join_matches else ""
-    
-    # Validate columns
+
     invalid_columns = [col for col in group_by if col not in grouping_columns]
     if invalid_columns:
         raise HTTPException(status_code=400, detail=f"Invalid group_by columns: {invalid_columns}")
-    
-    # Build GROUP BY clause
-    group_columns = []
-    select_columns = []
-    
-    for col in group_by:
-        db_column = grouping_columns[col]
-        group_columns.append(db_column)
-        select_columns.append(f"{db_column} as {col}")
-    
+
+    group_columns = [grouping_columns[col] for col in group_by]
+    select_group_clause = ", ".join(f"{db_col} as {col}" for col, db_col in zip(group_by, group_columns))
     group_by_clause = ", ".join(group_columns)
-    select_group_clause = ", ".join(select_columns)
-    
-    # Determine runs calculation
+
     batter_grouping = "batter" in group_by
     use_runs_off_bat_only = batter_grouping or has_batter_filters
     runs_calculation = "SUM(dd.batruns)" if use_runs_off_bat_only else "SUM(dd.score)"
-    
-    # Build HAVING clause
+
+    # HAVING in the new pattern is a WHERE on the aggregated CTE; predicates
+    # reference the aggregated column aliases (balls/runs/wickets) rather
+    # than re-issuing the SUM/COUNT.
     having_conditions = []
     if min_balls is not None:
-        having_conditions.append("COUNT(*) >= :min_balls")
+        having_conditions.append("balls >= :min_balls")
         params["min_balls"] = min_balls
     if max_balls is not None:
-        having_conditions.append("COUNT(*) <= :max_balls")
+        having_conditions.append("balls <= :max_balls")
         params["max_balls"] = max_balls
     if min_runs is not None:
-        having_conditions.append(f"{runs_calculation} >= :min_runs")
+        having_conditions.append("runs >= :min_runs")
         params["min_runs"] = min_runs
     if max_runs is not None:
-        having_conditions.append(f"{runs_calculation} <= :max_runs")
+        having_conditions.append("runs <= :max_runs")
         params["max_runs"] = max_runs
     if min_wickets is not None:
-        having_conditions.append(
-            "SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) >= :min_wickets"
-        )
+        having_conditions.append("wickets >= :min_wickets")
         params["min_wickets"] = min_wickets
     if max_wickets is not None:
-        having_conditions.append(
-            "SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) <= :max_wickets"
-        )
+        having_conditions.append("wickets <= :max_wickets")
         params["max_wickets"] = max_wickets
 
-    having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
-    
-    # Get total balls matching the WHERE clause
-    total_balls_query = f"""
-        SELECT COUNT(*) FROM delivery_details dd
-        {join_clause}
-        {where_clause}
-    """
-    total_balls_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
-    total_balls = db.execute(text(total_balls_query), total_balls_params).scalar()
-    
-    # For multi-level grouping, get parent group totals (first column)
-    parent_totals = {}
+    having_predicate = " AND ".join(having_conditions) if having_conditions else "TRUE"
+    having_where_clause = f"WHERE {having_predicate}" if having_conditions else ""
+
+    # Multi-level grouping: percent_balls is shown relative to the first
+    # group_by column's total. Single-level: relative to the universe.
     if len(group_by) > 1:
-        first_col = group_by[0]
-        first_db_col = grouping_columns[first_col]
-        parent_query = f"""
-            SELECT {first_db_col} as parent_key, COUNT(*) as parent_balls
+        parent_partition_sql = f"SUM(g.balls) OVER (PARTITION BY g.{group_by[0]})"
+    else:
+        parent_partition_sql = "NULL::bigint"
+
+    # Stage 2 join: re-evaluate each group_by expression on dd/m and match
+    # against the value carried in the qualifying CTE. CASE expressions are
+    # re-evaluated per row but only over the small Stage 2 row set.
+    stage2_join_conditions = " AND ".join(
+        f"({db_col}) = q.{col}"
+        for col, db_col in zip(group_by, group_columns)
+    )
+
+    final_select_groups = ", ".join(f"q.{col} as {col}" for col in group_by)
+    final_group_by_carry = ", ".join(f"q.{col}" for col in group_by)
+
+    combined_query = f"""
+        WITH all_groups AS (
+            SELECT
+                {select_group_clause},
+                COUNT(*) as balls,
+                COUNT(DISTINCT (dd.p_match, dd.inns)) as innings_count,
+                {runs_calculation} as runs,
+                SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
             FROM delivery_details dd
             {join_clause}
             {where_clause}
-            GROUP BY {first_db_col}
-        """
-        parent_result = db.execute(text(parent_query), total_balls_params).fetchall()
-        for row in parent_result:
-            parent_totals[str(row[0])] = row[1]
-    
-    # Build aggregation query
-    aggregation_query = f"""
-        SELECT 
-            {select_group_clause},
-            COUNT(*) as balls,
-            COUNT(DISTINCT (dd.p_match, dd.inns)) as innings_count,
-            {runs_calculation} as runs,
-            SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
+            GROUP BY {group_by_clause}
+        ),
+        with_totals AS (
+            SELECT g.*,
+                SUM(g.balls) OVER () as universe_balls,
+                {parent_partition_sql} as parent_balls
+            FROM all_groups g
+        ),
+        qualifying AS (
+            SELECT *,
+                COUNT(*) OVER () as total_groups_after_having,
+                SUM(innings_count) OVER () as total_innings_after_having
+            FROM with_totals
+            {having_where_clause}
+            ORDER BY balls DESC
+            LIMIT :limit OFFSET :offset
+        )
+        SELECT
+            {final_select_groups},
+            q.balls, q.innings_count, q.runs, q.wickets,
+            q.universe_balls, q.parent_balls,
+            q.total_groups_after_having, q.total_innings_after_having,
             SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots,
             SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
             SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) as fours,
             SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) as sixes,
-            
-            -- Average
-            CASE WHEN SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) > 0 
-                THEN CAST({runs_calculation} AS DECIMAL) / SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END)
-                ELSE NULL END as average,
-            
-            -- Strike Rate
-            CASE WHEN COUNT(*) > 0 
-                THEN (CAST({runs_calculation} AS DECIMAL) * 100.0) / COUNT(*)
-                ELSE 0 END as strike_rate,
-            
-            -- Balls per dismissal
-            CASE WHEN SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) > 0 
-                THEN CAST(COUNT(*) AS DECIMAL) / SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END)
-                ELSE NULL END as balls_per_dismissal,
-            
-            -- Dot percentage
-            CASE WHEN COUNT(*) > 0 
-                THEN (CAST(SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / COUNT(*)
+            CASE WHEN q.wickets > 0 THEN CAST(q.runs AS DECIMAL) / q.wickets ELSE NULL END as average,
+            CASE WHEN q.balls > 0 THEN (CAST(q.runs AS DECIMAL) * 100.0) / q.balls ELSE 0 END as strike_rate,
+            CASE WHEN q.wickets > 0 THEN CAST(q.balls AS DECIMAL) / q.wickets ELSE NULL END as balls_per_dismissal,
+            CASE WHEN q.balls > 0
+                THEN (CAST(SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / q.balls
                 ELSE 0 END as dot_percentage,
-            
-            -- Boundary percentage
-            CASE WHEN COUNT(*) > 0 
-                THEN (CAST(SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / COUNT(*)
+            CASE WHEN q.balls > 0
+                THEN (CAST(SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / q.balls
                 ELSE 0 END as boundary_percentage,
-            
-            -- Control percentage
             CASE WHEN SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END) > 0
-                THEN (CAST(SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / 
+                THEN (CAST(SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) /
                       SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END)
                 ELSE NULL END as control_percentage
-            
-        FROM delivery_details dd
+        FROM qualifying q
+        JOIN delivery_details dd ON {stage2_join_conditions}
         {join_clause}
         {where_clause}
-        GROUP BY {group_by_clause}
-        {having_clause}
-        ORDER BY balls DESC
-        LIMIT :limit
-        OFFSET :offset
+        GROUP BY {final_group_by_carry}, q.balls, q.innings_count, q.runs, q.wickets,
+                 q.universe_balls, q.parent_balls,
+                 q.total_groups_after_having, q.total_innings_after_having
+        ORDER BY q.balls DESC
     """
-    
-    result = db.execute(text(aggregation_query), params).fetchall()
-    
-    # Format results
+
+    result = db.execute(text(combined_query), params).fetchall()
+
+    universe_balls = 0
+    total_groups = 0
+    total_innings_in_query = 0
     formatted_results = []
+    n = len(group_by)
+
     for row in result:
-        row_dict = {}
-        
-        # Add grouping columns
-        for i, col in enumerate(group_by):
-            row_dict[col] = row[i]
-        
-        # Add statistics
-        stats_start = len(group_by)
-        balls = row[stats_start]
-        innings_count = row[stats_start + 1]
-        
-        # Calculate percent_balls relative to parent group (for multi-level) or total (for single-level)
-        if len(group_by) > 1 and parent_totals:
-            parent_key = str(row[0])  # First column value is the parent
-            parent_balls = parent_totals.get(parent_key, total_balls)
-            percent_balls = round((balls / parent_balls) * 100, 2) if parent_balls > 0 else 0
+        row_dict = {col: row[i] for i, col in enumerate(group_by)}
+        balls = row[n]
+        innings_count = row[n + 1]
+        runs = row[n + 2]
+        wickets = row[n + 3]
+        universe_balls = row[n + 4] or 0
+        parent_balls = row[n + 5]
+        total_groups = row[n + 6] or 0
+        total_innings_in_query = row[n + 7] or 0
+        dots = row[n + 8]
+        boundaries = row[n + 9]
+        fours = row[n + 10]
+        sixes = row[n + 11]
+        average = row[n + 12]
+        strike_rate = row[n + 13]
+        balls_per_dismissal = row[n + 14]
+        dot_percentage = row[n + 15]
+        boundary_percentage = row[n + 16]
+        control_percentage = row[n + 17]
+
+        if len(group_by) > 1 and parent_balls is not None and parent_balls > 0:
+            percent_balls = round((balls / parent_balls) * 100, 2)
+        elif universe_balls > 0:
+            percent_balls = round((balls / universe_balls) * 100, 2)
         else:
-            percent_balls = round((balls / total_balls) * 100, 2) if total_balls > 0 else 0
-        
+            percent_balls = 0
+
         row_dict.update({
             "balls": balls,
             "innings_count": innings_count,
-            "runs": row[stats_start + 2],
-            "wickets": row[stats_start + 3],
-            "dots": row[stats_start + 4],
-            "boundaries": row[stats_start + 5],
-            "fours": row[stats_start + 6],
-            "sixes": row[stats_start + 7],
-            "average": float(row[stats_start + 8]) if row[stats_start + 8] is not None else None,
-            "strike_rate": float(row[stats_start + 9]) if row[stats_start + 9] is not None else 0,
-            "balls_per_dismissal": float(row[stats_start + 10]) if row[stats_start + 10] is not None else None,
-            "dot_percentage": float(row[stats_start + 11]) if row[stats_start + 11] is not None else 0,
-            "boundary_percentage": float(row[stats_start + 12]) if row[stats_start + 12] is not None else 0,
-            "control_percentage": float(row[stats_start + 13]) if row[stats_start + 13] is not None else None,
-            "percent_balls": percent_balls
+            "runs": runs,
+            "wickets": wickets,
+            "dots": dots,
+            "boundaries": boundaries,
+            "fours": fours,
+            "sixes": sixes,
+            "average": float(average) if average is not None else None,
+            "strike_rate": float(strike_rate) if strike_rate is not None else 0,
+            "balls_per_dismissal": float(balls_per_dismissal) if balls_per_dismissal is not None else None,
+            "dot_percentage": float(dot_percentage) if dot_percentage is not None else 0,
+            "boundary_percentage": float(boundary_percentage) if boundary_percentage is not None else 0,
+            "control_percentage": float(control_percentage) if control_percentage is not None else None,
+            "percent_balls": percent_balls,
         })
-        
         formatted_results.append(row_dict)
-    
-    # Count total groups
-    count_query = f"""
-        SELECT COUNT(*) FROM (
-            SELECT {group_by_clause}
-            FROM delivery_details dd
-            {join_clause}
-            {where_clause}
-            GROUP BY {group_by_clause}
-            {having_clause}
-        ) as grouped_count
-    """
-    count_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
-    total_groups = db.execute(text(count_query), count_params).scalar()
-    innings_total_query = f"""
-        SELECT COALESCE(SUM(innings_count), 0) FROM (
-            SELECT COUNT(DISTINCT (dd.p_match, dd.inns)) AS innings_count
-            FROM delivery_details dd
-            {join_clause}
-            {where_clause}
-            GROUP BY {group_by_clause}
-            {having_clause}
-        ) grouped_innings
-    """
-    total_innings_in_query = db.execute(text(innings_total_query), count_params).scalar() or 0
-    
-    # Generate summary data if requested
+
+    # Empty Stage 2 means no rows passed HAVING (or LIMIT/OFFSET past the
+    # end). Window-function metadata is unavailable in that case — fall back
+    # to one cheap aggregate over the same all_groups CTE so the response
+    # still carries accurate totals.
+    if not formatted_results:
+        fallback_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
+        fallback_query = f"""
+            WITH all_groups AS (
+                SELECT
+                    {select_group_clause},
+                    COUNT(*) as balls,
+                    COUNT(DISTINCT (dd.p_match, dd.inns)) as innings_count,
+                    {runs_calculation} as runs,
+                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
+                FROM delivery_details dd
+                {join_clause}
+                {where_clause}
+                GROUP BY {group_by_clause}
+            )
+            SELECT
+                COALESCE(SUM(balls), 0) as universe_balls,
+                COUNT(*) FILTER (WHERE {having_predicate}) as total_groups,
+                COALESCE(SUM(innings_count) FILTER (WHERE {having_predicate}), 0) as total_innings
+            FROM all_groups
+        """
+        fb_row = db.execute(text(fallback_query), fallback_params).fetchone()
+        if fb_row:
+            universe_balls = fb_row[0] or 0
+            total_groups = fb_row[1] or 0
+            total_innings_in_query = fb_row[2] or 0
+
     summary_data = None
     percentages = None
     if show_summary_rows and len(group_by) >= 1:
         summary_data, percentages = generate_summary_data(
-            where_clause, params, group_by, runs_calculation, db, total_balls, join_matches=join_matches
+            where_clause, params, group_by, runs_calculation, db, universe_balls, join_matches=join_matches
         )
-    
+
     return {
         "data": formatted_results,
         "summary_data": summary_data,
@@ -2940,7 +2954,7 @@ def handle_grouped_query(
             "total_groups": total_groups,
             "total_innings_in_query": total_innings_in_query,
             "returned_groups": len(formatted_results),
-            "total_balls_in_query": total_balls,
+            "total_balls_in_query": universe_balls,
             "limit": limit,
             "offset": offset,
             "has_more": total_groups > (offset + len(formatted_results)),
