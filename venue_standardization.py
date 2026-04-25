@@ -182,40 +182,113 @@ ADDITIONAL_VENUES = {
     'UKM-YSD Cricket Oval, Bangi' : 'YSD-UKM Cricket Oval, Bangi'
 }
 
-# Merge all venue standardizations
-VENUE_STANDARDIZATION = {**VENUE_STANDARDIZATION, **NEW_VENUES, **ADDITIONAL_VENUES}
+# Snapshot the curated original mapping before merging in the auto-imported
+# venue lists; original canonicals are the source of truth for direction
+# (e.g. 'M Chinnaswamy Stadium' is the canonical, not 'M Chinnaswamy Stadium,
+# Bangalore'). NEW_VENUES later sometimes extends these canonicals into
+# city-suffixed long forms — that's the chain bug we fix below.
+_ORIGINAL_VENUE_STANDARDIZATION = dict(VENUE_STANDARDIZATION)
+_ORIGINAL_CANONICALS = {v for v in _ORIGINAL_VENUE_STANDARDIZATION.values() if v}
+
+
+def _filter_and_invert_extensions(secondary, original_canonicals):
+    """Drop entries that extend an original canonical (key is canonical,
+    value is a longer city-suffixed form) and invert them so that any rows
+    previously normalized to the long form get migrated back to the short
+    canonical."""
+    result = {}
+    for k, v in secondary.items():
+        if not k or not v:
+            continue
+        if k in original_canonicals and v not in original_canonicals:
+            result.setdefault(v, k)
+        else:
+            result[k] = v
+    return result
+
+
+_FIXED_NEW_VENUES = _filter_and_invert_extensions(NEW_VENUES, _ORIGINAL_CANONICALS)
+_FIXED_ADDITIONAL_VENUES = _filter_and_invert_extensions(ADDITIONAL_VENUES, _ORIGINAL_CANONICALS)
+
+VENUE_STANDARDIZATION = {
+    **_ORIGINAL_VENUE_STANDARDIZATION,
+    **_FIXED_NEW_VENUES,
+    **_FIXED_ADDITIONAL_VENUES,
+}
+
+
+def _build_resolved_canonical(mapping):
+    """Forward-chain each key to its terminal, with cycle protection. Also
+    folds in destination-only nodes as identity so the resolved map can
+    serve as the alias index (every known variant -> canonical)."""
+    resolved = {}
+    for start in mapping:
+        if start in resolved:
+            continue
+        chain = []
+        cur = start
+        while cur in mapping and cur not in chain:
+            chain.append(cur)
+            nxt = mapping[cur]
+            if nxt == cur or len(chain) > 12:
+                break
+            cur = nxt
+        for node in chain:
+            resolved[node] = cur
+        resolved.setdefault(cur, cur)
+    for v in mapping.values():
+        if v:
+            resolved.setdefault(v, v)
+    return resolved
+
+
+RESOLVED_VENUE_CANONICAL = _build_resolved_canonical(VENUE_STANDARDIZATION)
+
 
 def standardize_venues():
+    """Batched UPDATE that normalizes both matches.venue and
+    delivery_details.ground using RESOLVED_VENUE_CANONICAL. Skips identity
+    mappings, so it is idempotent on re-run."""
     engine, SessionLocal = get_database_connection()
     session = SessionLocal()
-    
+
+    pairs = [(raw, canonical) for raw, canonical in RESOLVED_VENUE_CANONICAL.items() if raw != canonical]
+    if not pairs:
+        print("No non-identity venue mappings; nothing to do.")
+        session.close()
+        return
+
+    values_sql = ", ".join(f"(:r{i}, :c{i})" for i in range(len(pairs)))
+    params = {}
+    for i, (raw, canonical) in enumerate(pairs):
+        params[f"r{i}"] = raw
+        params[f"c{i}"] = canonical
+
     try:
-        # Get current venues
-        result = session.execute(text("SELECT DISTINCT venue FROM matches WHERE venue IS NOT NULL"))
-        current_venues = [row[0] for row in result]
-        print(f"Found {len(current_venues)} distinct venues before standardization")
-        
-        # Perform updates
-        for old_name, new_name in VENUE_STANDARDIZATION.items():
-            query = text("""
-                UPDATE matches 
-                SET venue = :new_name 
-                WHERE venue = :old_name
+        for table, column in (("matches", "venue"), ("delivery_details", "ground")):
+            before = session.execute(
+                text(f"SELECT COUNT(DISTINCT {column}) FROM {table} WHERE {column} IS NOT NULL")
+            ).scalar()
+            update_sql = text(f"""
+                UPDATE {table} AS t
+                SET {column} = mp.canonical
+                FROM (VALUES {values_sql}) AS mp(raw, canonical)
+                WHERE t.{column} = mp.raw AND t.{column} IS DISTINCT FROM mp.canonical
             """)
-            result = session.execute(query, {"new_name": new_name, "old_name": old_name})
-            if result.rowcount > 0:
-                print(f"Updated {result.rowcount} rows: '{old_name}' -> '{new_name}'")
-        
-        session.commit()
-        
-        # Check results
-        result = session.execute(text("SELECT DISTINCT venue FROM matches WHERE venue IS NOT NULL"))
+            result = session.execute(update_sql, params)
+            session.commit()
+            after = session.execute(
+                text(f"SELECT COUNT(DISTINCT {column}) FROM {table} WHERE {column} IS NOT NULL")
+            ).scalar()
+            print(f"[{table}.{column}] rows updated: {result.rowcount}; distinct values {before} -> {after}")
+
+        result = session.execute(text("SELECT DISTINCT venue FROM matches WHERE venue IS NOT NULL ORDER BY venue"))
         standardized_venues = [row[0] for row in result]
         print(f"\nFound {len(standardized_venues)} distinct venues after standardization")
         print("\nStandardized venues:")
-        for venue in sorted(standardized_venues):
+        for venue in standardized_venues:
             print(f"- {venue}")
-            
+
     except Exception as e:
         print(f"Error: {e}")
         session.rollback()

@@ -16,9 +16,10 @@ from datetime import date
 import logging
 
 try:
-    from venue_standardization import VENUE_STANDARDIZATION
+    from venue_standardization import VENUE_STANDARDIZATION, RESOLVED_VENUE_CANONICAL
 except Exception:  # pragma: no cover - defensive import fallback
     VENUE_STANDARDIZATION = {}
+    RESOLVED_VENUE_CANONICAL = {}
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,12 @@ DELIVERIES_LAST_DATE = date(2025, 11, 27)
 
 
 _CANONICAL_TO_VENUE_ALIASES: Dict[str, set] = {}
-for _alias, _canonical in (VENUE_STANDARDIZATION or {}).items():
+# Prefer the resolved map (post chain-collapse to short-form canonical) so
+# get_venue_aliases('M Chinnaswamy Stadium') reaches every variant including
+# 'M.Chinnaswamy Stadium' and 'M Chinnaswamy Stadium, Bengaluru'. Fall back to
+# the raw mapping if the resolved map isn't available.
+_alias_source = RESOLVED_VENUE_CANONICAL or VENUE_STANDARDIZATION or {}
+for _alias, _canonical in _alias_source.items():
     if not _canonical:
         continue
     _CANONICAL_TO_VENUE_ALIASES.setdefault(_canonical, set()).add(_alias)
