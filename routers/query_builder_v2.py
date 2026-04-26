@@ -129,6 +129,10 @@ def query_deliveries(
     # Grouping and aggregation
     group_by: List[str] = Query(default=[], description="Group results by columns"),
     show_summary_rows: bool = Query(default=False, description="Include summary rows for multi-level grouping"),
+    ball_aggregation: Literal["snapshot", "cumulative"] = Query(
+        default="snapshot",
+        description="When grouping by `ball` or `ball_in_spell`: snapshot = stats AT ball N (default); cumulative = running totals through ball N (not yet implemented).",
+    ),
     
     # Filters for grouped results
     min_balls: Optional[int] = Query(default=None, ge=1, description="Minimum balls for grouped results"),
@@ -239,7 +243,8 @@ def query_deliveries(
             include_international=include_international,
             top_teams=top_teams,
             query_mode=query_mode,
-            db=db
+            db=db,
+            ball_aggregation=ball_aggregation,
         )
         return result
     except HTTPException:
@@ -319,6 +324,7 @@ def get_available_columns(db: Session = Depends(get_session)):
                 "batting_team", "bowling_team",
                 "batter", "bowler", "non_striker", "partnership", "batting_position",
                 "innings", "phase",
+                "over", "ball_in_over", "ball", "ball_in_spell",
                 "match_outcome", "chase_outcome", "toss_decision",
                 "bat_hand", "striker_batter_type",
                 "bowl_style", "bowl_kind", "crease_combo",

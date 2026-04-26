@@ -136,6 +136,9 @@ const QueryBuilder = ({ isMobile }) => {
   const [nlRecommendedColumns, setNlRecommendedColumns] = useState([]);
   const [nlRecommendedChart, setNlRecommendedChart] = useState(null);
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
+  // ball_aggregation toggle: only meaningful when ball or ball_in_spell is in
+  // the active group_by; otherwise the backend ignores it.
+  const [ballAggregation, setBallAggregation] = useState('snapshot');
   const executeQueryRef = useRef(null);
   const nlInputRef = useRef(null);
 
@@ -195,6 +198,9 @@ const QueryBuilder = ({ isMobile }) => {
       });
       
       urlGroupBy.forEach(col => params.append('group_by', col));
+      if (ballAggregation && ballAggregation !== 'snapshot') {
+        params.append('ball_aggregation', ballAggregation);
+      }
 
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
@@ -230,6 +236,9 @@ const QueryBuilder = ({ isMobile }) => {
       });
       
       groupBy.forEach(col => params.append('group_by', col));
+      if (ballAggregation && ballAggregation !== 'snapshot') {
+        params.append('ball_aggregation', ballAggregation);
+      }
 
       // Always update URL so queries are shareable
       const newParams = filtersToUrlParams(filters, groupBy);
@@ -423,7 +432,7 @@ const QueryBuilder = ({ isMobile }) => {
               groupBy={groupBy}
               filters={filters}
               recommendedColumns={nlRecommendedColumns}
-              recommendedChart={nlRecommendedChart}
+              recommendedChart={nlRecommendedChart || results?.metadata?.recommended_chart || null}
               nlInterpretation={nlInterpretation}
               nlConfidence={nlConfidence}
               nlRawFilters={nlRawFilters}
@@ -432,6 +441,13 @@ const QueryBuilder = ({ isMobile }) => {
               onDismissInterpretation={dismissInterpretation}
               interpretationDisabled={loading || isApplyingSuggestion}
               isMobile={isMobile}
+              ballAggregation={ballAggregation}
+              onBallAggregationChange={(mode) => {
+                setBallAggregation(mode);
+                // Re-fetch with the new mode. executeQueryRef guards against
+                // a stale-closure call before mount.
+                setTimeout(() => executeQueryRef.current && executeQueryRef.current(), 0);
+              }}
             />
           )}
         </Box>

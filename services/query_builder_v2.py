@@ -26,14 +26,16 @@ DELIVERY_DETAILS_START_DATE = date(2015, 1, 1)
 # Columns only available in delivery_details (2015+)
 ADVANCED_COLUMNS = {
     'line', 'length', 'shot', 'control', 'wagon_zone', 'wagon_x', 'wagon_y',
-    'bat_hand'
+    'bat_hand',
+    # Computed ball-position columns require the delivery_details schema.
+    'ball_in_over', 'ball', 'ball_in_spell',
 }
 
 # Columns available in both tables (can be queried across full date range)
 COMMON_COLUMNS = {
     'venue', 'competition', 'year', 'batting_team', 'bowling_team',
     'batter', 'bowler', 'innings', 'phase', 'match_id', 'country',
-    'dismissal'
+    'dismissal', 'over'
 }
 
 # Columns that exist in both but have different coverage
@@ -471,6 +473,9 @@ def get_legacy_grouping_columns_map():
         # Innings/Phase
         "innings": "d.innings",
         "phase": "CASE WHEN d.over < 6 THEN 'powerplay' WHEN d.over < 15 THEN 'middle' ELSE 'death' END",
+        # Over is stored on legacy deliveries; the nth-ball variants are
+        # delivery_details-only (see ADVANCED_COLUMNS — they force use_new=True).
+        "over": "d.over",
         
         # Batter attributes (partial coverage in legacy)
         "bat_hand": "NULL",  # Not available
@@ -1932,13 +1937,14 @@ def query_deliveries_service(
     # Pagination and limits
     limit: int,
     offset: int,
-    
+
     # Include international matches
     include_international: bool,
     top_teams: Optional[int],
     query_mode: str,
-    
-    db
+
+    db,
+    ball_aggregation: str = "snapshot",
 ):
     """
     Main service function to query cricket delivery data with flexible filtering and grouping.
@@ -2186,6 +2192,7 @@ def query_deliveries_service(
                     min_runs, max_runs, limit, offset, db, filters_applied,
                     has_batter_filters, show_summary_rows, join_matches=join_new_matches,
                     min_wickets=min_wickets, max_wickets=max_wickets,
+                    ball_aggregation=ball_aggregation,
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_groups']
@@ -2379,6 +2386,8 @@ def query_deliveries_service(
                     "query_mode_used": query_mode,
                     "data_source": data_source_label,
                     "warnings": delivery_warnings,
+                    "ball_aggregation": ball_aggregation,
+                    "recommended_chart": recommend_chart_for_group_by(group_by, ball_aggregation),
                     "note": "Grouped data with cricket aggregations" + (" (merged from multiple sources)" if len(data_sources) > 1 else "")
                 }
             }
@@ -2711,6 +2720,206 @@ def handle_ungrouped_query(where_clause, params, limit, offset, db, filters, joi
     }
 
 
+# =============================================================================
+# COMPUTED GROUP-BY COLUMNS (delivery-position windows)
+# =============================================================================
+# These columns aren't stored on delivery_details — they're produced by
+# auxiliary CTEs that ROW_NUMBER() over the deliveries scan. They count LEGAL
+# deliveries only (wide=0 AND noball=0) so "ball N" always means the Nth
+# legal ball, matching how cricket fans count innings/spells. INNER JOINs in
+# handle_grouped_query then drop wides/noballs from the result when these
+# columns are in group_by.
+
+BALL_IN_OVER_SEQ_CTE = """ball_in_over_seq AS (
+    SELECT id,
+           ROW_NUMBER() OVER (
+               PARTITION BY p_match, inns, over
+               ORDER BY ball
+           ) AS ball_in_over
+    FROM delivery_details
+    WHERE wide = 0 AND noball = 0
+)"""
+
+BALL_IN_OVER_SEQ_JOIN = "JOIN ball_in_over_seq bio ON bio.id = dd.id"
+
+# ball_seq carries both the ball-of-innings ROW_NUMBER (used in snapshot mode)
+# AND running-window cumulative metric totals (used in cumulative mode). The
+# windows partition by (p_match, inns), which caps at ~120 rows per innings,
+# so the per-row cost is negligible even when only ball_in_innings is used.
+BALL_SEQ_CTE = """ball_seq AS (
+    SELECT id,
+           ROW_NUMBER() OVER w AS ball_in_innings,
+           SUM(batruns) OVER w AS runs_through_ball,
+           SUM(score) OVER w AS score_through_ball,
+           COUNT(*) OVER w AS balls_through_ball,
+           SUM(CASE WHEN dismissal IS NOT NULL AND dismissal != '' THEN 1 ELSE 0 END) OVER w AS wickets_through_ball,
+           SUM(CASE WHEN batruns = 0 AND wide = 0 AND noball = 0 THEN 1 ELSE 0 END) OVER w AS dots_through_ball,
+           SUM(CASE WHEN batruns IN (4, 6) THEN 1 ELSE 0 END) OVER w AS boundaries_through_ball,
+           SUM(CASE WHEN batruns = 4 THEN 1 ELSE 0 END) OVER w AS fours_through_ball,
+           SUM(CASE WHEN batruns = 6 THEN 1 ELSE 0 END) OVER w AS sixes_through_ball,
+           SUM(CASE WHEN control = 1 THEN 1 ELSE 0 END) OVER w AS controlled_through_ball,
+           SUM(CASE WHEN control IS NOT NULL THEN 1 ELSE 0 END) OVER w AS control_balls_through_ball
+    FROM delivery_details
+    WHERE wide = 0 AND noball = 0
+    WINDOW w AS (
+        PARTITION BY p_match, inns
+        ORDER BY over, ball
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    )
+)"""
+
+BALL_SEQ_JOIN = "JOIN ball_seq bs ON bs.id = dd.id"
+
+# Spell detection: a "spell" is a continuous stint by a bowler — typically
+# overs spaced by 2 (the alternating-ends rule prevents back-to-back overs
+# from one bowler, so consecutive overs in a spell go N, N+2, N+4...). A
+# spell break = the bowler is rotated out for more than one full pair, i.e.
+# gap > 2 between two of their overs. With this threshold, overs 5, 7, 9 are
+# one spell (18 legal balls); overs 5, 7, 11 are two (5+7, then 11).
+SPELL_SEQ_CTES = [
+    """bowler_overs AS (
+        SELECT DISTINCT p_match, inns, bowl, over
+        FROM delivery_details
+    )""",
+    """bowler_overs_marked AS (
+        SELECT p_match, inns, bowl, over,
+               CASE
+                 WHEN LAG(over) OVER (
+                        PARTITION BY p_match, inns, bowl ORDER BY over
+                      ) IS NULL
+                   OR over - LAG(over) OVER (
+                        PARTITION BY p_match, inns, bowl ORDER BY over
+                      ) > 2
+                 THEN 1 ELSE 0
+               END AS is_new_spell
+        FROM bowler_overs
+    )""",
+    """bowler_spells AS (
+        SELECT p_match, inns, bowl, over,
+               SUM(is_new_spell) OVER (
+                   PARTITION BY p_match, inns, bowl ORDER BY over
+                   ROWS UNBOUNDED PRECEDING
+               ) AS spell_id
+        FROM bowler_overs_marked
+    )""",
+    # spell_seq carries both ball_in_spell AND running-window cumulative
+    # totals partitioned by spell. Used in cumulative mode the same way
+    # ball_seq.runs_through_ball is — the outer SUMs aggregate per-row
+    # cumulative values across all spells that reached this position.
+    """spell_seq AS (
+        SELECT dd.id,
+               ROW_NUMBER() OVER w AS ball_in_spell,
+               SUM(dd.batruns) OVER w AS runs_through_ball,
+               SUM(dd.score) OVER w AS score_through_ball,
+               COUNT(*) OVER w AS balls_through_ball,
+               SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) OVER w AS wickets_through_ball,
+               SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) OVER w AS dots_through_ball,
+               SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) OVER w AS boundaries_through_ball,
+               SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) OVER w AS fours_through_ball,
+               SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) OVER w AS sixes_through_ball,
+               SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) OVER w AS controlled_through_ball,
+               SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END) OVER w AS control_balls_through_ball
+        FROM delivery_details dd
+        JOIN bowler_spells bsp
+          ON bsp.p_match = dd.p_match
+         AND bsp.inns = dd.inns
+         AND bsp.bowl = dd.bowl
+         AND bsp.over = dd.over
+        WHERE dd.wide = 0 AND dd.noball = 0
+        WINDOW w AS (
+            PARTITION BY dd.p_match, dd.inns, dd.bowl, bsp.spell_id
+            ORDER BY dd.over, dd.ball
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        )
+    )""",
+]
+
+SPELL_SEQ_JOIN = "JOIN spell_seq ss ON ss.id = dd.id"
+
+# Maps a computed group_by column to the CTEs and join it requires. The
+# column expression itself lives in get_grouping_columns_map() and resolves
+# to the alias produced by the join (e.g. bs.ball_in_innings).
+COMPUTED_GROUP_BY_COLUMNS = {
+    "ball_in_over": {
+        "ctes": [BALL_IN_OVER_SEQ_CTE],
+        "join": BALL_IN_OVER_SEQ_JOIN,
+    },
+    "ball": {
+        "ctes": [BALL_SEQ_CTE],
+        "join": BALL_SEQ_JOIN,
+    },
+    "ball_in_spell": {
+        "ctes": SPELL_SEQ_CTES,
+        "join": SPELL_SEQ_JOIN,
+    },
+}
+
+
+def recommend_chart_for_group_by(group_by, ball_aggregation="snapshot"):
+    """Pick a default chart for a grouped /query/deliveries response.
+
+    Returned shape matches what QueryResults.normalizeRecommendedChart accepts:
+        {type, x_axis, y_axis, reason, [stacked], [secondary_y_axis], [series]}
+
+    Returns None when no obvious default fits — the frontend then leaves the
+    chart panel empty and the user picks manually.
+    """
+    if not group_by:
+        return None
+
+    if group_by == ["over"]:
+        return {
+            "type": "bar",
+            "stacked": True,
+            "x_axis": "over",
+            "y_axis": ["runs", "wickets"],
+            "reason": "Runs and wickets per over (Manhattan)",
+        }
+
+    if group_by == ["ball_in_over"]:
+        return {
+            "type": "bar",
+            "x_axis": "ball_in_over",
+            "y_axis": "strike_rate",
+            "reason": "Strike rate by ball within the over",
+        }
+
+    if group_by == ["ball"]:
+        if ball_aggregation == "cumulative":
+            return {
+                "type": "line",
+                "x_axis": "ball",
+                "y_axis": "strike_rate",
+                "reason": "Cumulative strike rate progression",
+            }
+        return {
+            "type": "bar",
+            "x_axis": "ball",
+            "y_axis": "strike_rate",
+            "reason": "Per-ball strike rate (snapshot)",
+        }
+
+    if group_by == ["ball_in_spell"]:
+        return {
+            "type": "bar",
+            "x_axis": "ball_in_spell",
+            "y_axis": "strike_rate",
+            "reason": "Strike rate by ball within bowler spell",
+        }
+
+    if "over" in group_by and len(group_by) == 2:
+        other = next(c for c in group_by if c != "over")
+        return {
+            "type": "bar",
+            "x_axis": "over",
+            "y_axis": "runs",
+            "series": other,
+            "reason": f"Runs per over, split by {other}",
+        }
+
+    return None
+
+
 def get_grouping_columns_map():
     """Map user-friendly group_by values to delivery_details column names."""
     match_outcome_sql = get_match_outcome_sql(
@@ -2759,6 +2968,14 @@ def get_grouping_columns_map():
         # Innings/Phase
         "innings": "dd.inns",
         "phase": "CASE WHEN dd.over < 6 THEN 'powerplay' WHEN dd.over < 15 THEN 'middle' ELSE 'death' END",
+        # Delivery-position groupings.
+        # `over` is a stored column. `ball_in_over` / `ball` / `ball_in_spell`
+        # are computed via auxiliary CTEs (see COMPUTED_GROUP_BY_COLUMNS) and
+        # joined in conditionally by handle_grouped_query.
+        "over": "dd.over",
+        "ball_in_over": "bio.ball_in_over",
+        "ball": "bs.ball_in_innings",
+        "ball_in_spell": "ss.ball_in_spell",
         
         # Batter attributes
         "bat_hand": "dd.bat_hand",
@@ -2792,6 +3009,7 @@ def handle_grouped_query(
     min_runs, max_runs, limit, offset, db, filters_applied=None,
     has_batter_filters=False, show_summary_rows=False, join_matches=False,
     min_wickets=None, max_wickets=None,
+    ball_aggregation="snapshot",
 ):
     """Return aggregated cricket statistics grouped by specified columns.
 
@@ -2812,6 +3030,37 @@ def handle_grouped_query(
     invalid_columns = [col for col in group_by if col not in grouping_columns]
     if invalid_columns:
         raise HTTPException(status_code=400, detail=f"Invalid group_by columns: {invalid_columns}")
+
+    # Cumulative ball_aggregation: each row at ball position N reports the
+    # average of per-innings running totals through ball N (rather than just
+    # what happened ON ball N). The cumulative columns are pre-computed in
+    # ball_seq / spell_seq via SUM(...) OVER (... ROWS UNBOUNDED PRECEDING),
+    # then summed again by the outer GROUP BY. Two consequences:
+    #   1. The metric SQL below switches from `dd.batruns` etc. to the
+    #      cumulative columns on bs/ss.
+    #   2. Mixing `ball` and `ball_in_spell` in cumulative mode is ambiguous
+    #      (which partition's running totals do we expose?), so we 400.
+    cumulative_source = None  # "bs" or "ss" — None means snapshot semantics
+    if ball_aggregation == "cumulative":
+        has_ball = "ball" in group_by
+        has_spell = "ball_in_spell" in group_by
+        if has_ball and has_spell:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "ball_aggregation=cumulative cannot combine `ball` and "
+                    "`ball_in_spell` in the same group_by — running totals "
+                    "would be ambiguous. Pick one."
+                ),
+            )
+        if has_ball:
+            cumulative_source = "bs"
+        elif has_spell:
+            cumulative_source = "ss"
+        else:
+            # Toggle is meaningless without a position-based group-by; quietly
+            # fall back to snapshot rather than failing the request.
+            ball_aggregation = "snapshot"
 
     # batting_position needs an aux CTE that ranks batters by first-ball order
     # within each innings. Compute it once over the full table and LEFT JOIN.
@@ -2840,13 +3089,65 @@ def handle_grouped_query(
             "LEFT JOIN player_aliases pa_ns  ON pa_ns.player_name = dd.non_striker"
         )
 
+    # Delivery-position grouping: ROW_NUMBER over delivery_details to produce
+    # ball_in_over / ball_in_innings / ball_in_spell. Each requested column
+    # contributes its own CTE(s) and an INNER JOIN by dd.id (drops wides/
+    # noballs from the group-by result, which is what "legal ball N" means).
+    computed_ctes = []
+    computed_joins = []
+    for col in group_by:
+        spec = COMPUTED_GROUP_BY_COLUMNS.get(col)
+        if spec:
+            computed_ctes.extend(spec["ctes"])
+            computed_joins.append(spec["join"])
+    computed_cte_prefix = ""
+    if computed_ctes:
+        computed_cte_prefix = ",\n        ".join(computed_ctes) + ",\n        "
+    computed_join = " ".join(computed_joins)
+
     group_columns = [grouping_columns[col] for col in group_by]
     select_group_clause = ", ".join(f"{db_col} as {col}" for col, db_col in zip(group_by, group_columns))
     group_by_clause = ", ".join(group_columns)
 
     batter_grouping = "batter" in group_by
     use_runs_off_bat_only = batter_grouping or has_batter_filters
-    runs_calculation = "SUM(dd.batruns)" if use_runs_off_bat_only else "SUM(dd.score)"
+
+    # Snapshot vs cumulative metric expressions. In snapshot mode each row
+    # in the underlying scan contributes its own outcome. In cumulative mode
+    # the per-row values are pre-summed by ball_seq/spell_seq window functions
+    # (`*_through_ball`), and the outer SUM() then aggregates those running
+    # totals across innings/spells.
+    if cumulative_source:
+        src = cumulative_source  # "bs" (ball_seq) or "ss" (spell_seq)
+        runs_column = "runs_through_ball" if use_runs_off_bat_only else "score_through_ball"
+        runs_calculation = f"SUM({src}.{runs_column})"
+        balls_expr = f"SUM({src}.balls_through_ball)"
+        wickets_expr = f"SUM({src}.wickets_through_ball)"
+        stage2_extra_select = (
+            f"{src}.dots_through_ball, "
+            f"{src}.boundaries_through_ball, "
+            f"{src}.fours_through_ball, "
+            f"{src}.sixes_through_ball, "
+            f"{src}.controlled_through_ball, "
+            f"{src}.control_balls_through_ball"
+        )
+        dots_expr = "SUM(s.dots_through_ball)"
+        boundaries_expr = "SUM(s.boundaries_through_ball)"
+        fours_expr = "SUM(s.fours_through_ball)"
+        sixes_expr = "SUM(s.sixes_through_ball)"
+        control_num_expr = "SUM(s.controlled_through_ball)"
+        control_den_expr = "SUM(s.control_balls_through_ball)"
+    else:
+        runs_calculation = "SUM(dd.batruns)" if use_runs_off_bat_only else "SUM(dd.score)"
+        balls_expr = "COUNT(*)"
+        wickets_expr = "SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END)"
+        stage2_extra_select = "dd.batruns, dd.wide, dd.noball, dd.control"
+        dots_expr = "SUM(CASE WHEN s.batruns = 0 AND s.wide = 0 AND s.noball = 0 THEN 1 ELSE 0 END)"
+        boundaries_expr = "SUM(CASE WHEN s.batruns IN (4, 6) THEN 1 ELSE 0 END)"
+        fours_expr = "SUM(CASE WHEN s.batruns = 4 THEN 1 ELSE 0 END)"
+        sixes_expr = "SUM(CASE WHEN s.batruns = 6 THEN 1 ELSE 0 END)"
+        control_num_expr = "SUM(CASE WHEN s.control = 1 THEN 1 ELSE 0 END)"
+        control_den_expr = "SUM(CASE WHEN s.control IS NOT NULL THEN 1 ELSE 0 END)"
 
     # HAVING in the new pattern is a WHERE on the aggregated CTE; predicates
     # reference the aggregated column aliases (balls/runs/wickets) rather
@@ -2893,16 +3194,17 @@ def handle_grouped_query(
     final_group_by_carry = ", ".join(f"q.{col}" for col in group_by)
 
     combined_query = f"""
-        WITH {bat_pos_cte}all_groups AS (
+        WITH {bat_pos_cte}{computed_cte_prefix}all_groups AS (
             SELECT
                 {select_group_clause},
-                COUNT(*) as balls,
+                {balls_expr} as balls,
                 COUNT(DISTINCT (dd.p_match, dd.inns)) as innings_count,
                 {runs_calculation} as runs,
-                SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
+                {wickets_expr} as wickets
             FROM delivery_details dd
             {bat_pos_join}
             {pa_join}
+            {computed_join}
             {join_clause}
             {where_clause}
             GROUP BY {group_by_clause}
@@ -2925,13 +3227,11 @@ def handle_grouped_query(
         stage2_source AS (
             SELECT
                 {select_group_clause},
-                dd.batruns,
-                dd.wide,
-                dd.noball,
-                dd.control
+                {stage2_extra_select}
             FROM delivery_details dd
             {bat_pos_join}
             {pa_join}
+            {computed_join}
             {join_clause}
             {where_clause}
         )
@@ -2940,22 +3240,21 @@ def handle_grouped_query(
             q.balls, q.innings_count, q.runs, q.wickets,
             q.universe_balls, q.parent_balls,
             q.total_groups_after_having, q.total_innings_after_having,
-            SUM(CASE WHEN s.batruns = 0 AND s.wide = 0 AND s.noball = 0 THEN 1 ELSE 0 END) as dots,
-            SUM(CASE WHEN s.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-            SUM(CASE WHEN s.batruns = 4 THEN 1 ELSE 0 END) as fours,
-            SUM(CASE WHEN s.batruns = 6 THEN 1 ELSE 0 END) as sixes,
+            {dots_expr} as dots,
+            {boundaries_expr} as boundaries,
+            {fours_expr} as fours,
+            {sixes_expr} as sixes,
             CASE WHEN q.wickets > 0 THEN CAST(q.runs AS DECIMAL) / q.wickets ELSE NULL END as average,
             CASE WHEN q.balls > 0 THEN (CAST(q.runs AS DECIMAL) * 100.0) / q.balls ELSE 0 END as strike_rate,
             CASE WHEN q.wickets > 0 THEN CAST(q.balls AS DECIMAL) / q.wickets ELSE NULL END as balls_per_dismissal,
             CASE WHEN q.balls > 0
-                THEN (CAST(SUM(CASE WHEN s.batruns = 0 AND s.wide = 0 AND s.noball = 0 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / q.balls
+                THEN (CAST({dots_expr} AS DECIMAL) * 100.0) / q.balls
                 ELSE 0 END as dot_percentage,
             CASE WHEN q.balls > 0
-                THEN (CAST(SUM(CASE WHEN s.batruns IN (4, 6) THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) / q.balls
+                THEN (CAST({boundaries_expr} AS DECIMAL) * 100.0) / q.balls
                 ELSE 0 END as boundary_percentage,
-            CASE WHEN SUM(CASE WHEN s.control IS NOT NULL THEN 1 ELSE 0 END) > 0
-                THEN (CAST(SUM(CASE WHEN s.control = 1 THEN 1 ELSE 0 END) AS DECIMAL) * 100.0) /
-                      SUM(CASE WHEN s.control IS NOT NULL THEN 1 ELSE 0 END)
+            CASE WHEN {control_den_expr} > 0
+                THEN (CAST({control_num_expr} AS DECIMAL) * 100.0) / {control_den_expr}
                 ELSE NULL END as control_percentage
         FROM qualifying q
         JOIN stage2_source s ON {stage2_join_conditions}
@@ -3027,16 +3326,17 @@ def handle_grouped_query(
     if not formatted_results:
         fallback_params = {k: v for k, v in params.items() if k not in ['limit', 'offset']}
         fallback_query = f"""
-            WITH {bat_pos_cte}all_groups AS (
+            WITH {bat_pos_cte}{computed_cte_prefix}all_groups AS (
                 SELECT
                     {select_group_clause},
-                    COUNT(*) as balls,
+                    {balls_expr} as balls,
                     COUNT(DISTINCT (dd.p_match, dd.inns)) as innings_count,
                     {runs_calculation} as runs,
-                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
+                    {wickets_expr} as wickets
                 FROM delivery_details dd
                 {bat_pos_join}
                 {pa_join}
+                {computed_join}
                 {join_clause}
                 {where_clause}
                 GROUP BY {group_by_clause}
@@ -3055,7 +3355,11 @@ def handle_grouped_query(
 
     summary_data = None
     percentages = None
-    if show_summary_rows and len(group_by) >= 1:
+    # Summary rows roll up parent groups under snapshot semantics (raw SUM
+    # over deliveries). They don't have a clean meaning in cumulative mode —
+    # the metrics there are already cross-innings averages of running totals
+    # — so skip summaries when cumulative is active.
+    if show_summary_rows and len(group_by) >= 1 and not cumulative_source:
         summary_data, percentages = generate_summary_data(
             where_clause, params, group_by, runs_calculation, db, universe_balls, join_matches=join_matches
         )
@@ -3075,6 +3379,8 @@ def handle_grouped_query(
             "grouped_by": group_by,
             "filters_applied": filters_applied,
             "has_summaries": summary_data is not None,
+            "ball_aggregation": ball_aggregation,
+            "recommended_chart": recommend_chart_for_group_by(group_by, ball_aggregation),
             "note": "Grouped data from delivery_details with cricket aggregations"
         }
     }
@@ -3129,21 +3435,45 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
                     "LEFT JOIN player_aliases pa_ns  ON pa_ns.player_name = dd.non_striker"
                 )
 
+            # Same conditional CTE/join splicing as handle_grouped_query for
+            # ball_in_over / ball / ball_in_spell. The bat_pos block uses a
+            # leading WITH; for summaries we need to emit a single WITH that
+            # combines bat_pos (if any) with the computed CTEs.
+            summary_computed_ctes = []
+            summary_computed_joins = []
+            for col in summary_group_by:
+                spec = COMPUTED_GROUP_BY_COLUMNS.get(col)
+                if spec:
+                    summary_computed_ctes.extend(spec["ctes"])
+                    summary_computed_joins.append(spec["join"])
+            summary_computed_join = " ".join(summary_computed_joins)
+
+            if summary_computed_ctes:
+                if summary_bat_pos_cte:
+                    # Strip the trailing newline/whitespace from bat_pos block,
+                    # extract its CTE body, and merge.
+                    bat_pos_body = "bat_pos AS (SELECT p_match, inns, bat, DENSE_RANK() OVER (PARTITION BY p_match, inns ORDER BY MIN(over*6 + ball)) AS pos FROM delivery_details WHERE bat IS NOT NULL GROUP BY p_match, inns, bat)"
+                    all_ctes = [bat_pos_body] + summary_computed_ctes
+                    summary_bat_pos_cte = "WITH " + ",\n                ".join(all_ctes) + "\n                "
+                else:
+                    summary_bat_pos_cte = "WITH " + ",\n                ".join(summary_computed_ctes) + "\n                "
+
             summary_query = f"""
                 {summary_bat_pos_cte}
-                SELECT 
+                SELECT
                     {summary_select_clause},
                     COUNT(*) as total_balls,
                     {runs_calculation} as total_runs,
                     SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as total_wickets,
                     SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as total_dots,
                     SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as total_boundaries,
-                    CASE WHEN COUNT(*) > 0 
+                    CASE WHEN COUNT(*) > 0
                         THEN (CAST({runs_calculation} AS DECIMAL) * 100.0) / COUNT(*)
                         ELSE 0 END as strike_rate
                 FROM delivery_details dd
                 {summary_bat_pos_join}
                 {summary_pa_join}
+                {summary_computed_join}
                 {join_clause}
                 {where_clause}
                 GROUP BY {summary_group_by_clause}

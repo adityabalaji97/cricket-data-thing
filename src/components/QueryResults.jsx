@@ -33,7 +33,9 @@ import {
   OutlinedInput,
   Popover,
   Collapse,
-  Stack
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup
 } from '@mui/material';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -170,19 +172,33 @@ const normalizeRecommendedChart = (recommendedChart) => {
   }
 
   const chartType = String(recommendedChart.type || '').trim().toLowerCase();
-  if (!['bar', 'scatter'].includes(chartType)) {
+  if (!['bar', 'scatter', 'line'].includes(chartType)) {
     return null;
   }
 
   const xAxis = String(recommendedChart.x_axis || '').trim().toLowerCase();
-  const yAxis = String(recommendedChart.y_axis || '').trim().toLowerCase();
+  // y_axis can be a single column name or an array (for stacked / multi-bar).
+  const rawY = recommendedChart.y_axis;
+  const yAxis = Array.isArray(rawY)
+    ? rawY.map((y) => String(y || '').trim().toLowerCase()).filter(Boolean)
+    : String(rawY || '').trim().toLowerCase();
   const reason = String(recommendedChart.reason || '').trim();
+  const series = recommendedChart.series
+    ? String(recommendedChart.series).trim().toLowerCase()
+    : null;
+  const stacked = Boolean(recommendedChart.stacked);
+  const secondaryYAxis = recommendedChart.secondary_y_axis
+    ? String(recommendedChart.secondary_y_axis).trim().toLowerCase()
+    : null;
 
   return {
     type: chartType,
     x_axis: xAxis,
     y_axis: yAxis,
     reason,
+    stacked,
+    series,
+    secondary_y_axis: secondaryYAxis,
   };
 };
 
@@ -200,7 +216,12 @@ const QueryResults = ({
   onDismissInterpretation,
   interpretationDisabled = false,
   isMobile,
+  ballAggregation = 'snapshot',
+  onBallAggregationChange,
 }) => {
+  const ballAggregationApplicable = Array.isArray(groupBy) && (
+    groupBy.includes('ball') || groupBy.includes('ball_in_spell')
+  );
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
   
@@ -1120,8 +1141,30 @@ const QueryResults = ({
         )}
       </Popover>
 
+      {/* Ball-aggregation toggle: only meaningful when grouping by ball or
+          ball_in_spell. Snapshot = stats AT ball N. Cumulative = average
+          running totals through ball N. */}
+      {ballAggregationApplicable && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Ball aggregation:
+          </Typography>
+          <ToggleButtonGroup
+            value={ballAggregation}
+            exclusive
+            size="small"
+            onChange={(_, value) => {
+              if (value && onBallAggregationChange) onBallAggregationChange(value);
+            }}
+          >
+            <ToggleButton value="snapshot">Per-ball snapshot</ToggleButton>
+            <ToggleButton value="cumulative">Cumulative</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      )}
+
       {/* Chart Panel */}
-      <ChartPanel 
+      <ChartPanel
         ref={chartPanelRef}
         data={sortedData.filter(row => !row.is_summary)}
         groupBy={groupBy}

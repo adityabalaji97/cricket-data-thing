@@ -17,6 +17,8 @@ import {
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -28,6 +30,7 @@ import {
 } from 'recharts';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ScatterPlotIcon from '@mui/icons-material/ScatterPlot';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import { getDataPointColor, getFallbackColor, hasTeamGrouping } from '../utils/teamColors';
@@ -43,6 +46,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
     addBarChart,
+    addLineChart,
     addScatterChart,
     applyRecommendedChart,
   }));
@@ -64,9 +68,32 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
       return false;
     }
 
+    // Stacked / multi-metric bar: y_axis arrives as an array of column names.
+    // Filter to known metrics and only stack if at least 2 survived.
+    if (config.stacked && Array.isArray(config.y_axis)) {
+      const stackedMetrics = config.y_axis
+        .map((m) => String(m || '').trim().toLowerCase())
+        .filter((m) => metricKeys.includes(m));
+      if (stackedMetrics.length >= 2) {
+        const newChart = {
+          id: nextChartId,
+          type: 'bar',
+          selectedMetric: stackedMetrics[0],
+          stackedMetrics,
+        };
+        setCharts(prev => [...prev, newChart]);
+        setNextChartId(prev => prev + 1);
+        return true;
+      }
+    }
+
     const fallbackMetric = metricKeys.includes('runs') ? 'runs' : metricKeys[0];
+    // y_axis can be a single string, an array, or absent. Normalize for the
+    // single-metric fallback path (e.g. recommendations that asked for a
+    // stacked bar but only one metric is available).
+    const yAxisCandidate = Array.isArray(config.y_axis) ? config.y_axis[0] : config.y_axis;
     const selectedMetric = pickPreferredMetric(
-      [config.selectedMetric, config.yMetric, config.y_axis, config.xMetric, config.x_axis],
+      [config.selectedMetric, config.yMetric, yAxisCandidate, config.xMetric, config.x_axis],
       metricKeys,
       fallbackMetric,
     );
@@ -77,6 +104,31 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
     const newChart = {
       id: nextChartId,
       type: 'bar',
+      selectedMetric,
+    };
+    setCharts(prev => [...prev, newChart]);
+    setNextChartId(prev => prev + 1);
+    return true;
+  };
+
+  const addLineChart = (config = {}) => {
+    const metricKeys = availableMetrics.map(metric => metric.key);
+    if (metricKeys.length === 0) {
+      return false;
+    }
+    const fallbackMetric = metricKeys.includes('strike_rate') ? 'strike_rate' : metricKeys[0];
+    const yAxisCandidate = Array.isArray(config.y_axis) ? config.y_axis[0] : config.y_axis;
+    const selectedMetric = pickPreferredMetric(
+      [config.selectedMetric, config.yMetric, yAxisCandidate],
+      metricKeys,
+      fallbackMetric,
+    );
+    if (!selectedMetric) {
+      return false;
+    }
+    const newChart = {
+      id: nextChartId,
+      type: 'line',
       selectedMetric,
     };
     setCharts(prev => [...prev, newChart]);
@@ -124,6 +176,9 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
     }
     if (recommendation.type === 'scatter') {
       return addScatterChart(recommendation);
+    }
+    if (recommendation.type === 'line') {
+      return addLineChart(recommendation);
     }
     return false;
   };
@@ -446,8 +501,18 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
 
   // Render individual bar chart
   const renderBarChart = (chart) => {
+    const isStacked = Array.isArray(chart.stackedMetrics) && chart.stackedMetrics.length >= 2;
+    const stackedData = isStacked
+      ? chart.stackedMetrics.map((key) => ({
+          key,
+          metric: availableMetrics.find((m) => m.key === key),
+        }))
+      : null;
     const selectedMetricData = availableMetrics.find(m => m.key === chart.selectedMetric);
-    
+    const titleLabel = isStacked
+      ? stackedData.map((d) => d.metric?.label || d.key).join(' + ')
+      : (selectedMetricData?.label || chart.selectedMetric);
+
     return (
       <Card key={chart.id} sx={{ mb: 3 }}>
         <CardContent>
@@ -455,7 +520,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <BarChartIcon />
-              Bar Chart - {selectedMetricData?.label || chart.selectedMetric}
+              Bar Chart - {titleLabel}
             </Typography>
             <IconButton
               size="small"
@@ -467,6 +532,97 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
           </Box>
 
           {/* Chart Controls */}
+          {!isStacked && (
+            <Stack direction={isMobile ? "column" : "row"} spacing={2} sx={{ mb: 3 }}>
+              <FormControl sx={{ minWidth: 200 }}>
+                <InputLabel>Metric</InputLabel>
+                <Select
+                  value={chart.selectedMetric}
+                  onChange={(e) => updateChart(chart.id, { selectedMetric: e.target.value })}
+                  label="Metric"
+                >
+                  {availableMetrics.map((metric) => (
+                    <MenuItem key={metric.key} value={metric.key}>
+                      {metric.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Stack>
+          )}
+
+          {/* Bar Chart */}
+          <Box sx={{ width: '100%', height: isMobile ? 300 : 400 }}>
+            <ResponsiveContainer>
+              <BarChart
+                data={chartData}
+                margin={{
+                  top: 20,
+                  right: 30,
+                  left: 20,
+                  bottom: isMobile ? 60 : 40
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis
+                  dataKey="name"
+                  angle={isMobile ? -45 : 0}
+                  textAnchor={isMobile ? "end" : "middle"}
+                  height={isMobile ? 80 : 40}
+                  interval={0}
+                  fontSize={isMobile ? 10 : 12}
+                />
+                <YAxis
+                  tickFormatter={(value) => formatAxisTick(value, isStacked ? chart.stackedMetrics[0] : chart.selectedMetric)}
+                  fontSize={12}
+                  {...(!isStacked && {
+                    domain: getDataDomain(chart.selectedMetric),
+                    ticks: generateNiceTicks(...getDataDomain(chart.selectedMetric), 6),
+                  })}
+                />
+                <Tooltip content={(props) => <CustomTooltip {...props} chartConfig={chart} />} />
+                <Legend />
+                {isStacked
+                  ? stackedData.map((d, idx) => (
+                      <Bar
+                        key={d.key}
+                        dataKey={d.key}
+                        stackId="a"
+                        fill={d.metric?.color || getFallbackColor(idx)}
+                        name={d.metric?.label || d.key}
+                        radius={idx === stackedData.length - 1 ? [2, 2, 0, 0] : 0}
+                      />
+                    ))
+                  : (
+                    <Bar
+                      dataKey={chart.selectedMetric}
+                      fill={selectedMetricData?.color || '#8884d8'}
+                      name={selectedMetricData?.label || chart.selectedMetric}
+                      radius={[2, 2, 0, 0]}
+                    />
+                  )}
+              </BarChart>
+            </ResponsiveContainer>
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderLineChart = (chart) => {
+    const selectedMetricData = availableMetrics.find(m => m.key === chart.selectedMetric);
+    return (
+      <Card key={chart.id} sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <ShowChartIcon />
+              Line Chart - {selectedMetricData?.label || chart.selectedMetric}
+            </Typography>
+            <IconButton size="small" onClick={() => removeChart(chart.id)} color="error">
+              <CloseIcon />
+            </IconButton>
+          </Box>
           <Stack direction={isMobile ? "column" : "row"} spacing={2} sx={{ mb: 3 }}>
             <FormControl sx={{ minWidth: 200 }}>
               <InputLabel>Metric</InputLabel>
@@ -483,21 +639,14 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
               </Select>
             </FormControl>
           </Stack>
-
-          {/* Bar Chart */}
           <Box sx={{ width: '100%', height: isMobile ? 300 : 400 }}>
             <ResponsiveContainer>
-              <BarChart
+              <LineChart
                 data={chartData}
-                margin={{
-                  top: 20,
-                  right: 30,
-                  left: 20,
-                  bottom: isMobile ? 60 : 40
-                }}
+                margin={{ top: 20, right: 30, left: 20, bottom: isMobile ? 60 : 40 }}
               >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis 
+                <XAxis
                   dataKey="name"
                   angle={isMobile ? -45 : 0}
                   textAnchor={isMobile ? "end" : "middle"}
@@ -505,7 +654,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
                   interval={0}
                   fontSize={isMobile ? 10 : 12}
                 />
-                <YAxis 
+                <YAxis
                   tickFormatter={(value) => formatAxisTick(value, chart.selectedMetric)}
                   fontSize={12}
                   domain={getDataDomain(chart.selectedMetric)}
@@ -513,13 +662,15 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
                 />
                 <Tooltip content={(props) => <CustomTooltip {...props} chartConfig={chart} />} />
                 <Legend />
-                <Bar 
-                  dataKey={chart.selectedMetric} 
-                  fill={selectedMetricData?.color || '#8884d8'}
+                <Line
+                  type="monotone"
+                  dataKey={chart.selectedMetric}
+                  stroke={selectedMetricData?.color || '#8884d8'}
+                  strokeWidth={2}
+                  dot={false}
                   name={selectedMetricData?.label || chart.selectedMetric}
-                  radius={[2, 2, 0, 0]}
                 />
-              </BarChart>
+              </LineChart>
             </ResponsiveContainer>
           </Box>
         </CardContent>
@@ -797,9 +948,11 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
       </Card>
 
       {/* Render Charts */}
-      {charts.map(chart => (
-        chart.type === 'bar' ? renderBarChart(chart) : renderScatterChart(chart)
-      ))}
+      {charts.map(chart => {
+        if (chart.type === 'bar') return renderBarChart(chart);
+        if (chart.type === 'line') return renderLineChart(chart);
+        return renderScatterChart(chart);
+      })}
 
       {/* Chart Tips */}
       {charts.length > 0 && (
