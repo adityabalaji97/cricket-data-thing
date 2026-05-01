@@ -599,6 +599,11 @@ const Matchups = ({
         firstInnings: null,
         secondInnings: null,
     });
+    const [postTossMatrixMeta, setPostTossMatrixMeta] = React.useState({
+        usedAllTimeFallback: false,
+        startDate: null,
+        endDate: null,
+    });
 
     const incomingTeam1PlayersRef = React.useRef(dedupeNames(team1_players || []));
     const incomingTeam2PlayersRef = React.useRef(dedupeNames(team2_players || []));
@@ -731,6 +736,7 @@ const Matchups = ({
         if (!hasPostTossContext || postTossMode === 'off') {
             setPostTossMatrixError(null);
             setPostTossMatrixData({ firstInnings: null, secondInnings: null });
+            setPostTossMatrixMeta({ usedAllTimeFallback: false, startDate: null, endDate: null });
             return;
         }
 
@@ -759,10 +765,15 @@ const Matchups = ({
                 const windowStartDate = postTossRaw?.windows?.[windowScope]?.start_date || startDate;
                 const windowEndDate = postTossRaw?.windows?.[windowScope]?.end_date || endDate;
 
-                const commonParams = (inningsValue, battingXi, bowlingXi) => {
+                const hasBattingRows = (payload) => (
+                    Object.keys(payload?.team1?.batting_matchups || {}).length > 0
+                    || Object.keys(payload?.team2?.batting_matchups || {}).length > 0
+                );
+
+                const commonParams = (inningsValue, battingXi, bowlingXi, rangeStartDate, rangeEndDate) => {
                     const params = new URLSearchParams();
-                    if (windowStartDate) params.append('start_date', windowStartDate);
-                    if (windowEndDate) params.append('end_date', windowEndDate);
+                    if (rangeStartDate) params.append('start_date', rangeStartDate);
+                    if (rangeEndDate) params.append('end_date', rangeEndDate);
                     battingXi.forEach((player) => params.append('team1_players', player));
                     bowlingXi.forEach((player) => params.append('team2_players', player));
                     params.append('use_current_roster', 'false');
@@ -777,25 +788,58 @@ const Matchups = ({
                     return params.toString();
                 };
 
-                const [firstRes, secondRes] = await Promise.all([
-                    axios.get(
-                        `${config.API_URL}/teams/${encodeURIComponent(battingFirst)}/${encodeURIComponent(battingSecond)}/matchups?${commonParams(1, firstXi, secondXi)}`,
-                    ),
-                    axios.get(
-                        `${config.API_URL}/teams/${encodeURIComponent(battingSecond)}/${encodeURIComponent(battingFirst)}/matchups?${commonParams(2, secondXi, firstXi)}`,
-                    ),
-                ]);
+                const fetchPair = async (rangeStartDate, rangeEndDate) => {
+                    const [firstRes, secondRes] = await Promise.all([
+                        axios.get(
+                            `${config.API_URL}/teams/${encodeURIComponent(battingFirst)}/${encodeURIComponent(battingSecond)}/matchups?${commonParams(1, firstXi, secondXi, rangeStartDate, rangeEndDate)}`,
+                        ),
+                        axios.get(
+                            `${config.API_URL}/teams/${encodeURIComponent(battingSecond)}/${encodeURIComponent(battingFirst)}/matchups?${commonParams(2, secondXi, firstXi, rangeStartDate, rangeEndDate)}`,
+                        ),
+                    ]);
+                    return {
+                        first: firstRes.data || null,
+                        second: secondRes.data || null,
+                    };
+                };
+
+                let usedAllTimeFallback = false;
+                let effectiveStartDate = windowStartDate || null;
+                let effectiveEndDate = windowEndDate || null;
+
+                let results = await fetchPair(windowStartDate, windowEndDate);
+                const hasWindowRows = hasBattingRows(results.first) || hasBattingRows(results.second);
+
+                // If the configured window is too sparse for head-to-head rows,
+                // retry General mode without date bounds so users still get usable
+                // matchup coverage for the selected XI.
+                if (postTossMode === 'general' && !hasWindowRows) {
+                    const fallbackResults = await fetchPair(null, null);
+                    const hasFallbackRows = hasBattingRows(fallbackResults.first) || hasBattingRows(fallbackResults.second);
+                    if (hasFallbackRows) {
+                        results = fallbackResults;
+                        usedAllTimeFallback = true;
+                        effectiveStartDate = null;
+                        effectiveEndDate = null;
+                    }
+                }
 
                 if (cancelled) return;
                 setPostTossMatrixData({
-                    firstInnings: firstRes.data || null,
-                    secondInnings: secondRes.data || null,
+                    firstInnings: results.first,
+                    secondInnings: results.second,
+                });
+                setPostTossMatrixMeta({
+                    usedAllTimeFallback,
+                    startDate: effectiveStartDate,
+                    endDate: effectiveEndDate,
                 });
             } catch (fetchError) {
                 if (cancelled) return;
                 console.error('Error fetching post-toss matchup matrices:', fetchError);
                 setPostTossMatrixError(fetchError?.response?.data?.detail || fetchError?.message || 'Failed to load post-toss matchups');
                 setPostTossMatrixData({ firstInnings: null, secondInnings: null });
+                setPostTossMatrixMeta({ usedAllTimeFallback: false, startDate: null, endDate: null });
             } finally {
                 if (!cancelled) setPostTossMatrixLoading(false);
             }
@@ -1097,6 +1141,11 @@ const Matchups = ({
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     {postTossMatrixLoading && <CircularProgress size={24} />}
                     {postTossMatrixError && <Alert severity="warning">{postTossMatrixError}</Alert>}
+                    {!postTossMatrixLoading && !postTossMatrixError && postTossMatrixMeta.usedAllTimeFallback && (
+                        <Alert severity="info">
+                            General window had no head-to-head rows for this XI, so matchup matrices were expanded to all-time history.
+                        </Alert>
+                    )}
 
                     {!postTossMatrixLoading && !postTossMatrixError && (
                         <>
@@ -1112,8 +1161,8 @@ const Matchups = ({
                                     bowlingConsolidated={postTossMatrixData.firstInnings.team2.bowling_consolidated}
                                     isMobile={isMobile}
                                     venue={postTossMode === 'venue' ? venue : 'All Venues'}
-                                    startDate={startDate}
-                                    endDate={endDate}
+                                    startDate={postTossMatrixMeta.startDate}
+                                    endDate={postTossMatrixMeta.endDate}
                                     formFlagsByPlayer={formFlagsByPlayer}
                                 />
                             ) : (
@@ -1132,8 +1181,8 @@ const Matchups = ({
                                     bowlingConsolidated={postTossMatrixData.secondInnings.team2.bowling_consolidated}
                                     isMobile={isMobile}
                                     venue={postTossMode === 'venue' ? venue : 'All Venues'}
-                                    startDate={startDate}
-                                    endDate={endDate}
+                                    startDate={postTossMatrixMeta.startDate}
+                                    endDate={postTossMatrixMeta.endDate}
                                     formFlagsByPlayer={formFlagsByPlayer}
                                 />
                             ) : (
