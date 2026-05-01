@@ -3,7 +3,9 @@ import axios from 'axios';
 import config from '../config';
 import { 
     Box, 
+    Button,
     Card, 
+    Collapse,
     CircularProgress,
     Alert,
     Autocomplete,
@@ -55,6 +57,13 @@ const dedupeNames = (names = []) => {
     });
     return output;
 };
+
+const toListKey = (names = []) => (
+    dedupeNames(names)
+        .map((name) => name.toLowerCase())
+        .sort()
+        .join('|')
+);
 
 
 const MetricCell = ({ data, isMobile, bowler, isBowlingConsolidated = false }) => {
@@ -498,19 +507,44 @@ const Matchups = ({
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [formFlagsByPlayer, setFormFlagsByPlayer] = React.useState({});
-    const [team1AxisPlayers, setTeam1AxisPlayers] = React.useState(dedupeNames(team1_players || []));
-    const [team2AxisPlayers, setTeam2AxisPlayers] = React.useState(dedupeNames(team2_players || []));
+    const [axisEditorOpen, setAxisEditorOpen] = React.useState(false);
+    const [team1AxisDraftPlayers, setTeam1AxisDraftPlayers] = React.useState(dedupeNames(team1_players || []));
+    const [team2AxisDraftPlayers, setTeam2AxisDraftPlayers] = React.useState(dedupeNames(team2_players || []));
+    const [team1AxisAppliedPlayers, setTeam1AxisAppliedPlayers] = React.useState(dedupeNames(team1_players || []));
+    const [team2AxisAppliedPlayers, setTeam2AxisAppliedPlayers] = React.useState(dedupeNames(team2_players || []));
     const [team1RosterOptions, setTeam1RosterOptions] = React.useState([]);
     const [team2RosterOptions, setTeam2RosterOptions] = React.useState([]);
 
+    const incomingTeam1PlayersRef = React.useRef(dedupeNames(team1_players || []));
+    const incomingTeam2PlayersRef = React.useRef(dedupeNames(team2_players || []));
+    const incomingTeam1Key = React.useMemo(() => toListKey(team1_players || []), [team1_players]);
+    const incomingTeam2Key = React.useMemo(() => toListKey(team2_players || []), [team2_players]);
+    const incomingPlayersKey = `${incomingTeam1Key}::${incomingTeam2Key}`;
+
     React.useEffect(() => {
-        const nextTeam1 = dedupeNames(team1_players || []);
-        const nextTeam2 = dedupeNames(team2_players || []);
-        if (nextTeam1.length || nextTeam2.length) {
-            setTeam1AxisPlayers(nextTeam1);
-            setTeam2AxisPlayers(nextTeam2);
-        }
+        incomingTeam1PlayersRef.current = dedupeNames(team1_players || []);
+        incomingTeam2PlayersRef.current = dedupeNames(team2_players || []);
     }, [team1_players, team2_players]);
+
+    React.useEffect(() => {
+        const incomingTeam1Players = incomingTeam1PlayersRef.current;
+        const incomingTeam2Players = incomingTeam2PlayersRef.current;
+        if (incomingTeam1Players.length || incomingTeam2Players.length) {
+            setTeam1AxisDraftPlayers(incomingTeam1Players);
+            setTeam2AxisDraftPlayers(incomingTeam2Players);
+            setTeam1AxisAppliedPlayers(incomingTeam1Players);
+            setTeam2AxisAppliedPlayers(incomingTeam2Players);
+        }
+    }, [incomingPlayersKey]);
+
+    React.useEffect(() => {
+        if (incomingTeam1Key || incomingTeam2Key) return;
+        setTeam1AxisDraftPlayers([]);
+        setTeam2AxisDraftPlayers([]);
+        setTeam1AxisAppliedPlayers([]);
+        setTeam2AxisAppliedPlayers([]);
+        setAxisEditorOpen(false);
+    }, [team1, team2, incomingTeam1Key, incomingTeam2Key]);
 
     React.useEffect(() => {
         let cancelled = false;
@@ -542,54 +576,47 @@ const Matchups = ({
 
     React.useEffect(() => {
         if (!enabled) return;
-        const timer = setTimeout(() => {
-            const fetchMatchups = async () => {
-                try {
-                    setMatchupData(null);
-                    setLoading(true);
-                    setError(null);
-                    setFormFlagsByPlayer({});
+        const fetchMatchups = async () => {
+            try {
+                setMatchupData(null);
+                setLoading(true);
+                setError(null);
+                setFormFlagsByPlayer({});
 
-                    // Build URL parameters properly
-                    const params = new URLSearchParams();
-                    params.append('start_date', startDate);
-                    params.append('end_date', endDate);
+                const params = new URLSearchParams();
+                params.append('start_date', startDate);
+                params.append('end_date', endDate);
 
-                    const effectiveTeam1Players = dedupeNames(team1AxisPlayers || []);
-                    const effectiveTeam2Players = dedupeNames(team2AxisPlayers || []);
-                    const hasCustomPlayers = Boolean(
-                        effectiveTeam1Players.length > 0 && effectiveTeam2Players.length > 0
-                    );
-                    
-                    // Add custom team players if provided
-                    if (hasCustomPlayers) {
-                        effectiveTeam1Players.forEach(player => {
-                            params.append('team1_players', player);
-                        });
-                        effectiveTeam2Players.forEach(player => {
-                            params.append('team2_players', player);
-                        });
-                    }
-                    
-                    params.append('use_current_roster', hasCustomPlayers ? 'false' : 'true');
+                const effectiveTeam1Players = dedupeNames(team1AxisAppliedPlayers || []);
+                const effectiveTeam2Players = dedupeNames(team2AxisAppliedPlayers || []);
+                const hasCustomPlayers = Boolean(
+                    effectiveTeam1Players.length > 0 && effectiveTeam2Players.length > 0
+                );
 
-                    // Get the matchups data
-                    const matchupsResponse = await axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/${encodeURIComponent(team2)}/matchups?${params.toString()}`);
-                    
-                    setMatchupData(matchupsResponse.data);
-                } catch (error) {
-                    console.error('Error fetching matchups:', error);
-                    setError(error.response?.data?.detail || 'Error fetching matchups');
-                } finally {
-                    setLoading(false);
+                if (hasCustomPlayers) {
+                    effectiveTeam1Players.forEach(player => {
+                        params.append('team1_players', player);
+                    });
+                    effectiveTeam2Players.forEach(player => {
+                        params.append('team2_players', player);
+                    });
                 }
-            };
 
-            fetchMatchups();
-        }, 400);
+                params.append('use_current_roster', hasCustomPlayers ? 'false' : 'true');
 
-        return () => clearTimeout(timer);
-    }, [enabled, team1, team2, startDate, endDate, team1AxisPlayers, team2AxisPlayers]);
+                const matchupsResponse = await axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/${encodeURIComponent(team2)}/matchups?${params.toString()}`);
+
+                setMatchupData(matchupsResponse.data);
+            } catch (error) {
+                console.error('Error fetching matchups:', error);
+                setError(error.response?.data?.detail || 'Error fetching matchups');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchMatchups();
+    }, [enabled, team1, team2, startDate, endDate, team1AxisAppliedPlayers, team2AxisAppliedPlayers]);
 
     React.useEffect(() => {
         if (!enabled || !matchupData?.team1 || !matchupData?.team2) return;
@@ -642,23 +669,23 @@ const Matchups = ({
     React.useEffect(() => {
         if (!enabled || !matchupData?.team1 || !matchupData?.team2) return;
         const hasIncomingCustom = Boolean(
-            (team1_players && team1_players.length > 0)
-            || (team2_players && team2_players.length > 0)
+            incomingTeam1Key
+            || incomingTeam2Key
         );
         if (hasIncomingCustom) return;
-        if (team1AxisPlayers.length === 0 && Array.isArray(matchupData?.team1?.players)) {
-            setTeam1AxisPlayers(dedupeNames(matchupData.team1.players));
+        if (team1AxisDraftPlayers.length === 0 && Array.isArray(matchupData?.team1?.players)) {
+            setTeam1AxisDraftPlayers(dedupeNames(matchupData.team1.players));
         }
-        if (team2AxisPlayers.length === 0 && Array.isArray(matchupData?.team2?.players)) {
-            setTeam2AxisPlayers(dedupeNames(matchupData.team2.players));
+        if (team2AxisDraftPlayers.length === 0 && Array.isArray(matchupData?.team2?.players)) {
+            setTeam2AxisDraftPlayers(dedupeNames(matchupData.team2.players));
         }
     }, [
         enabled,
         matchupData,
-        team1_players,
-        team2_players,
-        team1AxisPlayers.length,
-        team2AxisPlayers.length,
+        incomingTeam1Key,
+        incomingTeam2Key,
+        team1AxisDraftPlayers.length,
+        team2AxisDraftPlayers.length,
     ]);
 
     if (!enabled) return null;
@@ -694,13 +721,18 @@ const Matchups = ({
     const team1Options = dedupeNames([
         ...team1RosterOptions,
         ...(matchupData?.team1?.players || []),
-        ...team1AxisPlayers,
+        ...team1AxisDraftPlayers,
     ]);
     const team2Options = dedupeNames([
         ...team2RosterOptions,
         ...(matchupData?.team2?.players || []),
-        ...team2AxisPlayers,
+        ...team2AxisDraftPlayers,
     ]);
+    const canApplyAxes = team1AxisDraftPlayers.length > 0 && team2AxisDraftPlayers.length > 0;
+    const hasDraftChanges = (
+        toListKey(team1AxisDraftPlayers) !== toListKey(team1AxisAppliedPlayers)
+        || toListKey(team2AxisDraftPlayers) !== toListKey(team2AxisAppliedPlayers)
+    );
 
     return (
         <Box sx={{ mt: 3 }}>
@@ -712,49 +744,82 @@ const Matchups = ({
                     boxShadow: isMobile ? 0 : undefined,
                 }}
             >
-                <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ mb: 1 }}>
-                    Matchup Matrix Axes
-                </Typography>
-                <Stack direction="column" spacing={1.5}>
-                    <Autocomplete
-                        multiple
-                        options={team1Options}
-                        value={team1AxisPlayers}
-                        onChange={(event, value) => setTeam1AxisPlayers(dedupeNames(value))}
-                        renderTags={(value, getTagProps) =>
-                            value.map((option, index) => (
-                                <Chip variant="outlined" label={option} {...getTagProps({ index })} key={`${option}-${index}`} />
-                            ))
-                        }
-                        renderInput={(params) => (
-                            <TextField
-                                {...params}
-                                size="small"
-                                label={`${matchupData.team1.name} batters/bowlers`}
-                                helperText="Edit axis players. Matrix refreshes automatically."
-                            />
-                        )}
-                    />
-                    <Autocomplete
-                        multiple
-                        options={team2Options}
-                        value={team2AxisPlayers}
-                        onChange={(event, value) => setTeam2AxisPlayers(dedupeNames(value))}
-                        renderTags={(value, getTagProps) =>
-                            value.map((option, index) => (
-                                <Chip variant="outlined" label={option} {...getTagProps({ index })} key={`${option}-${index}`} />
-                            ))
-                        }
-                        renderInput={(params) => (
-                            <TextField
-                                {...params}
-                                size="small"
-                                label={`${matchupData.team2.name} batters/bowlers`}
-                                helperText="Add/remove players to re-run pairwise matchups."
-                            />
-                        )}
-                    />
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                    <Typography variant={isMobile ? "subtitle1" : "h6"}>
+                        Matchup Matrix Axes
+                    </Typography>
+                    <Button
+                        size="small"
+                        variant={axisEditorOpen ? "contained" : "outlined"}
+                        onClick={() => setAxisEditorOpen((prev) => !prev)}
+                    >
+                        {axisEditorOpen ? "Hide Axes" : "Edit Axes"}
+                    </Button>
                 </Stack>
+                <Collapse in={axisEditorOpen}>
+                    <Stack direction="column" spacing={1.5}>
+                        <Autocomplete
+                            multiple
+                            options={team1Options}
+                            value={team1AxisDraftPlayers}
+                            onChange={(event, value) => setTeam1AxisDraftPlayers(dedupeNames(value))}
+                            renderTags={(value, getTagProps) =>
+                                value.map((option, index) => (
+                                    <Chip variant="outlined" label={option} {...getTagProps({ index })} key={`${option}-${index}`} />
+                                ))
+                            }
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    size="small"
+                                    label={`${matchupData.team1.name} batters/bowlers`}
+                                    helperText="Edit players, then click Update matchups."
+                                />
+                            )}
+                        />
+                        <Autocomplete
+                            multiple
+                            options={team2Options}
+                            value={team2AxisDraftPlayers}
+                            onChange={(event, value) => setTeam2AxisDraftPlayers(dedupeNames(value))}
+                            renderTags={(value, getTagProps) =>
+                                value.map((option, index) => (
+                                    <Chip variant="outlined" label={option} {...getTagProps({ index })} key={`${option}-${index}`} />
+                                ))
+                            }
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    size="small"
+                                    label={`${matchupData.team2.name} batters/bowlers`}
+                                    helperText="Changes are local until you update."
+                                />
+                            )}
+                        />
+                        <Stack direction={isMobile ? "column" : "row"} spacing={1}>
+                            <Button
+                                variant="contained"
+                                onClick={() => {
+                                    setTeam1AxisAppliedPlayers(dedupeNames(team1AxisDraftPlayers));
+                                    setTeam2AxisAppliedPlayers(dedupeNames(team2AxisDraftPlayers));
+                                }}
+                                disabled={!canApplyAxes || !hasDraftChanges || loading}
+                            >
+                                Update Matchups
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                onClick={() => {
+                                    setTeam1AxisDraftPlayers(dedupeNames(team1AxisAppliedPlayers));
+                                    setTeam2AxisDraftPlayers(dedupeNames(team2AxisAppliedPlayers));
+                                }}
+                                disabled={!hasDraftChanges || loading}
+                            >
+                                Reset Changes
+                            </Button>
+                        </Stack>
+                    </Stack>
+                </Collapse>
             </Card>
 
             {/* Fantasy Analysis from server */}
