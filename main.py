@@ -590,6 +590,7 @@ def get_venue_notes(
     leagues: List[str] = Query(default=[]),
     include_international: bool = Query(default=False),
     top_teams: Optional[int] = Query(default=None),
+    day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$"),
     db: Session = Depends(get_session)
 ):
     try:
@@ -598,6 +599,7 @@ def get_venue_notes(
         logging.info(f"Leagues: {leagues}")
         logging.info(f"Venue: {venue}")
         logging.info(f"Date range: {start_date} to {end_date}")
+        logging.info(f"Day/Night filter: {day_or_night}")
         logging.info(f"Include international: {include_international}")
         logging.info(f"Top teams: {top_teams}")
 
@@ -612,7 +614,8 @@ def get_venue_notes(
             leagues=expanded_leagues,
             include_international=include_international,
             top_teams=top_teams,
-            db=db
+            db=db,
+            day_or_night=day_or_night,
         )
 
         if not match_stats:
@@ -643,7 +646,8 @@ def get_venue_notes(
             leagues=expanded_leagues,
             include_international=include_international,
             top_teams=top_teams,
-            db=db
+            db=db,
+            day_or_night=day_or_night,
         )
 
         return {
@@ -920,6 +924,7 @@ def get_venue_stats(
     leagues: List[str] = Query(default=[]),
     include_international: bool = Query(default=False),
     top_teams: Optional[int] = Query(default=None),
+    day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$"),
     db: Session = Depends(get_session)
 ):
     try:
@@ -933,6 +938,7 @@ def get_venue_stats(
             "leagues": leagues,
             "full_names": list(teams_mapping.keys()),
             "abbrev_names": list(teams_mapping.values()),
+            "day_or_night": day_or_night,
         }
 
         if venue_aliases:
@@ -962,6 +968,7 @@ def get_venue_stats(
         else:
             competition_filter = " AND false"
         venue_filter = "AND m.venue = ANY(:venue_aliases)" if venue_aliases else ""
+        day_or_night_filter = "AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)"
 
         # Batting Query
         batting_query = text(f"""
@@ -977,6 +984,7 @@ def get_venue_stats(
                     AND (:start_date IS NULL OR m.date >= :start_date)
                     AND (:end_date IS NULL OR m.date <= :end_date)
                     {competition_filter}
+                    {day_or_night_filter}
             )
             SELECT
                 bs.striker as name,
@@ -1010,6 +1018,7 @@ def get_venue_stats(
                     AND (:start_date IS NULL OR m.date >= :start_date)
                     AND (:end_date IS NULL OR m.date <= :end_date)
                     {competition_filter}
+                    {day_or_night_filter}
             )
             SELECT
                 bw.bowler as name,
@@ -1048,6 +1057,7 @@ def get_venue_stats(
                         AND (:start_date IS NULL OR m.date >= :start_date)
                         AND (:end_date IS NULL OR m.date <= :end_date)
                         {competition_filter}
+                        {day_or_night_filter}
                 )
                 SELECT
                     dd.bat as name,
@@ -1080,6 +1090,7 @@ def get_venue_stats(
                         AND (:start_date IS NULL OR m.date >= :start_date)
                         AND (:end_date IS NULL OR m.date <= :end_date)
                         {competition_filter}
+                        {day_or_night_filter}
                 )
                 SELECT
                     dd.bowl as name,
@@ -1143,6 +1154,7 @@ def get_venue_stats(
                     AND (:start_date IS NULL OR m.date >= :start_date)
                     AND (:end_date IS NULL OR m.date <= :end_date)
                     {competition_filter}
+                    {day_or_night_filter}
             ),
             batter_stats AS (
                 SELECT 

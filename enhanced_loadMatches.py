@@ -34,6 +34,7 @@ from models import Match, Delivery, Player, Base
 from database import get_database_connection
 from player_discovery import PlayerDiscoveryService, PlayerInfo
 from elo_update_service import ELOUpdateService
+from services.day_night_classifier import classify_day_night, SUPPORTED_COMPETITIONS
 import logging
 
 # Set up logging
@@ -73,6 +74,10 @@ class EnhancedMatchLoader:
         
         # Track newly loaded matches for ELO calculation
         self.newly_loaded_matches: List[str] = []
+
+        # Track (date, competition) pairs touched by newly loaded matches so the
+        # day/night reconciler only reclassifies the affected groups.
+        self.newly_loaded_groups: Set[Tuple[object, str]] = set()
     
     def _load_player_cache(self, session: Session) -> None:
         """Load all player data into memory cache for fast lookups"""
@@ -323,6 +328,10 @@ class EnhancedMatchLoader:
             # Track newly loaded match for ELO calculation
             if self.calculate_elo:
                 self.newly_loaded_matches.append(match_id)
+
+            # Track (date, competition) for day/night reconciliation if applicable
+            if competition in SUPPORTED_COMPETITIONS:
+                self.newly_loaded_groups.add((match.date, competition))
             
             logger.info(f"✅ Successfully processed match {match_id} with {len(deliveries)} deliveries")
             return True
@@ -396,7 +405,66 @@ class EnhancedMatchLoader:
         except Exception as e:
             logger.error(f"❌ Error calculating ELO for loaded matches: {e}")
             return {'processed': 0, 'updated': 0, 'errors': len(self.newly_loaded_matches)}
-    
+
+    def reconcile_day_or_night_for_loaded_matches(self) -> Dict[str, int]:
+        """
+        Re-classify day_or_night for every (date, competition) group touched
+        by this batch. Run after matches are committed.
+
+        Reclassifying the whole peer group (not just the new match) handles the
+        edge case where a same-date pair lands across two batches: the first
+        match was labeled 'night' alone, then needs to be re-labeled when its
+        peer arrives.
+        """
+        stats = {'groups_processed': 0, 'matches_updated': 0, 'errors': 0}
+        if not self.newly_loaded_groups:
+            return stats
+
+        session = self.SessionLocal()
+        try:
+            for date, competition in self.newly_loaded_groups:
+                try:
+                    rows = session.execute(
+                        text(
+                            """
+                            SELECT id, event_match_number
+                            FROM matches
+                            WHERE date = :date AND competition = :competition
+                            ORDER BY event_match_number NULLS LAST, id
+                            """
+                        ),
+                        {"date": date, "competition": competition},
+                    ).fetchall()
+
+                    peers = [{"id": r[0], "event_match_number": r[1]} for r in rows]
+                    labels = classify_day_night(competition=competition, peer_matches=peers)
+                    if not labels:
+                        continue
+
+                    for match_id, label in labels.items():
+                        session.execute(
+                            text("UPDATE matches SET day_or_night = :label WHERE id = :match_id"),
+                            {"label": label, "match_id": match_id},
+                        )
+                        stats['matches_updated'] += 1
+                    stats['groups_processed'] += 1
+                except Exception as e:
+                    logger.error(f"Error reconciling day/night for {date} {competition}: {e}")
+                    stats['errors'] += 1
+                    session.rollback()
+                    continue
+
+            session.commit()
+            logger.info(
+                f"🌗 Day/night reconciler: {stats['groups_processed']} groups, "
+                f"{stats['matches_updated']} matches updated, {stats['errors']} errors"
+            )
+        finally:
+            session.close()
+            self.newly_loaded_groups.clear()
+
+        return stats
+
     def process_matches(self, input_path: str) -> Dict[str, int]:
         """
         Process single file or directory of JSON match files
@@ -506,7 +574,11 @@ class EnhancedMatchLoader:
                 stats['elo_processed'] = elo_stats['processed']
                 stats['elo_updated'] = elo_stats['updated']
                 stats['elo_errors'] = elo_stats['errors']
-            
+
+            # Reconcile day/night classification for affected (date, competition) groups
+            if stats['processed'] > 0 and self.newly_loaded_groups:
+                self.reconcile_day_or_night_for_loaded_matches()
+
             # Final statistics
             logger.info(f"\n📊 Processing Summary:")
             logger.info(f"  Total files: {stats['total_files']}")
@@ -715,6 +787,12 @@ class EnhancedMatchLoader:
                 # Add match IDs to newly loaded list for ELO calculation
                 if self.calculate_elo:
                     self.newly_loaded_matches.extend([m['id'] for m in matches_to_insert])
+
+                # Track (date, competition) for day/night reconciliation
+                for m in matches_to_insert:
+                    comp = m.get('competition')
+                    if comp in SUPPORTED_COMPETITIONS:
+                        self.newly_loaded_groups.add((m['date'], comp))
             
             # Calculate ELO for bulk inserted matches
             elo_stats = {'processed': 0, 'updated': 0, 'errors': 0}
@@ -724,7 +802,11 @@ class EnhancedMatchLoader:
                 stats['elo_processed'] = elo_stats['processed']
                 stats['elo_updated'] = elo_stats['updated']
                 stats['elo_errors'] = elo_stats['errors']
-            
+
+            # Reconcile day/night classification for affected (date, competition) groups
+            if stats['processed'] > 0 and self.newly_loaded_groups:
+                self.reconcile_day_or_night_for_loaded_matches()
+
             return stats
             
         except Exception as e:

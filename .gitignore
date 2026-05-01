@@ -54,6 +54,8 @@ venue_stats.log
 # Database exports and backups
 data_exports/
 *.sql
+!add_day_or_night_column.sql
+!add_post_toss_predictions_table.sql
 *.sql.gz
 *.dump
 

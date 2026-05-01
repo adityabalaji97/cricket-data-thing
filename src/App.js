@@ -17,7 +17,9 @@ import {
   useTheme,
   Collapse,
   Card,
-  CardContent
+  CardContent,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
@@ -173,8 +175,10 @@ const AppContent = () => {
   const open = Boolean(anchorEl);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [dayNightFilter, setDayNightFilter] = useState('all');
 
   const hasFetchedRef = useRef(false);
+  const dateManuallyAdjustedRef = useRef(false);
 
   const handleMenuClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -233,6 +237,7 @@ const AppContent = () => {
           const team2Param = getQueryParam('team2');
           const includeInternationalParam = getQueryParam('includeInternational');
           const topTeamsParam = getQueryParam('topTeams');
+          const dayNightParam = getQueryParam('dayNight') || getQueryParam('day_or_night');
 
           if (includeInternationalParam !== null || topTeamsParam !== null) {
             const parsedTopTeams = Number.parseInt(topTeamsParam, 10);
@@ -245,6 +250,14 @@ const AppContent = () => {
                 ? parsedTopTeams
                 : prev.topTeams
             }));
+          }
+
+          if (dayNightParam === 'day' || dayNightParam === 'night' || dayNightParam === 'all') {
+            setDayNightFilter(dayNightParam);
+            if (dayNightParam === 'day' && !dateManuallyAdjustedRef.current) {
+              const dayDefaultStart = `${new Date().getFullYear() - 4}-01-01`;
+              setStartDate(dayDefaultStart);
+            }
           }
           
           // Set venue if it's in the URL parameters
@@ -287,6 +300,7 @@ const AppContent = () => {
   }, [location.search]); // Re-run this effect when location.search changes
 
   const handleDateChange = (value, isStartDate) => {
+    dateManuallyAdjustedRef.current = true;
     const newDate = value;
     if (isStartDate) {
       if (newDate > endDate) {
@@ -307,6 +321,20 @@ const AppContent = () => {
     }
     setError(null);
     setShowVisualizations(false);
+  };
+
+  const handleDayNightChange = (event, nextValue) => {
+    if (!nextValue) return;
+    setDayNightFilter(nextValue);
+    hasFetchedRef.current = false;
+
+    if (!dateManuallyAdjustedRef.current) {
+      if (nextValue === 'day') {
+        setStartDate(`${new Date().getFullYear() - 4}-01-01`);
+      } else {
+        setStartDate(DEFAULT_START_DATE);
+      }
+    }
   };
 
   useEffect(() => {
@@ -344,6 +372,9 @@ const AppContent = () => {
         params.append('include_international', competitions.international);
         if (competitions.international && competitions.topTeams) {
           params.append('top_teams', competitions.topTeams);
+        }
+        if (dayNightFilter !== 'all') {
+          params.append('day_or_night', dayNightFilter);
         }
 
         try {
@@ -446,7 +477,7 @@ const AppContent = () => {
     fetchMatchHistory();
     return () => abortController.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedVenue, selectedTeam1, selectedTeam2, startDate, endDate, showVisualizations]);
+  }, [selectedVenue, selectedTeam1, selectedTeam2, startDate, endDate, showVisualizations, dayNightFilter]);
 
   // Collapse filters after data has loaded
   useEffect(() => {
@@ -719,6 +750,22 @@ const AppContent = () => {
                     />
                   </Box>
 
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
+                      Match Time Slice
+                    </Typography>
+                    <ToggleButtonGroup
+                      size="small"
+                      value={dayNightFilter}
+                      exclusive
+                      onChange={handleDayNightChange}
+                    >
+                      <ToggleButton value="all">All</ToggleButton>
+                      <ToggleButton value="day">Day</ToggleButton>
+                      <ToggleButton value="night">Night</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+
                   <CompetitionFilter onFilterChange={handleFilterChange} isMobile={isMobile} value={competitions} />
 
                   {startDate && endDate && !error && (
@@ -814,6 +861,8 @@ const AppContent = () => {
                   leagues={competitions.leagues}
                   includeInternational={competitions.international}
                   topTeams={competitions.topTeams}
+                  dayNightFilter={dayNightFilter}
+                  onDayNightFilterChange={(nextValue) => handleDayNightChange(null, nextValue)}
                 />
               </>
             )}

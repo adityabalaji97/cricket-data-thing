@@ -127,6 +127,8 @@ def _build_batter_avg_balls_lookup(
     batter_names: List[str],
     start_date: Optional[date],
     end_date: Optional[date],
+    innings_position: Optional[int] = None,
+    venue_filter: Optional[str] = None,
 ) -> Dict[str, float]:
     unique_batters = _dedupe_player_names(batter_names)
     if not unique_batters:
@@ -159,6 +161,8 @@ def _build_batter_avg_balls_lookup(
           AND bs.balls_faced > 0
           AND (:start_date IS NULL OR m.date >= :start_date)
           AND (:end_date IS NULL OR m.date <= :end_date)
+          AND (:innings_position IS NULL OR bs.innings = :innings_position)
+          AND (:venue_filter IS NULL OR m.venue = :venue_filter)
         GROUP BY COALESCE(am.canonical_name, bs.striker)
         """
     )
@@ -169,6 +173,8 @@ def _build_batter_avg_balls_lookup(
             "batters": unique_batters,
             "start_date": start_date,
             "end_date": end_date,
+            "innings_position": innings_position,
+            "venue_filter": venue_filter,
         },
     ).fetchall()
 
@@ -184,6 +190,8 @@ def _build_bowler_avg_balls_lookup(
     bowler_names: List[str],
     start_date: Optional[date],
     end_date: Optional[date],
+    innings_position: Optional[int] = None,
+    venue_filter: Optional[str] = None,
 ) -> Dict[str, float]:
     unique_bowlers = _dedupe_player_names(bowler_names)
     if not unique_bowlers:
@@ -221,6 +229,8 @@ def _build_bowler_avg_balls_lookup(
           AND bw.overs > 0
           AND (:start_date IS NULL OR m.date >= :start_date)
           AND (:end_date IS NULL OR m.date <= :end_date)
+          AND (:innings_position IS NULL OR bw.innings = :innings_position)
+          AND (:venue_filter IS NULL OR m.venue = :venue_filter)
         GROUP BY COALESCE(am.canonical_name, bw.bowler)
         """
     )
@@ -231,6 +241,8 @@ def _build_bowler_avg_balls_lookup(
             "bowlers": unique_bowlers,
             "start_date": start_date,
             "end_date": end_date,
+            "innings_position": innings_position,
+            "venue_filter": venue_filter,
         },
     ).fetchall()
 
@@ -536,6 +548,7 @@ def calculate_fantasy_points_from_matchups(team1_batting, team2_batting, team1_b
 
     return {
         "top_fantasy_picks": all_fantasy_players[:15],
+        "all_fantasy_players": all_fantasy_players,
     }
 
 def get_team_matchups_service(
@@ -547,7 +560,15 @@ def get_team_matchups_service(
     team2_players: List[str],
     db,
     use_current_roster: bool = False,
+    innings_position: Optional[int] = None,
+    venue_filter: Optional[str] = None,
 ):
+    """
+    innings_position: when set to 1 or 2, restricts all underlying historical
+    queries (deliveries, delivery_details, batting_stats, bowling_stats) to
+    that innings only. None (default) returns Overall stats. Used by the
+    post-toss preview to compute bat-first vs bat-second projections separately.
+    """
     try:
         table_routing = should_use_delivery_details(start_date, end_date)
         use_deliveries = bool(table_routing.get("use_deliveries"))
@@ -609,6 +630,7 @@ def get_team_matchups_service(
                            OR (team1 = ANY(:team2_names) OR team2 = ANY(:team2_names)))
                     AND (:start_date IS NULL OR date >= :start_date)
                     AND (:end_date IS NULL OR date <= :end_date)
+                    AND (:venue_filter IS NULL OR venue = :venue_filter)
                     ORDER BY date DESC
                     LIMIT 10
                 ),
@@ -694,7 +716,8 @@ def get_team_matchups_service(
                 "team1_names": team1_names,
                 "team2_names": team2_names,
                 "start_date": start_date,
-                "end_date": end_date
+                "end_date": end_date,
+                "venue_filter": venue_filter,
             }).fetchall()
             team1_players = _dedupe_player_names([row[0] for row in recent_players if row[1] == team1])
             team2_players = _dedupe_player_names([row[0] for row in recent_players if row[1] == team2])
@@ -736,6 +759,8 @@ def get_team_matchups_service(
                       AND COALESCE(bowl_alias.canonical_name, d.bowler) = ANY(:team1_players)))
                     AND (:deliveries_start_date IS NULL OR m.date >= :deliveries_start_date)
                     AND (:deliveries_end_date IS NULL OR m.date <= :deliveries_end_date)
+                    AND (:venue_filter IS NULL OR m.venue = :venue_filter)
+                    AND (:innings_position IS NULL OR d.innings = :innings_position)
                 GROUP BY COALESCE(bat_alias.canonical_name, d.batter), COALESCE(bowl_alias.canonical_name, d.bowler)
 
                 UNION ALL
@@ -749,6 +774,7 @@ def get_team_matchups_service(
                     SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
                     SUM(CASE WHEN dd.score = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots
                 FROM delivery_details dd
+                LEFT JOIN matches m2 ON m2.id = dd.p_match
                 LEFT JOIN alias_map bat_alias ON LOWER(dd.bat) = bat_alias.name_key
                 LEFT JOIN alias_map bowl_alias ON LOWER(dd.bowl) = bowl_alias.name_key
                 WHERE
@@ -760,6 +786,12 @@ def get_team_matchups_service(
                       AND COALESCE(bowl_alias.canonical_name, dd.bowl) = ANY(:team1_players)))
                     AND (:details_start_date IS NULL OR dd.match_date::date >= :details_start_date)
                     AND (:details_end_date IS NULL OR dd.match_date::date <= :details_end_date)
+                    AND (
+                        :venue_filter IS NULL
+                        OR m2.venue = :venue_filter
+                        OR dd.ground = :venue_filter
+                    )
+                    AND (:innings_position IS NULL OR dd.innings = :innings_position)
                 GROUP BY COALESCE(bat_alias.canonical_name, dd.bat), COALESCE(bowl_alias.canonical_name, dd.bowl)
             ),
             player_stats AS (
@@ -814,6 +846,8 @@ def get_team_matchups_service(
             "deliveries_end_date": deliveries_end_date,
             "details_start_date": details_start_date,
             "details_end_date": details_end_date,
+            "venue_filter": venue_filter,
+            "innings_position": innings_position,
         }).fetchall()
 
         team1_batting = {}
@@ -845,12 +879,16 @@ def get_team_matchups_service(
             batter_names=list(team1_batting.keys()) + list(team2_batting.keys()),
             start_date=start_date,
             end_date=end_date,
+            innings_position=innings_position,
+            venue_filter=venue_filter,
         )
         bowler_avg_balls_lookup = _build_bowler_avg_balls_lookup(
             db=db,
             bowler_names=team1_players + team2_players,
             start_date=start_date,
             end_date=end_date,
+            innings_position=innings_position,
+            venue_filter=venue_filter,
         )
 
         # Add "Overall" entry for each batter in team1_batting

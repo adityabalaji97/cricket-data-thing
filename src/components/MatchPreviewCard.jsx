@@ -3,12 +3,16 @@ import {
   Box,
   CircularProgress,
   Chip,
+  ToggleButton,
+  ToggleButtonGroup,
   Stack,
   Typography,
 } from '@mui/material';
 import axios from 'axios';
 import config from '../config';
 import CondensedName from './common/CondensedName';
+import PostTossSetup from './PostTossSetup';
+import PostTossAnalysis from './PostTossAnalysis';
 
 const MatchPreviewCard = ({
   venue,
@@ -20,10 +24,14 @@ const MatchPreviewCard = ({
   topTeams = 20,
   enabled = true,
   isMobile = false,
+  onPostTossApply = null,
+  dayNightFilter = 'all',
+  onDayNightFilterChange = null,
 }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [postTossData, setPostTossData] = useState(null);
 
   const requestKey = useMemo(
     () => JSON.stringify({
@@ -34,8 +42,9 @@ const MatchPreviewCard = ({
       endDate: endDate || null,
       includeInternational,
       topTeams,
+      dayNightFilter,
     }),
-    [venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams]
+    [venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams, dayNightFilter]
   );
 
   const parsedPreview = useMemo(() => {
@@ -79,6 +88,7 @@ const MatchPreviewCard = ({
 
     const fetchPreview = async () => {
       setData(null);
+      setPostTossData(null);
       setLoading(true);
       setError(null);
       try {
@@ -90,6 +100,7 @@ const MatchPreviewCard = ({
               ...(endDate ? { end_date: endDate } : {}),
               include_international: includeInternational,
               top_teams: topTeams,
+              ...(dayNightFilter !== 'all' ? { day_or_night: dayNightFilter } : {}),
             }
           }
         );
@@ -108,7 +119,7 @@ const MatchPreviewCard = ({
     return () => {
       cancelled = true;
     };
-  }, [enabled, requestKey, venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams]);
+  }, [enabled, requestKey, venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams, dayNightFilter]);
 
   if (!enabled || !venue || !team1Identifier || !team2Identifier) return null;
 
@@ -133,6 +144,17 @@ const MatchPreviewCard = ({
 
   if (!data?.preview) return null;
 
+  const handlePostTossApply = (nextData) => {
+    setPostTossData(nextData);
+    onPostTossApply?.({
+      team1Xi: nextData?.team1_xi || [],
+      team2Xi: nextData?.team2_xi || [],
+      xpointsPostToss: nextData?.xpoints_post_toss || {},
+      xpointsDelta: nextData?.xpoints_delta || {},
+      raw: nextData || null,
+    });
+  };
+
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.08)' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
@@ -153,6 +175,22 @@ const MatchPreviewCard = ({
           )}
         </Stack>
       </Box>
+
+      <Box sx={{ mb: 1.2 }}>
+        <ToggleButtonGroup
+          size="small"
+          value={dayNightFilter}
+          exclusive
+          onChange={(event, nextValue) => {
+            if (!nextValue) return;
+            onDayNightFilterChange?.(nextValue);
+          }}
+        >
+          <ToggleButton value="all">All</ToggleButton>
+          <ToggleButton value="day">Day</ToggleButton>
+          <ToggleButton value="night">Night</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
       <Box>
         {(parsedPreview.length ? parsedPreview : [{ title: 'Preview', bullets: [], paragraphs: [String(data.preview)] }]).map((section) => (
           <Box key={section.title} sx={{ mb: 1.2 }}>
@@ -172,6 +210,19 @@ const MatchPreviewCard = ({
           </Box>
         ))}
       </Box>
+
+      <PostTossSetup
+        venue={venue}
+        team1Identifier={team1Identifier}
+        team2Identifier={team2Identifier}
+        isMobile={isMobile}
+        onApplyResult={handlePostTossApply}
+      />
+
+      <PostTossAnalysis
+        data={postTossData}
+        isMobile={isMobile}
+      />
     </Box>
   );
 };

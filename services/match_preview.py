@@ -726,8 +726,8 @@ def _summarize_matchups_and_fantasy(
         "lineup_players": lineup_players,
         "lineup_sources": lineup_sources,
         "fantasy_top": {
-            t1_name: _top_fantasy("team1"),
-            t2_name: _top_fantasy("team2"),
+            t1_name: _top_fantasy(t1_name),
+            t2_name: _top_fantasy(t2_name),
         },
         "batting_edges": {
             t1_name: _top_batting_edges((matchup_data or {}).get("team1")),
@@ -1610,6 +1610,7 @@ def gather_preview_context(
     end_date: Optional[date] = None,
     include_international: bool = True,
     top_teams: int = 20,
+    day_or_night: Optional[str] = None,
 ) -> Dict[str, Any]:
     team1 = resolve_team_identifier(team1_identifier)
     team2 = resolve_team_identifier(team2_identifier)
@@ -1622,6 +1623,7 @@ def gather_preview_context(
         include_international=include_international,
         top_teams=top_teams,
         db=db,
+        day_or_night=day_or_night,
     )
     phase_stats = get_venue_phase_stats(
         venue=venue if venue != "All Venues" else None,
@@ -1631,6 +1633,7 @@ def gather_preview_context(
         include_international=include_international,
         top_teams=top_teams,
         db=db,
+        day_or_night=day_or_night,
     )
     h2h = _get_h2h_last_n(db, team1, team2, 10, start_date=start_date, end_date=end_date)
     venue_h2h = _get_h2h_last_n(

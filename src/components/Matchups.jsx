@@ -6,6 +6,10 @@ import {
     Card, 
     CircularProgress,
     Alert,
+    Autocomplete,
+    Chip,
+    Stack,
+    TextField,
     Typography, 
     Table, 
     TableBody, 
@@ -36,6 +40,20 @@ const getPlayerFormFlag = (formFlagsByPlayer = {}, playerName = '') => (
 const getPlayerFormMeta = (formFlagsByPlayer = {}, playerName = '') => {
     const flag = getPlayerFormFlag(formFlagsByPlayer, playerName);
     return flag ? getFormFlagMeta(flag) : null;
+};
+
+const dedupeNames = (names = []) => {
+    const seen = new Set();
+    const output = [];
+    (names || []).forEach((name) => {
+        const clean = String(name || '').trim();
+        if (!clean) return;
+        const key = clean.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        output.push(clean);
+    });
+    return output;
 };
 
 
@@ -151,7 +169,7 @@ const MetricCell = ({ data, isMobile, bowler, isBowlingConsolidated = false }) =
 
 
 
-const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer }) => {
+const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer, postTossXpoints = {}, postTossDelta = {} }) => {
     if (!fantasyData || !fantasyData.top_fantasy_picks) return null;
 
     const getConfidenceColor = (confidence) => {
@@ -159,6 +177,8 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer }) => {
         if (confidence >= 0.6) return 'warning.main';
         return 'error.main';
     };
+
+    const hasPostToss = Object.keys(postTossXpoints || {}).length > 0;
 
     return (
         <Card sx={{
@@ -179,12 +199,20 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer }) => {
                         <TableRow>
                             <TableCell sx={{ fontWeight: 'bold', py: 1 }}>Player</TableCell>
                             <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>xPoints</TableCell>
+                            {hasPostToss && (
+                                <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>xPoints (post-toss)</TableCell>
+                            )}
+                            {hasPostToss && (
+                                <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>Δ</TableCell>
+                            )}
                             <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>Confidence</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {fantasyData.top_fantasy_picks.map((player) => {
                             const formMeta = getPlayerFormMeta(formFlagsByPlayer, player.player_name);
+                            const postToss = postTossXpoints?.[player.player_name];
+                            const delta = postTossDelta?.[player.player_name];
                             return (
                                 <TableRow key={player.player_name}>
                                 <TableCell sx={{ py: 0.75, fontWeight: 'bold', borderLeft: `3px solid ${getFormBorderColor(formMeta)}` }}>
@@ -193,6 +221,24 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer }) => {
                                 <TableCell align="right" sx={{ py: 0.75, color: 'primary.main', fontWeight: 'bold' }}>
                                     {player.expected_points?.toFixed(1) || '0.0'}
                                 </TableCell>
+                                {hasPostToss && (
+                                    <TableCell align="right" sx={{ py: 0.75, color: 'secondary.main', fontWeight: 600 }}>
+                                        {typeof postToss === 'number' ? postToss.toFixed(1) : '—'}
+                                    </TableCell>
+                                )}
+                                {hasPostToss && (
+                                    <TableCell
+                                        align="right"
+                                        sx={{
+                                            py: 0.75,
+                                            color: typeof delta === 'number'
+                                                ? (delta > 0 ? 'success.main' : (delta < 0 ? 'error.main' : 'text.secondary'))
+                                                : 'text.secondary',
+                                        }}
+                                    >
+                                        {typeof delta === 'number' ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)}` : '—'}
+                                    </TableCell>
+                                )}
                                 <TableCell align="right" sx={{ py: 0.75, color: getConfidenceColor(player.confidence || 0) }}>
                                     {((player.confidence || 0) * 100).toFixed(0)}%
                                 </TableCell>
@@ -436,56 +482,114 @@ const MatchupMatrix = ({
     );
 };
 
-const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_players, isMobile, enabled = true }) => {
+const Matchups = ({
+    team1,
+    team2,
+    startDate,
+    endDate,
+    team1_players,
+    team2_players,
+    isMobile,
+    enabled = true,
+    postTossXpoints = {},
+    postTossDelta = {},
+}) => {
     const [matchupData, setMatchupData] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [formFlagsByPlayer, setFormFlagsByPlayer] = React.useState({});
+    const [team1AxisPlayers, setTeam1AxisPlayers] = React.useState(dedupeNames(team1_players || []));
+    const [team2AxisPlayers, setTeam2AxisPlayers] = React.useState(dedupeNames(team2_players || []));
+    const [team1RosterOptions, setTeam1RosterOptions] = React.useState([]);
+    const [team2RosterOptions, setTeam2RosterOptions] = React.useState([]);
+
+    React.useEffect(() => {
+        const nextTeam1 = dedupeNames(team1_players || []);
+        const nextTeam2 = dedupeNames(team2_players || []);
+        if (nextTeam1.length || nextTeam2.length) {
+            setTeam1AxisPlayers(nextTeam1);
+            setTeam2AxisPlayers(nextTeam2);
+        }
+    }, [team1_players, team2_players]);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        const loadRosterOptions = async () => {
+            try {
+                const [team1Res, team2Res] = await Promise.all([
+                    axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/roster`),
+                    axios.get(`${config.API_URL}/teams/${encodeURIComponent(team2)}/roster`),
+                ]);
+                if (cancelled) return;
+                const t1 = dedupeNames((team1Res.data?.players || []).map((row) => row?.name));
+                const t2 = dedupeNames((team2Res.data?.players || []).map((row) => row?.name));
+                setTeam1RosterOptions(t1);
+                setTeam2RosterOptions(t2);
+            } catch (rosterError) {
+                if (cancelled) return;
+                console.error('Error loading roster options for matchup axes:', rosterError);
+                setTeam1RosterOptions([]);
+                setTeam2RosterOptions([]);
+            }
+        };
+        if (enabled && team1 && team2) {
+            loadRosterOptions();
+        }
+        return () => {
+            cancelled = true;
+        };
+    }, [enabled, team1, team2]);
 
     React.useEffect(() => {
         if (!enabled) return;
+        const timer = setTimeout(() => {
+            const fetchMatchups = async () => {
+                try {
+                    setMatchupData(null);
+                    setLoading(true);
+                    setError(null);
+                    setFormFlagsByPlayer({});
 
-        const fetchMatchups = async () => {
-            try {
-                setMatchupData(null);
-                setLoading(true);
-                setError(null);
-                setFormFlagsByPlayer({});
+                    // Build URL parameters properly
+                    const params = new URLSearchParams();
+                    params.append('start_date', startDate);
+                    params.append('end_date', endDate);
 
-                // Build URL parameters properly
-                const params = new URLSearchParams();
-                params.append('start_date', startDate);
-                params.append('end_date', endDate);
-                
-                // Add custom team players if provided
-                if (team1_players && team1_players.length > 0) {
-                    team1_players.forEach(player => {
-                        params.append('team1_players', player);
-                    });
+                    const effectiveTeam1Players = dedupeNames(team1AxisPlayers || []);
+                    const effectiveTeam2Players = dedupeNames(team2AxisPlayers || []);
+                    const hasCustomPlayers = Boolean(
+                        effectiveTeam1Players.length > 0 && effectiveTeam2Players.length > 0
+                    );
+                    
+                    // Add custom team players if provided
+                    if (hasCustomPlayers) {
+                        effectiveTeam1Players.forEach(player => {
+                            params.append('team1_players', player);
+                        });
+                        effectiveTeam2Players.forEach(player => {
+                            params.append('team2_players', player);
+                        });
+                    }
+                    
+                    params.append('use_current_roster', hasCustomPlayers ? 'false' : 'true');
+
+                    // Get the matchups data
+                    const matchupsResponse = await axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/${encodeURIComponent(team2)}/matchups?${params.toString()}`);
+                    
+                    setMatchupData(matchupsResponse.data);
+                } catch (error) {
+                    console.error('Error fetching matchups:', error);
+                    setError(error.response?.data?.detail || 'Error fetching matchups');
+                } finally {
+                    setLoading(false);
                 }
-                
-                if (team2_players && team2_players.length > 0) {
-                    team2_players.forEach(player => {
-                        params.append('team2_players', player);
-                    });
-                }
-                
-                params.append('use_current_roster', 'true');
+            };
 
-                // Get the matchups data
-                const matchupsResponse = await axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/${encodeURIComponent(team2)}/matchups?${params.toString()}`);
-                
-                setMatchupData(matchupsResponse.data);
-            } catch (error) {
-                console.error('Error fetching matchups:', error);
-                setError(error.response?.data?.detail || 'Error fetching matchups');
-            } finally {
-                setLoading(false);
-            }
-        };
+            fetchMatchups();
+        }, 400);
 
-        fetchMatchups();
-    }, [enabled, team1, team2, startDate, endDate, team1_players, team2_players]);
+        return () => clearTimeout(timer);
+    }, [enabled, team1, team2, startDate, endDate, team1AxisPlayers, team2AxisPlayers]);
 
     React.useEffect(() => {
         if (!enabled || !matchupData?.team1 || !matchupData?.team2) return;
@@ -535,6 +639,28 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
         };
     }, [enabled, matchupData, startDate, endDate]);
 
+    React.useEffect(() => {
+        if (!enabled || !matchupData?.team1 || !matchupData?.team2) return;
+        const hasIncomingCustom = Boolean(
+            (team1_players && team1_players.length > 0)
+            || (team2_players && team2_players.length > 0)
+        );
+        if (hasIncomingCustom) return;
+        if (team1AxisPlayers.length === 0 && Array.isArray(matchupData?.team1?.players)) {
+            setTeam1AxisPlayers(dedupeNames(matchupData.team1.players));
+        }
+        if (team2AxisPlayers.length === 0 && Array.isArray(matchupData?.team2?.players)) {
+            setTeam2AxisPlayers(dedupeNames(matchupData.team2.players));
+        }
+    }, [
+        enabled,
+        matchupData,
+        team1_players,
+        team2_players,
+        team1AxisPlayers.length,
+        team2AxisPlayers.length,
+    ]);
+
     if (!enabled) return null;
     if (loading) return <CircularProgress />;
     if (error) return <Alert severity="error">{error}</Alert>;
@@ -565,13 +691,79 @@ const Matchups = ({ team1, team2, startDate, endDate, team1_players, team2_playe
         );
     }
 
+    const team1Options = dedupeNames([
+        ...team1RosterOptions,
+        ...(matchupData?.team1?.players || []),
+        ...team1AxisPlayers,
+    ]);
+    const team2Options = dedupeNames([
+        ...team2RosterOptions,
+        ...(matchupData?.team2?.players || []),
+        ...team2AxisPlayers,
+    ]);
+
     return (
         <Box sx={{ mt: 3 }}>
+            <Card
+                sx={{
+                    p: 2,
+                    mb: 2,
+                    backgroundColor: isMobile ? 'transparent' : undefined,
+                    boxShadow: isMobile ? 0 : undefined,
+                }}
+            >
+                <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ mb: 1 }}>
+                    Matchup Matrix Axes
+                </Typography>
+                <Stack direction="column" spacing={1.5}>
+                    <Autocomplete
+                        multiple
+                        options={team1Options}
+                        value={team1AxisPlayers}
+                        onChange={(event, value) => setTeam1AxisPlayers(dedupeNames(value))}
+                        renderTags={(value, getTagProps) =>
+                            value.map((option, index) => (
+                                <Chip variant="outlined" label={option} {...getTagProps({ index })} key={`${option}-${index}`} />
+                            ))
+                        }
+                        renderInput={(params) => (
+                            <TextField
+                                {...params}
+                                size="small"
+                                label={`${matchupData.team1.name} batters/bowlers`}
+                                helperText="Edit axis players. Matrix refreshes automatically."
+                            />
+                        )}
+                    />
+                    <Autocomplete
+                        multiple
+                        options={team2Options}
+                        value={team2AxisPlayers}
+                        onChange={(event, value) => setTeam2AxisPlayers(dedupeNames(value))}
+                        renderTags={(value, getTagProps) =>
+                            value.map((option, index) => (
+                                <Chip variant="outlined" label={option} {...getTagProps({ index })} key={`${option}-${index}`} />
+                            ))
+                        }
+                        renderInput={(params) => (
+                            <TextField
+                                {...params}
+                                size="small"
+                                label={`${matchupData.team2.name} batters/bowlers`}
+                                helperText="Add/remove players to re-run pairwise matchups."
+                            />
+                        )}
+                    />
+                </Stack>
+            </Card>
+
             {/* Fantasy Analysis from server */}
             <FantasyAnalysisCard
                 fantasyData={matchupData?.fantasy_analysis}
                 isMobile={isMobile}
                 formFlagsByPlayer={formFlagsByPlayer}
+                postTossXpoints={postTossXpoints}
+                postTossDelta={postTossDelta}
             />
 
             {/* Team 1 vs Team 2 Matchups */}

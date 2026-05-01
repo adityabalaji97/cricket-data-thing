@@ -17,6 +17,8 @@ def get_team_matchups(
     team1_players: List[str] = Query(default=[]),
     team2_players: List[str] = Query(default=[]),
     use_current_roster: bool = Query(default=False),
+    innings_position: Optional[int] = Query(default=None, ge=1, le=2),
+    venue_filter: Optional[str] = Query(default=None),
     db: Session = Depends(get_session)
 ):
     result = get_team_matchups_service(
@@ -28,5 +30,7 @@ def get_team_matchups(
         team2_players=team2_players,
         db=db,
         use_current_roster=use_current_roster,
+        innings_position=innings_position,
+        venue_filter=venue_filter,
     )
     return result

@@ -216,6 +216,7 @@ def get_match_totals_from_deliveries(
     leagues: List[str],
     include_international: bool,
     top_teams: Optional[int],
+    day_or_night: Optional[str],
     db: Session
 ) -> Dict[str, Any]:
     """
@@ -226,7 +227,8 @@ def get_match_totals_from_deliveries(
         "venue": venue if venue and venue != "All Venues" else None,
         "start_date": start_date,
         "end_date": end_date,
-        "leagues": leagues
+        "leagues": leagues,
+        "day_or_night": day_or_night,
     }
 
     venue_filter = build_venue_filter_deliveries(venue, params)
@@ -246,6 +248,7 @@ def get_match_totals_from_deliveries(
                 {venue_filter}
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
+                AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
                 {competition_filter}
             GROUP BY m.id, m.won_batting_first, m.won_fielding_first, d.innings
         ),
@@ -256,6 +259,7 @@ def get_match_totals_from_deliveries(
                 {venue_filter}
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
+                AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
                 {competition_filter}
         )
         SELECT
@@ -301,6 +305,7 @@ def get_match_totals_from_delivery_details(
     leagues: List[str],
     include_international: bool,
     top_teams: Optional[int],
+    day_or_night: Optional[str],
     db: Session
 ) -> Dict[str, Any]:
     """
@@ -311,7 +316,8 @@ def get_match_totals_from_delivery_details(
         "venue": venue if venue and venue != "All Venues" else None,
         "start_date": start_date,
         "end_date": end_date,
-        "leagues": leagues
+        "leagues": leagues,
+        "day_or_night": day_or_night,
     }
 
     venue_filter = build_venue_filter_delivery_details(venue, params)
@@ -331,6 +337,7 @@ def get_match_totals_from_delivery_details(
                 {venue_filter}
                 AND (:start_date IS NULL OR dd.match_date::date >= :start_date)
                 AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+                AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
                 {competition_filter}
             GROUP BY dd.p_match, m.won_batting_first, m.won_fielding_first, dd.inns
         ),
@@ -342,6 +349,7 @@ def get_match_totals_from_delivery_details(
                 {venue_filter}
                 AND (:start_date IS NULL OR dd.match_date::date >= :start_date)
                 AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+                AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
                 {competition_filter}
         )
         SELECT
@@ -387,7 +395,8 @@ def get_venue_match_stats(
     leagues: List[str],
     include_international: bool,
     top_teams: Optional[int],
-    db: Session
+    db: Session,
+    day_or_night: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Get venue match statistics, automatically routing to correct table(s) based on date range.
@@ -402,7 +411,7 @@ def get_venue_match_stats(
     if routing['use_delivery_details']:
         dd_start, dd_end = routing['delivery_details_date_range']
         result = get_match_totals_from_delivery_details(
-            venue, dd_start, dd_end, leagues, include_international, top_teams, db
+            venue, dd_start, dd_end, leagues, include_international, top_teams, day_or_night, db
         )
         if result:
             return result
@@ -411,7 +420,7 @@ def get_venue_match_stats(
     if routing['use_deliveries']:
         d_start, d_end = routing['deliveries_date_range']
         result = get_match_totals_from_deliveries(
-            venue, d_start, d_end, leagues, include_international, top_teams, db
+            venue, d_start, d_end, leagues, include_international, top_teams, day_or_night, db
         )
         if result:
             return result
@@ -427,7 +436,8 @@ def get_venue_phase_stats(
     leagues: List[str],
     include_international: bool,
     top_teams: Optional[int],
-    db: Session
+    db: Session,
+    day_or_night: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Get phase-wise statistics for a venue.
@@ -474,7 +484,8 @@ def get_venue_phase_stats(
             "venue": venue if venue and venue != "All Venues" else None,
             "start_date": source_start_date,
             "end_date": source_end_date,
-            "leagues": leagues
+            "leagues": leagues,
+            "day_or_night": day_or_night,
         }
 
         if source == "delivery_details":
@@ -504,6 +515,7 @@ def get_venue_phase_stats(
                         {venue_filter}
                         AND (:start_date IS NULL OR dd.match_date::date >= :start_date)
                         AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
+                        AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
                         {competition_filter}
                     GROUP BY dd.inns, dd.p_match, m.won_batting_first, m.won_fielding_first, phase
                 ),
@@ -590,6 +602,7 @@ def get_venue_phase_stats(
                 {venue_filter}
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
+                AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
                 {competition_filter}
             GROUP BY d.innings, d.match_id, m.won_batting_first, m.won_fielding_first, phase
         ),

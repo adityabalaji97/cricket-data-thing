@@ -123,6 +123,9 @@ class Match(Base):
     team1_elo = Column(Integer, nullable=True)  # Team1's ELO rating before this match
     team2_elo = Column(Integer, nullable=True)  # Team2's ELO rating before this match
 
+    # Day vs night classification (IPL-only currently). 'day', 'night', or NULL.
+    day_or_night = Column(String, nullable=True)
+
     def to_dict(self) -> dict:
         """Convert match to dictionary with formatted scores"""
         return {

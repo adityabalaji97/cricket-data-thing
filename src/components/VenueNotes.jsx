@@ -972,11 +972,14 @@ const VenueNotes = ({
     leagues = [],
     includeInternational = false,
     topTeams = null,
+    dayNightFilter = 'all',
+    onDayNightFilterChange = null,
   }) => {
 
     const [activeSectionId, setActiveSectionId] = useState('summary');
     const [activatedSections, setActivatedSections] = useState(() => new Set(['summary']));
     const [similarZoneFilters, setSimilarZoneFilters] = useState(DEFAULT_SIMILAR_ZONE_FILTERS);
+    const [postTossSelection, setPostTossSelection] = useState(null);
     const sectionRefs = useRef({});
     const foresightEnabled = activeSectionId === 'foresight' || activatedSections.has('foresight');
     const previewEnabled = activeSectionId === 'preview' || activatedSections.has('preview');
@@ -985,6 +988,10 @@ const VenueNotes = ({
         || activeSectionId === 'venueTwins'
         || activatedSections.has('similar')
         || activatedSections.has('venueTwins');
+
+    useEffect(() => {
+        setPostTossSelection(null);
+    }, [selectedTeam1?.full_name, selectedTeam2?.full_name, venue, startDate, endDate, dayNightFilter]);
 
     const {
         data: similarData,
@@ -1034,6 +1041,9 @@ const VenueNotes = ({
                         topTeams={20}
                         enabled={previewEnabled}
                         isMobile={isMobile}
+                        onPostTossApply={setPostTossSelection}
+                        dayNightFilter={dayNightFilter}
+                        onDayNightFilterChange={onDayNightFilterChange}
                     />
                 ),
             });
@@ -1067,6 +1077,10 @@ const VenueNotes = ({
                             team2={selectedTeam2.full_name}
                             startDate={startDate}
                             endDate={endDate}
+                            team1_players={postTossSelection?.team1Xi || []}
+                            team2_players={postTossSelection?.team2Xi || []}
+                            postTossXpoints={postTossSelection?.xpointsPostToss || {}}
+                            postTossDelta={postTossSelection?.xpointsDelta || {}}
                             enabled={teamsEnabled}
                             isMobile={isMobile}
                         />
@@ -1221,6 +1235,9 @@ const VenueNotes = ({
         similarLoading,
         similarError,
         similarZoneFilters,
+        postTossSelection,
+        dayNightFilter,
+        onDayNightFilterChange,
     ]);
 
     const formattedDateRange = useMemo(() => formatVenueDateRange(startDate, endDate), [startDate, endDate]);

@@ -1,14 +1,18 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import hashlib
 import json
 import logging
 import os
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from database import get_session
+from services.cricinfo_scraper import scrape_match_setup
 from services.match_preview import (
     build_deterministic_preview_sections,
     build_narrative_data_context,
@@ -19,7 +23,12 @@ from services.match_preview import (
     validate_llm_narrative,
     validate_llm_rewrite,
 )
+from services.matchups import _canonicalize_players, get_team_matchups_service
 from services.rolling_form import get_form_flags_for_players
+try:
+    from venue_standardization import VENUE_STANDARDIZATION
+except Exception:  # pragma: no cover - defensive fallback
+    VENUE_STANDARDIZATION = {}
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +47,10 @@ PREVIEW_ENGINE_VERSION = "v3-narrative"
 DEFAULT_PREVIEW_MODE = "hybrid"
 
 preview_cache: Dict[str, Dict] = {}
+post_toss_cache: Dict[str, Dict[str, Any]] = {}
+POST_TOSS_CACHE_TTL_SECONDS = int(os.getenv("POST_TOSS_CACHE_TTL_SECONDS", "21600"))
+POST_TOSS_BATTING_MIN_BALLS = int(os.getenv("POST_TOSS_BATTING_MIN_BALLS", "40"))
+POST_TOSS_BOWLING_MIN_BALLS = int(os.getenv("POST_TOSS_BOWLING_MIN_BALLS", "30"))
 
 
 def _inject_form_flags(context: Dict, db: Session) -> None:
@@ -224,6 +237,7 @@ def _cache_key(
     include_international: bool,
     top_teams: int,
     preview_mode: str,
+    day_or_night: Optional[str],
 ) -> str:
     payload = json.dumps(
         {
@@ -234,6 +248,7 @@ def _cache_key(
             "end_date": str(end_date) if end_date else None,
             "include_international": include_international,
             "top_teams": top_teams,
+            "day_or_night": day_or_night,
             "preview_version": PREVIEW_ENGINE_VERSION,
             "openai_model": OPENAI_MODEL,
             "preview_mode": preview_mode,
@@ -315,12 +330,23 @@ def get_match_preview(
     end_date: Optional[date] = Query(None),
     include_international: bool = Query(True),
     top_teams: int = Query(20, ge=1, le=50),
+    day_or_night: Optional[str] = Query(None, pattern="^(day|night)$"),
     debug: bool = Query(False),
     db: Session = Depends(get_session),
 ):
     try:
         preview_mode = DEFAULT_PREVIEW_MODE
-        key = _cache_key(venue, team1_id, team2_id, start_date, end_date, include_international, top_teams, preview_mode)
+        key = _cache_key(
+            venue,
+            team1_id,
+            team2_id,
+            start_date,
+            end_date,
+            include_international,
+            top_teams,
+            preview_mode,
+            day_or_night,
+        )
         if key in preview_cache:
             cached = preview_cache[key]
             return {**cached, "cached": True}
@@ -334,6 +360,7 @@ def get_match_preview(
             end_date=end_date,
             include_international=include_international,
             top_teams=top_teams,
+            day_or_night=day_or_night,
         )
         try:
             _inject_form_flags(context, db)
@@ -385,3 +412,597 @@ def get_match_preview(
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate match preview: {str(e)}")
+
+
+class PostTossPayload(BaseModel):
+    match_id: Optional[str] = None
+    venue: str
+    team1_id: str
+    team2_id: str
+    batting_first_team: str
+    team1_xi: List[str]
+    team2_xi: List[str]
+    impact_subs: List[str] = []
+    source: str = Field(default="manual", pattern="^(manual|scraped)$")
+    general_window_years: int = Field(default=2, ge=1, le=6)
+    venue_window_years: int = Field(default=3, ge=1, le=8)
+
+
+class ScrapeCricinfoPayload(BaseModel):
+    url: str
+
+
+def _dedupe_names(names: List[str]) -> List[str]:
+    seen = set()
+    deduped: List[str] = []
+    for raw in names or []:
+        name = str(raw or "").strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(name)
+    return deduped
+
+
+def _canonicalize_lineup(names: List[str], db: Session) -> List[str]:
+    if not names:
+        return []
+    try:
+        canonical = _canonicalize_players(names, db)
+        return _dedupe_names(canonical if canonical else names)
+    except Exception:
+        return _dedupe_names(names)
+
+
+def _canonicalize_venue_name(venue: Optional[str]) -> Optional[str]:
+    if not venue:
+        return venue
+    if str(venue).strip() == "All Venues":
+        return None
+    return VENUE_STANDARDIZATION.get(venue, venue)
+
+
+def _window_date_range(window_years: int) -> Tuple[date, date]:
+    end_date = date.today()
+    start_date = end_date - timedelta(days=365 * window_years)
+    return start_date, end_date
+
+
+def _normalize_list_for_cache(values: List[str]) -> List[str]:
+    return sorted({str(v or "").strip().lower() for v in values or [] if str(v or "").strip()})
+
+
+def _post_toss_cache_key(
+    *,
+    venue: Optional[str],
+    team1_id: str,
+    team2_id: str,
+    batting_first_team: str,
+    team1_xi: List[str],
+    team2_xi: List[str],
+    impact_subs: List[str],
+    general_window_years: int,
+    venue_window_years: int,
+) -> str:
+    normalized = {
+        "venue": str(venue or "").strip().lower(),
+        "team1_id": str(team1_id or "").strip().lower(),
+        "team2_id": str(team2_id or "").strip().lower(),
+        "batting_first_team": str(batting_first_team or "").strip().lower(),
+        "team1_xi": _normalize_list_for_cache(team1_xi),
+        "team2_xi": _normalize_list_for_cache(team2_xi),
+        "impact_subs": _normalize_list_for_cache(impact_subs),
+        "general_window_years": general_window_years,
+        "venue_window_years": venue_window_years,
+    }
+    serialized = json.dumps(normalized, sort_keys=True)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _get_cached_post_toss(key: str) -> Optional[Dict[str, Any]]:
+    entry = post_toss_cache.get(key)
+    if not entry:
+        return None
+    expires_at = entry.get("expires_at")
+    if not isinstance(expires_at, datetime) or datetime.utcnow() >= expires_at:
+        post_toss_cache.pop(key, None)
+        return None
+    return entry.get("data")
+
+
+def _set_cached_post_toss(key: str, data: Dict[str, Any]) -> None:
+    post_toss_cache[key] = {
+        "expires_at": datetime.utcnow() + timedelta(seconds=POST_TOSS_CACHE_TTL_SECONDS),
+        "data": data,
+    }
+
+
+def _log_post_toss_prediction(
+    *,
+    db: Session,
+    match_id: Optional[str],
+    payload_data: Dict[str, Any],
+    result_data: Dict[str, Any],
+    source: str,
+) -> None:
+    try:
+        db.execute(
+            text(
+                """
+                INSERT INTO post_toss_predictions (match_id, payload, result, source)
+                VALUES (
+                    :match_id,
+                    CAST(:payload_json AS JSONB),
+                    CAST(:result_json AS JSONB),
+                    :source
+                )
+                """
+            ),
+            {
+                "match_id": match_id,
+                "payload_json": json.dumps(payload_data, default=str),
+                "result_json": json.dumps(result_data, default=str),
+                "source": source,
+            },
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Failed to write post_toss_predictions log row: %s", exc)
+
+
+def _safe_float(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except Exception:
+        return 0.0
+
+
+def _sum_batting_overall(team_payload: Dict[str, Any]) -> Dict[str, Any]:
+    batting = (team_payload or {}).get("batting_matchups") or {}
+    balls = runs = wickets = boundaries = dots = 0
+    players = 0
+    for _, vs_map in batting.items():
+        overall = (vs_map or {}).get("Overall")
+        if not overall:
+            continue
+        players += 1
+        balls += int(overall.get("balls", 0) or 0)
+        runs += int(overall.get("runs", 0) or 0)
+        wickets += int(overall.get("wickets", 0) or 0)
+        boundaries += int(overall.get("boundaries", 0) or 0)
+        dots += int(overall.get("dots", 0) or 0)
+    strike_rate = (runs * 100.0 / balls) if balls else 0.0
+    boundary_pct = (boundaries * 100.0 / balls) if balls else 0.0
+    dot_pct = (dots * 100.0 / balls) if balls else 0.0
+    return {
+        "sample_balls": balls,
+        "sample_players": players,
+        "runs": runs,
+        "wickets": wickets,
+        "strike_rate": round(strike_rate, 2),
+        "boundary_percentage": round(boundary_pct, 2),
+        "dot_percentage": round(dot_pct, 2),
+    }
+
+
+def _sum_bowling_overall(team_payload: Dict[str, Any]) -> Dict[str, Any]:
+    bowling = (team_payload or {}).get("bowling_consolidated") or {}
+    balls = runs = wickets = boundaries = dots = 0
+    players = 0
+    for _, stats in bowling.items():
+        if not stats:
+            continue
+        players += 1
+        balls += int(stats.get("balls", 0) or 0)
+        runs += int(stats.get("runs", 0) or 0)
+        wickets += int(stats.get("wickets", 0) or 0)
+        boundaries += int(stats.get("boundaries", 0) or 0)
+        dots += int(stats.get("dots", 0) or 0)
+    overs = balls / 6.0 if balls else 0.0
+    economy = (runs / overs) if overs else 0.0
+    dot_pct = (dots * 100.0 / balls) if balls else 0.0
+    boundary_pct = (boundaries * 100.0 / balls) if balls else 0.0
+    wkts_per_match = (wickets * 120.0 / balls) if balls else 0.0
+    return {
+        "sample_balls": balls,
+        "sample_players": players,
+        "runs_conceded": runs,
+        "wickets": wickets,
+        "economy": round(economy, 2),
+        "dot_percentage": round(dot_pct, 2),
+        "boundary_percentage": round(boundary_pct, 2),
+        "wickets_per_20_overs": round(wkts_per_match, 2),
+    }
+
+
+def _player_points_map(matchup_payload: Dict[str, Any]) -> Dict[str, float]:
+    fantasy = (matchup_payload or {}).get("fantasy_analysis") or {}
+    players = (fantasy.get("all_fantasy_players") or fantasy.get("top_fantasy_picks") or [])
+    output: Dict[str, float] = {}
+    for row in players:
+        name = str((row or {}).get("player_name") or "").strip()
+        if not name:
+            continue
+        output[name] = _safe_float((row or {}).get("expected_points"))
+    return output
+
+
+def _merge_points(*maps: Dict[str, float]) -> Dict[str, float]:
+    merged: Dict[str, float] = {}
+    for mapping in maps:
+        for player, points in (mapping or {}).items():
+            merged[player] = round(_safe_float(merged.get(player)) + _safe_float(points), 3)
+    return merged
+
+
+def _build_query_link(
+    *,
+    venue: Optional[str],
+    start_date: date,
+    end_date: date,
+    innings: int,
+    batters: List[str],
+    bowlers: List[str],
+) -> str:
+    params: List[Tuple[str, str]] = [
+        ("query_mode", "delivery"),
+        ("start_date", start_date.isoformat()),
+        ("end_date", end_date.isoformat()),
+        ("innings", str(innings)),
+        ("min_balls", "6"),
+        ("group_by", "batter"),
+        ("group_by", "bowler"),
+    ]
+    if venue:
+        params.append(("venue", venue))
+    for batter in batters:
+        params.append(("batters", batter))
+    for bowler in bowlers:
+        params.append(("bowlers", bowler))
+    return f"/query?{urlencode(params, doseq=True)}"
+
+
+def _window_matchup_bundle(
+    *,
+    db: Session,
+    batting_first_team: str,
+    batting_second_team: str,
+    first_team_xi: List[str],
+    second_team_xi: List[str],
+    start_date: date,
+    end_date: date,
+    venue_filter: Optional[str],
+    window_label: str,
+) -> Dict[str, Any]:
+    first_specific = get_team_matchups_service(
+        team1=batting_first_team,
+        team2=batting_second_team,
+        start_date=start_date,
+        end_date=end_date,
+        team1_players=first_team_xi,
+        team2_players=second_team_xi,
+        db=db,
+        use_current_roster=False,
+        innings_position=1,
+        venue_filter=venue_filter,
+    )
+    second_specific = get_team_matchups_service(
+        team1=batting_second_team,
+        team2=batting_first_team,
+        start_date=start_date,
+        end_date=end_date,
+        team1_players=second_team_xi,
+        team2_players=first_team_xi,
+        db=db,
+        use_current_roster=False,
+        innings_position=2,
+        venue_filter=venue_filter,
+    )
+    first_overall = get_team_matchups_service(
+        team1=batting_first_team,
+        team2=batting_second_team,
+        start_date=start_date,
+        end_date=end_date,
+        team1_players=first_team_xi,
+        team2_players=second_team_xi,
+        db=db,
+        use_current_roster=False,
+        innings_position=None,
+        venue_filter=venue_filter,
+    )
+    second_overall = get_team_matchups_service(
+        team1=batting_second_team,
+        team2=batting_first_team,
+        start_date=start_date,
+        end_date=end_date,
+        team1_players=second_team_xi,
+        team2_players=first_team_xi,
+        db=db,
+        use_current_roster=False,
+        innings_position=None,
+        venue_filter=venue_filter,
+    )
+
+    first_bat_metrics = _sum_batting_overall((first_specific or {}).get("team1") or {})
+    first_bowl_metrics = _sum_bowling_overall((first_specific or {}).get("team2") or {})
+    second_bat_metrics = _sum_batting_overall((second_specific or {}).get("team1") or {})
+    second_bowl_metrics = _sum_bowling_overall((second_specific or {}).get("team2") or {})
+
+    first_bat_overall = _sum_batting_overall((first_overall or {}).get("team1") or {})
+    first_bowl_overall = _sum_bowling_overall((first_overall or {}).get("team2") or {})
+    second_bat_overall = _sum_batting_overall((second_overall or {}).get("team1") or {})
+    second_bowl_overall = _sum_bowling_overall((second_overall or {}).get("team2") or {})
+
+    blocks = {
+        "first_innings_batting": {
+            "window": window_label,
+            "kind": "batting",
+            "innings": 1,
+            "team": batting_first_team,
+            "opponent": batting_second_team,
+            "metrics": first_bat_metrics,
+            "overall_fallback": first_bat_overall if first_bat_metrics["sample_balls"] < POST_TOSS_BATTING_MIN_BALLS else None,
+            "sample_warning": first_bat_metrics["sample_balls"] < POST_TOSS_BATTING_MIN_BALLS,
+        },
+        "first_innings_bowling": {
+            "window": window_label,
+            "kind": "bowling",
+            "innings": 1,
+            "team": batting_second_team,
+            "opponent": batting_first_team,
+            "metrics": first_bowl_metrics,
+            "overall_fallback": first_bowl_overall if first_bowl_metrics["sample_balls"] < POST_TOSS_BOWLING_MIN_BALLS else None,
+            "sample_warning": first_bowl_metrics["sample_balls"] < POST_TOSS_BOWLING_MIN_BALLS,
+        },
+        "second_innings_batting": {
+            "window": window_label,
+            "kind": "batting",
+            "innings": 2,
+            "team": batting_second_team,
+            "opponent": batting_first_team,
+            "metrics": second_bat_metrics,
+            "overall_fallback": second_bat_overall if second_bat_metrics["sample_balls"] < POST_TOSS_BATTING_MIN_BALLS else None,
+            "sample_warning": second_bat_metrics["sample_balls"] < POST_TOSS_BATTING_MIN_BALLS,
+        },
+        "second_innings_bowling": {
+            "window": window_label,
+            "kind": "bowling",
+            "innings": 2,
+            "team": batting_first_team,
+            "opponent": batting_second_team,
+            "metrics": second_bowl_metrics,
+            "overall_fallback": second_bowl_overall if second_bowl_metrics["sample_balls"] < POST_TOSS_BOWLING_MIN_BALLS else None,
+            "sample_warning": second_bowl_metrics["sample_balls"] < POST_TOSS_BOWLING_MIN_BALLS,
+        },
+    }
+
+    drill_down_links = {
+        "first_innings_batting": _build_query_link(
+            venue=venue_filter,
+            start_date=start_date,
+            end_date=end_date,
+            innings=1,
+            batters=first_team_xi,
+            bowlers=second_team_xi,
+        ),
+        "first_innings_bowling": _build_query_link(
+            venue=venue_filter,
+            start_date=start_date,
+            end_date=end_date,
+            innings=1,
+            batters=first_team_xi,
+            bowlers=second_team_xi,
+        ),
+        "second_innings_batting": _build_query_link(
+            venue=venue_filter,
+            start_date=start_date,
+            end_date=end_date,
+            innings=2,
+            batters=second_team_xi,
+            bowlers=first_team_xi,
+        ),
+        "second_innings_bowling": _build_query_link(
+            venue=venue_filter,
+            start_date=start_date,
+            end_date=end_date,
+            innings=2,
+            batters=second_team_xi,
+            bowlers=first_team_xi,
+        ),
+    }
+
+    return {
+        "blocks": blocks,
+        "points_map": _merge_points(_player_points_map(first_specific), _player_points_map(second_specific)),
+        "base_points_map": _merge_points(_player_points_map(first_overall), _player_points_map(second_overall)),
+        "drill_down_links": drill_down_links,
+        "raw": {
+            "first_innings_specific": first_specific,
+            "second_innings_specific": second_specific,
+        },
+    }
+
+
+@router.post("/post-toss")
+def post_toss_preview(
+    payload: PostTossPayload,
+    db: Session = Depends(get_session),
+):
+    try:
+        if payload.batting_first_team not in {payload.team1_id, payload.team2_id}:
+            raise HTTPException(
+                status_code=400,
+                detail="batting_first_team must match either team1_id or team2_id",
+            )
+
+        normalized_venue = _canonicalize_venue_name(payload.venue)
+        team1_xi = _canonicalize_lineup(payload.team1_xi, db)
+        team2_xi = _canonicalize_lineup(payload.team2_xi, db)
+        impact_subs = _canonicalize_lineup(payload.impact_subs, db)
+
+        if not team1_xi or not team2_xi:
+            raise HTTPException(
+                status_code=400,
+                detail="Both team1_xi and team2_xi must contain at least one player",
+            )
+
+        cache_key = _post_toss_cache_key(
+            venue=normalized_venue,
+            team1_id=payload.team1_id,
+            team2_id=payload.team2_id,
+            batting_first_team=payload.batting_first_team,
+            team1_xi=team1_xi,
+            team2_xi=team2_xi,
+            impact_subs=impact_subs,
+            general_window_years=payload.general_window_years,
+            venue_window_years=payload.venue_window_years,
+        )
+        cached = _get_cached_post_toss(cache_key)
+        if cached:
+            return {
+                **cached,
+                "cached": True,
+                "source": payload.source,
+                "match_id": payload.match_id,
+            }
+
+        batting_first_team = payload.batting_first_team
+        batting_second_team = payload.team2_id if batting_first_team == payload.team1_id else payload.team1_id
+
+        first_team_xi = team1_xi if batting_first_team == payload.team1_id else team2_xi
+        second_team_xi = team2_xi if batting_second_team == payload.team2_id else team1_xi
+
+        general_start, general_end = _window_date_range(payload.general_window_years)
+        venue_start, venue_end = _window_date_range(payload.venue_window_years)
+
+        general_bundle = _window_matchup_bundle(
+            db=db,
+            batting_first_team=batting_first_team,
+            batting_second_team=batting_second_team,
+            first_team_xi=first_team_xi,
+            second_team_xi=second_team_xi,
+            start_date=general_start,
+            end_date=general_end,
+            venue_filter=None,
+            window_label="general",
+        )
+        venue_bundle = _window_matchup_bundle(
+            db=db,
+            batting_first_team=batting_first_team,
+            batting_second_team=batting_second_team,
+            first_team_xi=first_team_xi,
+            second_team_xi=second_team_xi,
+            start_date=venue_start,
+            end_date=venue_end,
+            venue_filter=normalized_venue,
+            window_label="venue",
+        )
+
+        xpoints_post_toss = general_bundle["points_map"]
+        xpoints_base = general_bundle["base_points_map"]
+        xpoints_delta = {
+            player: round(points - _safe_float(xpoints_base.get(player)), 3)
+            for player, points in xpoints_post_toss.items()
+        }
+
+        result = {
+            "success": True,
+            "cached": False,
+            "source": payload.source,
+            "venue": normalized_venue,
+            "match_id": payload.match_id,
+            "team1_id": payload.team1_id,
+            "team2_id": payload.team2_id,
+            "batting_first_team": batting_first_team,
+            "batting_second_team": batting_second_team,
+            "team1_xi": team1_xi,
+            "team2_xi": team2_xi,
+            "impact_subs": impact_subs,
+            "windows": {
+                "general": {
+                    "start_date": general_start.isoformat(),
+                    "end_date": general_end.isoformat(),
+                },
+                "venue": {
+                    "start_date": venue_start.isoformat(),
+                    "end_date": venue_end.isoformat(),
+                },
+            },
+            "blocks": general_bundle["blocks"],
+            "venue_blocks": venue_bundle["blocks"],
+            "xpoints_post_toss": xpoints_post_toss,
+            "xpoints_base": xpoints_base,
+            "xpoints_delta": xpoints_delta,
+            "drill_down_links": {
+                "general": general_bundle["drill_down_links"],
+                "venue": venue_bundle["drill_down_links"],
+            },
+            "raw": {
+                "general": general_bundle["raw"],
+                "venue": venue_bundle["raw"],
+            },
+            "computed_at": datetime.utcnow().isoformat() + "Z",
+        }
+
+        _set_cached_post_toss(cache_key, result)
+        _log_post_toss_prediction(
+            db=db,
+            match_id=payload.match_id,
+            payload_data={
+                "match_id": payload.match_id,
+                "venue": normalized_venue,
+                "team1_id": payload.team1_id,
+                "team2_id": payload.team2_id,
+                "batting_first_team": batting_first_team,
+                "team1_xi": team1_xi,
+                "team2_xi": team2_xi,
+                "impact_subs": impact_subs,
+                "general_window_years": payload.general_window_years,
+                "venue_window_years": payload.venue_window_years,
+            },
+            result_data={
+                "blocks": result.get("blocks"),
+                "venue_blocks": result.get("venue_blocks"),
+                "xpoints_post_toss": result.get("xpoints_post_toss"),
+                "xpoints_base": result.get("xpoints_base"),
+                "xpoints_delta": result.get("xpoints_delta"),
+                "windows": result.get("windows"),
+                "computed_at": result.get("computed_at"),
+            },
+            source=payload.source,
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to build post-toss preview: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to build post-toss preview: {exc}")
+
+
+@router.post("/scrape-cricinfo")
+def scrape_cricinfo_endpoint(
+    payload: ScrapeCricinfoPayload,
+    db: Session = Depends(get_session),
+):
+    try:
+        scraped = scrape_match_setup(payload.url, db=db, timeout_seconds=5.0)
+        return {"success": scraped.get("source") != "failed", **scraped}
+    except Exception as exc:
+        logger.error("Cricinfo scrape failed for %s: %s", payload.url, exc, exc_info=True)
+        return {
+            "success": False,
+            "source": "failed",
+            "error": str(exc),
+            "team1_xi": [],
+            "team2_xi": [],
+            "impact_subs": [],
+            "toss_winner": None,
+            "toss_decision": None,
+            "batting_first_team": None,
+            "venue": None,
+            "match_date": None,
+        }
