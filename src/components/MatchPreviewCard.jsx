@@ -11,7 +11,6 @@ import {
 import axios from 'axios';
 import config from '../config';
 import CondensedName from './common/CondensedName';
-import PostTossSetup from './PostTossSetup';
 
 const MatchPreviewCard = ({
   venue,
@@ -23,7 +22,6 @@ const MatchPreviewCard = ({
   topTeams = 20,
   enabled = true,
   isMobile = false,
-  onPostTossApply = null,
   dayNightFilter = 'all',
   onDayNightFilterChange = null,
 }) => {
@@ -141,18 +139,6 @@ const MatchPreviewCard = ({
 
   if (!data?.preview) return null;
 
-  const handlePostTossApply = (nextData) => {
-    onPostTossApply?.({
-      team1Xi: nextData?.team1_xi || [],
-      team2Xi: nextData?.team2_xi || [],
-      xpointsPostToss: nextData?.xpoints_post_toss || {},
-      xpointsBase: nextData?.xpoints_base || {},
-      xpointsDelta: nextData?.xpoints_delta || {},
-      playerDrillLinks: nextData?.player_drill_links || {},
-      raw: nextData || null,
-    });
-  };
-
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.08)' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
@@ -208,15 +194,6 @@ const MatchPreviewCard = ({
           </Box>
         ))}
       </Box>
-
-      <PostTossSetup
-        venue={venue}
-        team1Identifier={team1Identifier}
-        team2Identifier={team2Identifier}
-        dayNightFilter={dayNightFilter}
-        isMobile={isMobile}
-        onApplyResult={handlePostTossApply}
-      />
     </Box>
   );
 };

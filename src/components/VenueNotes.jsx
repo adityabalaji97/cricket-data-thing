@@ -38,6 +38,7 @@ import Matchups from './Matchups';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
 import VenueSimilarity, { useVenueSimilarityData } from './VenueSimilarity';
 import MatchPreviewCard from './MatchPreviewCard';
+import PostTossSetup from './PostTossSetup';
 import VenueDismissalAnalytics from './VenueDismissalAnalytics';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 import VenueSectionTabs from './VenueSectionTabs';
@@ -993,6 +994,18 @@ const VenueNotes = ({
         setPostTossSelection(null);
     }, [selectedTeam1?.full_name, selectedTeam2?.full_name, venue, startDate, endDate, dayNightFilter]);
 
+    const handlePostTossApply = useCallback((nextData) => {
+        setPostTossSelection({
+            team1Xi: nextData?.team1_xi || [],
+            team2Xi: nextData?.team2_xi || [],
+            xpointsPostToss: nextData?.xpoints_post_toss || {},
+            xpointsBase: nextData?.xpoints_base || {},
+            xpointsDelta: nextData?.xpoints_delta || {},
+            playerDrillLinks: nextData?.player_drill_links || {},
+            raw: nextData || null,
+        });
+    }, []);
+
     const {
         data: similarData,
         tacticalEdgesData: similarTacticalEdgesData,
@@ -1041,7 +1054,6 @@ const VenueNotes = ({
                         topTeams={20}
                         enabled={previewEnabled}
                         isMobile={isMobile}
-                        onPostTossApply={setPostTossSelection}
                         dayNightFilter={dayNightFilter}
                         onDayNightFilterChange={onDayNightFilterChange}
                     />
@@ -1072,6 +1084,14 @@ const VenueNotes = ({
                                 <CircularProgress size={24} />
                             </Box>
                         )}
+                        <PostTossSetup
+                            venue={venue}
+                            team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
+                            team2Identifier={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
+                            dayNightFilter={dayNightFilter}
+                            isMobile={isMobile}
+                            onApplyResult={handlePostTossApply}
+                        />
                         <Matchups
                             team1={selectedTeam1.full_name}
                             team2={selectedTeam2.full_name}
@@ -1240,6 +1260,7 @@ const VenueNotes = ({
         similarError,
         similarZoneFilters,
         postTossSelection,
+        handlePostTossApply,
         dayNightFilter,
         onDayNightFilterChange,
     ]);

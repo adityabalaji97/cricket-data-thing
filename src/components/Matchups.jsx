@@ -755,10 +755,14 @@ const Matchups = ({
                     throw new Error('Missing post-toss teams or XI to build innings matchups');
                 }
 
+                const windowScope = postTossMode === 'venue' ? 'venue' : 'general';
+                const windowStartDate = postTossRaw?.windows?.[windowScope]?.start_date || startDate;
+                const windowEndDate = postTossRaw?.windows?.[windowScope]?.end_date || endDate;
+
                 const commonParams = (inningsValue, battingXi, bowlingXi) => {
                     const params = new URLSearchParams();
-                    if (startDate) params.append('start_date', startDate);
-                    if (endDate) params.append('end_date', endDate);
+                    if (windowStartDate) params.append('start_date', windowStartDate);
+                    if (windowEndDate) params.append('end_date', windowEndDate);
                     battingXi.forEach((player) => params.append('team1_players', player));
                     bowlingXi.forEach((player) => params.append('team2_players', player));
                     params.append('use_current_roster', 'false');
