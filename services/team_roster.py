@@ -22,6 +22,7 @@ def _discover_roster_from_matches(
     team_name: str,
     db: Session,
     lookback_days: int = 30,
+    day_or_night: Optional[str] = None,
 ) -> Optional[list]:
     """
     Discover team roster from recent match data (batting_stats + bowling_stats).
@@ -36,8 +37,12 @@ def _discover_roster_from_matches(
         WHERE (team1 = ANY(:teams) OR team2 = ANY(:teams))
           AND date >= :cutoff
           AND competition = 'Indian Premier League'
+          AND (:day_or_night IS NULL OR day_or_night = :day_or_night)
     """)
-    count = db.execute(check_query, {"teams": team_variations, "cutoff": cutoff}).scalar()
+    count = db.execute(
+        check_query,
+        {"teams": team_variations, "cutoff": cutoff, "day_or_night": day_or_night},
+    ).scalar()
 
     if not count:
         return None
@@ -49,6 +54,7 @@ def _discover_roster_from_matches(
             WHERE (team1 = ANY(:teams) OR team2 = ANY(:teams))
               AND date >= :cutoff
               AND competition = 'Indian Premier League'
+              AND (:day_or_night IS NULL OR day_or_night = :day_or_night)
         ),
         batters AS (
             SELECT DISTINCT bs.player_name as name, 'batter' as source
@@ -81,7 +87,10 @@ def _discover_roster_from_matches(
         ORDER BY role, name
     """)
 
-    rows = db.execute(players_query, {"teams": team_variations, "cutoff": cutoff}).fetchall()
+    rows = db.execute(
+        players_query,
+        {"teams": team_variations, "cutoff": cutoff, "day_or_night": day_or_night},
+    ).fetchall()
 
     if not rows:
         return None
@@ -112,6 +121,7 @@ def get_team_roster_service(
     team_name: str,
     db: Session,
     lookback_days: int = 30,
+    day_or_night: Optional[str] = None,
 ) -> dict:
     """
     Get current team roster with fallback logic.
@@ -125,7 +135,12 @@ def get_team_roster_service(
         }
     """
     # Try match data first
-    players = _discover_roster_from_matches(team_name, db, lookback_days)
+    players = _discover_roster_from_matches(
+        team_name=team_name,
+        db=db,
+        lookback_days=lookback_days,
+        day_or_night=day_or_night,
+    )
     static_players = _get_static_roster(team_name)
 
     if players:

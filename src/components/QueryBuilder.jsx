@@ -37,6 +37,7 @@ const getDefaultFilters = () => ({
   is_chase: null,
   chase_outcome: [],
   toss_decision: [],
+  day_or_night: null,
 
   // Query mode (default is fully backward-compatible delivery mode)
   query_mode: 'delivery',

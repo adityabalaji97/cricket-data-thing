@@ -10,8 +10,11 @@ import {
     Alert,
     Autocomplete,
     Chip,
+    IconButton,
     Stack,
     TextField,
+    ToggleButton,
+    ToggleButtonGroup,
     Typography, 
     Table, 
     TableBody, 
@@ -27,6 +30,7 @@ import {
     Activity,
     Trophy,
 } from 'lucide-react';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {
     getFormFlagMeta,
     normalizeAnalyticsName,
@@ -64,6 +68,37 @@ const toListKey = (names = []) => (
         .sort()
         .join('|')
 );
+
+const isDayNightValue = (value) => value === 'day' || value === 'night';
+
+const resolvePostTossPlayerLinks = (
+    postTossRaw = null,
+    postTossPlayerDrillLinks = {},
+    mode = 'general',
+) => {
+    const scope = mode === 'venue' ? 'venue' : 'general';
+    const linksFromResponse = postTossPlayerDrillLinks?.[scope];
+    if (linksFromResponse && Object.keys(linksFromResponse).length > 0) {
+        return linksFromResponse;
+    }
+    const axisMap = postTossRaw?.players_by_axis || {};
+    const links = {};
+    const scores = {};
+    Object.values(axisMap).forEach((axis) => {
+        const players = axis?.[scope]?.players || [];
+        players.forEach((row) => {
+            const name = String(row?.player || '').trim();
+            const link = String(row?.drill_link || '').trim();
+            const score = Number(row?.xpoints || 0);
+            if (!name || !link) return;
+            if (!(name in links) || score >= (scores[name] ?? -Infinity)) {
+                links[name] = link;
+                scores[name] = score;
+            }
+        });
+    });
+    return links;
+};
 
 
 const MetricCell = ({ data, isMobile, bowler, isBowlingConsolidated = false }) => {
@@ -178,7 +213,14 @@ const MetricCell = ({ data, isMobile, bowler, isBowlingConsolidated = false }) =
 
 
 
-const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer, postTossXpoints = {}, postTossDelta = {} }) => {
+const FantasyAnalysisCard = ({
+    fantasyData,
+    isMobile,
+    formFlagsByPlayer,
+    postTossXpoints = {},
+    postTossDelta = {},
+    postTossPlayerLinks = {},
+}) => {
     if (!fantasyData || !fantasyData.top_fantasy_picks) return null;
 
     const getConfidenceColor = (confidence) => {
@@ -188,6 +230,18 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer, postTos
     };
 
     const hasPostToss = Object.keys(postTossXpoints || {}).length > 0;
+    const sortedPicks = [...(fantasyData?.top_fantasy_picks || [])];
+    if (hasPostToss) {
+        sortedPicks.sort((a, b) => {
+            const aPost = Number(postTossXpoints?.[a.player_name]);
+            const bPost = Number(postTossXpoints?.[b.player_name]);
+            const aHas = Number.isFinite(aPost);
+            const bHas = Number.isFinite(bPost);
+            if (aHas && bHas && bPost !== aPost) return bPost - aPost;
+            if (aHas !== bHas) return aHas ? -1 : 1;
+            return Number(b.expected_points || 0) - Number(a.expected_points || 0);
+        });
+    }
 
     return (
         <Card sx={{
@@ -218,10 +272,12 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer, postTos
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {fantasyData.top_fantasy_picks.map((player) => {
+                        {sortedPicks.map((player) => {
                             const formMeta = getPlayerFormMeta(formFlagsByPlayer, player.player_name);
                             const postToss = postTossXpoints?.[player.player_name];
                             const delta = postTossDelta?.[player.player_name];
+                            const drillLink = postTossPlayerLinks?.[player.player_name]
+                                || postTossPlayerLinks?.[normalizeAnalyticsName(player.player_name)];
                             return (
                                 <TableRow key={player.player_name}>
                                 <TableCell sx={{ py: 0.75, fontWeight: 'bold', borderLeft: `3px solid ${getFormBorderColor(formMeta)}` }}>
@@ -232,7 +288,25 @@ const FantasyAnalysisCard = ({ fantasyData, isMobile, formFlagsByPlayer, postTos
                                 </TableCell>
                                 {hasPostToss && (
                                     <TableCell align="right" sx={{ py: 0.75, color: 'secondary.main', fontWeight: 600 }}>
-                                        {typeof postToss === 'number' ? postToss.toFixed(1) : '—'}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.25 }}>
+                                            <Box component="span">
+                                                {typeof postToss === 'number' ? postToss.toFixed(1) : '—'}
+                                            </Box>
+                                            {drillLink && (
+                                                <Tooltip title="Open player query drill-down">
+                                                    <IconButton
+                                                        component="a"
+                                                        href={drillLink}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        size="small"
+                                                        sx={{ p: 0.25 }}
+                                                    >
+                                                        <OpenInNewIcon sx={{ fontSize: 14 }} />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                        </Box>
                                     </TableCell>
                                 )}
                                 {hasPostToss && (
@@ -494,14 +568,18 @@ const MatchupMatrix = ({
 const Matchups = ({
     team1,
     team2,
+    venue = 'All Venues',
     startDate,
     endDate,
     team1_players,
     team2_players,
     isMobile,
     enabled = true,
+    dayNightFilter = 'all',
     postTossXpoints = {},
     postTossDelta = {},
+    postTossRaw = null,
+    postTossPlayerDrillLinks = {},
 }) => {
     const [matchupData, setMatchupData] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
@@ -514,12 +592,36 @@ const Matchups = ({
     const [team2AxisAppliedPlayers, setTeam2AxisAppliedPlayers] = React.useState(dedupeNames(team2_players || []));
     const [team1RosterOptions, setTeam1RosterOptions] = React.useState([]);
     const [team2RosterOptions, setTeam2RosterOptions] = React.useState([]);
+    const [postTossMode, setPostTossMode] = React.useState('off'); // off | general | venue
+    const [postTossMatrixLoading, setPostTossMatrixLoading] = React.useState(false);
+    const [postTossMatrixError, setPostTossMatrixError] = React.useState(null);
+    const [postTossMatrixData, setPostTossMatrixData] = React.useState({
+        firstInnings: null,
+        secondInnings: null,
+    });
 
     const incomingTeam1PlayersRef = React.useRef(dedupeNames(team1_players || []));
     const incomingTeam2PlayersRef = React.useRef(dedupeNames(team2_players || []));
     const incomingTeam1Key = React.useMemo(() => toListKey(team1_players || []), [team1_players]);
     const incomingTeam2Key = React.useMemo(() => toListKey(team2_players || []), [team2_players]);
     const incomingPlayersKey = `${incomingTeam1Key}::${incomingTeam2Key}`;
+    const hasPostTossContext = Boolean(
+        postTossRaw?.batting_first_team
+        && postTossRaw?.team1_id
+        && postTossRaw?.team2_id
+    );
+    const postTossLinksScope = postTossMode === 'venue' ? 'venue' : 'general';
+    const postTossPlayerLinks = React.useMemo(
+        () => resolvePostTossPlayerLinks(postTossRaw, postTossPlayerDrillLinks, postTossLinksScope),
+        [postTossRaw, postTossPlayerDrillLinks, postTossLinksScope],
+    );
+    const matrixAxesLocked = hasPostTossContext && postTossMode !== 'off';
+
+    React.useEffect(() => {
+        if (!hasPostTossContext && postTossMode !== 'off') {
+            setPostTossMode('off');
+        }
+    }, [hasPostTossContext, postTossMode]);
 
     React.useEffect(() => {
         incomingTeam1PlayersRef.current = dedupeNames(team1_players || []);
@@ -550,9 +652,12 @@ const Matchups = ({
         let cancelled = false;
         const loadRosterOptions = async () => {
             try {
+                const rosterParams = isDayNightValue(dayNightFilter)
+                    ? { day_or_night: dayNightFilter }
+                    : {};
                 const [team1Res, team2Res] = await Promise.all([
-                    axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/roster`),
-                    axios.get(`${config.API_URL}/teams/${encodeURIComponent(team2)}/roster`),
+                    axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/roster`, { params: rosterParams }),
+                    axios.get(`${config.API_URL}/teams/${encodeURIComponent(team2)}/roster`, { params: rosterParams }),
                 ]);
                 if (cancelled) return;
                 const t1 = dedupeNames((team1Res.data?.players || []).map((row) => row?.name));
@@ -572,7 +677,7 @@ const Matchups = ({
         return () => {
             cancelled = true;
         };
-    }, [enabled, team1, team2]);
+    }, [enabled, team1, team2, dayNightFilter]);
 
     React.useEffect(() => {
         if (!enabled) return;
@@ -584,8 +689,8 @@ const Matchups = ({
                 setFormFlagsByPlayer({});
 
                 const params = new URLSearchParams();
-                params.append('start_date', startDate);
-                params.append('end_date', endDate);
+                if (startDate) params.append('start_date', startDate);
+                if (endDate) params.append('end_date', endDate);
 
                 const effectiveTeam1Players = dedupeNames(team1AxisAppliedPlayers || []);
                 const effectiveTeam2Players = dedupeNames(team2AxisAppliedPlayers || []);
@@ -603,6 +708,9 @@ const Matchups = ({
                 }
 
                 params.append('use_current_roster', hasCustomPlayers ? 'false' : 'true');
+                if (isDayNightValue(dayNightFilter)) {
+                    params.append('day_or_night', dayNightFilter);
+                }
 
                 const matchupsResponse = await axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1)}/${encodeURIComponent(team2)}/matchups?${params.toString()}`);
 
@@ -616,7 +724,84 @@ const Matchups = ({
         };
 
         fetchMatchups();
-    }, [enabled, team1, team2, startDate, endDate, team1AxisAppliedPlayers, team2AxisAppliedPlayers]);
+    }, [enabled, team1, team2, startDate, endDate, dayNightFilter, team1AxisAppliedPlayers, team2AxisAppliedPlayers]);
+
+    React.useEffect(() => {
+        if (!enabled) return;
+        if (!hasPostTossContext || postTossMode === 'off') {
+            setPostTossMatrixError(null);
+            setPostTossMatrixData({ firstInnings: null, secondInnings: null });
+            return;
+        }
+
+        let cancelled = false;
+        const fetchPostTossMatrix = async () => {
+            setPostTossMatrixLoading(true);
+            setPostTossMatrixError(null);
+            try {
+                const battingFirst = postTossRaw?.batting_first_team;
+                const battingSecond = postTossRaw?.batting_second_team
+                    || (battingFirst === postTossRaw?.team1_id ? postTossRaw?.team2_id : postTossRaw?.team1_id);
+                const team1Xi = dedupeNames(postTossRaw?.team1_xi || []);
+                const team2Xi = dedupeNames(postTossRaw?.team2_xi || []);
+                const xiByTeam = {
+                    [postTossRaw?.team1_id]: team1Xi,
+                    [postTossRaw?.team2_id]: team2Xi,
+                };
+                const firstXi = dedupeNames(xiByTeam?.[battingFirst] || []);
+                const secondXi = dedupeNames(xiByTeam?.[battingSecond] || []);
+
+                if (!battingFirst || !battingSecond || firstXi.length === 0 || secondXi.length === 0) {
+                    throw new Error('Missing post-toss teams or XI to build innings matchups');
+                }
+
+                const commonParams = (inningsValue, battingXi, bowlingXi) => {
+                    const params = new URLSearchParams();
+                    if (startDate) params.append('start_date', startDate);
+                    if (endDate) params.append('end_date', endDate);
+                    battingXi.forEach((player) => params.append('team1_players', player));
+                    bowlingXi.forEach((player) => params.append('team2_players', player));
+                    params.append('use_current_roster', 'false');
+                    params.append('innings_position', String(inningsValue));
+                    params.append('min_balls', '1');
+                    if (postTossMode === 'venue' && venue && venue !== 'All Venues') {
+                        params.append('venue_filter', venue);
+                    }
+                    if (isDayNightValue(dayNightFilter)) {
+                        params.append('day_or_night', dayNightFilter);
+                    }
+                    return params.toString();
+                };
+
+                const [firstRes, secondRes] = await Promise.all([
+                    axios.get(
+                        `${config.API_URL}/teams/${encodeURIComponent(battingFirst)}/${encodeURIComponent(battingSecond)}/matchups?${commonParams(1, firstXi, secondXi)}`,
+                    ),
+                    axios.get(
+                        `${config.API_URL}/teams/${encodeURIComponent(battingSecond)}/${encodeURIComponent(battingFirst)}/matchups?${commonParams(2, secondXi, firstXi)}`,
+                    ),
+                ]);
+
+                if (cancelled) return;
+                setPostTossMatrixData({
+                    firstInnings: firstRes.data || null,
+                    secondInnings: secondRes.data || null,
+                });
+            } catch (fetchError) {
+                if (cancelled) return;
+                console.error('Error fetching post-toss matchup matrices:', fetchError);
+                setPostTossMatrixError(fetchError?.response?.data?.detail || fetchError?.message || 'Failed to load post-toss matchups');
+                setPostTossMatrixData({ firstInnings: null, secondInnings: null });
+            } finally {
+                if (!cancelled) setPostTossMatrixLoading(false);
+            }
+        };
+
+        fetchPostTossMatrix();
+        return () => {
+            cancelled = true;
+        };
+    }, [enabled, hasPostTossContext, postTossMode, postTossRaw, startDate, endDate, venue, dayNightFilter]);
 
     React.useEffect(() => {
         if (!enabled || !matchupData?.team1 || !matchupData?.team2) return;
@@ -698,7 +883,7 @@ const Matchups = ({
         return <Alert severity="warning">Unexpected matchup data format.</Alert>;
     }
 
-    // Check if there's any actual matchup data
+    // Check if there's any actual matchup data in the default view.
     const hasMatchups = (
         (
             matchupData.team1.batting_matchups
@@ -710,7 +895,7 @@ const Matchups = ({
         )
     );
 
-    if (!hasMatchups) {
+    if (!hasMatchups && postTossMode === 'off') {
         return (
             <Alert severity="info" sx={{ mt: 3 }}>
                 No matchup data found between these players in the selected time period.
@@ -736,6 +921,42 @@ const Matchups = ({
 
     return (
         <Box sx={{ mt: 3 }}>
+            {hasPostTossContext && (
+                <Card
+                    sx={{
+                        p: 2,
+                        mb: 2,
+                        backgroundColor: isMobile ? 'transparent' : undefined,
+                        boxShadow: isMobile ? 0 : undefined,
+                    }}
+                >
+                    <Stack
+                        direction={isMobile ? 'column' : 'row'}
+                        spacing={1}
+                        alignItems={isMobile ? 'flex-start' : 'center'}
+                        justifyContent="space-between"
+                    >
+                        <Typography variant={isMobile ? "subtitle1" : "h6"}>
+                            Post-Toss Matchup View
+                        </Typography>
+                        <ToggleButtonGroup
+                            size="small"
+                            value={postTossMode}
+                            exclusive
+                            onChange={(event, nextValue) => {
+                                if (!nextValue) return;
+                                setPostTossMode(nextValue);
+                            }}
+                        >
+                            <ToggleButton value="off">Off</ToggleButton>
+                            <ToggleButton value="general">General</ToggleButton>
+                            <ToggleButton value="venue">At Venue</ToggleButton>
+                        </ToggleButtonGroup>
+                    </Stack>
+                </Card>
+            )}
+
+            {!matrixAxesLocked && (
             <Card
                 sx={{
                     p: 2,
@@ -821,6 +1042,12 @@ const Matchups = ({
                     </Stack>
                 </Collapse>
             </Card>
+            )}
+            {matrixAxesLocked && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                    Playing XI axes are locked to the post-toss teams while post-toss mode is active.
+                </Alert>
+            )}
 
             {/* Fantasy Analysis from server */}
             <FantasyAnalysisCard
@@ -829,33 +1056,89 @@ const Matchups = ({
                 formFlagsByPlayer={formFlagsByPlayer}
                 postTossXpoints={postTossXpoints}
                 postTossDelta={postTossDelta}
+                postTossPlayerLinks={postTossPlayerLinks}
             />
 
-            {/* Team 1 vs Team 2 Matchups */}
-            <MatchupMatrix 
-                batting_team={matchupData.team1.name}
-                bowling_team={matchupData.team2.name}
-                matchups={matchupData.team1.batting_matchups}
-                bowlingConsolidated={matchupData.team2.bowling_consolidated}
-                isMobile={isMobile}
-                venue={matchupData.venue}
-                startDate={startDate}
-                endDate={endDate}
-                formFlagsByPlayer={formFlagsByPlayer}
-            />
-            
-            {/* Team 2 vs Team 1 Matchups */}
-            <MatchupMatrix 
-                batting_team={matchupData.team2.name}
-                bowling_team={matchupData.team1.name}
-                matchups={matchupData.team2.batting_matchups}
-                bowlingConsolidated={matchupData.team1.bowling_consolidated}
-                isMobile={isMobile}
-                venue={matchupData.venue}
-                startDate={startDate}
-                endDate={endDate}
-                formFlagsByPlayer={formFlagsByPlayer}
-            />
+            {postTossMode === 'off' && (
+                <>
+                    {/* Team 1 vs Team 2 Matchups */}
+                    <MatchupMatrix
+                        batting_team={matchupData.team1.name}
+                        bowling_team={matchupData.team2.name}
+                        matchups={matchupData.team1.batting_matchups}
+                        bowlingConsolidated={matchupData.team2.bowling_consolidated}
+                        isMobile={isMobile}
+                        venue={venue}
+                        startDate={startDate}
+                        endDate={endDate}
+                        formFlagsByPlayer={formFlagsByPlayer}
+                    />
+
+                    {/* Team 2 vs Team 1 Matchups */}
+                    <MatchupMatrix
+                        batting_team={matchupData.team2.name}
+                        bowling_team={matchupData.team1.name}
+                        matchups={matchupData.team2.batting_matchups}
+                        bowlingConsolidated={matchupData.team1.bowling_consolidated}
+                        isMobile={isMobile}
+                        venue={venue}
+                        startDate={startDate}
+                        endDate={endDate}
+                        formFlagsByPlayer={formFlagsByPlayer}
+                    />
+                </>
+            )}
+
+            {postTossMode !== 'off' && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {postTossMatrixLoading && <CircularProgress size={24} />}
+                    {postTossMatrixError && <Alert severity="warning">{postTossMatrixError}</Alert>}
+
+                    {!postTossMatrixLoading && !postTossMatrixError && (
+                        <>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                                1st Innings Matchups
+                            </Typography>
+                            {postTossMatrixData?.firstInnings?.team1?.batting_matchups
+                                && Object.keys(postTossMatrixData.firstInnings.team1.batting_matchups).length > 0 ? (
+                                <MatchupMatrix
+                                    batting_team={postTossMatrixData.firstInnings.team1.name}
+                                    bowling_team={postTossMatrixData.firstInnings.team2.name}
+                                    matchups={postTossMatrixData.firstInnings.team1.batting_matchups}
+                                    bowlingConsolidated={postTossMatrixData.firstInnings.team2.bowling_consolidated}
+                                    isMobile={isMobile}
+                                    venue={postTossMode === 'venue' ? venue : 'All Venues'}
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    formFlagsByPlayer={formFlagsByPlayer}
+                                />
+                            ) : (
+                                <Alert severity="info">No 1st-innings matchup data for the selected post-toss filters.</Alert>
+                            )}
+
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                                2nd Innings Matchups
+                            </Typography>
+                            {postTossMatrixData?.secondInnings?.team1?.batting_matchups
+                                && Object.keys(postTossMatrixData.secondInnings.team1.batting_matchups).length > 0 ? (
+                                <MatchupMatrix
+                                    batting_team={postTossMatrixData.secondInnings.team1.name}
+                                    bowling_team={postTossMatrixData.secondInnings.team2.name}
+                                    matchups={postTossMatrixData.secondInnings.team1.batting_matchups}
+                                    bowlingConsolidated={postTossMatrixData.secondInnings.team2.bowling_consolidated}
+                                    isMobile={isMobile}
+                                    venue={postTossMode === 'venue' ? venue : 'All Venues'}
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    formFlagsByPlayer={formFlagsByPlayer}
+                                />
+                            ) : (
+                                <Alert severity="info">No 2nd-innings matchup data for the selected post-toss filters.</Alert>
+                            )}
+                        </>
+                    )}
+                </Box>
+            )}
         </Box>
     );
 };

@@ -65,6 +65,7 @@ export const parseUrlParams = (search) => {
   filters.is_chase = getNullableBoolParam('is_chase');
   filters.chase_outcome = getArrayParam('chase_outcome');
   filters.toss_decision = getArrayParam('toss_decision');
+  filters.day_or_night = getSingleParam('day_or_night');
   filters.query_mode = getSingleParam('query_mode', 'delivery');
   
   // Batter filters

@@ -451,6 +451,7 @@ def get_teams_elo_history(
 @router.get("/{team_name}/roster")
 def get_team_roster(
     team_name: str,
+    day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$"),
     db: Session = Depends(get_session)
 ):
     """
@@ -464,7 +465,11 @@ def get_team_roster(
         Player list with roles, display names, and roster source
     """
     try:
-        return get_team_roster_service(team_name=team_name, db=db)
+        return get_team_roster_service(
+            team_name=team_name,
+            db=db,
+            day_or_night=day_or_night,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

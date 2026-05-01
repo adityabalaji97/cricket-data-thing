@@ -39,6 +39,7 @@ const PostTossSetup = ({
   venue,
   team1Identifier,
   team2Identifier,
+  dayNightFilter = 'all',
   isMobile = false,
   onApplyResult,
 }) => {
@@ -59,6 +60,9 @@ const PostTossSetup = ({
 
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyError, setApplyError] = useState(null);
+  const normalizedDayNight = dayNightFilter === 'day' || dayNightFilter === 'night'
+    ? dayNightFilter
+    : null;
 
   const allPlayers = useMemo(
     () => uniqueNames([...(team1Roster || []), ...(team2Roster || [])]),
@@ -74,8 +78,12 @@ const PostTossSetup = ({
       setRosterError(null);
       try {
         const [team1Res, team2Res] = await Promise.all([
-          axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1Identifier)}/roster`),
-          axios.get(`${config.API_URL}/teams/${encodeURIComponent(team2Identifier)}/roster`),
+          axios.get(`${config.API_URL}/teams/${encodeURIComponent(team1Identifier)}/roster`, {
+            params: normalizedDayNight ? { day_or_night: normalizedDayNight } : {},
+          }),
+          axios.get(`${config.API_URL}/teams/${encodeURIComponent(team2Identifier)}/roster`, {
+            params: normalizedDayNight ? { day_or_night: normalizedDayNight } : {},
+          }),
         ]);
 
         if (cancelled) return;
@@ -106,7 +114,7 @@ const PostTossSetup = ({
     return () => {
       cancelled = true;
     };
-  }, [team1Identifier, team2Identifier]);
+  }, [team1Identifier, team2Identifier, normalizedDayNight]);
 
   const handleScrape = async () => {
     const url = String(cricinfoUrl || '').trim();
@@ -181,6 +189,10 @@ const PostTossSetup = ({
         team2_xi: uniqueNames(team2Xi),
         impact_subs: uniqueNames(impactSubs),
         source: inputSource,
+        ...(normalizedDayNight ? { day_or_night: normalizedDayNight } : {}),
+        ...(normalizedDayNight === 'day'
+          ? { general_window_years: 4, venue_window_years: 5 }
+          : {}),
       });
       onApplyResult?.(response.data);
     } catch (err) {

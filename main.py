@@ -1443,6 +1443,7 @@ def get_match_history(
     team2: str,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$"),
     db: Session = Depends(get_session)
 ):
     try:
@@ -1464,6 +1465,7 @@ def get_match_history(
                 FROM matches m
                 WHERE (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
+                AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
                 {venue_filter_clause}
                 ORDER BY m.date DESC
                 LIMIT 7
@@ -1472,6 +1474,7 @@ def get_match_history(
                 "venue_aliases": venue_aliases,
                 "start_date": start_date,
                 "end_date": end_date,
+                "day_or_night": day_or_night,
             }
         ).fetchall()
 
@@ -1482,11 +1485,17 @@ def get_match_history(
                 FROM matches m
                 WHERE (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
+                AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
                 AND (m.team1 = ANY(:team1_names) OR m.team2 = ANY(:team1_names))
                 ORDER BY m.date DESC
                 LIMIT 5
             """),
-            {"team1_names": team1_names, "start_date": start_date, "end_date": end_date}
+            {
+                "team1_names": team1_names,
+                "start_date": start_date,
+                "end_date": end_date,
+                "day_or_night": day_or_night,
+            }
         ).fetchall()
 
         # Get team2 matches
@@ -1496,11 +1505,17 @@ def get_match_history(
                 FROM matches m
                 WHERE (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
+                AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
                 AND (m.team1 = ANY(:team2_names) OR m.team2 = ANY(:team2_names))
                 ORDER BY m.date DESC
                 LIMIT 5
             """),
-            {"team2_names": team2_names, "start_date": start_date, "end_date": end_date}
+            {
+                "team2_names": team2_names,
+                "start_date": start_date,
+                "end_date": end_date,
+                "day_or_night": day_or_night,
+            }
         ).fetchall()
 
         # Get head-to-head matches
@@ -1510,12 +1525,19 @@ def get_match_history(
                 FROM matches m
                 WHERE (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
+                AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
                 AND ((m.team1 = ANY(:team1_names) AND m.team2 = ANY(:team2_names))
                      OR (m.team1 = ANY(:team2_names) AND m.team2 = ANY(:team1_names)))
                 ORDER BY m.date DESC
                 LIMIT 5
             """),
-            {"team1_names": team1_names, "team2_names": team2_names, "start_date": start_date, "end_date": end_date}
+            {
+                "team1_names": team1_names,
+                "team2_names": team2_names,
+                "start_date": start_date,
+                "end_date": end_date,
+                "day_or_night": day_or_night,
+            }
         ).fetchall()
 
         # Get scores for all matches using the dual-table service

@@ -23,7 +23,12 @@ from services.match_preview import (
     validate_llm_narrative,
     validate_llm_rewrite,
 )
-from services.matchups import _canonicalize_players, get_team_matchups_service
+from services.matchups import (
+    _canonicalize_players,
+    _calculate_batting_projection_points,
+    _calculate_bowling_projection_points,
+)
+from services.query_builder_v2 import query_deliveries_service
 from services.rolling_form import get_form_flags_for_players
 try:
     from venue_standardization import VENUE_STANDARDIZATION
@@ -426,6 +431,7 @@ class PostTossPayload(BaseModel):
     source: str = Field(default="manual", pattern="^(manual|scraped)$")
     general_window_years: int = Field(default=2, ge=1, le=6)
     venue_window_years: int = Field(default=3, ge=1, le=8)
+    day_or_night: Optional[str] = Field(default=None, pattern="^(day|night)$")
 
 
 class ScrapeCricinfoPayload(BaseModel):
@@ -666,7 +672,209 @@ def _build_query_link(
     return f"/query?{urlencode(params, doseq=True)}"
 
 
-def _window_matchup_bundle(
+def _build_player_drill_link(
+    *,
+    venue: Optional[str],
+    start_date: date,
+    end_date: date,
+    innings: Optional[int],
+    player: str,
+    kind: str,  # "batting" | "bowling"
+    day_or_night: Optional[str] = None,
+) -> str:
+    """Drill-down link for a single player's stats in the query builder."""
+    params: List[Tuple[str, str]] = [
+        ("query_mode", "delivery"),
+        ("start_date", start_date.isoformat()),
+        ("end_date", end_date.isoformat()),
+        ("leagues", "IPL"),
+        ("group_by", "batter" if kind == "batting" else "bowler"),
+    ]
+    if innings is not None:
+        params.append(("innings", str(innings)))
+    if venue:
+        params.append(("venue", venue))
+    if day_or_night:
+        params.append(("day_or_night", day_or_night))
+    if kind == "batting":
+        params.append(("batters", player))
+    else:
+        params.append(("bowlers", player))
+    return f"/query?{urlencode(params, doseq=True)}"
+
+
+def _build_axis_drill_link(
+    *,
+    venue: Optional[str],
+    start_date: date,
+    end_date: date,
+    innings: int,
+    players: List[str],
+    kind: str,
+    day_or_night: Optional[str] = None,
+) -> str:
+    """Drill-down link for an entire axis (whole batting/bowling XI)."""
+    params: List[Tuple[str, str]] = [
+        ("query_mode", "delivery"),
+        ("start_date", start_date.isoformat()),
+        ("end_date", end_date.isoformat()),
+        ("innings", str(innings)),
+        ("leagues", "IPL"),
+        ("group_by", "batter" if kind == "batting" else "bowler"),
+    ]
+    if venue:
+        params.append(("venue", venue))
+    if day_or_night:
+        params.append(("day_or_night", day_or_night))
+    role_key = "batters" if kind == "batting" else "bowlers"
+    for player in players:
+        params.append((role_key, player))
+    return f"/query?{urlencode(params, doseq=True)}"
+
+
+def _run_post_toss_axis(
+    *,
+    db: Session,
+    players: List[str],
+    kind: str,  # "batting" | "bowling"
+    innings: Optional[int],
+    venue: Optional[str],
+    start_date: date,
+    end_date: date,
+    day_or_night: Optional[str],
+) -> List[Dict[str, Any]]:
+    """
+    Run a single per-team aggregate query for one axis of the post-toss panel.
+    Returns a list of player dicts with stats + computed xPoints + drill link.
+    """
+    if not players:
+        return []
+
+    group_by = ["batter"] if kind == "batting" else ["bowler"]
+    role_arg = "batters" if kind == "batting" else "bowlers"
+    role_kwargs = {role_arg: players}
+    other_arg = "bowlers" if kind == "batting" else "batters"
+    role_kwargs[other_arg] = []
+
+    try:
+        result = query_deliveries_service(
+            venue=venue,
+            start_date=start_date,
+            end_date=end_date,
+            leagues=["IPL"],
+            teams=[],
+            batting_teams=[],
+            bowling_teams=[],
+            players=[],
+            **role_kwargs,
+            bat_hand=None,
+            bowl_style=[],
+            bowl_kind=[],
+            crease_combo=[],
+            line=[],
+            length=[],
+            shot=[],
+            control=None,
+            wagon_zone=[],
+            dismissal=[],
+            innings=innings,
+            over_min=None,
+            over_max=None,
+            match_outcome=[],
+            is_chase=None,
+            chase_outcome=[],
+            toss_decision=[],
+            group_by=group_by,
+            show_summary_rows=False,
+            min_balls=None,
+            max_balls=None,
+            min_runs=None,
+            max_runs=None,
+            min_wickets=None,
+            max_wickets=None,
+            limit=200,
+            offset=0,
+            include_international=False,
+            top_teams=None,
+            query_mode="delivery",
+            db=db,
+            day_or_night=day_or_night,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Post-toss axis query failed (kind=%s innings=%s venue=%s): %s",
+            kind, innings, venue, exc,
+        )
+        return []
+
+    rows = (result or {}).get("data") or []
+    out: List[Dict[str, Any]] = []
+    name_key = "batter" if kind == "batting" else "bowler"
+    for row in rows:
+        player = str(row.get(name_key) or "").strip()
+        if not player:
+            continue
+        stats = {
+            "balls": int(row.get("balls") or 0),
+            "runs": int(row.get("runs") or 0),
+            "wickets": int(row.get("wickets") or 0),
+            "boundaries": int(row.get("boundaries") or 0),
+            "dots": int(row.get("dots") or 0),
+            "strike_rate": float(row.get("strike_rate") or 0.0),
+            "average": float(row.get("average") or 0.0) if row.get("average") is not None else None,
+            "boundary_percentage": float(row.get("boundary_percentage") or 0.0),
+            "dot_percentage": float(row.get("dot_percentage") or 0.0),
+        }
+        if kind == "batting":
+            projection = _calculate_batting_projection_points(stats)
+        else:
+            projection = _calculate_bowling_projection_points(stats)
+        xpoints = float(projection.get("points") or 0.0)
+        confidence = float(projection.get("confidence") or 0.0)
+        drill_link = _build_player_drill_link(
+            venue=venue,
+            start_date=start_date,
+            end_date=end_date,
+            innings=innings,
+            player=player,
+            kind=kind,
+            day_or_night=day_or_night,
+        )
+        out.append({
+            "player": player,
+            "balls": stats["balls"],
+            "runs": stats["runs"],
+            "wickets": stats["wickets"],
+            "boundaries": stats["boundaries"],
+            "dots": stats["dots"],
+            "strike_rate": round(stats["strike_rate"], 2),
+            "average": round(stats["average"], 2) if stats["average"] is not None else None,
+            "boundary_percentage": round(stats["boundary_percentage"], 2),
+            "dot_percentage": round(stats["dot_percentage"], 2),
+            "xpoints": round(xpoints, 2),
+            "xpoints_confidence": round(confidence, 2),
+            "drill_link": drill_link,
+        })
+    out.sort(key=lambda r: (r["xpoints"], r["balls"]), reverse=True)
+    return out
+
+
+def _sum_player_xpoints(axis_bundle: Dict[str, Any]) -> Dict[str, float]:
+    """Sum xPoints by player across all axis rows in a bundle."""
+    points_map: Dict[str, float] = {}
+    for axis_data in (axis_bundle or {}).values():
+        for row in axis_data.get("players", []):
+            player = str(row.get("player") or "").strip()
+            if not player:
+                continue
+            points_map[player] = round(
+                _safe_float(points_map.get(player)) + _safe_float(row.get("xpoints")),
+                3,
+            )
+    return points_map
+
+
+def _run_post_toss_window(
     *,
     db: Session,
     batting_first_team: str,
@@ -676,154 +884,50 @@ def _window_matchup_bundle(
     start_date: date,
     end_date: date,
     venue_filter: Optional[str],
-    window_label: str,
+    day_or_night: Optional[str],
 ) -> Dict[str, Any]:
-    first_specific = get_team_matchups_service(
-        team1=batting_first_team,
-        team2=batting_second_team,
-        start_date=start_date,
-        end_date=end_date,
-        team1_players=first_team_xi,
-        team2_players=second_team_xi,
-        db=db,
-        use_current_roster=False,
-        innings_position=1,
-        venue_filter=venue_filter,
-    )
-    second_specific = get_team_matchups_service(
-        team1=batting_second_team,
-        team2=batting_first_team,
-        start_date=start_date,
-        end_date=end_date,
-        team1_players=second_team_xi,
-        team2_players=first_team_xi,
-        db=db,
-        use_current_roster=False,
-        innings_position=2,
-        venue_filter=venue_filter,
-    )
-    first_overall = get_team_matchups_service(
-        team1=batting_first_team,
-        team2=batting_second_team,
-        start_date=start_date,
-        end_date=end_date,
-        team1_players=first_team_xi,
-        team2_players=second_team_xi,
-        db=db,
-        use_current_roster=False,
-        innings_position=None,
-        venue_filter=venue_filter,
-    )
-    second_overall = get_team_matchups_service(
-        team1=batting_second_team,
-        team2=batting_first_team,
-        start_date=start_date,
-        end_date=end_date,
-        team1_players=second_team_xi,
-        team2_players=first_team_xi,
-        db=db,
-        use_current_roster=False,
-        innings_position=None,
-        venue_filter=venue_filter,
-    )
-
-    first_bat_metrics = _sum_batting_overall((first_specific or {}).get("team1") or {})
-    first_bowl_metrics = _sum_bowling_overall((first_specific or {}).get("team2") or {})
-    second_bat_metrics = _sum_batting_overall((second_specific or {}).get("team1") or {})
-    second_bowl_metrics = _sum_bowling_overall((second_specific or {}).get("team2") or {})
-
-    first_bat_overall = _sum_batting_overall((first_overall or {}).get("team1") or {})
-    first_bowl_overall = _sum_bowling_overall((first_overall or {}).get("team2") or {})
-    second_bat_overall = _sum_batting_overall((second_overall or {}).get("team1") or {})
-    second_bowl_overall = _sum_bowling_overall((second_overall or {}).get("team2") or {})
-
-    blocks = {
-        "first_innings_batting": {
-            "window": window_label,
-            "kind": "batting",
-            "innings": 1,
-            "team": batting_first_team,
-            "opponent": batting_second_team,
-            "metrics": first_bat_metrics,
-            "overall_fallback": first_bat_overall if first_bat_metrics["sample_balls"] < POST_TOSS_BATTING_MIN_BALLS else None,
-            "sample_warning": first_bat_metrics["sample_balls"] < POST_TOSS_BATTING_MIN_BALLS,
-        },
-        "first_innings_bowling": {
-            "window": window_label,
-            "kind": "bowling",
-            "innings": 1,
-            "team": batting_second_team,
-            "opponent": batting_first_team,
-            "metrics": first_bowl_metrics,
-            "overall_fallback": first_bowl_overall if first_bowl_metrics["sample_balls"] < POST_TOSS_BOWLING_MIN_BALLS else None,
-            "sample_warning": first_bowl_metrics["sample_balls"] < POST_TOSS_BOWLING_MIN_BALLS,
-        },
-        "second_innings_batting": {
-            "window": window_label,
-            "kind": "batting",
-            "innings": 2,
-            "team": batting_second_team,
-            "opponent": batting_first_team,
-            "metrics": second_bat_metrics,
-            "overall_fallback": second_bat_overall if second_bat_metrics["sample_balls"] < POST_TOSS_BATTING_MIN_BALLS else None,
-            "sample_warning": second_bat_metrics["sample_balls"] < POST_TOSS_BATTING_MIN_BALLS,
-        },
-        "second_innings_bowling": {
-            "window": window_label,
-            "kind": "bowling",
-            "innings": 2,
-            "team": batting_first_team,
-            "opponent": batting_second_team,
-            "metrics": second_bowl_metrics,
-            "overall_fallback": second_bowl_overall if second_bowl_metrics["sample_balls"] < POST_TOSS_BOWLING_MIN_BALLS else None,
-            "sample_warning": second_bowl_metrics["sample_balls"] < POST_TOSS_BOWLING_MIN_BALLS,
-        },
+    """Build the four per-axis player tables for one (general | venue) window."""
+    axes = {
+        "first_innings_batting": (first_team_xi, "batting", 1, batting_first_team, batting_second_team),
+        "first_innings_bowling": (second_team_xi, "bowling", 1, batting_second_team, batting_first_team),
+        "second_innings_batting": (second_team_xi, "batting", 2, batting_second_team, batting_first_team),
+        "second_innings_bowling": (first_team_xi, "bowling", 2, batting_first_team, batting_second_team),
     }
 
-    drill_down_links = {
-        "first_innings_batting": _build_query_link(
+    axis_results: Dict[str, Any] = {}
+    drill_links: Dict[str, str] = {}
+    for axis_name, (players, kind, innings, team, opponent) in axes.items():
+        rows = _run_post_toss_axis(
+            db=db,
+            players=players,
+            kind=kind,
+            innings=innings,
             venue=venue_filter,
             start_date=start_date,
             end_date=end_date,
-            innings=1,
-            batters=first_team_xi,
-            bowlers=second_team_xi,
-        ),
-        "first_innings_bowling": _build_query_link(
+            day_or_night=day_or_night,
+        )
+        axis_results[axis_name] = {
+            "kind": kind,
+            "innings": innings,
+            "team": team,
+            "opponent": opponent,
+            "players": rows,
+            "sample_balls": sum(r["balls"] for r in rows),
+            "sample_players": len([r for r in rows if r["balls"] > 0]),
+        }
+        drill_links[axis_name] = _build_axis_drill_link(
             venue=venue_filter,
             start_date=start_date,
             end_date=end_date,
-            innings=1,
-            batters=first_team_xi,
-            bowlers=second_team_xi,
-        ),
-        "second_innings_batting": _build_query_link(
-            venue=venue_filter,
-            start_date=start_date,
-            end_date=end_date,
-            innings=2,
-            batters=second_team_xi,
-            bowlers=first_team_xi,
-        ),
-        "second_innings_bowling": _build_query_link(
-            venue=venue_filter,
-            start_date=start_date,
-            end_date=end_date,
-            innings=2,
-            batters=second_team_xi,
-            bowlers=first_team_xi,
-        ),
-    }
-
+            innings=innings,
+            players=players,
+            kind=kind,
+            day_or_night=day_or_night,
+        )
     return {
-        "blocks": blocks,
-        "points_map": _merge_points(_player_points_map(first_specific), _player_points_map(second_specific)),
-        "base_points_map": _merge_points(_player_points_map(first_overall), _player_points_map(second_overall)),
-        "drill_down_links": drill_down_links,
-        "raw": {
-            "first_innings_specific": first_specific,
-            "second_innings_specific": second_specific,
-        },
+        "axes": axis_results,
+        "drill_down_links": drill_links,
     }
 
 
@@ -861,6 +965,11 @@ def post_toss_preview(
             general_window_years=payload.general_window_years,
             venue_window_years=payload.venue_window_years,
         )
+        # Bake day_or_night into the cache key by appending to it; keeps the
+        # existing helper signature stable while still distinguishing day/night
+        # results.
+        if payload.day_or_night:
+            cache_key = f"{cache_key}:{payload.day_or_night}"
         cached = _get_cached_post_toss(cache_key)
         if cached:
             return {
@@ -879,7 +988,7 @@ def post_toss_preview(
         general_start, general_end = _window_date_range(payload.general_window_years)
         venue_start, venue_end = _window_date_range(payload.venue_window_years)
 
-        general_bundle = _window_matchup_bundle(
+        general_bundle = _run_post_toss_window(
             db=db,
             batting_first_team=batting_first_team,
             batting_second_team=batting_second_team,
@@ -888,9 +997,9 @@ def post_toss_preview(
             start_date=general_start,
             end_date=general_end,
             venue_filter=None,
-            window_label="general",
+            day_or_night=payload.day_or_night,
         )
-        venue_bundle = _window_matchup_bundle(
+        venue_bundle = _run_post_toss_window(
             db=db,
             batting_first_team=batting_first_team,
             batting_second_team=batting_second_team,
@@ -899,15 +1008,97 @@ def post_toss_preview(
             start_date=venue_start,
             end_date=venue_end,
             venue_filter=normalized_venue,
-            window_label="venue",
+            day_or_night=payload.day_or_night,
         )
 
-        xpoints_post_toss = general_bundle["points_map"]
-        xpoints_base = general_bundle["base_points_map"]
-        xpoints_delta = {
-            player: round(points - _safe_float(xpoints_base.get(player)), 3)
-            for player, points in xpoints_post_toss.items()
+        # Build post-toss xPoints map by summing a player's batting + bowling
+        # contributions from innings-aware general-window axes.
+        xpoints_post_toss = _sum_player_xpoints(general_bundle.get("axes") or {})
+
+        # Build base (pre-toss) xPoints by removing innings constraints while
+        # keeping the same player pools and date window.
+        xpoints_base: Dict[str, float] = {}
+        base_axes = [
+            (first_team_xi, "batting"),
+            (first_team_xi, "bowling"),
+            (second_team_xi, "batting"),
+            (second_team_xi, "bowling"),
+        ]
+        for axis_players, axis_kind in base_axes:
+            base_rows = _run_post_toss_axis(
+                db=db,
+                players=axis_players,
+                kind=axis_kind,
+                innings=None,
+                venue=None,
+                start_date=general_start,
+                end_date=general_end,
+                day_or_night=payload.day_or_night,
+            )
+            for row in base_rows:
+                player = str(row.get("player") or "").strip()
+                if not player:
+                    continue
+                xpoints_base[player] = round(
+                    _safe_float(xpoints_base.get(player)) + _safe_float(row.get("xpoints")),
+                    3,
+                )
+
+        # Ensure every playing-XI player has a post-toss value; if innings-
+        # specific data is missing, fall back to the broader base projection.
+        for player in dict.fromkeys([*first_team_xi, *second_team_xi]):
+            if player not in xpoints_post_toss:
+                xpoints_post_toss[player] = round(_safe_float(xpoints_base.get(player)), 3)
+            if player not in xpoints_base:
+                xpoints_base[player] = round(_safe_float(xpoints_post_toss.get(player)), 3)
+
+        all_players = set(xpoints_post_toss.keys()) | set(xpoints_base.keys())
+        xpoints_delta: Dict[str, float] = {
+            player: round(
+                _safe_float(xpoints_post_toss.get(player)) - _safe_float(xpoints_base.get(player)),
+                3,
+            )
+            for player in all_players
         }
+
+        # players_by_axis: combine general + venue rows per axis
+        players_by_axis: Dict[str, Any] = {}
+        player_drill_links: Dict[str, Dict[str, str]] = {"general": {}, "venue": {}}
+        player_link_scores: Dict[str, Dict[str, float]] = {"general": {}, "venue": {}}
+        for axis_name in (general_bundle["axes"] or {}).keys():
+            general_axis = general_bundle["axes"][axis_name]
+            venue_axis = (venue_bundle["axes"] or {}).get(axis_name) or {"players": []}
+            players_by_axis[axis_name] = {
+                "kind": general_axis["kind"],
+                "innings": general_axis["innings"],
+                "team": general_axis["team"],
+                "opponent": general_axis["opponent"],
+                "general": {
+                    "players": general_axis["players"],
+                    "sample_balls": general_axis["sample_balls"],
+                    "sample_players": general_axis["sample_players"],
+                },
+                "venue": {
+                    "players": venue_axis.get("players", []),
+                    "sample_balls": venue_axis.get("sample_balls", 0),
+                    "sample_players": venue_axis.get("sample_players", 0),
+                },
+            }
+
+            for scope, axis_rows in (
+                ("general", general_axis.get("players", [])),
+                ("venue", venue_axis.get("players", [])),
+            ):
+                for row in axis_rows:
+                    player = str(row.get("player") or "").strip()
+                    link = str(row.get("drill_link") or "").strip()
+                    if not player or not link:
+                        continue
+                    points = _safe_float(row.get("xpoints"))
+                    previous = _safe_float(player_link_scores[scope].get(player))
+                    if player not in player_drill_links[scope] or points >= previous:
+                        player_link_scores[scope][player] = points
+                        player_drill_links[scope][player] = link
 
         result = {
             "success": True,
@@ -922,6 +1113,7 @@ def post_toss_preview(
             "team1_xi": team1_xi,
             "team2_xi": team2_xi,
             "impact_subs": impact_subs,
+            "day_or_night": payload.day_or_night,
             "windows": {
                 "general": {
                     "start_date": general_start.isoformat(),
@@ -932,18 +1124,14 @@ def post_toss_preview(
                     "end_date": venue_end.isoformat(),
                 },
             },
-            "blocks": general_bundle["blocks"],
-            "venue_blocks": venue_bundle["blocks"],
+            "players_by_axis": players_by_axis,
             "xpoints_post_toss": xpoints_post_toss,
             "xpoints_base": xpoints_base,
             "xpoints_delta": xpoints_delta,
+            "player_drill_links": player_drill_links,
             "drill_down_links": {
                 "general": general_bundle["drill_down_links"],
                 "venue": venue_bundle["drill_down_links"],
-            },
-            "raw": {
-                "general": general_bundle["raw"],
-                "venue": venue_bundle["raw"],
             },
             "computed_at": datetime.utcnow().isoformat() + "Z",
         }
@@ -963,13 +1151,14 @@ def post_toss_preview(
                 "impact_subs": impact_subs,
                 "general_window_years": payload.general_window_years,
                 "venue_window_years": payload.venue_window_years,
+                "day_or_night": payload.day_or_night,
             },
             result_data={
-                "blocks": result.get("blocks"),
-                "venue_blocks": result.get("venue_blocks"),
+                "players_by_axis": result.get("players_by_axis"),
                 "xpoints_post_toss": result.get("xpoints_post_toss"),
                 "xpoints_base": result.get("xpoints_base"),
                 "xpoints_delta": result.get("xpoints_delta"),
+                "player_drill_links": result.get("player_drill_links"),
                 "windows": result.get("windows"),
                 "computed_at": result.get("computed_at"),
             },

@@ -508,17 +508,23 @@ def build_legacy_where_clause(
     venue, start_date, end_date, leagues, teams, batting_teams, bowling_teams,
     players, batters, bowlers, bowl_style, bowl_kind, crease_combo, dismissal, innings, over_min, over_max,
     match_outcome, is_chase, chase_outcome, toss_decision,
-    include_international, top_teams, group_by, base_params, db
+    include_international, top_teams, group_by, base_params, db,
+    day_or_night=None,
 ):
     """Build dynamic WHERE clause for legacy deliveries table."""
     conditions = ["1=1"]
     params = base_params.copy()
-    
+
     # Venue filter
     if venue:
         params["venue_aliases"] = get_venue_aliases(venue)
         conditions.append("m.venue = ANY(:venue_aliases)")
-    
+
+    # Day/night filter (matches table is already joined in legacy path)
+    if day_or_night:
+        conditions.append("m.day_or_night = :day_or_night")
+        params["day_or_night"] = day_or_night
+
     # Date filters
     if start_date:
         conditions.append("m.date >= :start_date")
@@ -1945,6 +1951,7 @@ def query_deliveries_service(
 
     db,
     ball_aggregation: str = "snapshot",
+    day_or_night: Optional[str] = None,
 ):
     """
     Main service function to query cricket delivery data with flexible filtering and grouping.
@@ -2113,7 +2120,8 @@ def query_deliveries_service(
             group_by=group_by,
         )
         delivery_warnings = list(routing["warnings"]) + _match_context_warning(match_context_used)
-        join_new_matches = match_context_used
+        # day_or_night filter requires joining matches in the modern (delivery_details) path
+        join_new_matches = match_context_used or bool(day_or_night)
 
         has_batter_filters = bool(batters) or bool(players)
         data_sources = []
@@ -2167,7 +2175,8 @@ def query_deliveries_service(
                 top_teams=top_teams,
                 group_by=group_by,
                 base_params=new_params,
-                db=db
+                db=db,
+                day_or_night=day_or_night,
             )
             
             # Get total balls from new table
@@ -2243,7 +2252,8 @@ def query_deliveries_service(
                 top_teams=top_teams,
                 group_by=group_by,
                 base_params=legacy_params,
-                db=db
+                db=db,
+                day_or_night=day_or_night,
             )
             
             legacy_total_balls = get_legacy_total_balls(legacy_where_clause, legacy_params, db) or 0
@@ -2406,17 +2416,27 @@ def build_where_clause(
     players, batters, bowlers, bat_hand, bowl_style, bowl_kind, crease_combo,
     line, length, shot, control, wagon_zone, dismissal, innings, over_min, over_max,
     match_outcome, is_chase, chase_outcome, toss_decision,
-    include_international, top_teams, group_by, base_params, db=None
+    include_international, top_teams, group_by, base_params, db=None,
+    day_or_night=None,
 ):
-    """Build dynamic WHERE clause for delivery_details table."""
+    """Build dynamic WHERE clause for delivery_details table.
+
+    When day_or_night is provided, the caller MUST also pass join_matches=True
+    to handle_grouped_query / handle_ungrouped_query so the m.* alias is in scope.
+    """
     conditions = ["1=1"]
     params = base_params.copy()
-    
+
     # Venue filter (ground in delivery_details)
     if venue:
         params["venue_aliases"] = get_venue_aliases(venue)
         conditions.append("dd.ground = ANY(:venue_aliases)")
-    
+
+    # Day/night filter (requires matches JOIN — see docstring)
+    if day_or_night:
+        conditions.append("m.day_or_night = :day_or_night")
+        params["day_or_night"] = day_or_night
+
     # Date filters (using year column for efficiency, can add date parsing if needed)
     if start_date:
         conditions.append("dd.year >= :start_year")

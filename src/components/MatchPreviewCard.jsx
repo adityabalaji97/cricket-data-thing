@@ -12,7 +12,6 @@ import axios from 'axios';
 import config from '../config';
 import CondensedName from './common/CondensedName';
 import PostTossSetup from './PostTossSetup';
-import PostTossAnalysis from './PostTossAnalysis';
 
 const MatchPreviewCard = ({
   venue,
@@ -31,7 +30,6 @@ const MatchPreviewCard = ({
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [postTossData, setPostTossData] = useState(null);
 
   const requestKey = useMemo(
     () => JSON.stringify({
@@ -88,7 +86,6 @@ const MatchPreviewCard = ({
 
     const fetchPreview = async () => {
       setData(null);
-      setPostTossData(null);
       setLoading(true);
       setError(null);
       try {
@@ -145,12 +142,13 @@ const MatchPreviewCard = ({
   if (!data?.preview) return null;
 
   const handlePostTossApply = (nextData) => {
-    setPostTossData(nextData);
     onPostTossApply?.({
       team1Xi: nextData?.team1_xi || [],
       team2Xi: nextData?.team2_xi || [],
       xpointsPostToss: nextData?.xpoints_post_toss || {},
+      xpointsBase: nextData?.xpoints_base || {},
       xpointsDelta: nextData?.xpoints_delta || {},
+      playerDrillLinks: nextData?.player_drill_links || {},
       raw: nextData || null,
     });
   };
@@ -215,13 +213,9 @@ const MatchPreviewCard = ({
         venue={venue}
         team1Identifier={team1Identifier}
         team2Identifier={team2Identifier}
+        dayNightFilter={dayNightFilter}
         isMobile={isMobile}
         onApplyResult={handlePostTossApply}
-      />
-
-      <PostTossAnalysis
-        data={postTossData}
-        isMobile={isMobile}
       />
     </Box>
   );

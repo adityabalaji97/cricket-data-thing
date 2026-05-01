@@ -1075,12 +1075,16 @@ const VenueNotes = ({
                         <Matchups
                             team1={selectedTeam1.full_name}
                             team2={selectedTeam2.full_name}
+                            venue={venue}
                             startDate={startDate}
                             endDate={endDate}
                             team1_players={postTossSelection?.team1Xi || []}
                             team2_players={postTossSelection?.team2Xi || []}
                             postTossXpoints={postTossSelection?.xpointsPostToss || {}}
                             postTossDelta={postTossSelection?.xpointsDelta || {}}
+                            postTossRaw={postTossSelection?.raw || null}
+                            postTossPlayerDrillLinks={postTossSelection?.playerDrillLinks || {}}
+                            dayNightFilter={dayNightFilter}
                             enabled={teamsEnabled}
                             isMobile={isMobile}
                         />

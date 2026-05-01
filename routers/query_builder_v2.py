@@ -125,7 +125,8 @@ def query_deliveries(
     is_chase: Optional[bool] = Query(default=None, description="Filter to chase innings only (true) or non-chase innings only (false)"),
     chase_outcome: List[str] = Query(default=[], description="Filter by batting-side chase outcome (win, loss, tie, no_result)"),
     toss_decision: List[str] = Query(default=[], description="Filter by toss decision (bat, field)"),
-    
+    day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$", description="Filter by day/night classification (IPL only)"),
+
     # Grouping and aggregation
     group_by: List[str] = Query(default=[], description="Group results by columns"),
     show_summary_rows: bool = Query(default=False, description="Include summary rows for multi-level grouping"),
@@ -245,6 +246,7 @@ def query_deliveries(
             query_mode=query_mode,
             db=db,
             ball_aggregation=ball_aggregation,
+            day_or_night=day_or_night,
         )
         return result
     except HTTPException:

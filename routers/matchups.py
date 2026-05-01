@@ -4,7 +4,6 @@ from typing import List, Optional
 from datetime import date
 from database import get_session
 from services.matchups import get_team_matchups_service
-import json
 
 router = APIRouter(prefix="/teams", tags=["matchups"])
 
@@ -19,6 +18,8 @@ def get_team_matchups(
     use_current_roster: bool = Query(default=False),
     innings_position: Optional[int] = Query(default=None, ge=1, le=2),
     venue_filter: Optional[str] = Query(default=None),
+    min_balls: int = Query(default=6, ge=1),
+    day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$"),
     db: Session = Depends(get_session)
 ):
     result = get_team_matchups_service(
@@ -32,5 +33,7 @@ def get_team_matchups(
         use_current_roster=use_current_roster,
         innings_position=innings_position,
         venue_filter=venue_filter,
+        min_balls=min_balls,
+        day_or_night=day_or_night,
     )
     return result
