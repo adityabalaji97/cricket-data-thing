@@ -127,18 +127,23 @@ const PostTossSetup = ({
 
       const scrapedTeam1 = data.team1 || '';
       const scrapedTeam2 = data.team2 || '';
+      const scrapedTeam1Abbrev = data.team1_abbrev || '';
+      const scrapedTeam2Abbrev = data.team2_abbrev || '';
       const scrapedBatFirst = data.batting_first_team || '';
 
+      const matchesTeam = (scraped, scrapedAbbrev, identifier) =>
+        isSameTeam(scraped, identifier) || isSameTeam(scrapedAbbrev, identifier);
+
       const canMapTeamsDirectly =
-        (isSameTeam(scrapedTeam1, team1Identifier) && isSameTeam(scrapedTeam2, team2Identifier))
-        || (isSameTeam(scrapedTeam1, team2Identifier) && isSameTeam(scrapedTeam2, team1Identifier));
+        (matchesTeam(scrapedTeam1, scrapedTeam1Abbrev, team1Identifier) && matchesTeam(scrapedTeam2, scrapedTeam2Abbrev, team2Identifier))
+        || (matchesTeam(scrapedTeam1, scrapedTeam1Abbrev, team2Identifier) && matchesTeam(scrapedTeam2, scrapedTeam2Abbrev, team1Identifier));
 
       const scrapedTeam1Xi = uniqueNames(data.team1_xi || []);
       const scrapedTeam2Xi = uniqueNames(data.team2_xi || []);
       const scrapedImpact = uniqueNames(data.impact_subs || []);
 
       if (canMapTeamsDirectly) {
-        if (isSameTeam(scrapedTeam1, team1Identifier)) {
+        if (matchesTeam(scrapedTeam1, scrapedTeam1Abbrev, team1Identifier)) {
           if (scrapedTeam1Xi.length) setTeam1Xi(scrapedTeam1Xi);
           if (scrapedTeam2Xi.length) setTeam2Xi(scrapedTeam2Xi);
         } else {
@@ -146,7 +151,6 @@ const PostTossSetup = ({
           if (scrapedTeam2Xi.length) setTeam1Xi(scrapedTeam2Xi);
         }
       } else {
-        // If mapping is uncertain, still populate likely values without overwriting both sides aggressively.
         if (scrapedTeam1Xi.length && !team1Xi.length) setTeam1Xi(scrapedTeam1Xi);
         if (scrapedTeam2Xi.length && !team2Xi.length) setTeam2Xi(scrapedTeam2Xi);
       }
@@ -156,8 +160,13 @@ const PostTossSetup = ({
       }
 
       if (scrapedBatFirst) {
-        if (isSameTeam(scrapedBatFirst, team1Identifier)) setBattingFirstTeam(team1Identifier);
-        if (isSameTeam(scrapedBatFirst, team2Identifier)) setBattingFirstTeam(team2Identifier);
+        const batFirstAbbrev = isSameTeam(scrapedBatFirst, scrapedTeam1) ? scrapedTeam1Abbrev
+          : isSameTeam(scrapedBatFirst, scrapedTeam2) ? scrapedTeam2Abbrev : '';
+        if (matchesTeam(scrapedBatFirst, batFirstAbbrev, team1Identifier)) {
+          setBattingFirstTeam(team1Identifier);
+        } else if (matchesTeam(scrapedBatFirst, batFirstAbbrev, team2Identifier)) {
+          setBattingFirstTeam(team2Identifier);
+        }
       }
 
       if (data.success) {

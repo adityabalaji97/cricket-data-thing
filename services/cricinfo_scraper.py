@@ -128,14 +128,18 @@ def _extract_team_name(team_payload: Dict[str, Any]) -> str:
     )
 
 
-def _extract_team_pair(payload: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], List[Dict[str, Any]]]:
+def _extract_team_abbrev(team_payload: Dict[str, Any]) -> str:
+    return _safe_str(team_payload.get("abbreviation"))
+
+
+def _extract_team_pair(payload: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], List[Dict[str, Any]]]:
     competitions = payload.get("competitions") or []
     if not competitions:
         competitions = (payload.get("header") or {}).get("competitions") or []
     comp = competitions[0] if competitions else {}
     competitors = comp.get("competitors") or []
     if len(competitors) < 2:
-        return None, None, []
+        return None, None, None, None, []
 
     # Prefer stable home/away ordering when available.
     def sort_key(item: Dict[str, Any]) -> int:
@@ -145,7 +149,9 @@ def _extract_team_pair(payload: Dict[str, Any]) -> Tuple[Optional[str], Optional
     competitors = sorted(competitors, key=sort_key)
     team1 = _extract_team_name(competitors[0].get("team") or competitors[0])
     team2 = _extract_team_name(competitors[1].get("team") or competitors[1])
-    return team1 or None, team2 or None, competitors
+    team1_abbrev = _extract_team_abbrev(competitors[0].get("team") or competitors[0])
+    team2_abbrev = _extract_team_abbrev(competitors[1].get("team") or competitors[1])
+    return team1 or None, team2 or None, team1_abbrev or None, team2_abbrev or None, competitors
 
 
 def _extract_player_names_from_competitor(competitor: Dict[str, Any]) -> Tuple[List[str], List[str]]:
@@ -322,6 +328,8 @@ def scrape_match_setup(
         "batting_first_team": None,
         "team1": None,
         "team2": None,
+        "team1_abbrev": None,
+        "team2_abbrev": None,
         "team1_xi": [],
         "team2_xi": [],
         "impact_subs": [],
@@ -358,9 +366,11 @@ def scrape_match_setup(
         base_payload["error"] = "Failed to fetch ESPN summary payload"
         return base_payload
 
-    team1, team2, competitors = _extract_team_pair(payload)
+    team1, team2, team1_abbrev, team2_abbrev, competitors = _extract_team_pair(payload)
     base_payload["team1"] = team1
     base_payload["team2"] = team2
+    base_payload["team1_abbrev"] = team1_abbrev
+    base_payload["team2_abbrev"] = team2_abbrev
 
     if not competitors:
         fallback = _extract_basic_html_setup(cricinfo_url, timeout_seconds=timeout_seconds)
@@ -385,8 +395,12 @@ def scrape_match_setup(
         away_roster = next((r for r in top_rosters if _safe_str(r.get("homeAway")).lower() == "away"), None)
         if home_roster:
             team1_xi, team1_subs = _extract_player_names_from_competitor(home_roster)
+            if not base_payload["team1_abbrev"]:
+                base_payload["team1_abbrev"] = _extract_team_abbrev((home_roster.get("team") or {}))
         if away_roster:
             team2_xi, team2_subs = _extract_player_names_from_competitor(away_roster)
+            if not base_payload["team2_abbrev"]:
+                base_payload["team2_abbrev"] = _extract_team_abbrev((away_roster.get("team") or {}))
 
     impact_subs = _dedupe_names([*team1_subs, *team2_subs])
 
