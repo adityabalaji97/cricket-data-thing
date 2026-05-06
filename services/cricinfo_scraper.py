@@ -25,7 +25,11 @@ from services.matchups import _canonicalize_players
 
 logger = logging.getLogger(__name__)
 
-ESPN_CRICKET_SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/cricket/summary?event={event_id}"
+ESPN_CRICKET_SUMMARY_URLS = [
+    "https://site.web.api.espn.com/apis/site/v2/sports/cricket/8048/summary?event={event_id}",
+    "https://site.web.api.espn.com/apis/site/v2/sports/cricket/summary?event={event_id}",
+    "https://site.api.espn.com/apis/site/v2/sports/cricket/summary?event={event_id}",
+]
 DEFAULT_TIMEOUT_SECONDS = 5.0
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -126,6 +130,8 @@ def _extract_team_name(team_payload: Dict[str, Any]) -> str:
 
 def _extract_team_pair(payload: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], List[Dict[str, Any]]]:
     competitions = payload.get("competitions") or []
+    if not competitions:
+        competitions = (payload.get("header") or {}).get("competitions") or []
     comp = competitions[0] if competitions else {}
     competitors = comp.get("competitors") or []
     if len(competitors) < 2:
@@ -196,8 +202,14 @@ def _parse_toss_from_text(text_value: str) -> Tuple[Optional[str], Optional[str]
         flags=re.IGNORECASE,
     )
     if not match:
+        match = re.search(
+            r"(?P<winner>.+?)\s*,\s*elected to (?P<decision>bat|field|bowl)",
+            text,
+            flags=re.IGNORECASE,
+        )
+    if not match:
         return None, None
-    winner = _safe_str(match.group("winner"))
+    winner = _safe_str(match.group("winner")).strip()
     decision_raw = _safe_str(match.group("decision")).lower()
     decision = "field" if decision_raw == "bowl" else decision_raw
     return winner or None, decision or None
@@ -205,10 +217,18 @@ def _parse_toss_from_text(text_value: str) -> Tuple[Optional[str], Optional[str]
 
 def _extract_toss(payload: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
     competitions = payload.get("competitions") or []
+    if not competitions:
+        competitions = (payload.get("header") or {}).get("competitions") or []
     comp = competitions[0] if competitions else {}
 
     note_candidates: List[str] = []
     for note in comp.get("notes") or []:
+        if isinstance(note, dict):
+            note_candidates.append(_safe_str(note.get("headline") or note.get("text")))
+        elif isinstance(note, str):
+            note_candidates.append(_safe_str(note))
+
+    for note in payload.get("notes") or []:
         if isinstance(note, dict):
             note_candidates.append(_safe_str(note.get("headline") or note.get("text")))
         elif isinstance(note, str):
@@ -318,8 +338,12 @@ def scrape_match_setup(
         return base_payload
     base_payload["event_id"] = event_id
 
-    summary_url = ESPN_CRICKET_SUMMARY_URL.format(event_id=event_id)
-    payload = _fetch_json(summary_url, timeout_seconds=timeout_seconds)
+    payload = None
+    for url_template in ESPN_CRICKET_SUMMARY_URLS:
+        summary_url = url_template.format(event_id=event_id)
+        payload = _fetch_json(summary_url, timeout_seconds=timeout_seconds)
+        if payload:
+            break
     if not payload:
         fallback = _extract_basic_html_setup(cricinfo_url, timeout_seconds=timeout_seconds)
         if fallback:
@@ -354,6 +378,16 @@ def scrape_match_setup(
 
     team1_xi, team1_subs = _extract_player_names_from_competitor(competitors[0])
     team2_xi, team2_subs = _extract_player_names_from_competitor(competitors[1])
+
+    if not team1_xi and not team2_xi:
+        top_rosters = payload.get("rosters") or []
+        home_roster = next((r for r in top_rosters if _safe_str(r.get("homeAway")).lower() == "home"), None)
+        away_roster = next((r for r in top_rosters if _safe_str(r.get("homeAway")).lower() == "away"), None)
+        if home_roster:
+            team1_xi, team1_subs = _extract_player_names_from_competitor(home_roster)
+        if away_roster:
+            team2_xi, team2_subs = _extract_player_names_from_competitor(away_roster)
+
     impact_subs = _dedupe_names([*team1_subs, *team2_subs])
 
     toss_winner, toss_decision = _extract_toss(payload)
