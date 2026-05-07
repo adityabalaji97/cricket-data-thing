@@ -21,7 +21,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
-from services.matchups import _canonicalize_players
+from services.matchups import _canonicalize_players, _to_legacy_players
 
 logger = logging.getLogger(__name__)
 
@@ -310,8 +310,8 @@ def _canonicalize_if_possible(players: List[str], db) -> List[str]:
     if db is None:
         return _dedupe_names(players)
     try:
-        canonical = _canonicalize_players(players, db)
-        return _dedupe_names(canonical if canonical else players)
+        legacy = _to_legacy_players(players, db)
+        return _dedupe_names(legacy if legacy else players)
     except Exception:
         return _dedupe_names(players)
 

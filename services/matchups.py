@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 # Cache for player_aliases to avoid full table scan on every call
 _ALIAS_CACHE: Dict[str, str] = {}
 _ALIAS_CACHE_TIME: float = 0
+_LEGACY_CACHE: Dict[str, str] = {}
 
 def get_all_team_name_variations(team_name):
     reverse_mapping = {}
@@ -44,7 +45,7 @@ def _dedupe_player_names(players: List[str]) -> List[str]:
 
 def _get_alias_lookup(db) -> Dict[str, str]:
     """Return cached alias lookup dict. Refreshes every hour."""
-    global _ALIAS_CACHE, _ALIAS_CACHE_TIME
+    global _ALIAS_CACHE, _ALIAS_CACHE_TIME, _LEGACY_CACHE
     now = time.time()
     if _ALIAS_CACHE and (now - _ALIAS_CACHE_TIME) < 3600:
         return _ALIAS_CACHE
@@ -63,6 +64,7 @@ def _get_alias_lookup(db) -> Dict[str, str]:
         return _ALIAS_CACHE
 
     alias_lookup: Dict[str, str] = {}
+    legacy_lookup: Dict[str, str] = {}
     for row in alias_rows:
         legacy_name = (row[0] or "").strip()
         canonical_name = (row[1] or "").strip()
@@ -71,8 +73,11 @@ def _get_alias_lookup(db) -> Dict[str, str]:
         alias_lookup[canonical_name.lower()] = canonical_name
         if legacy_name:
             alias_lookup[legacy_name.lower()] = canonical_name
+            legacy_lookup[canonical_name.lower()] = legacy_name
+            legacy_lookup[legacy_name.lower()] = legacy_name
 
     _ALIAS_CACHE = alias_lookup
+    _LEGACY_CACHE = legacy_lookup
     _ALIAS_CACHE_TIME = now
     logger.info("Refreshed player alias cache: %d entries", len(alias_lookup))
     return alias_lookup
@@ -89,6 +94,18 @@ def _canonicalize_players(players: List[str], db) -> List[str]:
 
     canonicalized = [alias_lookup.get(player.lower(), player) for player in deduped_players]
     return _dedupe_player_names(canonicalized)
+
+
+def _to_legacy_players(players: List[str], db) -> List[str]:
+    deduped_players = _dedupe_player_names(players)
+    if not deduped_players:
+        return []
+
+    _get_alias_lookup(db)
+    if not _LEGACY_CACHE:
+        return deduped_players
+
+    return _dedupe_player_names([_LEGACY_CACHE.get(p.lower(), p) for p in deduped_players])
 
 # Fantasy point constants (shared with fantasy_planner)
 # Batting points
