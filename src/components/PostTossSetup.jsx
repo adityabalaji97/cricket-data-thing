@@ -126,51 +126,22 @@ const PostTossSetup = ({
       const response = await axios.post(`${config.API_URL}/match-preview/scrape-cricinfo`, { url });
       const data = response.data || {};
 
-      const scrapedTeam1 = data.team1 || '';
-      const scrapedTeam2 = data.team2 || '';
-      const scrapedTeam1Abbrev = data.team1_abbrev || '';
-      const scrapedTeam2Abbrev = data.team2_abbrev || '';
-      const scrapedBatFirst = data.batting_first_team || '';
-
-      const matchesTeam = (scraped, scrapedAbbrev, identifier) =>
-        isSameTeam(scraped, identifier) || isSameTeam(scrapedAbbrev, identifier);
-
-      const canMapTeamsDirectly =
-        (matchesTeam(scrapedTeam1, scrapedTeam1Abbrev, team1Identifier) && matchesTeam(scrapedTeam2, scrapedTeam2Abbrev, team2Identifier))
-        || (matchesTeam(scrapedTeam1, scrapedTeam1Abbrev, team2Identifier) && matchesTeam(scrapedTeam2, scrapedTeam2Abbrev, team1Identifier));
-
-      const scrapedTeam1Xi = uniqueNames(data.team1_xi || []);
-      const scrapedTeam2Xi = uniqueNames(data.team2_xi || []);
-      const scrapedImpact = uniqueNames(data.impact_subs || []);
-
-      if (canMapTeamsDirectly) {
-        if (matchesTeam(scrapedTeam1, scrapedTeam1Abbrev, team1Identifier)) {
-          if (scrapedTeam1Xi.length) setTeam1Xi(scrapedTeam1Xi);
-          if (scrapedTeam2Xi.length) setTeam2Xi(scrapedTeam2Xi);
-        } else {
-          if (scrapedTeam1Xi.length) setTeam2Xi(scrapedTeam1Xi);
-          if (scrapedTeam2Xi.length) setTeam1Xi(scrapedTeam2Xi);
-        }
-      } else {
-        if (scrapedTeam1Xi.length && !team1Xi.length) setTeam1Xi(scrapedTeam1Xi);
-        if (scrapedTeam2Xi.length && !team2Xi.length) setTeam2Xi(scrapedTeam2Xi);
-      }
-
-      if (scrapedImpact.length) {
-        setImpactSubs(scrapedImpact);
-      }
-
-      if (scrapedBatFirst) {
-        const batFirstAbbrev = isSameTeam(scrapedBatFirst, scrapedTeam1) ? scrapedTeam1Abbrev
-          : isSameTeam(scrapedBatFirst, scrapedTeam2) ? scrapedTeam2Abbrev : '';
-        if (matchesTeam(scrapedBatFirst, batFirstAbbrev, team1Identifier)) {
-          setBattingFirstTeam(team1Identifier);
-        } else if (matchesTeam(scrapedBatFirst, batFirstAbbrev, team2Identifier)) {
-          setBattingFirstTeam(team2Identifier);
-        }
-      }
-
       if (data.success) {
+        const xi1 = uniqueNames(data.team1_xi || []);
+        const xi2 = uniqueNames(data.team2_xi || []);
+        const impact = uniqueNames(data.impact_subs || []);
+        const t1 = data.team1 || data.team1_abbrev || '';
+        const t2 = data.team2 || data.team2_abbrev || '';
+        const batFirst = data.batting_first_team || '';
+
+        const swapped = isSameTeam(t1, team2Identifier) && isSameTeam(t2, team1Identifier);
+        setTeam1Xi(swapped ? xi2 : xi1);
+        setTeam2Xi(swapped ? xi1 : xi2);
+        if (impact.length) setImpactSubs(impact);
+
+        if (isSameTeam(batFirst, team1Identifier)) setBattingFirstTeam(team1Identifier);
+        else if (isSameTeam(batFirst, team2Identifier)) setBattingFirstTeam(team2Identifier);
+
         setInputSource('scraped');
         setScrapeMessage(`Auto-fetch succeeded (${data.source || 'espn_api'}). Review and edit if needed.`);
       } else {
@@ -272,6 +243,7 @@ const PostTossSetup = ({
 
       <Stack direction="column" spacing={1.5}>
         <Autocomplete
+          key={`t1-${inputSource}`}
           multiple
           options={team1Roster}
           freeSolo
@@ -289,6 +261,7 @@ const PostTossSetup = ({
         />
 
         <Autocomplete
+          key={`t2-${inputSource}`}
           multiple
           options={team2Roster}
           freeSolo
@@ -306,6 +279,7 @@ const PostTossSetup = ({
         />
 
         <Autocomplete
+          key={`impact-${inputSource}`}
           multiple
           options={allPlayers}
           freeSolo
