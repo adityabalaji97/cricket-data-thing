@@ -424,11 +424,22 @@ def scrape_match_setup(
         header_date = header_competitions[0].get("date")
     match_date = _safe_str(header_date or payload.get("date"))
 
+    out_team1 = base_payload["team1_abbrev"] or team1
+    out_team2 = base_payload["team2_abbrev"] or team2
+    out_bat_first = None
+    if batting_first_team:
+        if batting_first_team.lower() == (team1 or "").lower():
+            out_bat_first = out_team1
+        elif batting_first_team.lower() == (team2 or "").lower():
+            out_bat_first = out_team2
+
     base_payload.update(
         {
             "toss_winner": toss_winner,
             "toss_decision": toss_decision,
-            "batting_first_team": batting_first_team,
+            "batting_first_team": out_bat_first,
+            "team1": out_team1,
+            "team2": out_team2,
             "team1_xi": _canonicalize_if_possible(team1_xi, db),
             "team2_xi": _canonicalize_if_possible(team2_xi, db),
             "impact_subs": _canonicalize_if_possible(impact_subs, db),
