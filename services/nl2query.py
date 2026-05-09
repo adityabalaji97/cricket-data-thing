@@ -14,9 +14,12 @@ from openai import OpenAI
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 try:
-    from venue_standardization import VENUE_STANDARDIZATION
+    from venue_standardization import VENUE_STANDARDIZATION, CITY_TO_VENUE
 except Exception:  # pragma: no cover - defensive fallback
     VENUE_STANDARDIZATION = {}
+    CITY_TO_VENUE = {}
+
+_INVALID_VENUE_VALUES = {"home", "away", "neutral", "all", "any"}
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +209,8 @@ venue, country, match_id, competition, year, batting_team, bowling_team, batter,
 13. For per-match bowling queries (e.g. "spinners with 4+ wickets", "5-wicket hauls"), group_by ["match_id", "innings", "bowler"] with the appropriate min_wickets filter. Bowl_kind/bowl_style filters work in this mode too.
 14. When a query says a bowler "conceded", "conceding", or "gave away" runs (e.g. "Bumrah conceding 30+ runs"), use "bowlers" (not "players") and group_by ["match_id", "innings", "bowler"] with min_runs/max_runs as the bowling-side threshold.
 15. For per-match batting queries (e.g. "centuries", "fifties", "100+ scores"), group_by ["match_id", "innings", "batter"] with the appropriate min_runs filter.
+16. For venue, use the official stadium name. Common city-to-stadium mappings: Ahmedabad/Motera → Narendra Modi Stadium, Kolkata → Eden Gardens, Chennai/Chepauk → MA Chidambaram Stadium, Bangalore/Bengaluru → M Chinnaswamy Stadium, Delhi/Kotla → Feroz Shah Kotla, Hyderabad → Rajiv Gandhi International Stadium, Jaipur → Sawai Mansingh Stadium, Mumbai → Wankhede Stadium. Use the stadium name directly in the venue filter.
+17. Do NOT set venue to "home", "away", or any non-stadium value. The database has no home/away concept. If the user asks about home/away, drop the venue filter and note it in the explanation.
 """
 
 EXAMPLE_QUERIES = [
@@ -564,13 +569,14 @@ def _build_venue_lookup() -> Dict[str, str]:
         if alias and canonical:
             candidates[alias] = canonical
             candidates[canonical] = canonical
+    for city_name, canonical_venue in (CITY_TO_VENUE or {}).items():
+        candidates.setdefault(city_name, canonical_venue)
     # Ensure key venues are always available even if mapping import fails.
     candidates.setdefault("Eden Gardens", "Eden Gardens")
     candidates.setdefault("Eden Gardens, Kolkata", "Eden Gardens")
     for raw_name, canonical in candidates.items():
         normalized = _normalize_text(raw_name)
-        # Avoid very short fragments that cause false matches.
-        if len(normalized) < 8 and len(normalized.split()) < 2:
+        if len(normalized) < 4 and len(normalized.split()) < 2:
             continue
         if normalized not in lookup:
             lookup[normalized] = canonical
@@ -939,7 +945,12 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
         if key in filters and isinstance(filters[key], list) and len(filters[key]) > 0:
             validated[key] = filters[key]
     if "venue" in filters and isinstance(filters["venue"], str) and filters["venue"].strip():
-        validated["venue"] = VENUE_STANDARDIZATION.get(filters["venue"].strip(), filters["venue"].strip())
+        raw_venue = filters["venue"].strip()
+        if raw_venue.lower() not in _INVALID_VENUE_VALUES:
+            canonical = VENUE_STANDARDIZATION.get(raw_venue, raw_venue)
+            if canonical == raw_venue:
+                canonical = CITY_TO_VENUE.get(raw_venue, CITY_TO_VENUE.get(raw_venue.title(), raw_venue))
+            validated["venue"] = canonical
 
     # Validated enum filters
     # Track if bat_hand should become a group_by (when LLM returns a list like ["RHB", "LHB"])

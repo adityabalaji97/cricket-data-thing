@@ -237,17 +237,72 @@ def search_players_with_aliases(
         }
         
         results = db.execute(search_query, params).fetchall()
-        
+
+        if not results and len(search_lower) >= 4:
+            search_words = [w for w in search_lower.split() if len(w) >= 2]
+            word_sim_clauses = " + ".join(
+                f"(SELECT MAX(similarity(w, :w{i})) FROM unnest(string_to_array(LOWER(best_name), ' ')) AS w)"
+                for i in range(len(search_words))
+            ) if search_words else "0"
+            trgm_query = text(f"""
+                WITH trgm_matches AS (
+                    SELECT
+                        p.name as legacy_name,
+                        COALESCE(pa.alias_name, p.name) as display_name,
+                        GREATEST(
+                            similarity(LOWER(p.name), :search),
+                            similarity(LOWER(COALESCE(pa.alias_name, '')), :search)
+                        ) as sim_score
+                    FROM players p
+                    LEFT JOIN player_aliases pa ON p.name = pa.player_name
+                    WHERE similarity(LOWER(p.name), :search) > 0.3
+                       OR similarity(LOWER(COALESCE(pa.alias_name, '')), :search) > 0.3
+
+                    UNION
+
+                    SELECT
+                        pa.player_name as legacy_name,
+                        pa.alias_name as display_name,
+                        similarity(LOWER(pa.alias_name), :search) as sim_score
+                    FROM player_aliases pa
+                    WHERE similarity(LOWER(pa.alias_name), :search) > 0.3
+                ),
+                deduplicated AS (
+                    SELECT
+                        legacy_name,
+                        display_name,
+                        MAX(sim_score) as best_score
+                    FROM trgm_matches
+                    GROUP BY legacy_name, display_name
+                ),
+                scored AS (
+                    SELECT
+                        legacy_name,
+                        display_name,
+                        best_score,
+                        LOWER(display_name) as best_name
+                    FROM deduplicated
+                )
+                SELECT legacy_name, display_name
+                FROM scored
+                ORDER BY ({word_sim_clauses}) DESC, best_score DESC, display_name
+                LIMIT :limit
+            """)
+            word_params = {f"w{i}": w for i, w in enumerate(search_words)}
+            word_params["search"] = search_lower
+            word_params["limit"] = limit
+            results = db.execute(trgm_query, word_params).fetchall()
+
         return [
             {
                 "name": row.legacy_name,  # For routing to /player, /bowler
                 "display_name": row.display_name,  # For UI display
                 "details_name": row.display_name,  # For delivery_details queries
                 "type": "player"
-            } 
+            }
             for row in results
         ]
-        
+
     except Exception as e:
         logger.error(f"Error in search_players_with_aliases: {e}")
         return []

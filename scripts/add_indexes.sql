@@ -28,3 +28,8 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bowling_stats_match_team ON bowling_
 -- player_aliases (scanned in full by every matchup call before caching)
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_player_aliases_alias ON player_aliases(alias_name);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_player_aliases_player ON player_aliases(player_name);
+
+-- pg_trgm fuzzy matching indexes for NL query player name resolution
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_players_name_trgm ON players USING gin (LOWER(name) gin_trgm_ops);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_player_aliases_alias_trgm ON player_aliases USING gin (LOWER(alias_name) gin_trgm_ops);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_player_aliases_player_trgm ON player_aliases USING gin (LOWER(player_name) gin_trgm_ops);

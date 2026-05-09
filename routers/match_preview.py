@@ -732,6 +732,70 @@ def _build_axis_drill_link(
     return f"/query?{urlencode(params, doseq=True)}"
 
 
+def _build_six_venue_links(
+    *,
+    first_team_xi: List[str],
+    second_team_xi: List[str],
+    venue: str,
+    batting_first_team: str,
+    batting_second_team: str,
+    day_or_night: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Build the 6 venue-only drill-down links for the post-toss panel."""
+    specs = [
+        ("first_inn_batting", f"{batting_first_team} batting in 1st innings at {venue}",
+         first_team_xi, None, 1, ["batter"]),
+        ("first_inn_bowling", f"{batting_second_team} bowling in 1st innings at {venue}",
+         None, second_team_xi, 1, ["bowler"]),
+        ("second_inn_bowling", f"{batting_first_team} bowling in 2nd innings at {venue}",
+         None, first_team_xi, 2, ["bowler"]),
+        ("second_inn_batting", f"{batting_second_team} batting in 2nd innings at {venue}",
+         second_team_xi, None, 2, ["batter"]),
+        ("first_inn_matchups", f"1st innings matchups at {venue}: {batting_first_team} vs {batting_second_team}",
+         first_team_xi, second_team_xi, 1, ["batter", "bowler"]),
+        ("second_inn_matchups", f"2nd innings matchups at {venue}: {batting_second_team} vs {batting_first_team}",
+         second_team_xi, first_team_xi, 2, ["batter", "bowler"]),
+    ]
+
+    links = []
+    for key, description, batters, bowlers, innings, group_by in specs:
+        params: List[Tuple[str, str]] = [
+            ("query_mode", "delivery"),
+            ("innings", str(innings)),
+            ("venue", venue),
+        ]
+        if day_or_night:
+            params.append(("day_or_night", day_or_night))
+        for g in group_by:
+            params.append(("group_by", g))
+
+        filters: Dict[str, Any] = {
+            "query_mode": "delivery",
+            "innings": innings,
+            "venue": venue,
+        }
+        if day_or_night:
+            filters["day_or_night"] = day_or_night
+
+        if batters:
+            filters["batters"] = list(batters)
+            for p in batters:
+                params.append(("batters", p))
+        if bowlers:
+            filters["bowlers"] = list(bowlers)
+            for p in bowlers:
+                params.append(("bowlers", p))
+
+        links.append({
+            "key": key,
+            "description": description,
+            "url": f"/query?{urlencode(params, doseq=True)}",
+            "filters": filters,
+            "group_by": group_by,
+        })
+    return links
+
+
 def _run_post_toss_axis(
     *,
     db: Session,
@@ -1129,10 +1193,15 @@ def post_toss_preview(
             "xpoints_base": xpoints_base,
             "xpoints_delta": xpoints_delta,
             "player_drill_links": player_drill_links,
-            "drill_down_links": {
-                "general": general_bundle["drill_down_links"],
-                "venue": venue_bundle["drill_down_links"],
-            },
+            "drill_down_links": {"general": {}, "venue": {}},
+            "venue_drill_links": _build_six_venue_links(
+                first_team_xi=first_team_xi,
+                second_team_xi=second_team_xi,
+                venue=normalized_venue or payload.venue,
+                batting_first_team=batting_first_team,
+                batting_second_team=batting_second_team,
+                day_or_night=payload.day_or_night,
+            ),
             "computed_at": datetime.utcnow().isoformat() + "Z",
         }
 

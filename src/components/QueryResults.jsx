@@ -35,7 +35,8 @@ import {
   Collapse,
   Stack,
   ToggleButton,
-  ToggleButtonGroup
+  ToggleButtonGroup,
+  CircularProgress,
 } from '@mui/material';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -46,6 +47,8 @@ import ClearIcon from '@mui/icons-material/Clear';
 import MapIcon from '@mui/icons-material/Map';
 import ThumbUpAltOutlinedIcon from '@mui/icons-material/ThumbUpAltOutlined';
 import ThumbDownAltOutlinedIcon from '@mui/icons-material/ThumbDownAltOutlined';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CloseIcon from '@mui/icons-material/Close';
 import ChartPanel from './ChartPanel';
 import { PitchMapContainer, getPitchMapMode } from './PitchMap';
 import config from '../config';
@@ -249,6 +252,9 @@ const QueryResults = ({
   const [feedbackNote, setFeedbackNote] = useState('');
   const [feedbackError, setFeedbackError] = useState(null);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+  const [aiSummary, setAiSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
 
   // Extract data early to avoid hooks rule violation
   const data = results?.data || [];
@@ -619,6 +625,35 @@ const QueryResults = ({
     document.body.removeChild(link);
   };
 
+  const handleSummarize = async () => {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    try {
+      const contextDesc = nlSourceQuery
+        || Object.entries(filters || {})
+            .filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0))
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+            .join('; ')
+        || 'Query results';
+      const response = await axios.post(`${config.API_URL}/summarize/results`, {
+        context_description: contextDesc.slice(0, 500),
+        filters: filters || {},
+        group_by: groupBy || [],
+        result_data: (data || []).slice(0, 50),
+        result_count: data?.length || 0,
+      });
+      if (response.data.success) {
+        setAiSummary(response.data.summary);
+      } else {
+        setSummaryError(response.data.error || 'Failed to generate summary');
+      }
+    } catch (err) {
+      setSummaryError(err.response?.data?.detail || err.message || 'Failed to generate summary');
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
   const submitFeedback = async ({ feedback, refinedQueryText = null }) => {
     const normalizedQuery = String(nlSourceQuery || '').trim();
     if (!normalizedQuery) {
@@ -959,6 +994,16 @@ const QueryResults = ({
                   >
                     Export CSV
                   </Button>
+                  <Button
+                    variant={aiSummary ? 'outlined' : 'contained'}
+                    color="secondary"
+                    startIcon={summaryLoading ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
+                    onClick={handleSummarize}
+                    disabled={summaryLoading || !data || data.length === 0}
+                    size="small"
+                  >
+                    {summaryLoading ? 'Analyzing...' : aiSummary ? 'Re-analyze' : 'Summarize'}
+                  </Button>
                 </Box>
               </Grid>
             </Grid>
@@ -995,6 +1040,30 @@ const QueryResults = ({
             />
           ))}
         </Box>
+      )}
+
+      {/* AI Summary */}
+      {(aiSummary || summaryError) && (
+        <Card variant="outlined" sx={{ mb: 2, bgcolor: 'grey.50' }}>
+          <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
+                <AutoAwesomeIcon fontSize="small" color="secondary" />
+                <Typography variant="subtitle2">AI Summary</Typography>
+              </Stack>
+              <IconButton size="small" onClick={() => { setAiSummary(null); setSummaryError(null); }}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+            {summaryError ? (
+              <Alert severity="error" sx={{ py: 0 }}>{summaryError}</Alert>
+            ) : (
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+                {aiSummary}
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Data Table with Sorting */}

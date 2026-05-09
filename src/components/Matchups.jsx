@@ -38,6 +38,7 @@ import {
 } from '../utils/analyticsApi';
 import { getFormBorderColor } from '../utils/playerNameUtils';
 import CondensedName from './common/CondensedName';
+import PostTossDrillLinks from './PostTossDrillLinks';
 
 const getPlayerFormFlag = (formFlagsByPlayer = {}, playerName = '') => (
     formFlagsByPlayer[playerName] || formFlagsByPlayer[normalizeAnalyticsName(playerName)] || null
@@ -1106,6 +1107,16 @@ const Matchups = ({
                 postTossDelta={postTossDelta}
                 postTossPlayerLinks={postTossPlayerLinks}
             />
+
+            {hasPostTossContext && postTossMode !== 'off' && postTossRaw?.venue_drill_links?.length > 0 && (
+                <PostTossDrillLinks
+                    links={postTossRaw.venue_drill_links}
+                    venue={venue}
+                    battingFirstTeam={postTossRaw.batting_first_team}
+                    battingSecondTeam={postTossRaw.batting_second_team}
+                    isMobile={isMobile}
+                />
+            )}
 
             {postTossMode === 'off' && (
                 <>

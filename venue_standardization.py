@@ -67,6 +67,42 @@ VENUE_STANDARDIZATION = {
     'Zayed Cricket Stadium, Abu Dhabi': 'Zayed Cricket Stadium',
 }
 
+CITY_TO_VENUE = {
+    "Ahmedabad": "Narendra Modi Stadium",
+    "Ahmadabad": "Narendra Modi Stadium",
+    "Motera": "Narendra Modi Stadium",
+    "Kolkata": "Eden Gardens",
+    "Calcutta": "Eden Gardens",
+    "Chennai": "MA Chidambaram Stadium",
+    "Chepauk": "MA Chidambaram Stadium",
+    "Bangalore": "M Chinnaswamy Stadium",
+    "Bengaluru": "M Chinnaswamy Stadium",
+    "Hyderabad": "Rajiv Gandhi International Stadium",
+    "Delhi": "Feroz Shah Kotla",
+    "Jaipur": "Sawai Mansingh Stadium",
+    "Lucknow": "Ekana Cricket Stadium",
+    "Mohali": "Punjab Cricket Association IS Bindra Stadium",
+    "Chandigarh": "Punjab Cricket Association IS Bindra Stadium",
+    "Mullanpur": "Maharaja Yadavindra Singh International Cricket Stadium, Mullanpur",
+    "Guwahati": "Barsapara Cricket Stadium, Guwahati",
+    "Dharamsala": "Himachal Pradesh Cricket Association Stadium",
+    "Dharamshala": "Himachal Pradesh Cricket Association Stadium",
+    "Ranchi": "JSCA International Stadium Complex, Ranchi",
+    "Indore": "Holkar Cricket Stadium, Indore",
+    "Pune": "Maharashtra Cricket Association Stadium",
+    "Rajkot": "Saurashtra Cricket Association Stadium, Rajkot",
+    "Visakhapatnam": "Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium",
+    "Vizag": "Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium",
+    "Mumbai": "Wankhede Stadium",
+    "Wankhede": "Wankhede Stadium",
+    "Chinnaswamy": "M Chinnaswamy Stadium",
+    "Kotla": "Feroz Shah Kotla",
+    "Raipur": "Shaheed Veer Narayan Singh International Stadium, Raipur",
+    "Cuttack": "Barabati Stadium, Cuttack",
+    "Nagpur": "Vidarbha Cricket Association Stadium, Jamtha, Nagpur",
+    "Thiruvananthapuram": "Greenfield International Stadium, Thiruvananthapuram",
+}
+
 from database import get_database_connection
 from sqlalchemy import text
 
