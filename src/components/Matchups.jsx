@@ -624,7 +624,9 @@ const Matchups = ({
     const matrixAxesLocked = hasPostTossContext && postTossMode !== 'off';
 
     React.useEffect(() => {
-        if (!hasPostTossContext && postTossMode !== 'off') {
+        if (hasPostTossContext && postTossMode === 'off') {
+            setPostTossMode('general');
+        } else if (!hasPostTossContext && postTossMode !== 'off') {
             setPostTossMode('off');
         }
     }, [hasPostTossContext, postTossMode]);
@@ -979,29 +981,9 @@ const Matchups = ({
                         boxShadow: isMobile ? 0 : undefined,
                     }}
                 >
-                    <Stack
-                        direction={isMobile ? 'column' : 'row'}
-                        spacing={1}
-                        alignItems={isMobile ? 'flex-start' : 'center'}
-                        justifyContent="space-between"
-                    >
-                        <Typography variant={isMobile ? "subtitle1" : "h6"}>
-                            Post-Toss Matchup View
-                        </Typography>
-                        <ToggleButtonGroup
-                            size="small"
-                            value={postTossMode}
-                            exclusive
-                            onChange={(event, nextValue) => {
-                                if (!nextValue) return;
-                                setPostTossMode(nextValue);
-                            }}
-                        >
-                            <ToggleButton value="off">Off</ToggleButton>
-                            <ToggleButton value="general">General</ToggleButton>
-                            <ToggleButton value="venue">At Venue</ToggleButton>
-                        </ToggleButtonGroup>
-                    </Stack>
+                    <Typography variant={isMobile ? "subtitle1" : "h6"}>
+                        Post-Toss Matchup View
+                    </Typography>
                 </Card>
             )}
 
@@ -1108,16 +1090,6 @@ const Matchups = ({
                 postTossPlayerLinks={postTossPlayerLinks}
             />
 
-            {hasPostTossContext && postTossMode !== 'off' && postTossRaw?.venue_drill_links?.length > 0 && (
-                <PostTossDrillLinks
-                    links={postTossRaw.venue_drill_links}
-                    venue={venue}
-                    battingFirstTeam={postTossRaw.batting_first_team}
-                    battingSecondTeam={postTossRaw.batting_second_team}
-                    isMobile={isMobile}
-                />
-            )}
-
             {postTossMode === 'off' && (
                 <>
                     {/* Team 1 vs Team 2 Matchups */}
@@ -1202,6 +1174,16 @@ const Matchups = ({
                         </>
                     )}
                 </Box>
+            )}
+
+            {hasPostTossContext && postTossRaw?.venue_drill_links?.length > 0 && (
+                <PostTossDrillLinks
+                    links={postTossRaw.venue_drill_links}
+                    venue={venue}
+                    battingFirstTeam={postTossRaw.batting_first_team}
+                    battingSecondTeam={postTossRaw.batting_second_team}
+                    isMobile={isMobile}
+                />
             )}
         </Box>
     );
