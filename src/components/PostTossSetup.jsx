@@ -45,7 +45,7 @@ const PostTossSetup = ({
   onApplyResult,
   espnEventId = null,
 }) => {
-  const [loadingRosters, setLoadingRosters] = useState(false);
+  const [loadingRosters, setLoadingRosters] = useState(true);
   const [rosterError, setRosterError] = useState(null);
   const [team1Roster, setTeam1Roster] = useState([]);
   const [team2Roster, setTeam2Roster] = useState([]);
@@ -72,7 +72,10 @@ const PostTossSetup = ({
   );
 
   useEffect(() => {
-    if (!team1Identifier || !team2Identifier) return;
+    if (!team1Identifier || !team2Identifier) {
+      setLoadingRosters(false);
+      return;
+    }
     let cancelled = false;
 
     const loadRosters = async () => {
