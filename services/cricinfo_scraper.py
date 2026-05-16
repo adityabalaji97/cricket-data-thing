@@ -317,8 +317,9 @@ def _canonicalize_if_possible(players: List[str], db) -> List[str]:
 
 
 def scrape_match_setup(
-    cricinfo_url: str,
+    cricinfo_url: str = "",
     *,
+    event_id: Optional[str] = None,
     db=None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> Dict[str, Any]:
@@ -340,7 +341,8 @@ def scrape_match_setup(
         "error": None,
     }
 
-    event_id = _extract_event_id(cricinfo_url)
+    if not event_id:
+        event_id = _extract_event_id(cricinfo_url)
     if not event_id:
         base_payload["error"] = "Could not parse ESPN event id from URL"
         return base_payload

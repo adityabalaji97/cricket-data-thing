@@ -975,6 +975,7 @@ const VenueNotes = ({
     topTeams = null,
     dayNightFilter = 'all',
     onDayNightFilterChange = null,
+    espnEventId = null,
   }) => {
 
     const [activeSectionId, setActiveSectionId] = useState('summary');
@@ -1091,6 +1092,7 @@ const VenueNotes = ({
                             dayNightFilter={dayNightFilter}
                             isMobile={isMobile}
                             onApplyResult={handlePostTossApply}
+                            espnEventId={espnEventId}
                         />
                         <Matchups
                             team1={selectedTeam1.full_name}
@@ -1263,6 +1265,7 @@ const VenueNotes = ({
         handlePostTossApply,
         dayNightFilter,
         onDayNightFilterChange,
+        espnEventId,
     ]);
 
     const formattedDateRange = useMemo(() => formatVenueDateRange(startDate, endDate), [startDate, endDate]);

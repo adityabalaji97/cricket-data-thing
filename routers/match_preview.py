@@ -435,7 +435,8 @@ class PostTossPayload(BaseModel):
 
 
 class ScrapeCricinfoPayload(BaseModel):
-    url: str
+    url: Optional[str] = None
+    event_id: Optional[str] = None
 
 
 def _dedupe_names(names: List[str]) -> List[str]:
@@ -1247,10 +1248,15 @@ def scrape_cricinfo_endpoint(
     db: Session = Depends(get_session),
 ):
     try:
-        scraped = scrape_match_setup(payload.url, db=db, timeout_seconds=5.0)
+        scraped = scrape_match_setup(
+            payload.url or "",
+            event_id=payload.event_id,
+            db=db,
+            timeout_seconds=5.0,
+        )
         return {"success": scraped.get("source") != "failed", **scraped}
     except Exception as exc:
-        logger.error("Cricinfo scrape failed for %s: %s", payload.url, exc, exc_info=True)
+        logger.error("Cricinfo scrape failed for %s: %s", payload.url or payload.event_id, exc, exc_info=True)
         return {
             "success": False,
             "source": "failed",

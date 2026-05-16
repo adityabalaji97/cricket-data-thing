@@ -163,6 +163,7 @@ const AppContent = () => {
   const [error, setError] = useState(null);
   const [matchHistory, setMatchHistory] = useState(null);
   const [venueStats, setVenueStats] = useState(null);
+  const [espnEventId, setEspnEventId] = useState(null);
   const [showVisualizations, setShowVisualizations] = useState(false);
   const [competitions, setCompetitions] = useState({
     leagues: [],
@@ -238,6 +239,11 @@ const AppContent = () => {
           const includeInternationalParam = getQueryParam('includeInternational');
           const topTeamsParam = getQueryParam('topTeams');
           const dayNightParam = getQueryParam('dayNight') || getQueryParam('day_or_night');
+          const matchIdParam = getQueryParam('matchId');
+
+          if (matchIdParam) {
+            setEspnEventId(matchIdParam);
+          }
 
           if (includeInternationalParam !== null || topTeamsParam !== null) {
             const parsedTopTeams = Number.parseInt(topTeamsParam, 10);
@@ -863,6 +869,7 @@ const AppContent = () => {
                   topTeams={competitions.topTeams}
                   dayNightFilter={dayNightFilter}
                   onDayNightFilterChange={(nextValue) => handleDayNightChange(null, nextValue)}
+                  espnEventId={espnEventId}
                 />
               </>
             )}

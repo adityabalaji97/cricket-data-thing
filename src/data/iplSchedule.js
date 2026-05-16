@@ -10,6 +10,7 @@ export const fetchUpcomingMatches = async (count = 3) => {
     const data = await response.json();
     return (Array.isArray(data) ? data : []).map((match, index) => ({
       matchNumber: index + 1,
+      matchId: match.match_id || null,
       date: match.date,
       time: match.time,
       venue: match.venue,

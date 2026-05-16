@@ -207,7 +207,7 @@ const LandingPage = () => {
                       color="primary"
                       component={Link}
                       startIcon={<StadiumIcon />}
-                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1Abbr || match.team1)}&team2=${encodeURIComponent(match.team2Abbr || match.team2)}&includeInternational=true&topTeams=20&autoload=true`}
+                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1Abbr || match.team1)}&team2=${encodeURIComponent(match.team2Abbr || match.team2)}&includeInternational=true&topTeams=20&autoload=true${match.matchId ? `&matchId=${encodeURIComponent(match.matchId)}` : ''}`}
                     >
                       Match Preview
                     </Button>
@@ -299,7 +299,7 @@ const LandingPage = () => {
                       component={Link}
                       startIcon={<StadiumIcon />}
                       fullWidth
-                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1Abbr || match.team1)}&team2=${encodeURIComponent(match.team2Abbr || match.team2)}&includeInternational=true&topTeams=20&autoload=true`}
+                      to={`/venue?venue=${encodeURIComponent(match.venue)}&team1=${encodeURIComponent(match.team1Abbr || match.team1)}&team2=${encodeURIComponent(match.team2Abbr || match.team2)}&includeInternational=true&topTeams=20&autoload=true${match.matchId ? `&matchId=${encodeURIComponent(match.matchId)}` : ''}`}
                     >
                       Match Preview
                     </Button>
