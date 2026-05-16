@@ -122,7 +122,6 @@ const PostTossSetup = ({
   useEffect(() => {
     if (!espnEventId || loadingRosters || autoScrapedRef.current) return;
     autoScrapedRef.current = true;
-    let cancelled = false;
 
     const autoScrape = async () => {
       setScrapeLoading(true);
@@ -131,7 +130,6 @@ const PostTossSetup = ({
         const response = await axios.post(`${config.API_URL}/match-preview/scrape-cricinfo`, {
           event_id: espnEventId,
         });
-        if (cancelled) return;
         const data = response.data || {};
 
         if (data.success && (data.toss_winner || (data.team1_xi || []).length > 0)) {
@@ -156,16 +154,13 @@ const PostTossSetup = ({
           setScrapeMessage('Toss data not available yet. You can paste a Cricinfo URL or check back closer to match time.');
         }
       } catch {
-        if (!cancelled) {
-          setScrapeMessage('Toss data not available yet. You can paste a Cricinfo URL or check back closer to match time.');
-        }
+        setScrapeMessage('Toss data not available yet. You can paste a Cricinfo URL or check back closer to match time.');
       } finally {
         setScrapeLoading(false);
       }
     };
 
     autoScrape();
-    return () => { cancelled = true; };
   }, [espnEventId, loadingRosters, team1Identifier, team2Identifier]);
 
   const handleScrape = async () => {
