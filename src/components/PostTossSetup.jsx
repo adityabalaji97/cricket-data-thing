@@ -144,15 +144,45 @@ const PostTossSetup = ({
           const batFirst = data.batting_first_team || '';
 
           const swapped = isSameTeam(t1, team2Identifier) && isSameTeam(t2, team1Identifier);
-          setTeam1Xi(swapped ? xi2 : xi1);
-          setTeam2Xi(swapped ? xi1 : xi2);
+          const finalXi1 = swapped ? xi2 : xi1;
+          const finalXi2 = swapped ? xi1 : xi2;
+          setTeam1Xi(finalXi1);
+          setTeam2Xi(finalXi2);
           if (impact.length) setImpactSubs(impact);
 
-          if (isSameTeam(batFirst, team1Identifier)) setBattingFirstTeam(team1Identifier);
-          else if (isSameTeam(batFirst, team2Identifier)) setBattingFirstTeam(team2Identifier);
+          let finalBatFirst = team1Identifier;
+          if (isSameTeam(batFirst, team1Identifier)) finalBatFirst = team1Identifier;
+          else if (isSameTeam(batFirst, team2Identifier)) finalBatFirst = team2Identifier;
+          setBattingFirstTeam(finalBatFirst);
 
           setInputSource('scraped');
-          setScrapeMessage(`Toss & lineup auto-fetched (${data.source || 'espn_api'}). Review and edit if needed.`);
+          setScrapeMessage(`Toss & lineup auto-fetched (${data.source || 'espn_api'}). Applying...`);
+
+          if (data.toss_winner && finalXi1.length > 0 && finalXi2.length > 0) {
+            setApplyLoading(true);
+            try {
+              const postTossRes = await axios.post(`${config.API_URL}/match-preview/post-toss`, {
+                venue,
+                team1_id: team1Identifier,
+                team2_id: team2Identifier,
+                batting_first_team: finalBatFirst,
+                team1_xi: finalXi1,
+                team2_xi: finalXi2,
+                impact_subs: impact,
+                source: 'scraped',
+                ...(normalizedDayNight ? { day_or_night: normalizedDayNight } : {}),
+                ...(normalizedDayNight === 'day'
+                  ? { general_window_years: 4, venue_window_years: 5 }
+                  : {}),
+              });
+              onApplyResult?.(postTossRes.data);
+              setScrapeMessage(`Toss & lineup auto-fetched and applied (${data.source || 'espn_api'}).`);
+            } catch {
+              setScrapeMessage(`Toss & lineup auto-fetched (${data.source || 'espn_api'}). Auto-apply failed — click Apply Post-Toss manually.`);
+            } finally {
+              setApplyLoading(false);
+            }
+          }
         } else {
           setScrapeMessage('Toss data not available yet. You can paste a Cricinfo URL or check back closer to match time.');
         }
@@ -164,7 +194,7 @@ const PostTossSetup = ({
     };
 
     autoScrape();
-  }, [espnEventId, loadingRosters, team1Identifier, team2Identifier]);
+  }, [espnEventId, loadingRosters, team1Identifier, team2Identifier, venue, normalizedDayNight, onApplyResult]);
 
   const handleScrape = async () => {
     const url = String(cricinfoUrl || '').trim();
