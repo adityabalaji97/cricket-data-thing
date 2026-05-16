@@ -979,7 +979,7 @@ const VenueNotes = ({
   }) => {
 
     const [activeSectionId, setActiveSectionId] = useState('summary');
-    const [activatedSections, setActivatedSections] = useState(() => new Set(['summary']));
+    const [activatedSections, setActivatedSections] = useState(() => new Set(['summary', 'preview', 'teams']));
     const [similarZoneFilters, setSimilarZoneFilters] = useState(DEFAULT_SIMILAR_ZONE_FILTERS);
     const [postTossSelection, setPostTossSelection] = useState(null);
     const sectionRefs = useRef({});
@@ -990,6 +990,8 @@ const VenueNotes = ({
         || activeSectionId === 'venueTwins'
         || activatedSections.has('similar')
         || activatedSections.has('venueTwins');
+    const dismissalsEnabled = activeSectionId === 'dismissals' || activatedSections.has('dismissals');
+    const boundariesEnabled = activeSectionId === 'boundaries' || activatedSections.has('boundaries');
 
     useEffect(() => {
         setPostTossSelection(null);
@@ -1146,6 +1148,7 @@ const VenueNotes = ({
                     includeInternational={includeInternational}
                     topTeams={topTeams}
                     isMobile={isMobile}
+                    enabled={dismissalsEnabled}
                 />
             ),
         });
@@ -1163,6 +1166,7 @@ const VenueNotes = ({
                     leagues={leagues}
                     includeInternational={includeInternational}
                     isMobile={isMobile}
+                    enabled={boundariesEnabled}
                 />
             ),
         });
@@ -1256,6 +1260,8 @@ const VenueNotes = ({
         foresightEnabled,
         previewEnabled,
         teamsEnabled,
+        dismissalsEnabled,
+        boundariesEnabled,
         similarData,
         similarTacticalEdgesData,
         similarLoading,
@@ -1293,21 +1299,9 @@ const VenueNotes = ({
 
     useEffect(() => {
         setActiveSectionId('summary');
-        setActivatedSections(new Set(['summary']));
+        setActivatedSections(new Set(['summary', 'preview', 'teams']));
         setSimilarZoneFilters(DEFAULT_SIMILAR_ZONE_FILTERS);
     }, [selectedTeam1, selectedTeam2, venue]);
-
-    // Staggered auto-activation: progressively activate sections after mount
-    useEffect(() => {
-        if (!sectionGroups.length) return;
-
-        const sectionIds = sectionGroups.map((g) => g.id).filter((id) => id !== 'summary');
-        const timers = sectionIds.map((id, index) =>
-            setTimeout(() => markSectionActivated(id), (index + 1) * 1000)
-        );
-
-        return () => timers.forEach(clearTimeout);
-    }, [sectionGroups, markSectionActivated]);
 
     useEffect(() => {
         if (!sectionGroups.length) {
@@ -1334,7 +1328,7 @@ const VenueNotes = ({
                 setActiveSectionId(nextActive);
             }
         }, {
-            rootMargin: '0px 0px 100% 0px',
+            rootMargin: '0px 0px 0px 0px',
             threshold: [0.1, 0.35, 0.6],
         });
 

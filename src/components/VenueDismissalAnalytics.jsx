@@ -10,14 +10,15 @@ const VenueDismissalAnalytics = ({
   leagues = [],
   includeInternational = false,
   topTeams = null,
-  isMobile
+  isMobile,
+  enabled = true,
 }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!venue || venue === 'All Venues') return;
+    if (!enabled || !venue || venue === 'All Venues') return;
 
     const fetchDismissalData = async () => {
       setLoading(true);
@@ -55,7 +56,7 @@ const VenueDismissalAnalytics = ({
     };
 
     fetchDismissalData();
-  }, [venue, startDate, endDate, leagues, includeInternational, topTeams]);
+  }, [enabled, venue, startDate, endDate, leagues, includeInternational, topTeams]);
 
   if (loading) {
     return (
