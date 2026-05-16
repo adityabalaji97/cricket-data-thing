@@ -156,9 +156,11 @@ const PostTossSetup = ({
           setScrapeMessage('Toss data not available yet. You can paste a Cricinfo URL or check back closer to match time.');
         }
       } catch {
-        // Silent fallback — manual entry is still available
+        if (!cancelled) {
+          setScrapeMessage('Toss data not available yet. You can paste a Cricinfo URL or check back closer to match time.');
+        }
       } finally {
-        if (!cancelled) setScrapeLoading(false);
+        setScrapeLoading(false);
       }
     };
 
