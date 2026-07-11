@@ -454,7 +454,7 @@ const TodayMatchCard = ({ match }) => {
         VS
       </Typography>
       <TeamFixtureRow color={team2Color} abbr={match.team2Abbr || match.team2} name={match.team2} />
-      <Box sx={{ height: 1, bgcolor: C.hairline, my: 1.7 }} />
+      <Box sx={{ height: '1px', bgcolor: C.hairline, my: 1.7 }} />
       <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, minHeight: 36 }}>
         {match.venue || 'Venue TBA'}
       </Typography>
@@ -669,7 +669,7 @@ const RecentMatchTile = ({ match }) => {
       </Box>
       <ScoreRow team={match.team1} score={match.innings1_score || match.team1_score} winner={team1Won} />
       <ScoreRow team={match.team2} score={match.innings2_score || match.team2_score} winner={team2Won} />
-      <Box sx={{ height: 1, bgcolor: C.hairline, my: 1.35 }} />
+      <Box sx={{ height: '1px', bgcolor: C.hairline, my: 1.35 }} />
       <Typography
         component={Link}
         to={`/scorecard/${match.match_id}`}
