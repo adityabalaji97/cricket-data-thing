@@ -1,8 +1,84 @@
 from sqlalchemy.sql import text
 from fastapi import HTTPException
-from typing import List, Dict, Optional
-from datetime import date
+from typing import Any, Dict, List, Optional
 from models import teams_mapping, leagues_mapping, INTERNATIONAL_TEAMS_RANKED
+
+
+def _iso_date(value: Any) -> Optional[str]:
+    return value.isoformat() if value else None
+
+
+def _display_competition(competition: Optional[str], is_t20i: bool = False) -> Optional[str]:
+    if is_t20i:
+        return "T20I"
+    return leagues_mapping.get(competition, competition)
+
+
+def _format_match(row: Any, *, is_t20i: bool = False) -> Dict[str, Any]:
+    competition_display = _display_competition(row.competition, is_t20i=is_t20i)
+    return {
+        "match_id": row.id,
+        "date": _iso_date(row.date),
+        "venue": row.venue,
+        "team1": teams_mapping.get(row.team1, row.team1),
+        "team2": teams_mapping.get(row.team2, row.team2),
+        "team1_full": row.team1,
+        "team2_full": row.team2,
+        "team1_score": None,
+        "team2_score": None,
+        "winner": teams_mapping.get(row.winner, row.winner) if row.winner else None,
+        "competition": "T20I" if is_t20i else row.competition,
+        "competition_key": "T20I" if is_t20i else row.competition,
+        "competition_abbr": competition_display,
+        "competition_display": competition_display,
+        "match_type": row.match_type,
+        "is_international": is_t20i,
+        "scorecard_path": f"/scorecard/{row.id}",
+    }
+
+
+def _competition_stats_from_rows(rows: List[Any]) -> Dict[str, Dict[str, Any]]:
+    stats: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        is_t20i = row.match_type == "international"
+        key = "T20I" if is_t20i else row.competition
+        if not key:
+            continue
+        stats[key] = {
+            "competition": key,
+            "competition_key": key,
+            "competition_display": _display_competition(row.competition, is_t20i=is_t20i),
+            "match_type": row.match_type,
+            "match_count": row.match_count,
+            "earliest_date": _iso_date(row.earliest_date),
+            "latest_date": _iso_date(row.latest_date),
+            "date_range": f"{row.earliest_date} to {row.latest_date}" if row.earliest_date and row.latest_date else None,
+            "priority": 1 if is_t20i else 2,
+        }
+    return stats
+
+
+def _discover_filters(competition_stats: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    filters = [{"key": "all", "label": "All", "match_count": sum(s["match_count"] for s in competition_stats.values())}]
+    for key, stat in sorted(
+        competition_stats.items(),
+        key=lambda item: (item[1].get("priority", 9), -(item[1].get("match_count") or 0), item[1].get("competition_display") or item[0]),
+    ):
+        filters.append({
+            "key": key,
+            "label": stat["competition_display"],
+            "match_count": stat["match_count"],
+            "latest_date": stat["latest_date"],
+        })
+    return filters
+
+
+def _bounded_int(value: int, *, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = minimum
+    return max(minimum, min(maximum, parsed))
 
 def get_recent_matches_by_league_service(db) -> Dict:
     """
@@ -161,3 +237,185 @@ def get_recent_matches_by_league_service(db) -> Dict:
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching recent matches by league: {str(e)}")
+
+
+def get_recent_matches_discover_service(
+    db,
+    competition: str = "all",
+    limit: int = 12,
+    offset: int = 0,
+    per_group: int = 3,
+) -> Dict[str, Any]:
+    """
+    Discover recent scorecard-ready matches.
+
+    competition=all returns grouped latest matches for T20I plus leagues.
+    competition=T20I or a league name returns a flat paginated result set.
+    """
+    try:
+        limit = _bounded_int(limit, minimum=1, maximum=48)
+        offset = max(0, int(offset or 0))
+        per_group = _bounded_int(per_group, minimum=1, maximum=6)
+        requested_competition = (competition or "all").strip()
+
+        stats_query = text("""
+            SELECT
+                'T20I' AS competition,
+                'international' AS match_type,
+                COUNT(*) AS match_count,
+                MIN(m.date) AS earliest_date,
+                MAX(m.date) AS latest_date
+            FROM matches m
+            WHERE m.match_type = 'international'
+              AND m.team1 = ANY(:international_teams)
+              AND m.team2 = ANY(:international_teams)
+            UNION ALL
+            SELECT
+                m.competition,
+                m.match_type,
+                COUNT(*) AS match_count,
+                MIN(m.date) AS earliest_date,
+                MAX(m.date) AS latest_date
+            FROM matches m
+            WHERE m.match_type = 'league'
+              AND m.competition IS NOT NULL
+            GROUP BY m.competition, m.match_type
+        """)
+        stats_rows = db.execute(stats_query, {"international_teams": INTERNATIONAL_TEAMS_RANKED}).fetchall()
+        competition_stats = _competition_stats_from_rows(stats_rows)
+        filters = _discover_filters(competition_stats)
+
+        if requested_competition.lower() == "all":
+            grouped_query = text("""
+                WITH base AS (
+                    SELECT
+                        m.id,
+                        m.date,
+                        m.venue,
+                        m.team1,
+                        m.team2,
+                        m.winner,
+                        CASE WHEN m.match_type = 'international' THEN 'T20I' ELSE m.competition END AS competition_key,
+                        CASE WHEN m.match_type = 'international' THEN 'T20I' ELSE m.competition END AS competition,
+                        m.match_type,
+                        CASE WHEN m.match_type = 'international' THEN 1 ELSE 2 END AS priority
+                    FROM matches m
+                    WHERE (
+                        m.match_type = 'international'
+                        AND m.team1 = ANY(:international_teams)
+                        AND m.team2 = ANY(:international_teams)
+                    )
+                    OR (
+                        m.match_type = 'league'
+                        AND m.competition IS NOT NULL
+                    )
+                ),
+                ranked AS (
+                    SELECT
+                        base.*,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY competition_key
+                            ORDER BY date DESC NULLS LAST, id DESC
+                        ) AS rn
+                    FROM base
+                )
+                SELECT *
+                FROM ranked
+                WHERE rn <= :per_group
+                ORDER BY priority, date DESC NULLS LAST, competition_key, rn
+            """)
+            rows = db.execute(grouped_query, {
+                "international_teams": INTERNATIONAL_TEAMS_RANKED,
+                "per_group": per_group,
+            }).fetchall()
+
+            grouped: Dict[str, Dict[str, Any]] = {}
+            for row in rows:
+                key = row.competition_key
+                stat = competition_stats.get(key, {})
+                group = grouped.setdefault(key, {
+                    "key": key,
+                    "label": _display_competition(None, is_t20i=key == "T20I") if key == "T20I" else leagues_mapping.get(key, key),
+                    "match_type": row.match_type,
+                    "total": stat.get("match_count", 0),
+                    "latest_date": stat.get("latest_date"),
+                    "has_more": (stat.get("match_count") or 0) > per_group,
+                    "matches": [],
+                })
+                group["matches"].append(_format_match(row, is_t20i=key == "T20I"))
+
+            groups = sorted(
+                grouped.values(),
+                key=lambda group: (
+                    0 if group["key"] == "T20I" else 1,
+                    -(competition_stats.get(group["key"], {}).get("match_count") or 0),
+                    group["label"],
+                ),
+            )
+
+            return {
+                "mode": "grouped",
+                "competition": "all",
+                "per_group": per_group,
+                "groups": groups,
+                "competition_stats": competition_stats,
+                "filters": filters,
+                "total_competitions": len(competition_stats),
+                "total_matches": sum(stat["match_count"] for stat in competition_stats.values()),
+            }
+
+        is_t20i = requested_competition.upper() == "T20I"
+        if is_t20i:
+            where_clause = """
+                m.match_type = 'international'
+                AND m.team1 = ANY(:international_teams)
+                AND m.team2 = ANY(:international_teams)
+            """
+            params = {"international_teams": INTERNATIONAL_TEAMS_RANKED}
+            key = "T20I"
+            label = "T20I"
+        else:
+            where_clause = "m.match_type = 'league' AND m.competition = :competition"
+            params = {"competition": requested_competition}
+            key = requested_competition
+            label = leagues_mapping.get(requested_competition, requested_competition)
+
+        total_query = text(f"SELECT COUNT(*) FROM matches m WHERE {where_clause}")
+        total = db.execute(total_query, params).scalar() or 0
+
+        flat_query = text(f"""
+            SELECT
+                m.id,
+                m.date,
+                m.venue,
+                m.team1,
+                m.team2,
+                m.winner,
+                CASE WHEN m.match_type = 'international' THEN 'T20I' ELSE m.competition END AS competition,
+                m.match_type
+            FROM matches m
+            WHERE {where_clause}
+            ORDER BY m.date DESC NULLS LAST, m.id DESC
+            LIMIT :limit OFFSET :offset
+        """)
+        flat_params = {**params, "limit": limit, "offset": offset}
+        rows = db.execute(flat_query, flat_params).fetchall()
+        matches = [_format_match(row, is_t20i=is_t20i) for row in rows]
+        next_offset = offset + len(matches)
+
+        return {
+            "mode": "filtered",
+            "competition": key,
+            "label": label,
+            "matches": matches,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": next_offset < total,
+            "next_offset": next_offset if next_offset < total else None,
+            "competition_stats": competition_stats,
+            "filters": filters,
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error discovering recent matches: {str(e)}")

@@ -24,6 +24,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
+import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import VenueNotes from './components/VenueNotes';
 import MatchupsTab from './components/MatchupsTab';
@@ -623,9 +624,41 @@ const AppContent = () => {
                 Fantasy Planner
               </MenuItem>
             </Menu>
-            <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap' }}>
-              {getPageTitle()}
-            </Typography>
+            {location.pathname === '/' ? (
+              <Box
+                component={Link}
+                to="/"
+                sx={{
+                  ml: 1,
+                  flexGrow: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  textDecoration: 'none',
+                  color: 'primary.main',
+                  minWidth: 0
+                }}
+              >
+                <SportsCricketIcon sx={{ fontSize: 24, transform: 'rotate(-35deg)' }} />
+                <Typography
+                  variant="h6"
+                  fontWeight={800}
+                  sx={{
+                    whiteSpace: 'nowrap',
+                    background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent'
+                  }}
+                >
+                  Hindsight
+                </Typography>
+              </Box>
+            ) : (
+              <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap' }}>
+                {getPageTitle()}
+              </Typography>
+            )}
             <IconButton
               onClick={() => setSearchExpanded(true)}
               size="small"

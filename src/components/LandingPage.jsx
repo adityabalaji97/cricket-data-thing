@@ -9,20 +9,14 @@ import {
   Grid,
   Paper,
   Divider,
-  useTheme,
-  useMediaQuery,
   Chip,
-  Stack,
-  CircularProgress,
-  IconButton,
-  Tooltip
+  CircularProgress
 } from '@mui/material';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import StadiumIcon from '@mui/icons-material/Stadium';
 import GroupsIcon from '@mui/icons-material/Groups';
 import PersonIcon from '@mui/icons-material/Person';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import PeopleIcon from '@mui/icons-material/People';
@@ -32,7 +26,6 @@ import { fetchUpcomingMatches, formatDate, formatVenue } from '../data/iplSchedu
 import EloLeaderboard from './EloLeaderboard';
 import EloRacerChart from './EloRacerChart';
 import RecentMatchesSummaryCard from './RecentMatchesSummaryCard';
-import SearchBar from './search/SearchBar';
 import FeaturedInningsCards from './FeaturedInningsCards';
 
 // Check if a match falls on today's local date
@@ -100,21 +93,8 @@ const FEATURE_CARDS = [
 ];
 
 const LandingPage = () => {
-  const theme = useTheme();
-  const navigate = useNavigate();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isMedium = useMediaQuery(theme.breakpoints.down('md'));
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const handleSearchSelect = (item) => {
-    if (item.type === 'player') {
-      navigate(`/search?q=${encodeURIComponent(item.name)}`);
-    } else if (item.type === 'team') {
-      navigate(`/team?team=${encodeURIComponent(item.name)}&autoload=true`);
-    } else if (item.type === 'venue') {
-      navigate(`/venue?venue=${encodeURIComponent(item.name)}&autoload=true`);
-    }
-  };
 
   useEffect(() => {
     const loadUpcomingMatches = async () => {
@@ -342,87 +322,13 @@ const LandingPage = () => {
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 0.5, md: 2 } }}>
-      {/* 1. Hero Section with Search */}
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 2, md: 4 },
-          mb: 2,
-          background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)',
-          borderRadius: 4,
-          position: 'relative',
-          overflow: 'hidden',
-          textAlign: 'center'
-        }}
-      >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: -50,
-            right: -50,
-            fontSize: 250,
-            opacity: 0.05,
-            transform: 'rotate(15deg)',
-            color: 'primary.main'
-          }}
-        >
-          <SportsCricketIcon fontSize="inherit" />
-        </Box>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
-          <SportsCricketIcon sx={{ fontSize: { xs: 28, md: 36 }, color: 'primary.main' }} />
-          <Typography
-            variant="h4"
-            fontWeight="bold"
-            sx={{
-              fontSize: { xs: '1.5rem', md: '2rem' },
-              background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}
-          >
-            Hindsight
-          </Typography>
-        </Box>
-
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3, fontSize: { xs: '0.85rem', md: '1rem' } }}>
-          Search players, teams or venues to get started
-        </Typography>
-
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2, minHeight: { xs: 180, md: 160 }, alignItems: 'flex-start', pt: 1, position: 'relative', zIndex: 10 }}>
-          <SearchBar
-            onSelect={handleSearchSelect}
-            placeholder="Search players, teams, or venues..."
-          />
-        </Box>
-
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-          <Chip
-            label="V Kohli"
-            size="small"
-            onClick={() => handleSearchSelect({ name: 'V Kohli', type: 'player' })}
-            sx={{ cursor: 'pointer' }}
-          />
-          <Chip
-            label="JJ Bumrah"
-            size="small"
-            onClick={() => handleSearchSelect({ name: 'JJ Bumrah', type: 'player' })}
-            sx={{ cursor: 'pointer' }}
-          />
-          <Chip
-            label="MS Dhoni"
-            size="small"
-            onClick={() => handleSearchSelect({ name: 'MS Dhoni', type: 'player' })}
-            sx={{ cursor: 'pointer' }}
-          />
-        </Box>
-      </Paper>
-
-      {/* 2. Today's Match (promoted) */}
+      {/* 1. Today's Match */}
       <TodaysMatchSection />
 
-      {/* 3. Featured Innings Cards */}
+      {/* 2. Recent Scorecards */}
+      <RecentMatchesSummaryCard />
+
+      {/* 3. Recent Standout Innings */}
       <FeaturedInningsCards />
 
       {/* 4. Feature Navigation Cards (simplified) */}
@@ -505,9 +411,6 @@ const LandingPage = () => {
 
       {/* 6. Remaining Upcoming Matches */}
       <UpcomingMatchLinks />
-
-      {/* 7. Recent Matches Summary */}
-      <RecentMatchesSummaryCard />
 
       {/* 8. Footer with Credits */}
       <Divider sx={{ mb: 3 }} />

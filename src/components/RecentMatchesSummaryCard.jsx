@@ -1,17 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
+  Box,
+  Button,
   Card,
   CardContent,
-  Typography,
-  Box,
-  Grid,
   Chip,
   CircularProgress,
-  Alert,
-  Button,
   Divider,
-  IconButton,
-  Tooltip,
+  Grid,
+  Typography,
   useMediaQuery,
   useTheme
 } from '@mui/material';
@@ -20,70 +18,188 @@ import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import StadiumIcon from '@mui/icons-material/Stadium';
 import GroupsIcon from '@mui/icons-material/Groups';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import InfoIcon from '@mui/icons-material/Info';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import axios from 'axios';
 import config from '../config';
 
+const formatDate = (dateString) => {
+  if (!dateString) return 'Unknown';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+};
+
+const matchTitle = (match) => `${match.team1} vs ${match.team2}`;
+
+const MatchListCard = ({ match, compact = false }) => (
+  <Card
+    variant="outlined"
+    sx={{
+      height: '100%',
+      borderRadius: 2,
+      transition: 'transform 0.2s, box-shadow 0.2s',
+      '&:hover': {
+        transform: { xs: 'none', md: 'translateY(-2px)' },
+        boxShadow: { xs: 0, md: 3 }
+      }
+    }}
+  >
+    <CardContent sx={{ p: compact ? 1.25 : 1.75, '&:last-child': { pb: compact ? 1.25 : 1.75 } }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 0.75 }}>
+        <Chip
+          label={match.competition_abbr || match.competition_display || match.competition}
+          size="small"
+          color={match.is_international ? 'primary' : 'default'}
+          sx={{ height: 22, fontSize: '0.7rem', fontWeight: 700 }}
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', mt: 0.25 }}>
+          {formatDate(match.date)}
+        </Typography>
+      </Box>
+
+      <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.75, lineHeight: 1.25 }}>
+        {matchTitle(match)}
+      </Typography>
+
+      {match.winner && (
+        <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 700, display: 'block', mb: 0.5 }}>
+          Winner: {match.winner}
+        </Typography>
+      )}
+
+      {match.venue && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.35 }}>
+          {match.venue}
+        </Typography>
+      )}
+
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1.25 }}>
+        {match.match_id && (
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={<SportsCricketIcon />}
+            component={Link}
+            to={`/scorecard/${match.match_id}`}
+            sx={{ fontSize: '0.72rem', py: 0.35, px: 1 }}
+          >
+            Scorecard
+          </Button>
+        )}
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<StadiumIcon />}
+          component={Link}
+          to={`/venue?venue=${encodeURIComponent(match.venue || '')}&team1=${encodeURIComponent(match.team1)}&team2=${encodeURIComponent(match.team2)}`}
+          sx={{ fontSize: '0.72rem', py: 0.35, px: 1 }}
+        >
+          Venue
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<GroupsIcon />}
+          component={Link}
+          to={`/matchups?team1=${encodeURIComponent(match.team1)}&team2=${encodeURIComponent(match.team2)}`}
+          sx={{ fontSize: '0.72rem', py: 0.35, px: 1 }}
+        >
+          H2H
+        </Button>
+      </Box>
+    </CardContent>
+  </Card>
+);
+
 const RecentMatchesSummaryCard = () => {
+  const [activeCompetition, setActiveCompetition] = useState('all');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
-  const [expanded, setExpanded] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
-    const fetchRecentMatches = async () => {
+    let cancelled = false;
+
+    const fetchDiscovery = async () => {
       try {
         setLoading(true);
         setError(null);
-        
-        const response = await axios.get(`${config.API_URL}/recent-matches/by-league`);
-        setData(response.data);
+        const response = await axios.get(`${config.API_URL}/recent-matches/discover`, {
+          params: { competition: activeCompetition, limit: 12, offset: 0, per_group: 3 }
+        });
+        if (!cancelled) setData(response.data);
       } catch (err) {
-        console.error('Error fetching recent matches:', err);
-        setError('Failed to load recent matches data');
+        console.error('Error fetching recent scorecards:', err);
+        if (!cancelled) setError('Failed to load recent scorecards');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchRecentMatches();
-  }, []);
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const getWinnerStyle = (match) => {
-    if (!match.winner) return { color: 'text.secondary' };
-    return { 
-      color: 'success.main',
-      fontWeight: 'bold'
+    fetchDiscovery();
+    return () => {
+      cancelled = true;
     };
+  }, [activeCompetition]);
+
+  const filters = useMemo(() => {
+    const source = data?.filters || [];
+    return source.slice(0, isMobile ? 8 : 12);
+  }, [data, isMobile]);
+
+  const competitionStats = useMemo(() => (
+    Object.values(data?.competition_stats || {})
+      .sort((a, b) => {
+        if (a.priority !== b.priority) return a.priority - b.priority;
+        return (b.match_count || 0) - (a.match_count || 0);
+      })
+  ), [data]);
+
+  const handleLoadMore = async () => {
+    if (!data?.has_more || data.next_offset == null || activeCompetition === 'all') return;
+    try {
+      setLoadingMore(true);
+      const response = await axios.get(`${config.API_URL}/recent-matches/discover`, {
+        params: {
+          competition: activeCompetition,
+          limit: data.limit || 12,
+          offset: data.next_offset,
+          per_group: 3
+        }
+      });
+      setData((prev) => ({
+        ...response.data,
+        matches: [...(prev?.matches || []), ...(response.data.matches || [])]
+      }));
+    } catch (err) {
+      console.error('Error loading more scorecards:', err);
+      setError('Failed to load more scorecards');
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   if (loading) {
     return (
-      <Card sx={{ mt: 4, p: 2 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
-          <CircularProgress />
-          <Typography sx={{ ml: 2, fontSize: isMobile ? '0.875rem' : '1rem' }}>Loading recent matches...</Typography>
-        </Box>
+      <Card sx={{ mb: 4, borderRadius: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
+            <CircularProgress size={24} />
+            <Typography sx={{ ml: 2 }}>Loading recent scorecards...</Typography>
+          </Box>
+        </CardContent>
       </Card>
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
-      <Card sx={{ mt: 4 }}>
+      <Card sx={{ mb: 4, borderRadius: 3 }}>
         <CardContent>
           <Alert severity="error">{error}</Alert>
         </CardContent>
@@ -91,229 +207,138 @@ const RecentMatchesSummaryCard = () => {
     );
   }
 
-  if (!data || !data.recent_matches) {
-    return null;
-  }
-
-  const displayMatches = expanded ? data.recent_matches : data.recent_matches.slice(0, 6);
-  const topCompetitions = Object.values(data.competition_stats || {})
-    .sort((a, b) => {
-      // T20I first (priority 1), then by match count
-      if (a.priority !== b.priority) {
-        return a.priority - b.priority;
-      }
-      return b.match_count - a.match_count;
-    });
+  if (!data) return null;
 
   return (
-    <Card sx={{
-      mt: 4,
-      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-      borderRadius: 3,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
-    }}>
-      <CardContent sx={{ p: isMobile ? 1.5 : 3 }}>
-        {/* Header */}
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'center',
-          mb: isMobile ? 2 : 3,
-          justifyContent: 'space-between',
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: isMobile ? 1 : 0
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? 0.5 : 1 }}>
-            <TrendingUpIcon sx={{ color: 'primary.main', fontSize: isMobile ? '1.2rem' : '1.5rem' }} />
-            <Typography variant={isMobile ? "body1" : "h5"} fontWeight="bold" color="primary.main">
-              Latest Cricket Activity
+    <Card
+      sx={{
+        mb: 4,
+        background: 'linear-gradient(135deg, #f5f9ff 0%, #e6eff8 100%)',
+        borderRadius: 3,
+        boxShadow: '0 8px 28px rgba(16, 60, 110, 0.12)'
+      }}
+    >
+      <CardContent sx={{ p: { xs: 1.5, md: 3 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'center', mb: 1.5 }}>
+          <Box>
+            <Typography variant={isMobile ? 'h6' : 'h5'} fontWeight={900} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <SportsCricketIcon color="primary" />
+              Recent Scorecards
             </Typography>
-            {!isMobile && (
-              <Tooltip title="Most recent match from each league and T20 internationals in our database">
-                <IconButton size="small">
-                  <InfoIcon fontSize="small" color="action" />
-                </IconButton>
-              </Tooltip>
-            )}
+            <Typography variant="body2" color="text.secondary">
+              Browse the newest T20 scorecards by competition
+            </Typography>
           </Box>
-
           <Chip
-            label={`${data.total_recent_matches} Recent Matches`}
-            color="primary"
             size="small"
-            icon={<SportsCricketIcon />}
-            sx={{ fontSize: isMobile ? '0.7rem' : '0.8125rem' }}
+            color="primary"
+            label={data.mode === 'filtered' ? `${data.total} matches` : `${data.total_matches} matches`}
           />
         </Box>
 
-        {/* Recent Matches Grid */}
-        <Box sx={{ mb: isMobile ? 2 : 3 }}>
-          <Typography variant={isMobile ? "body1" : "h6"} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? 0.5 : 1, fontWeight: 600 }}>
-            <CalendarTodayIcon fontSize="small" color="primary" />
-            Latest Matches (T20I + Leagues)
-          </Typography>
-          
-          <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: 1 }}>
-            {displayMatches.map((match, index) => (
-              <Grid item xs={12} sm={6} md={4} key={match.match_id || index}>
-                <Card sx={{
-                  height: '100%',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: 4
-                  },
-                  border: '1px solid',
-                  borderColor: 'divider'
-                }}>
-                  <CardContent sx={{ p: isMobile ? 1.25 : 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: isMobile ? 0.75 : 1 }}>
-                      <Chip
-                        label={match.competition_abbr || match.competition}
-                        size="small"
-                        color={match.is_international ? "primary" : "secondary"}
-                        sx={{
-                          fontSize: isMobile ? '0.65rem' : '0.7rem',
-                          fontWeight: match.is_international ? 'bold' : 'normal',
-                          height: isMobile ? 20 : 24
-                        }}
-                      />
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
-                        {formatDate(match.date)}
-                      </Typography>
-                    </Box>
-
-                    <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: isMobile ? 0.5 : 1, fontSize: isMobile ? '0.8rem' : '0.9rem' }}>
-                      {match.team1} vs {match.team2}
-                    </Typography>
-
-                    {match.winner && (
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          ...getWinnerStyle(match),
-                          fontSize: isMobile ? '0.65rem' : '0.75rem'
-                        }}
-                      >
-                        Winner: {match.winner}
-                      </Typography>
-                    )}
-
-                    {match.venue && (
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
-                        📍 {match.venue}
-                      </Typography>
-                    )}
-
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 0.5 : 1, mt: isMobile ? 1 : 1.5 }}>
-                      {match.match_id && (
-                        <Button
-                          size="small"
-                          variant="contained"
-                          startIcon={isMobile ? undefined : <SportsCricketIcon />}
-                          component={Link}
-                          to={`/scorecard/${match.match_id}`}
-                          sx={{ fontSize: isMobile ? '0.65rem' : '0.7rem', py: 0.3, px: isMobile ? 0.75 : 1 }}
-                        >
-                          Scorecard
-                        </Button>
-                      )}
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={isMobile ? undefined : <StadiumIcon />}
-                        component={Link}
-                        to={`/venue?venue=${encodeURIComponent(match.venue || '')}&team1=${match.team1}&team2=${match.team2}`}
-                        sx={{ fontSize: isMobile ? '0.65rem' : '0.7rem', py: 0.3, px: isMobile ? 0.75 : 1 }}
-                      >
-                        Venue
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={isMobile ? undefined : <GroupsIcon />}
-                        component={Link}
-                        to={`/matchups?team1=${match.team1}&team2=${match.team2}`}
-                        sx={{ fontSize: isMobile ? '0.65rem' : '0.7rem', py: 0.3, px: isMobile ? 0.75 : 1 }}
-                      >
-                        H2H
-                      </Button>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-          
-          {data.recent_matches.length > 6 && (
-            <Box sx={{ textAlign: 'center', mt: 2 }}>
-              <Button
-                variant="outlined"
-                onClick={() => setExpanded(!expanded)}
-                size="small"
-                sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
-              >
-                {expanded ? 'Show Less' : `Show All ${data.recent_matches.length} Matches`}
-              </Button>
-            </Box>
-          )}
+        <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 1, mb: 1.5 }}>
+          {filters.map((filter) => (
+            <Chip
+              key={filter.key}
+              label={filter.label}
+              clickable
+              color={activeCompetition === filter.key ? 'primary' : 'default'}
+              variant={activeCompetition === filter.key ? 'filled' : 'outlined'}
+              onClick={() => setActiveCompetition(filter.key)}
+              sx={{ flexShrink: 0, fontWeight: 700 }}
+            />
+          ))}
         </Box>
 
-        <Divider sx={{ my: isMobile ? 2 : 3 }} />
+        {error && (
+          <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>
+        )}
 
-        {/* Competition Statistics */}
-        <Box>
-          <Typography variant={isMobile ? "body1" : "h6"} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? 0.5 : 1, fontWeight: 600 }}>
-            <SportsCricketIcon fontSize="small" color="primary" />
-            League Match Counts
-          </Typography>
-          
-          <Grid container spacing={isMobile ? 1 : 1.5} sx={{ mt: 1 }}>
-            {topCompetitions.map((comp, index) => (
-              <Grid item xs={6} sm={4} md={3} key={comp.competition || index}>
-                <Box sx={{
-                  p: isMobile ? 1 : 1.5,
-                  bgcolor: 'background.paper',
-                  borderRadius: 2,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  textAlign: 'center',
-                  transition: 'transform 0.2s',
-                  '&:hover': {
-                    transform: 'scale(1.02)'
-                  }
-                }}>
-                  <Typography variant="body2" fontWeight="bold" color="primary.main" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
-                    {comp.competition_display}
+        {data.mode === 'grouped' ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {(data.groups || []).slice(0, isMobile ? 5 : 8).map((group) => (
+              <Box key={group.key}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="subtitle1" fontWeight={900}>
+                    {group.label}
                   </Typography>
-                  <Typography variant={isMobile ? "body1" : "h6"} color="text.primary" sx={{ my: 0.5, fontSize: isMobile ? '1rem' : '1.25rem' }}>
-                    {comp.match_count.toLocaleString()}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
-                    matches
-                  </Typography>
-                  {comp.latest_date && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
-                      Latest: {formatDate(comp.latest_date)}
-                    </Typography>
+                  {group.has_more && (
+                    <Button size="small" onClick={() => setActiveCompetition(group.key)}>
+                      View more
+                    </Button>
                   )}
                 </Box>
-              </Grid>
+                <Grid container spacing={1.25}>
+                  {(group.matches || []).map((match) => (
+                    <Grid item xs={12} md={4} key={match.match_id}>
+                      <MatchListCard match={match} compact={isMobile} />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
             ))}
-          </Grid>
-        </Box>
+          </Box>
+        ) : (
+          <Box>
+            <Grid container spacing={1.25}>
+              {(data.matches || []).map((match) => (
+                <Grid item xs={12} md={4} key={match.match_id}>
+                  <MatchListCard match={match} compact={isMobile} />
+                </Grid>
+              ))}
+            </Grid>
+            {data.has_more && (
+              <Box sx={{ textAlign: 'center', mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  startIcon={loadingMore ? <CircularProgress size={16} /> : <CalendarTodayIcon />}
+                >
+                  {loadingMore ? 'Loading...' : 'Load more'}
+                </Button>
+              </Box>
+            )}
+          </Box>
+        )}
 
-        {/* Footer */}
-        <Box sx={{
-          mt: isMobile ? 2 : 3,
-          pt: isMobile ? 1.5 : 2,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          textAlign: 'center'
-        }}>
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
-            Showing the most recent match from each of {data.total_competitions} competitions in our database
-          </Typography>
-        </Box>
+        {!!competitionStats.length && (
+          <>
+            <Divider sx={{ my: 2.5 }} />
+            <Typography variant="subtitle1" fontWeight={900} sx={{ mb: 1 }}>
+              League Match Counts
+            </Typography>
+            <Grid container spacing={1}>
+              {competitionStats.slice(0, isMobile ? 6 : 10).map((comp) => (
+                <Grid item xs={6} sm={4} md={3} key={comp.competition_key || comp.competition}>
+                  <Button
+                    fullWidth
+                    variant={activeCompetition === comp.competition_key ? 'contained' : 'outlined'}
+                    onClick={() => setActiveCompetition(comp.competition_key || comp.competition)}
+                    sx={{
+                      display: 'block',
+                      textAlign: 'center',
+                      py: 1,
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      minHeight: 92
+                    }}
+                  >
+                    <Typography component="span" display="block" fontWeight={900}>
+                      {comp.competition_display}
+                    </Typography>
+                    <Typography component="span" display="block" variant="h6" fontWeight={900}>
+                      {(comp.match_count || 0).toLocaleString()}
+                    </Typography>
+                    <Typography component="span" display="block" variant="caption">
+                      Latest: {formatDate(comp.latest_date)}
+                    </Typography>
+                  </Button>
+                </Grid>
+              ))}
+            </Grid>
+          </>
+        )}
       </CardContent>
     </Card>
   );

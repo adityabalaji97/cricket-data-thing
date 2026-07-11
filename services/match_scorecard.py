@@ -288,13 +288,34 @@ def _details_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str
                 LEFT JOIN alias_map pa ON LOWER(dd.bat) = pa.name_key
                 WHERE dd.p_match = :match_id AND dd.bat IS NOT NULL
             ),
-            outs AS (
-                SELECT DISTINCT ON (inns, batter_name)
-                    inns, batter_name, dismissal
+            player_map AS (
+                SELECT DISTINCT ON (p_bat)
+                    p_bat,
+                    batter_name
                 FROM base
-                WHERE dismissal IS NOT NULL AND dismissal != ''
-                  AND (bat_out IS NULL OR bat_out = '' OR bat_out = bat OR bat_out = batter_name)
-                ORDER BY inns, batter_name, over DESC, ball DESC
+                WHERE p_bat IS NOT NULL AND batter_name IS NOT NULL
+                ORDER BY p_bat, inns, over, ball
+            ),
+            outs AS (
+                SELECT DISTINCT ON (inns, dismissed_name)
+                    inns,
+                    dismissed_name AS batter_name,
+                    dismissal
+                FROM (
+                    SELECT
+                        b.inns,
+                        COALESCE(pm.batter_name, CASE WHEN LOWER(COALESCE(b.bat_out, '')) = 'true' THEN b.batter_name ELSE NULL END) AS dismissed_name,
+                        b.dismissal,
+                        b.over,
+                        b.ball
+                    FROM base b
+                    LEFT JOIN player_map pm ON pm.p_bat = b.p_out
+                    WHERE LOWER(COALESCE(b.out, '')) = 'true'
+                      AND b.dismissal IS NOT NULL
+                      AND b.dismissal != ''
+                ) wicket_rows
+                WHERE dismissed_name IS NOT NULL
+                ORDER BY inns, dismissed_name, over DESC, ball DESC
             )
             SELECT
                 b.inns AS innings,
@@ -607,6 +628,8 @@ def _bowl_vs_batter_sql() -> str:
                SUM(total_runs) AS runs,
                SUM(CASE WHEN dismissal IS NOT NULL AND dismissal != ''
                          AND LOWER(dismissal) NOT LIKE '%run out%' THEN 1 ELSE 0 END) AS wickets,
+               SUM(CASE WHEN batter_runs = 4 THEN 1 ELSE 0 END) AS fours,
+               SUM(CASE WHEN batter_runs = 6 THEN 1 ELSE 0 END) AS sixes,
                SUM(CASE WHEN total_runs = 0 AND wide = 0 AND noball = 0 THEN 1 ELSE 0 END) AS dots
         FROM base
         WHERE batter_name IS NOT NULL AND bowler_name IS NOT NULL
@@ -982,6 +1005,8 @@ def _bowl_vs_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "runs": runs,
         "balls": balls,
         "wkts": int(row.get("wickets") or 0),
+        "fours": int(row.get("fours") or 0),
+        "sixes": int(row.get("sixes") or 0),
         "dots": int(row.get("dots") or 0),
         "econ": econ,
         "bar_pct": min(100, round(econ / 14.0 * 100)),
@@ -1045,10 +1070,28 @@ def _top_performers(innings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         team = item["batting_team"]
         top_bat = max(item.get("batting", []), key=lambda x: x.get("runs", 0), default=None)
         if top_bat:
-            out.append({"kind": "top_bat", "team": team, "player": top_bat["name"], "label": f"{top_bat['runs']}{'*' if top_bat.get('not_out') else ''}"})
+            out.append({
+                "kind": "top_bat",
+                "team": team,
+                "innings": item["innings"],
+                "player_id": top_bat["id"],
+                "player": top_bat["name"],
+                "label": f"{top_bat['runs']}{'*' if top_bat.get('not_out') else ''}",
+                "screen": "batting",
+                "lens": "bowler",
+            })
         top_bowl = max(item.get("bowling", []), key=lambda x: (x.get("wickets", 0), -x.get("runs", 0)), default=None)
         if top_bowl:
-            out.append({"kind": "top_bowl", "team": item["bowling_team"], "player": top_bowl["name"], "label": f"{top_bowl['wickets']}/{top_bowl['runs']}"})
+            out.append({
+                "kind": "top_bowl",
+                "team": item["bowling_team"],
+                "innings": item["innings"],
+                "player_id": top_bowl["id"],
+                "player": top_bowl["name"],
+                "label": f"{top_bowl['wickets']}/{top_bowl['runs']}",
+                "screen": "bowling",
+                "lens": "batter",
+            })
     return out
 
 

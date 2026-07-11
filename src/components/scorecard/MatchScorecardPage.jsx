@@ -140,7 +140,13 @@ const MatchScorecardPage = () => {
           />
         )}
 
-        {screen === 'summary' && <ScorecardSummaryScreen data={data} />}
+        {screen === 'summary' && (
+          <ScorecardSummaryScreen
+            data={data}
+            searchParams={searchParams}
+            setSearchParams={setSearchParams}
+          />
+        )}
         {screen === 'batting' && innings && (
           <BattingBreakdownScreen
             data={data}
@@ -200,11 +206,31 @@ const InningsPicker = ({ innings, active, onChange }) => (
   </div>
 );
 
-const ScorecardSummaryScreen = ({ data }) => {
+const ScorecardSummaryScreen = ({ data, searchParams, setSearchParams }) => {
   const [fullOpen, setFullOpen] = useState(false);
   const winnerAccent = getAccent(data, data.match.winner);
   const winnerPrefix = data.match.winner ? `${data.match.winner} won by ` : '';
   const hasWinnerMargin = winnerPrefix && data.match.result_text?.startsWith(winnerPrefix);
+  const openBattingInnings = (innings) => setParam(searchParams, setSearchParams, {
+    screen: 'batting',
+    innings,
+    openBatter: null,
+    openBowler: null,
+    target: null,
+  });
+  const openPerformer = (item) => {
+    if (!item.screen || !item.innings || !item.player_id) return;
+    const isBatting = item.screen === 'batting';
+    setParam(searchParams, setSearchParams, {
+      screen: item.screen,
+      innings: item.innings,
+      batLens: isBatting ? item.lens : null,
+      bowlLens: isBatting ? null : item.lens,
+      openBatter: isBatting ? item.player_id : null,
+      openBowler: isBatting ? null : item.player_id,
+      target: `${isBatting ? 'batter' : 'bowler'}-${item.innings}-${item.player_id}`,
+    });
+  };
 
   return (
     <main>
@@ -218,20 +244,25 @@ const ScorecardSummaryScreen = ({ data }) => {
         {data.match.chase_note && <p>{data.match.chase_note}</p>}
         <div className="score-lines">
           {data.summary.innings_scores.map((score) => (
-            <div className="score-line" key={score.innings} style={{ '--team-accent': getAccent(data, score.team) }}>
+            <button
+              type="button"
+              className="score-line score-line-button"
+              key={score.innings}
+              style={{ '--team-accent': getAccent(data, score.team) }}
+              onClick={() => openBattingInnings(score.innings)}
+            >
               <span className="team-dot" />
               <span>{score.team}</span>
               <b>{score.runs}<small>/{score.wickets}</small></b>
               <em>{score.overs}</em>
-            </div>
+            </button>
           ))}
         </div>
       </section>
 
-      <MomentCard moment={data.summary.moment} playerOfMatch={data.match.player_of_match} />
+      <TopPerformers data={data} onSelect={openPerformer} />
+      {data.match.player_of_match && <PlayerOfMatchCard player={data.match.player_of_match} />}
       <MomentumWorm data={data} />
-      <PlayerOfMatchCard player={data.match.player_of_match} />
-      <TopPerformers data={data} />
 
       <section className="scorecard-collapse">
         <button type="button" onClick={() => setFullOpen((value) => !value)}>
@@ -247,19 +278,6 @@ const ScorecardSummaryScreen = ({ data }) => {
     </main>
   );
 };
-
-const MomentCard = ({ moment, playerOfMatch }) => (
-  <section className="moment-card">
-    <div className="scorecard-kicker">The moment</div>
-    <h2>{moment?.title || 'Decisive passage'}</h2>
-    <p>{moment?.subtitle || `${playerOfMatch || 'The player of the match'} shaped the result.`}</p>
-    {moment?.chips?.length > 0 && (
-      <div className="moment-chips">
-        {moment.chips.map((chip, index) => <span key={`${chip}-${index}`}>{chip}</span>)}
-      </div>
-    )}
-  </section>
-);
 
 const MomentumWorm = ({ data }) => (
   <section className="worm-card">
@@ -303,16 +321,22 @@ const PlayerOfMatchCard = ({ player }) => (
   </section>
 );
 
-const TopPerformers = ({ data }) => (
+const TopPerformers = ({ data, onSelect }) => (
   <section className="top-performers">
     <div className="section-label">Top performers</div>
     <div className="performer-grid">
       {data.summary.top_performers.map((item, index) => (
-        <div className="performer-card" key={`${item.kind}-${item.team}-${item.player}`} style={{ '--team-accent': getAccent(data, item.team, index % 2 ? '#5b8def' : '#f0b429') }}>
+        <button
+          type="button"
+          className="performer-card"
+          key={`${item.kind}-${item.team}-${item.player}`}
+          style={{ '--team-accent': getAccent(data, item.team, index % 2 ? '#5b8def' : '#f0b429') }}
+          onClick={() => onSelect(item)}
+        >
           <span>{item.kind === 'top_bat' ? 'TOP BAT' : 'TOP WKT'} - {item.team}</span>
           <b>{item.player}</b>
           <strong>{item.label}</strong>
-        </div>
+        </button>
       ))}
     </div>
   </section>
@@ -342,7 +366,7 @@ const FullInnings = ({ data, innings }) => (
 
 const BattingBreakdownScreen = ({ data, innings, searchParams, setSearchParams }) => {
   const lens = searchParams.get('batLens') || 'bowler';
-  const openId = searchParams.get('openBatter') || innings.batting[0]?.id;
+  const openId = searchParams.get('openBatter');
 
   return (
     <main>
@@ -379,7 +403,7 @@ const BattingBreakdownScreen = ({ data, innings, searchParams, setSearchParams }
 
 const BowlingBreakdownScreen = ({ data, innings, searchParams, setSearchParams }) => {
   const lens = searchParams.get('bowlLens') || 'batter';
-  const openId = searchParams.get('openBowler') || innings.bowling[0]?.id;
+  const openId = searchParams.get('openBowler');
 
   return (
     <main>
@@ -427,6 +451,7 @@ const BatterAccordionRow = ({ data, innings, player, open, lens, onToggle, onLen
     <button type="button" className="accordion-trigger batting" onClick={onToggle}>
       <span className="player-name">{player.name}<small>{player.dismissal}</small></span>
       <b>{player.runs}</b><em>{player.balls}</em><strong>{player.strike_rate}</strong>
+      <span className={`row-chevron ${open ? 'open' : ''}`} aria-hidden="true" />
     </button>
     {open && (
       <div className="accordion-panel">
@@ -446,6 +471,7 @@ const BowlerAccordionRow = ({ data, innings, player, open, lens, onToggle, onLen
     <button type="button" className="accordion-trigger bowling" onClick={onToggle}>
       <span className="player-name">{player.name}<small>{player.style || 'Bowler'}</small></span>
       <b>{player.overs}</b><em>{player.runs}</em><strong>{player.wickets}</strong>
+      <span className={`row-chevron ${open ? 'open' : ''}`} aria-hidden="true" />
     </button>
     {open && (
       <div className="accordion-panel">
@@ -501,7 +527,7 @@ const BowlVsBatter = ({ player, innings, onCrossLink }) => (
             <b>{row.runs} <small>({row.balls})</small></b>
           </div>
           <MetricBar pct={row.bar_pct} color={row.bar_color} />
-          <div className="metric-trail"><strong>Econ {row.econ}</strong><span>{row.wkts} wkt</span><span>{row.dots} dots</span></div>
+          <div className="metric-trail"><strong>Econ {row.econ}</strong><span>{row.fours}x4</span><span>{row.sixes}x6</span><span>{row.wkts} wkt</span><span>{row.dots} dots</span></div>
         </div>
       );
     })}

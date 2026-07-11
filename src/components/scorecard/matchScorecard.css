@@ -26,7 +26,6 @@
 .scorecard-top h1,
 .screen-header h2,
 .result-card h2,
-.moment-card h2,
 .pom-card h2 {
   margin: 0;
   font-family: 'Barlow Semi Condensed', sans-serif;
@@ -42,7 +41,6 @@
 .scorecard-top p,
 .screen-header p,
 .result-card p,
-.moment-card p,
 .pom-card p {
   color: #9aa1ac;
   margin: 4px 0 0;
@@ -132,7 +130,6 @@
 
 .screen-header,
 .result-card,
-.moment-card,
 .worm-card,
 .pom-card,
 .top-performers,
@@ -149,7 +146,6 @@
 }
 
 .result-card,
-.moment-card,
 .worm-card,
 .pom-card {
   border-radius: 22px;
@@ -178,6 +174,20 @@
   align-items: center;
   gap: 12px;
   padding: 10px 0 6px;
+}
+
+.score-line-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.score-line-button:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .score-line .team-dot {
@@ -210,47 +220,6 @@
   text-align: right;
   font-style: normal;
   font-variant-numeric: tabular-nums;
-}
-
-.moment-card {
-  padding: 18px;
-  background: radial-gradient(120% 120% at 100% 0%, rgba(182,242,74,0.14) 0%, rgba(182,242,74,0) 55%), #0f1218;
-  border-color: rgba(182, 242, 74, 0.22);
-}
-
-.moment-card .scorecard-kicker {
-  color: #b6f24a;
-}
-
-.moment-card h2 {
-  font-size: 22px;
-  line-height: 1.1;
-  margin-top: 8px;
-}
-
-.moment-chips {
-  display: flex;
-  gap: 9px;
-  margin-top: 14px;
-}
-
-.moment-chips span {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-family: 'Barlow Semi Condensed', sans-serif;
-  font-weight: 700;
-  font-size: 22px;
-  color: #050608;
-  background: #b6f24a;
-  animation: scorecard-pop 500ms ease both;
-}
-
-@keyframes scorecard-pop {
-  from { transform: scale(0.82); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
 }
 
 .worm-card {
@@ -341,6 +310,16 @@
   padding: 13px;
   background: #14171e;
   border: 1px solid rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.performer-card:hover {
+  border-color: rgba(182, 242, 74, 0.35);
+  transform: translateY(-1px);
 }
 
 .performer-card span {
@@ -492,11 +471,11 @@
 }
 
 .scorecard-row-header.batting {
-  grid-template-columns: 1fr 40px 34px 42px;
+  grid-template-columns: 1fr 40px 34px 42px 16px;
 }
 
 .scorecard-row-header.bowling {
-  grid-template-columns: 1fr 40px 34px 36px;
+  grid-template-columns: 1fr 40px 34px 36px 16px;
 }
 
 .scorecard-row-header span:not(:first-child) {
@@ -535,11 +514,11 @@
 }
 
 .accordion-trigger.batting {
-  grid-template-columns: 1fr 40px 34px 42px;
+  grid-template-columns: 1fr 40px 34px 42px 16px;
 }
 
 .accordion-trigger.bowling {
-  grid-template-columns: 1fr 40px 34px 36px;
+  grid-template-columns: 1fr 40px 34px 36px 16px;
 }
 
 .accordion-trigger b,
@@ -559,6 +538,20 @@
 
 .accordion-trigger strong {
   color: #f0b429;
+}
+
+.row-chevron {
+  width: 8px;
+  height: 8px;
+  justify-self: end;
+  border-top: 2px solid #b6f24a;
+  border-right: 2px solid #b6f24a;
+  transform: rotate(45deg);
+  transition: transform 180ms ease;
+}
+
+.row-chevron.open {
+  transform: rotate(135deg);
 }
 
 .player-name {
@@ -878,4 +871,3 @@
     font-size: 9.5px;
   }
 }
-
