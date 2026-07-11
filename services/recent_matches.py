@@ -6,6 +6,7 @@ from models import teams_mapping, leagues_mapping, INTERNATIONAL_TEAMS_RANKED
 
 
 DETAILS_START_DATE = date(2015, 1, 1)
+IPL_COMPETITIONS = ("IPL", "Indian Premier League")
 
 
 def _iso_date(value: Any) -> Optional[str]:
@@ -15,7 +16,24 @@ def _iso_date(value: Any) -> Optional[str]:
 def _display_competition(competition: Optional[str], is_t20i: bool = False) -> Optional[str]:
     if is_t20i:
         return "T20I"
+    competition = _canonical_competition_key(competition)
     return leagues_mapping.get(competition, competition)
+
+
+def _canonical_competition_key(competition: Optional[str]) -> Optional[str]:
+    if not competition:
+        return competition
+    value = str(competition).strip()
+    if value.lower() in {"ipl", "indian premier league"}:
+        return "IPL"
+    return value
+
+
+def _competition_values_for_key(competition: str) -> List[str]:
+    key = _canonical_competition_key(competition)
+    if key == "IPL":
+        return list(IPL_COMPETITIONS)
+    return [competition]
 
 
 def _balls_to_overs(balls: int) -> str:
@@ -69,7 +87,8 @@ def _result_text_from_summary(row: Any, innings_scores: List[Dict[str, Any]]) ->
 
 
 def _format_match(row: Any, *, is_t20i: bool = False, score_summary: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    competition_display = _display_competition(row.competition, is_t20i=is_t20i)
+    competition_key = "T20I" if is_t20i else _canonical_competition_key(row.competition)
+    competition_display = _display_competition(competition_key, is_t20i=is_t20i)
     innings_scores = (score_summary or {}).get("innings_scores") or []
     innings1_score = _score_label(innings_scores[0]) if len(innings_scores) >= 1 else None
     innings2_score = _score_label(innings_scores[1]) if len(innings_scores) >= 2 else None
@@ -89,8 +108,8 @@ def _format_match(row: Any, *, is_t20i: bool = False, score_summary: Optional[Di
         "innings_scores": innings_scores,
         "result_text": result_text,
         "winner": teams_mapping.get(row.winner, row.winner) if row.winner else None,
-        "competition": "T20I" if is_t20i else row.competition,
-        "competition_key": "T20I" if is_t20i else row.competition,
+        "competition": competition_key,
+        "competition_key": competition_key,
         "competition_abbr": competition_display,
         "competition_display": competition_display,
         "match_type": row.match_type,
@@ -103,18 +122,28 @@ def _competition_stats_from_rows(rows: List[Any]) -> Dict[str, Dict[str, Any]]:
     stats: Dict[str, Dict[str, Any]] = {}
     for row in rows:
         is_t20i = row.match_type == "international"
-        key = "T20I" if is_t20i else row.competition
+        key = "T20I" if is_t20i else _canonical_competition_key(row.competition)
         if not key:
             continue
+        current = stats.get(key)
+        match_count = int(row.match_count or 0)
+        earliest_date = row.earliest_date
+        latest_date = row.latest_date
+        if current:
+            match_count += int(current.get("match_count") or 0)
+            current_earliest = _parse_iso_date(current.get("earliest_date"))
+            current_latest = _parse_iso_date(current.get("latest_date"))
+            earliest_date = min([item for item in [earliest_date, current_earliest] if item], default=earliest_date)
+            latest_date = max([item for item in [latest_date, current_latest] if item], default=latest_date)
         stats[key] = {
             "competition": key,
             "competition_key": key,
-            "competition_display": _display_competition(row.competition, is_t20i=is_t20i),
+            "competition_display": _display_competition(key, is_t20i=is_t20i),
             "match_type": row.match_type,
-            "match_count": row.match_count,
-            "earliest_date": _iso_date(row.earliest_date),
-            "latest_date": _iso_date(row.latest_date),
-            "date_range": f"{row.earliest_date} to {row.latest_date}" if row.earliest_date and row.latest_date else None,
+            "match_count": match_count,
+            "earliest_date": _iso_date(earliest_date),
+            "latest_date": _iso_date(latest_date),
+            "date_range": f"{earliest_date} to {latest_date}" if earliest_date and latest_date else None,
             "priority": 1 if is_t20i else 2,
         }
     return stats
@@ -512,7 +541,10 @@ def get_recent_matches_discover_service(
               AND m.team2 = ANY(:international_teams)
             UNION ALL
             SELECT
-                m.competition,
+                CASE
+                    WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
+                    ELSE m.competition
+                END AS competition,
                 m.match_type,
                 COUNT(*) AS match_count,
                 MIN(m.date) AS earliest_date,
@@ -520,9 +552,17 @@ def get_recent_matches_discover_service(
             FROM matches m
             WHERE m.match_type = 'league'
               AND m.competition IS NOT NULL
-            GROUP BY m.competition, m.match_type
+            GROUP BY
+                CASE
+                    WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
+                    ELSE m.competition
+                END,
+                m.match_type
         """)
-        stats_rows = db.execute(stats_query, {"international_teams": INTERNATIONAL_TEAMS_RANKED}).fetchall()
+        stats_rows = db.execute(stats_query, {
+            "international_teams": INTERNATIONAL_TEAMS_RANKED,
+            "ipl_competitions": list(IPL_COMPETITIONS),
+        }).fetchall()
         competition_stats = _competition_stats_from_rows(stats_rows)
         filters = _discover_filters(competition_stats)
         filter_options = {
@@ -541,8 +581,16 @@ def get_recent_matches_discover_service(
                         m.team2,
                         m.winner,
                         m.outcome,
-                        CASE WHEN m.match_type = 'international' THEN 'T20I' ELSE m.competition END AS competition_key,
-                        CASE WHEN m.match_type = 'international' THEN 'T20I' ELSE m.competition END AS competition,
+                        CASE
+                            WHEN m.match_type = 'international' THEN 'T20I'
+                            WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
+                            ELSE m.competition
+                        END AS competition_key,
+                        CASE
+                            WHEN m.match_type = 'international' THEN 'T20I'
+                            WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
+                            ELSE m.competition
+                        END AS competition,
                         m.match_type,
                         CASE WHEN m.match_type = 'international' THEN 1 ELSE 2 END AS priority
                     FROM matches m
@@ -564,6 +612,7 @@ def get_recent_matches_discover_service(
             """)
             rows = db.execute(grouped_query, {
                 **filtered_base_params,
+                "ipl_competitions": list(IPL_COMPETITIONS),
                 "per_group": per_group,
             }).fetchall()
             score_summaries = _score_summaries_for_rows(db, rows)
@@ -620,10 +669,10 @@ def get_recent_matches_discover_service(
             key = "T20I"
             label = "T20I"
         else:
-            comp_clause = "m.match_type = 'league' AND m.competition = :competition"
-            params = {"competition": requested_competition}
-            key = requested_competition
-            label = leagues_mapping.get(requested_competition, requested_competition)
+            key = _canonical_competition_key(requested_competition)
+            comp_clause = "m.match_type = 'league' AND m.competition = ANY(:competition_values)"
+            params = {"competition_values": _competition_values_for_key(requested_competition)}
+            label = _display_competition(key)
 
         where_clause = " AND ".join([f"({comp_clause})", *date_clauses, *team_clauses])
         params = {**params, **date_params, **team_params}
@@ -639,14 +688,18 @@ def get_recent_matches_discover_service(
                 m.team2,
                 m.winner,
                 m.outcome,
-                CASE WHEN m.match_type = 'international' THEN 'T20I' ELSE m.competition END AS competition,
+                CASE
+                    WHEN m.match_type = 'international' THEN 'T20I'
+                    WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
+                    ELSE m.competition
+                END AS competition,
                 m.match_type
             FROM matches m
             WHERE {where_clause}
             ORDER BY m.date DESC NULLS LAST, m.id DESC
             LIMIT :limit OFFSET :offset
         """)
-        flat_params = {**params, "limit": limit, "offset": offset}
+        flat_params = {**params, "ipl_competitions": list(IPL_COMPETITIONS), "limit": limit, "offset": offset}
         rows = db.execute(flat_query, flat_params).fetchall()
         score_summaries = _score_summaries_for_rows(db, rows)
         matches = [

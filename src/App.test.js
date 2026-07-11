@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import LandingPage from './components/LandingPage';
 
 jest.mock('react-router-dom', () => {
@@ -33,8 +33,8 @@ beforeEach(() => {
     }
     if (target.includes('/recent-matches/discover')) {
       return mockResponse({
-        mode: 'filtered',
-        competition: 'Indian Premier League',
+        mode: 'grouped',
+        competition: 'all',
         matches: [{
           match_id: 'match-1',
           date: '2026-07-10',
@@ -50,17 +50,23 @@ beforeEach(() => {
           result_text: 'KKR won by 17 runs',
         }],
         competition_stats: {
-          'Indian Premier League': {
-            competition: 'Indian Premier League',
-            competition_key: 'Indian Premier League',
+          IPL: {
+            competition: 'IPL',
+            competition_key: 'IPL',
             competition_display: 'IPL',
             match_count: 1,
             latest_date: '2026-07-10',
           },
         },
-        filters: [{ key: 'Indian Premier League', label: 'IPL', latest_date: '2026-07-10' }],
+        filters: [
+          { key: 'all', label: 'All', match_count: 1 },
+          { key: 'IPL', label: 'IPL', latest_date: '2026-07-10' },
+        ],
         filter_options: {
-          competitions: [{ key: 'Indian Premier League', label: 'IPL', latest_date: '2026-07-10' }],
+          competitions: [
+            { key: 'all', label: 'All', match_count: 1 },
+            { key: 'IPL', label: 'IPL', latest_date: '2026-07-10' },
+          ],
           teams: [{ value: 'KKR', label: 'KKR' }, { value: 'CSK', label: 'CSK' }],
         },
       });
@@ -82,6 +88,10 @@ test('renders redesigned landing sections and explore drawer', async () => {
   expect(screen.getByText('Recent Matches')).toBeInTheDocument();
   expect(screen.getByText('Recent Standout Innings')).toBeInTheDocument();
   expect(screen.getByText('ELO Team Rankings')).toBeInTheDocument();
+
+  await waitFor(() => {
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('competition=all'));
+  });
 
   fireEvent.click(screen.getByRole('button', { name: /explore/i }));
 

@@ -124,12 +124,6 @@ const flattenRecentMatches = (data) => {
   return (data.groups || []).flatMap((group) => group.matches || []);
 };
 
-const latestCompetition = (stats) => {
-  const items = Object.values(stats || {}).filter((item) => item.competition || item.competition_key);
-  const sorted = items.sort((a, b) => String(b.latest_date || '').localeCompare(String(a.latest_date || '')));
-  return sorted[0]?.competition_key || sorted[0]?.competition || null;
-};
-
 const sectionTitleSx = {
   color: C.hi,
   fontFamily: fonts.display,
@@ -450,7 +444,7 @@ const TodayMatchCard = ({ match }) => {
         <Typography sx={{ ...monoSx, color: live ? C.red : C.soft }}>{status}</Typography>
       </Box>
       <TeamFixtureRow color={team1Color} abbr={match.team1Abbr || match.team1} name={match.team1} />
-      <Typography sx={{ color: C.faint, fontFamily: fonts.mono, fontSize: 11, textAlign: 'center', my: 1.3 }}>
+      <Typography sx={{ color: C.faint, fontFamily: fonts.mono, fontSize: 10, lineHeight: 1, textAlign: 'center', my: 0.7 }}>
         VS
       </Typography>
       <TeamFixtureRow color={team2Color} abbr={match.team2Abbr || match.team2} name={match.team2} />
@@ -1173,7 +1167,7 @@ const LandingPage = ({ showLeagueCounts = true }) => {
   const [fixturesLoading, setFixturesLoading] = useState(true);
   const [recentData, setRecentData] = useState(null);
   const [recentLoading, setRecentLoading] = useState(true);
-  const [activeCompetition, setActiveCompetition] = useState('');
+  const [activeCompetition, setActiveCompetition] = useState('all');
   const [teamFilter, setTeamFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [innings, setInnings] = useState([]);
@@ -1210,10 +1204,6 @@ const LandingPage = ({ showLeagueCounts = true }) => {
         const payload = await response.json();
         if (cancelled) return;
         setRecentData(payload);
-        if (!activeCompetition) {
-          const nextCompetition = latestCompetition(payload.competition_stats);
-          if (nextCompetition) setActiveCompetition(nextCompetition);
-        }
       } catch (error) {
         console.error('Error fetching recent matches:', error);
         if (!cancelled) setRecentData(null);

@@ -2,6 +2,8 @@ from datetime import date
 from types import SimpleNamespace
 
 from services.recent_matches import (
+    _canonical_competition_key,
+    _competition_values_for_key,
     _date_filter_clause,
     _format_match,
     _score_summaries_for_rows,
@@ -118,3 +120,10 @@ def test_team_filter_matches_full_name_and_abbreviation_candidates():
     assert "team_candidates" in params
     assert "kkr" in params["team_candidates"]
     assert "kolkata knight riders" in params["team_candidates"]
+
+
+def test_ipl_competition_aliases_share_one_canonical_key():
+    assert _canonical_competition_key("Indian Premier League") == "IPL"
+    assert _canonical_competition_key("IPL") == "IPL"
+    assert _competition_values_for_key("IPL") == ["IPL", "Indian Premier League"]
+    assert _competition_values_for_key("Indian Premier League") == ["IPL", "Indian Premier League"]
