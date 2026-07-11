@@ -217,6 +217,11 @@ const AppContent = () => {
 
   useEffect(() => {
     const fetchInitialData = async () => {
+      if (location.pathname === '/') {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
@@ -307,7 +312,7 @@ const AppContent = () => {
     };
 
     fetchInitialData();
-  }, [location.search]); // Re-run this effect when location.search changes
+  }, [location.pathname, location.search]); // Re-run this effect when route or query changes
 
   const handleDateChange = (value, isStartDate) => {
     dateManuallyAdjustedRef.current = true;
@@ -517,6 +522,10 @@ const AppContent = () => {
   const getPageTitle = () => {
     return getPageTitleForPath(location.pathname);
   };
+
+  if (location.pathname === '/') {
+    return <LandingPage />;
+  }
 
   return (
     <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>

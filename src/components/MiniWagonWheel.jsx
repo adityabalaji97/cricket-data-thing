@@ -1,7 +1,17 @@
 import React from 'react';
 import { colors as designColors } from '../theme/designSystem';
 
-const runColor = (runs) => {
+const darkRunColors = {
+  6: '#f0b429',
+  4: '#b6f24a',
+  3: '#5b8def',
+  2: '#7aa5f0',
+  1: '#9fbff5',
+  0: '#5b6270',
+};
+
+const runColor = (runs, variant = 'light') => {
+  if (variant === 'dark') return darkRunColors[runs] || darkRunColors[0];
   if (runs === 6) return designColors.chart.orange;
   if (runs === 4) return designColors.chart.green;
   if (runs === 3) return designColors.primary[500];
@@ -10,11 +20,12 @@ const runColor = (runs) => {
   return designColors.neutral[400];
 };
 
-const MiniWagonWheel = ({ deliveries = [], size = 120 }) => {
+const MiniWagonWheel = ({ deliveries = [], size = 120, variant = 'light' }) => {
   const centerX = size / 2;
   const centerY = size / 2;
   const maxRadius = size * 0.42;
   const batterRadius = Math.max(size * 0.025, 2);
+  const isDark = variant === 'dark';
 
   const zoneLines = [];
   for (let i = 0; i < 8; i++) {
@@ -25,7 +36,7 @@ const MiniWagonWheel = ({ deliveries = [], size = 120 }) => {
       <line
         key={`zone-${i}`}
         x1={centerX} y1={centerY} x2={x2} y2={y2}
-        stroke={designColors.neutral[200]}
+        stroke={isDark ? 'rgba(255,255,255,0.06)' : designColors.neutral[200]}
         strokeWidth="1"
         strokeDasharray="3,3"
       />
@@ -63,14 +74,14 @@ const MiniWagonWheel = ({ deliveries = [], size = 120 }) => {
       <g key={`d-${index}`}>
         <line
           x1={centerX} y1={centerY} x2={normalizedX} y2={normalizedY}
-          stroke={runColor(delivery.runs)}
+          stroke={runColor(delivery.runs, variant)}
           strokeWidth={1.5}
           opacity={0.6}
           strokeLinecap="round"
         />
         <circle
           cx={normalizedX} cy={normalizedY} r={3}
-          fill={runColor(delivery.runs)}
+          fill={runColor(delivery.runs, variant)}
         />
       </g>
     );
@@ -80,13 +91,13 @@ const MiniWagonWheel = ({ deliveries = [], size = 120 }) => {
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <circle
         cx={centerX} cy={centerY} r={maxRadius}
-        fill={designColors.neutral[100]}
-        stroke={designColors.neutral[300]}
+        fill={isDark ? '#070a0e' : designColors.neutral[100]}
+        stroke={isDark ? 'rgba(255,255,255,0.08)' : designColors.neutral[300]}
         strokeWidth="1.5"
       />
       {zoneLines}
       {deliveryLines}
-      <circle cx={centerX} cy={centerY} r={batterRadius} fill={designColors.neutral[800]} />
+      <circle cx={centerX} cy={centerY} r={batterRadius} fill={isDark ? '#f3f4f6' : designColors.neutral[800]} />
     </svg>
   );
 };

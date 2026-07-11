@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from typing import Optional
 from database import get_session
 from services.recent_matches import get_recent_matches_by_league_service, get_recent_matches_discover_service
 
@@ -33,6 +34,10 @@ def get_recent_matches_discover(
     limit: int = Query(12, ge=1, le=48),
     offset: int = Query(0, ge=0),
     per_group: int = Query(3, ge=1, le=6),
+    team: Optional[str] = Query(None, description="Team abbreviation or full name, matched against either side"),
+    window: str = Query("all", description="all, 7, 30, or 90 day recency window"),
+    date_from: Optional[str] = Query(None, description="Inclusive ISO start date"),
+    date_to: Optional[str] = Query(None, description="Inclusive ISO end date"),
     db: Session = Depends(get_session),
 ):
     """
@@ -48,6 +53,10 @@ def get_recent_matches_discover(
             limit=limit,
             offset=offset,
             per_group=per_group,
+            team=team,
+            window=window,
+            date_from=date_from,
+            date_to=date_to,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
