@@ -1,0 +1,881 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+.scorecard-page {
+  background: #0a0c11;
+  color: #f3f4f6;
+  min-height: 100vh;
+  margin: -24px;
+  padding: 0 0 28px;
+  font-family: 'Barlow', sans-serif;
+}
+
+.scorecard-shell {
+  width: min(100%, 430px);
+  margin: 0 auto;
+  background: #0a0c11;
+  min-height: 100vh;
+}
+
+.scorecard-top {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 18px 12px;
+}
+
+.scorecard-top h1,
+.screen-header h2,
+.result-card h2,
+.moment-card h2,
+.pom-card h2 {
+  margin: 0;
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.scorecard-top h1 {
+  font-size: 26px;
+  line-height: 1.05;
+}
+
+.scorecard-top p,
+.screen-header p,
+.result-card p,
+.moment-card p,
+.pom-card p {
+  color: #9aa1ac;
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.scorecard-kicker,
+.section-label,
+.panel-title {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7b828c;
+}
+
+.scorecard-kicker.gold {
+  color: #f0b429;
+}
+
+.scorecard-screen-tabs,
+.innings-picker,
+.scorecard-segmented {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: #070a0e;
+  border-radius: 12px;
+}
+
+.scorecard-screen-tabs button,
+.scorecard-segmented button {
+  flex: 1;
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #7b828c;
+  cursor: pointer;
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transition: all 150ms ease;
+}
+
+.scorecard-screen-tabs button.active,
+.scorecard-segmented button.active {
+  background: #b6f24a;
+  color: #050608;
+}
+
+.innings-picker {
+  margin: 0 18px 14px;
+}
+
+.innings-picker button {
+  flex: 1;
+  min-height: 46px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #7b828c;
+  cursor: pointer;
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.innings-picker button.active {
+  background: #14171e;
+  color: #f3f4f6;
+}
+
+.innings-picker span,
+.innings-picker b {
+  display: block;
+  font-size: 11px;
+}
+
+.innings-picker b {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.screen-header,
+.result-card,
+.moment-card,
+.worm-card,
+.pom-card,
+.top-performers,
+.scorecard-collapse {
+  margin: 0 18px 20px;
+}
+
+.screen-header {
+  padding: 2px 0 0;
+}
+
+.screen-header h2 {
+  font-size: 26px;
+}
+
+.result-card,
+.moment-card,
+.worm-card,
+.pom-card {
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.result-card {
+  padding: 20px 18px 18px;
+  background: linear-gradient(160deg, #171b23 0%, #101319 100%);
+}
+
+.result-card h2 {
+  font-size: 27px;
+  line-height: 1.05;
+  margin-top: 6px;
+}
+
+.score-lines {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  margin-top: 16px;
+  padding-top: 3px;
+}
+
+.score-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0 6px;
+}
+
+.score-line .team-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--team-accent);
+}
+
+.score-line span:nth-child(2) {
+  flex: 1;
+  font-weight: 600;
+}
+
+.score-line b {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-line small {
+  color: #9aa1ac;
+  font-size: 16px;
+}
+
+.score-line em {
+  width: 34px;
+  color: #7b828c;
+  font-size: 12px;
+  text-align: right;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.moment-card {
+  padding: 18px;
+  background: radial-gradient(120% 120% at 100% 0%, rgba(182,242,74,0.14) 0%, rgba(182,242,74,0) 55%), #0f1218;
+  border-color: rgba(182, 242, 74, 0.22);
+}
+
+.moment-card .scorecard-kicker {
+  color: #b6f24a;
+}
+
+.moment-card h2 {
+  font-size: 22px;
+  line-height: 1.1;
+  margin-top: 8px;
+}
+
+.moment-chips {
+  display: flex;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.moment-chips span {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 22px;
+  color: #050608;
+  background: #b6f24a;
+  animation: scorecard-pop 500ms ease both;
+}
+
+@keyframes scorecard-pop {
+  from { transform: scale(0.82); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.worm-card {
+  padding: 18px 16px 14px;
+  background: #14171e;
+}
+
+.card-heading-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.card-heading-row > span {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7b828c;
+}
+
+.card-heading-row div {
+  display: flex;
+  gap: 12px;
+}
+
+.card-heading-row em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.worm-card line {
+  stroke: rgba(255, 255, 255, 0.05);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.worm-card line.base {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.worm-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #6b7280;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pom-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: #14171e;
+}
+
+.photo-block {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: repeating-linear-gradient(135deg, #20242d 0 6px, #191c24 6px 12px);
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.top-performers .section-label {
+  margin-bottom: 10px;
+}
+
+.performer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.performer-card {
+  border-radius: 16px;
+  padding: 13px;
+  background: #14171e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.performer-card span {
+  display: block;
+  color: #6b7280;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.performer-card b {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.performer-card strong {
+  display: block;
+  color: var(--team-accent);
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.scorecard-collapse > button {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #14171e;
+  color: #f3f4f6;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scorecard-collapse > button b {
+  color: #b6f24a;
+  font-size: 12px;
+}
+
+.full-scorecard {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 550ms cubic-bezier(.4, 0, .2, 1);
+}
+
+.full-scorecard.open {
+  max-height: 5000px;
+}
+
+.full-innings {
+  padding-top: 14px;
+}
+
+.full-innings-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.full-innings-title b {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 15px;
+}
+
+.full-innings-title span {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.mini-table {
+  display: grid;
+  grid-template-columns: 1fr 30px 26px 22px 22px;
+  gap: 0;
+  align-items: center;
+  padding: 7px 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mini-table.header {
+  border-top: 0;
+  color: #6b7280;
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  padding-bottom: 6px;
+}
+
+.mini-table span:not(:first-child) {
+  text-align: right;
+  font-size: 12px;
+  color: #9aa1ac;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-table b {
+  font-size: 13px;
+}
+
+.mini-table small {
+  display: block;
+  color: #6b7280;
+  font-size: 10px;
+}
+
+.bowling-mini-row {
+  display: flex;
+  padding: 6px 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+}
+
+.bowling-mini-row span {
+  flex: 1;
+  font-weight: 600;
+}
+
+.bowling-mini-row em {
+  width: 80px;
+  text-align: right;
+  color: #9aa1ac;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.bowling-mini-row b {
+  width: 36px;
+  text-align: right;
+  color: #f0b429;
+  font-variant-numeric: tabular-nums;
+}
+
+.scorecard-row-header {
+  display: grid;
+  align-items: center;
+  padding: 14px 22px 6px;
+  color: #6b7280;
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scorecard-row-header.batting {
+  grid-template-columns: 1fr 40px 34px 42px;
+}
+
+.scorecard-row-header.bowling {
+  grid-template-columns: 1fr 40px 34px 36px;
+}
+
+.scorecard-row-header span:not(:first-child) {
+  text-align: right;
+}
+
+.accordion-list {
+  padding: 0 12px 20px;
+}
+
+.scorecard-accordion-row {
+  border-radius: 16px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  background: #101319;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  scroll-margin-top: 40px;
+}
+
+.accordion-trigger {
+  width: 100%;
+  display: grid;
+  align-items: center;
+  gap: 4px;
+  padding: 13px 12px;
+  background: transparent;
+  border: 0;
+  color: #f3f4f6;
+  cursor: pointer;
+  text-align: left;
+  font-family: 'Barlow', sans-serif;
+}
+
+.accordion-trigger:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.accordion-trigger.batting {
+  grid-template-columns: 1fr 40px 34px 42px;
+}
+
+.accordion-trigger.bowling {
+  grid-template-columns: 1fr 40px 34px 36px;
+}
+
+.accordion-trigger b,
+.accordion-trigger em,
+.accordion-trigger strong {
+  text-align: right;
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 17px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.accordion-trigger em {
+  color: #9aa1ac;
+  font-size: 13px;
+}
+
+.accordion-trigger strong {
+  color: #f0b429;
+}
+
+.player-name {
+  min-width: 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.player-name small {
+  display: block;
+  color: #6b7280;
+  font-weight: 400;
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accordion-panel {
+  padding: 2px 12px 16px;
+}
+
+.scorecard-segmented {
+  margin-bottom: 14px;
+}
+
+.panel-title {
+  margin-bottom: 10px;
+}
+
+.matchup-bar-row {
+  margin-bottom: 12px;
+  cursor: default;
+}
+
+.matchup-bar-row[role="button"] {
+  cursor: pointer;
+}
+
+.bar-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  gap: 8px;
+}
+
+.bar-row-top span {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.bar-row-top b {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-row-top small {
+  color: #6b7280;
+}
+
+.cross-link {
+  border: 0;
+  background: transparent;
+  color: #5b8def;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  padding: 0 0 0 4px;
+}
+
+.cross-link.gold-link {
+  color: #f0b429;
+}
+
+.metric-bar {
+  height: 7px;
+  background: #070a0e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.metric-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.metric-trail {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+  color: #7b828c;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-trail strong {
+  color: #f0b429;
+}
+
+.split-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.split-grid.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.split-grid.two {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.split-card {
+  background: #070a0e;
+  border-radius: 14px;
+  padding: 14px 10px;
+  text-align: center;
+  min-width: 0;
+}
+
+.split-card span {
+  display: block;
+  color: #7b828c;
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.split-card small {
+  color: #4b5058;
+  font-size: 9px;
+}
+
+.split-card b {
+  display: block;
+  margin-top: 6px;
+  color: #f3f4f6;
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.split-card b.gold-value {
+  color: #f0b429;
+}
+
+.split-card strong {
+  display: block;
+  color: #f0b429;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.split-card em {
+  display: block;
+  color: #9aa1ac;
+  font-size: 10.5px;
+  font-style: normal;
+  margin-top: 2px;
+}
+
+.scorecard-empty {
+  text-align: center;
+  padding: 34px 20px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.wagon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.wagon-wrap svg {
+  display: block;
+}
+
+.wagon-wrap circle {
+  stroke: rgba(255, 255, 255, 0.09);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.wagon-wrap circle:nth-child(2) {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.05);
+}
+
+.wagon-wrap line {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.85;
+}
+
+.wagon-wrap text {
+  font-size: 3.6px;
+  font-family: 'Barlow', sans-serif;
+  font-weight: 600;
+  fill: #9aa1ac;
+  text-anchor: middle;
+}
+
+.wagon-wrap .center {
+  fill: #f3f4f6;
+  stroke: none;
+}
+
+.wagon-wrap p {
+  color: #6b7280;
+  font-size: 11px;
+  margin: 2px 0 0;
+}
+
+.heatmap-wrap .panel-title {
+  margin-bottom: 10px;
+}
+
+.heatmap-grid {
+  display: grid;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.axis-label {
+  color: #6b7280;
+  font-size: 8px;
+  text-align: center;
+  align-self: end;
+}
+
+.axis-label.row {
+  color: #9aa1ac;
+  font-size: 8.5px;
+  text-align: left;
+  align-self: center;
+}
+
+.heat-cell {
+  height: 30px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.heat-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: #6b7280;
+  font-size: 9.5px;
+}
+
+.heat-legend i {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(182,242,74,0.65), rgba(240,180,41,0.5), rgba(229,72,77,0.5));
+}
+
+.heat-legend.batting i {
+  background: linear-gradient(90deg, rgba(91,141,239,0.5), rgba(240,180,41,0.5), rgba(182,242,74,0.6));
+}
+
+.scorecard-loading,
+.scorecard-error {
+  margin: 24px 18px;
+  border-radius: 16px;
+  background: #101319;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #9aa1ac;
+  padding: 18px;
+}
+
+@media (min-width: 700px) {
+  .scorecard-page {
+    margin: -24px;
+    padding: 32px 0;
+    background: #080a0f;
+  }
+
+  .scorecard-shell {
+    border-radius: 32px;
+    overflow: hidden;
+    min-height: auto;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  }
+}
+
+@media (max-width: 420px) {
+  .scorecard-page {
+    margin: -16px;
+  }
+
+  .split-grid.three {
+    gap: 6px;
+  }
+
+  .split-card {
+    padding: 12px 6px;
+  }
+
+  .scorecard-segmented button {
+    font-size: 9.5px;
+  }
+}
+

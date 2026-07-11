@@ -204,7 +204,19 @@ const RecentMatchesSummaryCard = () => {
                       </Typography>
                     )}
 
-                    <Box sx={{ display: 'flex', gap: isMobile ? 0.5 : 1, mt: isMobile ? 1 : 1.5 }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 0.5 : 1, mt: isMobile ? 1 : 1.5 }}>
+                      {match.match_id && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={isMobile ? undefined : <SportsCricketIcon />}
+                          component={Link}
+                          to={`/scorecard/${match.match_id}`}
+                          sx={{ fontSize: isMobile ? '0.65rem' : '0.7rem', py: 0.3, px: isMobile ? 0.75 : 1 }}
+                        >
+                          Scorecard
+                        </Button>
+                      )}
                       <Button
                         size="small"
                         variant="outlined"

@@ -43,6 +43,7 @@ import GuessInningsGame from './components/games/GuessInningsGame';
 import PlayerJourneysGame from './components/games/PlayerJourneysGame';
 import CreditsPage from './components/CreditsPage';
 import FantasyPlanner from './components/FantasyPlanner';
+import MatchScorecardPage from './components/scorecard/MatchScorecardPage';
 import axios from 'axios';
 
 import config from './config';
@@ -123,6 +124,7 @@ const AppContent = () => {
     path === '/games/player-journeys' ? 13 :
     path === '/fantasy-planner' ? 14 :
     path === '/credits' ? false :
+    path.startsWith('/scorecard') ? false :
     path.startsWith('/wrapped') ? false : 0
   );
 
@@ -143,6 +145,7 @@ const AppContent = () => {
     path === '/games/player-journeys' ? 'Player Journeys' :
     path === '/fantasy-planner' ? 'Fantasy Planner' :
     path === '/credits' ? 'Credits & Acknowledgements' :
+    path.startsWith('/scorecard') ? 'Match Scorecard' :
     path.startsWith('/wrapped') ? '2025 Wrapped' : 'Home'
   );
   
@@ -688,6 +691,7 @@ const AppContent = () => {
         <Route path="/search" element={<GoogleSearchLanding />} />
         <Route path="/credits" element={<CreditsPage />} />
         <Route path="/fantasy-planner" element={<FantasyPlanner isMobile={isMobile} />} />
+        <Route path="/scorecard/:matchId" element={<MatchScorecardPage />} />
         <Route path="/venue" element={
           <Box sx={{ my: { xs: 1.5, md: 3 } }}>
             {error && (
