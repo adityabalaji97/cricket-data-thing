@@ -72,6 +72,45 @@ const toListKey = (names = []) => (
 
 const isDayNightValue = (value) => value === 'day' || value === 'night';
 
+const IPL_TEAM_IDENTIFIERS = new Set([
+    'csk',
+    'chennai super kings',
+    'mi',
+    'mumbai indians',
+    'kkr',
+    'kolkata knight riders',
+    'gt',
+    'gujarat titans',
+    'lsg',
+    'lucknow super giants',
+    'pbks',
+    'punjab kings',
+    'kings xi punjab',
+    'rcb',
+    'royal challengers bangalore',
+    'royal challengers bengaluru',
+    'dc',
+    'delhi capitals',
+    'delhi daredevils',
+    'srh',
+    'sunrisers hyderabad',
+    'rr',
+    'rajasthan royals',
+    'rpsg',
+    'rising pune supergiants',
+    'rising pune supergiant',
+    'gl',
+    'gujarat lions',
+    'dch',
+    'deccan chargers',
+    'ktk',
+    'kochi tuskers kerala',
+]);
+
+const isIplTeamIdentifier = (teamName) => (
+    IPL_TEAM_IDENTIFIERS.has(String(teamName || '').trim().toLowerCase())
+);
+
 const resolvePostTossPlayerLinks = (
     postTossRaw = null,
     postTossPlayerDrillLinks = {},
@@ -715,7 +754,10 @@ const Matchups = ({
                     });
                 }
 
-                params.append('use_current_roster', hasCustomPlayers ? 'false' : 'true');
+                const shouldUseCurrentRoster = !hasCustomPlayers
+                    && isIplTeamIdentifier(team1)
+                    && isIplTeamIdentifier(team2);
+                params.append('use_current_roster', shouldUseCurrentRoster ? 'true' : 'false');
                 if (isDayNightValue(dayNightFilter)) {
                     params.append('day_or_night', dayNightFilter);
                 }

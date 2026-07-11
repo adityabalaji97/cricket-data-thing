@@ -6,6 +6,7 @@ from typing import List, Optional, Dict
 from datetime import date
 from models import teams_mapping
 from services.delivery_data_service import should_use_delivery_details
+from ipl_rosters import get_team_abbrev_from_name
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,10 @@ def _dedupe_player_names(players: List[str]) -> List[str]:
         seen.add(key)
         deduped.append(cleaned)
     return deduped
+
+
+def _is_ipl_team(team_name: str) -> bool:
+    return bool(get_team_abbrev_from_name(team_name or ""))
 
 def _get_alias_lookup(db) -> Dict[str, str]:
     """Return cached alias lookup dict. Refreshes every hour."""
@@ -610,6 +615,8 @@ def get_team_matchups_service(
         use_custom_teams = len(team1_players) > 0 and len(team2_players) > 0
         team1_lineup_source = "custom" if use_custom_teams else "recent_10"
         team2_lineup_source = "custom" if use_custom_teams else "recent_10"
+
+        use_current_roster = bool(use_current_roster and _is_ipl_team(team1) and _is_ipl_team(team2))
 
         # When use_current_roster is True, populate player lists from current roster service.
         if not use_custom_teams and use_current_roster:

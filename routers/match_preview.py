@@ -27,6 +27,7 @@ from services.matchups import (
     _canonicalize_players,
     _calculate_batting_projection_points,
     _calculate_bowling_projection_points,
+    _is_ipl_team,
 )
 from services.query_builder_v2 import query_deliveries_service
 from services.rolling_form import get_form_flags_for_players
@@ -681,6 +682,8 @@ def _build_player_drill_link(
     innings: Optional[int],
     player: str,
     kind: str,  # "batting" | "bowling"
+    leagues: Optional[List[str]] = None,
+    include_international: bool = False,
     day_or_night: Optional[str] = None,
 ) -> str:
     """Drill-down link for a single player's stats in the query builder."""
@@ -688,9 +691,12 @@ def _build_player_drill_link(
         ("query_mode", "delivery"),
         ("start_date", start_date.isoformat()),
         ("end_date", end_date.isoformat()),
-        ("leagues", "IPL"),
         ("group_by", "batter" if kind == "batting" else "bowler"),
     ]
+    for league in leagues or []:
+        params.append(("leagues", league))
+    if include_international:
+        params.append(("include_international", "true"))
     if innings is not None:
         params.append(("innings", str(innings)))
     if venue:
@@ -712,6 +718,8 @@ def _build_axis_drill_link(
     innings: int,
     players: List[str],
     kind: str,
+    leagues: Optional[List[str]] = None,
+    include_international: bool = False,
     day_or_night: Optional[str] = None,
 ) -> str:
     """Drill-down link for an entire axis (whole batting/bowling XI)."""
@@ -720,9 +728,12 @@ def _build_axis_drill_link(
         ("start_date", start_date.isoformat()),
         ("end_date", end_date.isoformat()),
         ("innings", str(innings)),
-        ("leagues", "IPL"),
         ("group_by", "batter" if kind == "batting" else "bowler"),
     ]
+    for league in leagues or []:
+        params.append(("leagues", league))
+    if include_international:
+        params.append(("include_international", "true"))
     if venue:
         params.append(("venue", venue))
     if day_or_night:
@@ -740,6 +751,8 @@ def _build_six_venue_links(
     venue: str,
     batting_first_team: str,
     batting_second_team: str,
+    leagues: Optional[List[str]] = None,
+    include_international: bool = False,
     day_or_night: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Build the 6 venue-only drill-down links for the post-toss panel."""
@@ -765,6 +778,10 @@ def _build_six_venue_links(
             ("innings", str(innings)),
             ("venue", venue),
         ]
+        for league in leagues or []:
+            params.append(("leagues", league))
+        if include_international:
+            params.append(("include_international", "true"))
         if day_or_night:
             params.append(("day_or_night", day_or_night))
         for g in group_by:
@@ -775,6 +792,10 @@ def _build_six_venue_links(
             "innings": innings,
             "venue": venue,
         }
+        if leagues:
+            filters["leagues"] = list(leagues)
+        if include_international:
+            filters["include_international"] = True
         if day_or_night:
             filters["day_or_night"] = day_or_night
 
@@ -806,6 +827,8 @@ def _run_post_toss_axis(
     venue: Optional[str],
     start_date: date,
     end_date: date,
+    leagues: Optional[List[str]],
+    include_international: bool,
     day_or_night: Optional[str],
 ) -> List[Dict[str, Any]]:
     """
@@ -826,7 +849,7 @@ def _run_post_toss_axis(
             venue=venue,
             start_date=start_date,
             end_date=end_date,
-            leagues=["IPL"],
+            leagues=leagues or [],
             teams=[],
             batting_teams=[],
             bowling_teams=[],
@@ -859,7 +882,7 @@ def _run_post_toss_axis(
             max_wickets=None,
             limit=200,
             offset=0,
-            include_international=False,
+            include_international=include_international,
             top_teams=None,
             query_mode="delivery",
             db=db,
@@ -903,6 +926,8 @@ def _run_post_toss_axis(
             innings=innings,
             player=player,
             kind=kind,
+            leagues=leagues,
+            include_international=include_international,
             day_or_night=day_or_night,
         )
         out.append({
@@ -949,6 +974,8 @@ def _run_post_toss_window(
     start_date: date,
     end_date: date,
     venue_filter: Optional[str],
+    leagues: Optional[List[str]],
+    include_international: bool,
     day_or_night: Optional[str],
 ) -> Dict[str, Any]:
     """Build the four per-axis player tables for one (general | venue) window."""
@@ -970,6 +997,8 @@ def _run_post_toss_window(
             venue=venue_filter,
             start_date=start_date,
             end_date=end_date,
+            leagues=leagues,
+            include_international=include_international,
             day_or_night=day_or_night,
         )
         axis_results[axis_name] = {
@@ -988,6 +1017,8 @@ def _run_post_toss_window(
             innings=innings,
             players=players,
             kind=kind,
+            leagues=leagues,
+            include_international=include_international,
             day_or_night=day_or_night,
         )
     return {
@@ -1049,6 +1080,9 @@ def post_toss_preview(
 
         first_team_xi = team1_xi if batting_first_team == payload.team1_id else team2_xi
         second_team_xi = team2_xi if batting_second_team == payload.team2_id else team1_xi
+        is_ipl_matchup = _is_ipl_team(payload.team1_id) and _is_ipl_team(payload.team2_id)
+        query_leagues = ["IPL"] if is_ipl_matchup else []
+        query_include_international = not is_ipl_matchup
 
         general_start, general_end = _window_date_range(payload.general_window_years)
         venue_start, venue_end = _window_date_range(payload.venue_window_years)
@@ -1062,6 +1096,8 @@ def post_toss_preview(
             start_date=general_start,
             end_date=general_end,
             venue_filter=None,
+            leagues=query_leagues,
+            include_international=query_include_international,
             day_or_night=payload.day_or_night,
         )
         venue_bundle = _run_post_toss_window(
@@ -1073,6 +1109,8 @@ def post_toss_preview(
             start_date=venue_start,
             end_date=venue_end,
             venue_filter=normalized_venue,
+            leagues=query_leagues,
+            include_international=query_include_international,
             day_or_night=payload.day_or_night,
         )
 
@@ -1098,6 +1136,8 @@ def post_toss_preview(
                 venue=None,
                 start_date=general_start,
                 end_date=general_end,
+                leagues=query_leagues,
+                include_international=query_include_international,
                 day_or_night=payload.day_or_night,
             )
             for row in base_rows:
@@ -1201,6 +1241,8 @@ def post_toss_preview(
                 venue=normalized_venue or payload.venue,
                 batting_first_team=batting_first_team,
                 batting_second_team=batting_second_team,
+                leagues=query_leagues,
+                include_international=query_include_international,
                 day_or_night=payload.day_or_night,
             ),
             "computed_at": datetime.utcnow().isoformat() + "Z",

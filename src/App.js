@@ -68,7 +68,26 @@ const TEAM_NAME_TO_ABBREVIATION = {
   'rising pune supergiant': 'RPSG',
   'gujarat lions': 'GL',
   'deccan chargers': 'DCh',
-  'kochi tuskers kerala': 'KTK'
+  'kochi tuskers kerala': 'KTK',
+  'afg': 'Afghanistan',
+  'aus': 'Australia',
+  'ban': 'Bangladesh',
+  'eng': 'England',
+  'ind': 'India',
+  'ire': 'Ireland',
+  'nam': 'Namibia',
+  'ned': 'Netherlands',
+  'nz': 'New Zealand',
+  'omn': 'Oman',
+  'pak': 'Pakistan',
+  'png': 'Papua New Guinea',
+  'sa': 'South Africa',
+  'sl': 'Sri Lanka',
+  'sco': 'Scotland',
+  'uae': 'UAE',
+  'usa': 'USA',
+  'wi': 'West Indies',
+  'zim': 'Zimbabwe'
 };
 
 const normalizeTeamValue = (value) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -86,7 +105,10 @@ const resolveTeamFromParam = (teamParam, sortedTeams) => {
   const mappedAbbreviation = TEAM_NAME_TO_ABBREVIATION[normalizedParam];
   if (mappedAbbreviation) {
     const mappedMatch = sortedTeams.find(
-      (team) => normalizeTeamValue(team.abbreviated_name) === normalizeTeamValue(mappedAbbreviation)
+      (team) => (
+        normalizeTeamValue(team.abbreviated_name) === normalizeTeamValue(mappedAbbreviation)
+        || normalizeTeamValue(team.full_name) === normalizeTeamValue(mappedAbbreviation)
+      )
     );
     if (mappedMatch) return mappedMatch;
   }
