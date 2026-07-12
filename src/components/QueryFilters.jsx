@@ -34,7 +34,7 @@ const InfoTooltip = ({ tooltip }) => (
 const CoverageWarning = ({ coverage, columnName }) => {
   if (coverage >= 80) return null;
   
-  const color = coverage < 50 ? 'warning.main' : 'info.main';
+  const color = coverage < 50 ? qbColors.gold : qbColors.blue;
   
   return (
     <Tooltip title={`${columnName} data is available for ${coverage}% of deliveries. Filtering may reduce results significantly.`}>
@@ -80,6 +80,13 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
   }
 
   const chaseOutcomeDisabled = filters.is_chase === false || filters.innings === 1;
+
+  const chipSx = {
+    color: qbColors.textMed,
+    borderColor: qbColors.borderStrong,
+    bgcolor: 'rgba(255,255,255,0.035)',
+    '& .MuiChip-deleteIcon': { color: qbColors.textFaint },
+  };
 
   return (
     <Box>
@@ -147,7 +154,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               options={availableColumns?.batting_teams || []}
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
-                  <Chip variant="outlined" label={option} size="small" color="primary" {...getTagProps({ index })} />
+                  <Chip variant="outlined" label={option} size="small" sx={chipSx} {...getTagProps({ index })} />
                 ))
               }
               renderInput={(params) => (
@@ -168,7 +175,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               options={availableColumns?.bowling_teams || []}
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
-                  <Chip variant="outlined" label={option} size="small" color="secondary" {...getTagProps({ index })} />
+                  <Chip variant="outlined" label={option} size="small" sx={chipSx} {...getTagProps({ index })} />
                 ))
               }
               renderInput={(params) => (
@@ -576,7 +583,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
                       variant="filled" 
                       label={option} 
                       size="small" 
-                      color="primary"
+                      sx={{ bgcolor: qbColors.accent, color: qbColors.bg, fontWeight: 700 }}
                       {...getTagProps({ index })} 
                     />
                   ))
@@ -611,7 +618,10 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
                     checked={filters.show_summary_rows || false}
                     onChange={(e) => handleFilterChange('show_summary_rows', e.target.checked)}
                     size="small"
-                    color="primary"
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: qbColors.accent },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: qbColors.accent },
+                    }}
                   />
                 }
                 label="Show Summary Rows"

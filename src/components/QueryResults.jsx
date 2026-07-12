@@ -57,6 +57,26 @@ import { PitchMapContainer, getPitchMapMode } from './PitchMap';
 import config from '../config';
 import { qbButtonSx, qbCardSx, qbColors, qbFonts, qbGhostButtonSx } from './queryBuilderTheme';
 
+const darkOutlineChipSx = {
+  bgcolor: 'rgba(255,255,255,0.035)',
+  color: qbColors.textMed,
+  borderColor: qbColors.borderStrong,
+  '& .MuiChip-icon': { color: qbColors.textLo },
+  '& .MuiChip-deleteIcon': {
+    color: qbColors.textFaint,
+    '&:hover': { color: qbColors.red },
+  },
+};
+
+const darkInfoAlertSx = {
+  bgcolor: 'rgba(91,141,239,0.14)',
+  color: qbColors.textMed,
+  border: '1px solid rgba(91,141,239,0.34)',
+  borderRadius: '10px',
+  '& .MuiAlert-icon': { color: qbColors.blue },
+  '& .MuiAlert-action .MuiIconButton-root': { color: qbColors.blue },
+};
+
 // Column Filter Component
 const ColumnFilter = ({ column, displayName, uniqueValues, selectedValues, onChange, onClear, isMobile }) => {
   return (
@@ -862,6 +882,7 @@ const QueryResults = ({
                       label={`Grouped by ${groupBy.join(', ')}`}
                       variant="outlined"
                       size="small"
+                      sx={darkOutlineChipSx}
                     />
                   )}
                 </>
@@ -888,12 +909,13 @@ const QueryResults = ({
                         label={`Grouped by: ${groupBy.join(', ')}`}
                         variant="outlined"
                         size="small"
+                        sx={darkOutlineChipSx}
                       />
                       {hasSummaries && (
                         <Chip
                           label="With Summary Rows"
-                          color="secondary"
                           size="small"
+                          sx={{ bgcolor: 'rgba(201,156,240,0.16)', color: qbColors.purple, fontWeight: 700 }}
                         />
                       )}
                     </>
@@ -901,13 +923,14 @@ const QueryResults = ({
                     <>
                       <Chip
                         label={`${(metadata.total_matching_rows || 0).toLocaleString()} total deliveries`}
-                        color="primary"
                         size="small"
+                        sx={{ bgcolor: qbColors.accent, color: qbColors.bg, fontWeight: 700 }}
                       />
                       <Chip
                         label={`Showing ${sortedData.length}`}
                         variant="outlined"
                         size="small"
+                        sx={darkOutlineChipSx}
                       />
                     </>
                   )}
@@ -917,6 +940,7 @@ const QueryResults = ({
                       label={`${Number(metadata.total_innings_in_query).toLocaleString()} total innings`}
                       variant="outlined"
                       size="small"
+                      sx={darkOutlineChipSx}
                     />
                   )}
 
@@ -925,22 +949,22 @@ const QueryResults = ({
                       label={`Sorted by: ${getColumnDisplayName(sortConfig.key)} (${sortConfig.direction})`}
                       variant="outlined"
                       size="small"
-                      color="secondary"
+                      sx={{ ...darkOutlineChipSx, color: qbColors.purple, borderColor: 'rgba(201,156,240,0.45)' }}
                     />
                   )}
 
                   {Object.keys(columnFilters).length > 0 && (
                     <Chip
                       label={`${Object.keys(columnFilters).length} column filter${Object.keys(columnFilters).length > 1 ? 's' : ''} active`}
-                      color="warning"
                       size="small"
                       icon={<FilterListIcon />}
+                      sx={{ bgcolor: 'rgba(240,180,41,0.14)', color: qbColors.gold, '& .MuiChip-icon': { color: qbColors.gold } }}
                     />
                   )}
                 </Box>
 
                 {metadata.filters_applied && (
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" sx={{ color: qbColors.textFaint }}>
                     {metadata.note}
                   </Typography>
                 )}
@@ -948,7 +972,7 @@ const QueryResults = ({
                 {aiChartReason && (
                   <Alert
                     severity="info"
-                    sx={{ mt: 1.25 }}
+                    sx={{ mt: 1.25, ...darkInfoAlertSx }}
                     onClose={() => setAiChartReason(null)}
                   >
                     {`AI suggested this chart because: ${aiChartReason}`}
@@ -964,7 +988,7 @@ const QueryResults = ({
                       startIcon={<ClearIcon />}
                       onClick={clearAllFilters}
                       size="small"
-                      color="warning"
+                      sx={{ ...qbGhostButtonSx, color: qbColors.gold, borderColor: 'rgba(240,180,41,0.35)' }}
                     >
                       Clear Filters
                     </Button>
@@ -976,7 +1000,7 @@ const QueryResults = ({
                       startIcon={<MapIcon />}
                       onClick={() => setShowPitchMap(!showPitchMap)}
                       size="small"
-                      color="success"
+                      sx={showPitchMap ? { ...qbButtonSx, minHeight: 36, fontSize: 11 } : { ...qbGhostButtonSx, minHeight: 36 }}
                     >
                       {showPitchMap ? 'Hide Pitch Map' : 'Show Pitch Map'}
                     </Button>
@@ -1082,21 +1106,21 @@ const QueryResults = ({
       
       {/* AI Summary */}
       {(aiSummary || summaryError) && (
-        <Card variant="outlined" sx={{ mb: 2, bgcolor: 'grey.50' }}>
+        <Card variant="outlined" sx={{ ...qbCardSx, mb: 2, bgcolor: qbColors.surface2 }}>
           <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
-                <AutoAwesomeIcon fontSize="small" color="secondary" />
-                <Typography variant="subtitle2">AI Summary</Typography>
+                <AutoAwesomeIcon fontSize="small" sx={{ color: qbColors.accent }} />
+                <Typography variant="subtitle2" sx={{ color: qbColors.textHi, fontFamily: qbFonts.display }}>AI Summary</Typography>
               </Stack>
-              <IconButton size="small" onClick={() => { setAiSummary(null); setSummaryError(null); }}>
+              <IconButton size="small" onClick={() => { setAiSummary(null); setSummaryError(null); }} sx={{ color: qbColors.textLo }}>
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Stack>
             {summaryError ? (
               <Alert severity="error" sx={{ py: 0 }}>{summaryError}</Alert>
             ) : (
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6, color: qbColors.textMed }}>
                 {aiSummary}
               </Typography>
             )}
@@ -1106,7 +1130,7 @@ const QueryResults = ({
 
       {/* Data Table with Sorting */}
       <Paper sx={{ ...qbCardSx, overflow: 'hidden' }}>
-        <TableContainer sx={{ maxHeight: isMobile ? 400 : 600 }}>
+        <TableContainer sx={{ maxHeight: isMobile ? 400 : 600, bgcolor: qbColors.surface1 }}>
           <Table stickyHeader size={isMobile ? "small" : "medium"}>
             <TableHead>
               <TableRow>
@@ -1122,13 +1146,14 @@ const QueryResults = ({
                     whiteSpace: 'nowrap',
                     textTransform: 'uppercase',
                     letterSpacing: '0.03em',
-                    color: 'text.secondary',
+                    color: qbColors.textLo,
+                    bgcolor: `${qbColors.surface2} !important`,
                     py: isMobile ? 0.5 : 1,
                     px: isMobile ? 0.75 : 1.5,
                     ...(isGroupByCol && {
                       position: 'sticky',
                       left: groupByIndex === 0 ? 0 : 'auto',
-                      backgroundColor: 'background.paper',
+                      backgroundColor: `${qbColors.surface2} !important`,
                       zIndex: groupByIndex === 0 ? 3 : 1,
                     })
                   }}>
@@ -1148,7 +1173,7 @@ const QueryResults = ({
                             opacity: 0.5
                           },
                           '&:hover': {
-                            color: 'primary.main'
+                            color: qbColors.accent
                           }
                         }}
                       >
@@ -1161,8 +1186,8 @@ const QueryResults = ({
                           sx={{
                             p: 0.25,
                             ml: 0.25,
-                            color: hasActiveFilter ? 'warning.main' : 'action.disabled',
-                            '&:hover': { color: hasActiveFilter ? 'warning.dark' : 'primary.main' },
+                            color: hasActiveFilter ? qbColors.gold : qbColors.textGhost,
+                            '&:hover': { color: hasActiveFilter ? qbColors.gold : qbColors.accent },
                           }}
                         >
                           <FilterListIcon sx={{ fontSize: '0.875rem' }} />
@@ -1180,12 +1205,17 @@ const QueryResults = ({
                   key={index} 
                   hover={!row.is_summary}
                   sx={{
-                    backgroundColor: row.is_summary ? 'grey.100' : 'inherit',
+                    backgroundColor: row.is_summary ? qbColors.surface2 : qbColors.surface1,
                     fontWeight: row.is_summary ? 'bold' : 'normal',
+                    '&:hover .MuiTableCell-root': {
+                      backgroundColor: row.is_summary ? qbColors.surface2 : `${qbColors.surface3} !important`,
+                    },
                     '& .MuiTableCell-root': {
                       fontWeight: row.is_summary ? 'bold' : 'normal',
                       borderTop: row.is_summary ? '2px solid' : 'none',
-                      borderTopColor: row.is_summary ? 'grey.400' : 'transparent'
+                      borderTopColor: row.is_summary ? qbColors.borderStrong : 'transparent',
+                      backgroundColor: row.is_summary ? qbColors.surface2 : qbColors.surface1,
+                      color: qbColors.textMed,
                     }
                   }}
                 >
@@ -1198,7 +1228,9 @@ const QueryResults = ({
                       ...(isGroupByCol && {
                         position: 'sticky',
                         left: groupByIndex === 0 ? 0 : 'auto',
-                        backgroundColor: row.is_summary ? 'grey.100' : 'background.paper',
+                        backgroundColor: row.is_summary ? `${qbColors.surface2} !important` : `${qbColors.surface1} !important`,
+                        color: qbColors.textHi,
+                        fontWeight: 700,
                         zIndex: groupByIndex === 0 ? 1 : 0,
                       })
                     }}>
@@ -1223,6 +1255,23 @@ const QueryResults = ({
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
+          sx={{
+            bgcolor: qbColors.surface2,
+            color: qbColors.textLo,
+            borderTop: `1px solid ${qbColors.border}`,
+            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+              color: qbColors.textLo,
+              fontFamily: qbFonts.mono,
+              fontSize: 11,
+            },
+            '& .MuiTablePagination-select, & .MuiSvgIcon-root': {
+              color: qbColors.textMed,
+            },
+            '& .MuiIconButton-root': {
+              color: qbColors.textMed,
+              '&.Mui-disabled': { color: qbColors.textGhost },
+            },
+          }}
         />
       </Paper>
 
@@ -1324,7 +1373,7 @@ const QueryResults = ({
           running totals through ball N. */}
       {ballAggregationApplicable && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: qbColors.textLo }}>
             Ball aggregation:
           </Typography>
           <ToggleButtonGroup
@@ -1354,9 +1403,9 @@ const QueryResults = ({
       
       {/* Applied Filters Info */}
       {metadata.filters_applied && (
-        <Accordion sx={{ mt: 2 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="h6">🔍 Applied Filters</Typography>
+        <Accordion sx={{ mt: 2, ...qbCardSx, '&:before': { display: 'none' } }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: qbColors.textLo }} />}>
+            <Typography variant="h6" sx={{ color: qbColors.textHi, fontFamily: qbFonts.display }}>Applied Filters</Typography>
           </AccordionSummary>
           <AccordionDetails>
             <Grid container spacing={1}>
@@ -1369,6 +1418,7 @@ const QueryResults = ({
                       label={`${getColumnDisplayName(key)}: ${Array.isArray(value) ? value.join(', ') : value}`}
                       variant="outlined"
                       size="small"
+                      sx={darkOutlineChipSx}
                     />
                   </Grid>
                 );
@@ -1398,19 +1448,21 @@ const QueryResults = ({
             mt: 2,
             p: 1.5,
             border: 1,
-            borderColor: 'divider',
-            bgcolor: 'background.default',
+            borderColor: qbColors.border,
+            bgcolor: qbColors.surface1,
+            color: qbColors.textMed,
+            borderRadius: '16px',
           }}
         >
           <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+            <Typography variant="body2" sx={{ fontWeight: 500, color: qbColors.textMed }}>
               Was this helpful?
             </Typography>
             <IconButton
               size="small"
               onClick={handleThumbsUp}
               disabled={feedbackSubmitting || feedbackSuccess}
-              color={feedbackSelection === 'good' || feedbackSuccess ? 'success' : 'default'}
+              sx={{ color: feedbackSelection === 'good' || feedbackSuccess ? qbColors.accent : qbColors.textLo }}
               aria-label="Helpful"
             >
               <ThumbUpAltOutlinedIcon fontSize="small" />
@@ -1419,7 +1471,7 @@ const QueryResults = ({
               size="small"
               onClick={handleThumbsDown}
               disabled={feedbackSubmitting || feedbackSuccess}
-              color={feedbackSelection === 'bad' ? 'error' : 'default'}
+              sx={{ color: feedbackSelection === 'bad' ? qbColors.red : qbColors.textLo }}
               aria-label="Not helpful"
             >
               <ThumbDownAltOutlinedIcon fontSize="small" />
@@ -1443,6 +1495,7 @@ const QueryResults = ({
                   size="small"
                   onClick={handleBadFeedbackSubmit}
                   disabled={feedbackSubmitting || !feedbackNote.trim()}
+                  sx={qbButtonSx}
                 >
                   {feedbackSubmitting ? 'Submitting...' : 'Submit feedback'}
                 </Button>
@@ -1451,7 +1504,7 @@ const QueryResults = ({
           )}
 
           {feedbackSuccess && (
-            <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 0.75 }}>
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: qbColors.accent }}>
               Thanks! Feedback recorded.
             </Typography>
           )}

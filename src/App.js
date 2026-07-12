@@ -45,6 +45,7 @@ import PlayerJourneysGame from './components/games/PlayerJourneysGame';
 import CreditsPage from './components/CreditsPage';
 import FantasyPlanner from './components/FantasyPlanner';
 import MatchScorecardPage from './components/scorecard/MatchScorecardPage';
+import { qbColors, qbFonts } from './components/queryBuilderTheme';
 import axios from 'axios';
 
 import config from './config';
@@ -206,6 +207,7 @@ const AppContent = () => {
 
   const hasFetchedRef = useRef(false);
   const dateManuallyAdjustedRef = useRef(false);
+  const isQueryRoute = location.pathname === '/query';
 
   const handleMenuClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -550,11 +552,20 @@ const AppContent = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
+    <Container
+      maxWidth="xl"
+      sx={{
+        px: { xs: isQueryRoute ? 0 : 1, sm: isQueryRoute ? 0 : 2, md: isQueryRoute ? 0 : 3 },
+        bgcolor: isQueryRoute ? qbColors.bg : 'transparent',
+        minHeight: isQueryRoute ? '100vh' : 'auto',
+      }}
+    >
       <Box sx={{ 
         borderBottom: 1, 
-        borderColor: 'divider', 
-        mb: 3, 
+        borderColor: isQueryRoute ? qbColors.border : 'divider',
+        mb: isQueryRoute ? 0 : 3,
+        px: isQueryRoute ? { xs: 1.5, md: 3 } : 0,
+        bgcolor: isQueryRoute ? qbColors.bg : 'transparent',
         display: 'flex',
         alignItems: 'center',
         flexDirection: 'row',
@@ -570,7 +581,7 @@ const AppContent = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              bgcolor: 'background.paper',
+              bgcolor: isQueryRoute ? qbColors.surface1 : 'background.paper',
               zIndex: 1200,
               display: 'flex',
               alignItems: 'center',
@@ -587,6 +598,7 @@ const AppContent = () => {
             <IconButton 
               onClick={() => setSearchExpanded(false)}
               size="small"
+              sx={{ color: isQueryRoute ? qbColors.textLo : undefined }}
             >
               <CloseIcon />
             </IconButton>
@@ -601,6 +613,7 @@ const AppContent = () => {
               aria-haspopup="true"
               onClick={handleMenuClick}
               size="large"
+              sx={{ color: isQueryRoute ? qbColors.textMed : undefined }}
             >
               <MenuIcon />
             </IconButton>
@@ -686,14 +699,14 @@ const AppContent = () => {
                 </Typography>
               </Box>
             ) : (
-              <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap' }}>
+              <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap', color: isQueryRoute ? qbColors.textHi : undefined, fontFamily: isQueryRoute ? qbFonts.display : undefined }}>
                 {getPageTitle()}
               </Typography>
             )}
             <IconButton
               onClick={() => setSearchExpanded(true)}
               size="small"
-              sx={{ ml: 'auto' }}
+              sx={{ ml: 'auto', color: isQueryRoute ? qbColors.textMed : undefined }}
               aria-label="search"
             >
               <SearchIcon />
@@ -707,7 +720,24 @@ const AppContent = () => {
               variant="scrollable"
               scrollButtons="auto"
               allowScrollButtonsMobile
-              sx={{ flexGrow: 1 }}
+              sx={{
+                flexGrow: 1,
+                minHeight: 60,
+                '& .MuiTabs-indicator': {
+                  bgcolor: isQueryRoute ? qbColors.accent : undefined,
+                },
+                '& .MuiTab-root': {
+                  color: isQueryRoute ? qbColors.textLo : undefined,
+                  fontFamily: isQueryRoute ? qbFonts.display : undefined,
+                  fontWeight: isQueryRoute ? 700 : undefined,
+                },
+                '& .MuiTab-root.Mui-selected': {
+                  color: isQueryRoute ? qbColors.accent : undefined,
+                },
+                '& .MuiTabs-scrollButtons': {
+                  color: isQueryRoute ? qbColors.textLo : undefined,
+                },
+              }}
             >
               <Tab label="Home" component={Link} to="/" />
               <Tab label="Search" component={Link} to="/search" />
@@ -728,7 +758,7 @@ const AppContent = () => {
             <IconButton
               onClick={() => setSearchExpanded(true)}
               size="small"
-              sx={{ ml: 1 }}
+              sx={{ ml: 1, color: isQueryRoute ? qbColors.textMed : undefined }}
               aria-label="search"
             >
               <SearchIcon />

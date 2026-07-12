@@ -36,7 +36,21 @@ import AddIcon from '@mui/icons-material/Add';
 import { getDataPointColor, getFallbackColor, hasTeamGrouping } from '../utils/teamColors';
 import ZoomableChart from './common/ZoomableChart';
 import { getAutoscaledDomain } from '../utils/chartDomainUtils';
-import { qbCardSx, qbColors, qbFonts } from './queryBuilderTheme';
+import { qbButtonSx, qbCardSx, qbColors, qbFonts } from './queryBuilderTheme';
+
+const darkChartChipSx = {
+  bgcolor: 'rgba(255,255,255,0.035)',
+  color: qbColors.textMed,
+  borderColor: qbColors.borderStrong,
+};
+
+const darkChartAlertSx = {
+  bgcolor: 'rgba(91,141,239,0.14)',
+  color: qbColors.textMed,
+  border: '1px solid rgba(91,141,239,0.34)',
+  borderRadius: '10px',
+  '& .MuiAlert-icon': { color: qbColors.blue },
+};
 
 const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialRecommendation = null, isMobile = false }, ref) => {
   const [charts, setCharts] = useState([]);
@@ -468,7 +482,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
         </Typography>
         
         {chartConfig?.type === 'bar' ? (
-          <Typography variant="body2" color="primary">
+          <Typography variant="body2" sx={{ color: qbColors.accent }}>
             {availableMetrics.find(m => m.key === chartConfig.selectedMetric)?.label}: {formatMetricValue(dataPoint[chartConfig.selectedMetric], chartConfig.selectedMetric)}
           </Typography>
         ) : (
@@ -485,10 +499,10 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
         {/* Show additional context */}
         <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
           {dataPoint.balls && (
-            <Chip size="small" label={`${dataPoint.balls.toLocaleString()} balls`} />
+            <Chip size="small" label={`${dataPoint.balls.toLocaleString()} balls`} sx={darkChartChipSx} />
           )}
           {dataPoint.runs && (
-            <Chip size="small" label={`${dataPoint.runs.toLocaleString()} runs`} />
+            <Chip size="small" label={`${dataPoint.runs.toLocaleString()} runs`} sx={darkChartChipSx} />
           )}
         </Box>
       </Card>
@@ -526,7 +540,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
             <IconButton
               size="small"
               onClick={() => removeChart(chart.id)}
-              color="error"
+              sx={{ color: qbColors.red }}
             >
               <CloseIcon />
             </IconButton>
@@ -620,7 +634,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
               <ShowChartIcon />
               Line Chart - {selectedMetricData?.label || chart.selectedMetric}
             </Typography>
-            <IconButton size="small" onClick={() => removeChart(chart.id)} color="error">
+            <IconButton size="small" onClick={() => removeChart(chart.id)} sx={{ color: qbColors.red }}>
               <CloseIcon />
             </IconButton>
           </Box>
@@ -701,14 +715,14 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
         <CardContent sx={{ px: isMobile ? 1 : 2 }}>
           {/* Chart Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ display: 'flex', alignItems: 'center', gap: 1, fontFamily: qbFonts.display, color: qbColors.textHi }}>
               <ScatterPlotIcon />
               {isMobile ? `${xMetricData?.label} vs ${yMetricData?.label}` : `Scatter Plot - ${xMetricData?.label} vs ${yMetricData?.label}`}
             </Typography>
             <IconButton
               size="small"
               onClick={() => removeChart(chart.id)}
-              color="error"
+              sx={{ color: qbColors.red }}
             >
               <CloseIcon />
             </IconButton>
@@ -900,6 +914,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
               startIcon={<AddIcon />}
               onClick={addBarChart}
               disabled={availableMetrics.length === 0}
+              sx={{ ...qbButtonSx, minHeight: 36, fontSize: 11 }}
             >
               Add Bar Chart
             </Button>
@@ -908,6 +923,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
               startIcon={<AddIcon />}
               onClick={addScatterChart}
               disabled={availableMetrics.length < 2}
+              sx={{ ...qbButtonSx, minHeight: 36, fontSize: 11 }}
             >
               Add Scatter Plot
             </Button>
@@ -919,29 +935,31 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
               label={`${chartData.length} data points`} 
               variant="outlined" 
               size="small" 
+              sx={darkChartChipSx}
             />
             <Chip 
               label={`Grouped by: ${groupBy.join(', ')}`} 
               variant="outlined" 
               size="small" 
+              sx={darkChartChipSx}
             />
             {charts.length > 0 && (
               <Chip 
                 label={`${charts.length} active charts`} 
-                color="primary"
                 size="small" 
+                sx={{ bgcolor: qbColors.accent, color: qbColors.bg, fontWeight: 700 }}
               />
             )}
           </Box>
 
           {availableMetrics.length === 0 && (
-            <Alert severity="info" sx={{ mt: 2 }}>
+            <Alert severity="info" sx={{ mt: 2, ...darkChartAlertSx }}>
               No numeric metrics available for visualization. Try grouping your data to see charts.
             </Alert>
           )}
 
           {availableMetrics.length === 1 && (
-            <Alert severity="warning" sx={{ mt: 2 }}>
+            <Alert severity="warning" sx={{ mt: 2, bgcolor: 'rgba(240,180,41,0.14)', color: qbColors.textMed, border: '1px solid rgba(240,180,41,0.34)', borderRadius: '10px', '& .MuiAlert-icon': { color: qbColors.gold } }}>
               Only one metric available. Add more grouping columns or metrics to enable scatter plots.
             </Alert>
           )}
@@ -957,9 +975,9 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
 
       {/* Chart Tips */}
       {charts.length > 0 && (
-        <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            💡 <strong>Chart Tips:</strong> 
+        <Box sx={{ mt: 2, p: 2, bgcolor: qbColors.surface2, border: `1px solid ${qbColors.border}`, borderRadius: '16px' }}>
+          <Typography variant="body2" sx={{ color: qbColors.textLo }}>
+            <strong>Chart Tips:</strong> 
             {isMobile ? (
               " Tap data points for details. Use controls to change metrics and axes."
             ) : (

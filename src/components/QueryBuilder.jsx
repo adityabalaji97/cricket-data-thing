@@ -8,7 +8,8 @@ import {
   CircularProgress,
   Collapse,
   Chip,
-  IconButton
+  IconButton,
+  GlobalStyles
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
@@ -469,6 +470,27 @@ const QueryBuilder = ({ isMobile }) => {
         },
       }}
     >
+      <GlobalStyles
+        styles={{
+          '.MuiAutocomplete-popper .MuiPaper-root, .MuiPopover-paper, .MuiMenu-paper': {
+            backgroundColor: qbColors.surface3,
+            color: qbColors.textMed,
+            border: `1px solid ${qbColors.borderStrong}`,
+            boxShadow: '0 24px 48px -18px rgba(0,0,0,0.75)',
+          },
+          '.MuiAutocomplete-popper .MuiAutocomplete-option': {
+            color: qbColors.textMed,
+            fontFamily: qbFonts.body,
+          },
+          '.MuiAutocomplete-popper .MuiAutocomplete-option[aria-selected="true"], .MuiAutocomplete-popper .MuiAutocomplete-option.Mui-focused': {
+            backgroundColor: 'rgba(182,242,74,0.12) !important',
+            color: qbColors.textHi,
+          },
+          '.MuiAutocomplete-noOptions, .MuiAutocomplete-loading': {
+            color: qbColors.textLo,
+          },
+        }}
+      />
       <Box sx={{ maxWidth: 1180, mx: 'auto' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: { xs: 2.5, md: 4 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
