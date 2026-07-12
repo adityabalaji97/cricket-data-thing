@@ -29,6 +29,7 @@ import config from '../config';
 import { fetchUpcomingMatches } from '../data/iplSchedule';
 import MiniWagonWheel from './MiniWagonWheel';
 import { getTeamColor } from '../utils/teamColors';
+import SearchBar from './search/SearchBar';
 
 const C = {
   bg: '#0a0c11',
@@ -286,51 +287,36 @@ const LandingDropdown = ({ id, label, value, options, onChange, openDropdown, se
 const TopBar = ({ navOpen, setNavOpen, isMobile }) => {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
-  const [query, setQuery] = useState('');
 
-  const submit = (event) => {
-    event.preventDefault();
-    const trimmed = query.trim();
-    if (!trimmed) return;
-    navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+  const routeEntity = (item) => {
+    if (item.type === 'player') {
+      navigate(`/search?q=${encodeURIComponent(item.name)}`);
+    } else if (item.type === 'team') {
+      navigate(`/team?team=${encodeURIComponent(item.name)}&autoload=true`);
+    } else if (item.type === 'venue') {
+      navigate(`/venue?venue=${encodeURIComponent(item.name)}&autoload=true`);
+    }
     setSearchOpen(false);
   };
 
   const searchField = (
     <Box
-      component="form"
-      onSubmit={submit}
       sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1,
         width: '100%',
         maxWidth: { xs: 'none', md: 420 },
         ml: { md: 'auto' },
-        px: 1.3,
-        py: 0.7,
-        minHeight: 42,
-        bgcolor: C.surface,
-        border: `1px solid ${C.hairlineStrong}`,
-        borderRadius: 2.2,
+        position: 'relative',
+        zIndex: 50,
       }}
     >
-      <SearchIcon sx={{ color: C.low, fontSize: 19 }} />
-      <Box
-        component="input"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search players, teams, venues"
-        sx={{
-          width: '100%',
-          bgcolor: 'transparent',
-          border: 0,
-          outline: 0,
-          color: C.hi,
-          fontFamily: fonts.body,
-          fontSize: 14,
-          '&::placeholder': { color: C.low },
+      <SearchBar
+        onSelect={routeEntity}
+        onFallback={(term) => {
+          navigate(`/query?nl=${encodeURIComponent(term)}`);
+          setSearchOpen(false);
         }}
+        placeholder="Search players, teams, venues"
+        variant="dark"
       />
     </Box>
   );

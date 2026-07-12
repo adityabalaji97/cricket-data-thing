@@ -10,7 +10,8 @@ import {
   CircularProgress,
   Box,
   Typography,
-  ClickAwayListener
+  ClickAwayListener,
+  Popper
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonIcon from '@mui/icons-material/Person';
@@ -44,6 +45,7 @@ const SearchBar = ({
   onFallback,
   placeholder = "Search players, teams, or venues...",
   autoFocus = false,
+  variant = 'light',
 }) => {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -52,6 +54,8 @@ const SearchBar = ({
   const [submitting, setSubmitting] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceRef = useRef(null);
+  const anchorRef = useRef(null);
+  const dark = variant === 'dark';
 
   const fetchSuggestions = async (queryText, limit = 10) => {
     const q = queryText.trim();
@@ -175,6 +179,7 @@ const SearchBar = ({
     <ClickAwayListener onClickAway={handleClickAway}>
       <Box
         component="form"
+        ref={anchorRef}
         onSubmit={handleSubmit}
         sx={{
           position: 'relative',
@@ -197,7 +202,7 @@ const SearchBar = ({
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchIcon color="action" />
+                <SearchIcon sx={{ color: dark ? '#9aa1ac' : 'action.active' }} />
               </InputAdornment>
             ),
             endAdornment: loading && (
@@ -207,9 +212,16 @@ const SearchBar = ({
             ),
             sx: {
               borderRadius: 3,
-              bgcolor: 'white',
-              '& fieldset': { borderColor: '#dfe1e5' },
-              '&:hover fieldset': { borderColor: '#c0c0c0' },
+              bgcolor: dark ? '#101319' : 'white',
+              color: dark ? '#f3f4f6' : undefined,
+              '& input': { color: dark ? '#f3f4f6' : undefined },
+              '& input::placeholder': {
+                color: dark ? '#6b7280' : undefined,
+                opacity: 1,
+              },
+              '& fieldset': { borderColor: dark ? 'rgba(255,255,255,0.14)' : '#dfe1e5' },
+              '&:hover fieldset': { borderColor: dark ? 'rgba(182,242,74,0.42)' : '#c0c0c0' },
+              '&.Mui-focused fieldset': { borderColor: dark ? '#b6f24a' : undefined },
             }
           }}
         />
@@ -221,15 +233,17 @@ const SearchBar = ({
             border: 0,
             px: { xs: 1.8, sm: 2.5 },
             borderRadius: 3,
-            bgcolor: '#1976d2',
-            color: 'white',
+            bgcolor: dark ? '#b6f24a' : '#1976d2',
+            color: dark ? '#0a0c11' : 'white',
             fontWeight: 700,
             cursor: query.trim() && !submitting ? 'pointer' : 'default',
             opacity: query.trim() && !submitting ? 1 : 0.55,
             minWidth: { xs: 50, sm: 94 },
             fontFamily: 'inherit',
             '&:hover': {
-              bgcolor: query.trim() && !submitting ? '#1565c0' : '#1976d2'
+              bgcolor: query.trim() && !submitting
+                ? (dark ? '#c8f56f' : '#1565c0')
+                : (dark ? '#b6f24a' : '#1976d2')
             }
           }}
           aria-label="Search"
@@ -246,19 +260,27 @@ const SearchBar = ({
           )}
         </Box>
         
-        {showSuggestions && suggestions.length > 0 && (
+        <Popper
+          open={showSuggestions && suggestions.length > 0}
+          anchorEl={anchorRef.current}
+          placement="bottom-start"
+          sx={{
+            zIndex: 1700,
+            width: anchorRef.current?.getBoundingClientRect().width || undefined,
+            maxWidth: 'calc(100vw - 24px)',
+          }}
+        >
           <Paper
             elevation={3}
             sx={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
               mt: 0.5,
               maxHeight: 400,
               overflow: 'auto',
-              zIndex: 1000,
-              borderRadius: 2
+              borderRadius: 2,
+              bgcolor: dark ? '#161a22' : 'background.paper',
+              color: dark ? '#f3f4f6' : undefined,
+              border: dark ? '1px solid rgba(255,255,255,0.12)' : undefined,
+              boxShadow: dark ? '0 24px 48px -18px rgba(0,0,0,0.75)' : undefined,
             }}
           >
             <List dense>
@@ -267,7 +289,7 @@ const SearchBar = ({
                   key={`${item.type}-${item.name}-${index}`}
                   onClick={() => handleSelect(item)}
                   sx={{
-                    '&:hover': { bgcolor: 'action.hover' },
+                    '&:hover': { bgcolor: dark ? 'rgba(182,242,74,0.1)' : 'action.hover' },
                     py: 1
                   }}
                 >
@@ -276,8 +298,9 @@ const SearchBar = ({
                   </ListItemIcon>
                   <ListItemText
                     primary={item.display_name || item.name}
+                    primaryTypographyProps={{ color: dark ? '#f3f4f6' : undefined }}
                     secondary={
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" sx={{ color: dark ? '#9aa1ac' : 'text.secondary' }}>
                         {getTypeLabel(item.type)}
                       </Typography>
                     }
@@ -286,7 +309,7 @@ const SearchBar = ({
               ))}
             </List>
           </Paper>
-        )}
+        </Popper>
       </Box>
     </ClickAwayListener>
   );

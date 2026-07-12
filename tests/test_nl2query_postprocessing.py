@@ -130,3 +130,50 @@ def test_invalid_confidence_defaults_to_medium(monkeypatch):
     result = nl2query.parse_nl_query("virat kohli by year")
     assert result["success"] is True
     assert result["confidence"] == "medium"
+
+
+def test_ambiguous_players_and_teams_are_rewritten_for_batting_context(monkeypatch):
+    nl2query._cache.clear()
+    monkeypatch.setattr(
+        nl2query,
+        "call_openai",
+        lambda _q: _mock_llm_response(
+            filters={
+                "players": ["Tilak Varma"],
+                "teams": ["India"],
+                "start_date": "2025-01-01",
+                "query_mode": "delivery",
+            },
+            group_by=["batting_position"],
+        ),
+    )
+
+    result = nl2query.parse_nl_query("tilak varma batting for india since 2025 by batting position")
+    assert result["success"] is True
+    assert result["filters"]["batters"] == ["Tilak Varma"]
+    assert result["filters"]["batting_teams"] == ["India"]
+    assert "players" not in result["filters"]
+    assert "teams" not in result["filters"]
+
+
+def test_ambiguous_players_and_teams_are_rewritten_for_bowling_context(monkeypatch):
+    nl2query._cache.clear()
+    monkeypatch.setattr(
+        nl2query,
+        "call_openai",
+        lambda _q: _mock_llm_response(
+            filters={
+                "players": ["Jasprit Bumrah"],
+                "teams": ["India"],
+                "query_mode": "delivery",
+            },
+            group_by=["bowler"],
+        ),
+    )
+
+    result = nl2query.parse_nl_query("jasprit bumrah bowling for india by year")
+    assert result["success"] is True
+    assert result["filters"]["bowlers"] == ["Jasprit Bumrah"]
+    assert result["filters"]["bowling_teams"] == ["India"]
+    assert "players" not in result["filters"]
+    assert "teams" not in result["filters"]

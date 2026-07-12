@@ -290,16 +290,17 @@ const QueryBuilder = ({ isMobile }) => {
         params.append('ball_aggregation', ballAggregation);
       }
 
-      // Always update URL so queries are shareable
-      const newParams = filtersToUrlParams(filters, groupBy);
-      const newUrl = `${window.location.pathname}?${newParams}`;
-      window.history.replaceState({}, '', newUrl);
-
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
       setQueryTab(1);
       setNlExpanded(false);
       setFiltersCollapsed(true);
+
+      // Update after the request succeeds so parsing/execution does not visibly
+      // churn the URL while the UI is still resolving state.
+      const newParams = filtersToUrlParams(filters, groupBy);
+      const newUrl = `${window.location.pathname}?${newParams}`;
+      window.history.replaceState({}, '', newUrl);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       
     } catch (error) {
@@ -362,7 +363,7 @@ const QueryBuilder = ({ isMobile }) => {
     setNlRecommendedColumns(Array.isArray(recommendedColumns) ? recommendedColumns : []);
     setNlRecommendedChart(recommendedChart || null);
     setQueryTab(0);
-    setHasLoadedFromUrl(false);
+    setHasLoadedFromUrl(true);
     setNlExpanded(false);
     setFiltersCollapsed(true);
 
@@ -431,7 +432,11 @@ const QueryBuilder = ({ isMobile }) => {
   return (
     <Box
       sx={{
-        mx: { xs: -1, sm: -2, md: -3 },
+        width: '100%',
+        maxWidth: '100vw',
+        boxSizing: 'border-box',
+        overflowX: 'hidden',
+        mx: { xs: 0, md: -3 },
         mt: -3,
         mb: -2,
         minHeight: '100vh',
@@ -472,6 +477,10 @@ const QueryBuilder = ({ isMobile }) => {
     >
       <GlobalStyles
         styles={{
+          'html, body, #root': {
+            backgroundColor: qbColors.bg,
+            overflowX: 'hidden',
+          },
           '.MuiAutocomplete-popper .MuiPaper-root, .MuiPopover-paper, .MuiMenu-paper': {
             backgroundColor: qbColors.surface3,
             color: qbColors.textMed,
@@ -491,15 +500,15 @@ const QueryBuilder = ({ isMobile }) => {
           },
         }}
       />
-      <Box sx={{ maxWidth: 1180, mx: 'auto' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: { xs: 2.5, md: 4 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ width: '100%', maxWidth: 1180, mx: 'auto', minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, mb: { xs: 2.5, md: 4 }, minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
             <Box component="img" src="/cricket-icon.svg" alt="" sx={{ width: 30, height: 30 }} />
-            <Typography sx={{ fontFamily: qbFonts.display, fontSize: 19, fontWeight: 700, color: qbColors.textHi }}>
+            <Typography sx={{ fontFamily: qbFonts.display, fontSize: 19, fontWeight: 700, color: qbColors.textHi, whiteSpace: 'nowrap' }}>
               Hindsight
             </Typography>
             <Typography sx={{ color: qbColors.textGhost }}>/</Typography>
-            <Typography sx={{ fontFamily: qbFonts.display, fontSize: 15, fontWeight: 600, color: qbColors.textLo }}>
+            <Typography sx={{ fontFamily: qbFonts.display, fontSize: 15, fontWeight: 600, color: qbColors.textLo, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               Query Builder
             </Typography>
           </Box>
@@ -511,6 +520,7 @@ const QueryBuilder = ({ isMobile }) => {
               height: 38,
               bgcolor: qbColors.surface1,
               px: 1.6,
+              flexShrink: 0,
             }}
           >
             Explore
@@ -550,7 +560,7 @@ const QueryBuilder = ({ isMobile }) => {
           </Box>
         )}
 
-        <Box sx={{ display: 'grid', gap: { xs: '22px', md: '28px' } }}>
+        <Box sx={{ display: 'grid', gap: { xs: '18px', md: '28px' }, minWidth: 0 }}>
           {(!hasResults || nlExpanded) ? (
             <NLQueryInput
               ref={nlInputRef}
@@ -559,11 +569,11 @@ const QueryBuilder = ({ isMobile }) => {
             />
           ) : (
             <Paper elevation={0} sx={{ ...qbCardSx, p: 1.25, borderColor: 'rgba(182,242,74,0.18)' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1.2, flexWrap: 'wrap' }}>
                 <Box sx={{ width: 32, height: 32, borderRadius: '10px', display: 'grid', placeItems: 'center', bgcolor: qbColors.accentSoft }}>
                   <SearchIcon sx={{ color: qbColors.accent, fontSize: 18 }} />
                 </Box>
-                <Typography sx={{ color: nlActive ? qbColors.textHi : qbColors.textLo, flex: 1, minWidth: 180 }}>
+                <Typography sx={{ color: nlActive ? qbColors.textHi : qbColors.textLo, flex: 1, minWidth: { xs: 0, sm: 180 }, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {nlActive ? `"${nlSourceQuery}"` : 'Built from filters - no natural-language query'}
                 </Typography>
                 <Button
@@ -599,7 +609,7 @@ const QueryBuilder = ({ isMobile }) => {
             <Box
               onClick={() => setFiltersCollapsed((prev) => !prev)}
               sx={{
-                p: { xs: 2, md: 2.4 },
+                p: { xs: 1.6, md: 2.4 },
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1.25,
@@ -610,7 +620,7 @@ const QueryBuilder = ({ isMobile }) => {
                 <Typography sx={{ fontFamily: qbFonts.mono, color: qbColors.accent, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
                   01 / Filters
                 </Typography>
-                <Typography sx={{ fontFamily: qbFonts.display, fontSize: { xs: 19, md: 23 }, fontWeight: 700 }}>
+                <Typography sx={{ fontFamily: qbFonts.display, fontSize: { xs: 18, md: 23 }, fontWeight: 700 }}>
                   Filters & Grouping
                 </Typography>
               </Box>
@@ -630,7 +640,7 @@ const QueryBuilder = ({ isMobile }) => {
             </Box>
 
             <Collapse in={!filtersCollapsed}>
-              <Box sx={{ px: { xs: 2, md: 2.4 }, pb: 2.4 }}>
+              <Box sx={{ px: { xs: 1.6, md: 2.4 }, pb: 2.4, minWidth: 0 }}>
                 <QueryFilters
                   filters={filters}
                   setFilters={setFilters}

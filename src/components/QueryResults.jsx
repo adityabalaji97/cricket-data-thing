@@ -61,7 +61,12 @@ const darkOutlineChipSx = {
   bgcolor: 'rgba(255,255,255,0.035)',
   color: qbColors.textMed,
   borderColor: qbColors.borderStrong,
+  maxWidth: '100%',
   '& .MuiChip-icon': { color: qbColors.textLo },
+  '& .MuiChip-label': {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
   '& .MuiChip-deleteIcon': {
     color: qbColors.textFaint,
     '&:hover': { color: qbColors.red },
@@ -850,22 +855,24 @@ const QueryResults = ({
   const columnsMenuOpen = Boolean(columnsAnchorEl);
 
   return (
-    <Box sx={{ color: qbColors.textHi }}>
+    <Box sx={{ color: qbColors.textHi, width: '100%', minWidth: 0, overflow: 'hidden' }}>
       {/* Results Summary */}
-      <Card sx={{ ...qbCardSx, mb: 2.5 }}>
-        <CardContent sx={{ pb: headerCollapsed ? '12px !important' : undefined }}>
+      <Card sx={{ ...qbCardSx, mb: 2.5, maxWidth: '100%', overflow: 'hidden' }}>
+        <CardContent sx={{ p: { xs: 1.6, md: 2 }, pb: headerCollapsed ? '12px !important' : undefined }}>
           {/* Compact summary pill — always visible */}
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              gap: 1,
               cursor: 'pointer',
+              minWidth: 0,
             }}
             onClick={() => setHeaderCollapsed(prev => !prev)}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                <Typography variant="h6" sx={{ fontFamily: qbFonts.display, fontSize: headerCollapsed ? '1rem' : 23, fontWeight: 700 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', minWidth: 0 }}>
+              <Typography variant="h6" sx={{ fontFamily: qbFonts.display, fontSize: headerCollapsed ? '1rem' : 23, fontWeight: 700, flexShrink: 0 }}>
                 Query Results
               </Typography>
               {headerCollapsed && (
@@ -895,8 +902,8 @@ const QueryResults = ({
 
           {/* Full header content — collapsible */}
           <Collapse in={!headerCollapsed}>
-            <Grid container spacing={2} alignItems="center" sx={{ mt: 0.5 }}>
-              <Grid item xs={12} sm={8}>
+            <Grid container spacing={{ xs: 1.5, md: 2 }} alignItems="flex-start" sx={{ mt: 0.5 }}>
+              <Grid item xs={12} md={7}>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
                   {isGrouped ? (
                     <>
@@ -909,7 +916,7 @@ const QueryResults = ({
                         label={`Grouped by: ${groupBy.join(', ')}`}
                         variant="outlined"
                         size="small"
-                        sx={darkOutlineChipSx}
+                        sx={{ ...darkOutlineChipSx, maxWidth: { xs: '100%', md: 360 } }}
                       />
                       {hasSummaries && (
                         <Chip
@@ -980,8 +987,19 @@ const QueryResults = ({
                 )}
               </Grid>
 
-              <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+              <Grid item xs={12} md={5} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 1,
+                    flexWrap: 'wrap',
+                    justifyContent: { xs: 'stretch', md: 'flex-end' },
+                    '& .MuiButton-root': {
+                      flex: { xs: '1 1 150px', sm: '0 1 auto' },
+                      minWidth: { xs: 0, sm: 'auto' },
+                    },
+                  }}
+                >
                   {isGrouped && data.length > 0 && Object.keys(columnFilters).length > 0 && (
                     <Button
                       variant="outlined"
@@ -1015,7 +1033,7 @@ const QueryResults = ({
                         size="small"
                         sx={{ ...qbButtonSx, minHeight: 36, fontSize: 11 }}
                       >
-                        + Bar chart
+                        Bar chart
                       </Button>
                       <Button
                         variant="contained"
@@ -1024,7 +1042,7 @@ const QueryResults = ({
                         size="small"
                         sx={{ ...qbButtonSx, minHeight: 36, fontSize: 11 }}
                       >
-                        + Scatter plot
+                        Scatter plot
                       </Button>
                       <Button
                         variant="outlined"
@@ -1033,7 +1051,7 @@ const QueryResults = ({
                         size="small"
                         sx={{ ...qbGhostButtonSx, minHeight: 36 }}
                       >
-                        + Line chart
+                        Line chart
                       </Button>
                     </>
                   )}
@@ -1129,9 +1147,9 @@ const QueryResults = ({
       )}
 
       {/* Data Table with Sorting */}
-      <Paper sx={{ ...qbCardSx, overflow: 'hidden' }}>
-        <TableContainer sx={{ maxHeight: isMobile ? 400 : 600, bgcolor: qbColors.surface1 }}>
-          <Table stickyHeader size={isMobile ? "small" : "medium"}>
+      <Paper sx={{ ...qbCardSx, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+        <TableContainer sx={{ maxHeight: isMobile ? 400 : 600, bgcolor: qbColors.surface1, overflowX: 'auto' }}>
+          <Table stickyHeader size={isMobile ? "small" : "medium"} sx={{ minWidth: Math.max(visibleColumns.length * (isMobile ? 96 : 124), isMobile ? 520 : 760) }}>
             <TableHead>
               <TableRow>
                 {visibleColumns.map((column, colIndex) => {
@@ -1259,6 +1277,11 @@ const QueryResults = ({
             bgcolor: qbColors.surface2,
             color: qbColors.textLo,
             borderTop: `1px solid ${qbColors.border}`,
+            '& .MuiToolbar-root': {
+              flexWrap: 'wrap',
+              rowGap: 0.5,
+              px: { xs: 1, sm: 2 },
+            },
             '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
               color: qbColors.textLo,
               fontFamily: qbFonts.mono,

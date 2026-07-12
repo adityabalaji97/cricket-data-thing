@@ -553,7 +553,7 @@ const AppContent = () => {
 
   return (
     <Container
-      maxWidth="xl"
+      maxWidth={isQueryRoute ? false : "xl"}
       sx={{
         px: { xs: isQueryRoute ? 0 : 1, sm: isQueryRoute ? 0 : 2, md: isQueryRoute ? 0 : 3 },
         bgcolor: isQueryRoute ? qbColors.bg : 'transparent',
@@ -592,7 +592,12 @@ const AppContent = () => {
             <Box sx={{ flexGrow: 1 }}>
               <SearchBar 
                 onSelect={handleHeaderSearchSelect}
+                onFallback={(term) => {
+                  setSearchExpanded(false);
+                  navigate(`/query?nl=${encodeURIComponent(term)}`);
+                }}
                 placeholder="Search players, teams, venues..."
+                variant={isQueryRoute ? 'dark' : 'light'}
               />
             </Box>
             <IconButton 

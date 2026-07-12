@@ -93,12 +93,12 @@ Return a JSON object with these fields:
 ### Player filters
 - "batters": list of batter names (use full names, e.g. "V Kohli", "MS Dhoni", "JC Buttler")
 - "bowlers": list of bowler names (use full names)
-- "players": list of player names (when role is ambiguous)
+- Do not use "players"; choose "batters" for batting/scoring queries and "bowlers" for bowling/conceding/wicket queries.
 
 ### Team filters
 - "batting_teams": list of full team names
 - "bowling_teams": list of full team names
-- "teams": list of full team names (when batting/bowling context unclear)
+- Do not use "teams"; choose "batting_teams" for batting-side/team scoring queries and "bowling_teams" for bowling-side/fielding queries.
 - "venue": a single venue/ground string (e.g. "Eden Gardens")
 
 ### League/competition filters
@@ -623,6 +623,10 @@ def _build_explanation(filters: Dict[str, Any], group_by: List[str]) -> str:
         scope_bits.append(f"bowlers {', '.join(filters['bowlers'])}")
     if filters.get("teams"):
         scope_bits.append(f"teams {', '.join(filters['teams'])}")
+    if filters.get("batting_teams"):
+        scope_bits.append(f"batting teams {', '.join(filters['batting_teams'])}")
+    if filters.get("bowling_teams"):
+        scope_bits.append(f"bowling teams {', '.join(filters['bowling_teams'])}")
     if filters.get("venue"):
         scope_bits.append(f"venue {filters['venue']}")
 
@@ -930,20 +934,102 @@ def _sanitize_interpretation(
     }
 
 
+def _clean_string_list(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    cleaned: List[str] = []
+    seen = set()
+    for item in value:
+        text = str(item).strip()
+        if not text:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(text)
+    return cleaned
+
+
+def _infer_player_filter_key(query: str, filters: Dict[str, Any], group_by: List[str]) -> str:
+    q = (query or "").lower()
+    batting_context = bool(re.search(
+        r"\b(bat|bats|batted|batting|batter|batters|striker|striking|score|scores|scored|runs?|strike\s*rate|sr|balls?\s*faced|boundary|boundaries|fours?|sixes?)\b",
+        q,
+    ))
+    bowling_context = bool(re.search(
+        r"\b(bowl|bowls|bowled|bowling|bowler|bowlers|wicket|wickets|economy|conceded|concedes|conceding|gave\s+away|runs?\s+conceded|dots?)\b",
+        q,
+    ))
+
+    if filters.get("bowl_kind") or filters.get("bowl_style") or filters.get("min_wickets") is not None or filters.get("max_wickets") is not None:
+        bowling_context = True
+    if filters.get("bat_hand") or filters.get("min_runs") is not None or filters.get("max_runs") is not None:
+        batting_context = True
+
+    if "bowler" in group_by and "batter" not in group_by:
+        bowling_context = True
+    if "batter" in group_by and "bowler" not in group_by:
+        batting_context = True
+
+    if bowling_context and not batting_context:
+        return "bowlers"
+    return "batters"
+
+
+def _infer_team_filter_key(query: str, filters: Dict[str, Any], group_by: List[str]) -> str:
+    q = (query or "").lower()
+    bowling_context = bool(re.search(
+        r"\b(bowling|bowled|bowler|bowlers|fielding|defending|conceded|concedes|conceding|wickets?)\b",
+        q,
+    ))
+    batting_context = bool(re.search(
+        r"\b(batting|batted|batter|batters|chasing|chase|scoring|scored|runs?|innings?)\b",
+        q,
+    ))
+
+    if filters.get("bowlers") or filters.get("bowl_kind") or filters.get("bowl_style"):
+        bowling_context = True
+    if filters.get("batters") or filters.get("bat_hand"):
+        batting_context = True
+    if "bowling_team" in group_by and "batting_team" not in group_by:
+        bowling_context = True
+    if "batting_team" in group_by and "bowling_team" not in group_by:
+        batting_context = True
+
+    if bowling_context and not batting_context:
+        return "bowling_teams"
+    return "batting_teams"
+
+
 def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
     """Validate and sanitize LLM output, stripping invalid values."""
     filters = parsed.get("filters", {})
     validated = {}
+    raw_group_by = parsed.get("group_by", [])
+    raw_group_by = raw_group_by if isinstance(raw_group_by, list) else []
 
     # Force-normalize: batting_stats/bowling_stats are deprecated. Any LLM
     # output that still emits them gets coerced to "delivery" so downstream
     # services always hit the delivery aggregate path.
     validated["query_mode"] = "delivery"
 
-    # String list filters (pass through - player/team names can't be validated without DB)
-    for key in ["batters", "bowlers", "players", "batting_teams", "bowling_teams", "teams"]:
-        if key in filters and isinstance(filters[key], list) and len(filters[key]) > 0:
-            validated[key] = filters[key]
+    # String list filters. Ambiguous legacy model keys are rewritten into the
+    # role-specific filters exposed by the Query Builder UI.
+    for key in ["batters", "bowlers", "batting_teams", "bowling_teams"]:
+        cleaned = _clean_string_list(filters.get(key))
+        if cleaned:
+            validated[key] = cleaned
+
+    ambiguous_players = _clean_string_list(filters.get("players"))
+    if ambiguous_players:
+        player_key = _infer_player_filter_key(query, {**filters, **validated}, raw_group_by)
+        validated[player_key] = _clean_string_list([*(validated.get(player_key, [])), *ambiguous_players])
+
+    ambiguous_teams = _clean_string_list(filters.get("teams"))
+    if ambiguous_teams:
+        team_key = _infer_team_filter_key(query, {**filters, **validated}, raw_group_by)
+        validated[team_key] = _clean_string_list([*(validated.get(team_key, [])), *ambiguous_teams])
     if "venue" in filters and isinstance(filters["venue"], str) and filters["venue"].strip():
         raw_venue = filters["venue"].strip()
         if raw_venue.lower() not in _INVALID_VENUE_VALUES:
