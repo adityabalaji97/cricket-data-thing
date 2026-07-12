@@ -20,6 +20,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import axios from 'axios';
 import config from '../config';
+import { qbButtonSx, qbCardSx, qbColors, qbFonts } from './queryBuilderTheme';
 
 const EXAMPLE_QUERIES = [
   "kohli vs spin since 2023",
@@ -125,23 +126,33 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
       elevation={2}
       sx={{
         p: isMobile ? 2 : 3,
-        mb: 3,
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: 'white'
+        ...qbCardSx,
+        mb: 0,
+        background: 'linear-gradient(150deg,#12160f,#101319 60%)',
+        borderColor: 'rgba(182,242,74,0.22)',
+        color: qbColors.textHi
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Box sx={{ width: 32, height: 32, borderRadius: '10px', display: 'grid', placeItems: 'center', bgcolor: qbColors.accentSoft }}>
+          <SearchIcon sx={{ color: qbColors.accent, fontSize: 18 }} />
+        </Box>
+        <Typography variant="h6" sx={{ fontFamily: qbFonts.display, fontWeight: 700, fontSize: 17 }}>
           Natural Language Search
         </Typography>
+        <Chip
+          label="AI"
+          size="small"
+          sx={{ bgcolor: qbColors.accent, color: qbColors.bg, height: 20, fontFamily: qbFonts.mono, fontWeight: 700 }}
+        />
         <Tooltip title={QUERY_TIPS} arrow placement="right">
-          <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+          <IconButton size="small" sx={{ color: qbColors.textLo }}>
             <HelpOutlineIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       </Box>
 
-      <Typography variant="body2" sx={{ mb: 2, opacity: 0.9, fontSize: isMobile ? '0.82rem' : '0.9rem' }}>
+      <Typography variant="body2" sx={{ mb: 2, color: qbColors.textLo, fontSize: isMobile ? '0.82rem' : '0.9rem' }}>
         Describe what you want to analyze in plain English across delivery details, batting stats, or bowling stats
       </Typography>
 
@@ -157,11 +168,17 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
           size="small"
           sx={{
             '& .MuiOutlinedInput-root': {
-              bgcolor: 'rgba(255,255,255,0.95)',
-              borderRadius: 1,
-              '& fieldset': { borderColor: 'transparent' },
-              '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
-              '&.Mui-focused fieldset': { borderColor: 'white' }
+              bgcolor: qbColors.bg,
+              borderRadius: '12px',
+              minHeight: 50,
+              color: qbColors.textHi,
+              '& fieldset': { borderColor: qbColors.borderStrong },
+              '&:hover fieldset': { borderColor: 'rgba(182,242,74,0.42)' },
+              '&.Mui-focused fieldset': { borderColor: qbColors.accent }
+            },
+            '& input::placeholder': {
+              color: qbColors.textFaint,
+              opacity: 1,
             }
           }}
         />
@@ -170,11 +187,9 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
           onClick={handleSubmit}
           disabled={!query.trim() || loading || disabled}
           sx={{
-            bgcolor: 'rgba(255,255,255,0.2)',
-            color: 'white',
+            ...qbButtonSx,
             minWidth: isMobile ? '100%' : 100,
-            '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' },
-            '&.Mui-disabled': { color: 'rgba(255,255,255,0.5)' }
+            minHeight: 50,
           }}
           startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SearchIcon />}
         >
@@ -192,23 +207,26 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
         </Alert>
       )}
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.8 }}>
         <Typography
           variant="caption"
           sx={{
-            opacity: 0.9,
+            color: qbColors.textLo,
+            fontFamily: qbFonts.mono,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
             cursor: 'pointer',
             userSelect: 'none',
-            '&:hover': { opacity: 1 }
+            '&:hover': { color: qbColors.accent }
           }}
           onClick={() => setShowExamples(prev => !prev)}
         >
-          {examplesVisible ? 'Hide examples' : 'Show examples'}
+          Try
         </Typography>
         <IconButton
           size="small"
           onClick={() => setShowExamples(prev => !prev)}
-          sx={{ color: 'rgba(255,255,255,0.8)', p: 0 }}
+          sx={{ color: qbColors.textLo, p: 0 }}
         >
           {examplesVisible ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
         </IconButton>
@@ -226,7 +244,7 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
             '::-webkit-scrollbar': { width: isMobile ? 4 : 0 }
           }}
         >
-          {EXAMPLE_QUERIES.map((example, index) => (
+          {EXAMPLE_QUERIES.slice(0, 3).map((example, index) => (
             <Chip
               key={index}
               label={example}
@@ -234,11 +252,14 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
               onClick={() => handleChipClick(example)}
               disabled={loading}
               sx={{
-                bgcolor: 'rgba(255,255,255,0.15)',
-                color: 'white',
+                bgcolor: 'rgba(255,255,255,0.06)',
+                color: qbColors.textMed,
+                border: `1px solid ${qbColors.borderStrong}`,
                 fontSize: '0.75rem',
+                fontFamily: qbFonts.mono,
+                borderRadius: '8px',
                 cursor: 'pointer',
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+                '&:hover': { bgcolor: qbColors.accentSoft, color: qbColors.accent, borderColor: 'rgba(182,242,74,0.4)' },
                 '&.Mui-disabled': { opacity: 0.5 }
               }}
             />

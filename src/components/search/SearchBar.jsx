@@ -3,7 +3,7 @@ import {
   TextField,
   Paper,
   List,
-  ListItem,
+  ListItemButton,
   ListItemText,
   ListItemIcon,
   InputAdornment,
@@ -17,14 +17,53 @@ import PersonIcon from '@mui/icons-material/Person';
 import GroupsIcon from '@mui/icons-material/Groups';
 import StadiumIcon from '@mui/icons-material/Stadium';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL, SEARCH_DEBOUNCE_MS, MIN_SEARCH_LENGTH } from './searchConfig';
 
-const SearchBar = ({ onSelect, placeholder = "Search players, teams, or venues..." }) => {
+export const normalizeSearchText = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+export const findExactSearchMatch = (query, suggestions = []) => {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return null;
+
+  return suggestions.find((item) => {
+    const candidates = [item?.name, item?.display_name, item?.details_name]
+      .map(normalizeSearchText)
+      .filter(Boolean);
+    return candidates.includes(normalizedQuery);
+  }) || null;
+};
+
+const SearchBar = ({
+  onSelect,
+  onSubmit,
+  onFallback,
+  placeholder = "Search players, teams, or venues...",
+  autoFocus = false,
+}) => {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceRef = useRef(null);
+
+  const fetchSuggestions = async (queryText, limit = 10) => {
+    const q = queryText.trim();
+    if (q.length < MIN_SEARCH_LENGTH) {
+      return [];
+    }
+
+    const response = await axios.get(`${API_BASE_URL}/search/suggestions`, {
+      params: { q, limit }
+    });
+    return response.data.suggestions || [];
+  };
 
   const getIcon = (type) => {
     switch (type) {
@@ -58,10 +97,8 @@ const SearchBar = ({ onSelect, placeholder = "Search players, teams, or venues..
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await axios.get(`${API_BASE_URL}/search/suggestions`, {
-          params: { q: query, limit: 10 }
-        });
-        setSuggestions(response.data.suggestions || []);
+        const nextSuggestions = await fetchSuggestions(query, 10);
+        setSuggestions(nextSuggestions);
         setShowSuggestions(true);
       } catch (error) {
         console.error('Search error:', error);
@@ -88,15 +125,70 @@ const SearchBar = ({ onSelect, placeholder = "Search players, teams, or venues..
     }
   };
 
+  const routeToQueryBuilder = (queryText) => {
+    const q = queryText.trim();
+    if (!q) return;
+
+    if (onFallback) {
+      onFallback(q);
+      return;
+    }
+
+    navigate(`/query?nl=${encodeURIComponent(q)}`);
+  };
+
+  const handleSubmit = async (event) => {
+    event?.preventDefault();
+    const q = query.trim();
+    if (!q || submitting) return;
+
+    setSubmitting(true);
+    try {
+      const freshSuggestions = await fetchSuggestions(q, 20);
+      setSuggestions(freshSuggestions);
+      const exactMatch = findExactSearchMatch(q, freshSuggestions);
+
+      if (onSubmit) {
+        onSubmit({ query: q, exactMatch, suggestions: freshSuggestions });
+      }
+
+      if (exactMatch) {
+        handleSelect(exactMatch);
+      } else {
+        setShowSuggestions(false);
+        routeToQueryBuilder(q);
+      }
+    } catch (error) {
+      console.error('Search submit error:', error);
+      setShowSuggestions(false);
+      routeToQueryBuilder(q);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleClickAway = () => {
     setShowSuggestions(false);
   };
 
   return (
     <ClickAwayListener onClickAway={handleClickAway}>
-      <Box sx={{ position: 'relative', width: '100%', maxWidth: 600, zIndex: 1300 }}>
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        sx={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: 680,
+          zIndex: 1300,
+          display: 'flex',
+          gap: 1,
+          alignItems: 'stretch'
+        }}
+      >
         <TextField
           fullWidth
+          autoFocus={autoFocus}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
@@ -121,6 +213,38 @@ const SearchBar = ({ onSelect, placeholder = "Search players, teams, or venues..
             }
           }}
         />
+        <Box
+          component="button"
+          type="submit"
+          disabled={!query.trim() || submitting}
+          sx={{
+            border: 0,
+            px: { xs: 1.8, sm: 2.5 },
+            borderRadius: 3,
+            bgcolor: '#1976d2',
+            color: 'white',
+            fontWeight: 700,
+            cursor: query.trim() && !submitting ? 'pointer' : 'default',
+            opacity: query.trim() && !submitting ? 1 : 0.55,
+            minWidth: { xs: 50, sm: 94 },
+            fontFamily: 'inherit',
+            '&:hover': {
+              bgcolor: query.trim() && !submitting ? '#1565c0' : '#1976d2'
+            }
+          }}
+          aria-label="Search"
+        >
+          {submitting ? (
+            <CircularProgress size={18} color="inherit" />
+          ) : (
+            <>
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                Search
+              </Box>
+              <SearchIcon sx={{ display: { xs: 'inline-flex', sm: 'none' }, verticalAlign: 'middle' }} />
+            </>
+          )}
+        </Box>
         
         {showSuggestions && suggestions.length > 0 && (
           <Paper
@@ -139,9 +263,8 @@ const SearchBar = ({ onSelect, placeholder = "Search players, teams, or venues..
           >
             <List dense>
               {suggestions.map((item, index) => (
-                <ListItem
+                <ListItemButton
                   key={`${item.type}-${item.name}-${index}`}
-                  button
                   onClick={() => handleSelect(item)}
                   sx={{
                     '&:hover': { bgcolor: 'action.hover' },
@@ -159,7 +282,7 @@ const SearchBar = ({ onSelect, placeholder = "Search players, teams, or venues..
                       </Typography>
                     }
                   />
-                </ListItem>
+                </ListItemButton>
               ))}
             </List>
           </Paper>

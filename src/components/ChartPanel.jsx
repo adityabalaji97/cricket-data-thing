@@ -36,6 +36,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { getDataPointColor, getFallbackColor, hasTeamGrouping } from '../utils/teamColors';
 import ZoomableChart from './common/ZoomableChart';
 import { getAutoscaledDomain } from '../utils/chartDomainUtils';
+import { qbCardSx, qbColors, qbFonts } from './queryBuilderTheme';
 
 const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialRecommendation = null, isMobile = false }, ref) => {
   const [charts, setCharts] = useState([]);
@@ -461,7 +462,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
     const dataPoint = payload[0].payload;
     
     return (
-      <Card sx={{ p: 2, maxWidth: 300, border: '1px solid #ccc' }}>
+      <Card sx={{ ...qbCardSx, p: 2, maxWidth: 300 }}>
         <Typography variant="subtitle2" gutterBottom>
           {dataPoint.name}
         </Typography>
@@ -514,11 +515,11 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
       : (selectedMetricData?.label || chart.selectedMetric);
 
     return (
-      <Card key={chart.id} sx={{ mb: 3 }}>
+      <Card key={chart.id} sx={{ ...qbCardSx, mb: 3 }}>
         <CardContent>
           {/* Chart Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontFamily: qbFonts.display, color: qbColors.textHi }}>
               <BarChartIcon />
               Bar Chart - {titleLabel}
             </Typography>
@@ -612,10 +613,10 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
   const renderLineChart = (chart) => {
     const selectedMetricData = availableMetrics.find(m => m.key === chart.selectedMetric);
     return (
-      <Card key={chart.id} sx={{ mb: 3 }}>
+      <Card key={chart.id} sx={{ ...qbCardSx, mb: 3 }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontFamily: qbFonts.display, color: qbColors.textHi }}>
               <ShowChartIcon />
               Line Chart - {selectedMetricData?.label || chart.selectedMetric}
             </Typography>
@@ -696,7 +697,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
     };
     
     return (
-      <Card key={chart.id} sx={{ mb: 3 }}>
+      <Card key={chart.id} sx={{ ...qbCardSx, mb: 3 }}>
         <CardContent sx={{ px: isMobile ? 1 : 2 }}>
           {/* Chart Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -748,7 +749,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
 
           {/* Mobile Selected Point Info */}
           {isMobile && selectedPoint && (
-            <Card variant="outlined" sx={{ mb: 2, p: 1.5, backgroundColor: 'grey.50' }}>
+            <Card variant="outlined" sx={{ mb: 2, p: 1.5, bgcolor: qbColors.surface2, borderColor: qbColors.border }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
@@ -875,10 +876,10 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
   return (
     <Box sx={{ mt: 3 }}>
       {/* Main Header */}
-      <Card sx={{ mb: 3 }}>
+      <Card sx={{ ...qbCardSx, mb: 3 }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontFamily: qbFonts.display, color: qbColors.textHi }}>
               <BarChartIcon />
               Data Visualization
             </Typography>

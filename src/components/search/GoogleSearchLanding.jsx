@@ -11,6 +11,7 @@ import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import SearchBar from './SearchBar';
+import { findExactSearchMatch } from './SearchBar';
 import PlayerSearchResult from './PlayerSearchResult';
 import { API_BASE_URL } from './searchConfig';
 
@@ -19,12 +20,29 @@ const GoogleSearchLanding = () => {
   const [searchParams] = useSearchParams();
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [luckyLoading, setLuckyLoading] = useState(false);
+  const [resolvedUrlQuery, setResolvedUrlQuery] = useState('');
   
   // Extract URL parameters for date filtering
   const [dateFilters, setDateFilters] = useState({
     startDate: null,
     endDate: null
   });
+
+  const routeEntity = (item, replace = false) => {
+    if (item.type === 'player') {
+      setSelectedEntity(item);
+      // Build URL with any existing date filters
+      const params = new URLSearchParams();
+      params.set('q', item.name);
+      if (dateFilters.startDate) params.set('start_date', dateFilters.startDate);
+      if (dateFilters.endDate) params.set('end_date', dateFilters.endDate);
+      navigate(`/search?${params.toString()}`, { replace });
+    } else if (item.type === 'team') {
+      navigate(`/team?team=${encodeURIComponent(item.name)}&autoload=true`, { replace });
+    } else if (item.type === 'venue') {
+      navigate(`/venue?venue=${encodeURIComponent(item.name)}&autoload=true`, { replace });
+    }
+  };
 
   // Auto-search from URL parameter and extract date filters
   useEffect(() => {
@@ -40,26 +58,33 @@ const GoogleSearchLanding = () => {
       });
     }
     
-    if (query && !selectedEntity) {
-      // Auto-select as player search
-      setSelectedEntity({ name: query, type: 'player' });
+    if (query && !selectedEntity && resolvedUrlQuery !== query) {
+      setResolvedUrlQuery(query);
+      const resolveQuery = async () => {
+        try {
+          const response = await axios.get(`${API_BASE_URL}/search/suggestions`, {
+            params: { q: query, limit: 20 }
+          });
+          const suggestions = response.data.suggestions || [];
+          const exactMatch = findExactSearchMatch(query, suggestions);
+
+          if (exactMatch) {
+            routeEntity(exactMatch, true);
+          } else {
+            navigate(`/query?nl=${encodeURIComponent(query)}`, { replace: true });
+          }
+        } catch (error) {
+          console.error('URL search resolve error:', error);
+          navigate(`/query?nl=${encodeURIComponent(query)}`, { replace: true });
+        }
+      };
+
+      resolveQuery();
     }
-  }, [searchParams, selectedEntity]);
+  }, [searchParams, selectedEntity, resolvedUrlQuery, navigate, dateFilters.startDate, dateFilters.endDate]);
 
   const handleSelect = (item) => {
-    if (item.type === 'player') {
-      setSelectedEntity(item);
-      // Build URL with any existing date filters
-      const params = new URLSearchParams();
-      params.set('q', item.name);
-      if (dateFilters.startDate) params.set('start_date', dateFilters.startDate);
-      if (dateFilters.endDate) params.set('end_date', dateFilters.endDate);
-      navigate(`/search?${params.toString()}`, { replace: true });
-    } else if (item.type === 'team') {
-      navigate(`/team?team=${encodeURIComponent(item.name)}&autoload=true`);
-    } else if (item.type === 'venue') {
-      navigate(`/venue?venue=${encodeURIComponent(item.name)}&autoload=true`);
-    }
+    routeEntity(item, true);
   };
 
   const handleFeelingLucky = async () => {

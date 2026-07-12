@@ -13,11 +13,12 @@ import {
 } from '@mui/material';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { qbCardSx, qbColors, qbFonts } from './queryBuilderTheme';
 
 const CONFIDENCE_STYLE = {
-  high: { label: 'High confidence', color: 'success' },
-  medium: { label: 'Medium confidence', color: 'warning' },
-  low: { label: 'Low confidence', color: 'error' },
+  high: { label: 'High', color: qbColors.accent, bg: qbColors.accentSoft },
+  medium: { label: 'Medium', color: qbColors.gold, bg: 'rgba(240,180,41,0.14)' },
+  low: { label: 'Low', color: qbColors.red, bg: 'rgba(229,72,77,0.14)' },
 };
 
 const ENTITY_COLOR = {
@@ -76,14 +77,15 @@ const NLInterpretation = ({
   const confidenceKey = normalizeConfidence(confidence);
   const confidenceMeta = CONFIDENCE_STYLE[confidenceKey];
   const summaryText = interpretation?.summary || 'Interpretation unavailable.';
-  const headerText = `AI Interpretation \u00b7 ${confidenceMeta.label}`;
-
   return (
-    <Paper elevation={1} sx={{ mb: 2, p: 2, border: 1, borderColor: 'divider' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5 }}>
+    <Paper elevation={0} sx={{ ...qbCardSx, p: 0, overflow: 'hidden' }}>
+      <Box
+        onClick={() => setCollapsed((prev) => !prev)}
+        sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, p: 2, cursor: 'pointer' }}
+      >
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="subtitle2" sx={{ mb: 0.5, color: 'text.secondary' }}>
-            {headerText}
+          <Typography variant="subtitle2" sx={{ mb: 0.5, color: qbColors.textLo, fontFamily: qbFonts.mono, fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+            AI Interpretation
           </Typography>
           {collapsed && (
             <Typography
@@ -93,6 +95,7 @@ const NLInterpretation = ({
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                color: qbColors.textHi,
               }}
             >
               {summaryText}
@@ -102,14 +105,24 @@ const NLInterpretation = ({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Chip
             size="small"
-            color={confidenceMeta.color}
-            label={confidenceMeta.label}
-            sx={{ fontWeight: 600 }}
+            label={`${confidenceMeta.label} confidence`}
+            sx={{
+              bgcolor: confidenceMeta.bg,
+              color: confidenceMeta.color,
+              fontWeight: 700,
+              fontFamily: qbFonts.mono,
+              fontSize: 10,
+              textTransform: 'uppercase',
+            }}
           />
           <IconButton
             size="small"
-            onClick={() => setCollapsed((prev) => !prev)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setCollapsed((prev) => !prev);
+            }}
             aria-label={collapsed ? 'Expand interpretation' : 'Collapse interpretation'}
+            sx={{ color: qbColors.textLo }}
           >
             {collapsed ? <ExpandMoreIcon fontSize="small" /> : <ExpandLessIcon fontSize="small" />}
           </IconButton>
@@ -117,15 +130,14 @@ const NLInterpretation = ({
       </Box>
 
       <Collapse in={!collapsed}>
-        <Box sx={{ mt: 1.25 }}>
-          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Typography variant="body2" sx={{ fontWeight: 500, color: qbColors.textHi }}>
             {summaryText}
           </Typography>
-        </Box>
 
         {parsedEntities.length > 0 && (
           <Box sx={{ mt: 1.75 }}>
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
+            <Typography variant="caption" sx={{ color: qbColors.textLo, display: 'block', mb: 0.75, fontFamily: qbFonts.mono, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
               Parsed entities
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
@@ -158,20 +170,20 @@ const NLInterpretation = ({
         {suggestions.length > 0 && (
           <>
             <Divider sx={{ my: 1.5 }} />
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
-              Refinement suggestions
+            <Typography variant="caption" sx={{ color: qbColors.textLo, display: 'block', mb: 0.75, fontFamily: qbFonts.mono, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              Refine
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-              {suggestions.map((suggestion, index) => (
+              {suggestions.slice(0, 2).map((suggestion, index) => (
                 <Chip
                   key={`${suggestion}-${index}`}
                   size="small"
-                  label={suggestion}
+                  label={`+ ${suggestion}`}
                   clickable={!!onSuggestionClick}
                   disabled={disabled}
                   onClick={() => onSuggestionClick?.(suggestion)}
                   variant="outlined"
-                  sx={{ maxWidth: '100%' }}
+                  sx={{ maxWidth: '100%', color: qbColors.textMed, borderColor: qbColors.borderStrong, borderStyle: 'dashed' }}
                 />
               ))}
             </Box>
@@ -183,7 +195,7 @@ const NLInterpretation = ({
             <Button
               size="small"
               onClick={() => setShowRawFilters((prev) => !prev)}
-              sx={{ px: 0, minWidth: 0 }}
+              sx={{ px: 0, minWidth: 0, color: qbColors.accent }}
             >
               {showRawFilters ? 'Hide raw filters' : 'Show raw filters'}
             </Button>
@@ -214,6 +226,7 @@ const NLInterpretation = ({
             </Button>
           </Box>
         )}
+        </Box>
       </Collapse>
     </Paper>
   );

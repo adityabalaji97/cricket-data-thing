@@ -30,6 +30,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Menu,
+  Checkbox,
+  ListItemText,
   OutlinedInput,
   Popover,
   Collapse,
@@ -52,6 +55,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ChartPanel from './ChartPanel';
 import { PitchMapContainer, getPitchMapMode } from './PitchMap';
 import config from '../config';
+import { qbButtonSx, qbCardSx, qbColors, qbFonts, qbGhostButtonSx } from './queryBuilderTheme';
 
 // Column Filter Component
 const ColumnFilter = ({ column, displayName, uniqueValues, selectedValues, onChange, onClear, isMobile }) => {
@@ -246,6 +250,8 @@ const QueryResults = ({
   const [showPitchMap, setShowPitchMap] = useState(false);
   const [aiChartReason, setAiChartReason] = useState(null);
   const [selectedMetricColumns, setSelectedMetricColumns] = useState(DEFAULT_SELECTED_METRIC_COLUMNS);
+  const [defaultMetricColumns, setDefaultMetricColumns] = useState(DEFAULT_SELECTED_METRIC_COLUMNS);
+  const [columnsAnchorEl, setColumnsAnchorEl] = useState(null);
   const [headerCollapsed, setHeaderCollapsed] = useState(isMobile);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackSelection, setFeedbackSelection] = useState(null);
@@ -388,6 +394,7 @@ const QueryResults = ({
       recommendedColumns,
     });
     setSelectedMetricColumns(initialColumns);
+    setDefaultMetricColumns(initialColumns);
   }, [results, isGrouped, displayData, groupBy, recommendedColumns]);
 
   const autoChartRecommendation = useMemo(() => {
@@ -519,6 +526,15 @@ const QueryResults = ({
     setTimeout(() => {
       if (chartPanelRef.current && chartPanelRef.current.addScatterChart) {
         chartPanelRef.current.addScatterChart();
+      }
+    }, 100);
+  };
+
+  const handleAddLineChart = () => {
+    setShowCharts(true);
+    setTimeout(() => {
+      if (chartPanelRef.current && chartPanelRef.current.addLineChart) {
+        chartPanelRef.current.addLineChart();
       }
     }, 100);
   };
@@ -797,12 +813,12 @@ const QueryResults = ({
     
     const allColumns = Object.keys(displayData[0]);
     
+    if (isGrouped) {
+      return [...getGroupingColumns(), ...selectedMetricColumns].filter(col => allColumns.includes(col));
+    }
+
     if (isMobile) {
-      if (isGrouped) {
-        return [...getGroupingColumns(), ...selectedMetricColumns].filter(col => allColumns.includes(col));
-      } else {
-        return ['batter', 'bowler', 'runs_off_bat', 'crease_combo'].filter(col => allColumns.includes(col));
-      }
+      return ['batter', 'bowler', 'runs_off_bat', 'crease_combo'].filter(col => allColumns.includes(col));
     }
     
     return allColumns.filter(col => !['is_summary', 'summary_level'].includes(col));
@@ -810,11 +826,13 @@ const QueryResults = ({
   
   const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const visibleColumns = getVisibleColumns();
+  const hiddenMetricCount = Math.max(availableMetricColumns.length - selectedMetricColumns.length, 0);
+  const columnsMenuOpen = Boolean(columnsAnchorEl);
 
   return (
-    <Box>
+    <Box sx={{ color: qbColors.textHi }}>
       {/* Results Summary */}
-      <Card sx={{ mb: 3 }}>
+      <Card sx={{ ...qbCardSx, mb: 2.5 }}>
         <CardContent sx={{ pb: headerCollapsed ? '12px !important' : undefined }}>
           {/* Compact summary pill — always visible */}
           <Box
@@ -827,7 +845,7 @@ const QueryResults = ({
             onClick={() => setHeaderCollapsed(prev => !prev)}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-              <Typography variant="h6" sx={{ fontSize: headerCollapsed ? '0.95rem' : undefined }}>
+                <Typography variant="h6" sx={{ fontFamily: qbFonts.display, fontSize: headerCollapsed ? '1rem' : 23, fontWeight: 700 }}>
                 Query Results
               </Typography>
               {headerCollapsed && (
@@ -836,8 +854,8 @@ const QueryResults = ({
                     label={isGrouped
                       ? `${metadata.total_groups || metadata.returned_groups} rows`
                       : `${(metadata.total_matching_rows || 0).toLocaleString()} deliveries`}
-                    color="primary"
                     size="small"
+                    sx={{ bgcolor: qbColors.accent, color: qbColors.bg, fontWeight: 700 }}
                   />
                   {isGrouped && (
                     <Chip
@@ -849,7 +867,7 @@ const QueryResults = ({
                 </>
               )}
             </Box>
-            <IconButton size="small">
+              <IconButton size="small" sx={{ color: qbColors.textLo }}>
               {headerCollapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}
             </IconButton>
           </Box>
@@ -863,8 +881,8 @@ const QueryResults = ({
                     <>
                       <Chip
                         label={`${metadata.total_groups || metadata.returned_groups} groups`}
-                        color="primary"
                         size="small"
+                        sx={{ bgcolor: qbColors.accent, color: qbColors.bg, fontWeight: 700 }}
                       />
                       <Chip
                         label={`Grouped by: ${groupBy.join(', ')}`}
@@ -971,19 +989,58 @@ const QueryResults = ({
                         startIcon={<AddIcon />}
                         onClick={handleAddBarChart}
                         size="small"
-                        sx={{ mr: 1 }}
+                        sx={{ ...qbButtonSx, minHeight: 36, fontSize: 11 }}
                       >
-                        Add Bar Chart
+                        + Bar chart
                       </Button>
                       <Button
                         variant="contained"
                         startIcon={<AddIcon />}
                         onClick={handleAddScatterChart}
                         size="small"
+                        sx={{ ...qbButtonSx, minHeight: 36, fontSize: 11 }}
                       >
-                        Add Scatter Plot
+                        + Scatter plot
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        startIcon={<AddIcon />}
+                        onClick={handleAddLineChart}
+                        size="small"
+                        sx={{ ...qbGhostButtonSx, minHeight: 36 }}
+                      >
+                        + Line chart
                       </Button>
                     </>
+                  )}
+                  {isGrouped && availableMetricColumns.length > 0 && (
+                    <Button
+                      variant="outlined"
+                      onClick={(event) => setColumnsAnchorEl(event.currentTarget)}
+                      size="small"
+                      sx={{
+                        ...qbGhostButtonSx,
+                        minHeight: 36,
+                        borderColor: hiddenMetricCount > 0 ? qbColors.accent : qbColors.borderStrong,
+                      }}
+                    >
+                      Columns
+                      <Box
+                        component="span"
+                        sx={{
+                          ml: 0.75,
+                          px: 0.65,
+                          py: 0.1,
+                          borderRadius: '999px',
+                          bgcolor: qbColors.accent,
+                          color: qbColors.bg,
+                          fontSize: 10,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {visibleColumns.length}
+                      </Box>
+                    </Button>
                   )}
                   <Button
                     variant="outlined"
@@ -991,16 +1048,17 @@ const QueryResults = ({
                     onClick={exportToCSV}
                     disabled={!data || data.length === 0}
                     size="small"
+                    sx={{ ...qbGhostButtonSx, minHeight: 36 }}
                   >
                     Export CSV
                   </Button>
                   <Button
                     variant={aiSummary ? 'outlined' : 'contained'}
-                    color="secondary"
                     startIcon={summaryLoading ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
                     onClick={handleSummarize}
                     disabled={summaryLoading || !data || data.length === 0}
                     size="small"
+                    sx={aiSummary ? { ...qbGhostButtonSx, minHeight: 36 } : { ...qbButtonSx, minHeight: 36, fontSize: 11 }}
                   >
                     {summaryLoading ? 'Analyzing...' : aiSummary ? 'Re-analyze' : 'Summarize'}
                   </Button>
@@ -1022,26 +1080,6 @@ const QueryResults = ({
         </Box>
       )}
       
-      {/* Column Selector for Mobile Grouped Results */}
-      {isMobile && isGrouped && availableMetricColumns.length > 0 && (
-        <Box sx={{ mb: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-          {availableMetricColumns.map(col => (
-            <Chip
-              key={col}
-              label={getColumnDisplayName(col)}
-              size="small"
-              variant={selectedMetricColumns.includes(col) ? 'filled' : 'outlined'}
-              color={selectedMetricColumns.includes(col) ? 'primary' : 'default'}
-              onClick={() => {
-                setSelectedMetricColumns(prev =>
-                  prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]
-                );
-              }}
-            />
-          ))}
-        </Box>
-      )}
-
       {/* AI Summary */}
       {(aiSummary || summaryError) && (
         <Card variant="outlined" sx={{ mb: 2, bgcolor: 'grey.50' }}>
@@ -1067,7 +1105,7 @@ const QueryResults = ({
       )}
 
       {/* Data Table with Sorting */}
-      <Paper>
+      <Paper sx={{ ...qbCardSx, overflow: 'hidden' }}>
         <TableContainer sx={{ maxHeight: isMobile ? 400 : 600 }}>
           <Table stickyHeader size={isMobile ? "small" : "medium"}>
             <TableHead>
@@ -1187,6 +1225,77 @@ const QueryResults = ({
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </Paper>
+
+      <Menu
+        open={columnsMenuOpen}
+        anchorEl={columnsAnchorEl}
+        onClose={() => setColumnsAnchorEl(null)}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 1,
+              minWidth: 260,
+              maxHeight: 360,
+              bgcolor: qbColors.surface3,
+              color: qbColors.textHi,
+              border: `1px solid ${qbColors.borderStrong}`,
+              borderRadius: '12px',
+              boxShadow: '0 24px 48px -18px rgba(0,0,0,0.75)',
+            }
+          }
+        }}
+      >
+        <Box sx={{ px: 1.5, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Typography sx={{ fontFamily: qbFonts.mono, color: qbColors.textLo, fontSize: 10, letterSpacing: '0.12em' }}>
+              COLUMNS
+            </Typography>
+            <Chip label="AI-picked" size="small" sx={{ height: 20, bgcolor: qbColors.accentSoft, color: qbColors.accent, fontFamily: qbFonts.mono, fontSize: 10 }} />
+          </Box>
+          <Button
+            size="small"
+            onClick={() => setSelectedMetricColumns(defaultMetricColumns)}
+            sx={{ minWidth: 0, p: 0, color: qbColors.accent, fontFamily: qbFonts.mono, fontSize: 11 }}
+          >
+            Reset
+          </Button>
+        </Box>
+        {getGroupingColumns().map((column) => (
+          <MenuItem key={`locked-${column}`} disabled sx={{ opacity: '1 !important', minHeight: 34 }}>
+            <Checkbox checked disabled size="small" sx={{ color: qbColors.accent, p: 0.5 }} />
+            <ListItemText
+              primary={getColumnDisplayName(column)}
+              secondary="KEY"
+              primaryTypographyProps={{ sx: { color: qbColors.textHi, fontSize: 13 } }}
+              secondaryTypographyProps={{ sx: { color: qbColors.accent, fontFamily: qbFonts.mono, fontSize: 9 } }}
+            />
+          </MenuItem>
+        ))}
+        {availableMetricColumns.map((column) => (
+          <MenuItem
+            key={`metric-${column}`}
+            onClick={() => {
+              setSelectedMetricColumns((prev) =>
+                prev.includes(column)
+                  ? prev.filter((item) => item !== column)
+                  : [...prev, column]
+              );
+            }}
+            sx={{ minHeight: 34, color: qbColors.textMed }}
+          >
+            <Checkbox
+              checked={selectedMetricColumns.includes(column)}
+              size="small"
+              sx={{
+                p: 0.5,
+                color: qbColors.textFaint,
+                '&.Mui-checked': { color: qbColors.accent },
+              }}
+            />
+            <ListItemText primary={getColumnDisplayName(column)} primaryTypographyProps={{ sx: { fontSize: 13 } }} />
+          </MenuItem>
+        ))}
+      </Menu>
 
       {/* Filter Popover */}
       <Popover

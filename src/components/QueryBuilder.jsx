@@ -6,15 +6,23 @@ import {
   Button,
   Alert,
   CircularProgress,
-  Tabs,
-  Tab
+  Collapse,
+  Chip,
+  IconButton
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import EditIcon from '@mui/icons-material/Edit';
+import MenuIcon from '@mui/icons-material/Menu';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import QueryFilters from './QueryFilters';
 import QueryResults from './QueryResults';
 import NLQueryInput from './NLQueryInput';
+import NLInterpretation from './NLInterpretation';
 import { useUrlParams, filtersToUrlParams } from '../utils/urlParamParser';
 import axios from 'axios';
 import config from '../config';
+import { qbButtonSx, qbCardSx, qbColors, qbFonts, qbGhostButtonSx } from './queryBuilderTheme';
 
 const getDefaultFilters = () => ({
   // Basic filters
@@ -117,6 +125,27 @@ const buildRefinedQuery = (baseQuery, suggestion) => {
   return `${source} ${fragment}`.trim();
 };
 
+const ACTIVE_FILTER_KEYS = [
+  'venue', 'start_date', 'end_date', 'leagues', 'teams', 'batting_teams', 'bowling_teams',
+  'players', 'batters', 'bowlers', 'bat_hand', 'bowl_style', 'bowl_kind',
+  'line', 'length', 'shot', 'control', 'wagon_zone', 'dismissal',
+  'innings', 'over_min', 'over_max',
+  'match_outcome', 'is_chase', 'chase_outcome', 'toss_decision',
+  'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets'
+];
+
+const getActiveFilterCount = (filters, groupBy) => {
+  const filterCount = ACTIVE_FILTER_KEYS.reduce((count, key) => {
+    const value = filters[key];
+    if (Array.isArray(value)) {
+      return count + (value.length > 0 ? 1 : 0);
+    }
+    return count + (value !== null && value !== undefined && value !== '' ? 1 : 0);
+  }, 0);
+
+  return filterCount + (Array.isArray(groupBy) ? groupBy.length : 0);
+};
+
 const QueryBuilder = ({ isMobile }) => {
   const { getFiltersFromUrl, getGroupByFromUrl, currentParams } = useUrlParams();
   
@@ -127,7 +156,7 @@ const QueryBuilder = ({ isMobile }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [availableColumns, setAvailableColumns] = useState(null);
-  const [queryTab, setQueryTab] = useState(0);
+  const [, setQueryTab] = useState(0);
   const [, setIsAutoExecuting] = useState(false);
   const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false);
   const [nlInterpretation, setNlInterpretation] = useState(null);
@@ -137,6 +166,8 @@ const QueryBuilder = ({ isMobile }) => {
   const [nlRecommendedColumns, setNlRecommendedColumns] = useState([]);
   const [nlRecommendedChart, setNlRecommendedChart] = useState(null);
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
+  const [nlExpanded, setNlExpanded] = useState(true);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   // ball_aggregation toggle: only meaningful when ball or ball_in_spell is in
   // the active group_by; otherwise the backend ignores it.
   const [ballAggregation, setBallAggregation] = useState('snapshot');
@@ -145,6 +176,19 @@ const QueryBuilder = ({ isMobile }) => {
 
   // Load filters from URL on mount
   useEffect(() => {
+    const params = new URLSearchParams(currentParams || '');
+    const nlQuery = params.get('nl');
+
+    if (nlQuery && !hasLoadedFromUrl) {
+      setHasLoadedFromUrl(true);
+      setNlExpanded(true);
+      setFiltersCollapsed(false);
+      setTimeout(() => {
+        nlInputRef.current?.runQuery?.(nlQuery);
+      }, 100);
+      return;
+    }
+
     const urlFilters = getFiltersFromUrl();
     const urlGroupBy = getGroupByFromUrl();
     
@@ -156,6 +200,8 @@ const QueryBuilder = ({ isMobile }) => {
       setGroupBy(urlGroupBy);
       setHasLoadedFromUrl(true);
       setIsAutoExecuting(true);
+      setNlExpanded(false);
+      setFiltersCollapsed(true);
       
       setTimeout(() => {
         executeQueryFromUrl(urlFilters, urlGroupBy);
@@ -206,6 +252,8 @@ const QueryBuilder = ({ isMobile }) => {
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
       setQueryTab(1);
+      setNlExpanded(false);
+      setFiltersCollapsed(true);
 
     } catch (error) {
       console.error('Error executing query from URL:', error);
@@ -249,6 +297,9 @@ const QueryBuilder = ({ isMobile }) => {
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
       setQueryTab(1);
+      setNlExpanded(false);
+      setFiltersCollapsed(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       
     } catch (error) {
       console.error('Error executing query:', error);
@@ -266,7 +317,7 @@ const QueryBuilder = ({ isMobile }) => {
     setGroupBy([]);
     setResults(null);
     setQueryTab(0);
-    setHasLoadedFromUrl(false);
+    setHasLoadedFromUrl(true);
     setIsAutoExecuting(false);
     setNlInterpretation(null);
     setNlConfidence('medium');
@@ -274,6 +325,8 @@ const QueryBuilder = ({ isMobile }) => {
     setNlRawFilters({});
     setNlRecommendedColumns([]);
     setNlRecommendedChart(null);
+    setNlExpanded(true);
+    setFiltersCollapsed(false);
     window.history.replaceState({}, '', window.location.pathname);
   };
   
@@ -309,10 +362,12 @@ const QueryBuilder = ({ isMobile }) => {
     setNlRecommendedChart(recommendedChart || null);
     setQueryTab(0);
     setHasLoadedFromUrl(false);
+    setNlExpanded(false);
+    setFiltersCollapsed(true);
 
-    // Update URL immediately so the query is shareable even before execution
-    const newParams = filtersToUrlParams(newFilters, newGroupBy);
-    const newUrl = `${window.location.pathname}?${newParams}`;
+    // Keep the typed NL query shareable until execution rewrites the URL with
+    // structured filters.
+    const newUrl = `${window.location.pathname}?nl=${encodeURIComponent((queryText || '').trim())}`;
     window.history.replaceState({}, '', newUrl);
 
     // Auto-execute for high confidence, just populate for medium/low
@@ -367,184 +422,310 @@ const QueryBuilder = ({ isMobile }) => {
     });
   };
 
-  const canExecute = !!availableColumns && hasValidFilters() && !loading && !isApplyingSuggestion;
-  const showMobileActionBar = isMobile && queryTab === 0;
+  const activeCount = getActiveFilterCount(filters, groupBy);
+  const canExecute = !!availableColumns && (hasValidFilters() || groupBy.length > 0) && !loading && !isApplyingSuggestion;
+  const hasResults = !!results;
+  const nlActive = !!nlSourceQuery;
   
   return (
-    <Box sx={{ my: isMobile ? 2 : 3 }}>
-      <Typography variant={isMobile ? "h5" : "h4"} gutterBottom>
-        🏏 Query Builder
-      </Typography>
-      
-      <Typography variant={isMobile ? "body2" : "body1"} color="text.secondary" sx={{ mb: 2.5 }}>
-        Build custom queries to analyze ball-by-ball cricket data.
-        Filter by line, length, shot type, wagon wheel zones, and more.
-      </Typography>
+    <Box
+      sx={{
+        mx: { xs: -1, sm: -2, md: -3 },
+        mt: -3,
+        mb: -2,
+        minHeight: '100vh',
+        bgcolor: qbColors.bg,
+        color: qbColors.textHi,
+        fontFamily: qbFonts.body,
+        px: { xs: '14px', md: '30px' },
+        py: { xs: '18px', md: '30px' },
+        '& .MuiTypography-root': { fontFamily: qbFonts.body },
+        '& .MuiPaper-root': { backgroundImage: 'none' },
+        '& .MuiInputBase-root': {
+          bgcolor: `${qbColors.input} !important`,
+          color: qbColors.textHi,
+          borderRadius: '12px',
+        },
+        '& .MuiInputLabel-root, & .MuiFormLabel-root': {
+          color: qbColors.textLo,
+          fontFamily: qbFonts.mono,
+          fontSize: 11,
+          letterSpacing: '0.06em',
+        },
+        '& .MuiOutlinedInput-notchedOutline': { borderColor: qbColors.borderStrong },
+        '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'rgba(182,242,74,0.42)',
+        },
+        '& .MuiChip-root': { fontFamily: qbFonts.mono },
+        '& .MuiTableCell-root': {
+          borderColor: qbColors.border,
+          color: qbColors.textMed,
+          fontFamily: qbFonts.body,
+        },
+        '& .MuiTableHead-root .MuiTableCell-root': {
+          bgcolor: `${qbColors.surface2} !important`,
+          color: qbColors.textLo,
+          fontFamily: qbFonts.mono,
+        },
+      }}
+    >
+      <Box sx={{ maxWidth: 1180, mx: 'auto' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: { xs: 2.5, md: 4 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box component="img" src="/cricket-icon.svg" alt="" sx={{ width: 30, height: 30 }} />
+            <Typography sx={{ fontFamily: qbFonts.display, fontSize: 19, fontWeight: 700, color: qbColors.textHi }}>
+              Hindsight
+            </Typography>
+            <Typography sx={{ color: qbColors.textGhost }}>/</Typography>
+            <Typography sx={{ fontFamily: qbFonts.display, fontSize: 15, fontWeight: 600, color: qbColors.textLo }}>
+              Query Builder
+            </Typography>
+          </Box>
+          <Button
+            href="/"
+            startIcon={<MenuIcon />}
+            sx={{
+              ...qbGhostButtonSx,
+              height: 38,
+              bgcolor: qbColors.surface1,
+              px: 1.6,
+            }}
+          >
+            Explore
+          </Button>
+        </Box>
 
-      <NLQueryInput
-        ref={nlInputRef}
-        onFiltersGenerated={handleNLFilters}
-        disabled={loading || isApplyingSuggestion}
-      />
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-      
-      <Paper elevation={2} sx={{ overflow: 'hidden' }}>
-        <Tabs 
-          value={queryTab} 
-          onChange={(e, newValue) => setQueryTab(newValue)}
-          variant={isMobile ? "fullWidth" : "standard"}
-          sx={{ 
-            borderBottom: 1, 
-            borderColor: 'divider',
-            bgcolor: 'grey.50'
-          }}
-        >
-          <Tab 
-            label="Filters & Grouping" 
-            sx={{ minHeight: 48 }}
-          />
-          <Tab 
-            label={`Results ${results ? `(${results.data?.length || 0})` : ''}`}
-            disabled={!results}
-            sx={{ minHeight: 48 }}
-          />
-        </Tabs>
-        
-        <Box sx={{ p: isMobile ? 2 : 3, pb: showMobileActionBar ? 10 : (isMobile ? 2 : 3) }}>
-          {queryTab === 0 && (
-            <QueryFilters
-              filters={filters}
-              setFilters={setFilters}
-              groupBy={groupBy}
-              setGroupBy={setGroupBy}
-              availableColumns={availableColumns}
-              isMobile={isMobile}
-            />
-          )}
-          
-          {queryTab === 1 && results && (
-            <QueryResults
-              results={results}
-              groupBy={groupBy}
-              filters={filters}
-              recommendedColumns={nlRecommendedColumns}
-              recommendedChart={nlRecommendedChart || results?.metadata?.recommended_chart || null}
-              nlInterpretation={nlInterpretation}
-              nlConfidence={nlConfidence}
-              nlRawFilters={nlRawFilters}
-              nlSourceQuery={nlSourceQuery}
-              onSuggestionClick={applySuggestion}
-              onDismissInterpretation={dismissInterpretation}
-              interpretationDisabled={loading || isApplyingSuggestion}
-              isMobile={isMobile}
-              ballAggregation={ballAggregation}
-              onBallAggregationChange={(mode) => {
-                setBallAggregation(mode);
-                // Re-fetch with the new mode. executeQueryRef guards against
-                // a stale-closure call before mount.
-                setTimeout(() => executeQueryRef.current && executeQueryRef.current(), 0);
+        {!hasResults && (
+          <Box sx={{ mb: { xs: 2.8, md: 4 } }}>
+            <Typography
+              sx={{
+                fontFamily: qbFonts.mono,
+                fontSize: 10,
+                letterSpacing: '0.16em',
+                color: qbColors.accent,
+                textTransform: 'uppercase',
+                mb: 1,
               }}
+            >
+              00 / Query Builder
+            </Typography>
+            <Typography
+              component="h1"
+              sx={{
+                fontFamily: qbFonts.display,
+                fontSize: { xs: 30, md: 42 },
+                lineHeight: 1.02,
+                fontWeight: 700,
+                color: qbColors.textHi,
+                mb: 1,
+              }}
+            >
+              Ask the ball-by-ball data anything.
+            </Typography>
+            <Typography sx={{ color: qbColors.textLo, fontSize: { xs: 14, md: 15 } }}>
+              Search in plain English, or build a query with filters and grouping.
+            </Typography>
+          </Box>
+        )}
+
+        <Box sx={{ display: 'grid', gap: { xs: '22px', md: '28px' } }}>
+          {(!hasResults || nlExpanded) ? (
+            <NLQueryInput
+              ref={nlInputRef}
+              onFiltersGenerated={handleNLFilters}
+              disabled={loading || isApplyingSuggestion}
+            />
+          ) : (
+            <Paper elevation={0} sx={{ ...qbCardSx, p: 1.25, borderColor: 'rgba(182,242,74,0.18)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap' }}>
+                <Box sx={{ width: 32, height: 32, borderRadius: '10px', display: 'grid', placeItems: 'center', bgcolor: qbColors.accentSoft }}>
+                  <SearchIcon sx={{ color: qbColors.accent, fontSize: 18 }} />
+                </Box>
+                <Typography sx={{ color: nlActive ? qbColors.textHi : qbColors.textLo, flex: 1, minWidth: 180 }}>
+                  {nlActive ? `"${nlSourceQuery}"` : 'Built from filters - no natural-language query'}
+                </Typography>
+                <Button
+                  size="small"
+                  startIcon={<EditIcon />}
+                  onClick={() => setNlExpanded(true)}
+                  sx={qbGhostButtonSx}
+                >
+                  New search
+                </Button>
+              </Box>
+            </Paper>
+          )}
+
+          {nlInterpretation && (
+            <NLInterpretation
+              interpretation={nlInterpretation}
+              confidence={nlConfidence}
+              rawFilters={nlRawFilters}
+              onSuggestionClick={applySuggestion}
+              onClose={dismissInterpretation}
+              disabled={loading || isApplyingSuggestion}
             />
           )}
-        </Box>
-        
-        {!showMobileActionBar && (
-        <Box sx={{ 
-          p: 2, 
-          bgcolor: 'grey.50', 
-          borderTop: 1, 
-          borderColor: 'divider',
-          display: 'flex',
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: 2,
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: isMobile ? 'column' : 'row',
-            gap: 1,
-            width: isMobile ? '100%' : 'auto'
-          }}>
-            <Button 
-              variant="contained"
-              onClick={executeQuery}
-              disabled={!canExecute}
-              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
-              sx={{ minWidth: 120 }}
-            >
-              {loading ? 'Querying...' : 'Execute Query'}
-            </Button>
-            
-            <Button 
-              variant="outlined"
-              onClick={clearFilters}
-              disabled={loading}
-              sx={{ minWidth: 100 }}
-            >
-              Clear All
-            </Button>
-            
-          </Box>
-          
-          <Typography variant="caption" color="text.secondary" sx={{ 
-            textAlign: isMobile ? 'center' : 'right',
-            maxWidth: isMobile ? '100%' : 300
-          }}>
-            {!hasValidFilters() && 'Select at least one filter to execute query'}
-            {hasValidFilters() && !loading && 'Ready to execute query'}
-            {groupBy.length > 0 && ` • Grouping by: ${groupBy.join(', ')}`}
-          </Typography>
-        </Box>
-        )}
-      </Paper>
 
-      {showMobileActionBar && (
-        <Box
-          sx={{
-            position: 'fixed',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 1200,
-            px: 1.5,
-            pb: 'max(10px, env(safe-area-inset-bottom))',
-            pt: 1,
-            bgcolor: 'rgba(255,255,255,0.97)',
-            borderTop: 1,
-            borderColor: 'divider',
-            backdropFilter: 'blur(6px)'
-          }}
-        >
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant="contained"
-              onClick={executeQuery}
-              disabled={!canExecute}
-              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : null}
-              sx={{ flex: 1 }}
+          {error && (
+            <Alert severity="error" sx={{ bgcolor: 'rgba(229,72,77,0.1)', color: qbColors.textHi, border: `1px solid rgba(229,72,77,0.28)` }}>
+              {error}
+            </Alert>
+          )}
+
+          <Paper elevation={0} sx={{ ...qbCardSx, overflow: 'hidden' }}>
+            <Box
+              onClick={() => setFiltersCollapsed((prev) => !prev)}
+              sx={{
+                p: { xs: 2, md: 2.4 },
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.25,
+                cursor: 'pointer',
+              }}
             >
-              {loading ? 'Querying...' : 'Execute'}
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={clearFilters}
-              disabled={loading}
-              sx={{ minWidth: 96 }}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontFamily: qbFonts.mono, color: qbColors.accent, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+                  01 / Filters
+                </Typography>
+                <Typography sx={{ fontFamily: qbFonts.display, fontSize: { xs: 19, md: 23 }, fontWeight: 700 }}>
+                  Filters & Grouping
+                </Typography>
+              </Box>
+              <Chip
+                label={`${activeCount} active`}
+                sx={{
+                  bgcolor: qbColors.accent,
+                  color: qbColors.bg,
+                  height: 26,
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              />
+              <IconButton size="small" sx={{ color: qbColors.textLo }}>
+                {filtersCollapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+              </IconButton>
+            </Box>
+
+            <Collapse in={!filtersCollapsed}>
+              <Box sx={{ px: { xs: 2, md: 2.4 }, pb: 2.4 }}>
+                <QueryFilters
+                  filters={filters}
+                  setFilters={setFilters}
+                  groupBy={groupBy}
+                  setGroupBy={setGroupBy}
+                  availableColumns={availableColumns}
+                  isMobile={isMobile}
+                />
+              </Box>
+            </Collapse>
+
+            <Box
+              sx={{
+                p: { xs: 2, md: 2.4 },
+                borderTop: `1px solid ${qbColors.border}`,
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                gap: 1.5,
+                alignItems: isMobile ? 'stretch' : 'center',
+                justifyContent: 'space-between',
+              }}
             >
-              Clear
-            </Button>
-          </Box>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 0.5 }}>
-            {!hasValidFilters() ? 'Add at least one filter' : 'Ready to run'}
+              <Box sx={{ display: 'flex', gap: 1, flexDirection: isMobile ? 'column' : 'row' }}>
+                <Button
+                  variant="contained"
+                  onClick={executeQuery}
+                  disabled={!canExecute}
+                  startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
+                  sx={{ ...qbButtonSx, minHeight: 46, px: 2.2 }}
+                >
+                  {loading ? 'Querying...' : 'Execute query'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={clearFilters}
+                  disabled={loading}
+                  sx={{ ...qbGhostButtonSx, minHeight: 46, px: 2 }}
+                >
+                  Clear all
+                </Button>
+              </Box>
+              <Typography sx={{ color: qbColors.textFaint, fontFamily: qbFonts.mono, fontSize: 11, textAlign: isMobile ? 'center' : 'right' }}>
+                {!canExecute && !loading && 'Add a filter or group-by dimension to run'}
+                {canExecute && !loading && groupBy.length > 0 && `Ready - grouping by ${groupBy.join(', ')}`}
+                {canExecute && !loading && groupBy.length === 0 && 'Ready - returns individual deliveries'}
+              </Typography>
+            </Box>
+          </Paper>
+
+          {hasResults ? (
+            <Box>
+              <Typography
+                sx={{
+                  fontFamily: qbFonts.mono,
+                  color: qbColors.accent,
+                  fontSize: 10,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  mb: 1,
+                }}
+              >
+                02 / Results
+              </Typography>
+              <QueryResults
+                results={results}
+                groupBy={groupBy}
+                filters={filters}
+                recommendedColumns={nlRecommendedColumns}
+                recommendedChart={nlRecommendedChart || results?.metadata?.recommended_chart || null}
+                nlInterpretation={null}
+                nlConfidence={nlConfidence}
+                nlRawFilters={nlRawFilters}
+                nlSourceQuery={nlSourceQuery}
+                onSuggestionClick={applySuggestion}
+                onDismissInterpretation={dismissInterpretation}
+                interpretationDisabled={loading || isApplyingSuggestion}
+                isMobile={isMobile}
+                ballAggregation={ballAggregation}
+                onBallAggregationChange={(mode) => {
+                  setBallAggregation(mode);
+                  setTimeout(() => executeQueryRef.current && executeQueryRef.current(), 0);
+                }}
+              />
+            </Box>
+          ) : (
+            <Paper
+              elevation={0}
+              sx={{
+                ...qbCardSx,
+                p: { xs: 3, md: 4 },
+                borderStyle: 'dashed',
+                display: 'grid',
+                placeItems: 'center',
+                textAlign: 'center',
+                color: qbColors.textLo,
+              }}
+            >
+              <SearchIcon sx={{ color: qbColors.accent, mb: 1 }} />
+              <Typography sx={{ fontFamily: qbFonts.display, color: qbColors.textHi, fontSize: 20, fontWeight: 700 }}>
+                No results yet
+              </Typography>
+              <Typography sx={{ maxWidth: 420, mt: 0.5 }}>
+                Search in plain English or set a filter and hit Execute.
+              </Typography>
+            </Paper>
+          )}
+        </Box>
+
+        <Box sx={{ mt: { xs: 3, md: 5 }, pt: 2, borderTop: `1px solid ${qbColors.border}`, display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'space-between' }}>
+          <Typography sx={{ color: qbColors.textGhost, fontFamily: qbFonts.mono, fontSize: 11 }}>
+            Hindsight © 2026 · data via Cricsheet
+          </Typography>
+          <Typography sx={{ color: qbColors.textGhost, fontFamily: qbFonts.mono, fontSize: 11 }}>
+            Shareable query URL updates on execute
           </Typography>
         </Box>
-      )}
+      </Box>
     </Box>
   );
 };

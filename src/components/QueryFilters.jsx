@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 import WarningIcon from '@mui/icons-material/Warning';
+import { qbColors, qbFonts } from './queryBuilderTheme';
 
 
 // Info tooltip component
@@ -82,7 +83,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
 
   return (
     <Box>
-      <Grid container spacing={isMobile ? 1.5 : 2}>
+      <Grid container spacing={isMobile ? 1.5 : 2.2}>
         {/* Row 1: Date Range & Venue */}
         <Grid item xs={12} sm={4} md={3}>
           <TextField
@@ -269,7 +270,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
 
         {/* Row 5: Advanced Match Context */}
         <Grid item xs={12}>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, mt: 1 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, mt: 1, color: qbColors.textLo, fontFamily: qbFonts.mono, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
             Advanced Match Context
           </Typography>
         </Grid>
@@ -416,7 +417,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         
         {/* Row 7: Delivery Details - NEW */}
         <Grid item xs={12}>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, mt: 1 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, mt: 1, color: qbColors.gold, fontFamily: qbFonts.mono, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
             Delivery Analysis Filters
           </Typography>
         </Grid>
@@ -530,9 +531,8 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
             mt: isMobile ? 1.5 : 2, 
             p: isMobile ? 1.5 : 2, 
             borderRadius: 2, 
-            border: '2px solid',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
+            border: '1.5px solid rgba(182,242,74,0.4)',
+            backgroundColor: 'rgba(182,242,74,0.05)',
             position: 'relative'
           }}>
             {/* Key insight badge */}
@@ -541,26 +541,27 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               position: 'absolute', 
               top: -12, 
               left: 16, 
-              backgroundColor: 'primary.main', 
-              color: 'white',
+              backgroundColor: qbColors.accent,
+              color: qbColors.bg,
               px: 1.5,
               py: 0.25,
               borderRadius: 1,
               fontSize: '0.7rem',
               fontWeight: 'bold',
+              fontFamily: qbFonts.mono,
               alignItems: 'center',
               gap: 0.5
             }}>
               🔑 KEY INSIGHT
             </Box>
             
-            <Typography variant="subtitle2" color="primary.dark" sx={{ mb: 0.75, mt: isMobile ? 0 : 0.5, fontWeight: 'bold' }}>
-              {isMobile ? 'Group By (Insight Mode)' : 'Group By — This changes everything!'}
+            <Typography variant="subtitle2" sx={{ mb: 0.75, mt: isMobile ? 0 : 0.5, fontWeight: 'bold', color: qbColors.textHi, fontFamily: qbFonts.display, fontSize: 18 }}>
+              {isMobile ? 'Group By (Insight Mode)' : 'Group by - this changes everything'}
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: isMobile ? 1 : 1.5 }}>
+            <Typography variant="caption" sx={{ display: 'block', mb: isMobile ? 1 : 1.5, color: qbColors.textLo }}>
               {isMobile
                 ? 'Pick dimensions like batter, phase, competition, or match_outcome.'
-                : 'Choose how to slice your data. Try "batter + phase" or "bowl_style + length" for powerful insights.'}
+                : 'Empty returns individual deliveries. Add dimensions like bowl_style, year, or phase to aggregate into chartable stats.'}
             </Typography>
             
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -588,7 +589,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
                     placeholder="Select dimensions to analyze..."
                     sx={{
                       '& .MuiOutlinedInput-root': {
-                        backgroundColor: 'white',
+                        backgroundColor: qbColors.input,
                       }
                     }}
                   />
@@ -699,7 +700,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         {/* Row 10: Query Settings */}
         <Grid item xs={12} sm={6}>
           <Box>
-            <Typography variant="body2" gutterBottom>Result Limit: {filters.limit}</Typography>
+            <Typography variant="body2" gutterBottom sx={{ color: qbColors.textMed }}>Result Limit: {filters.limit}</Typography>
             <Slider
               value={filters.limit}
               onChange={(e, value) => handleFilterChange('limit', value)}
@@ -721,7 +722,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         {filters.include_international && (
           <Grid item xs={12} sm={6}>
             <Box>
-              <Typography variant="body2" gutterBottom>Top Teams: {filters.top_teams}</Typography>
+            <Typography variant="body2" gutterBottom sx={{ color: qbColors.textMed }}>Top Teams: {filters.top_teams}</Typography>
               <Slider
                 value={filters.top_teams}
                 onChange={(e, value) => handleFilterChange('top_teams', value)}
@@ -744,7 +745,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         {/* Data coverage info */}
         {availableColumns?.total_deliveries && (
           <Grid item xs={12}>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" sx={{ color: qbColors.textFaint, fontFamily: qbFonts.mono }}>
               Total deliveries in database: {availableColumns.total_deliveries.toLocaleString()}
             </Typography>
           </Grid>
