@@ -19,7 +19,7 @@ explicit promotion steps.
 |---|---|---|
 | **0.1** | Local env + regression baseline | [x] 2026-07-25 |
 | **0.2** | Schema migration: `format` / `gender` columns | [x] 2026-07-25 (local only) |
-| **0.3** | `format_config.py` + `/formats` + phase helpers | [ ] |
+| **0.3** | `format_config.py` + `/formats` + phase helpers | [x] 2026-07-25 |
 | **0.4** | Pipeline format-awareness | [ ] |
 | **0.5** | `table_routing` replaces the 2015 date fork | [ ] |
 | **0.6** | Query builder backend format param | [ ] |

@@ -7,7 +7,109 @@ from __future__ import annotations
 from datetime import date
 from typing import Dict, Iterable, List, Optional, Tuple
 
+from format_config import FormatSpec, Phase, get_format
 from utils.league_utils import expand_league_abbreviations
+
+
+# =========================================================================================
+# Format-aware helpers
+# =========================================================================================
+# The 6/15 over phase split used to be inline SQL in ~200 places. These helpers generate the
+# same SQL from format_config, so a call site can be migrated without changing its output.
+# Migrating a T20 call site must be a no-op -- the regression goldens enforce that.
+
+
+def phase_bounds(
+    fmt: Optional[str] = None,
+    gender: Optional[str] = None,
+    *,
+    n_phases: int = 3,
+) -> Tuple[Phase, ...]:
+    """The ordered phases for a format: 3-way (default) or the finer 4-way preview split."""
+    spec = get_format(fmt, gender)
+    if n_phases == 3:
+        return spec.phases
+    if n_phases == 4:
+        return spec.phases_4
+    raise ValueError(f"n_phases must be 3 or 4, got {n_phases}")
+
+
+def phase_case_sql(
+    fmt: Optional[str] = None,
+    gender: Optional[str] = None,
+    *,
+    over_column: str = "over",
+    n_phases: int = 3,
+) -> str:
+    """Build the CASE expression that maps an over number to a phase key.
+
+    ``over_column`` is the fully-qualified column, e.g. ``d.over`` or ``dd.over``.
+
+    For men's T20 with the defaults this returns exactly the literal that was previously
+    inlined in services/query_builder_v2.py, character for character:
+
+        CASE WHEN d.over < 6 THEN 'powerplay' WHEN d.over < 15 THEN 'middle' ELSE 'death' END
+    """
+    phases = phase_bounds(fmt, gender, n_phases=n_phases)
+
+    clauses = []
+    for phase in phases[:-1]:
+        # Phases are inclusive bounds, so the exclusive cut-off is end_over + 1.
+        clauses.append(f"WHEN {over_column} < {phase.end_over + 1} THEN '{phase.key}'")
+
+    return f"CASE {' '.join(clauses)} ELSE '{phases[-1].key}' END"
+
+
+def table_routing(
+    fmt: Optional[str] = None,
+    gender: Optional[str] = None,
+    *,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> Dict[str, bool]:
+    """Decide which ball-by-ball table(s) a query needs.
+
+    The legacy `deliveries` table holds men's T20 only, from before 2015. Every other
+    format lives entirely in `delivery_details` regardless of date -- which matters because
+    ODI data goes back to 2005, and the old date-only check would have routed those matches
+    to a table that has never contained them.
+
+    Returns ``{"legacy": bool, "details": bool}``.
+    """
+    spec = get_format(fmt, gender)
+    cutoff = spec.legacy_table_before
+
+    if cutoff is None:
+        return {"legacy": False, "details": True}
+
+    # Legacy data is only relevant if the requested window reaches back before the cutoff.
+    needs_legacy = start_date is None or start_date < cutoff
+    # delivery_details is needed unless the window ends entirely before the cutoff.
+    needs_details = end_date is None or end_date >= cutoff
+
+    # A window with no dates at all spans everything, so both are needed.
+    return {"legacy": needs_legacy, "details": needs_details or not needs_legacy}
+
+
+def format_filter_sql(
+    alias: str,
+    fmt: Optional[str] = None,
+    gender: Optional[str] = None,
+    *,
+    params: Optional[Dict] = None,
+) -> str:
+    """WHERE fragment pinning a query to one format, for tables carrying format/gender.
+
+    Pass ``params`` to bind values; otherwise the values are inlined (they come from a
+    closed, validated set, so there is no injection surface either way).
+    """
+    spec = get_format(fmt, gender)
+    if params is None:
+        return f"{alias}.format = '{spec.format}' AND {alias}.gender = '{spec.gender}'"
+
+    params["_format"] = spec.format
+    params["_gender"] = spec.gender
+    return f"{alias}.format = :_format AND {alias}.gender = :_gender"
 
 
 def normalize_leagues(leagues: Optional[List[str]]) -> List[str]:

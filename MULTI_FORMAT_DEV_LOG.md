@@ -9,7 +9,7 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** 0.2 complete → next is **0.3 format_config + /formats + helpers**
+- **Active chunk:** 0.3 complete → next is **0.4 pipeline format-awareness**
 - **Branch:** `multi-format` (branched from `main` @ `29b61c1`)
 - **Local DB:** `hindsight_local` on localhost:5432 (PG14 server), 644 MB subset of prod, healthy.
   Rebuild any time with `scripts/dev/setup_local_db.sh`.
@@ -20,12 +20,55 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 - **Migrations applied — prod:** **none** — `001` is still pending on production
 - **Goldens:** 13 endpoints in `scripts/goldens/local/`, `check` passes clean (re-captured in 0.2
   after a deterministic-ordering fix; see that entry).
-- **Blocked on / next action:** chunk 0.3 — create `format_config.py`, the `GET /formats`
-  endpoint, and the phase/routing helpers in `services/analytics_common.py`.
+- **Blocked on / next action:** chunk 0.4 — pipeline format-awareness. **Needs a local copy of
+  `t20_bbb.csv`** (GitHub secret `DROPBOX_CSV_URL`) plus an ODI slice to test against; neither is
+  on this machine yet.
 
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-25 — Chunk 0.3 — Claude — COMPLETE
+
+**Done**
+- `format_config.py` — the single source of truth. Four specs: men's T20, women's T20, men's ODI,
+  Tests. Each carries innings count, balls per innings, chase innings, over cap, a 3-phase and a
+  4-phase model, fantasy ruleset key, and SR/economy benchmark bands.
+- `services/analytics_common.py` — added `phase_bounds()`, `phase_case_sql()`, `table_routing()`
+  and `format_filter_sql()`.
+- `routers/formats.py` — `GET /formats`, wired into `main.py`.
+
+**Verified**
+- `phase_case_sql()` reproduces **both** existing inline literals character-for-character
+  (`d.over` and `dd.over` variants from `services/query_builder_v2.py:475,2990`). This is the
+  guarantee that migrating a T20 call site in chunk 0.6 changes nothing.
+- T20 `display_overs` come out as `1-6 / 7-15 / 16-20`, matching the hand-written `PHASE_META`
+  labels in `services/match_scorecard.py:19-23` — independent confirmation the bounds are right.
+- `table_routing('ODI','male', 2005→2010)` → `delivery_details` only, which is the whole point:
+  the old date-only fork would have sent those to the legacy table, which has never held ODIs.
+- `/formats` reports `available: false` for the three unloaded formats and `3926` matches for
+  men's T20.
+- Goldens: **PASS 13/13**.
+
+**Decisions / surprises**
+- Phase *keys* are deliberately reused across formats (`powerplay`/`middle`/`death`, with Tests
+  substituting `new_ball` for the first). That is what lets the existing `pp_*`/`middle_*`/`death_*`
+  stat columns serve every format unchanged — decision D3. Only labels and over ranges vary.
+- Tests declare `over_max = None`; the API cap comes from `UNBOUNDED_OVER_MAX = 199` via
+  `effective_over_max()`, so an unbounded filter can't reach the query layer.
+- `get_format()` raises on an unknown combination rather than falling back to T20 — a silent
+  fallback would produce plausible-but-wrong numbers, which is the worst failure mode here.
+- Format availability in `/formats` is **data-driven** (`COUNT(*) > 0` on `matches`), so no
+  feature flag is needed to reveal a format — loading its data is what enables it. The count is
+  cached for the process lifetime; call `reset_coverage_cache()` after a load.
+- `.gitignore` also ignores `*.sql` wholesale, which silently excluded both the new migration and
+  `scripts/recreate_delivery_details.sql` (the file the plan calls authoritative — it was never
+  tracked). Added negations for `scripts/migrations/` and that file.
+
+**Next**
+- Chunk 0.4: pipeline format-awareness — `--format`/`--gender` flags on the loader, column
+  stamping, `max_balls` cross-check, retire `cleanup_non_t20.py`, per-format phase bounds in
+  `sync_stats_from_dd.py`, and fantasy gating on `fantasy_ruleset`.
 
 ### 2026-07-25 — Chunk 0.2 — Claude — COMPLETE (local only)
 
