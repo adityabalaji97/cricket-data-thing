@@ -228,11 +228,24 @@ Create `format_config.py`; add `GET /formats`; add `phase_case_sql()`, `phase_bo
 literal at `services/query_builder_v2.py:475`; `/formats` returns all four combinations.
 
 **0.4 Pipeline format-awareness**
-Per D4. Requires a local copy of `t20_bbb.csv` (Dropbox secret `DROPBOX_CSV_URL`) — generate small
-slices into `data/slices/` for fast iteration.
-*Verify:* reload a T20 slice → `batting_stats`/`bowling_stats` identical to a pre-change run; load a
-100-match ODI slice → rows land with `format='ODI'`, `overs=50`, no fantasy points written, and
-nothing deleted.
+Per D4, **amended by the ODI recon in the dev log — read that entry first.** Two changes to what
+was originally planned:
+
+* **Do not derive `overs` from `first_row.max_balls`.** In real ODI data `max_balls` is `0` for 32%
+  of matches and varies within a match; `(max_balls or 120) // 6` would stamp `overs = 20` on a
+  third of all ODIs. Derive from the maximum over actually observed in the match, and treat
+  `max_balls` only as a soft check (warn when observed length exceeds the format's
+  `balls_per_innings`, don't require equality — rain-reduced games are legitimate).
+* **The `competition` → `tournament` fallback is mandatory.** 56% of ODI matches have an empty
+  `competition` and `matches.competition` is `NOT NULL`, so without the fallback most of the load
+  fails outright. `tournament` was populated in 100% of the empty cases.
+
+Test data: `data/slices/odi_slice.csv` exists (349 matches). A T20 slice still needs either
+`t20_bbb.csv` (secret `DROPBOX_CSV_URL`) or an export from `hindsight_local`; generate slices with
+`scripts/dev/make_csv_slice.py`.
+*Verify:* reload a T20 slice → `batting_stats`/`bowling_stats` identical to a pre-change run; load
+the ODI slice → rows land with `format='ODI'`, `overs` of 50 (or the correct reduced value), no
+fantasy points written, and nothing deleted.
 
 **0.5 table_routing replaces the 2015 fork** — per D5.
 *Verify:* goldens pass (both `scorecard_legacy_pre2015` and `qb_legacy_pre2015_window` exist
@@ -361,8 +374,13 @@ extra cost off the clock until it buys something.
 1. Test `max_balls` semantics are unknown → C0 gates C1; NULL-safety ships in 0.4 regardless.
 2. `wprob` / `predscore` in the CSVs are T20-trained → hide win-probability UI for non-T20 formats.
 3. Dream11 ODI constants must be confirmed against the current rulebook before A10.
-4. Empty ODI `competition` values → `tournament`-based inference may misclassify some bilateral
-   series; audit during A1.
+4. ~~Empty ODI `competition` values may misclassify some bilateral series~~ — **confirmed and
+   upgraded**: 56% of ODI matches have no `competition`, and `matches.competition` is `NOT NULL`,
+   so the `tournament` fallback is required for the load to work at all. `tournament` was populated
+   in 100% of empty cases in the sample. Still audit the international/league split during A1.
+8. **`max_balls` cannot be trusted as the format signal** (0 for 32% of ODI matches, and varies
+   within a match). The `--format` flag is authoritative; derive `overs` from observed play. See
+   the ODI recon entry in the dev log.
 5. Women's name collisions: the schema handles it, but any endpoint that looks players up by bare
    name needs the gender threaded through (grep during B1).
 6. `query_builder_metadata` distinct-value lists must be partitioned by `(format, gender)` or ODI

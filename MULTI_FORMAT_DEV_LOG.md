@@ -20,13 +20,60 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 - **Migrations applied — prod:** **none** — `001` is still pending on production
 - **Goldens:** 13 endpoints in `scripts/goldens/local/`, `check` passes clean (re-captured in 0.2
   after a deterministic-ordering fix; see that entry).
-- **Blocked on / next action:** chunk 0.4 — pipeline format-awareness. **Needs a local copy of
-  `t20_bbb.csv`** (GitHub secret `DROPBOX_CSV_URL`) plus an ODI slice to test against; neither is
-  on this machine yet.
+- **Test data:** `data/slices/odi_slice.csv` — 349 complete ODI matches, 149,599 balls, 2000-01-09
+  to 2007-03-23 (gitignored; regenerate with `scripts/dev/make_csv_slice.py`).
+  **`t20_bbb.csv` is still not on this machine** — chunk 0.4's T20 no-regression check needs it
+  (GitHub secret `DROPBOX_CSV_URL`), or export one from `hindsight_local` instead.
+- **Blocked on / next action:** chunk 0.4 — pipeline format-awareness. Read the ODI recon entry
+  below first: two of its findings change what 0.4 has to do.
 
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-25 — ODI data recon (unplanned, gates chunk 0.4) — Claude
+
+Pulled a real ODI slice to de-risk 0.4 and found two things that change the plan.
+
+**1. `max_balls` is NOT a reliable format signal — this breaks the planned approach.**
+The plan (and `sync_from_delivery_details.py:172`) treats `max_balls` as the format signal via
+`overs = (max_balls or 120) // 6`. In the slice:
+
+- **111 of 349 matches (32%)** have `max_balls = 0` on their first row.
+- `max_balls` **varies within a single match** in 115 of 349 matches, so reading it from
+  `first_row` is arbitrary.
+- Those same matches clearly *are* ODIs: their highest over is 45-50.
+
+Because `0 or 120` evaluates to `120` in Python, the current code would assign **`overs = 20` to a
+third of all ODI matches** — silently mislabelling them as T20-shaped. Legitimate rain-reduced
+games also appear (`max_balls` of 282, 240 → 47, 40 overs), so a strict equality check against the
+format's `balls_per_innings` would abort constantly.
+
+*Revised approach for 0.4:* the explicit `--format` flag is authoritative for what gets stamped
+into the `format` column. Derive `matches.overs` from the **maximum over actually observed in the
+match** (or the max of `max_balls` across the match, ignoring zeros), not from `first_row`. Use
+`max_balls` only as a soft sanity check — warn if the observed innings length *exceeds* the
+format's `balls_per_innings`, rather than requiring equality.
+
+**2. `competition` is empty far more often than expected — but `tournament` always covers it.**
+- **197 of 349 matches (56%)** have an empty `competition` (86,604 of 149,599 rows).
+- In **every single one**, `tournament` is populated ("Australia in South Africa ODI Series",
+  "ICC World Cup", …).
+
+`matches.competition` is `NOT NULL`, so the `tournament` fallback is **mandatory, not optional** —
+without it more than half the ODI load fails to insert. Plan risk #4 was rated minor; it is not.
+
+**Other observations**
+- `inns` only ever takes values 1 and 2 in this window — no super overs to handle yet.
+- The file is chronological and starts earlier than assumed: **2000**, not 2005. Combined with
+  chunk 0.3's `table_routing`, those pre-2015 ODIs correctly route to `delivery_details`.
+- The ODI CSV column is `date`; the `delivery_details` table has both `date` (NULL) and
+  `match_date` (populated). Don't assume the CSV and table column names line up.
+- `winner` can be `'-'` (no result), and `target` is empty even on second-innings rows for some
+  matches — the sync's result handling needs to tolerate both.
+
+**Tooling added:** `scripts/dev/make_csv_slice.py` streams only the leading bytes of the Dropbox
+folder's zip and extracts whole matches, so nobody has to download 11 GB to test the loader.
 
 ### 2026-07-25 — Chunk 0.3 — Claude — COMPLETE
 
