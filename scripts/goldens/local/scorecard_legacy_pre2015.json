@@ -352,18 +352,6 @@
                   },
                   {
                     "balls": 2,
-                    "bar_pct": 24,
-                    "dots": 1,
-                    "fours": 0,
-                    "id": "johan-botha",
-                    "linkable": true,
-                    "name": "Johan Botha",
-                    "runs": 1,
-                    "sixes": 0,
-                    "sr": 50
-                  },
-                  {
-                    "balls": 2,
                     "bar_pct": 0,
                     "dots": 2,
                     "fours": 0,
@@ -373,6 +361,18 @@
                     "runs": 0,
                     "sixes": 0,
                     "sr": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_pct": 24,
+                    "dots": 1,
+                    "fours": 0,
+                    "id": "johan-botha",
+                    "linkable": true,
+                    "name": "Johan Botha",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 50
                   }
                 ]
               },
@@ -494,9 +494,9 @@
                     "bar_pct": 48,
                     "dots": 0,
                     "fours": 0,
-                    "id": "shaun-tait",
+                    "id": "ben-laughlin",
                     "linkable": true,
-                    "name": "Shaun Tait",
+                    "name": "Ben Laughlin",
                     "runs": 1,
                     "sixes": 0,
                     "sr": 100
@@ -506,9 +506,9 @@
                     "bar_pct": 48,
                     "dots": 0,
                     "fours": 0,
-                    "id": "ben-laughlin",
+                    "id": "shaun-tait",
                     "linkable": true,
-                    "name": "Ben Laughlin",
+                    "name": "Shaun Tait",
                     "runs": 1,
                     "sixes": 0,
                     "sr": 100
@@ -987,18 +987,6 @@
                 "rows": [
                   {
                     "balls": 3,
-                    "bar_pct": 16,
-                    "dots": 2,
-                    "fours": 0,
-                    "id": "shaun-tait",
-                    "linkable": true,
-                    "name": "Shaun Tait",
-                    "runs": 1,
-                    "sixes": 0,
-                    "sr": 33
-                  },
-                  {
-                    "balls": 3,
                     "bar_pct": 32,
                     "dots": 1,
                     "fours": 0,
@@ -1008,6 +996,18 @@
                     "runs": 2,
                     "sixes": 0,
                     "sr": 67
+                  },
+                  {
+                    "balls": 3,
+                    "bar_pct": 16,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "shaun-tait",
+                    "linkable": true,
+                    "name": "Shaun Tait",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 33
                   }
                 ]
               },
@@ -1114,18 +1114,6 @@
                   },
                   {
                     "balls": 3,
-                    "bar_pct": 16,
-                    "dots": 2,
-                    "fours": 0,
-                    "id": "shaun-tait",
-                    "linkable": true,
-                    "name": "Shaun Tait",
-                    "runs": 1,
-                    "sixes": 0,
-                    "sr": 33
-                  },
-                  {
-                    "balls": 3,
                     "bar_pct": 32,
                     "dots": 1,
                     "fours": 0,
@@ -1135,6 +1123,18 @@
                     "runs": 2,
                     "sixes": 0,
                     "sr": 67
+                  },
+                  {
+                    "balls": 3,
+                    "bar_pct": 16,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "shaun-tait",
+                    "linkable": true,
+                    "name": "Shaun Tait",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 33
                   }
                 ]
               },
@@ -1700,12 +1700,12 @@
                     "dots": 2,
                     "econ": 2.0,
                     "fours": 0,
-                    "id": "joe-mennie",
+                    "id": "ben-hilfenhaus",
                     "linkable": true,
-                    "name": "Joe Mennie",
+                    "name": "Ben Hilfenhaus",
                     "runs": 1,
                     "sixes": 0,
-                    "wkts": 1
+                    "wkts": 0
                   },
                   {
                     "balls": 3,
@@ -1714,12 +1714,12 @@
                     "dots": 2,
                     "econ": 2.0,
                     "fours": 0,
-                    "id": "ben-hilfenhaus",
+                    "id": "joe-mennie",
                     "linkable": true,
-                    "name": "Ben Hilfenhaus",
+                    "name": "Joe Mennie",
                     "runs": 1,
                     "sixes": 0,
-                    "wkts": 0
+                    "wkts": 1
                   },
                   {
                     "balls": 2,
@@ -1738,20 +1738,6 @@
                   {
                     "balls": 1,
                     "bar_color": "#b6f24a",
-                    "bar_pct": 43,
-                    "dots": 0,
-                    "econ": 6.0,
-                    "fours": 0,
-                    "id": "george-bailey",
-                    "linkable": true,
-                    "name": "George Bailey",
-                    "runs": 1,
-                    "sixes": 0,
-                    "wkts": 0
-                  },
-                  {
-                    "balls": 1,
-                    "bar_color": "#b6f24a",
                     "bar_pct": 0,
                     "dots": 1,
                     "econ": 0.0,
@@ -1762,6 +1748,20 @@
                     "runs": 0,
                     "sixes": 0,
                     "wkts": 1
+                  },
+                  {
+                    "balls": 1,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 0,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "george-bailey",
+                    "linkable": true,
+                    "name": "George Bailey",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 0
                   }
                 ]
               },
@@ -1904,20 +1904,6 @@
                   {
                     "balls": 2,
                     "bar_color": "#b6f24a",
-                    "bar_pct": 43,
-                    "dots": 0,
-                    "econ": 6.0,
-                    "fours": 0,
-                    "id": "timm-van-der-gugten",
-                    "linkable": true,
-                    "name": "Timm van der Gugten",
-                    "runs": 2,
-                    "sixes": 0,
-                    "wkts": 0
-                  },
-                  {
-                    "balls": 2,
-                    "bar_color": "#b6f24a",
                     "bar_pct": 0,
                     "dots": 2,
                     "econ": 0.0,
@@ -1926,6 +1912,20 @@
                     "linkable": true,
                     "name": "Alex Hales",
                     "runs": 0,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 0,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "timm-van-der-gugten",
+                    "linkable": true,
+                    "name": "Timm van der Gugten",
+                    "runs": 2,
                     "sixes": 0,
                     "wkts": 0
                   },
@@ -2235,20 +2235,6 @@
                   },
                   {
                     "balls": 2,
-                    "bar_color": "#f0b429",
-                    "bar_pct": 64,
-                    "dots": 0,
-                    "econ": 9.0,
-                    "fours": 0,
-                    "id": "timm-van-der-gugten",
-                    "linkable": true,
-                    "name": "Timm van der Gugten",
-                    "runs": 3,
-                    "sixes": 0,
-                    "wkts": 0
-                  },
-                  {
-                    "balls": 2,
                     "bar_color": "#b6f24a",
                     "bar_pct": 21,
                     "dots": 1,
@@ -2260,6 +2246,20 @@
                     "runs": 1,
                     "sixes": 0,
                     "wkts": 1
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#f0b429",
+                    "bar_pct": 64,
+                    "dots": 0,
+                    "econ": 9.0,
+                    "fours": 0,
+                    "id": "timm-van-der-gugten",
+                    "linkable": true,
+                    "name": "Timm van der Gugten",
+                    "runs": 3,
+                    "sixes": 0,
+                    "wkts": 0
                   },
                   {
                     "balls": 1,
@@ -2735,18 +2735,6 @@
                   },
                   {
                     "balls": 2,
-                    "bar_pct": 48,
-                    "dots": 0,
-                    "fours": 0,
-                    "id": "timm-van-der-gugten",
-                    "linkable": true,
-                    "name": "Timm van der Gugten",
-                    "runs": 2,
-                    "sixes": 0,
-                    "sr": 100
-                  },
-                  {
-                    "balls": 2,
                     "bar_pct": 100,
                     "dots": 0,
                     "fours": 0,
@@ -2756,6 +2744,18 @@
                     "runs": 7,
                     "sixes": 1,
                     "sr": 350
+                  },
+                  {
+                    "balls": 2,
+                    "bar_pct": 48,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "timm-van-der-gugten",
+                    "linkable": true,
+                    "name": "Timm van der Gugten",
+                    "runs": 2,
+                    "sixes": 0,
+                    "sr": 100
                   }
                 ]
               },

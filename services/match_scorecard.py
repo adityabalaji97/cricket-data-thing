@@ -617,7 +617,10 @@ def _bat_vs_bowler_sql(source_alias: str) -> str:
         FROM {source_alias}
         WHERE batter_name IS NOT NULL AND bowler_name IS NOT NULL
         GROUP BY innings, batter_name, bowler_name
-        ORDER BY innings, batter_name, balls DESC
+        -- bowler_name breaks ties on balls; without it, equally-faced bowlers come back in
+        -- whatever order the plan happens to produce, so the rendered order can change
+        -- between deploys on identical data.
+        ORDER BY innings, batter_name, balls DESC, bowler_name
     """
 
 
@@ -634,7 +637,7 @@ def _bowl_vs_batter_sql() -> str:
         FROM base
         WHERE batter_name IS NOT NULL AND bowler_name IS NOT NULL
         GROUP BY innings, bowler_name, batter_name
-        ORDER BY innings, bowler_name, balls DESC
+        ORDER BY innings, bowler_name, balls DESC, batter_name
     """
 
 

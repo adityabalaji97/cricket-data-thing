@@ -9,22 +9,64 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** 0.1 complete → next is **0.2 schema migration**
+- **Active chunk:** 0.2 complete → next is **0.3 format_config + /formats + helpers**
 - **Branch:** `multi-format` (branched from `main` @ `29b61c1`)
 - **Local DB:** `hindsight_local` on localhost:5432 (PG14 server), 644 MB subset of prod, healthy.
   Rebuild any time with `scripts/dev/setup_local_db.sh`.
 - **Prod DB:** Heroku `cricket-data-thing`, PG16.13, **essential-1** (6.28 GB / 10 GB).
   Upgrade to essential-2 is **NOT done yet** — deliberately deferred until just before the
   Phase A ODI backfill (chunk A1), since nothing before that needs the extra space.
-- **Migrations applied — local:** none yet
-- **Migrations applied — prod:** none yet
-- **Goldens:** 13 endpoints captured in `scripts/goldens/local/`, `check` passes clean.
-- **Blocked on / next action:** chunk 0.2 — write and apply
-  `scripts/migrations/001_multi_format_columns.sql` against `hindsight_local` only.
+- **Migrations applied — local:** `001_multi_format_columns.sql` ✅
+- **Migrations applied — prod:** **none** — `001` is still pending on production
+- **Goldens:** 13 endpoints in `scripts/goldens/local/`, `check` passes clean (re-captured in 0.2
+  after a deterministic-ordering fix; see that entry).
+- **Blocked on / next action:** chunk 0.3 — create `format_config.py`, the `GET /formats`
+  endpoint, and the phase/routing helpers in `services/analytics_common.py`.
 
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-25 — Chunk 0.2 — Claude — COMPLETE (local only)
+
+**Done**
+- `scripts/migrations/001_multi_format_columns.sql`: adds `format`/`gender` to `matches`,
+  `delivery_details`, `batting_stats`, `bowling_stats`, and `gender` to `players`; CHECK
+  constraints on the allowed values; swaps `players` `UNIQUE(name)` → `UNIQUE(name, gender)`;
+  adds a partial `idx_dd_format_gender` and `idx_matches_format_gender`. Idempotent.
+- `models.py`: the four models above plus `Player` updated to match, with `UniqueConstraint`
+  in `Player.__table_args__`.
+- `scripts/recreate_delivery_details.sql` (the authoritative DDL) updated to include the new
+  columns, checks and index, so a rebuild-from-scratch matches a migrated database.
+- **Bug fix:** `services/match_scorecard.py` — `_bat_vs_bowler_sql` and `_bowl_vs_batter_sql`
+  ordered by `balls DESC` with no tiebreaker. Added `bowler_name` / `batter_name` as the final
+  sort key.
+
+**Verified**
+- Migration ran in **1.5 s** on the 770k-row local `delivery_details` — confirms the PG11+
+  fast-default path, so production should be near-instant too.
+- `SELECT format, gender, count(*)` → exactly one `(T20, male)` bucket per table, equal to the
+  pre-migration totals (`delivery_details` 770,040 · `matches` 3,926 · `players` 6,887).
+- Re-running the migration is clean (NOTICEs only).
+- `models.py` imports and the ORM reflects all new columns.
+- Goldens: **PASS, 13/13**, stable across repeated runs.
+
+**Decisions / surprises**
+- The golden check initially failed on `scorecard_legacy_pre2015` with 110 differences — which
+  turned out to be **pure row reordering, not a data change**: an order-insensitive comparison of
+  the whole payload was equal, and the re-captured golden is byte-identical in size (51,696) to
+  the original. Root cause: the new `idx_matches_format_gender` changed the query plan, and the
+  vs-bowler breakdown's `ORDER BY ... balls DESC` had no tiebreaker, so equally-faced bowlers came
+  back in a different order. Fixed at source rather than papered over in the harness (an unstable
+  sort means the scorecard could render rows differently between deploys on identical data).
+  Goldens were then re-captured.
+- Worth knowing for later chunks: **adding an index can flip golden diffs without any data
+  changing.** If a check fails, compare order-insensitively before assuming a regression.
+
+**Next**
+- Chunk 0.3: `format_config.py` (phase splits, innings counts, balls per innings, benchmark bands),
+  `GET /formats`, and `phase_case_sql()` / `phase_bounds()` / `table_routing()` in
+  `services/analytics_common.py`. No call sites migrated in that chunk.
 
 ### 2026-07-25 — Chunk 0.1 — Claude — COMPLETE
 

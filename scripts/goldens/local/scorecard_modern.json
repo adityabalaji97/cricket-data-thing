@@ -2974,20 +2974,6 @@
                   {
                     "balls": 5,
                     "bar_color": "#b6f24a",
-                    "bar_pct": 43,
-                    "dots": 3,
-                    "econ": 6.0,
-                    "fours": 1,
-                    "id": "shubman-gill",
-                    "linkable": true,
-                    "name": "Shubman Gill",
-                    "runs": 5,
-                    "sixes": 0,
-                    "wkts": 0
-                  },
-                  {
-                    "balls": 5,
-                    "bar_color": "#b6f24a",
                     "bar_pct": 17,
                     "dots": 4,
                     "econ": 2.4,
@@ -3000,15 +2986,15 @@
                     "wkts": 1
                   },
                   {
-                    "balls": 2,
-                    "bar_color": "#e5484d",
-                    "bar_pct": 100,
-                    "dots": 0,
-                    "econ": 15.0,
+                    "balls": 5,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 3,
+                    "econ": 6.0,
                     "fours": 1,
-                    "id": "rahul-tewatia",
+                    "id": "shubman-gill",
                     "linkable": true,
-                    "name": "Rahul Tewatia",
+                    "name": "Shubman Gill",
                     "runs": 5,
                     "sixes": 0,
                     "wkts": 0
@@ -3028,16 +3014,16 @@
                     "wkts": 0
                   },
                   {
-                    "balls": 1,
-                    "bar_color": "#b6f24a",
-                    "bar_pct": 43,
+                    "balls": 2,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 100,
                     "dots": 0,
-                    "econ": 6.0,
-                    "fours": 0,
-                    "id": "rashid-khan",
+                    "econ": 15.0,
+                    "fours": 1,
+                    "id": "rahul-tewatia",
                     "linkable": true,
-                    "name": "Rashid Khan",
-                    "runs": 1,
+                    "name": "Rahul Tewatia",
+                    "runs": 5,
                     "sixes": 0,
                     "wkts": 0
                   },
@@ -3054,6 +3040,20 @@
                     "runs": 0,
                     "sixes": 0,
                     "wkts": 1
+                  },
+                  {
+                    "balls": 1,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 0,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "rashid-khan",
+                    "linkable": true,
+                    "name": "Rashid Khan",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 0
                   }
                 ]
               },
@@ -3366,20 +3366,6 @@
                   {
                     "balls": 2,
                     "bar_color": "#e5484d",
-                    "bar_pct": 86,
-                    "dots": 1,
-                    "econ": 12.0,
-                    "fours": 1,
-                    "id": "shubman-gill",
-                    "linkable": true,
-                    "name": "Shubman Gill",
-                    "runs": 4,
-                    "sixes": 0,
-                    "wkts": 1
-                  },
-                  {
-                    "balls": 2,
-                    "bar_color": "#e5484d",
                     "bar_pct": 100,
                     "dots": 0,
                     "econ": 15.0,
@@ -3388,6 +3374,20 @@
                     "linkable": true,
                     "name": "Jason Holder",
                     "runs": 5,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 0,
+                    "dots": 2,
+                    "econ": 0.0,
+                    "fours": 0,
+                    "id": "jos-buttler",
+                    "linkable": true,
+                    "name": "Jos Buttler",
+                    "runs": 0,
                     "sixes": 0,
                     "wkts": 0
                   },
@@ -3421,17 +3421,17 @@
                   },
                   {
                     "balls": 2,
-                    "bar_color": "#b6f24a",
-                    "bar_pct": 0,
-                    "dots": 2,
-                    "econ": 0.0,
-                    "fours": 0,
-                    "id": "jos-buttler",
+                    "bar_color": "#e5484d",
+                    "bar_pct": 86,
+                    "dots": 1,
+                    "econ": 12.0,
+                    "fours": 1,
+                    "id": "shubman-gill",
                     "linkable": true,
-                    "name": "Jos Buttler",
-                    "runs": 0,
+                    "name": "Shubman Gill",
+                    "runs": 4,
                     "sixes": 0,
-                    "wkts": 0
+                    "wkts": 1
                   },
                   {
                     "balls": 1,
@@ -3731,6 +3731,20 @@
                     "balls": 3,
                     "bar_color": "#b6f24a",
                     "bar_pct": 43,
+                    "dots": 0,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "jos-buttler",
+                    "linkable": true,
+                    "name": "Jos Buttler",
+                    "runs": 3,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
                     "dots": 1,
                     "econ": 6.0,
                     "fours": 0,
@@ -3742,16 +3756,16 @@
                     "wkts": 0
                   },
                   {
-                    "balls": 3,
+                    "balls": 2,
                     "bar_color": "#b6f24a",
                     "bar_pct": 43,
                     "dots": 0,
                     "econ": 6.0,
                     "fours": 0,
-                    "id": "jos-buttler",
+                    "id": "jason-holder",
                     "linkable": true,
-                    "name": "Jos Buttler",
-                    "runs": 3,
+                    "name": "Jason Holder",
+                    "runs": 2,
                     "sixes": 0,
                     "wkts": 0
                   },
@@ -3768,20 +3782,6 @@
                     "runs": 6,
                     "sixes": 1,
                     "wkts": 1
-                  },
-                  {
-                    "balls": 2,
-                    "bar_color": "#b6f24a",
-                    "bar_pct": 43,
-                    "dots": 0,
-                    "econ": 6.0,
-                    "fours": 0,
-                    "id": "jason-holder",
-                    "linkable": true,
-                    "name": "Jason Holder",
-                    "runs": 2,
-                    "sixes": 0,
-                    "wkts": 0
                   },
                   {
                     "balls": 1,
@@ -4674,18 +4674,6 @@
                   },
                   {
                     "balls": 6,
-                    "bar_pct": 100,
-                    "dots": 0,
-                    "fours": 3,
-                    "id": "kagiso-rabada",
-                    "linkable": true,
-                    "name": "Kagiso Rabada",
-                    "runs": 25,
-                    "sixes": 2,
-                    "sr": 417
-                  },
-                  {
-                    "balls": 6,
                     "bar_pct": 56,
                     "dots": 2,
                     "fours": 1,
@@ -4695,6 +4683,18 @@
                     "runs": 7,
                     "sixes": 0,
                     "sr": 117
+                  },
+                  {
+                    "balls": 6,
+                    "bar_pct": 100,
+                    "dots": 0,
+                    "fours": 3,
+                    "id": "kagiso-rabada",
+                    "linkable": true,
+                    "name": "Kagiso Rabada",
+                    "runs": 25,
+                    "sixes": 2,
+                    "sr": 417
                   },
                   {
                     "balls": 1,

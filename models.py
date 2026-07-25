@@ -116,9 +116,14 @@ class Match(Base):
     bowl_first = Column(String, nullable=True)
     won_batting_first = Column(Boolean, nullable=True)
     won_fielding_first = Column(Boolean, nullable=True)
-    match_type = Column(String, nullable=False)  # 'league' or 'international'
+    match_type = Column(String, nullable=False)  # 'league' or 'international' - NOT the cricket format
     competition = Column(String, nullable=False)  # e.g. 'IPL', 'T20I', 'BBL', etc.
-    
+
+    # Cricket format and gender. See format_config.py for what each format implies
+    # (innings count, phase boundaries, balls per innings).
+    format = Column(String(8), nullable=False, server_default='T20')  # 'T20' | 'ODI' | 'TEST'
+    gender = Column(String(6), nullable=False, server_default='male')  # 'male' | 'female'
+
     # ELO rating columns - store pre-match ratings
     team1_elo = Column(Integer, nullable=True)  # Team1's ELO rating before this match
     team2_elo = Column(Integer, nullable=True)  # Team2's ELO rating before this match
@@ -171,8 +176,12 @@ class Delivery(Base):
 
 class Player(Base):
     __tablename__ = 'players'
+    __table_args__ = (UniqueConstraint('name', 'gender', name='players_name_gender_key'),)
+
     id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True)
+    # Unique per (name, gender), not per name: men's and women's cricket share plenty of names.
+    name = Column(String)
+    gender = Column(String(6), nullable=False, server_default='male')  # 'male' | 'female'
     batting_hand = Column(String)  # LHB/RHB
     bowling_type = Column(String)  # RF/RM/RO etc.
     nationality = Column(String)
@@ -189,6 +198,12 @@ class BattingStats(Base):
     innings = Column(Integer)
     striker = Column(String)
     batting_team = Column(String)
+
+    # Denormalized from matches so the stats tables can be filtered without a join.
+    # The pp_/middle_/death_ columns below are phase 1/2/3 for whichever format this is:
+    # format_config.py maps them to the right over ranges and display labels.
+    format = Column(String(8), nullable=False, server_default='T20')
+    gender = Column(String(6), nullable=False, server_default='male')
     
     # Basic stats
     runs = Column(Integer)
@@ -249,7 +264,11 @@ class BowlingStats(Base):
     innings = Column(Integer)
     bowler = Column(String)
     bowling_team = Column(String)
-    
+
+    # Denormalized from matches; see the note on BattingStats about the phase columns.
+    format = Column(String(8), nullable=False, server_default='T20')
+    gender = Column(String(6), nullable=False, server_default='male')
+
     # Basic stats
     overs = Column(Float)
     runs_conceded = Column(Integer)

@@ -56,6 +56,12 @@ data_exports/
 *.sql
 !add_day_or_night_column.sql
 !add_post_toss_predictions_table.sql
+# Hand-written migrations are this project's only schema mechanism, and
+# recreate_delivery_details.sql is the authoritative delivery_details DDL.
+# They must always be tracked -- the blanket *.sql rule above silently dropped them.
+!scripts/migrations/
+!scripts/migrations/*.sql
+!scripts/recreate_delivery_details.sql
 *.sql.gz
 *.dump
 
