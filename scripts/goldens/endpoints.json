@@ -1,0 +1,149 @@
+[
+  {
+    "name": "qb_columns",
+    "path": "/query/deliveries/columns",
+    "params": {}
+  },
+  {
+    "name": "qb_basic_group_by_phase",
+    "path": "/query/deliveries",
+    "params": {
+      "start_date": "2024-01-01",
+      "leagues": [
+        "IPL"
+      ],
+      "group_by": [
+        "phase"
+      ],
+      "limit": 100
+    }
+  },
+  {
+    "name": "qb_batter_vs_pace_by_length",
+    "path": "/query/deliveries",
+    "params": {
+      "batters": [
+        "Nicholas Pooran"
+      ],
+      "bowl_kind": [
+        "pace bowler"
+      ],
+      "group_by": [
+        "length"
+      ],
+      "min_balls": 20,
+      "limit": 100
+    }
+  },
+  {
+    "name": "qb_death_overs_venue",
+    "path": "/query/deliveries",
+    "params": {
+      "venue": "Sylhet International Cricket Stadium",
+      "over_min": 15,
+      "over_max": 19,
+      "group_by": [
+        "bowl_kind"
+      ],
+      "limit": 100
+    }
+  },
+  {
+    "name": "qb_chase_outcome",
+    "path": "/query/deliveries",
+    "params": {
+      "start_date": "2024-01-01",
+      "leagues": [
+        "IPL"
+      ],
+      "innings": 2,
+      "chase_outcome": [
+        "win"
+      ],
+      "group_by": [
+        "crease_combo"
+      ],
+      "limit": 100
+    }
+  },
+  {
+    "name": "qb_batting_stats_mode",
+    "path": "/query/deliveries",
+    "params": {
+      "start_date": "2024-01-01",
+      "leagues": [
+        "IPL"
+      ],
+      "query_mode": "batting_stats",
+      "group_by": [
+        "batter"
+      ],
+      "min_balls": 100,
+      "limit": 50
+    }
+  },
+  {
+    "name": "qb_bowling_stats_mode",
+    "path": "/query/deliveries",
+    "params": {
+      "start_date": "2024-01-01",
+      "leagues": [
+        "IPL"
+      ],
+      "query_mode": "bowling_stats",
+      "group_by": [
+        "bowler"
+      ],
+      "min_balls": 100,
+      "limit": 50
+    }
+  },
+  {
+    "name": "qb_international",
+    "path": "/query/deliveries",
+    "params": {
+      "start_date": "2024-01-01",
+      "include_international": true,
+      "top_teams": 10,
+      "group_by": [
+        "year"
+      ],
+      "limit": 100
+    }
+  },
+  {
+    "name": "scorecard_modern",
+    "path": "/matches/1535465/scorecard",
+    "params": {}
+  },
+  {
+    "name": "match_preview",
+    "path": "/match-preview/Sylhet%20International%20Cricket%20Stadium/Rangpur%20Riders/Sylhet%20Titans",
+    "params": {
+      "include_international": true,
+      "top_teams": 20
+    }
+  },
+  {
+    "name": "landing_featured_innings",
+    "path": "/landing/featured-innings",
+    "params": {}
+  },
+  {
+    "name": "scorecard_legacy_pre2015",
+    "path": "/matches/756757/scorecard",
+    "params": {}
+  },
+  {
+    "name": "qb_legacy_pre2015_window",
+    "path": "/query/deliveries",
+    "params": {
+      "start_date": "2013-01-01",
+      "end_date": "2014-12-31",
+      "group_by": [
+        "phase"
+      ],
+      "limit": 100
+    }
+  }
+]

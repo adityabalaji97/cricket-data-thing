@@ -71,6 +71,10 @@ data_exports/
 # Analysis output files
 *.json
 
+# ...but the multi-format regression goldens are source of truth and must be committed
+!scripts/goldens/endpoints.json
+!scripts/goldens/**/*.json
+
 .vercel
 .env
 

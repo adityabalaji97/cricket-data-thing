@@ -1,0 +1,125 @@
+{
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "average": 46.789474,
+        "balls": 7212,
+        "balls_per_dismissal": 29.198381,
+        "boundaries": 1584,
+        "boundary_percentage": 21.963394,
+        "control_percentage": 76.730092,
+        "crease_combo": "lhb_rhb",
+        "dot_percentage": 30.560177,
+        "dots": 2204,
+        "fours": 1015,
+        "innings_count": 110,
+        "percent_balls": 55.39,
+        "runs": 11557,
+        "sixes": 569,
+        "strike_rate": 160.246811,
+        "wickets": 247
+      },
+      {
+        "average": 41.505682,
+        "balls": 4536,
+        "balls_per_dismissal": 25.772727,
+        "boundaries": 1013,
+        "boundary_percentage": 22.332451,
+        "control_percentage": 77.175698,
+        "crease_combo": "rhb_rhb",
+        "dot_percentage": 30.53351,
+        "dots": 1385,
+        "fours": 649,
+        "innings_count": 98,
+        "percent_balls": 34.84,
+        "runs": 7305,
+        "sixes": 364,
+        "strike_rate": 161.044974,
+        "wickets": 176
+      },
+      {
+        "average": 42.352941,
+        "balls": 1273,
+        "balls_per_dismissal": 24.960784,
+        "boundaries": 322,
+        "boundary_percentage": 25.29458,
+        "control_percentage": 73.376623,
+        "crease_combo": "lhb_lhb",
+        "dot_percentage": 32.99293,
+        "dots": 420,
+        "fours": 202,
+        "innings_count": 52,
+        "percent_balls": 9.78,
+        "runs": 2160,
+        "sixes": 120,
+        "strike_rate": 169.677926,
+        "wickets": 51
+      }
+    ],
+    "metadata": {
+      "ball_aggregation": "snapshot",
+      "data_source": "delivery_details",
+      "data_sources": [
+        "delivery_details (2024-2026)"
+      ],
+      "filters_applied": {
+        "bat_hand": null,
+        "batters": [],
+        "batting_teams": [],
+        "bowl_kind": [],
+        "bowl_style": [],
+        "bowlers": [],
+        "bowling_teams": [],
+        "chase_outcome": [
+          "win"
+        ],
+        "control": null,
+        "crease_combo": [],
+        "dismissal": [],
+        "end_date": null,
+        "group_by": [
+          "crease_combo"
+        ],
+        "innings": 2,
+        "is_chase": null,
+        "leagues": [
+          "IPL"
+        ],
+        "length": [],
+        "line": [],
+        "match_outcome": [],
+        "max_wickets": null,
+        "min_wickets": null,
+        "over_range": null,
+        "players": [],
+        "query_mode": "delivery",
+        "shot": [],
+        "start_date": "2024-01-01",
+        "teams": [],
+        "toss_decision": [],
+        "venue": null,
+        "wagon_zone": []
+      },
+      "grouped_by": [
+        "crease_combo"
+      ],
+      "has_more": false,
+      "has_summaries": false,
+      "limit": 100,
+      "note": "Grouped data with cricket aggregations",
+      "offset": 0,
+      "query_mode_used": "delivery",
+      "recommended_chart": null,
+      "returned_groups": 3,
+      "total_balls_in_query": 13021,
+      "total_groups": 3,
+      "total_innings_in_query": 260,
+      "warnings": [
+        "Team names are normalized for winner/batting/bowling comparison. Unresolved mismatches are classified as no_result."
+      ]
+    },
+    "percentages": null,
+    "summary_data": null
+  }
+}

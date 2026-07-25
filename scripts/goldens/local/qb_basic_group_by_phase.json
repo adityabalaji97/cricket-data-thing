@@ -1,0 +1,121 @@
+{
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "average": 32.532772,
+        "balls": 23959,
+        "balls_per_dismissal": 22.433521,
+        "boundaries": 4127,
+        "boundary_percentage": 17.22526,
+        "control_percentage": 76.966099,
+        "dot_percentage": 28.769982,
+        "dots": 6893,
+        "fours": 2481,
+        "innings_count": 433,
+        "percent_balls": 46.16,
+        "phase": "middle",
+        "runs": 34745,
+        "sixes": 1646,
+        "strike_rate": 145.018573,
+        "wickets": 1068
+      },
+      {
+        "average": 37.557864,
+        "balls": 16308,
+        "balls_per_dismissal": 24.195846,
+        "boundaries": 4008,
+        "boundary_percentage": 24.576895,
+        "control_percentage": 72.090231,
+        "dot_percentage": 41.280353,
+        "dots": 6732,
+        "fours": 2856,
+        "innings_count": 435,
+        "percent_balls": 31.42,
+        "phase": "powerplay",
+        "runs": 25314,
+        "sixes": 1152,
+        "strike_rate": 155.22443,
+        "wickets": 674
+      },
+      {
+        "average": 22.246637,
+        "balls": 11634,
+        "balls_per_dismissal": 13.042601,
+        "boundaries": 2621,
+        "boundary_percentage": 22.528795,
+        "control_percentage": 66.544249,
+        "dot_percentage": 28.090081,
+        "dots": 3268,
+        "fours": 1431,
+        "innings_count": 414,
+        "percent_balls": 22.42,
+        "phase": "death",
+        "runs": 19844,
+        "sixes": 1190,
+        "strike_rate": 170.569022,
+        "wickets": 892
+      }
+    ],
+    "metadata": {
+      "ball_aggregation": "snapshot",
+      "data_source": "delivery_details",
+      "data_sources": [
+        "delivery_details (2024-2026)"
+      ],
+      "filters_applied": {
+        "bat_hand": null,
+        "batters": [],
+        "batting_teams": [],
+        "bowl_kind": [],
+        "bowl_style": [],
+        "bowlers": [],
+        "bowling_teams": [],
+        "chase_outcome": [],
+        "control": null,
+        "crease_combo": [],
+        "dismissal": [],
+        "end_date": null,
+        "group_by": [
+          "phase"
+        ],
+        "innings": null,
+        "is_chase": null,
+        "leagues": [
+          "IPL"
+        ],
+        "length": [],
+        "line": [],
+        "match_outcome": [],
+        "max_wickets": null,
+        "min_wickets": null,
+        "over_range": null,
+        "players": [],
+        "query_mode": "delivery",
+        "shot": [],
+        "start_date": "2024-01-01",
+        "teams": [],
+        "toss_decision": [],
+        "venue": null,
+        "wagon_zone": []
+      },
+      "grouped_by": [
+        "phase"
+      ],
+      "has_more": false,
+      "has_summaries": false,
+      "limit": 100,
+      "note": "Grouped data with cricket aggregations",
+      "offset": 0,
+      "query_mode_used": "delivery",
+      "recommended_chart": null,
+      "returned_groups": 3,
+      "total_balls_in_query": 51901,
+      "total_groups": 3,
+      "total_innings_in_query": 1282,
+      "warnings": []
+    },
+    "percentages": null,
+    "summary_data": null
+  }
+}

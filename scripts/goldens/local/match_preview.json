@@ -1,0 +1,220 @@
+{
+  "status": 200,
+  "body": {
+    "llm_model": "gpt-4o-mini",
+    "llm_strategy": "chat.completions",
+    "llm_used": false,
+    "preview": "## Venue Profile\n- 70 matches at Sylhet International Cricket Stadium: 28 bat-first wins vs 37 chases (40% bat-first) \u2014 chasing edge.\n- Scoring benchmarks: avg winning score 176, avg chasing score 141 (range 61-254); winning template is death overs driven with 58 runs in that phase.\n\n## Form Guide\n- Rangpur Riders LWWLL; batting first scored 111, 181, 114, 178 \u2014 reached avg winning score (176) in 2 of 4; chasing 174/173 (W) \u2014 reached avg chasing score (141) in 1 of 1.\n- Sylhet Titans LWLWW; batting first scored 180 \u2014 reached avg winning score (176) in 1 of 1; chasing 153/165 (L), 112/111 (W), 142/147 (L), 119/114 (W) \u2014 reached avg chasing score (141) in 2 of 4.\n- With a chasing edge at this venue, Rangpur Riders's 1 recent chasing win(s) vs Sylhet Titans's 2 is a key form differentiator; bowling-first restrictions avg 173 (Rangpur Riders) vs 112 (Sylhet Titans).\n\n## Head-to-Head\n- 3 meetings in window: Rangpur Riders 1-2 Sylhet Titans. Most recent (2026-01-20) went to Sylhet Titans at Shere Bangla National Stadium, Mirpur.\n- 2 H2H match(es) at this venue \u2014 same-venue H2H strengthens the signal.\n\n## Key Matchup Factor\n- Winning-template pressure point is death overs (41 runs on average in successful chases).\n- Top picks \u2014 Rangpur Riders: Akif Javed (56 exp pts, conf 0.90), Dawid Malan (54 exp pts, conf 0.90); Sylhet Titans: Shohidul Islam (78 exp pts, conf 0.90), Khaled Ahmed (51 exp pts, conf 0.90).\n- Key edges: Khushdil Shah vs Nasum Ahmed (12b, SR 292); Khaled Ahmed threat (124b, 10 wkts, econ 7.65); Rony Talukdar vs Nahid Rana (11b, SR 218); Mustafizur Rahman threat (144b, 8 wkts, econ 7.38).\n\n## Preview Take\n- Lean Sylhet Titans (-6) (ELO: Rangpur Riders 1615 vs Sylhet Titans 1533) \u2014 Recent H2H edge, Venue bias: chasing_edge, Fantasy/matchup edge.\n- Toss/innings path: recent venue split is 2 bat-first wins vs 5 chases in the last 7.",
+    "preview_mode": "hybrid",
+    "preview_version": "v3-narrative",
+    "sections": [
+      {
+        "bullets": [
+          "70 matches at Sylhet International Cricket Stadium: 28 bat-first wins vs 37 chases (40% bat-first) \u2014 chasing edge.",
+          "Scoring benchmarks: avg winning score 176, avg chasing score 141 (range 61-254); winning template is death overs driven with 58 runs in that phase."
+        ],
+        "evidence_tags": [
+          "match_results_distribution",
+          "innings_scores_analysis",
+          "phase_wise_strategy"
+        ],
+        "id": "venue_profile",
+        "title": "Venue Profile"
+      },
+      {
+        "bullets": [
+          "Rangpur Riders LWWLL; batting first scored 111, 181, 114, 178 \u2014 reached avg winning score (176) in 2 of 4; chasing 174/173 (W) \u2014 reached avg chasing score (141) in 1 of 1.",
+          "Sylhet Titans LWLWW; batting first scored 180 \u2014 reached avg winning score (176) in 1 of 1; chasing 153/165 (L), 112/111 (W), 142/147 (L), 119/114 (W) \u2014 reached avg chasing score (141) in 2 of 4.",
+          "With a chasing edge at this venue, Rangpur Riders's 1 recent chasing win(s) vs Sylhet Titans's 2 is a key form differentiator; bowling-first restrictions avg 173 (Rangpur Riders) vs 112 (Sylhet Titans)."
+        ],
+        "evidence_tags": [
+          "match_results_distribution",
+          "innings_scores_analysis"
+        ],
+        "id": "form_guide",
+        "title": "Form Guide"
+      },
+      {
+        "bullets": [
+          "3 meetings in window: Rangpur Riders 1-2 Sylhet Titans. Most recent (2026-01-20) went to Sylhet Titans at Shere Bangla National Stadium, Mirpur.",
+          "2 H2H match(es) at this venue \u2014 same-venue H2H strengthens the signal."
+        ],
+        "evidence_tags": [
+          "head_to_head_stats"
+        ],
+        "id": "head_to_head",
+        "title": "Head-to-Head"
+      },
+      {
+        "bullets": [
+          "Winning-template pressure point is death overs (41 runs on average in successful chases).",
+          "Top picks \u2014 Rangpur Riders: Akif Javed (56 exp pts, conf 0.90), Dawid Malan (54 exp pts, conf 0.90); Sylhet Titans: Shohidul Islam (78 exp pts, conf 0.90), Khaled Ahmed (51 exp pts, conf 0.90).",
+          "Key edges: Khushdil Shah vs Nasum Ahmed (12b, SR 292); Khaled Ahmed threat (124b, 10 wkts, econ 7.65); Rony Talukdar vs Nahid Rana (11b, SR 218); Mustafizur Rahman threat (144b, 8 wkts, econ 7.38)."
+        ],
+        "evidence_tags": [
+          "phase_wise_strategy",
+          "expected_fantasy_points"
+        ],
+        "id": "key_matchup_factor",
+        "title": "Key Matchup Factor"
+      },
+      {
+        "bullets": [
+          "Lean Sylhet Titans (-6) (ELO: Rangpur Riders 1615 vs Sylhet Titans 1533) \u2014 Recent H2H edge, Venue bias: chasing_edge, Fantasy/matchup edge.",
+          "Toss/innings path: recent venue split is 2 bat-first wins vs 5 chases in the last 7."
+        ],
+        "evidence_tags": [
+          "match_results_distribution",
+          "innings_scores_analysis",
+          "recent_matches_at_venue",
+          "phase_wise_strategy",
+          "expected_fantasy_points"
+        ],
+        "id": "preview_take",
+        "title": "Preview Take"
+      }
+    ],
+    "success": true,
+    "team1": "Rangpur Riders",
+    "team2": "Sylhet Titans",
+    "top_ranked_players": {
+      "available": true,
+      "teams": {
+        "Rangpur Riders": {
+          "lineup_size": 17,
+          "top_batting": [
+            {
+              "form_flag": "neutral",
+              "player": "Towhid Hridoy",
+              "quality_score": 86.0,
+              "rank": 6
+            },
+            {
+              "form_flag": "hot",
+              "player": "Litton Das",
+              "quality_score": 59.5,
+              "rank": 30
+            },
+            {
+              "form_flag": "cold",
+              "player": "Iftikhar Ahmed",
+              "quality_score": 37.9,
+              "rank": 57
+            }
+          ],
+          "top_bowling": [
+            {
+              "form_flag": "hot",
+              "player": "Nahid Rana",
+              "quality_score": 97.3,
+              "rank": 3
+            },
+            {
+              "form_flag": "hot",
+              "player": "Akif Javed",
+              "quality_score": 94.2,
+              "rank": 4
+            },
+            {
+              "form_flag": "cold",
+              "player": "Mustafizur Rahman",
+              "quality_score": 61.6,
+              "rank": 39
+            }
+          ],
+          "top_overall": [
+            {
+              "batting_quality": null,
+              "bowling_quality": 97.3,
+              "discipline": "bowling",
+              "form_flag": "hot",
+              "player": "Nahid Rana",
+              "quality_score": 97.3,
+              "rank": 3
+            },
+            {
+              "batting_quality": null,
+              "bowling_quality": 94.2,
+              "discipline": "bowling",
+              "form_flag": "hot",
+              "player": "Akif Javed",
+              "quality_score": 94.2,
+              "rank": 4
+            },
+            {
+              "batting_quality": 86.0,
+              "bowling_quality": null,
+              "discipline": "batting",
+              "form_flag": "neutral",
+              "player": "Towhid Hridoy",
+              "quality_score": 86.0,
+              "rank": 6
+            }
+          ]
+        },
+        "Sylhet Titans": {
+          "lineup_size": 18,
+          "top_batting": [
+            {
+              "form_flag": "hot",
+              "player": "Moeen Ali",
+              "quality_score": 14.4,
+              "rank": 85
+            },
+            {
+              "form_flag": "cold",
+              "player": "Mehidy Hasan Miraz",
+              "quality_score": 9.0,
+              "rank": 88
+            }
+          ],
+          "top_bowling": [
+            {
+              "form_flag": "neutral",
+              "player": "Salman Irshad",
+              "quality_score": 60.1,
+              "rank": 41
+            },
+            {
+              "form_flag": "hot",
+              "player": "Azmatullah Omarzai",
+              "quality_score": 55.8,
+              "rank": 49
+            }
+          ],
+          "top_overall": [
+            {
+              "batting_quality": null,
+              "bowling_quality": 60.1,
+              "discipline": "bowling",
+              "form_flag": "neutral",
+              "player": "Salman Irshad",
+              "quality_score": 60.1,
+              "rank": 41
+            },
+            {
+              "batting_quality": null,
+              "bowling_quality": 55.8,
+              "discipline": "bowling",
+              "form_flag": "hot",
+              "player": "Azmatullah Omarzai",
+              "quality_score": 55.8,
+              "rank": 49
+            },
+            {
+              "batting_quality": 14.4,
+              "bowling_quality": null,
+              "discipline": "batting",
+              "form_flag": "hot",
+              "player": "Moeen Ali",
+              "quality_score": 14.4,
+              "rank": 85
+            }
+          ]
+        }
+      },
+      "top_n": 3
+    },
+    "venue": "Sylhet International Cricket Stadium"
+  }
+}

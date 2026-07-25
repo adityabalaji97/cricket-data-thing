@@ -1,0 +1,179 @@
+{
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "average": 36.045455,
+        "balls": 653,
+        "balls_per_dismissal": 29.681818,
+        "boundaries": 107,
+        "boundary_percentage": 16.385911,
+        "control_percentage": 71.205008,
+        "dot_percentage": 41.807044,
+        "dots": 273,
+        "fours": 59,
+        "innings_count": 142,
+        "length": "GOOD_LENGTH",
+        "percent_balls": 28.11,
+        "runs": 793,
+        "sixes": 48,
+        "strike_rate": 121.43951,
+        "wickets": 22
+      },
+      {
+        "average": 44.176471,
+        "balls": 605,
+        "balls_per_dismissal": 35.588235,
+        "boundaries": 98,
+        "boundary_percentage": 16.198347,
+        "control_percentage": 65.59322,
+        "dot_percentage": 39.008264,
+        "dots": 236,
+        "fours": 50,
+        "innings_count": 142,
+        "length": "SHORT_OF_A_GOOD_LENGTH",
+        "percent_balls": 26.04,
+        "runs": 751,
+        "sixes": 48,
+        "strike_rate": 124.132231,
+        "wickets": 17
+      },
+      {
+        "average": 38.75,
+        "balls": 524,
+        "balls_per_dismissal": 21.833333,
+        "boundaries": 144,
+        "boundary_percentage": 27.480916,
+        "control_percentage": 81.027668,
+        "dot_percentage": 26.145038,
+        "dots": 137,
+        "fours": 85,
+        "innings_count": 129,
+        "length": "FULL",
+        "percent_balls": 22.56,
+        "runs": 930,
+        "sixes": 59,
+        "strike_rate": 177.480916,
+        "wickets": 24
+      },
+      {
+        "average": 36.214286,
+        "balls": 266,
+        "balls_per_dismissal": 19.0,
+        "boundaries": 83,
+        "boundary_percentage": 31.203008,
+        "control_percentage": 62.450593,
+        "dot_percentage": 25.93985,
+        "dots": 69,
+        "fours": 42,
+        "innings_count": 106,
+        "length": "SHORT",
+        "percent_balls": 11.45,
+        "runs": 507,
+        "sixes": 41,
+        "strike_rate": 190.601504,
+        "wickets": 14
+      },
+      {
+        "average": 57.6,
+        "balls": 159,
+        "balls_per_dismissal": 31.8,
+        "boundaries": 44,
+        "boundary_percentage": 27.672956,
+        "control_percentage": 73.856209,
+        "dot_percentage": 20.754717,
+        "dots": 33,
+        "fours": 25,
+        "innings_count": 66,
+        "length": "FULL_TOSS",
+        "percent_balls": 6.84,
+        "runs": 288,
+        "sixes": 19,
+        "strike_rate": 181.132075,
+        "wickets": 5
+      },
+      {
+        "average": 24.666667,
+        "balls": 108,
+        "balls_per_dismissal": 36.0,
+        "boundaries": 6,
+        "boundary_percentage": 5.555556,
+        "control_percentage": 56.730769,
+        "dot_percentage": 41.666667,
+        "dots": 45,
+        "fours": 6,
+        "innings_count": 59,
+        "length": "YORKER",
+        "percent_balls": 4.65,
+        "runs": 74,
+        "sixes": 0,
+        "strike_rate": 68.518519,
+        "wickets": 3
+      }
+    ],
+    "metadata": {
+      "ball_aggregation": "snapshot",
+      "data_source": "delivery_details",
+      "data_sources": [
+        "delivery_details (2015-2026)"
+      ],
+      "filters_applied": {
+        "bat_hand": null,
+        "batters": [
+          "Nicholas Pooran"
+        ],
+        "batting_teams": [],
+        "bowl_kind": [
+          "pace bowler"
+        ],
+        "bowl_style": [],
+        "bowlers": [],
+        "bowling_teams": [],
+        "chase_outcome": [],
+        "control": null,
+        "crease_combo": [],
+        "dismissal": [],
+        "end_date": null,
+        "group_by": [
+          "length"
+        ],
+        "innings": null,
+        "is_chase": null,
+        "leagues": [],
+        "length": [],
+        "line": [],
+        "match_outcome": [],
+        "max_wickets": null,
+        "min_wickets": null,
+        "over_range": null,
+        "players": [],
+        "query_mode": "delivery",
+        "shot": [],
+        "start_date": null,
+        "teams": [],
+        "toss_decision": [],
+        "venue": null,
+        "wagon_zone": []
+      },
+      "grouped_by": [
+        "length"
+      ],
+      "has_more": false,
+      "has_summaries": false,
+      "limit": 100,
+      "note": "Grouped data with cricket aggregations",
+      "offset": 0,
+      "query_mode_used": "delivery",
+      "recommended_chart": null,
+      "returned_groups": 6,
+      "total_balls_in_query": 2323,
+      "total_groups": 6,
+      "total_innings_in_query": 644,
+      "warnings": [
+        "Columns ['length'] are only available from 2015 onwards. Data before 2015 is excluded from results."
+      ]
+    },
+    "percentages": null,
+    "summary_data": null
+  }
+}
