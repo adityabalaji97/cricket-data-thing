@@ -124,13 +124,18 @@ class DeliveryDetailsSync:
             session.close()
     
     def extract_match_data_from_dd(self, session: Session, match_id: str) -> Optional[Dict]:
+        # max_over_in_innings replaces max_balls as the source for matches.overs: max_balls is 0
+        # for a third of ODI matches, varies within a match, and the Test feed omits it entirely.
         query = text("""
             SELECT p_match, match_date, ground, country, competition, winner, toss,
-                   team_bat, team_bowl, inns, max_balls
+                   team_bat, team_bowl, inns, max_balls,
+                   tournament, trophy_name, daynight, format, gender,
+                   MAX(over) AS max_over_in_innings
             FROM delivery_details
             WHERE p_match = :match_id
             GROUP BY p_match, match_date, ground, country, competition, winner, toss,
-                     team_bat, team_bowl, inns, max_balls
+                     team_bat, team_bowl, inns, max_balls,
+                     tournament, trophy_name, daynight, format, gender
             ORDER BY inns
         """)
         rows = session.execute(query, {'match_id': match_id}).fetchall()
@@ -159,13 +164,39 @@ class DeliveryDetailsSync:
         
         toss_winner, toss_decision = self._parse_toss_field(first_row.toss, team1, team2)
         
-        competition = first_row.competition or ''
-        is_international = any(c.lower() in competition.lower() for c in self.INTERNATIONAL_COMPETITIONS)
-        match_type = 'international' if is_international else 'league'
-        
-        max_balls = first_row.max_balls or 120
-        overs = max_balls // 6
-        
+        from services.competition_normalizer import (
+            is_international as resolve_is_international,
+            normalize_competition,
+            resolve_event_name,
+        )
+
+        fmt = getattr(first_row, 'format', None) or 'T20'
+        gender = getattr(first_row, 'gender', None) or 'male'
+        tournament = getattr(first_row, 'tournament', None)
+        trophy_name = getattr(first_row, 'trophy_name', None)
+
+        # competition is the coarse bucket you filter by; event_name is the specific event.
+        # The ODI feed leaves competition empty for bilateral series and puts the name in
+        # tournament, so reading competition alone would produce an empty bucket -- which
+        # satisfies NOT NULL but breaks every filter and the international check below.
+        competition = normalize_competition(first_row.competition, tournament, trophy_name, fmt)
+        event_name = resolve_event_name(first_row.competition, tournament)
+
+        teams_in_match = [team1, team2]
+        match_type = (
+            'international'
+            if resolve_is_international(first_row.competition, teams_in_match, fmt)
+            else 'league'
+        )
+
+        # Derive from the overs actually bowled. `over` is 0-indexed in this table, so add 1.
+        # Rain-reduced games legitimately come in short, and Tests have no fixed length at all.
+        max_over = max(
+            (row.max_over_in_innings for row in rows if row.max_over_in_innings is not None),
+            default=None,
+        )
+        overs = (max_over + 1) if max_over is not None else None
+
         match_data = {
             'id': match_id,
             'date': first_row.match_date,
@@ -176,11 +207,14 @@ class DeliveryDetailsSync:
             'winner': first_row.winner,
             'toss_winner': toss_winner,
             'toss_decision': toss_decision,
-            'competition': first_row.competition,
+            'competition': competition,
             'match_type': match_type,
             'overs': overs,
             'balls_per_over': 6,
-            'event_name': first_row.competition,
+            'event_name': event_name,
+            'format': fmt,
+            'gender': gender,
+            'day_or_night': self._map_day_or_night(getattr(first_row, 'daynight', None)),
         }
         
         if toss_winner and toss_decision:
@@ -198,6 +232,31 @@ class DeliveryDetailsSync:
         
         return match_data
     
+    @staticmethod
+    def _map_day_or_night(daynight: Optional[str]) -> Optional[str]:
+        """Map the feed's daynight string onto the binary matches.day_or_night column.
+
+        The column is populated today by an IPL-only heuristic that leaves it NULL for 92% of
+        matches; the feed ships this as real data for every match.
+
+        A day/night match is classed as 'night' because the second innings -- where dew and
+        lights actually change how the game plays -- is under lights, which matches how IPL
+        evening games are already classified. It is really a third category, so the raw value
+        is kept in delivery_details.daynight and this mapping can be revisited without a reload.
+        """
+        if not daynight:
+            return None
+        value = str(daynight).strip().lower()
+        if value in {'', '-'}:
+            return None
+        if 'day/night' in value or 'day-night' in value:
+            return 'night'
+        if 'night' in value:
+            return 'night'
+        if 'day' in value:
+            return 'day'
+        return None
+
     def _parse_toss_field(self, toss_str: str, team1: str, team2: str) -> Tuple[Optional[str], Optional[str]]:
         if not toss_str:
             return None, None
