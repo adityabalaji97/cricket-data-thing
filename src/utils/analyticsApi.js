@@ -30,8 +30,27 @@ export const buildAnalyticsQuery = (params = {}) => {
   return query.toString();
 };
 
+/**
+ * The format every request is scoped to, set once by FormatProvider.
+ *
+ * Held at module level rather than passed through each call site: there are 132 inline
+ * `config.API_URL` fetches across 52 files, and threading a parameter through all of them is a
+ * migration in itself. Anything going through this module picks the format up for free.
+ *
+ * Defaults to men's T20, so behaviour is unchanged until a format is actually selected.
+ */
+let activeFormatParams = { format: 'T20', gender: 'male' };
+
+export const setActiveFormatParams = (params) => {
+  if (params?.format && params?.gender) activeFormatParams = { ...params };
+};
+
+export const getActiveFormatParams = () => ({ ...activeFormatParams });
+
 export const buildAnalyticsUrl = (path, params = {}) => {
-  const query = buildAnalyticsQuery(params);
+  // An explicit format on the call wins, so a component can pin one request to another format
+  // (comparing across formats, say) without changing the global selection.
+  const query = buildAnalyticsQuery({ ...activeFormatParams, ...params });
   return `${config.API_URL}${path}${query ? `?${query}` : ''}`;
 };
 

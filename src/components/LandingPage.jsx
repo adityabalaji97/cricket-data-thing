@@ -30,30 +30,29 @@ import { fetchUpcomingMatches } from '../data/iplSchedule';
 import MiniWagonWheel from './MiniWagonWheel';
 import { getTeamColor } from '../utils/teamColors';
 import SearchBar from './search/SearchBar';
+import { colors as dark, fonts } from '../theme/hindsightDark';
 
+// Mapped onto the shared dark-theme tokens rather than redefining them; see
+// src/theme/hindsightDark.js. The names are kept short because they are used densely
+// throughout this file. Note `hairline` was rgba(255,255,255,0.06) here and 0.07 in the
+// query builder -- the shared token resolves that to 0.07.
 const C = {
-  bg: '#0a0c11',
-  surface: '#101319',
-  raised: '#14171e',
-  muted: '#0d1015',
-  inset: '#070a0e',
-  hairline: 'rgba(255,255,255,0.06)',
-  hairlineStrong: 'rgba(255,255,255,0.12)',
-  hi: '#f3f4f6',
-  mid: '#c3c8d0',
-  soft: '#9aa1ac',
-  low: '#6b7280',
-  faint: '#4b5563',
-  lime: '#b6f24a',
-  limeHover: '#c8f56f',
-  gold: '#f0b429',
-  red: '#e5484d',
-};
-
-const fonts = {
-  body: '"Barlow", sans-serif',
-  display: '"Barlow Semi Condensed", sans-serif',
-  mono: '"IBM Plex Mono", monospace',
+  bg: dark.bg,
+  surface: dark.surface1,
+  raised: dark.surface2,
+  muted: dark.input,
+  inset: dark.inset,
+  hairline: dark.border,
+  hairlineStrong: dark.borderStrong,
+  hi: dark.textHi,
+  mid: dark.textMed,
+  soft: dark.textLo,
+  low: dark.textFaint,
+  faint: dark.textGhost,
+  lime: dark.accent,
+  limeHover: dark.accentHover,
+  gold: dark.gold,
+  red: dark.red,
 };
 
 const DATE_OPTIONS = [

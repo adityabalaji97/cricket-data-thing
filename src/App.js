@@ -50,6 +50,7 @@ import axios from 'axios';
 
 import config from './config';
 import { DEFAULT_START_DATE, TODAY } from './utils/dateDefaults';
+import FormatSwitcher from './components/FormatSwitcher';
 
 const TEAM_NAME_TO_ABBREVIATION = {
   'chennai super kings': 'CSK',
@@ -708,14 +709,17 @@ const AppContent = () => {
                 {getPageTitle()}
               </Typography>
             )}
-            <IconButton
-              onClick={() => setSearchExpanded(true)}
-              size="small"
-              sx={{ ml: 'auto', color: isQueryRoute ? qbColors.textMed : undefined }}
-              aria-label="search"
-            >
-              <SearchIcon />
-            </IconButton>
+            <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <FormatSwitcher isMobile />
+              <IconButton
+                onClick={() => setSearchExpanded(true)}
+                size="small"
+                sx={{ color: isQueryRoute ? qbColors.textMed : undefined }}
+                aria-label="search"
+              >
+                <SearchIcon />
+              </IconButton>
+            </Box>
           </>
         ) : (
           <>
@@ -760,14 +764,17 @@ const AppContent = () => {
               <Tab label="🛤️ Player Journeys" component={Link} to="/games/player-journeys" />
               <Tab label="Fantasy Planner" component={Link} to="/fantasy-planner" />
             </Tabs>
-            <IconButton
-              onClick={() => setSearchExpanded(true)}
-              size="small"
-              sx={{ ml: 1, color: isQueryRoute ? qbColors.textMed : undefined }}
-              aria-label="search"
-            >
-              <SearchIcon />
-            </IconButton>
+            <Box sx={{ ml: 1, display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+              <FormatSwitcher />
+              <IconButton
+                onClick={() => setSearchExpanded(true)}
+                size="small"
+                sx={{ color: isQueryRoute ? qbColors.textMed : undefined }}
+                aria-label="search"
+              >
+                <SearchIcon />
+              </IconButton>
+            </Box>
           </>
         )}
       </Box>
