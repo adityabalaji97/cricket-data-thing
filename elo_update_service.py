@@ -47,7 +47,8 @@ class ELOUpdateService:
         self.k_factor = k_factor
         self.elo_calculator = ELOCalculator(k_factor=k_factor)
         
-    def get_matches_without_elo(self, session: Session, limit: Optional[int] = None) -> List[Match]:
+    def get_matches_without_elo(self, session: Session, limit: Optional[int] = None,
+                                fmt: Optional[str] = None, gender: str = 'male') -> List[Match]:
         """
         Get matches that don't have ELO ratings, ordered chronologically
         
@@ -60,15 +61,20 @@ class ELOUpdateService:
         """
         query = session.query(Match).filter(
             or_(Match.team1_elo.is_(None), Match.team2_elo.is_(None))
-        ).order_by(Match.date, Match.id)
+        )
+        # One rating stream per format: a team's ODI results must not move its T20 rating.
+        if fmt is not None:
+            query = query.filter(Match.format == fmt, Match.gender == gender)
+        query = query.order_by(Match.date, Match.id)
         
         if limit:
             query = query.limit(limit)
             
         return query.all()
     
-    def get_matches_after_date(self, session: Session, after_date: datetime, 
-                              include_missing_elo: bool = True) -> List[Match]:
+    def get_matches_after_date(self, session: Session, after_date: datetime,
+                              include_missing_elo: bool = True,
+                              fmt: Optional[str] = None, gender: str = 'male') -> List[Match]:
         """
         Get matches after a specific date that may need ELO recalculation
         
@@ -82,22 +88,25 @@ class ELOUpdateService:
         """
         if include_missing_elo:
             # Get matches after date OR matches without ELO
-            matches = session.query(Match).filter(
+            query = session.query(Match).filter(
                 or_(
                     Match.date > after_date,
                     Match.team1_elo.is_(None),
                     Match.team2_elo.is_(None)
                 )
-            ).order_by(Match.date, Match.id).all()
+            )
         else:
-            # Just matches after date
-            matches = session.query(Match).filter(
-                Match.date > after_date
-            ).order_by(Match.date, Match.id).all()
-            
-        return matches
+            query = session.query(Match).filter(Match.date > after_date)
+
+        # One rating stream per format.
+        if fmt is not None:
+            query = query.filter(Match.format == fmt, Match.gender == gender)
+
+        return query.order_by(Match.date, Match.id).all()
     
-    def find_earliest_missing_elo_date(self, session: Session) -> Optional[datetime]:
+    def find_earliest_missing_elo_date(self, session: Session,
+                                       fmt: Optional[str] = None,
+                                       gender: str = 'male') -> Optional[datetime]:
         """
         Find the earliest date where ELO data is missing
         
@@ -108,10 +117,11 @@ class ELOUpdateService:
             Earliest date with missing ELO, or None if all matches have ELO
         """
         result = session.execute(text("""
-            SELECT MIN(date) 
-            FROM matches 
-            WHERE team1_elo IS NULL OR team2_elo IS NULL
-        """)).scalar()
+            SELECT MIN(date)
+            FROM matches
+            WHERE (team1_elo IS NULL OR team2_elo IS NULL)
+            AND (:fmt IS NULL OR (format = :fmt AND gender = :gender))
+        """), {'fmt': fmt, 'gender': gender}).scalar()
         
         return result
     
@@ -183,7 +193,8 @@ class ELOUpdateService:
         logger.info(f"ELO calculation complete - Processed: {stats['processed']}, Updated: {stats['updated']}, Errors: {stats['errors']}")
         return stats
     
-    def _load_existing_team_ratings(self, session: Session, before_date: datetime) -> None:
+    def _load_existing_team_ratings(self, session: Session, before_date: datetime,
+                                    fmt: Optional[str] = None, gender: str = 'male') -> None:
         """
         Load existing team ratings from matches before a specific date.
         Optimized to use a single query with window functions.
@@ -209,6 +220,7 @@ class ELOUpdateService:
                 FROM matches
                 WHERE date < :before_date
                 AND team1_elo IS NOT NULL AND team2_elo IS NOT NULL
+                AND (:fmt IS NULL OR (format = :fmt AND gender = :gender))
 
                 UNION ALL
 
@@ -222,6 +234,7 @@ class ELOUpdateService:
                 FROM matches
                 WHERE date < :before_date
                 AND team1_elo IS NOT NULL AND team2_elo IS NOT NULL
+                AND (:fmt IS NULL OR (format = :fmt AND gender = :gender))
             ),
             latest_per_team AS (
                 SELECT team, date, team_elo, opponent_elo, winner,
@@ -234,7 +247,10 @@ class ELOUpdateService:
             WHERE final_rn = 1
         """)
 
-        results = session.execute(latest_matches_query, {'before_date': before_date}).fetchall()
+        results = session.execute(
+            latest_matches_query,
+            {'before_date': before_date, 'fmt': fmt, 'gender': gender},
+        ).fetchall()
         logger.info(f"Found {len(results)} teams with ELO history before {before_date}")
 
         loaded_count = 0
@@ -318,8 +334,10 @@ class ELOUpdateService:
             logger.error(f"Error committing ELO updates: {e}")
             raise
     
-    def calculate_missing_elo_ratings(self, batch_size: int = 1000, 
-                                    max_matches: Optional[int] = None) -> Dict[str, int]:
+    def calculate_missing_elo_ratings(self, batch_size: int = 1000,
+                                    max_matches: Optional[int] = None,
+                                    fmt: Optional[str] = None,
+                                    gender: str = 'male') -> Dict[str, int]:
         """
         Calculate ELO ratings for all matches that don't have them
         
@@ -333,14 +351,36 @@ class ELOUpdateService:
         session = next(get_session())
         
         try:
+            # Each (format, gender) is an independent rating stream, so process them one at a
+            # time with a fresh calculator. Sharing one pass would let an ODI result move a
+            # team's T20 rating, since team_ratings is keyed by team name alone.
+            combos = [] if fmt is not None else session.execute(text("""
+                SELECT DISTINCT format, gender FROM matches ORDER BY format, gender
+            """)).fetchall()
+            if len(combos) > 1:
+                totals = {'processed': 0, 'updated': 0, 'errors': 0}
+                for combo_format, combo_gender in combos:
+                    logger.info(f"--- ELO pass for {combo_format}/{combo_gender} ---")
+                    self.elo_calculator = ELOCalculator(k_factor=self.k_factor)
+                    result = self.calculate_missing_elo_ratings(
+                        batch_size, max_matches, combo_format, combo_gender
+                    )
+                    for key in totals:
+                        totals[key] += result.get(key, 0)
+                return totals
+
             logger.info("🔍 Finding matches without ELO ratings...")
             
             # Check current status
-            total_matches = session.query(Match).count()
+            scope = session.query(Match)
+            if fmt is not None:
+                scope = scope.filter(Match.format == fmt, Match.gender == gender)
+            total_matches = scope.count()
             matches_with_elo = session.execute(text("""
-                SELECT COUNT(*) FROM matches 
+                SELECT COUNT(*) FROM matches
                 WHERE team1_elo IS NOT NULL AND team2_elo IS NOT NULL
-            """)).scalar()
+                AND (:fmt IS NULL OR (format = :fmt AND gender = :gender))
+            """), {'fmt': fmt, 'gender': gender}).scalar()
             
             missing_count = total_matches - matches_with_elo
             logger.info(f"Total matches: {total_matches}")
@@ -352,14 +392,16 @@ class ELOUpdateService:
                 return {'processed': 0, 'updated': 0, 'errors': 0}
             
             # Find earliest date where ELO is missing
-            earliest_missing_date = self.find_earliest_missing_elo_date(session)
+            earliest_missing_date = self.find_earliest_missing_elo_date(session, fmt, gender)
             logger.info(f"Earliest missing ELO date: {earliest_missing_date}")
             
             # Get all matches from that date forward (to maintain chronological order)
             matches_to_process = self.get_matches_after_date(
-                session, 
+                session,
                 earliest_missing_date - timedelta(days=1),  # Start one day before to be safe
-                include_missing_elo=True
+                include_missing_elo=True,
+                fmt=fmt,
+                gender=gender,
             )
             
             if max_matches:
