@@ -76,8 +76,21 @@ served to every other. ODI was returning T20 innings at SR 207 and looking plaus
 **third** instance — after `query_builder_metadata` (0.6) and the analytics response cache (0.7).
 **When making anything format-aware, check its cache key before believing the result.**
 
-**Still outstanding for A11:** `/recent-matches/discover`, which drives the match tiles. Ten
-queries over `matches` plus its own competition aliasing, so it wants a dedicated pass.
+**Still outstanding for A11: `/recent-matches/discover`.** I attempted it and **reverted**, so
+the endpoint is untouched and working. Worth reading before the next attempt:
+
+The format *pin* was easy and worked — ODI correctly narrowed to 3 matches against T20's 116.
+What defeated it in the time available is that `'T20I'` is hardcoded as the international label
+in at least four layers: three SQL `CASE` expressions and a `SELECT` literal
+(`services/recent_matches.py` around lines 555, 607, 612, 717), the Python grouping key in
+`_competition_stats_from_rows`, the group label in the grouping loop, and `_display_competition`
+itself. Binding it as `:intl_label` fixed the labels but broke the endpoint with an empty-string
+error I did not finish tracing — the first query in the chain still succeeds in isolation, so the
+failure is further down, most likely a query whose params dict does not carry the new binding.
+
+Suggested approach next time: add the binding to **one** query at a time and test after each,
+rather than replacing all four literals at once. Also check the `priority` ordering expression,
+which may reference the same literal.
 
 ### 2026-07-26 — Chunk A9 — Claude — per-format ELO
 
