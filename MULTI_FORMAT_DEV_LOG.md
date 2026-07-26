@@ -19,13 +19,21 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > Expect ~1,647,737 ODI rows. If the process died early, re-run it — it skips duplicates:
 > `python3 scripts/load_delivery_details_full.py --csv data/odi_bbb.csv --format ODI --gender male`
 >
-> **2. Run the follow-on steps** (none of these happen automatically):
+> **2. Run the rest of the pipeline.** I loaded with `load_delivery_details_full.py`, which is
+> only step 2 of six. The orchestrator does the rest, so use it with `--skip-load`:
 > ```
-> python3 sync_from_delivery_details.py --sync-matches --confirm
-> python3 sync_from_delivery_details.py --sync-stats  --confirm
-> python3 elo_update_service.py --calculate-missing
-> python3 scripts/refresh_query_builder_metadata.py
+> python3 scripts/load_delivery_details_pipeline.py \
+>     --csv data/odi_bbb.csv --format ODI --gender male \
+>     --skip-validation --skip-load
 > ```
+> That runs: backfill advanced columns (line/length/shot) -> populate non_striker and
+> crease_combo -> **update the players table** -> refresh query-builder metadata -> sync matches
+> and stats -> ELO.
+>
+> Do **not** just run the four commands sync/stats/ELO/metadata by hand. That was my original
+> instruction and it was wrong: it skips the advanced-column backfill, the crease-combo
+> population, and `update_players` — so ODI-only players would never reach the `players` table
+> and the left-right analysis columns would stay empty for every ODI ball.
 >
 > **3. Then push and deploy** (deliberately left for the morning):
 > ```
