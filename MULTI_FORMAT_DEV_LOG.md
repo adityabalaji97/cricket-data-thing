@@ -9,15 +9,22 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** 0.3 complete → next is **0.4 pipeline format-awareness**
+- **Active chunk:** 0.4 in progress (0.4a data sources + recon done, 0.4b migration 002 done;
+  next is 0.4c competition normalizer)
 - **Branch:** `multi-format` (branched from `main` @ `29b61c1`)
 - **Local DB:** `hindsight_local` on localhost:5432 (PG14 server), 644 MB subset of prod, healthy.
   Rebuild any time with `scripts/dev/setup_local_db.sh`.
 - **Prod DB:** Heroku `cricket-data-thing`, PG16.13, **essential-1** (6.28 GB / 10 GB).
   Upgrade to essential-2 is **NOT done yet** — deliberately deferred until just before the
   Phase A ODI backfill (chunk A1), since nothing before that needs the extra space.
-- **Migrations applied — local:** `001_multi_format_columns.sql` ✅
-- **Migrations applied — prod:** **none** — `001` is still pending on production
+- **Migrations applied — local:** `001_multi_format_columns.sql` ✅,
+  `002_delivery_details_source_columns.sql` ✅
+- **Migrations applied — prod:** **none** — `001` and `002` are both still pending on production
+- **Dataset URLs:** all four are in `.env` (gitignored) as `DROPBOX_T20_URL`, `DROPBOX_ODI_URL`,
+  `DROPBOX_WT20_URL`, `DROPBOX_TEST_URL`. **This repo is public — never commit these values**, and
+  pull slices with `make_csv_slice.py --url-env NAME` so no link lands in shell history.
+- **Slices in `data/slices/`** (gitignored, regenerate as needed): `t20_slice.csv` (2,874 matches,
+  2015-2022), `odi_slice.csv` (349, 2000-2007), `test_slice.csv` (85, 2020-2025).
 - **Goldens:** 13 endpoints in `scripts/goldens/local/`, `check` passes clean (re-captured in 0.2
   after a deterministic-ordering fix; see that entry).
 - **Test data:** `data/slices/odi_slice.csv` — 349 complete ODI matches, 149,599 balls, 2000-01-09
@@ -30,6 +37,53 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-26 — Chunk 0.4a/0.4b — Claude — data sources, Test recon, migration 002
+
+**Done**
+- All four dataset URLs into `.env`; `make_csv_slice.py` gained `--url-env` (there is deliberately
+  **no `--url` flag** — the links carry an access key and this repo is public).
+- `scripts/migrations/002_delivery_details_source_columns.sql` applied locally: `tournament`,
+  `season`, `daynight`, `trophy_name`, `rain`, plus Test-only `day`, `session`, `trail_by`,
+  `lead_by`. `recreate_delivery_details.sql` updated to match.
+- Slices built for all three formats.
+
+**The big finding: the four CSVs do NOT share a schema.** My earlier claim that the ODI file has
+"the exact same schema as t20_bbb.csv" was **wrong**. Actual differences:
+
+| | extra columns | missing columns |
+|---|---|---|
+| `t20_bbb.csv` | `bowl_runs`, `bowl_wkt` | `rain`, `gmt_offset` |
+| `odi_bbb.csv` | `rain`, `gmt_offset` | `bowl_runs`, `bowl_wkt` |
+| `test_bbb.csv` | `trail_by`, `lead_by`, `day`, `session` | `max_balls`, `inns_runs_rem`, `inns_balls_rem`, `inns_rr`, `inns_rrr`, `rain`, `gmt_offset` |
+
+**`test_bbb.csv` has no `max_balls` column at all.** Anything that reads it must tolerate absence,
+not just a zero or NULL value. Good news: `scripts/load_delivery_details_full.py:124-125` already
+keeps only mapped columns that exist, so a missing column is skipped rather than crashing.
+
+**Test recon (front-loads chunk C0)** — from `test_slice.csv`, 85 matches, 2020-2025:
+- `inns` spans **1-4** as expected: 69 matches have 4 innings, 15 have 3 (innings wins and draws),
+  1 has 2.
+- `over` **resets per innings**; the longest innings in the sample reached over 197. So
+  `UNBOUNDED_OVER_MAX` was raised from 199 to 299 in `format_config.py` — 199 was uncomfortably
+  close to real data.
+- **`day` (1-5) and `session` (1-3) are real columns.** Sessions are how Tests are actually
+  structured, so Phase C should revisit whether the over-based new-ball/old-ball buckets in
+  `format_config.py` are the right phase model at all. Noted in a comment there.
+- `winner` is `'-'` for draws (7 of 85). `target` is populated on every row, including first
+  innings — do not treat "has a target" as "is a chase".
+- ~1,683 balls per match on average.
+
+**Verified, do not "fix" this:** the CSVs are **1-indexed** on `over` (ODI 1-50, Test 1-197) while
+`delivery_details.over` is **0-indexed** (T20 rows run 0-19). `load_delivery_details_full.py:131-132`
+already subtracts 1. Anyone comparing a CSV over number to a database one will otherwise be off by
+one over, which silently shifts every phase boundary.
+
+**Also fixed:** the URLs in `.env` had to be **quoted** — they contain `&`, so an unquoted value
+breaks `source .env` (bash treats it as a background operator and truncates the URL).
+
+**Next:** 0.4c competition normalizer, then 0.4d/0.4e loader and sync, then 0.4g (pin the
+format-blind consumers) before any ODI data is loaded locally.
 
 ### 2026-07-25 — ODI data recon (unplanned, gates chunk 0.4) — Claude
 

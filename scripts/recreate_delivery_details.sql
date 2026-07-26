@@ -62,6 +62,22 @@ CREATE TABLE delivery_details (
     control INTEGER,
     pred_score FLOAT,
     win_prob FLOAT,
+    -- Source columns preserved by scripts/migrations/002_delivery_details_source_columns.sql.
+    -- `tournament` is the only source of a series name when `competition` is empty, which is
+    -- how the ODI feed represents bilateral series. `daynight` replaces the IPL-only heuristic
+    -- behind matches.day_or_night. `trophy_name` is the cleanest key for normalising
+    -- competition names.
+    tournament VARCHAR,
+    season VARCHAR(16),
+    daynight VARCHAR(24),
+    trophy_name VARCHAR,
+    rain REAL,
+    -- Test-only: real day (1-5) and session (1-3) numbers, plus match state. The Test feed
+    -- has no `max_balls` column at all, so nothing may assume that column is populated.
+    day SMALLINT,
+    session SMALLINT,
+    trail_by INTEGER,
+    lead_by INTEGER,
     -- Cricket format and gender (added by scripts/migrations/001_multi_format_columns.sql).
     -- Denormalized rather than joined from matches: the hot query-builder paths never join
     -- matches, so a WHERE predicate here is far cheaper than adding a join to each of them.

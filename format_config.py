@@ -128,6 +128,11 @@ _ODI_PHASES_4 = (
 
 # Tests: there is no powerplay, so the phases follow the ball instead. The second new ball
 # becomes available at 80 overs, which is the natural third boundary.
+#
+# NOTE (recon, 2026-07-26): test_bbb.csv ships real `day` (1-5) and `session` (1-3) columns,
+# now preserved by migration 002. Sessions are how Tests are actually structured, so the Phase C
+# work should revisit whether these over-based buckets are the right model or whether phases
+# should key off session instead. Left over-based for now because nothing consumes them yet.
 _TEST_PHASES = (
     Phase("new_ball", "New ball", 0, 19),
     Phase("middle", "Old ball", 20, 79),
@@ -220,8 +225,10 @@ _SPECS: Dict[Tuple[str, str], FormatSpec] = {
     ),
 }
 
-# Highest over the API will accept when a format declares no cap (Tests).
-UNBOUNDED_OVER_MAX = 199
+# Highest over the API will accept when a format declares no cap (Tests). A Test innings in the
+# sample reached over 197, and the longest first-class innings on record run past 250, so this is
+# set well clear of anything real rather than at the observed maximum.
+UNBOUNDED_OVER_MAX = 299
 
 
 # ---------------------------------------------------------------------------------------

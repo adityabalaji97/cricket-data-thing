@@ -1,18 +1,27 @@
 #!/usr/bin/env python3
 """Extract a small, complete-match slice of a ball-by-ball CSV for local testing.
 
-The full datasets are large (the shared Dropbox folder is ~11 GB) and downloading one just to
-exercise the loader wastes hours. This streams only the first N bytes of the folder's zip and
-decompresses the leading part of the requested CSV, then keeps whole matches so innings and
-ball sequences stay internally consistent.
+The full datasets run to hundreds of megabytes each and downloading one just to exercise the
+loader wastes time, so this reads only the leading bytes of a file and keeps whole matches, so
+innings and ball sequences stay internally consistent.
 
-    # from the shared Dropbox folder (streams, never downloads the whole archive)
-    python scripts/dev/make_csv_slice.py --dropbox-url "<folder share url>" \
-        --member odi_bbb.csv --out data/slices/odi_slice.csv
+    # normal use: the URL comes from .env, never from the command line
+    python scripts/dev/make_csv_slice.py --url-env DROPBOX_ODI_URL \
+        --out data/slices/odi_slice.csv --matches 300
 
     # from a CSV already on disk
     python scripts/dev/make_csv_slice.py --csv /path/to/t20_bbb.csv \
         --out data/slices/t20_slice.csv --matches 200
+
+    # legacy: pull a member out of the whole-folder zip (no longer needed for the four
+    # ball-by-ball datasets, which have direct per-file links)
+    python scripts/dev/make_csv_slice.py --url-env DROPBOX_FOLDER_URL \
+        --member odi_bbb.csv --out data/slices/odi_slice.csv
+
+The URLs live in `.env` (gitignored) because this repository is **public** and each Dropbox
+share link embeds an `rlkey` that grants access to the data. `--url-env` names the variable so
+no link is ever typed on a command line or left in shell history; there is deliberately no
+`--url` flag.
 
 Slices live in data/slices/ and are gitignored -- regenerate rather than commit them.
 """
@@ -22,11 +31,24 @@ from __future__ import annotations
 import argparse
 import csv
 import io
+import os
 import struct
 import sys
 import urllib.request
 import zlib
 from pathlib import Path
+
+try:  # optional: lets the script pick up .env without the caller exporting anything
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover
+    load_dotenv = None
+
+
+def read_leading_bytes(url: str, max_bytes: int) -> str:
+    """Download the first `max_bytes` of a plain CSV URL and decode them as text."""
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(request) as response:
+        return response.read(max_bytes).decode("utf-8", "replace")
 
 
 def stream_member_from_zip(url: str, member: str, max_bytes: int) -> str:
@@ -90,25 +112,46 @@ def slice_complete_matches(text: str, match_limit: int | None) -> tuple[list[dic
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--dropbox-url", help="Shared folder URL (dl=1 is applied automatically)")
+    source.add_argument(
+        "--url-env",
+        help="Name of the env var holding the download URL, e.g. DROPBOX_ODI_URL. "
+        "There is no --url flag on purpose: links carry an access key and must not "
+        "appear in shell history.",
+    )
     source.add_argument("--csv", help="Path to a CSV already on disk")
-    parser.add_argument("--member", default="odi_bbb.csv", help="File to pull out of the zip")
+    parser.add_argument(
+        "--member",
+        default=None,
+        help="Only for a whole-folder zip URL: which file to extract from the archive",
+    )
     parser.add_argument("--out", required=True, help="Destination slice path")
     parser.add_argument("--matches", type=int, default=None, help="Cap on matches kept")
     parser.add_argument(
         "--max-bytes",
         type=int,
         default=60_000_000,
-        help="How much of the zip stream to read (default 60 MB)",
+        help="How much of the stream to read (default 60 MB)",
     )
     args = parser.parse_args()
 
-    if args.dropbox_url:
-        url = args.dropbox_url.replace("dl=0", "dl=1")
+    if args.url_env:
+        if load_dotenv is not None:
+            load_dotenv()
+        url = os.getenv(args.url_env)
+        if not url:
+            raise SystemExit(
+                f"{args.url_env} is not set. Add it to .env (which is gitignored) — "
+                "do not pass the URL on the command line."
+            )
+        url = url.replace("dl=0", "dl=1")
         if "dl=" not in url:
             url += ("&" if "?" in url else "?") + "dl=1"
-        print(f"Streaming up to {args.max_bytes:,} bytes for {args.member}...")
-        text = stream_member_from_zip(url, args.member, args.max_bytes)
+
+        print(f"Reading up to {args.max_bytes:,} bytes from ${args.url_env}...")
+        if args.member:
+            text = stream_member_from_zip(url, args.member, args.max_bytes)
+        else:
+            text = read_leading_bytes(url, args.max_bytes)
     else:
         text = Path(args.csv).read_text(encoding="utf-8", errors="replace")
 
