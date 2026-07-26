@@ -15,18 +15,6 @@
         "strike_rate": 154.7
       },
       {
-        "average": 34.66,
-        "balls_faced": 909,
-        "batter": "Yashasvi Jaiswal",
-        "dismissals": 41,
-        "dots": 342,
-        "fours": 166,
-        "innings_count": 45,
-        "runs": 1421,
-        "sixes": 62,
-        "strike_rate": 156.33
-      },
-      {
         "average": 34.36,
         "balls_faced": 885,
         "batter": "Prabhsimran Singh",
@@ -39,16 +27,16 @@
         "strike_rate": 163.05
       },
       {
-        "average": 48.95,
-        "balls_faced": 1316,
-        "batter": "Sai Sudharsan",
+        "average": 34.66,
+        "balls_faced": 909,
+        "batter": "Yashasvi Jaiswal",
         "dismissals": 41,
-        "dots": 380,
-        "fours": 211,
-        "innings_count": 44,
-        "runs": 2007,
-        "sixes": 68,
-        "strike_rate": 152.51
+        "dots": 342,
+        "fours": 166,
+        "innings_count": 45,
+        "runs": 1421,
+        "sixes": 62,
+        "strike_rate": 156.33
       },
       {
         "average": 36.24,
@@ -61,6 +49,18 @@
         "runs": 1486,
         "sixes": 113,
         "strike_rate": 201.08
+      },
+      {
+        "average": 48.95,
+        "balls_faced": 1316,
+        "batter": "Sai Sudharsan",
+        "dismissals": 41,
+        "dots": 380,
+        "fours": 211,
+        "innings_count": 44,
+        "runs": 2007,
+        "sixes": 68,
+        "strike_rate": 152.51
       },
       {
         "average": 48.43,
@@ -99,16 +99,16 @@
         "strike_rate": 156.54
       },
       {
-        "average": 32.95,
-        "balls_faced": 767,
-        "batter": "Travis Head",
-        "dismissals": 41,
-        "dots": 279,
-        "fours": 160,
+        "average": 33.47,
+        "balls_faced": 777,
+        "batter": "Ishan Kishan",
+        "dismissals": 38,
+        "dots": 242,
+        "fours": 128,
         "innings_count": 42,
-        "runs": 1351,
-        "sixes": 70,
-        "strike_rate": 176.14
+        "runs": 1272,
+        "sixes": 63,
+        "strike_rate": 163.71
       },
       {
         "average": 39.28,
@@ -135,40 +135,16 @@
         "strike_rate": 156.25
       },
       {
-        "average": 33.47,
-        "balls_faced": 777,
-        "batter": "Ishan Kishan",
-        "dismissals": 38,
-        "dots": 242,
-        "fours": 128,
+        "average": 32.95,
+        "balls_faced": 767,
+        "batter": "Travis Head",
+        "dismissals": 41,
+        "dots": 279,
+        "fours": 160,
         "innings_count": 42,
-        "runs": 1272,
-        "sixes": 63,
-        "strike_rate": 163.71
-      },
-      {
-        "average": 32.65,
-        "balls_faced": 700,
-        "batter": "Rajat Patidar",
-        "dismissals": 37,
-        "dots": 202,
-        "fours": 76,
-        "innings_count": 41,
-        "runs": 1208,
-        "sixes": 89,
-        "strike_rate": 172.57
-      },
-      {
-        "average": 45.89,
-        "balls_faced": 1082,
-        "batter": "KL Rahul",
-        "dismissals": 36,
-        "dots": 317,
-        "fours": 153,
-        "innings_count": 41,
-        "runs": 1652,
-        "sixes": 71,
-        "strike_rate": 152.68
+        "runs": 1351,
+        "sixes": 70,
+        "strike_rate": 176.14
       },
       {
         "average": 44.47,
@@ -183,16 +159,40 @@
         "strike_rate": 153.01
       },
       {
-        "average": 39.15,
-        "balls_faced": 816,
-        "batter": "Suryakumar Yadav",
-        "dismissals": 34,
-        "dots": 269,
-        "fours": 133,
+        "average": 45.89,
+        "balls_faced": 1082,
+        "batter": "KL Rahul",
+        "dismissals": 36,
+        "dots": 317,
+        "fours": 153,
+        "innings_count": 41,
+        "runs": 1652,
+        "sixes": 71,
+        "strike_rate": 152.68
+      },
+      {
+        "average": 32.65,
+        "balls_faced": 700,
+        "batter": "Rajat Patidar",
+        "dismissals": 37,
+        "dots": 202,
+        "fours": 76,
+        "innings_count": 41,
+        "runs": 1208,
+        "sixes": 89,
+        "strike_rate": 172.57
+      },
+      {
+        "average": 34.77,
+        "balls_faced": 687,
+        "batter": "Dhruv Jurel",
+        "dismissals": 30,
+        "dots": 214,
+        "fours": 87,
         "innings_count": 40,
-        "runs": 1331,
-        "sixes": 66,
-        "strike_rate": 163.11
+        "runs": 1043,
+        "sixes": 53,
+        "strike_rate": 151.82
       },
       {
         "average": 35.28,
@@ -207,16 +207,16 @@
         "strike_rate": 149.56
       },
       {
-        "average": 34.77,
-        "balls_faced": 687,
-        "batter": "Dhruv Jurel",
-        "dismissals": 30,
-        "dots": 214,
-        "fours": 87,
+        "average": 39.15,
+        "balls_faced": 816,
+        "batter": "Suryakumar Yadav",
+        "dismissals": 34,
+        "dots": 269,
+        "fours": 133,
         "innings_count": 40,
-        "runs": 1043,
-        "sixes": 53,
-        "strike_rate": 151.82
+        "runs": 1331,
+        "sixes": 66,
+        "strike_rate": 163.11
       },
       {
         "average": 34.94,
@@ -255,18 +255,6 @@
         "strike_rate": 154.81
       },
       {
-        "average": 30.94,
-        "balls_faced": 738,
-        "batter": "Rohit Sharma",
-        "dismissals": 36,
-        "dots": 297,
-        "fours": 107,
-        "innings_count": 38,
-        "runs": 1114,
-        "sixes": 66,
-        "strike_rate": 150.95
-      },
-      {
         "average": 27.63,
         "balls_faced": 708,
         "batter": "Ajinkya Rahane",
@@ -277,6 +265,18 @@
         "runs": 967,
         "sixes": 45,
         "strike_rate": 136.58
+      },
+      {
+        "average": 30.94,
+        "balls_faced": 738,
+        "batter": "Rohit Sharma",
+        "dismissals": 36,
+        "dots": 297,
+        "fours": 107,
+        "innings_count": 38,
+        "runs": 1114,
+        "sixes": 66,
+        "strike_rate": 150.95
       },
       {
         "average": 41.71,
@@ -315,6 +315,30 @@
         "strike_rate": 137.62
       },
       {
+        "average": 29.87,
+        "balls_faced": 643,
+        "batter": "Aiden Markram",
+        "dismissals": 30,
+        "dots": 205,
+        "fours": 76,
+        "innings_count": 35,
+        "runs": 896,
+        "sixes": 37,
+        "strike_rate": 139.35
+      },
+      {
+        "average": 21.53,
+        "balls_faced": 437,
+        "batter": "Hardik Pandya",
+        "dismissals": 30,
+        "dots": 145,
+        "fours": 56,
+        "innings_count": 35,
+        "runs": 646,
+        "sixes": 31,
+        "strike_rate": 147.83
+      },
+      {
         "average": 20.89,
         "balls_faced": 385,
         "batter": "Jitesh Sharma",
@@ -325,18 +349,6 @@
         "runs": 564,
         "sixes": 35,
         "strike_rate": 146.49
-      },
-      {
-        "average": 36.65,
-        "balls_faced": 415,
-        "batter": "Tim David",
-        "dismissals": 20,
-        "dots": 130,
-        "fours": 52,
-        "innings_count": 35,
-        "runs": 733,
-        "sixes": 52,
-        "strike_rate": 176.63
       },
       {
         "average": 29.15,
@@ -363,40 +375,16 @@
         "strike_rate": 149.06
       },
       {
-        "average": 21.53,
-        "balls_faced": 437,
-        "batter": "Hardik Pandya",
-        "dismissals": 30,
-        "dots": 145,
-        "fours": 56,
+        "average": 36.65,
+        "balls_faced": 415,
+        "batter": "Tim David",
+        "dismissals": 20,
+        "dots": 130,
+        "fours": 52,
         "innings_count": 35,
-        "runs": 646,
-        "sixes": 31,
-        "strike_rate": 147.83
-      },
-      {
-        "average": 29.87,
-        "balls_faced": 643,
-        "batter": "Aiden Markram",
-        "dismissals": 30,
-        "dots": 205,
-        "fours": 76,
-        "innings_count": 35,
-        "runs": 896,
-        "sixes": 37,
-        "strike_rate": 139.35
-      },
-      {
-        "average": 31.83,
-        "balls_faced": 469,
-        "batter": "Marcus Stoinis",
-        "dismissals": 24,
-        "dots": 156,
-        "fours": 70,
-        "innings_count": 34,
-        "runs": 764,
-        "sixes": 42,
-        "strike_rate": 162.9
+        "runs": 733,
+        "sixes": 52,
+        "strike_rate": 176.63
       },
       {
         "average": 23.96,
@@ -411,28 +399,16 @@
         "strike_rate": 140.38
       },
       {
-        "average": 37.21,
-        "balls_faced": 767,
-        "batter": "Ruturaj Gaikwad",
-        "dismissals": 28,
-        "dots": 262,
-        "fours": 101,
-        "innings_count": 33,
-        "runs": 1042,
-        "sixes": 34,
-        "strike_rate": 135.85
-      },
-      {
-        "average": 31.86,
-        "balls_faced": 445,
-        "batter": "Rinku Singh",
-        "dismissals": 21,
-        "dots": 140,
-        "fours": 60,
-        "innings_count": 33,
-        "runs": 669,
-        "sixes": 29,
-        "strike_rate": 150.34
+        "average": 31.83,
+        "balls_faced": 469,
+        "batter": "Marcus Stoinis",
+        "dismissals": 24,
+        "dots": 156,
+        "fours": 70,
+        "innings_count": 34,
+        "runs": 764,
+        "sixes": 42,
+        "strike_rate": 162.9
       },
       {
         "average": 27.82,
@@ -459,6 +435,30 @@
         "strike_rate": 163.97
       },
       {
+        "average": 31.86,
+        "balls_faced": 445,
+        "batter": "Rinku Singh",
+        "dismissals": 21,
+        "dots": 140,
+        "fours": 60,
+        "innings_count": 33,
+        "runs": 669,
+        "sixes": 29,
+        "strike_rate": 150.34
+      },
+      {
+        "average": 37.21,
+        "balls_faced": 767,
+        "batter": "Ruturaj Gaikwad",
+        "dismissals": 28,
+        "dots": 262,
+        "fours": 101,
+        "innings_count": 33,
+        "runs": 1042,
+        "sixes": 34,
+        "strike_rate": 135.85
+      },
+      {
         "average": 24.97,
         "balls_faced": 492,
         "batter": "Devdutt Padikkal",
@@ -469,6 +469,18 @@
         "runs": 749,
         "sixes": 38,
         "strike_rate": 152.24
+      },
+      {
+        "average": 20.09,
+        "balls_faced": 289,
+        "batter": "Abdul Samad",
+        "dismissals": 23,
+        "dots": 93,
+        "fours": 33,
+        "innings_count": 31,
+        "runs": 462,
+        "sixes": 30,
+        "strike_rate": 159.86
       },
       {
         "average": 35.86,
@@ -495,30 +507,6 @@
         "strike_rate": 192.99
       },
       {
-        "average": 20.09,
-        "balls_faced": 289,
-        "batter": "Abdul Samad",
-        "dismissals": 23,
-        "dots": 93,
-        "fours": 33,
-        "innings_count": 31,
-        "runs": 462,
-        "sixes": 30,
-        "strike_rate": 159.86
-      },
-      {
-        "average": 28.63,
-        "balls_faced": 446,
-        "batter": "Sunil Narine",
-        "dismissals": 27,
-        "dots": 198,
-        "fours": 77,
-        "innings_count": 30,
-        "runs": 773,
-        "sixes": 56,
-        "strike_rate": 173.32
-      },
-      {
         "average": 36.88,
         "balls_faced": 608,
         "batter": "Angkrish Raghuvanshi",
@@ -543,16 +531,16 @@
         "strike_rate": 163.32
       },
       {
-        "average": 33.76,
-        "balls_faced": 396,
-        "batter": "David Miller",
-        "dismissals": 17,
-        "dots": 122,
-        "fours": 48,
-        "innings_count": 29,
-        "runs": 574,
-        "sixes": 26,
-        "strike_rate": 144.95
+        "average": 28.63,
+        "balls_faced": 446,
+        "batter": "Sunil Narine",
+        "dismissals": 27,
+        "dots": 198,
+        "fours": 77,
+        "innings_count": 30,
+        "runs": 773,
+        "sixes": 56,
+        "strike_rate": 173.32
       },
       {
         "average": 28.31,
@@ -565,6 +553,18 @@
         "runs": 736,
         "sixes": 26,
         "strike_rate": 147.79
+      },
+      {
+        "average": 33.76,
+        "balls_faced": 396,
+        "batter": "David Miller",
+        "dismissals": 17,
+        "dots": 122,
+        "fours": 48,
+        "innings_count": 29,
+        "runs": 574,
+        "sixes": 26,
+        "strike_rate": 144.95
       },
       {
         "average": 19.55,

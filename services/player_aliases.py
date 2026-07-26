@@ -359,7 +359,7 @@ def get_all_name_variants(names: List[str], db: Session) -> List[str]:
 def load_aliases_map(db: Session) -> Dict[str, str]:
     """
     Load all player aliases into a dict for efficient bulk lookups.
-    
+
     Returns:
         Dict mapping old_name -> new_name
     """
@@ -370,3 +370,66 @@ def load_aliases_map(db: Session) -> Dict[str, str]:
     except Exception as e:
         logger.warning(f"Error loading aliases map: {e}")
         return {}
+
+
+# =========================================================================================
+# Canonical-name SQL, for grouping
+# =========================================================================================
+# The stats tables are written by two ingest paths with different naming conventions --
+# statsProcessor.py writes Cricsheet style ("V Kohli"), sync_stats_from_dd.py writes full names
+# ("Virat Kohli") -- so the same player has rows under both. Grouping on the raw name therefore
+# splits a player in two. This CTE maps either spelling onto one canonical name so the
+# aggregation merges in SQL, where it can actually sum, rather than being relabelled afterwards.
+
+ALIAS_MAP_CTE = """
+    alias_map AS (
+        SELECT DISTINCT ON (name_key) name_key, canonical_name
+        FROM (
+            -- A canonical name maps to itself. Priority 0 so that if a name is BOTH somebody's
+            -- canonical name and somebody else's legacy form, being canonical wins.
+            SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name, 0 AS priority
+            FROM player_aliases
+            WHERE alias_name IS NOT NULL
+
+            UNION ALL
+
+            -- Legacy form maps to the canonical name, but only where the mapping is
+            -- unambiguous. 39 legacy names map to several full names and some of those are
+            -- genuinely different people -- "A Shukla" is both Arpit and Ayush Shukla -- so
+            -- collapsing them would merge two careers into one. Those are left unmapped, which
+            -- keeps them split exactly as they are today rather than confidently wrong.
+            SELECT LOWER(pa.player_name) AS name_key, pa.alias_name AS canonical_name, 1 AS priority
+            FROM player_aliases pa
+            JOIN (
+                SELECT player_name
+                FROM player_aliases
+                WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
+                GROUP BY player_name
+                HAVING COUNT(DISTINCT alias_name) = 1
+            ) unambiguous ON unambiguous.player_name = pa.player_name
+            WHERE pa.player_name IS NOT NULL AND pa.alias_name IS NOT NULL
+        ) mapped
+        -- DISTINCT ON without ORDER BY returns an arbitrary row, which would make results vary
+        -- between runs for no reason. Order so the choice is deterministic.
+        ORDER BY name_key, priority, canonical_name
+    )
+"""
+
+
+def canonical_name_sql(name_column: str, alias: str = "am") -> str:
+    """The expression to select and group by, in place of the raw name column.
+
+    Falls back to the stored name when there is no mapping -- players with no alias, and the
+    ambiguous ones we deliberately skip.
+    """
+    return f"COALESCE({alias}.canonical_name, {name_column})"
+
+
+def alias_map_join_sql(name_column: str, alias: str = "am") -> str:
+    """The join that attaches the canonical name.
+
+    LEFT JOIN against the deduplicated CTE, never against player_aliases directly: that table
+    has no uniqueness on either column, so a bare join fans out rows wherever a name has more
+    than one alias and silently double-counts every aggregate.
+    """
+    return f"LEFT JOIN alias_map {alias} ON LOWER({name_column}) = {alias}.name_key"

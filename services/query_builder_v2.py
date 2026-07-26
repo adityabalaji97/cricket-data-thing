@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import date
 from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
 from services.delivery_data_service import get_venue_aliases
+from services.player_aliases import ALIAS_MAP_CTE, alias_map_join_sql, canonical_name_sql
 from services.bowler_types import PACE_TYPES as ALL_KNOWN_PACE_TYPES, SPIN_TYPES as ALL_KNOWN_SPIN_TYPES
 import logging
 
@@ -1453,7 +1454,9 @@ def query_batting_stats_service(
         "year": "EXTRACT(YEAR FROM m.date)",
         "batting_team": "bs.batting_team",
         "bowling_team": bowling_team_expr,
-        "batter": "bs.striker",
+        # Canonical name, so a player stored under both naming conventions aggregates as one
+        # row instead of two. See services/player_aliases.ALIAS_MAP_CTE.
+        "batter": canonical_name_sql("bs.striker"),
         "innings": "bs.innings",
         "match_id": "bs.match_id",
         "match_outcome": match_outcome_sql,
@@ -1465,6 +1468,12 @@ def query_batting_stats_service(
     select_cols = [f"{grouping_columns[c]} AS {c}" for c in group_by]
     group_by_clause = ", ".join(group_cols)
     select_group_clause = ", ".join(select_cols)
+
+    # The canonical-name expression only resolves if the alias CTE and its join are in scope.
+    # Added only when a player column is actually grouped on, so other groupings pay nothing.
+    needs_alias = any("am.canonical_name" in col for col in group_cols)
+    alias_cte = f"WITH {ALIAS_MAP_CTE}" if needs_alias else ""
+    alias_join = alias_map_join_sql("bs.striker") if needs_alias else ""
 
     having_conditions = []
     if min_balls is not None:
@@ -1483,6 +1492,7 @@ def query_batting_stats_service(
     having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
 
     aggregation_query = f"""
+        {alias_cte}
         SELECT
             {select_group_clause},
             COUNT(*) AS innings_count,
@@ -1496,10 +1506,14 @@ def query_batting_stats_service(
             CASE WHEN SUM(bs.wickets) > 0 THEN SUM(bs.runs)::DECIMAL / SUM(bs.wickets) ELSE NULL END AS average
         FROM batting_stats bs
         JOIN matches m ON m.id = bs.match_id
+        {alias_join}
         {where_clause}
         GROUP BY {group_by_clause}
         {having_clause}
-        ORDER BY innings_count DESC
+        -- Group columns break ties on innings_count. Without them equally-played players come
+        -- back in whatever order the plan produces, so an unrelated change -- adding a join,
+        -- say -- silently reshuffles the leaderboard.
+        ORDER BY innings_count DESC, {group_by_clause}
         LIMIT :limit
         OFFSET :offset
     """
@@ -1522,10 +1536,12 @@ def query_batting_stats_service(
         formatted.append(payload)
 
     count_query = f"""
+        {alias_cte}
         SELECT COUNT(*) FROM (
             SELECT {group_by_clause}
             FROM batting_stats bs
             JOIN matches m ON m.id = bs.match_id
+            {alias_join}
             {where_clause}
             GROUP BY {group_by_clause}
             {having_clause}
@@ -1534,10 +1550,12 @@ def query_batting_stats_service(
     count_params = {k: v for k, v in params.items() if k not in ["limit", "offset"]}
     total_groups = db.execute(text(count_query), count_params).scalar() or 0
     innings_total_query = f"""
+        {alias_cte}
         SELECT COALESCE(SUM(innings_count), 0) FROM (
             SELECT COUNT(*) AS innings_count
             FROM batting_stats bs
             JOIN matches m ON m.id = bs.match_id
+            {alias_join}
             {where_clause}
             GROUP BY {group_by_clause}
             {having_clause}
@@ -1808,7 +1826,8 @@ def query_bowling_stats_service(
         "year": "EXTRACT(YEAR FROM m.date)",
         "batting_team": batting_team_expr,
         "bowling_team": "bs.bowling_team",
-        "bowler": "bs.bowler",
+        # Canonical name -- see the note on the batting map.
+        "bowler": canonical_name_sql("bs.bowler"),
         "innings": "bs.innings",
         "match_id": "bs.match_id",
         "match_outcome": match_outcome_sql,
@@ -1820,6 +1839,12 @@ def query_bowling_stats_service(
     select_cols = [f"{grouping_columns[c]} AS {c}" for c in group_by]
     group_by_clause = ", ".join(group_cols)
     select_group_clause = ", ".join(select_cols)
+
+    # The canonical-name expression only resolves if the alias CTE and its join are in scope.
+    # Added only when a player column is actually grouped on, so other groupings pay nothing.
+    needs_alias = any("am.canonical_name" in col for col in group_cols)
+    alias_cte = f"WITH {ALIAS_MAP_CTE}" if needs_alias else ""
+    alias_join = alias_map_join_sql("bs.bowler") if needs_alias else ""
 
     having_conditions = []
     if min_balls is not None:
@@ -1843,6 +1868,7 @@ def query_bowling_stats_service(
     having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
 
     aggregation_query = f"""
+        {alias_cte}
         SELECT
             {select_group_clause},
             COUNT(*) AS innings_count,
@@ -1857,10 +1883,14 @@ def query_bowling_stats_service(
             CASE WHEN SUM(bs.wickets) > 0 THEN (SUM(bs.overs) * 6.0)::DECIMAL / SUM(bs.wickets) ELSE NULL END AS balls_per_wicket
         FROM bowling_stats bs
         JOIN matches m ON m.id = bs.match_id
+        {alias_join}
         {where_clause}
         GROUP BY {group_by_clause}
         {having_clause}
-        ORDER BY innings_count DESC
+        -- Group columns break ties on innings_count. Without them equally-played players come
+        -- back in whatever order the plan produces, so an unrelated change -- adding a join,
+        -- say -- silently reshuffles the leaderboard.
+        ORDER BY innings_count DESC, {group_by_clause}
         LIMIT :limit
         OFFSET :offset
     """
@@ -1884,10 +1914,12 @@ def query_bowling_stats_service(
         formatted.append(payload)
 
     count_query = f"""
+        {alias_cte}
         SELECT COUNT(*) FROM (
             SELECT {group_by_clause}
             FROM bowling_stats bs
             JOIN matches m ON m.id = bs.match_id
+            {alias_join}
             {where_clause}
             GROUP BY {group_by_clause}
             {having_clause}
@@ -1896,10 +1928,12 @@ def query_bowling_stats_service(
     count_params = {k: v for k, v in params.items() if k not in ["limit", "offset"]}
     total_groups = db.execute(text(count_query), count_params).scalar() or 0
     innings_total_query = f"""
+        {alias_cte}
         SELECT COALESCE(SUM(innings_count), 0) FROM (
             SELECT COUNT(*) AS innings_count
             FROM bowling_stats bs
             JOIN matches m ON m.id = bs.match_id
+            {alias_join}
             {where_clause}
             GROUP BY {group_by_clause}
             {having_clause}
