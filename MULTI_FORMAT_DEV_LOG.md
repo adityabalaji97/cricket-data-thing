@@ -36,12 +36,10 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
   2015-2022), `odi_slice.csv` (349, 2000-2007), `test_slice.csv` (85, 2020-2025).
 - **Goldens:** 13 endpoints in `scripts/goldens/local/`, `check` passes clean (re-captured in 0.2
   after a deterministic-ordering fix; see that entry).
-- **Test data:** `data/slices/odi_slice.csv` — 349 complete ODI matches, 149,599 balls, 2000-01-09
-  to 2007-03-23 (gitignored; regenerate with `scripts/dev/make_csv_slice.py`).
-  **`t20_bbb.csv` is still not on this machine** — chunk 0.4's T20 no-regression check needs it
-  (GitHub secret `DROPBOX_CSV_URL`), or export one from `hindsight_local` instead.
-- **Blocked on / next action:** chunk 0.4 — pipeline format-awareness. Read the ODI recon entry
-  below first: two of its findings change what 0.4 has to do.
+- **Local data loaded:** men's T20 (3,926 matches / 770k balls) **and** men's ODI (257 matches /
+  149,599 balls, 2000-2007), with derived batting and bowling stats for both.
+- **Blocked on / next action:** nothing blocking. Start **0.7** (frontend foundation). Two known
+  follow-ups are listed above: the `/columns` cache partition, and the stored-wickets backfill.
 
 ---
 
