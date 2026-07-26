@@ -52,7 +52,7 @@ def affected_match_ids(session, fmt=None, limit=None):
     """Matches that have stored stats derived from delivery_details."""
     clauses = ["bs.match_id IS NOT NULL"]
     params = {}
-    if fmt:
+    if fmt and has_format_column(session):
         clauses.append("dd.format = :fmt")
         params["fmt"] = fmt
 
@@ -68,18 +68,40 @@ def affected_match_ids(session, fmt=None, limit=None):
     return [row[0] for row in session.execute(text(query), params).fetchall()]
 
 
+def has_format_column(session) -> bool:
+    """Whether migration 001 has been applied to this database.
+
+    The repair is independent of the multi-format work and must be runnable on a database that
+    has not had those columns added yet, so the report groups by format only where it exists.
+    """
+    return bool(
+        session.execute(
+            text(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'batting_stats' AND column_name = 'format'
+                """
+            )
+        ).scalar()
+    )
+
+
 def report(session) -> None:
     """Show how bad the stored data is, before and after."""
+    grouped = has_format_column(session)
+    group_col = "format" if grouped else "'all'::text AS format"
+    group_by = "GROUP BY format ORDER BY format" if grouped else ""
+
     rows = session.execute(
         text(
-            """
-            SELECT format,
+            f"""
+            SELECT {group_col},
                    count(*) AS total,
                    count(*) FILTER (WHERE wickets > 1) AS impossible,
                    round(avg(wickets)::numeric, 3) AS avg_wickets,
                    max(wickets) AS max_wickets
             FROM batting_stats
-            GROUP BY format ORDER BY format
+            {group_by}
             """
         )
     ).fetchall()

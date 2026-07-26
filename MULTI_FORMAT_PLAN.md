@@ -25,6 +25,8 @@ explicit promotion steps.
 | **0.6** | Query builder backend format param | [x] 2026-07-26 (`/columns` scoping deferred) |
 | **0.7** | Frontend foundation: theme, FormatContext, API client | [ ] |
 | **0.8** | Sunset gating + NavMenu consolidation | [ ] |
+| **0.9** | Production stats backfill (corrupt wicket counts) | [~] 2026-07-26 in progress |
+| **0.10** | Player-name canonicalisation at grouping | [x] 2026-07-26 |
 | **A1** | ODI backfill load | [ ] |
 | **A2** | Workflow matrix (t20 + odi daily) | [ ] |
 | **A3** | Query builder ODI (frontend) | [ ] |
@@ -263,6 +265,21 @@ survives reload.
 
 **0.8 Sunset gating + NavMenu** — pin sunset endpoints to `format='T20' AND gender='male'`; extract
 one `<NavMenu>`. *Verify:* goldens pass; grep shows no un-pinned stats aggregate.
+
+**0.9 Production stats backfill.** Two counting bugs in `sync_stats_from_dd.py` corrupted every
+row it wrote: string booleans (`'false'` is truthy in Python) made **every ball count as a
+wicket**, and wides were counted as balls faced. 52,070 of 185,050 production `batting_stats`
+rows carried an impossible `wickets > 1`, which is the divisor for batting average — the live API
+reported 2.61 for Sikandar Raza. Repaired with `scripts/backfill_recompute_stats.py`.
+*Note:* this needed migration 001 on production, which was therefore applied ahead of A1.
+Bowling was unaffected — its dismissal-type filter sidestepped the bug.
+
+**0.10 Player-name canonicalisation.** The stats tables mix two naming conventions from the two
+ingest paths, so 2,265 aliased players had rows under both names and grouping split them in two.
+`ALIAS_MAP_CTE` in `services/player_aliases.py` collapses them, following the fan-out-safe
+pattern from `services/matchups.py`. The 39 legacy names that map to several different full
+names are deliberately excluded — `DJ Bravo` maps to both Darren and Dwayne — and listed by
+`scripts/report_ambiguous_aliases.py`.
 
 ### Phase A — Men's ODIs
 

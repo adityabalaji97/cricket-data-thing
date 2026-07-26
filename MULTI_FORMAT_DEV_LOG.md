@@ -32,7 +32,9 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
   Phase A ODI backfill (chunk A1), since nothing before that needs the extra space.
 - **Migrations applied — local:** `001_multi_format_columns.sql` ✅,
   `002_delivery_details_source_columns.sql` ✅
-- **Migrations applied — prod:** **none** — `001` and `002` are both still pending on production
+- **Migrations applied — prod:** `001_multi_format_columns.sql` ✅ (2026-07-26, 12s, all 2.33M
+  rows stamped T20/male; live app verified healthy after). `002` still pending.
+  Applied ahead of A1 because chunk 0.9's backfill needs those columns.
 - **Dataset URLs:** all four are in `.env` (gitignored) as `DROPBOX_T20_URL`, `DROPBOX_ODI_URL`,
   `DROPBOX_WT20_URL`, `DROPBOX_TEST_URL`. **This repo is public — never commit these values**, and
   pull slices with `make_csv_slice.py --url-env NAME` so no link lands in shell history.
@@ -48,6 +50,33 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-26 — Chunks 0.9 and 0.10 — Claude
+
+**0.10 player-name canonicalisation — COMPLETE (local).** `ALIAS_MAP_CTE` and
+`UNAMBIGUOUS_ALIASES` in `services/player_aliases.py`; applied to the batting and bowling
+stats-mode grouping, and the six previously-bare `player_aliases` joins behind the
+`non_striker`/`partnership` groupings now go through the deduplicated source.
+
+* Kohli returns as **one** row (3,660 runs, average 46.92) where there were two.
+* Grouped totals match the raw table exactly — 1,175,427 runs over 67,301 rows collapsing to
+  5,456 groups — proving the join does not fan out.
+* **39 ambiguous legacy names are deliberately excluded.** `scripts/report_ambiguous_aliases.py`
+  classifies them: 25 are genuinely different players, including **`DJ Bravo` → Darren *and*
+  Dwayne Bravo**, `MW Short` → D'Arcy and Matthew Short, `RK Singh` → Rinku and Rupesh Singh.
+  Collapsing those would have merged real careers and shown it without any hint of a problem.
+* Fixed an unstable sort found on the way: `ORDER BY innings_count DESC` had no tiebreaker, so
+  merely adding a join reshuffled the leaderboard. Same class as the scorecard bug in 0.2.
+
+**0.9 production backfill — IN PROGRESS.** Backup `b002` captured first (the only prior backup
+was from 2025-05-24, 25 MB — not a usable rollback). Migration 001 applied to production as a
+newly-discovered prerequisite. A 50-match batch behaved correctly (455 rows repaired), then the
+full run over 10,218 matches started.
+
+**Note for whoever picks this up:** the backfill is network-bound against RDS — roughly 1.5% CPU,
+all round-trip latency — so it takes hours rather than minutes. It commits every 200 matches and
+is safely resumable: re-running simply recomputes matches again, since it deletes and rebuilds
+per match rather than appending.
 
 ### 2026-07-26 — Chunk 0.6 — Claude — query builder is format-aware
 
