@@ -325,6 +325,14 @@ the point; T20 fantasy values untouched.
 
 ### Phase B — Women's T20
 
+**⚠️ Before B1: the pipeline's middle steps are not gender-aware.**
+`scripts/update_players_from_new_data_FIXED.py`, `backfill_advanced_data.py` and
+`add_left_right_columns.py` contain no gender handling at all. For men's ODI that is harmless —
+`players.gender` defaults to `'male'`, which is correct. For women's T20 it means players would
+be created as **male**: not a crash, since `UNIQUE(name, gender)` still accepts them, just
+silently wrong, and it defeats the name-collision handling migration 001 exists for.
+Make `update_players` set gender from the load flags before running B1.
+
 **B1 WT20 load + collisions** — audit cross-gender name collisions before loading; `UNIQUE(name,
 gender)`; load `--format T20 --gender female`; women's ELO stream.
 *Verify:* the cross-gender contamination query returns 0 rows; spot-check a WBBL and a Women's T20
