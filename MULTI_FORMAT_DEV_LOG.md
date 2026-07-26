@@ -9,6 +9,41 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
+> ### ☀️ START HERE IN THE MORNING (2026-07-27)
+>
+> **1. Check the ODI load finished.** It was inserting when the session ended.
+> ```
+> pgrep -f load_delivery_details_full          # empty = finished
+> heroku pg:psql -a cricket-data-thing -c "SELECT format, count(*) FROM delivery_details GROUP BY 1;"
+> ```
+> Expect ~1,647,737 ODI rows. If the process died early, re-run it — it skips duplicates:
+> `python3 scripts/load_delivery_details_full.py --csv data/odi_bbb.csv --format ODI --gender male`
+>
+> **2. Run the follow-on steps** (none of these happen automatically):
+> ```
+> python3 sync_from_delivery_details.py --sync-matches --confirm
+> python3 sync_from_delivery_details.py --sync-stats  --confirm
+> python3 elo_update_service.py --calculate-missing
+> python3 scripts/refresh_query_builder_metadata.py
+> ```
+>
+> **3. Then push and deploy** (deliberately left for the morning):
+> ```
+> git push -u origin multi-format      # 40+ commits, never pushed
+> # merge to main, then: git push heroku main
+> ```
+>
+> **4. ⚠️ ONLY AFTER MERGING TO MAIN, update the GitHub Actions secret:**
+> ```
+> gh secret set DATABASE_URL -R adityabalaji97/cricket-data-thing \
+>   -b "$(heroku config:get DATABASE_URL -a cricket-data-thing)"
+> ```
+> The Heroku plan change rotated the database credentials and **GitHub was not updated**, so the
+> nightly refresh is currently failing on authentication. Do not fix it before merging: the
+> workflow runs from `main`, which still has the old `sync_stats_from_dd.py` with the wicket bug,
+> so a successful run would write corrupt stats again and partially undo the backfill.
+
+
 - **Active chunk:** **Phase 0 complete, plus A3, A5, A9 and most of A11.** ODIs are usable in the query
   builder UI and render correct scorecards, all against local data. Next is **Phase A**, which opens with
   the Heroku essential-2 upgrade and the real ODI backfill (A1), then the workflow matrix (A2).
