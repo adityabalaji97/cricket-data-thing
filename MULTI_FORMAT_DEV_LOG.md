@@ -80,8 +80,22 @@ the string `'false'` is truthy in Python — so **every ball counted as a wicket
 
 A second, subtler error sat on top: a wicket falling on a ball a batter faced is not necessarily
 *that batter's* wicket, because the non-striker can be run out at the bowler's end. `bat_out`
-distinguishes the two and agrees exactly with `p_out = p_bat` (3,738 striker dismissals vs 3,939
-total wickets in the ODI slice).
+distinguishes the two (3,738 striker dismissals vs 3,939 total wickets in the ODI slice).
+
+**Two traps for anyone touching this code:**
+
+1. **Do not switch to `p_out == p_bat`.** It looks equivalent and agrees with `bat_out` for ODIs
+   (3,738) and Tests (2,802), but it is **broken in the T20 feed** — the two id columns never
+   match on any of the 7,961 T20 wicket balls in the sample. Using it would credit every T20
+   batter with zero dismissals. `bat_out` is the only signal that works across all three feeds.
+2. **`bat_out` is not a dismissal flag on its own.** Outside wicket balls it is `'true'` on almost
+   every delivery in the ODI and Test feeds (149,398 of 149,599 ODI rows). It only carries meaning
+   in conjunction with `out`.
+
+**Casing differs between the two sides of the pipeline:** the source CSVs write Python-style
+`'True'`/`'False'`, the loaded table holds lowercase `'true'`/`'false'`. So a bare `== 'true'`
+works against the database and silently matches nothing against a CSV — the comparison must be
+case-insensitive.
 
 **Blast radius in the stored data** (`batting_stats.wickets` can only ever be 0 or 1):
 
