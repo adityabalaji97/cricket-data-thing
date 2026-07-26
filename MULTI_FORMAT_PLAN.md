@@ -25,7 +25,7 @@ explicit promotion steps.
 | **0.6** | Query builder backend format param | [x] 2026-07-26 (`/columns` scoping deferred) |
 | **0.7** | Frontend foundation: theme, FormatContext, API client | [ ] |
 | **0.8** | Sunset gating + NavMenu consolidation | [ ] |
-| **0.9** | Production stats backfill (corrupt wicket counts) | [~] 2026-07-26 in progress |
+| **0.9** | Production stats backfill (corrupt wicket counts) | [x] 2026-07-26 (prod) |
 | **0.10** | Player-name canonicalisation at grouping | [x] 2026-07-26 |
 | **A1** | ODI backfill load | [ ] |
 | **A2** | Workflow matrix (t20 + odi daily) | [ ] |

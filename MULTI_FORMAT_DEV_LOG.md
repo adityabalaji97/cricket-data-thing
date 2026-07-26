@@ -20,10 +20,8 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
   - The corrupted stats are repaired by `scripts/backfill_recompute_stats.py`. Locally this took
     impossible wicket counts from 21,905 to 19 and batting averages from absurd (Sikandar Raza
     2.61) to correct (Kohli 57.58, top of the list).
-- ⚠️ **Still to do on PRODUCTION:** the backfill has only been run against `hindsight_local`.
-  Production still holds the corrupt rows, and its batting averages in the query builder's
-  `batting_stats` mode are visibly wrong today. Run `scripts/backfill_recompute_stats.py`
-  there — after a `heroku pg:backups:capture` — as part of the deploy.
+- ✅ **Production backfill DONE** (2026-07-26). Corrupt rows 52,070 → 74 (0.04%, source-data
+  anomalies); live batting averages verified correct. Backup `b002` predates the change.
 - **Branch:** `multi-format` (branched from `main` @ `29b61c1`)
 - **Local DB:** `hindsight_local` on localhost:5432 (PG14 server), 644 MB subset of prod, healthy.
   Rebuild any time with `scripts/dev/setup_local_db.sh`.
@@ -68,10 +66,26 @@ stats-mode grouping, and the six previously-bare `player_aliases` joins behind t
 * Fixed an unstable sort found on the way: `ORDER BY innings_count DESC` had no tiebreaker, so
   merely adding a join reshuffled the leaderboard. Same class as the scorecard bug in 0.2.
 
-**0.9 production backfill — IN PROGRESS.** Backup `b002` captured first (the only prior backup
+**0.9 production backfill — COMPLETE.** Backup `b002` captured first (the only prior backup
 was from 2025-05-24, 25 MB — not a usable rollback). Migration 001 applied to production as a
 newly-discovered prerequisite. A 50-match batch behaved correctly (455 rows repaired), then the
-full run over 10,218 matches started.
+full run completed over all 10,219 matches in about 2h20m at ~1.2 matches/sec (network-bound
+against RDS, not CPU).
+
+**Result on production:**
+
+| | Before | After |
+|---|---|---|
+| Impossible wicket counts | 52,070 of 185,050 (28%) | **74 of 182,062 (0.04%)** |
+| Average wickets per batting innings | 4.876 | **0.767** |
+| Maximum | 80 | **3** |
+
+The 74 survivors are source-data anomalies — the feed flags the same batter dismissed more than
+once in one innings — not a code fault, and the same pattern seen locally. Integrity is clean:
+zero orphans and zero half-written matches.
+
+**Live endpoints confirmed fixed:** batting averages now read Pooran 38.17, de Kock 28.26,
+Sikandar Raza 26.09 (was **2.61**); team phase averages read 32.44 and 20.26 (was **4.22**).
 
 **Note for whoever picks this up:** the backfill is network-bound against RDS — roughly 1.5% CPU,
 all round-trip latency — so it takes hours rather than minutes. Run it **detached** (`nohup`);
