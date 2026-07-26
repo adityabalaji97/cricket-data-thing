@@ -487,6 +487,8 @@ def get_legacy_grouping_columns_map():
 
         # Innings/Phase
         "innings": "d.innings",
+        # Legacy `deliveries` holds men's T20 before 2015 and nothing else, so the T20 phase
+        # split is correct here by construction and needs no format lookup.
         "phase": "CASE WHEN d.over < 6 THEN 'powerplay' WHEN d.over < 15 THEN 'middle' ELSE 'death' END",
         # Over is stored on legacy deliveries; the nth-ball variants are
         # delivery_details-only (see ADVANCED_COLUMNS — they force use_new=True).
@@ -1967,14 +1969,16 @@ def query_deliveries_service(
     db,
     ball_aggregation: str = "snapshot",
     day_or_night: Optional[str] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ):
     """
     Main service function to query cricket delivery data with flexible filtering and grouping.
-    
-    Routes queries to appropriate tables based on date range and columns used:
-    - delivery_details: 2015+ data with advanced columns (line, length, shot, etc.)
-    - deliveries: Pre-2015 data with basic columns
-    
+
+    Routes queries to appropriate tables based on format, date range and columns used:
+    - delivery_details: every format; the only table for anything that is not men's T20
+    - deliveries: men's T20 before 2015 only
+
     For queries spanning both date ranges, results are merged with player name normalization.
     """
     try:
@@ -2088,7 +2092,9 @@ def query_deliveries_service(
             start_date=start_date,
             end_date=end_date,
             group_by=group_by or [],
-            filters_used=filters_for_routing
+            filters_used=filters_for_routing,
+            fmt=fmt,
+            gender=gender,
         )
         
         logger.info(f"Query routing: use_new={routing['use_new']}, use_legacy={routing['use_legacy']}, warnings={routing['warnings']}")
@@ -2192,6 +2198,8 @@ def query_deliveries_service(
                 base_params=new_params,
                 db=db,
                 day_or_night=day_or_night,
+                fmt=fmt,
+                gender=gender,
             )
             
             # Get total balls from new table
@@ -2217,6 +2225,7 @@ def query_deliveries_service(
                     has_batter_filters, show_summary_rows, join_matches=join_new_matches,
                     min_wickets=min_wickets, max_wickets=max_wickets,
                     ball_aggregation=ball_aggregation,
+                    fmt=fmt, gender=gender,
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_groups']
@@ -2962,8 +2971,14 @@ def recommend_chart_for_group_by(group_by, ball_aggregation="snapshot"):
     return None
 
 
-def get_grouping_columns_map():
-    """Map user-friendly group_by values to delivery_details column names."""
+def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
+    """Map user-friendly group_by values to delivery_details column names.
+
+    The `phase` expression comes from format_config rather than a literal, so grouping by phase
+    means powerplay/middle/death for T20 and ODI over ranges for an ODI query. For men's T20 the
+    generated SQL is character-identical to the literal it replaced.
+    """
+    from services.analytics_common import phase_case_sql
     match_outcome_sql = get_match_outcome_sql(
         batting_team_expr="dd.team_bat",
         bowling_team_expr="dd.team_bowl",
@@ -3009,7 +3024,7 @@ def get_grouping_columns_map():
 
         # Innings/Phase
         "innings": "dd.inns",
-        "phase": "CASE WHEN dd.over < 6 THEN 'powerplay' WHEN dd.over < 15 THEN 'middle' ELSE 'death' END",
+        "phase": phase_case_sql(fmt, gender, over_column="dd.over"),
         # Delivery-position groupings.
         # `over` is a stored column. `ball_in_over` / `ball` / `ball_in_spell`
         # are computed via auxiliary CTEs (see COMPUTED_GROUP_BY_COLUMNS) and
@@ -3052,6 +3067,7 @@ def handle_grouped_query(
     has_batter_filters=False, show_summary_rows=False, join_matches=False,
     min_wickets=None, max_wickets=None,
     ball_aggregation="snapshot",
+    fmt="T20", gender="male",
 ):
     """Return aggregated cricket statistics grouped by specified columns.
 
@@ -3066,7 +3082,7 @@ def handle_grouped_query(
     the empty-result case.
     """
 
-    grouping_columns = get_grouping_columns_map()
+    grouping_columns = get_grouping_columns_map(fmt, gender)
     join_clause = "JOIN matches m ON m.id = dd.p_match" if join_matches else ""
 
     invalid_columns = [col for col in group_by if col not in grouping_columns]
@@ -3403,7 +3419,8 @@ def handle_grouped_query(
     # — so skip summaries when cumulative is active.
     if show_summary_rows and len(group_by) >= 1 and not cumulative_source:
         summary_data, percentages = generate_summary_data(
-            where_clause, params, group_by, runs_calculation, db, universe_balls, join_matches=join_matches
+            where_clause, params, group_by, runs_calculation, db, universe_balls,
+            join_matches=join_matches, fmt=fmt, gender=gender,
         )
 
     return {
@@ -3428,10 +3445,11 @@ def handle_grouped_query(
     }
 
 
-def generate_summary_data(where_clause, params, group_by, runs_calculation, db, total_balls, join_matches=False):
+def generate_summary_data(where_clause, params, group_by, runs_calculation, db, total_balls, join_matches=False,
+                          fmt="T20", gender="male"):
     """Generate hierarchical summary data for grouped queries with percent_balls."""
     try:
-        grouping_columns = get_grouping_columns_map()
+        grouping_columns = get_grouping_columns_map(fmt, gender)
         join_clause = "JOIN matches m ON m.id = dd.p_match" if join_matches else ""
         summaries = {}
         percentages = {}

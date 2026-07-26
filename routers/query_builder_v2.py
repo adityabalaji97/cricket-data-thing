@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Literal
 from datetime import date
 from database import get_session
+from format_config import effective_over_max, get_format
 from services.query_builder_v2 import query_deliveries_service
 try:
     from venue_standardization import VENUE_STANDARDIZATION
@@ -118,9 +119,11 @@ def query_deliveries(
     dismissal: List[str] = Query(default=[], description="Filter by dismissal type (caught, bowled, lbw, etc.)"),
     
     # Match context filters
-    innings: Optional[int] = Query(default=None, description="Filter by innings (1 or 2)"),
-    over_min: Optional[int] = Query(default=None, ge=0, le=19, description="Minimum over (0-19)"),
-    over_max: Optional[int] = Query(default=None, ge=0, le=19, description="Maximum over (0-19)"),
+    innings: Optional[int] = Query(default=None, description="Filter by innings (1-2, or 1-4 for Tests)"),
+    # Bounds are validated against the format below rather than pinned here: 19 is right for T20,
+    # 49 for ODIs and there is no fixed cap for Tests.
+    over_min: Optional[int] = Query(default=None, ge=0, description="Minimum over (0-indexed)"),
+    over_max: Optional[int] = Query(default=None, ge=0, description="Maximum over (0-indexed)"),
     match_outcome: List[str] = Query(default=[], description="Filter by batting-side outcome (win, loss, tie, no_result)"),
     is_chase: Optional[bool] = Query(default=None, description="Filter to chase innings only (true) or non-chase innings only (false)"),
     chase_outcome: List[str] = Query(default=[], description="Filter by batting-side chase outcome (win, loss, tie, no_result)"),
@@ -154,7 +157,15 @@ def query_deliveries(
         default="delivery",
         description="Query source mode: delivery (default), batting_stats, bowling_stats"
     ),
-    
+
+    # Format selection. Defaults to men's T20 so existing links and saved URLs keep working.
+    format: Literal["T20", "ODI", "TEST"] = Query(
+        default="T20", description="Cricket format"
+    ),
+    gender: Literal["male", "female"] = Query(
+        default="male", description="Men's or women's cricket"
+    ),
+
     db: Session = Depends(get_session)
 ):
     """
@@ -203,6 +214,24 @@ def query_deliveries(
         if not bat_hand and striker_batter_type:
             bat_hand = striker_batter_type
 
+        # Validate over and innings bounds against the requested format. A 40th over is a normal
+        # ODI filter and a nonsense T20 one, so the limits cannot live on the Query() declarations.
+        spec = get_format(format, gender)
+        over_cap = effective_over_max(spec)
+        for name, value in (("over_min", over_min), ("over_max", over_max)):
+            if value is not None and value > over_cap:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{name}={value} is out of range for {spec.label}: "
+                           f"valid overs are 0-{over_cap}.",
+                )
+        if innings is not None and not (1 <= innings <= spec.innings_count):
+            raise HTTPException(
+                status_code=422,
+                detail=f"innings={innings} is invalid for {spec.label}: "
+                       f"valid innings are 1-{spec.innings_count}.",
+            )
+
         result = query_deliveries_service(
             venue=venue,
             start_date=start_date,
@@ -247,6 +276,8 @@ def query_deliveries(
             db=db,
             ball_aggregation=ball_aggregation,
             day_or_night=day_or_night,
+            fmt=format,
+            gender=gender,
         )
         return result
     except HTTPException:
