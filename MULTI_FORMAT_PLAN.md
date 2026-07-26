@@ -35,7 +35,7 @@ explicit promotion steps.
 | **A6** | Match preview redesign 1: shell | [ ] |
 | **A7** | Match preview redesign 2: core blocks + format phases | [ ] |
 | **A8** | Match preview redesign 3: children + mobile pass | [ ] |
-| **A9** | Per-format ELO | [ ] |
+| **A9** | Per-format ELO | [x] 2026-07-26 |
 | **A10** | ODI fantasy points | [ ] |
 | **A11** | Landing page multi-format | [ ] |
 | **B1** | WT20 load + player name collisions | [ ] |

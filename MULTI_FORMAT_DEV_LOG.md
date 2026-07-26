@@ -9,7 +9,7 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** **Phase 0 complete, plus A3 and A5.** ODIs are usable in the query
+- **Active chunk:** **Phase 0 complete, plus A3, A5 and A9.** ODIs are usable in the query
   builder UI and render correct scorecards, all against local data. Next is **Phase A**, which opens with
   the Heroku essential-2 upgrade and the real ODI backfill (A1), then the workflow matrix (A2).
 - **Before A1:** production still needs migration `002`, and the branch is **unpushed and
@@ -51,6 +51,30 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-26 — Chunk A9 — Claude — per-format ELO
+
+Done before A1 deliberately: ELO was computed chronologically over every match with ratings held
+in a dict keyed by team name alone, so the moment real ODI data reached production a team's ODI
+results would have moved its T20 rating. Each `(format, gender)` is now its own pass with a fresh
+calculator, and all four selection points are scoped.
+
+**Two leaks that only measurement caught.** The first run logged "T20: 0 matches missing" and yet
+moved the T20 checksum — `get_matches_after_date` was still being called without a format, so the
+ODI pass pulled in every format's matches. The missing-count check had the mirror-image flaw: it
+counted all formats, so once one pass filled its own matches the next reported nothing to do.
+Reading the code suggested it was fine; only comparing checksums before and after showed it was not.
+
+**Verified by isolation, not absolute values:** nulling ODI ratings and recomputing leaves the T20
+checksum byte-identical, and a second pass finds nothing to do. ODI ratings are era-plausible,
+Australia top at 1683 in 2006.
+
+⚠️ **Local ELO legitimately differs from production** and always will: ratings depend on the full
+match history, and the local database is a 3,926-match subset of production's 11,500. My first
+verification attempt compared a local recompute against a production-derived checksum and
+"failed" for that reason alone. Do not treat that gap as a bug.
+
+One golden moved — the match preview's ELO line — and was re-captured.
 
 ### 2026-07-26 — Chunks A3 and A5 — Claude
 
