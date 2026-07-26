@@ -74,9 +74,20 @@ newly-discovered prerequisite. A 50-match batch behaved correctly (455 rows repa
 full run over 10,218 matches started.
 
 **Note for whoever picks this up:** the backfill is network-bound against RDS — roughly 1.5% CPU,
-all round-trip latency — so it takes hours rather than minutes. It commits every 200 matches and
-is safely resumable: re-running simply recomputes matches again, since it deletes and rebuilds
-per match rather than appending.
+all round-trip latency — so it takes hours rather than minutes. Run it **detached** (`nohup`);
+a first attempt was killed with the tool session that started it.
+
+**What the interruption cost, and what it did not.** Corrupt rows had already dropped from
+51,615 to 36,049 when it stopped, and that progress survived. An integrity sweep found **no
+half-written matches** — every match has both batting and bowling stats or neither, which is what
+the delete-and-rebuild-per-match design is meant to guarantee. One match (`1018875`, a CPL 2016
+game with only its second innings recorded) was left with its stats deleted and not rebuilt;
+recomputing it restored 4 rows and there are now zero orphans among matches that exist in the
+`matches` table. Thirty other `delivery_details` matches have no stats, but they are not in the
+`matches` table at all and predate this work.
+
+The script now commits every 50 matches instead of 200, so an interruption loses less, and takes
+`--match` for repairing a single game and `--resume-from` for continuing a partial run.
 
 ### 2026-07-26 — Chunk 0.6 — Claude — query builder is format-aware
 

@@ -115,6 +115,9 @@ def main() -> int:
     parser.add_argument("--format", dest="fmt", default=None,
                         help="Restrict to one format (T20, ODI, TEST). Default: all.")
     parser.add_argument("--limit", type=int, default=None, help="Process at most N matches")
+    parser.add_argument("--match", default=None, help="Recompute a single match id and stop")
+    parser.add_argument("--resume-from", default=None,
+                        help="Skip match ids below this one, to continue an interrupted run")
     parser.add_argument("--dry-run", action="store_true", help="Report only, write nothing")
     parser.add_argument("--confirm", action="store_true", help="Required for a full run")
     args = parser.parse_args()
@@ -128,7 +131,12 @@ def main() -> int:
         report(session)
         print()
 
-        match_ids = affected_match_ids(session, args.fmt, args.limit)
+        if args.match:
+            match_ids = [args.match]
+        else:
+            match_ids = affected_match_ids(session, args.fmt, args.limit)
+            if args.resume_from:
+                match_ids = [m for m in match_ids if str(m) >= str(args.resume_from)]
         print(f"Matches with delivery_details-derived stats: {len(match_ids):,}")
 
         if args.dry_run:
@@ -161,7 +169,7 @@ def main() -> int:
                         session.add(stats)
 
             recomputed += 1
-            if recomputed % 200 == 0:
+            if recomputed % 50 == 0:
                 session.commit()
 
         session.commit()
