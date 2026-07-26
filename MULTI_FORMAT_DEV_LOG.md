@@ -11,29 +11,36 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### ☀️ START HERE IN THE MORNING (2026-07-27)
 >
-> **1. Check the ODI load finished.** It was inserting when the session ended.
-> ```
-> pgrep -f load_delivery_details_full          # empty = finished
-> heroku pg:psql -a cricket-data-thing -c "SELECT format, count(*) FROM delivery_details GROUP BY 1;"
-> ```
-> Expect ~1,647,737 ODI rows. If the process died early, re-run it — it skips duplicates:
-> `python3 scripts/load_delivery_details_full.py --csv data/odi_bbb.csv --format ODI --gender male`
+> ### 🛑 ORDER CHANGED — DEPLOY BEFORE RESUMING THE LOAD
 >
-> **2. Run the rest of the pipeline.** I loaded with `load_delivery_details_full.py`, which is
-> only step 2 of six. The orchestrator does the rest, so use it with `--skip-load`:
-> ```
-> python3 scripts/load_delivery_details_pipeline.py \
->     --csv data/odi_bbb.csv --format ODI --gender male \
->     --skip-validation --skip-load
-> ```
-> That runs: backfill advanced columns (line/length/shot) -> populate non_striker and
-> crease_combo -> **update the players table** -> refresh query-builder metadata -> sync matches
-> and stats -> ELO.
+> The ODI load **stopped early at 500,000 of 1,647,737 rows**. The rows that landed cover
+> **2000-01-09 to 2010-03-02 — every one of them pre-2015.**
 >
-> Do **not** just run the four commands sync/stats/ELO/metadata by hand. That was my original
-> instruction and it was wrong: it skips the advanced-column backfill, the crease-combo
-> population, and `update_players` — so ODI-only players would never reach the `players` table
-> and the left-right analysis columns would stay empty for every ODI ball.
+> Production is *currently* uncontaminated, but only by accident. The deployed code on `main`
+> has no format filters; what saves it is the old 2015 date fork, which routes pre-2015 queries
+> to the legacy `deliveries` table and only reads `delivery_details` from 2015 onward. The loaded
+> ODI rows are therefore unreachable. Verified live: grouping by over returns nothing above over
+> 19 except a single pre-existing artifact.
+>
+> **Resuming the load would break that.** The remaining ~1.1M rows include ODIs from 2015 to
+> 2026, which land exactly where the live, un-pinned code reads. Those would be mixed into T20
+> results — the contamination chunk 0.4g exists to prevent, whose guards are on the branch and
+> **not deployed**.
+>
+> **So, in this order:**
+>
+> **1. Push and deploy first.**
+> ```
+> git push -u origin multi-format
+> # merge to main, then:
+> git push heroku main
+> ```
+>
+> **2. Then finish the load** (it skips duplicates, so just re-run it):
+> ```
+> python3 scripts/load_delivery_details_full.py --csv data/odi_bbb.csv --format ODI --gender male
+> ```
+> Run it detached (`nohup ... &`) — the first attempt died when its parent session ended.
 >
 > **3. Then push and deploy** (deliberately left for the morning):
 > ```
