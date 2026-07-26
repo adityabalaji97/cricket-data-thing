@@ -2417,14 +2417,21 @@ def build_where_clause(
     line, length, shot, control, wagon_zone, dismissal, innings, over_min, over_max,
     match_outcome, is_chase, chase_outcome, toss_decision,
     include_international, top_teams, group_by, base_params, db=None,
-    day_or_night=None,
+    day_or_night=None, fmt="T20", gender="male",
 ):
     """Build dynamic WHERE clause for delivery_details table.
 
     When day_or_night is provided, the caller MUST also pass join_matches=True
     to handle_grouped_query / handle_ungrouped_query so the m.* alias is in scope.
+
+    Every query is pinned to one (format, gender). Without it, a request with no leagues and
+    no include_international emits no competition predicate at all -- i.e. everything in the
+    table -- so a second format would silently join men's T20 results. Defaults to men's T20
+    until the format parameter is threaded through the router.
     """
-    conditions = ["1=1"]
+    from services.analytics_common import format_filter_sql
+
+    conditions = ["1=1", format_filter_sql("dd", fmt, gender)]
     params = base_params.copy()
 
     # Venue filter (ground in delivery_details)

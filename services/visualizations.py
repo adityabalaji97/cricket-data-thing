@@ -13,6 +13,14 @@ from services.delivery_data_service import get_venue_aliases
 
 logger = logging.getLogger(__name__)
 
+# These endpoints back T20-only pages that are being sunset rather than made format-aware, so
+# every query is pinned to men's T20. The pin is required, not cosmetic: the "All Leagues"
+# branch in each function expresses "domestic cricket" as `dd.competition != 'T20I'`, which an
+# ODI or Test row also satisfies, and when neither leagues nor include_international is set no
+# competition predicate is emitted at all.
+T20_MEN_PIN = ["dd.format = 'T20'", "dd.gender = 'male'"]
+
+
 
 def get_player_name_for_delivery_details(db: Session, player_name: str) -> List[str]:
     """
@@ -111,7 +119,7 @@ def get_wagon_wheel_data(
         logger.info(f"Resolved batter names: {batter_names}")
 
         # Build WHERE conditions
-        conditions = ["dd.bat = ANY(:batter_names)", "dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"]
+        conditions = ["dd.bat = ANY(:batter_names)", "dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"] + T20_MEN_PIN
         params = {"batter_names": batter_names}
 
         if start_date:
@@ -296,7 +304,7 @@ def get_pitch_map_data(
         logger.info(f"Resolved batter names: {batter_names}")
 
         # Build WHERE conditions (same as wagon wheel)
-        conditions = ["dd.bat = ANY(:batter_names)", "dd.line IS NOT NULL", "dd.length IS NOT NULL"]
+        conditions = ["dd.bat = ANY(:batter_names)", "dd.line IS NOT NULL", "dd.length IS NOT NULL"] + T20_MEN_PIN
         params = {"batter_names": batter_names}
 
         if start_date:
@@ -465,7 +473,7 @@ def get_bowler_wagon_wheel_data(
         logger.info(f"Resolved bowler names: {bowler_names}")
 
         # Build WHERE conditions - query by bowler (dd.bowl)
-        conditions = ["dd.bowl = ANY(:bowler_names)", "dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"]
+        conditions = ["dd.bowl = ANY(:bowler_names)", "dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"] + T20_MEN_PIN
         params = {"bowler_names": bowler_names}
 
         if start_date:
@@ -643,7 +651,7 @@ def get_bowler_pitch_map_data(
         logger.info(f"Resolved bowler names: {bowler_names}")
 
         # Build WHERE conditions
-        conditions = ["dd.bowl = ANY(:bowler_names)", "dd.line IS NOT NULL", "dd.length IS NOT NULL"]
+        conditions = ["dd.bowl = ANY(:bowler_names)", "dd.line IS NOT NULL", "dd.length IS NOT NULL"] + T20_MEN_PIN
         params = {"bowler_names": bowler_names}
 
         if start_date:
@@ -777,7 +785,7 @@ def get_venue_wagon_wheel_data(
     try:
         logger.info(f"Fetching venue wagon wheel data for {venue}")
 
-        conditions = ["dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"]
+        conditions = ["dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"] + T20_MEN_PIN
         params: Dict[str, Any] = {}
 
         if venue and venue != "All Venues":
@@ -937,7 +945,7 @@ def get_venue_pitch_map_data(
     try:
         logger.info(f"Fetching venue pitch map data for {venue}")
 
-        conditions = ["dd.line IS NOT NULL", "dd.length IS NOT NULL"]
+        conditions = ["dd.line IS NOT NULL", "dd.length IS NOT NULL"] + T20_MEN_PIN
         params: Dict[str, Any] = {}
 
         if venue and venue != "All Venues":

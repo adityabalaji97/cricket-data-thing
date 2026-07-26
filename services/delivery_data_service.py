@@ -180,10 +180,24 @@ def build_competition_filter_delivery_details(
     leagues: List[str],
     include_international: bool,
     top_teams: Optional[int],
-    params: Dict[str, Any]
+    params: Dict[str, Any],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> str:
-    """Build competition filter for delivery_details table."""
+    """Build competition filter for delivery_details table.
+
+    The returned fragment is pinned to one (format, gender). That pin is load-bearing, not
+    defensive: the "all leagues" branch below expresses "domestic cricket" as
+    ``competition != 'T20I'``, which an ODI or Test row also satisfies. Without the pin, the
+    moment a second format lands in delivery_details every caller of this function starts
+    quietly mixing formats into men's T20 aggregates.
+
+    Defaults to men's T20 so existing callers keep their current behaviour exactly; callers
+    become format-aware as they are migrated.
+    """
     from models import INTERNATIONAL_TEAMS_RANKED
+
+    from services.analytics_common import format_filter_sql
 
     competition_conditions = []
 
@@ -191,22 +205,39 @@ def build_competition_filter_delivery_details(
         # Specific leagues selected
         competition_conditions.append("dd.competition = ANY(:leagues)")
     else:
-        # All leagues selected — include all non-T20I (franchise/league) matches
-        competition_conditions.append("dd.competition != 'T20I'")
+        # All leagues selected — include all non-international (franchise/league) matches.
+        # Scoped by the format pin below, so this only ever means "domestic <format>".
+        competition_conditions.append(
+            f"dd.competition != '{_international_bucket(fmt)}'"
+        )
 
     if include_international:
+        bucket = _international_bucket(fmt)
         if top_teams:
             top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
             params["top_teams"] = top_team_list
             competition_conditions.append(
-                "(dd.competition = 'T20I' AND dd.team_bat = ANY(:top_teams) AND dd.team_bowl = ANY(:top_teams))"
+                f"(dd.competition = '{bucket}' AND dd.team_bat = ANY(:top_teams) AND dd.team_bowl = ANY(:top_teams))"
             )
         else:
-            competition_conditions.append("dd.competition = 'T20I'")
+            competition_conditions.append(f"dd.competition = '{bucket}'")
+
+    format_pin = format_filter_sql("dd", fmt, gender)
 
     if competition_conditions:
-        return "AND (" + " OR ".join(competition_conditions) + ")"
-    return "AND 1=1"
+        return f"AND {format_pin} AND (" + " OR ".join(competition_conditions) + ")"
+    return f"AND {format_pin}"
+
+
+def _international_bucket(fmt: str) -> str:
+    """The competition value that means "international" for a format.
+
+    Mirrors services/competition_normalizer.DEFAULT_BUCKET: men's T20 internationals are 'T20I',
+    ODIs are 'ODI', Tests are 'Test'.
+    """
+    from services.competition_normalizer import DEFAULT_BUCKET
+
+    return DEFAULT_BUCKET.get((fmt or "T20").upper(), "T20I")
 
 
 def get_match_totals_from_deliveries(
