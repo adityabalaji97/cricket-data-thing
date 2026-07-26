@@ -134,6 +134,7 @@ def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=No
     a third of ODI matches, varies within a single match, and the Test feed omits it entirely.
     """
     from format_config import effective_over_max, get_format
+    from services.competition_normalizer import normalize_competition
 
     spec = get_format(fmt, gender)
     over_cap = effective_over_max(spec)
@@ -175,6 +176,27 @@ def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=No
         # Stamp the format from the flags, not from the data.
         df['format'] = spec.format
         df['gender'] = spec.gender
+
+        # Normalise competition to the same bucket the matches table uses. Without this the two
+        # disagree -- matches.competition says 'ODI' while delivery_details keeps the raw series
+        # name or NULL -- and the query builder's league filter, which reads delivery_details,
+        # matches nothing for any format whose feed does not already ship normalised values.
+        # The raw series name is not lost: it stays in the `tournament` column.
+        if 'competition' in df.columns:
+            source_cols = [c for c in ('competition', 'tournament', 'trophy_name') if c in df.columns]
+            triples = df[source_cols].drop_duplicates()
+            mapping = {}
+            for row in triples.itertuples(index=False):
+                values = dict(zip(source_cols, row))
+                mapping[tuple(row)] = normalize_competition(
+                    values.get('competition'),
+                    values.get('tournament'),
+                    values.get('trophy_name'),
+                    spec.format,
+                )
+            df['competition'] = [
+                mapping[tuple(r)] for r in df[source_cols].itertuples(index=False)
+            ]
         
         # Filter out existing records if we have existing keys
         if existing_keys:

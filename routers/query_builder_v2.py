@@ -290,11 +290,18 @@ def query_deliveries(
 
 
 @router.get("/deliveries/columns")
-def get_available_columns(db: Session = Depends(get_session)):
+def get_available_columns(
+    format: Literal["T20", "ODI", "TEST"] = Query(default="T20", description="Cricket format"),
+    gender: Literal["male", "female"] = Query(default="male", description="Men's or women's"),
+    db: Session = Depends(get_session),
+):
     """
-    Get available columns for filtering and grouping.
-    
-    Reads from precomputed query_builder_metadata table for fast response.
+    Get available columns for filtering and grouping, scoped to one format.
+
+    Reads from the precomputed query_builder_metadata table. Entries are cached per
+    (format, gender) so an ODI competition never appears in the T20 dropdown; men's T20 also
+    keeps the unscoped keys, which is what the fallback below reads.
+
     Run scripts/refresh_query_builder_metadata.py to update after data loads.
     """
     try:
@@ -315,12 +322,18 @@ def get_available_columns(db: Session = Depends(get_session)):
                 "coverage": row[2]
             }
         
-        # Helper to get values with fallback
+        # Scoped entries win; the unscoped key is the men's T20 fallback, and also covers a
+        # format whose cache has not been refreshed yet.
+        scoped_suffix = "" if (format, gender) == ("T20", "male") else f":{format}:{gender}"
+
+        def _entry(key):
+            return metadata.get(f"{key}{scoped_suffix}") or metadata.get(key, {})
+
         def get_values(key):
-            return metadata.get(key, {}).get("values", [])
-        
+            return _entry(key).get("values", [])
+
         def get_coverage(key):
-            return metadata.get(key, {}).get("coverage")
+            return _entry(key).get("coverage")
         
         # Get total deliveries
         total_deliveries = get_values("total_deliveries")

@@ -29,15 +29,31 @@ def get_engine(db_url):
     return create_engine(db_url)
 
 
-def refresh_metadata(engine):
-    """Refresh all metadata from delivery_details."""
-    
-    print("Refreshing query_builder_metadata...")
+def refresh_metadata(engine, fmt="T20", gender="male"):
+    """Refresh the cached filter values for one (format, gender).
+
+    The cache backs the query builder's dropdowns and is a plain SELECT DISTINCT, so without
+    scoping it every format's competitions, venues and players would land in one list and an
+    ODI competition would appear in the T20 dropdown.
+
+    Men's T20 keeps writing the bare keys ("competitions") as well as the scoped ones, so any
+    reader that has not been updated still sees exactly what it saw before.
+    """
+    is_default = (fmt, gender) == ("T20", "male")
+
+    def scoped_key(key):
+        return key if is_default else f"{key}:{fmt}:{gender}"
+
+    format_predicate = f"AND format = '{fmt}' AND gender = '{gender}'"
+
+    print(f"Refreshing query_builder_metadata for {fmt}/{gender}...")
     start_time = datetime.now()
-    
+
     with engine.begin() as conn:
         # Get total count first
-        total_count = conn.execute(text("SELECT COUNT(*) FROM delivery_details")).scalar()
+        total_count = conn.execute(text(
+            f"SELECT COUNT(*) FROM delivery_details WHERE 1=1 {format_predicate}"
+        )).scalar()
         print(f"Total deliveries: {total_count:,}")
         
         # Define columns to cache with their coverage calculation
@@ -64,9 +80,9 @@ def refresh_metadata(engine):
             
             # Get distinct values
             values_query = text(f"""
-                SELECT DISTINCT {column} 
-                FROM delivery_details 
-                WHERE {column} IS NOT NULL 
+                SELECT DISTINCT {column}
+                FROM delivery_details
+                WHERE {column} IS NOT NULL {format_predicate}
                 ORDER BY {column}
             """)
             values = [row[0] for row in conn.execute(values_query).fetchall()]
@@ -81,7 +97,8 @@ def refresh_metadata(engine):
             coverage = None
             if needs_coverage:
                 coverage_query = text(f"""
-                    SELECT COUNT(*) FROM delivery_details WHERE {column} IS NOT NULL
+                    SELECT COUNT(*) FROM delivery_details
+                    WHERE {column} IS NOT NULL {format_predicate}
                 """)
                 non_null_count = conn.execute(coverage_query).scalar()
                 coverage = round((non_null_count / total_count * 100), 1) if total_count > 0 else 0
@@ -98,7 +115,7 @@ def refresh_metadata(engine):
             """)
             
             conn.execute(upsert_query, {
-                "key": key,
+                "key": scoped_key(key),
                 "values": json.dumps(values),
                 "coverage": coverage,
                 "distinct_count": len(values)
@@ -180,7 +197,17 @@ def main():
     if args.show_only:
         show_metadata(engine)
     else:
-        refresh_metadata(engine)
+        # Refresh every (format, gender) that actually has data, so each gets its own scoped
+        # cache entries. Driven by the data rather than a hardcoded list, so a newly loaded
+        # format is picked up without touching this script.
+        combos = engine.connect().execute(text(
+            "SELECT DISTINCT format, gender FROM delivery_details ORDER BY format, gender"
+        )).fetchall()
+        if not combos:
+            combos = [("T20", "male")]
+
+        for fmt, gender in combos:
+            refresh_metadata(engine, fmt, gender)
         show_metadata(engine)
 
 
