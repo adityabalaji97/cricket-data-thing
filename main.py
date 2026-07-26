@@ -743,7 +743,12 @@ def get_player_batting_innings(
         print(f"Fetching batting innings for player: {player_name}")
         
         # First verify if the player exists
-        player_exists = db.query(BattingStats).filter(BattingStats.striker == player_name).first()
+        player_exists = (
+            db.query(BattingStats)
+            .filter(BattingStats.striker == player_name)
+            .filter(BattingStats.format == 'T20', BattingStats.gender == 'male')
+            .first()
+        )
         if not player_exists:
             raise HTTPException(status_code=404, detail=f"No batting innings found for player {player_name}")
         
@@ -752,6 +757,7 @@ def get_player_batting_innings(
             db.query(BattingStats, Match)
             .join(Match, BattingStats.match_id == Match.id)
             .filter(BattingStats.striker == player_name)
+            .filter(BattingStats.format == 'T20', BattingStats.gender == 'male')
         )
         
         # Log the SQL query
@@ -835,6 +841,7 @@ def get_player_bowling_innings(
         db.query(BowlingStats, Match)
         .join(Match, BowlingStats.match_id == Match.id)
         .filter(BowlingStats.bowler == player_name)
+        .filter(BowlingStats.format == 'T20', BowlingStats.gender == 'male')
     )
     
     # Apply filters
@@ -894,8 +901,18 @@ def get_player_bowling_innings(
 @app.get("/players")
 def get_players(db: Session = Depends(get_session)):
     """Get list of all players who have either batting or bowling stats"""
-    batters = db.query(BattingStats.striker).distinct().all()
-    bowlers = db.query(BowlingStats.bowler).distinct().all()
+    # Men's T20 only: this list feeds the sunset player pages, and mixing formats here would
+    # offer players the rest of those pages cannot show.
+    batters = (
+        db.query(BattingStats.striker)
+        .filter(BattingStats.format == 'T20', BattingStats.gender == 'male')
+        .distinct().all()
+    )
+    bowlers = (
+        db.query(BowlingStats.bowler)
+        .filter(BowlingStats.format == 'T20', BowlingStats.gender == 'male')
+        .distinct().all()
+    )
     
     players = set([b[0] for b in batters] + [bo[0] for bo in bowlers])
     return sorted(list(players))
@@ -1000,7 +1017,7 @@ def get_venue_stats(
                 CAST(SUM(bs.runs)::float / NULLIF(COUNT(CASE WHEN bs.wickets > 0 THEN 1 END), 0) AS DECIMAL(10,2)) as average,
                 CAST((SUM(bs.runs)::float * 100 / NULLIF(SUM(bs.balls_faced), 0)) AS DECIMAL(10,2)) as strike_rate,
                 CAST(SUM(bs.balls_faced)::float / NULLIF(COUNT(CASE WHEN bs.wickets > 0 THEN 1 END), 0) AS DECIMAL(10,2)) as balls_per_dismissal
-            FROM batting_stats bs
+            FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
             JOIN match_filter mf ON bs.match_id = mf.id
             JOIN matches m ON bs.match_id = m.id
             LEFT JOIN team_mapping tm ON bs.batting_team = tm.full_name
@@ -1034,7 +1051,7 @@ def get_venue_stats(
                 CAST((SUM(CAST(bw.overs AS float)) * 6 / NULLIF(SUM(bw.wickets)::float, 0)) AS DECIMAL(10,2)) as strike_rate,
                 CAST((SUM(bw.runs_conceded)::float / NULLIF(SUM(bw.wickets), 0)) AS DECIMAL(10,2)) as average,
                 CAST((SUM(bw.runs_conceded)::float / NULLIF(SUM(CAST(bw.overs AS float)), 0)) AS DECIMAL(10,2)) as economy
-            FROM bowling_stats bw
+            FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bw
             JOIN match_filter mf ON bw.match_id = mf.id
             JOIN matches m ON bw.match_id = m.id
             LEFT JOIN team_mapping tm ON bw.bowling_team = tm.full_name
@@ -1073,7 +1090,7 @@ def get_venue_stats(
                     CAST(SUM(dd.batruns)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as average,
                     CAST((SUM(dd.batruns)::float * 100 / NULLIF(COUNT(*), 0)) AS DECIMAL(10,2)) as strike_rate,
                     CAST(COUNT(*)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as balls_per_dismissal
-                FROM delivery_details dd
+                FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
                 JOIN match_filter mf ON dd.p_match = mf.id
                 LEFT JOIN team_mapping tm ON dd.team_bat = tm.full_name
                 WHERE dd.bat IS NOT NULL
@@ -1106,7 +1123,7 @@ def get_venue_stats(
                     CAST(COUNT(*)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as strike_rate,
                     CAST(SUM(dd.score)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as average,
                     CAST((SUM(dd.score)::float * 6 / NULLIF(COUNT(*), 0)) AS DECIMAL(10,2)) as economy
-                FROM delivery_details dd
+                FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
                 JOIN match_filter mf ON dd.p_match = mf.id
                 LEFT JOIN team_mapping tm ON dd.team_bowl = tm.full_name
                 WHERE dd.bowl IS NOT NULL
@@ -1190,7 +1207,7 @@ def get_venue_stats(
                     SUM(bs.death_boundaries) as death_boundaries,
                     COUNT(DISTINCT CASE WHEN bs.death_balls > 0 THEN bs.match_id END) as death_innings,
                     CAST(SUM(bs.balls_faced)::float / COUNT(DISTINCT bs.match_id) AS DECIMAL(10,2)) as bpi
-                FROM batting_stats bs
+                FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
                 JOIN match_filter mf ON bs.match_id = mf.id
                 JOIN matches m ON bs.match_id = m.id
                 WHERE bs.batting_team != bs.striker
@@ -1202,7 +1219,7 @@ def get_venue_stats(
                     bs.striker,
                     COALESCE(tm.abbreviated_name, bs.batting_team) as team,
                     m.date
-                FROM batting_stats bs
+                FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
                 JOIN match_filter mf ON bs.match_id = mf.id
                 JOIN matches m ON bs.match_id = m.id
                 LEFT JOIN team_mapping tm ON bs.batting_team = tm.full_name
@@ -1237,7 +1254,7 @@ def get_venue_stats(
                     SUM(bs.death_dots) as death_dots,
                     SUM(bs.death_boundaries) as death_boundaries,
                     COUNT(DISTINCT CASE WHEN bs.death_balls > 0 THEN bs.match_id END) as death_innings
-                FROM batting_stats bs
+                FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
                 JOIN match_filter mf ON bs.match_id = mf.id
                 JOIN matches m ON bs.match_id = m.id
                 WHERE bs.batting_team != bs.striker
@@ -1373,9 +1390,9 @@ def get_teams(db: Session = Depends(get_session)):
     try:
         query = text("""
             SELECT DISTINCT team FROM (
-                SELECT DISTINCT batting_team as team FROM batting_stats
+                SELECT DISTINCT batting_team as team FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') batting_stats
                 UNION
-                SELECT DISTINCT bowling_team as team FROM bowling_stats
+                SELECT DISTINCT bowling_team as team FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bowling_stats
             ) teams
             WHERE team IS NOT NULL
             ORDER BY team
@@ -1665,12 +1682,12 @@ def get_team_matchups(
                     WHERE bowling_team = ANY(:team1_names)
                     UNION
                     SELECT DISTINCT bat as player
-                    FROM delivery_details dd
+                    FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
                     JOIN recent_matches rm ON dd.p_match = rm.id
                     WHERE team_bat = ANY(:team1_names)
                     UNION
                     SELECT DISTINCT bowl
-                    FROM delivery_details dd
+                    FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
                     JOIN recent_matches rm ON dd.p_match = rm.id
                     WHERE team_bowl = ANY(:team1_names)
                 ),
@@ -1686,12 +1703,12 @@ def get_team_matchups(
                     WHERE bowling_team = ANY(:team2_names)
                     UNION
                     SELECT DISTINCT bat as player
-                    FROM delivery_details dd
+                    FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
                     JOIN recent_matches rm ON dd.p_match = rm.id
                     WHERE team_bat = ANY(:team2_names)
                     UNION
                     SELECT DISTINCT bowl
-                    FROM delivery_details dd
+                    FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
                     JOIN recent_matches rm ON dd.p_match = rm.id
                     WHERE team_bowl = ANY(:team2_names)
                 )
@@ -1743,7 +1760,7 @@ def get_team_matchups(
                     SUM(CASE WHEN dd.out::boolean = true THEN 1 ELSE 0 END) as wickets,
                     SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
                     SUM(CASE WHEN dd.score = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots
-                FROM delivery_details dd
+                FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
                 WHERE
                     (dd.bat = ANY(:team1_players) AND dd.bowl = ANY(:team2_players)
                     OR dd.bat = ANY(:team2_players) AND dd.bowl = ANY(:team1_players))
@@ -1961,7 +1978,7 @@ async def get_venue_bowling_stats(
                 NULLIF(CAST(SUM(bs.death_runs) AS numeric), 0) as death_runs,
                 NULLIF(CAST(SUM(bs.death_boundaries) AS numeric), 0) as death_boundaries
                 
-            FROM bowling_stats bs
+            FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bs
             JOIN matches m ON bs.match_id = m.id
             JOIN BowlerTypes bt ON bs.bowler = bt.name
             {where_clause}
@@ -2198,7 +2215,7 @@ def get_player_stats(
                 CAST(SUM(bs.runs) * 100.0 AS FLOAT) / NULLIF(SUM(bs.balls_faced), 0) as strike_rate,
                 CAST(SUM(bs.dots) * 100.0 AS FLOAT) / NULLIF(SUM(bs.balls_faced), 0) as dot_percentage,
                 CAST(SUM(bs.fours + bs.sixes) * 100.0 AS FLOAT) / NULLIF(SUM(bs.balls_faced), 0) as boundary_percentage
-            FROM batting_stats bs
+            FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
             JOIN matches m ON bs.match_id = m.id
             WHERE bs.striker = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
@@ -2226,7 +2243,7 @@ def get_player_stats(
                 SUM(bs.death_dots) as death_dots,
                 SUM(bs.death_boundaries) as death_boundaries,
                 SUM(bs.death_wickets) as death_wickets
-            FROM batting_stats bs
+            FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
             JOIN matches m ON bs.match_id = m.id
             WHERE bs.striker = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
@@ -2248,7 +2265,7 @@ def get_player_stats(
                     WHEN m.team1 = bs.batting_team THEN m.team2 
                     ELSE m.team1 
                 END as bowling_team
-            FROM batting_stats bs
+            FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
             JOIN matches m ON bs.match_id = m.id
             WHERE bs.striker = ANY(:player_names)
             AND (:start_date IS NULL OR m.date >= :start_date)
@@ -3122,7 +3139,7 @@ def get_venue_player_fantasy_history(
                 player_name
             FROM (
                 SELECT bs.striker as player_name, bs.batting_team as team, m.date
-                FROM batting_stats bs
+                FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
                 JOIN matches m ON bs.match_id = m.id
                 WHERE (:team1 IS NULL OR :team2 IS NULL OR 
                       (bs.batting_team = ANY(:team1_names) OR bs.batting_team = ANY(:team2_names)))
@@ -3599,7 +3616,7 @@ def get_player_bowling_stats(
                 SELECT
                     SUM(1) as total_legal_balls,
                     SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
-                FROM delivery_details dd
+                FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
                 JOIN matches m ON dd.p_match = m.id
                 WHERE dd.bowl = ANY(:player_names)
                 AND dd.wide = 0 AND dd.noball = 0  -- Only legal deliveries
@@ -3622,7 +3639,7 @@ def get_player_bowling_stats(
                 CAST(lbs.total_legal_balls AS FLOAT) / NULLIF(SUM(bs.wickets), 0) as bowling_strike_rate,
                 CAST(SUM(bs.runs_conceded) * 6.0 AS FLOAT) / NULLIF(lbs.total_legal_balls, 0) as economy_rate,
                 CAST(SUM(bs.dots) * 100.0 AS FLOAT) / NULLIF(lbs.total_legal_balls, 0) as dot_percentage
-            FROM bowling_stats bs
+            FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bs
             JOIN matches m ON bs.match_id = m.id
             CROSS JOIN legal_balls_summary lbs
             WHERE bs.bowler = ANY(:player_names)
@@ -3690,7 +3707,7 @@ def get_player_bowling_stats(
                 plb.pp_legal_balls,
                 plb.middle_legal_balls,
                 plb.death_legal_balls
-            FROM bowling_stats bs
+            FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bs
             JOIN matches m ON bs.match_id = m.id
             CROSS JOIN phase_legal_balls plb
             WHERE bs.bowler = ANY(:player_names)
@@ -3799,7 +3816,7 @@ def get_player_bowling_stats(
                     WHEN m.team1 = bs.bowling_team THEN m.team2 
                     ELSE m.team1 
                 END as batting_team
-            FROM bowling_stats bs
+            FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bs
             JOIN matches m ON bs.match_id = m.id
             JOIN innings_legal_balls ilb ON bs.match_id = ilb.match_id AND bs.innings = ilb.innings
             WHERE bs.bowler = ANY(:player_names)
