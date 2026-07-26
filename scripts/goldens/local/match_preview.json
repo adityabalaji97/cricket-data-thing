@@ -1,10 +1,6 @@
 {
   "status": 200,
   "body": {
-    "llm_model": "gpt-4o-mini",
-    "llm_strategy": "chat.completions",
-    "llm_used": false,
-    "preview": "## Venue Profile\n- 70 matches at Sylhet International Cricket Stadium: 28 bat-first wins vs 37 chases (40% bat-first) \u2014 chasing edge.\n- Scoring benchmarks: avg winning score 176, avg chasing score 141 (range 61-254); winning template is death overs driven with 58 runs in that phase.\n\n## Form Guide\n- Rangpur Riders LWWLL; batting first scored 111, 181, 114, 178 \u2014 reached avg winning score (176) in 2 of 4; chasing 174/173 (W) \u2014 reached avg chasing score (141) in 1 of 1.\n- Sylhet Titans LWLWW; batting first scored 180 \u2014 reached avg winning score (176) in 1 of 1; chasing 153/165 (L), 112/111 (W), 142/147 (L), 119/114 (W) \u2014 reached avg chasing score (141) in 2 of 4.\n- With a chasing edge at this venue, Rangpur Riders's 1 recent chasing win(s) vs Sylhet Titans's 2 is a key form differentiator; bowling-first restrictions avg 173 (Rangpur Riders) vs 112 (Sylhet Titans).\n\n## Head-to-Head\n- 3 meetings in window: Rangpur Riders 1-2 Sylhet Titans. Most recent (2026-01-20) went to Sylhet Titans at Shere Bangla National Stadium, Mirpur.\n- 2 H2H match(es) at this venue \u2014 same-venue H2H strengthens the signal.\n\n## Key Matchup Factor\n- Winning-template pressure point is death overs (41 runs on average in successful chases).\n- Top picks \u2014 Rangpur Riders: Akif Javed (56 exp pts, conf 0.90), Dawid Malan (54 exp pts, conf 0.90); Sylhet Titans: Shohidul Islam (78 exp pts, conf 0.90), Khaled Ahmed (51 exp pts, conf 0.90).\n- Key edges: Khushdil Shah vs Nasum Ahmed (12b, SR 292); Khaled Ahmed threat (124b, 10 wkts, econ 7.65); Rony Talukdar vs Nahid Rana (11b, SR 218); Mustafizur Rahman threat (144b, 8 wkts, econ 7.38).\n\n## Preview Take\n- Lean Sylhet Titans (-6) (ELO: Rangpur Riders 1615 vs Sylhet Titans 1533) \u2014 Recent H2H edge, Venue bias: chasing_edge, Fantasy/matchup edge.\n- Toss/innings path: recent venue split is 2 bat-first wins vs 5 chases in the last 7.",
     "preview_mode": "hybrid",
     "preview_version": "v3-narrative",
     "sections": [
@@ -48,7 +44,7 @@
       {
         "bullets": [
           "Winning-template pressure point is death overs (41 runs on average in successful chases).",
-          "Top picks \u2014 Rangpur Riders: Akif Javed (56 exp pts, conf 0.90), Dawid Malan (54 exp pts, conf 0.90); Sylhet Titans: Shohidul Islam (78 exp pts, conf 0.90), Khaled Ahmed (51 exp pts, conf 0.90).",
+          "Top picks \u2014 Rangpur Riders: Dawid Malan (53 exp pts, conf 0.90), Akif Javed (53 exp pts, conf 0.90); Sylhet Titans: Shohidul Islam (73 exp pts, conf 0.90), Khaled Ahmed (49 exp pts, conf 0.90).",
           "Key edges: Khushdil Shah vs Nasum Ahmed (12b, SR 292); Khaled Ahmed threat (124b, 10 wkts, econ 7.65); Rony Talukdar vs Nahid Rana (11b, SR 218); Mustafizur Rahman threat (144b, 8 wkts, econ 7.38)."
         ],
         "evidence_tags": [
@@ -90,13 +86,13 @@
               "rank": 6
             },
             {
-              "form_flag": "hot",
+              "form_flag": "neutral",
               "player": "Litton Das",
               "quality_score": 59.5,
               "rank": 30
             },
             {
-              "form_flag": "cold",
+              "form_flag": "neutral",
               "player": "Iftikhar Ahmed",
               "quality_score": 37.9,
               "rank": 57
@@ -162,7 +158,7 @@
               "rank": 85
             },
             {
-              "form_flag": "cold",
+              "form_flag": "neutral",
               "player": "Mehidy Hasan Miraz",
               "quality_score": 9.0,
               "rank": 88
