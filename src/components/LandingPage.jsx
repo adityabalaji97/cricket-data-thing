@@ -6,6 +6,7 @@ import {
   IconButton,
   Typography,
   useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import SearchIcon from '@mui/icons-material/Search';
@@ -31,6 +32,7 @@ import MiniWagonWheel from './MiniWagonWheel';
 import { getTeamColor } from '../utils/teamColors';
 import SearchBar from './search/SearchBar';
 import { colors as dark, fonts } from '../theme/hindsightDark';
+import { useFormat } from '../context/FormatContext';
 
 // Mapped onto the shared dark-theme tokens rather than redefining them; see
 // src/theme/hindsightDark.js. The names are kept short because they are used densely
@@ -768,6 +770,7 @@ const FeaturedInningsSection = ({ innings, loading, isMobile }) => {
 };
 
 const EloSection = ({ isMobile, openDropdown, setOpenDropdown }) => {
+  const { formatParams } = useFormat();
   const [eloComp, setEloComp] = useState('international');
   const [eloRange, setEloRange] = useState('all');
   const [rankings, setRankings] = useState([]);
@@ -800,8 +803,13 @@ const EloSection = ({ isMobile, openDropdown, setOpenDropdown }) => {
         params.set('start_date', `${now.getFullYear()}-01-01`);
         params.set('end_date', dateInput(now));
       }
+      // ELO is a separate stream per format, so the ranking must be scoped to the selection.
+      params.set('format', formatParams.format);
+      params.set('gender', formatParams.gender);
       try {
-        const response = await fetch(`${config.API_URL}/teams/elo-rankings?${params.toString()}`);
+        const response = await fetch(
+          `${config.API_URL}/teams/elo-rankings?${params.toString()}`,
+        );
         const payload = await response.json();
         if (!cancelled) setRankings(payload.rankings || []);
       } catch (error) {
@@ -813,7 +821,7 @@ const EloSection = ({ isMobile, openDropdown, setOpenDropdown }) => {
     };
     fetchRankings();
     return () => { cancelled = true; };
-  }, [eloComp, eloRange]);
+  }, [eloComp, eloRange, formatParams.format, formatParams.gender]);
 
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
@@ -1145,7 +1153,11 @@ const EmptyCard = ({ label, actionLabel, onAction }) => (
 );
 
 const LandingPage = ({ showLeagueCounts = true }) => {
-  const isMobile = useMediaQuery('(max-width:759px)');
+  // Match the app-wide breakpoint from App.js rather than a page-specific pixel value;
+  // three different mobile thresholds across the hero pages made behaviour inconsistent.
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { formatParams } = useFormat();
   const [navOpen, setNavOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [fixtures, setFixtures] = useState([]);
@@ -1177,6 +1189,7 @@ const LandingPage = ({ showLeagueCounts = true }) => {
     const loadRecent = async () => {
       setRecentLoading(true);
       const params = new URLSearchParams({
+        ...formatParams,
         competition: activeCompetition || 'all',
         limit: '18',
         offset: '0',

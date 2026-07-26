@@ -367,6 +367,8 @@ def get_teams_elo_rankings(
     top_teams: Optional[int] = Query(None, description="Limit to top N international teams"),
     start_date: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
+    format: str = Query("T20", description="Cricket format"),
+    gender: str = Query("male", description="Men's or women's cricket"),
     db: Session = Depends(get_session)
 ):
     """
@@ -389,9 +391,11 @@ def get_teams_elo_rankings(
             top_teams=top_teams,
             start_date=start_date,
             end_date=end_date,
-            db=db
+            db=db,
+            fmt=format,
+            gender=gender,
         )
-        
+
         return {
             "total_teams": len(rankings),
             "filter_criteria": {

@@ -283,15 +283,24 @@ def get_teams_elo_rankings_service(
     top_teams: Optional[int] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    db = None
+    db = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> List[dict]:
-    """Get current ELO rankings for teams based on their most recent ratings"""
+    """Get current ELO rankings for teams based on their most recent ratings.
+
+    Scoped to one format. ELO is a separate stream per format (see A9), so without this a
+    team's "latest" rating would be whichever format it happened to play most recently, and
+    the table would silently mix T20 and ODI ratings in one ranking.
+    """
     try:
         params = {
             "league": league,
             "include_international": include_international,
             "start_date": start_date,
-            "end_date": end_date
+            "end_date": end_date,
+            "fmt": fmt,
+            "gender": gender,
         }
         
         competition_conditions = []
@@ -345,6 +354,7 @@ def get_teams_elo_rankings_service(
                         ROW_NUMBER() OVER (PARTITION BY m.team1 ORDER BY m.date DESC, m.id DESC) as rn
                     FROM matches m
                     WHERE m.team1_elo IS NOT NULL
+                    AND m.format = :fmt AND m.gender = :gender
                     AND (:start_date IS NULL OR m.date >= :start_date)
                     AND (:end_date IS NULL OR m.date <= :end_date)
                     {competition_filter}
@@ -368,6 +378,7 @@ def get_teams_elo_rankings_service(
                         ROW_NUMBER() OVER (PARTITION BY m.team2 ORDER BY m.date DESC, m.id DESC) as rn
                     FROM matches m
                     WHERE m.team2_elo IS NOT NULL
+                    AND m.format = :fmt AND m.gender = :gender
                     AND (:start_date IS NULL OR m.date >= :start_date)
                     AND (:end_date IS NULL OR m.date <= :end_date)
                     {competition_filter}
