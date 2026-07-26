@@ -20,8 +20,8 @@ explicit promotion steps.
 | **0.1** | Local env + regression baseline | [x] 2026-07-25 |
 | **0.2** | Schema migration: `format` / `gender` columns | [x] 2026-07-25 (local only) |
 | **0.3** | `format_config.py` + `/formats` + phase helpers | [x] 2026-07-25 |
-| **0.4** | Pipeline format-awareness | ~ in progress (a,b,c,g,h done; d,e,f left) |
-| **0.5** | `table_routing` replaces the 2015 date fork | [ ] **folded into 0.4** — the ODI slice is entirely pre-2015, so the data is invisible without it |
+| **0.4** | Pipeline format-awareness | [x] 2026-07-26 (local) |
+| **0.5** | `table_routing` replaces the 2015 date fork | [x] 2026-07-26 — folded into 0.4 |
 | **0.6** | Query builder backend format param | [ ] |
 | **0.7** | Frontend foundation: theme, FormatContext, API client | [ ] |
 | **0.8** | Sunset gating + NavMenu consolidation | [ ] |
@@ -410,3 +410,6 @@ lands in shell history. The same values belong in GitHub Actions secrets for the
 6. `query_builder_metadata` distinct-value lists must be partitioned by `(format, gender)` or ODI
    competitions will pollute the T20 dropdowns.
 7. Monitor T20 p95 latency for 48h after A1; partitioning is the escape hatch.
+8. **⚠️ OPEN: stored `batting_stats.wickets` is corrupt for 34% of T20 rows** (93% of 2026).
+   Cause was string-boolean truthiness in `sync_stats_from_dd.py`, now fixed in code, but the
+   stored data needs a backfill decision. See the dev log entry of 2026-07-26.

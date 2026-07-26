@@ -9,10 +9,11 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** 0.4 in progress. **Done:** 0.4a data sources + recon, 0.4b migration 002,
-  0.4c competition normalizer, 0.4g consumer pinning, 0.4h landmine retired.
-  **Remaining:** 0.4d loader flags/stamping, 0.4e sync corrections, 0.4f phase bounds + fantasy
-  gating, folded-in 0.5 table routing, then the ODI load and the contamination canary.
+- **Active chunk:** **0.4 COMPLETE (incl. folded-in 0.5).** Next is 0.6 — thread the format
+  parameter through the query-builder router so ODI becomes queryable from the API.
+- ⚠️ **OPEN PRODUCTION ISSUE — needs a decision, see the 2026-07-26 entry below:** 34% of stored
+  `batting_stats` rows (21,905 of 63,704) hold impossible wicket counts, rising to 93% of 2026
+  rows. The code bug is fixed; the **stored data is still wrong** and needs a backfill.
 - **Branch:** `multi-format` (branched from `main` @ `29b61c1`)
 - **Local DB:** `hindsight_local` on localhost:5432 (PG14 server), 644 MB subset of prod, healthy.
   Rebuild any time with `scripts/dev/setup_local_db.sh`.
@@ -39,6 +40,78 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-26 — Chunk 0.4d/0.4e/0.4f + 0.5 — Claude — 0.4 COMPLETE
+
+**Done**
+- **0.4d loader** — required `--format`/`--gender`, column stamping, nine new source columns in
+  `COL_MAP`, and an over-vs-cap sanity check.
+- **0.4e sync** — `overs` from play, normalizer wired into `competition`/`event_name`/
+  `match_type`, `day_or_night` from the feed, format/gender stamped onto `matches`.
+- **0.4f** — `phase_bounds()` in `sync_stats_from_dd`, fantasy gated on an implemented-ruleset
+  registry.
+- **0.5 (folded in)** — `table_routing()` replaces the 2015 date fork in both hero paths.
+
+**Verified end-to-end on the local database**
+- Mislabelling the ODI slice as T20 aborts (over 49 vs cap 19), exit 1.
+- 149,599 ODI balls loaded; 257 ODI matches created; 4,201 batting and 2,985 bowling stat rows.
+- `overs`: 184 matches at 50, rest 45-49 for shortened games, **never 20**.
+- `competition`: ODI 228, ICC World Cup 15, ICC Champions Trophy 14. `match_type` international
+  for all 257. `event_name` keeps the series name.
+- ODI phase split 28k/77k/18k — middle-dominant, as ODI boundaries imply.
+- ODI `fantasy_points` NULL; T20 untouched.
+- A 2007 World Cup ODI scorecard renders (Scotland 136/10 in 34.1 overs) where date-based
+  routing previously returned nothing.
+- **Goldens 13/13 identical at every step**, including with two formats in both
+  `delivery_details` and `matches`. That is the contamination canary — the single-table design
+  and the 0.4g pins both hold.
+
+**Proof the phase swap is a no-op for T20:** recomputing 493 batting innings with the old
+hardcoded tuples and the new format-driven ones produced **zero** differences. (Comparing against
+*stored* rows is not a valid test — see below.)
+
+---
+
+### ⚠️ 2026-07-26 — PRE-EXISTING DATA BUG FOUND — needs a backfill decision
+
+**What is wrong.** `delivery_details.out` and `bat_out` are `VARCHAR` holding the strings
+`'true'`/`'false'`, not booleans. `sync_stats_from_dd.py` tested them with plain truthiness, and
+the string `'false'` is truthy in Python — so **every ball counted as a wicket**.
+
+A second, subtler error sat on top: a wicket falling on a ball a batter faced is not necessarily
+*that batter's* wicket, because the non-striker can be run out at the bowler's end. `bat_out`
+distinguishes the two and agrees exactly with `p_out = p_bat` (3,738 striker dismissals vs 3,939
+total wickets in the ODI slice).
+
+**Blast radius in the stored data** (`batting_stats.wickets` can only ever be 0 or 1):
+
+| Rows | Impossible (`wickets > 1`) | Share |
+|---|---|---|
+| All T20 (63,704) | 21,905 | **34.4%** |
+| 2026 matches (12,176) | 11,309 | **93%** |
+| 2025 matches (21,401) | 6,648 | 31% |
+| 2024 matches (22,194) | 3,948 | 18% |
+| 2013-14 matches (7,933) | 0 | 0% |
+
+The clean pre-2015 rows come from the legacy `statsProcessor.py` path; the corruption is entirely
+from the `delivery_details` sync, and it grows as more matches arrive through it. The maximum
+stored value is **76 wickets for a single batter in a single innings**.
+
+**Code is fixed** (`_truthy`, `_is_out`, `_batter_dismissed`), so anything synced from now on is
+correct — ODI rows came out with wickets only ever 0 or 1. **The stored T20 data is still wrong.**
+
+**Decision needed:** re-run the stats sync for affected T20 matches. It is a delete-and-recompute
+of `batting_stats`/`bowling_stats` for matches from 2015 onward, which is why it wants an explicit
+go-ahead and a backup rather than being folded in silently. Worth checking first which
+user-visible features read `batting_stats.wickets` and phase wickets, to gauge how visible the
+error currently is.
+
+**Also noted:** recomputed `balls_faced`/`dots` differ from stored values by 1-3 on some innings.
+That is a *separate*, pre-existing discrepancy between the legacy and delivery_details paths, not
+caused by this work — the old-vs-new isolation test showed zero differences. Worth a look before
+any backfill, since a backfill would move those numbers too.
+
+---
 
 ### 2026-07-26 — Chunk 0.4a/0.4b — Claude — data sources, Test recon, migration 002
 
