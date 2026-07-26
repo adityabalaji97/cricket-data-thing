@@ -15,12 +15,24 @@ from services.query_builder_v2 import get_legacy_bowler_style_sql, get_legacy_bo
 
 
 DETAILS_START_DATE = date(2015, 1, 1)
-PHASE_ORDER = {"powerplay": 0, "middle": 1, "death": 2}
-PHASE_META = {
-    "powerplay": {"label": "Powerplay", "overs": "1-6"},
-    "middle": {"label": "Middle", "overs": "7-15"},
-    "death": {"label": "Death", "overs": "16-20"},
-}
+PHASE_ORDER = {"powerplay": 0, "new_ball": 0, "middle": 1, "death": 2}
+
+
+def phase_meta_for(fmt: str = "T20", gender: str = "male") -> Dict[str, Dict[str, str]]:
+    """Phase labels and over ranges for a format.
+
+    These were hardcoded as "1-6"/"7-15"/"16-20", which is only true for T20 — an ODI powerplay
+    is overs 1-10. format_config already carries the display ranges.
+    """
+    from services.analytics_common import phase_bounds
+
+    return {
+        phase.key: {"label": phase.label, "overs": phase.display_overs}
+        for phase in phase_bounds(fmt, gender)
+    }
+
+
+PHASE_META = phase_meta_for()
 LINE_ORDER = [
     "WIDE_OUTSIDE_OFFSTUMP",
     "OUTSIDE_OFFSTUMP",
@@ -83,10 +95,13 @@ def get_match_scorecard_service(match_id: str, min_balls: int, db: Session) -> D
     )
     use_details = data_source == "delivery_details"
 
+    fmt = match.get("format") or "T20"
+    gender = match.get("gender") or "male"
+
     if use_details:
-        innings = _build_details_innings(match_id, min_balls, db)
+        innings = _build_details_innings(match_id, min_balls, db, fmt, gender)
     else:
-        innings = _build_legacy_innings(match_id, min_balls, db)
+        innings = _build_legacy_innings(match_id, min_balls, db, fmt, gender)
 
     if not innings:
         raise HTTPException(status_code=404, detail=f"No delivery data found for match: {match_id}")
@@ -156,7 +171,9 @@ def _format_match(match: Dict[str, Any], innings: List[Dict[str, Any]]) -> Dict[
         "team2": match.get("team2"),
         "winner": match.get("winner"),
         "result_text": _result_text(match, innings),
-        "chase_note": _chase_note(innings),
+        "chase_note": _chase_note(
+            innings, match.get("format") or "T20", match.get("gender") or "male"
+        ),
         "player_of_match": match.get("player_of_match"),
         "teams": _team_accents(innings),
         "toss": {
@@ -176,7 +193,7 @@ def _build_summary(match: Dict[str, Any], innings: List[Dict[str, Any]]) -> Dict
     }
 
 
-def _build_details_innings(match_id: str, min_balls: int, db: Session) -> List[Dict[str, Any]]:
+def _build_details_innings(match_id: str, min_balls: int, db: Session, fmt: str = "T20", gender: str = "male") -> List[Dict[str, Any]]:
     innings_rows = db.execute(
         text(
             """
@@ -200,8 +217,8 @@ def _build_details_innings(match_id: str, min_balls: int, db: Session) -> List[D
 
     batting = _details_batting_rows(match_id, db)
     bowling = _details_bowling_rows(match_id, db)
-    batter_breakdowns = _details_batter_breakdowns(match_id, min_balls, db)
-    bowler_breakdowns = _details_bowler_breakdowns(match_id, min_balls, db)
+    batter_breakdowns = _details_batter_breakdowns(match_id, min_balls, db, fmt, gender)
+    bowler_breakdowns = _details_bowler_breakdowns(match_id, min_balls, db, fmt, gender)
     worms = _details_worm(match_id, db)
 
     out = []
@@ -231,7 +248,7 @@ def _build_details_innings(match_id: str, min_balls: int, db: Session) -> List[D
     return out
 
 
-def _build_legacy_innings(match_id: str, min_balls: int, db: Session) -> List[Dict[str, Any]]:
+def _build_legacy_innings(match_id: str, min_balls: int, db: Session, fmt: str = "T20", gender: str = "male") -> List[Dict[str, Any]]:
     innings_rows = db.execute(
         text(
             """
@@ -255,8 +272,8 @@ def _build_legacy_innings(match_id: str, min_balls: int, db: Session) -> List[Di
 
     batting = _legacy_batting_rows(match_id, db)
     bowling = _legacy_bowling_rows(match_id, db)
-    batter_breakdowns = _legacy_batter_breakdowns(match_id, min_balls, db)
-    bowler_breakdowns = _legacy_bowler_breakdowns(match_id, min_balls, db)
+    batter_breakdowns = _legacy_batter_breakdowns(match_id, min_balls, db, fmt, gender)
+    bowler_breakdowns = _legacy_bowler_breakdowns(match_id, min_balls, db, fmt, gender)
     worms = _legacy_worm(match_id, db)
 
     out = []
@@ -460,7 +477,7 @@ def _legacy_bowling_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str,
     return _group_bowling_rows(rows)
 
 
-def _details_batter_breakdowns(match_id: str, min_balls: int, db: Session) -> Dict[tuple, Dict[str, Any]]:
+def _details_batter_breakdowns(match_id: str, min_balls: int, db: Session, fmt: str = "T20", gender: str = "male") -> Dict[tuple, Dict[str, Any]]:
     base = _details_base_cte()
     result: Dict[tuple, Dict[str, Any]] = {}
     _seed_batters(result, _details_players(match_id, db), legacy=False)
@@ -471,7 +488,7 @@ def _details_batter_breakdowns(match_id: str, min_balls: int, db: Session) -> Di
         item["vs_bowler"]["rows"].append(_bat_vs_row(row))
 
     rows = db.execute(text(base + _phase_sql("batter_name", batting=True)), {"match_id": match_id}).mappings().all()
-    _attach_phase_rows(result, rows, batting=True, min_balls=min_balls)
+    _attach_phase_rows(result, rows, batting=True, min_balls=min_balls, fmt=fmt, gender=gender)
 
     rows = db.execute(text(base + _pace_spin_sql("batter_name", batting=True, source="details")), {"match_id": match_id}).mappings().all()
     _attach_pace_spin_rows(result, rows, batting=True, min_balls=min_balls)
@@ -484,7 +501,7 @@ def _details_batter_breakdowns(match_id: str, min_balls: int, db: Session) -> Di
     return result
 
 
-def _legacy_batter_breakdowns(match_id: str, min_balls: int, db: Session) -> Dict[tuple, Dict[str, Any]]:
+def _legacy_batter_breakdowns(match_id: str, min_balls: int, db: Session, fmt: str = "T20", gender: str = "male") -> Dict[tuple, Dict[str, Any]]:
     base = _legacy_base_cte()
     result: Dict[tuple, Dict[str, Any]] = {}
     _seed_batters(result, _legacy_players(match_id, db), legacy=True)
@@ -495,14 +512,14 @@ def _legacy_batter_breakdowns(match_id: str, min_balls: int, db: Session) -> Dic
         item["vs_bowler"]["rows"].append(_bat_vs_row(row))
 
     rows = db.execute(text(base + _phase_sql("batter_name", batting=True)), {"match_id": match_id}).mappings().all()
-    _attach_phase_rows(result, rows, batting=True, min_balls=min_balls)
+    _attach_phase_rows(result, rows, batting=True, min_balls=min_balls, fmt=fmt, gender=gender)
 
     rows = db.execute(text(base + _pace_spin_sql("batter_name", batting=True, source="legacy")), {"match_id": match_id}).mappings().all()
     _attach_pace_spin_rows(result, rows, batting=True, min_balls=min_balls)
     return result
 
 
-def _details_bowler_breakdowns(match_id: str, min_balls: int, db: Session) -> Dict[tuple, Dict[str, Any]]:
+def _details_bowler_breakdowns(match_id: str, min_balls: int, db: Session, fmt: str = "T20", gender: str = "male") -> Dict[tuple, Dict[str, Any]]:
     base = _details_base_cte()
     result: Dict[tuple, Dict[str, Any]] = {}
     _seed_bowlers(result, _details_players(match_id, db), legacy=False)
@@ -513,7 +530,7 @@ def _details_bowler_breakdowns(match_id: str, min_balls: int, db: Session) -> Di
         item["vs_batter"]["rows"].append(_bowl_vs_row(row))
 
     rows = db.execute(text(base + _phase_sql("bowler_name", batting=False)), {"match_id": match_id}).mappings().all()
-    _attach_phase_rows(result, rows, batting=False, min_balls=min_balls)
+    _attach_phase_rows(result, rows, batting=False, min_balls=min_balls, fmt=fmt, gender=gender)
 
     rows = db.execute(text(base + _hand_sql("bowler_name", source="details")), {"match_id": match_id}).mappings().all()
     _attach_hand_rows(result, rows, min_balls=min_balls)
@@ -526,7 +543,7 @@ def _details_bowler_breakdowns(match_id: str, min_balls: int, db: Session) -> Di
     return result
 
 
-def _legacy_bowler_breakdowns(match_id: str, min_balls: int, db: Session) -> Dict[tuple, Dict[str, Any]]:
+def _legacy_bowler_breakdowns(match_id: str, min_balls: int, db: Session, fmt: str = "T20", gender: str = "male") -> Dict[tuple, Dict[str, Any]]:
     base = _legacy_base_cte()
     result: Dict[tuple, Dict[str, Any]] = {}
     _seed_bowlers(result, _legacy_players(match_id, db), legacy=True)
@@ -537,7 +554,7 @@ def _legacy_bowler_breakdowns(match_id: str, min_balls: int, db: Session) -> Dic
         item["vs_batter"]["rows"].append(_bowl_vs_row(row))
 
     rows = db.execute(text(base + _phase_sql("bowler_name", batting=False)), {"match_id": match_id}).mappings().all()
-    _attach_phase_rows(result, rows, batting=False, min_balls=min_balls)
+    _attach_phase_rows(result, rows, batting=False, min_balls=min_balls, fmt=fmt, gender=gender)
 
     rows = db.execute(text(base + _hand_sql("bowler_name", source="legacy")), {"match_id": match_id}).mappings().all()
     _attach_hand_rows(result, rows, min_balls=min_balls)
@@ -659,12 +676,14 @@ def _bowl_vs_batter_sql() -> str:
     """
 
 
-def _phase_sql(player_col: str, batting: bool) -> str:
+def _phase_sql(player_col: str, batting: bool, fmt: str = "T20", gender: str = "male") -> str:
+    from services.analytics_common import phase_case_sql
+
     runs_col = "batter_runs" if batting else "total_runs"
     wicket_sql = "0" if batting else "SUM(CASE WHEN dismissal IS NOT NULL AND dismissal != '' AND LOWER(dismissal) NOT LIKE '%run out%' THEN 1 ELSE 0 END)"
     return f"""
         SELECT innings, {player_col} AS player,
-               CASE WHEN over < 6 THEN 'powerplay' WHEN over < 15 THEN 'middle' ELSE 'death' END AS item,
+               {phase_case_sql(fmt, gender, over_column="over")} AS item,
                COUNT(*) AS balls,
                SUM({runs_col}) AS runs,
                {wicket_sql} AS wickets
@@ -785,7 +804,7 @@ def _seed_bowlers(result: Dict[tuple, Dict[str, Any]], players: Iterable[Dict[st
             result.setdefault((int(row["innings"]), row["bowler_name"]), _empty_bowler_breakdowns(legacy, True))
 
 
-def _attach_phase_rows(result: Dict[tuple, Dict[str, Any]], rows: Iterable[Dict[str, Any]], batting: bool, min_balls: int) -> None:
+def _attach_phase_rows(result: Dict[tuple, Dict[str, Any]], rows: Iterable[Dict[str, Any]], batting: bool, min_balls: int, fmt: str = "T20", gender: str = "male") -> None:
     buckets: Dict[tuple, List[Dict[str, Any]]] = {}
     for row in rows:
         buckets.setdefault((int(row["innings"]), row["player"]), []).append(dict(row))
@@ -795,12 +814,13 @@ def _attach_phase_rows(result: Dict[tuple, Dict[str, Any]], rows: Iterable[Dict[
         target = item["phase"]
         target["available"] = total_balls >= min_balls
         target["rows"] = []
-        for phase in ("powerplay", "middle", "death"):
+        phase_meta = phase_meta_for(fmt, gender)
+        for phase in phase_meta:
             source = next((r for r in group_rows if r.get("item") == phase), None)
             balls = int(source.get("balls") or 0) if source else 0
             runs = int(source.get("runs") or 0) if source else 0
             wickets = int(source.get("wickets") or 0) if source else 0
-            meta = PHASE_META[phase]
+            meta = phase_meta[phase]
             if batting:
                 target["rows"].append({"key": phase, "label": meta["label"], "overs": meta["overs"], "runs": runs, "balls": balls, "sr": _sr(runs, balls)})
             else:
@@ -1167,21 +1187,41 @@ def _result_text(match: Dict[str, Any], innings: List[Dict[str, Any]]) -> str:
             return f"{winner} won by {by['runs']} runs"
         if by.get("wickets"):
             return f"{winner} won by {by['wickets']} wickets"
-    if len(innings) >= 2 and innings[1]["score"]["team"] == winner:
-        wkts = 10 - innings[1]["score"]["wickets"]
+    # Fall back to deriving the margin from the chasing innings, which only holds for a
+    # two-innings format -- a Test win can come by an innings, and a draw has no winner at all.
+    chase_index = len(innings) - 1
+    if len(innings) == 2 and innings[chase_index]["score"]["team"] == winner:
+        wkts = 10 - innings[chase_index]["score"]["wickets"]
         if wkts > 0:
             return f"{winner} won by {wkts} wickets"
     return f"{winner} won"
 
 
-def _chase_note(innings: List[Dict[str, Any]]) -> Optional[str]:
-    if len(innings) < 2:
+def _chase_note(
+    innings: List[Dict[str, Any]],
+    fmt: str = "T20",
+    gender: str = "male",
+) -> Optional[str]:
+    """A line describing the chase, or None where the idea does not apply."""
+    from format_config import get_format
+
+    spec = get_format(fmt, gender)
+
+    # Tests have no fixed innings length, so "balls to spare" is meaningless there, and the
+    # target comes from three previous innings rather than one.
+    if spec.balls_per_innings is None:
         return None
-    first = innings[0]["score"]
-    second = innings[1]["score"]
-    target = first["runs"] + 1
-    if second["runs"] >= target:
-        balls_left = max(0, 120 - int(second.get("balls") or 0))
+    if len(innings) < spec.chase_innings:
+        return None
+
+    chase = innings[spec.chase_innings - 1]["score"]
+    target = innings[spec.chase_innings - 2]["score"]["runs"] + 1
+
+    if chase["runs"] >= target:
+        # A rain-reduced innings is shorter than the format's nominal length, so prefer the
+        # innings' own ball allowance where the data carries one.
+        allowance = chase.get("balls_allowed") or spec.balls_per_innings
+        balls_left = max(0, allowance - int(chase.get("balls") or 0))
         return f"Chased {target} with {balls_left} balls to spare"
     return f"Target {target}"
 
