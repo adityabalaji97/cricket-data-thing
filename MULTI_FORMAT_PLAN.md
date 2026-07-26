@@ -20,8 +20,8 @@ explicit promotion steps.
 | **0.1** | Local env + regression baseline | [x] 2026-07-25 |
 | **0.2** | Schema migration: `format` / `gender` columns | [x] 2026-07-25 (local only) |
 | **0.3** | `format_config.py` + `/formats` + phase helpers | [x] 2026-07-25 |
-| **0.4** | Pipeline format-awareness | [ ] |
-| **0.5** | `table_routing` replaces the 2015 date fork | [ ] |
+| **0.4** | Pipeline format-awareness | ~ in progress (a,b,c,g,h done; d,e,f left) |
+| **0.5** | `table_routing` replaces the 2015 date fork | [ ] **folded into 0.4** — the ODI slice is entirely pre-2015, so the data is invisible without it |
 | **0.6** | Query builder backend format param | [ ] |
 | **0.7** | Frontend foundation: theme, FormatContext, API client | [ ] |
 | **0.8** | Sunset gating + NavMenu consolidation | [ ] |
@@ -356,10 +356,34 @@ full three-heroes × four-formats mobile QA; final golden diff.
 real data lands. Nothing in Phase 0 needs it, so the upgrade is deliberately deferred to keep the
 extra cost off the clock until it buys something.
 
+## Dataset sources
+
+The four ball-by-ball CSVs have direct download URLs held in `.env` (gitignored) as
+`DROPBOX_T20_URL`, `DROPBOX_ODI_URL`, `DROPBOX_WT20_URL`, `DROPBOX_TEST_URL`.
+
+**This repository is public and each URL embeds an access key, so the values must never be
+committed** — reference the variable names only, and pull slices with
+`scripts/dev/make_csv_slice.py --url-env NAME` (there is deliberately no `--url` flag) so no link
+lands in shell history. The same values belong in GitHub Actions secrets for the workflow matrix.
+
+| File | Size | Est. balls | Notes |
+|---|---|---|---|
+| `t20_bbb.csv` | 966 MB | ~2.47M | already loaded; repaired upstream in June 2026 |
+| `test_bbb.csv` | 836 MB | ~2.14M | **no `max_balls` column**; adds `day`, `session`, `trail_by`, `lead_by` |
+| `odi_bbb.csv` | 692 MB | ~1.77M | adds `rain`, `gmt_offset` |
+| `womens_t20_bbb.csv` | 301 MB | ~0.77M | |
+
+**The four files do not share a schema** — see the dev log for the exact per-file differences.
+`load_delivery_details_full.py` keeps only mapped columns that exist, so absence is handled.
+
 ## Do not touch
 
-* **Never run `cleanup_non_t20.py`** — it deletes any match with more than 260 deliveries. It must
-  be retired in chunk 0.4 before any non-T20 data exists anywhere.
+* **`cleanup_non_t20.py` is retired** — it deleted any match with more than 260 deliveries, which
+  is every ODI and every Test. It now refuses to run and exits 1. Do not resurrect it from git
+  history; filter on `format`/`gender` instead.
+* **CSV `over` is 1-indexed; `delivery_details.over` is 0-indexed.**
+  `load_delivery_details_full.py:131-132` already subtracts 1. Comparing a CSV over number to a
+  database one without that shift silently moves every phase boundary by one over.
 * **Never point `.env` at the local database**, and never point `DATABASE_URL` at production while
   developing. `.env` holds the production URL; local work exports `DATABASE_URL` instead.
 * **`models.py:308-396` (`DeliveryDetails`) is stale** and does not describe the live table.

@@ -9,8 +9,10 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** 0.4 in progress (0.4a data sources + recon done, 0.4b migration 002 done;
-  next is 0.4c competition normalizer)
+- **Active chunk:** 0.4 in progress. **Done:** 0.4a data sources + recon, 0.4b migration 002,
+  0.4c competition normalizer, 0.4g consumer pinning, 0.4h landmine retired.
+  **Remaining:** 0.4d loader flags/stamping, 0.4e sync corrections, 0.4f phase bounds + fantasy
+  gating, folded-in 0.5 table routing, then the ODI load and the contamination canary.
 - **Branch:** `multi-format` (branched from `main` @ `29b61c1`)
 - **Local DB:** `hindsight_local` on localhost:5432 (PG14 server), 644 MB subset of prod, healthy.
   Rebuild any time with `scripts/dev/setup_local_db.sh`.
@@ -84,6 +86,67 @@ breaks `source .env` (bash treats it as a background operator and truncates the 
 
 **Next:** 0.4c competition normalizer, then 0.4d/0.4e loader and sync, then 0.4g (pin the
 format-blind consumers) before any ODI data is loaded locally.
+
+---
+
+### 2026-07-26 — Chunk 0.4c/0.4g/0.4h — Claude
+
+**Done**
+- `services/competition_normalizer.py` — `normalize_competition()`, `resolve_event_name()`,
+  `is_international()`, plus `unmapped_competitions()` for auditing.
+- **Pinned the format-blind consumers** (0.4g): `format_filter_sql()` now scopes
+  `delivery_data_service.build_competition_filter_delivery_details` (backs the match preview and
+  six other services), `query_builder_v2.build_where_clause`, and all six condition lists in
+  `services/visualizations.py` (via a `T20_MEN_PIN` constant — those pages are being sunset, not
+  made format-aware). All default to men's T20, so nothing changes until 0.6 threads the format
+  parameter through.
+- **Retired `cleanup_non_t20.py`** (0.4h) — now prints why and exits 1.
+
+**Why 0.4g could not wait for the 0.6/0.8 gating chunks**
+Three separate places decided "this is domestic cricket" by *negating* a competition name
+(`dd.competition != 'T20I'`), which an ODI or Test row satisfies just as well. The query
+builder's `delivery_details` path was worse: with neither `leagues` nor `include_international`
+set it emitted **no competition predicate at all**. Any of these would have started silently
+mixing formats the moment ODI rows landed — which happens during this very chunk's verification.
+The legacy `deliveries` table needs no pin; it is men's T20 pre-2015 by construction.
+
+**Verified**
+- Normalizer against all three slices: ODI (349) → `ODI` 298, `ICC Champions Trophy` 30,
+  `ICC World Cup` 21; Test (85) → `ICC World Test Championship` 73, `Test` 12; no blank buckets,
+  every match keeps a specific `event_name`.
+- **T20 is a provable no-op**: across all 2,874 T20 matches in the slice, every normalized bucket
+  equals the raw feed value verbatim, and `is_international()` agrees with the legacy substring
+  rule on all 2,874. That was the requirement.
+- Goldens **13/13 identical** after the pinning work.
+- Landmine drill: `python cleanup_non_t20.py` exits 1 and leaves the database untouched.
+
+**Decisions / surprises**
+- `trophy_name` is the best normalization key — it collapses sponsor renames that `competition`
+  splits apart: "VB Series", "Carlton & United Series", "Commonwealth Bank Series" and "Carlton
+  Series" are all one tournament under the trophy "Australian Tri Series (CB Series)".
+- Tests never leave `competition` empty, but the values are inconsistent per series ("Zimbabwe in
+  BDESH Test" vs "Zimbabwe in Bangladesh Test"), with `WTC` for World Test Championship matches.
+- `is_international` deliberately branches: ODIs and Tests are only played between countries, so
+  team names settle it; T20 keeps the historical competition-substring rule so existing rows do
+  not move.
+
+**Next (the remaining half of 0.4)**
+1. **0.4d loader** — `--format`/`--gender` flags on `scripts/load_delivery_details_pipeline.py`
+   and `load_delivery_details_full.py`; stamp the columns; extend `COL_MAP` with the nine new
+   source columns; add the single over-vs-`over_max` sanity check.
+   *Note `load_delivery_details_full.py:124-125` already skips CSV columns that do not exist, and
+   `:131-132` already converts 1-indexed CSV overs to 0-indexed — do not duplicate either.*
+2. **0.4e sync** — in `sync_from_delivery_details.py`: derive `overs` from the highest over
+   bowled (not `first_row.max_balls`, which Tests do not even have); `competition`/`event_name`/
+   `match_type` from the normalizer; `day_or_night` from the new `daynight` column; stamp
+   format/gender onto `matches` and the stats tables.
+3. **0.4f** — `phase_bounds()` in `sync_stats_from_dd.py:95,170`; fantasy only when
+   `format_config` declares a `fantasy_ruleset`.
+4. **0.5 (folded in)** — swap `query_builder_v2.py:23-24` and `match_scorecard.py:17` to
+   `table_routing()`. Required: the ODI slice is 100% pre-2015, so without this the loaded data
+   returns nothing from either hero feature.
+5. **Then load the ODI slice and re-run the goldens** — they must still be 13/13. That is the
+   contamination canary and the first real test of the single-table design.
 
 ### 2026-07-25 — ODI data recon (unplanned, gates chunk 0.4) — Claude
 
