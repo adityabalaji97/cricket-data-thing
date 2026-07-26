@@ -29,10 +29,16 @@ jobs:
           curl -L -o t20_bbb.csv "${{ secrets.DROPBOX_CSV_URL }}"
           echo "Downloaded $(du -sh t20_bbb.csv | cut -f1) CSV"
 
+      # --format/--gender are required and authoritative: the loader never infers format from
+      # the data. Adding the ODI, women's T20 and Test legs is chunk A2, and must wait until
+      # the production database has migrations 001/002 applied and enough headroom for the
+      # extra data (see MULTI_FORMAT_PLAN.md).
       - name: Run delivery details pipeline
         run: |
           python scripts/load_delivery_details_pipeline.py \
             --csv t20_bbb.csv \
+            --format T20 \
+            --gender male \
             --skip-validation
 
       - name: Update ELO ratings

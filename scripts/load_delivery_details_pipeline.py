@@ -81,7 +81,7 @@ def step_validate(csv_path, db_url, dry_run=False):
     return True
 
 
-def step_load(csv_path, db_url, dry_run=False):
+def step_load(csv_path, db_url, dry_run=False, fmt="T20", gender="male"):
     """Step 2: Load new rows with duplicate detection."""
     print_header("STEP 2: LOAD DATA")
     
@@ -94,7 +94,10 @@ def step_load(csv_path, db_url, dry_run=False):
     existing_keys = get_existing_keys(engine)
     
     # Load new data
-    results = load_csv(csv_path, engine, dry_run=dry_run, existing_keys=existing_keys)
+    # fmt/gender must be passed explicitly: load_csv defaults to men's T20, so omitting them
+    # would stamp an ODI or Test file as T20.
+    results = load_csv(csv_path, engine, dry_run=dry_run, existing_keys=existing_keys,
+                       fmt=fmt, gender=gender)
     
     print(f"\n✓ Load complete")
     print(f"  - CSV rows: {results['total_in_csv']:,}")
@@ -240,7 +243,11 @@ Examples:
   python scripts/load_delivery_details_pipeline.py --csv data.csv --db-url "$DATABASE_URL" --skip-elo
         """
     )
-    parser.add_argument('--csv', required=True, help='Path to t20_bbb.csv')
+    parser.add_argument('--csv', required=True, help='Path to the ball-by-ball CSV')
+    parser.add_argument('--format', required=True, dest='fmt', choices=['T20', 'ODI', 'TEST'],
+                        help='Cricket format held in this file. Authoritative - never inferred.')
+    parser.add_argument('--gender', required=True, choices=['male', 'female'],
+                        help='Gender held in this file')
     parser.add_argument('--db-url', help='Database URL (or set DATABASE_URL env var)')
     parser.add_argument('--dry-run', action='store_true', help='Show what would happen without making changes')
     parser.add_argument('--skip-validation', action='store_true', help='Skip the validation step')
@@ -285,7 +292,7 @@ Examples:
         
         # Step 2: Load
         if not args.skip_load:
-            step_load(args.csv, db_url, dry_run=args.dry_run)
+            step_load(args.csv, db_url, dry_run=args.dry_run, fmt=args.fmt, gender=args.gender)
         else:
             print("\n[SKIPPED] Step 2: Load Data")
         
