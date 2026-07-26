@@ -67,10 +67,17 @@ column rather than assuming the write side is the whole job.
 Also unified the landing page's mobile breakpoint — it used a hand-picked `max-width:759px` while
 `App.js` uses the theme's `sm`.
 
-**Still T20-shaped, so A11 is not finished:** `/recent-matches/discover` and
-`/landing/featured-innings`. The match tiles and featured innings do not follow the format
-selection yet. The frontend passes the parameter and it is currently ignored. Both carry hardcoded
-competition whitelists (`routers/landing.py` `FEATURED_COMPETITIONS`) and need their own pass.
+**`/landing/featured-innings` is now format-aware** — pinned on format, with the "standout"
+strike-rate threshold taken from that format's benchmark band rather than a T20 constant of 130.
+
+**⚠️ Caches keep being the trap.** Featured innings looked like it worked and did not: the
+response cache was one global entry with no format in the key, so whichever format asked first was
+served to every other. ODI was returning T20 innings at SR 207 and looking plausible. That is the
+**third** instance — after `query_builder_metadata` (0.6) and the analytics response cache (0.7).
+**When making anything format-aware, check its cache key before believing the result.**
+
+**Still outstanding for A11:** `/recent-matches/discover`, which drives the match tiles. Ten
+queries over `matches` plus its own competition aliasing, so it wants a dedicated pass.
 
 ### 2026-07-26 — Chunk A9 — Claude — per-format ELO
 
