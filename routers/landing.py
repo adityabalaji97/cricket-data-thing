@@ -3,13 +3,14 @@ Landing page router - featured innings endpoint
 Surfaces recent standout batting performances with wagon wheel data.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text, bindparam
 import logging
 import time
 
 from database import get_session
+from format_config import get_format
 
 router = APIRouter(prefix="/landing", tags=["landing"])
 logger = logging.getLogger(__name__)
@@ -39,31 +40,42 @@ _FULL_MEMBER_TEAMS = {
 }
 
 # Simple in-memory cache with 1-hour TTL
-_featured_cache = {"data": None, "timestamp": 0}
+# Keyed by (format, gender): a single global entry would serve whichever format asked first to
+# every other one. Same trap as the query-builder column cache.
+_featured_cache: dict = {}
 CACHE_TTL = 3600
 
 
 @router.get("/featured-innings")
-def get_featured_innings(db: Session = Depends(get_session)):
+def get_featured_innings(
+    format: str = Query("T20", description="Cricket format"),
+    gender: str = Query("male", description="Men's or women's cricket"),
+    db: Session = Depends(get_session),
+):
     """
     Return up to 6 standout recent batting innings with wagon wheel data.
     Used on the landing page to showcase impressive performances.
     """
-    global _featured_cache
-
+    cache_key = (format, gender)
     now = time.time()
-    if _featured_cache["data"] is not None and (now - _featured_cache["timestamp"]) < CACHE_TTL:
-        return _featured_cache["data"]
+    cached = _featured_cache.get(cache_key)
+    if cached and (now - cached["timestamp"]) < CACHE_TTL:
+        return cached["data"]
 
     try:
-        result = _fetch_featured_innings(db, days=30, min_runs=40, min_sr=130)
+        spec = get_format(format, gender)
+        good_sr = spec.sr_bands[0]
+        result = _fetch_featured_innings(
+            db, days=30, min_runs=40, min_sr=good_sr, fmt=format, gender=gender
+        )
 
         # Fallback: expand window if too few results
         if len(result) < 3:
-            result = _fetch_featured_innings(db, days=60, min_runs=30, min_sr=120)
+            result = _fetch_featured_innings(
+                db, days=60, min_runs=30, min_sr=spec.sr_bands[1], fmt=format, gender=gender
+            )
 
-        _featured_cache["data"] = result
-        _featured_cache["timestamp"] = now
+        _featured_cache[cache_key] = {"data": result, "timestamp": now}
 
         return result
 
@@ -72,10 +84,23 @@ def get_featured_innings(db: Session = Depends(get_session)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float):
+def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float,
+                            fmt: str = 'T20', gender: str = 'male'):
     """Fetch standout innings and their wagon wheel data."""
 
     # Step 1: Find standout innings from batting_stats (used as candidate filter)
+    # The league whitelist is a T20 concept. Every ODI or Test sits in its format's own bucket
+    # or a named ICC event, so for those the format pin above is already the right filter and
+    # only the Full Member check is worth keeping.
+    if fmt == "T20" and gender == "male":
+        competition_clause = (
+            "m.competition IN :competitions"
+            " OR (m.competition IN ('T20I', 'International Twenty20')"
+            "     AND (m.team1 IN :full_members OR m.team2 IN :full_members))"
+        )
+    else:
+        competition_clause = "m.team1 IN :full_members OR m.team2 IN :full_members"
+
     innings_query = text(f"""
         SELECT bs.match_id, bs.striker, bs.innings, bs.runs, bs.balls_faced,
                bs.strike_rate, bs.fours, bs.sixes, bs.batting_team,
@@ -83,12 +108,11 @@ def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float
         FROM batting_stats bs
         JOIN matches m ON bs.match_id = m.id
         WHERE m.date >= CURRENT_DATE - INTERVAL '{days} days'
+          AND bs.format = :fmt AND bs.gender = :gender
           AND bs.runs >= :min_runs
           AND bs.strike_rate >= :min_sr
           AND bs.balls_faced >= 15
-          AND (m.competition IN :competitions
-               OR (m.competition IN ('T20I', 'International Twenty20')
-                   AND (m.team1 IN :full_members OR m.team2 IN :full_members)))
+          AND ({competition_clause})
         ORDER BY bs.runs DESC, bs.strike_rate DESC
         LIMIT 20
     """).bindparams(
@@ -99,8 +123,10 @@ def _fetch_featured_innings(db: Session, days: int, min_runs: int, min_sr: float
     innings_rows = db.execute(innings_query, {
         "min_runs": min_runs,
         "min_sr": min_sr,
+        "fmt": fmt,
+        "gender": gender,
         "competitions": FEATURED_COMPETITIONS,
-        "full_members": list(_FULL_MEMBER_TEAMS)
+        "full_members": list(_FULL_MEMBER_TEAMS),
     }).fetchall()
 
     results = []
