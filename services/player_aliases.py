@@ -416,6 +416,25 @@ ALIAS_MAP_CTE = """
 """
 
 
+# A join-able source of unambiguous legacy -> canonical pairs, for the older call sites that
+# already reference `<alias>.alias_name` and only need the fan-out removed. `player_aliases` has
+# no uniqueness on either column, so joining it directly multiplies rows -- and therefore
+# double-counts every aggregate -- for the 39 legacy names that map to several full names.
+# Those same names are excluded here rather than arbitrarily collapsed, for the reason given
+# in ALIAS_MAP_CTE.
+UNAMBIGUOUS_ALIASES = """(
+            SELECT pa.player_name, pa.alias_name
+            FROM player_aliases pa
+            JOIN (
+                SELECT player_name
+                FROM player_aliases
+                WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
+                GROUP BY player_name
+                HAVING COUNT(DISTINCT alias_name) = 1
+            ) unambiguous ON unambiguous.player_name = pa.player_name
+        )"""
+
+
 def canonical_name_sql(name_column: str, alias: str = "am") -> str:
     """The expression to select and group by, in place of the raw name column.
 

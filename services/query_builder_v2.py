@@ -11,7 +11,12 @@ from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import date
 from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
 from services.delivery_data_service import get_venue_aliases
-from services.player_aliases import ALIAS_MAP_CTE, alias_map_join_sql, canonical_name_sql
+from services.player_aliases import (
+    ALIAS_MAP_CTE,
+    UNAMBIGUOUS_ALIASES,
+    alias_map_join_sql,
+    canonical_name_sql,
+)
 from services.bowler_types import PACE_TYPES as ALL_KNOWN_PACE_TYPES, SPIN_TYPES as ALL_KNOWN_SPIN_TYPES
 import logging
 
@@ -866,8 +871,8 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
     pa_join = ""
     if needs_partner_canon:
         pa_join = (
-            "LEFT JOIN player_aliases pa_bat ON pa_bat.player_name = d.batter "
-            "LEFT JOIN player_aliases pa_ns  ON pa_ns.player_name = d.non_striker"
+            "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = d.batter "
+            "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = d.non_striker"
         )
 
     combined_query = f"""
@@ -3201,8 +3206,8 @@ def handle_grouped_query(
     pa_join = ""
     if needs_partner_canon:
         pa_join = (
-            "LEFT JOIN player_aliases pa_bat ON pa_bat.player_name = dd.bat "
-            "LEFT JOIN player_aliases pa_ns  ON pa_ns.player_name = dd.non_striker"
+            "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = dd.bat "
+            "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = dd.non_striker"
         )
 
     # Delivery-position grouping: ROW_NUMBER over delivery_details to produce
@@ -3549,8 +3554,8 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
             summary_pa_join = ""
             if summary_needs_partner_canon:
                 summary_pa_join = (
-                    "LEFT JOIN player_aliases pa_bat ON pa_bat.player_name = dd.bat "
-                    "LEFT JOIN player_aliases pa_ns  ON pa_ns.player_name = dd.non_striker"
+                    "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = dd.bat "
+                    "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = dd.non_striker"
                 )
 
             # Same conditional CTE/join splicing as handle_grouped_query for
