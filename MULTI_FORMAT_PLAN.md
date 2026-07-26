@@ -23,7 +23,7 @@ explicit promotion steps.
 | **0.4** | Pipeline format-awareness | [x] 2026-07-26 (local) |
 | **0.5** | `table_routing` replaces the 2015 date fork | [x] 2026-07-26 — folded into 0.4 |
 | **0.6** | Query builder backend format param | [x] 2026-07-26 (`/columns` scoping deferred) |
-| **0.7** | Frontend foundation: theme, FormatContext, API client | [ ] |
+| **0.7** | Frontend foundation: theme, FormatContext, API client | [x] 2026-07-26 |
 | **0.8** | Sunset gating + NavMenu consolidation | [ ] |
 | **0.9** | Production stats backfill (corrupt wicket counts) | [x] 2026-07-26 (prod) |
 | **0.10** | Player-name canonicalisation at grouping | [x] 2026-07-26 |

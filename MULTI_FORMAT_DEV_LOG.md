@@ -9,9 +9,8 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** **0.4, 0.5 and 0.6 COMPLETE.** ODIs are queryable end to end locally.
-  Next is **0.7** (frontend foundation: theme consolidation, FormatContext, API client) and
-  **0.8** (sunset gating + NavMenu).
+- **Active chunk:** **0.4-0.7, 0.9 and 0.10 COMPLETE.** Next is **0.8** (sunset gating +
+  NavMenu consolidation), then Phase A opens with the essential-2 upgrade and the ODI backfill.
 - **Both former blockers are now resolved in code, locally:**
   - The dropdown cache is partitioned by (format, gender); `/deliveries/columns` takes a format
     parameter. Fixing it exposed that the loader left `delivery_details.competition` raw while
@@ -48,6 +47,35 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-26 — Chunk 0.7 — Claude — frontend foundation
+
+**Done:** `src/theme/hindsightDark.js` is now the only definition of the dark design system;
+`queryBuilderTheme.js` is a thin alias so its seven importers are untouched, `LandingPage` maps
+its short names onto the shared tokens, and the tokens are published as CSS custom properties
+(`--hs-*`) for stylesheets that cannot import JS. Added `src/context/FormatContext.jsx` (fed by
+`GET /formats`, persisted to localStorage and `?fmt=`) and `src/components/FormatSwitcher.jsx`
+in both the mobile and desktop headers.
+
+**No visual drift, proven rather than eyeballed:** every token was compared against the previous
+definitions. All 19 query-builder tokens are byte-identical. The only change anywhere is the
+landing page's `hairline`, 0.06 → 0.07 alpha — the pre-existing drift between the two copies,
+now reconciled.
+
+**Notes for the next session**
+- `analyticsApi.js` holds the active format at module level and `FormatProvider` pushes the
+  selection into it, so anything already routed through that module becomes format-aware without
+  touching the 132 inline `config.API_URL` fetches. Migrating a call site to `analyticsApi` is
+  now how you make it format-aware.
+- Switching format clears the analytics response cache, otherwise a switch can serve the previous
+  format's numbers from cache.
+- `matchScorecard.css` still contains its own hex literals. The CSS variables exist for it now,
+  but the substitution has not been done — worth doing when the scorecard is next touched.
+- Two stray `#0a0c11` literals remain in inline JSX styles (`search/SearchBar.jsx:237`,
+  `scorecard/MatchScorecardPage.jsx:641`). Cosmetic, not duplicate palettes.
+- There is no browser driver in this environment, so nothing was screenshotted. The token
+  comparison above is the substitute; a human should still glance at the landing page and query
+  builder before this ships.
 
 ### 2026-07-26 — Chunks 0.9 and 0.10 — Claude
 
