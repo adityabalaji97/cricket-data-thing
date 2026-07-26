@@ -256,7 +256,9 @@ def analyze_query_requirements(
     start_date: Optional[date],
     end_date: Optional[date],
     group_by: List[str],
-    filters_used: Dict[str, Any]
+    filters_used: Dict[str, Any],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, Any]:
     """
     Analyze query to determine which tables to use.
@@ -293,9 +295,22 @@ def analyze_query_requirements(
     query_start = start_date or date(2005, 1, 1)  # Default to earliest data
     query_end = end_date or date.today()
     
+    # The legacy `deliveries` table only ever held men's T20 from before 2015. Every other
+    # format lives entirely in delivery_details regardless of date -- which matters because ODI
+    # data goes back to 2000, and a date-only fork would route all of it to a table that has
+    # never contained an ODI, silently returning nothing.
+    from services.analytics_common import table_routing
+
+    routing = table_routing(fmt, gender, start_date=start_date, end_date=end_date)
+    if not routing['legacy']:
+        result['use_legacy'] = False
+        result['use_new'] = True
+        result['new_date_range'] = (query_start, query_end)
+        return result
+
     has_pre_2015 = query_start < DELIVERY_DETAILS_START_DATE
     has_post_2015 = query_end >= DELIVERY_DETAILS_START_DATE
-    
+
     # If advanced columns used, we can only query delivery_details (2015+)
     if advanced_used:
         result['use_new'] = True

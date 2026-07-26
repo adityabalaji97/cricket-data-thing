@@ -76,7 +76,11 @@ def get_match_scorecard_service(match_id: str, min_balls: int, db: Session) -> D
         raise HTTPException(status_code=404, detail=f"Match not found: {match_id}")
 
     match_date = match.get("date")
-    data_source = data_source_for_match_date(match_date)
+    data_source = data_source_for_match_date(
+        match_date,
+        match.get("format") or "T20",
+        match.get("gender") or "male",
+    )
     use_details = data_source == "delivery_details"
 
     if use_details:
@@ -111,7 +115,7 @@ def _fetch_match(match_id: str, db: Session) -> Optional[Dict[str, Any]]:
             """
             SELECT id, date, venue, city, event_name, event_match_number, team1, team2,
                    toss_winner, toss_decision, winner, outcome, player_of_match,
-                   overs, balls_per_over, match_type, competition
+                   overs, balls_per_over, match_type, competition, format, gender
             FROM matches
             WHERE id = :match_id
             """
@@ -121,7 +125,21 @@ def _fetch_match(match_id: str, db: Session) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 
-def data_source_for_match_date(match_date: Optional[date]) -> str:
+def data_source_for_match_date(
+    match_date: Optional[date],
+    fmt: str = "T20",
+    gender: str = "male",
+) -> str:
+    """Which ball-by-ball table holds this match.
+
+    Date alone is not enough: the legacy `deliveries` table only ever held men's T20 from
+    before 2015, so a 2005 ODI must still come from delivery_details. Routing it by date would
+    send it to a table that has never contained an ODI and render an empty scorecard.
+    """
+    from services.analytics_common import table_routing
+
+    if not table_routing(fmt, gender, start_date=match_date, end_date=match_date)['legacy']:
+        return "delivery_details"
     return "delivery_details" if match_date and match_date >= DETAILS_START_DATE else "deliveries"
 
 

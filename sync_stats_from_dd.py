@@ -59,7 +59,8 @@ class StatsFromDeliveryDetails:
             SELECT p_match as match_id, inns as innings, over, ball,
                    bat as batter, bowl as bowler,
                    team_bat as batting_team, team_bowl as bowling_team,
-                   score, batruns, outcome, out, dismissal, noball, wide, byes, legbyes
+                   score, batruns, outcome, out, bat_out, dismissal, noball, wide, byes, legbyes,
+                   format, gender
             FROM delivery_details
             WHERE p_match = :match_id
             ORDER BY inns, over, ball
@@ -68,6 +69,31 @@ class StatsFromDeliveryDetails:
         columns = result.keys()
         return [dict(zip(columns, row)) for row in result.fetchall()]
     
+    @staticmethod
+    def _phase_ranges(deliveries: List[Dict]):
+        """Phase boundaries for this match's format, as (column_prefix, start, end_exclusive).
+
+        The pp_/middle_/death_ columns are positional phase 1/2/3 rather than literally
+        powerplay/middle/death -- format_config supplies the over ranges and the display labels
+        (see MULTI_FORMAT_PLAN.md decision D3). For men's T20 this reproduces the previously
+        hardcoded [(0, 6), (6, 15), (15, 99)] exactly.
+        """
+        from services.analytics_common import phase_bounds
+
+        fmt = (deliveries[0].get('format') if deliveries else None) or 'T20'
+        gender = (deliveries[0].get('gender') if deliveries else None) or 'male'
+        phases = phase_bounds(fmt, gender)
+
+        column_prefixes = ['pp', 'middle', 'death']
+        ranges = []
+        for index, phase in enumerate(phases):
+            # The final phase stays unbounded, as the old literal 99 was: Test innings have no
+            # fixed length, and an over beyond the nominal end must still be counted somewhere.
+            is_last = index == len(phases) - 1
+            end = 10_000 if is_last or phase.end_over is None else phase.end_over + 1
+            ranges.append((column_prefixes[index], phase.start_over, end))
+        return ranges
+
     def calculate_batting_stats(self, match_id: str, innings: int, batter: str, deliveries: List[Dict]) -> BattingStats:
         batter_dels = [d for d in deliveries if d['innings'] == innings and d['batter'] == batter]
         if not batter_dels:
@@ -80,7 +106,7 @@ class StatsFromDeliveryDetails:
         
         stats.runs = sum(d['batruns'] or 0 for d in batter_dels)
         stats.balls_faced = len([d for d in batter_dels if not d['wide']])
-        stats.wickets = sum(1 for d in batter_dels if d['out'])
+        stats.wickets = sum(1 for d in batter_dels if self._batter_dismissed(d))
         stats.dots = sum(1 for d in batter_dels if (d['batruns'] or 0) == 0 and not d['wide'])
         stats.ones = sum(1 for d in batter_dels if (d['batruns'] or 0) == 1)
         stats.twos = sum(1 for d in batter_dels if (d['batruns'] or 0) == 2)
@@ -92,13 +118,13 @@ class StatsFromDeliveryDetails:
             stats.strike_rate = (stats.runs * 100.0) / stats.balls_faced
         
         # Phase stats
-        for phase, (start, end) in [('pp', (0, 6)), ('middle', (6, 15)), ('death', (15, 99))]:
+        for phase, start, end in self._phase_ranges(deliveries):
             phase_dels = [d for d in batter_dels if start <= d['over'] < end]
             setattr(stats, f'{phase}_runs', sum(d['batruns'] or 0 for d in phase_dels))
             balls = len([d for d in phase_dels if not d['wide']])
             setattr(stats, f'{phase}_balls', balls)
             setattr(stats, f'{phase}_dots', sum(1 for d in phase_dels if (d['batruns'] or 0) == 0 and not d['wide']))
-            setattr(stats, f'{phase}_wickets', sum(1 for d in phase_dels if d['out']))
+            setattr(stats, f'{phase}_wickets', sum(1 for d in phase_dels if self._batter_dismissed(d)))
             setattr(stats, f'{phase}_boundaries', sum(1 for d in phase_dels if (d['batruns'] or 0) in [4, 6]))
             if balls > 0:
                 setattr(stats, f'{phase}_strike_rate', (getattr(stats, f'{phase}_runs') * 100.0) / balls)
@@ -130,9 +156,69 @@ class StatsFromDeliveryDetails:
             if stats.strike_rate:
                 stats.sr_diff = stats.strike_rate - stats.team_sr_excl_batter
         
-        stats.fantasy_points = self.fantasy_calculator.calculate_batting_points(stats)
+        self._stamp_format(stats, deliveries)
+        if self._fantasy_applies(deliveries):
+            stats.fantasy_points = self.fantasy_calculator.calculate_batting_points(stats)
         return stats
-    
+
+    @staticmethod
+    def _truthy(value) -> bool:
+        """Interpret delivery_details' string booleans.
+
+        `out` and `bat_out` are VARCHAR holding the strings 'true' and 'false', not booleans.
+        Testing them directly is always true -- the string 'false' is truthy in Python -- which
+        counts every single ball as a wicket.
+        """
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() in {'true', 't', '1', 'yes'}
+
+    @classmethod
+    def _is_out(cls, delivery: Dict) -> bool:
+        """Whether a wicket fell on this delivery, whoever was dismissed."""
+        return cls._truthy(delivery.get('out'))
+
+    @classmethod
+    def _batter_dismissed(cls, delivery: Dict) -> bool:
+        """Whether the *striker* was the player dismissed on this delivery.
+
+        A wicket on a ball this batter faced is not necessarily this batter's wicket: the
+        non-striker can be run out at the bowler's end. `bat_out` distinguishes the two, and
+        agrees exactly with `p_out = p_bat` in the data.
+        """
+        return cls._truthy(delivery.get('out')) and cls._truthy(delivery.get('bat_out'))
+
+    @staticmethod
+    def _stamp_format(stats, deliveries: List[Dict]) -> None:
+        """Denormalize format/gender onto the stats row so it can be filtered without a join."""
+        if deliveries:
+            stats.format = deliveries[0].get('format') or 'T20'
+            stats.gender = deliveries[0].get('gender') or 'male'
+
+    # Fantasy rulesets that are actually implemented. format_config declares 'odi' for men's
+    # ODIs, but that is a statement of intent for a later chunk, not a promise that a calculator
+    # exists -- so the gate below keys off this registry rather than off the declared name.
+    # Add 'odi' here when fantasy_points_odi lands.
+    IMPLEMENTED_FANTASY_RULESETS = {'t20'}
+
+    @classmethod
+    def _fantasy_applies(cls, deliveries: List[Dict]) -> bool:
+        """Whether fantasy points can be computed correctly for this format.
+
+        FantasyPointsCalculator is calibrated entirely for T20 -- strike-rate bands around
+        130/150/170, economy bands 5 to 12, 18-to-24-ball bowling caps. Applied to an ODI it
+        inflates every number; applied to a Test it is meaningless. Where no implemented ruleset
+        matches, the column is left NULL rather than filled with a plausible-looking wrong value.
+        """
+        from format_config import get_format
+
+        fmt = (deliveries[0].get('format') if deliveries else None) or 'T20'
+        gender = (deliveries[0].get('gender') if deliveries else None) or 'male'
+        ruleset = get_format(fmt, gender).fantasy_ruleset
+        return ruleset in cls.IMPLEMENTED_FANTASY_RULESETS
+
     def calculate_bowling_stats(self, match_id: str, innings: int, bowler: str, deliveries: List[Dict]) -> BowlingStats:
         bowler_dels = [d for d in deliveries if d['innings'] == innings and d['bowler'] == bowler]
         if not bowler_dels:
@@ -146,7 +232,7 @@ class StatsFromDeliveryDetails:
         legal_balls = len([d for d in bowler_dels if not d['wide'] and not d['noball']])
         stats.overs = legal_balls / 6
         stats.runs_conceded = sum((d['score'] or 0) + (d['wide'] or 0) + (d['noball'] or 0) for d in bowler_dels)
-        stats.wickets = sum(1 for d in bowler_dels if d['out'] and d['dismissal'] and 
+        stats.wickets = sum(1 for d in bowler_dels if self._is_out(d) and d['dismissal'] and 
                           d['dismissal'].lower() in [w.lower() for w in self.BOWLER_WICKETS])
         stats.dots = sum(1 for d in bowler_dels if (d['score'] or 0) == 0 and not d['wide'] and not d['noball'])
         stats.fours_conceded = sum(1 for d in bowler_dels if (d['score'] or 0) == 4)
@@ -167,13 +253,13 @@ class StatsFromDeliveryDetails:
         stats.bowling_position = len(prior_bowlers) + 1
         
         # Phase stats
-        for phase, (start, end) in [('pp', (0, 6)), ('middle', (6, 15)), ('death', (15, 99))]:
+        for phase, start, end in self._phase_ranges(deliveries):
             phase_dels = [d for d in bowler_dels if start <= d['over'] < end]
             legal = len([d for d in phase_dels if not d['wide'] and not d['noball']])
             setattr(stats, f'{phase}_overs', legal / 6)
             runs = sum((d['score'] or 0) + (d['wide'] or 0) + (d['noball'] or 0) for d in phase_dels)
             setattr(stats, f'{phase}_runs', runs)
-            setattr(stats, f'{phase}_wickets', sum(1 for d in phase_dels if d['out'] and d['dismissal'] and 
+            setattr(stats, f'{phase}_wickets', sum(1 for d in phase_dels if self._is_out(d) and d['dismissal'] and 
                           d['dismissal'].lower() in [w.lower() for w in self.BOWLER_WICKETS]))
             setattr(stats, f'{phase}_dots', sum(1 for d in phase_dels if (d['score'] or 0) == 0 and not d['wide'] and not d['noball']))
             setattr(stats, f'{phase}_boundaries', sum(1 for d in phase_dels if (d['score'] or 0) in [4, 6]))
@@ -190,9 +276,11 @@ class StatsFromDeliveryDetails:
             if stats.economy:
                 stats.economy_diff = stats.economy - stats.team_economy_excl_bowler
         
-        stats.fantasy_points = self.fantasy_calculator.calculate_bowling_points(stats)
+        self._stamp_format(stats, deliveries)
+        if self._fantasy_applies(deliveries):
+            stats.fantasy_points = self.fantasy_calculator.calculate_bowling_points(stats)
         return stats
-    
+
     def process_match_stats(self, session: Session, match_id: str) -> Dict:
         deliveries = self.get_match_deliveries(session, match_id)
         if not deliveries:
