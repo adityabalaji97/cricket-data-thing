@@ -22,7 +22,7 @@ explicit promotion steps.
 | **0.3** | `format_config.py` + `/formats` + phase helpers | [x] 2026-07-25 |
 | **0.4** | Pipeline format-awareness | [x] 2026-07-26 (local) |
 | **0.5** | `table_routing` replaces the 2015 date fork | [x] 2026-07-26 — folded into 0.4 |
-| **0.6** | Query builder backend format param | [ ] |
+| **0.6** | Query builder backend format param | [x] 2026-07-26 (`/columns` scoping deferred) |
 | **0.7** | Frontend foundation: theme, FormatContext, API client | [ ] |
 | **0.8** | Sunset gating + NavMenu consolidation | [ ] |
 | **A1** | ODI backfill load | [ ] |

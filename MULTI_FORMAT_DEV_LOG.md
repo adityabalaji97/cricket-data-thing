@@ -9,8 +9,14 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** **0.4 COMPLETE (incl. folded-in 0.5).** Next is 0.6 — thread the format
-  parameter through the query-builder router so ODI becomes queryable from the API.
+- **Active chunk:** **0.4, 0.5 and 0.6 COMPLETE.** ODIs are queryable end to end locally.
+  Next is **0.7** (frontend foundation: theme consolidation, FormatContext, API client) and
+  **0.8** (sunset gating + NavMenu).
+- **Carried over from 0.6:** `/query/deliveries/columns` is **not** format-scoped yet. It reads
+  the `query_builder_metadata` cache, which is a `SELECT DISTINCT` with no format partition, so
+  **refreshing that cache now would mix ODI competitions into the T20 dropdown**. Partition the
+  cache keys by (format, gender) before running `scripts/refresh_query_builder_metadata.py`
+  against a multi-format database.
 - ⚠️ **OPEN PRODUCTION ISSUE — needs a decision, see the 2026-07-26 entry below:** 34% of stored
   `batting_stats` rows (21,905 of 63,704) hold impossible wicket counts, rising to 93% of 2026
   rows. The code bug is fixed; the **stored data is still wrong** and needs a backfill.
@@ -40,6 +46,20 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-26 — Chunk 0.6 — Claude — query builder is format-aware
+
+**Done:** `format`/`gender` request parameters (default men's T20); over and innings bounds
+validated against the format instead of fixed `le=19`; the phase grouping expression on the
+delivery_details path now comes from `format_config`.
+
+**Verified:** goldens 13/13 on defaults; an ODI query returns 149,599 balls with phase strike
+rates of 70.3 (powerplay) / 75.5 (middle) / 106.8 (death) — the right shape for the format;
+`over_max=45` gives 200 for ODI and 422 for T20; `innings=4` gives 200 for Tests and 422 for ODI.
+
+**Left open:** `/columns` format scoping, see CURRENT STATE. The legacy `deliveries` grouping map
+deliberately keeps its hardcoded phase literal — that table holds only men's T20 from before
+2015, so the T20 split is correct there by construction.
 
 ### 2026-07-26 — Chunk 0.4d/0.4e/0.4f + 0.5 — Claude — 0.4 COMPLETE
 
