@@ -9,7 +9,8 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** **PHASE 0 IS COMPLETE** (0.1-0.10). Next is **Phase A**, which opens with
+- **Active chunk:** **Phase 0 complete, plus A3 and A5.** ODIs are usable in the query
+  builder UI and render correct scorecards, all against local data. Next is **Phase A**, which opens with
   the Heroku essential-2 upgrade and the real ODI backfill (A1), then the workflow matrix (A2).
 - **Before A1:** production still needs migration `002`, and the branch is **unpushed and
   undeployed** — production is running `main` with only migration 001 applied and its stats
@@ -50,6 +51,28 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-26 — Chunks A3 and A5 — Claude
+
+Both chosen deliberately as the Phase A work that needs no production load and no spend, so they
+could be built and verified against the local ODI slice.
+
+**A3 query builder UI.** Over inputs were capped at 19 and the innings dropdown hardcoded to two
+entries, so the UI could not express an ODI query even though the backend has accepted one since
+0.6. Both now come from the selected format, with the cap shown in the field label. All three
+requests carry the format, including the columns lookup — its values are cached per format, so
+without it an ODI query was offered the T20 competition list. That fetch re-runs on format change.
+
+**A5 scorecard.** The phase breakdown used a hardcoded `over < 6 / over < 15` CASE with "1-6"
+labels, so an ODI card split at T20 boundaries. Now from format_config: an ODI reads
+Powerplay 1-10, Middle 11-40, Death 41-50. The chase note no longer subtracts from a literal 120
+— it uses the format's innings length, prefers the innings' own allowance for rain-reduced games,
+derives the target from the innings before the chase, and returns nothing for Tests. The
+result-text wicket-margin fallback is guarded to two-innings matches.
+
+Verified: T20 caps at over 19 with 38 competitions, ODI at 49 with 3; an overs 41-50 ODI filter
+resolves to the death phase over 12,046 balls; a 2006 England v Ireland ODI renders with correct
+phases and a Target 302 note. Goldens 13/13 throughout.
 
 ### 2026-07-26 — Chunk 0.8 — Claude — PHASE 0 COMPLETE
 

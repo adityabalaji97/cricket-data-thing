@@ -29,9 +29,9 @@ explicit promotion steps.
 | **0.10** | Player-name canonicalisation at grouping | [x] 2026-07-26 |
 | **A1** | ODI backfill load | [ ] |
 | **A2** | Workflow matrix (t20 + odi daily) | [ ] |
-| **A3** | Query builder ODI (frontend) | [ ] |
+| **A3** | Query builder ODI (frontend) | [x] 2026-07-26 |
 | **A4** | nl2query + summarizer ODI | [ ] |
-| **A5** | Scorecard ODI | [ ] |
+| **A5** | Scorecard ODI | [x] 2026-07-26 |
 | **A6** | Match preview redesign 1: shell | [ ] |
 | **A7** | Match preview redesign 2: core blocks + format phases | [ ] |
 | **A8** | Match preview redesign 3: children + mobile pass | [ ] |
