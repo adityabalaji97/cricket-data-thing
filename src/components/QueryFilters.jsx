@@ -19,6 +19,7 @@ import {
 import InfoIcon from '@mui/icons-material/Info';
 import WarningIcon from '@mui/icons-material/Warning';
 import { qbColors, qbFonts } from './queryBuilderTheme';
+import { useFormat } from '../context/FormatContext';
 
 
 // Info tooltip component
@@ -45,8 +46,20 @@ const CoverageWarning = ({ coverage, columnName }) => {
   );
 };
 
+const ORDINALS = ['1st', '2nd', '3rd', '4th'];
+const ordinalInnings = (n) => `${ORDINALS[n - 1] || `${n}th`} Innings`;
+
 const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColumns, isMobile }) => {
   // All dropdown data now comes from availableColumns (fetched from delivery_details)
+  const { active } = useFormat();
+
+  // Limits come from the selected format, not from T20 constants: an over 40 filter is normal
+  // for an ODI and meaningless for a T20, and Tests have four innings rather than two.
+  const overMax = active?.over_max ?? 19;
+  const inningsOptions = Array.from(
+    { length: active?.innings_count ?? 2 },
+    (_unused, index) => index + 1,
+  );
   
   const handleFilterChange = (key, value) => {
     setFilters(prev => {
@@ -245,19 +258,20 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               label="Innings"
             >
               <MenuItem value="">All</MenuItem>
-              <MenuItem value={1}>1st Innings</MenuItem>
-              <MenuItem value={2}>2nd Innings</MenuItem>
+              {inningsOptions.map((n) => (
+                <MenuItem key={n} value={n}>{ordinalInnings(n)}</MenuItem>
+              ))}
             </Select>
           </FormControl>
         </Grid>
         
         <Grid item xs={12} sm={4} md={3}>
           <TextField
-            label="Over Min"
+            label={`Over Min (0-${overMax})`}
             type="number"
             value={filters.over_min ?? ''}
             onChange={(e) => handleFilterChange('over_min', e.target.value ? parseInt(e.target.value) : null)}
-            inputProps={{ min: 0, max: 19 }}
+            inputProps={{ min: 0, max: overMax }}
             size="small"
             fullWidth
           />
@@ -265,11 +279,11 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         
         <Grid item xs={12} sm={4} md={3}>
           <TextField
-            label="Over Max"
+            label={`Over Max (0-${overMax})`}
             type="number"
             value={filters.over_max ?? ''}
             onChange={(e) => handleFilterChange('over_max', e.target.value ? parseInt(e.target.value) : null)}
-            inputProps={{ min: 0, max: 19 }}
+            inputProps={{ min: 0, max: overMax }}
             size="small"
             fullWidth
           />

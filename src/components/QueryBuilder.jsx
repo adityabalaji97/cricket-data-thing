@@ -24,6 +24,7 @@ import { useUrlParams, filtersToUrlParams } from '../utils/urlParamParser';
 import axios from 'axios';
 import config from '../config';
 import { qbButtonSx, qbCardSx, qbColors, qbFonts, qbGhostButtonSx } from './queryBuilderTheme';
+import { useFormat } from '../context/FormatContext';
 
 const getDefaultFilters = () => ({
   // Basic filters
@@ -148,6 +149,7 @@ const getActiveFilterCount = (filters, groupBy) => {
 };
 
 const QueryBuilder = ({ isMobile }) => {
+  const { formatParams, active } = useFormat();
   const { getFiltersFromUrl, getGroupByFromUrl, currentParams } = useUrlParams();
   
   const [filters, setFilters] = useState(getDefaultFilters);
@@ -214,7 +216,10 @@ const QueryBuilder = ({ isMobile }) => {
   useEffect(() => {
     const fetchAvailableColumns = async () => {
       try {
-        const response = await axios.get(`${config.API_URL}/query/deliveries/columns`);
+        const response = await axios.get(
+          `${config.API_URL}/query/deliveries/columns`,
+          { params: formatParams },
+        );
         setAvailableColumns(response.data);
       } catch (error) {
         console.error('Error fetching available columns:', error);
@@ -223,14 +228,17 @@ const QueryBuilder = ({ isMobile }) => {
     };
     
     fetchAvailableColumns();
-  }, []);
+    // Re-fetch on format change: the dropdown values are cached per format on the backend, so
+    // an ODI query must not be offered the T20 competition list.
+  }, [formatParams.format, formatParams.gender]);
   
   const executeQueryFromUrl = async (urlFilters, urlGroupBy) => {
     try {
       setLoading(true);
       setError(null);
       
-      const params = new URLSearchParams();
+      // Scope the query to the selected format; the backend defaults to men's T20.
+      const params = new URLSearchParams(formatParams);
       
       Object.entries(urlFilters).forEach(([key, value]) => {
         if (key === 'query_mode' && value === 'delivery') {
@@ -270,7 +278,8 @@ const QueryBuilder = ({ isMobile }) => {
       setLoading(true);
       setError(null);
       
-      const params = new URLSearchParams();
+      // Scope the query to the selected format; the backend defaults to men's T20.
+      const params = new URLSearchParams(formatParams);
       
       Object.entries(filters).forEach(([key, value]) => {
         if (key === 'query_mode' && value === 'delivery') {
