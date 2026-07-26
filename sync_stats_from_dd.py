@@ -165,15 +165,16 @@ class StatsFromDeliveryDetails:
     def _truthy(value) -> bool:
         """Interpret delivery_details' string booleans.
 
-        `out` and `bat_out` are VARCHAR holding the strings 'true' and 'false', not booleans.
-        Testing them directly is always true -- the string 'false' is truthy in Python -- which
-        counts every single ball as a wicket.
+        `out` and `bat_out` are VARCHAR holding the strings 'true' and 'false', not booleans, so
+        testing them directly is always true -- 'false' is a non-empty string -- which counts
+        every single ball as a wicket.
+
+        The comparison is case-insensitive because the two sides of the pipeline disagree: the
+        source CSVs write Python-style 'True'/'False' while the loaded table holds lowercase
+        'true'/'false'. A plain `== 'true'` works against the database and silently returns
+        nothing when run against a CSV.
         """
-        if value is None:
-            return False
-        if isinstance(value, bool):
-            return value
-        return str(value).strip().lower() in {'true', 't', '1', 'yes'}
+        return str(value).strip().lower() == 'true' if value is not None else False
 
     @classmethod
     def _is_out(cls, delivery: Dict) -> bool:
@@ -185,8 +186,16 @@ class StatsFromDeliveryDetails:
         """Whether the *striker* was the player dismissed on this delivery.
 
         A wicket on a ball this batter faced is not necessarily this batter's wicket: the
-        non-striker can be run out at the bowler's end. `bat_out` distinguishes the two, and
-        agrees exactly with `p_out = p_bat` in the data.
+        non-striker can be run out at the bowler's end.
+
+        `bat_out` is the only signal that works across all three feeds. The obvious alternative,
+        `p_out == p_bat`, agrees with it for ODIs and Tests but is broken in the T20 feed, where
+        the two id columns never match on any of the 7,961 wicket balls in the sample -- using it
+        would credit T20 batters with zero dismissals.
+
+        Note `bat_out` is not a dismissal flag on its own: outside wicket balls it is 'true' on
+        almost every delivery in the ODI and Test feeds. It only carries meaning together with
+        `out`, hence the conjunction.
         """
         return cls._truthy(delivery.get('out')) and cls._truthy(delivery.get('bat_out'))
 
