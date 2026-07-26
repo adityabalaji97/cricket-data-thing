@@ -9,8 +9,11 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** **0.4-0.7, 0.9 and 0.10 COMPLETE.** Next is **0.8** (sunset gating +
-  NavMenu consolidation), then Phase A opens with the essential-2 upgrade and the ODI backfill.
+- **Active chunk:** **PHASE 0 IS COMPLETE** (0.1-0.10). Next is **Phase A**, which opens with
+  the Heroku essential-2 upgrade and the real ODI backfill (A1), then the workflow matrix (A2).
+- **Before A1:** production still needs migration `002`, and the branch is **unpushed and
+  undeployed** — production is running `main` with only migration 001 applied and its stats
+  data repaired.
 - **Both former blockers are now resolved in code, locally:**
   - The dropdown cache is partitioned by (format, gender); `/deliveries/columns` takes a format
     parameter. Fixing it exposed that the loader left `delivery_details.competition` raw while
@@ -47,6 +50,27 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-26 — Chunk 0.8 — Claude — PHASE 0 COMPLETE
+
+**Sunset endpoints pinned to men's T20.** `main.py`'s 23 raw-SQL queries are pinned by wrapping
+the table in a filtered subquery rather than editing 23 different WHERE clauses — a subquery
+cannot interact with existing filter logic, and Postgres pushes the predicate down.
+
+**Grep was not sufficient, and only querying the endpoint revealed it.** `/players` is built with
+the SQLAlchemy ORM rather than a SQL string, so the textual substitution missed it and the
+endpoint still returned ODI-only players. Four ORM sites needed the filter added directly.
+`/players` now returns 5,668 names instead of 6,146, and Andrew Strauss, Ed Joyce and Geraint
+Jones — ODI-only in the local data — are correctly absent. **Lesson for later chunks: pinning by
+pattern-matching SQL text leaves ORM queries untouched.**
+
+**Navigation defined once.** `src/navItems.js` replaces the four hand-maintained copies in
+`App.js` (tab-index map, title map, desktop Tabs, mobile Menu). Verified against the originals:
+all 15 entries match on label, tab index and title.
+
+Eleven entries carry `t20Only`. They stay reachable but are disabled in both navs when a non-T20
+format is selected, because their endpoints are now T20-pinned and would otherwise render an empty
+page that reads as broken rather than out of scope.
 
 ### 2026-07-26 — Chunk 0.7 — Claude — frontend foundation
 
