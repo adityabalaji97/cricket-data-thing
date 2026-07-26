@@ -1,13 +1,18 @@
 """
-Load ALL columns from t20_bbb.csv into delivery_details table.
+Load ALL columns from a ball-by-ball CSV into the delivery_details table.
 Handles duplicates by only inserting new rows based on (p_match, inns, over, ball).
 
+--format and --gender are required: each source file holds exactly one format, and the flag is
+authoritative. Format is never inferred from the data -- `max_balls` is 0 for a third of ODI
+matches, varies within a match, and does not exist at all in the Test feed.
+
 Usage:
-    python scripts/load_delivery_details_full.py --csv /path/to/t20_bbb.csv --db-url "$DATABASE_URL"
-    python scripts/load_delivery_details_full.py --csv /path/to/t20_bbb.csv --dry-run
-    
-    # Using environment variable:
-    python scripts/load_delivery_details_full.py --csv /path/to/t20_bbb.csv
+    python scripts/load_delivery_details_full.py --csv data/slices/odi_slice.csv \
+        --format ODI --gender male
+    python scripts/load_delivery_details_full.py --csv /path/to/t20_bbb.csv \
+        --format T20 --gender male --dry-run
+
+The database URL comes from --db-url or $DATABASE_URL.
 """
 
 import os
@@ -76,7 +81,20 @@ COL_MAP = {
     'shot': 'shot',
     'control': 'control',
     'predscore': 'pred_score',
-    'wprob': 'win_prob'
+    'wprob': 'win_prob',
+
+    # Source columns preserved by migration 002. Not every file has every one of these -- the
+    # Test feed has no `rain`, the limited-overs feeds have no `day`/`session` -- and load_csv
+    # keeps only the mapped columns that are actually present, so absence is fine.
+    'tournament': 'tournament',
+    'season': 'season',
+    'trophy_name': 'trophy_name',
+    'daynight': 'daynight',
+    'rain': 'rain',
+    'day': 'day',
+    'session': 'session',
+    'trail_by': 'trail_by',
+    'lead_by': 'lead_by',
 }
 
 
@@ -107,29 +125,56 @@ def get_existing_keys(engine):
         return existing
 
 
-def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=None):
-    """Load CSV into delivery_details, skipping duplicates."""
-    
-    print(f"\nLoading from {csv_path}...")
+def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=None,
+             fmt="T20", gender="male"):
+    """Load CSV into delivery_details, skipping duplicates.
+
+    Every row is stamped with `fmt`/`gender` from the caller's flags rather than anything
+    derived from the data. `max_balls` looks like a format signal but is not one: it is 0 for
+    a third of ODI matches, varies within a single match, and the Test feed omits it entirely.
+    """
+    from format_config import effective_over_max, get_format
+
+    spec = get_format(fmt, gender)
+    over_cap = effective_over_max(spec)
+
+    print(f"\nLoading from {csv_path} as {spec.label} (format={spec.format}, gender={spec.gender})...")
     total_in_csv = 0
     total_skipped = 0
     total_inserted = 0
-    
+    max_over_seen = -1
+
     for i, chunk in enumerate(pd.read_csv(csv_path, chunksize=chunk_size, low_memory=False)):
         total_in_csv += len(chunk)
-        
+
         # Rename columns
         chunk = chunk.rename(columns=COL_MAP)
-        
+
         # Keep only mapped columns that exist
         cols_to_keep = [c for c in COL_MAP.values() if c in chunk.columns]
         df = chunk[cols_to_keep].copy()
-        
+
         # Convert p_match to string
         df['p_match'] = df['p_match'].astype(str)
-        
+
         # Fix over numbering: new dataset is 1-indexed, existing is 0-indexed
         df['over'] = df['over'] - 1
+
+        # The one guard the --format flag cannot provide: if the file really is another format
+        # (a rotated Dropbox secret pasted into the wrong slot), the overs give it away.
+        chunk_max_over = pd.to_numeric(df['over'], errors='coerce').max()
+        if pd.notna(chunk_max_over):
+            max_over_seen = max(max_over_seen, int(chunk_max_over))
+        if max_over_seen > over_cap:
+            raise SystemExit(
+                f"ABORTING: over {max_over_seen} exceeds the maximum of {over_cap} for "
+                f"{spec.label}. This file does not look like {spec.format} data — check that "
+                f"--format matches the source before loading."
+            )
+
+        # Stamp the format from the flags, not from the data.
+        df['format'] = spec.format
+        df['gender'] = spec.gender
         
         # Filter out existing records if we have existing keys
         if existing_keys:
@@ -174,16 +219,22 @@ def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=No
             print(f"  Chunk {i+1}: Inserted {len(df):,} new rows (total: {total_inserted:,})", end='\r')
     
     print(f"\n")
+    print(f"  Highest over seen: {max_over_seen} (cap for {spec.label}: {over_cap})")
     return {
         'total_in_csv': total_in_csv,
         'total_skipped': total_skipped,
-        'total_inserted': total_inserted
+        'total_inserted': total_inserted,
+        'max_over_seen': max_over_seen,
     }
 
 
 def main():
     parser = argparse.ArgumentParser(description='Load full CSV to delivery_details')
-    parser.add_argument('--csv', required=True, help='Path to t20_bbb.csv')
+    parser.add_argument('--csv', required=True, help='Path to the ball-by-ball CSV')
+    parser.add_argument('--format', required=True, dest='fmt', choices=['T20', 'ODI', 'TEST'],
+                        help='Cricket format held in this file. Authoritative - never inferred.')
+    parser.add_argument('--gender', required=True, choices=['male', 'female'],
+                        help='Gender held in this file')
     parser.add_argument('--db-url', help='Database URL (or set DATABASE_URL env var)')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be inserted without making changes')
     parser.add_argument('--force', action='store_true', help='Skip duplicate checking (faster but may create duplicates)')
@@ -210,7 +261,8 @@ def main():
         print("WARNING: --force mode - skipping duplicate check!")
     
     # Load CSV
-    results = load_csv(args.csv, engine, dry_run=args.dry_run, existing_keys=existing_keys)
+    results = load_csv(args.csv, engine, dry_run=args.dry_run, existing_keys=existing_keys,
+                       fmt=args.fmt, gender=args.gender)
     
     # Print summary
     print("=" * 60)
