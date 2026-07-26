@@ -51,6 +51,8 @@ import axios from 'axios';
 import config from './config';
 import { DEFAULT_START_DATE, TODAY } from './utils/dateDefaults';
 import FormatSwitcher from './components/FormatSwitcher';
+import { NAV_ITEMS, getCurrentTabForPath, getPageTitleForPath } from './navItems';
+import { useFormat } from './context/FormatContext';
 
 const TEAM_NAME_TO_ABBREVIATION = {
   'chennai super kings': 'CSK',
@@ -131,48 +133,9 @@ const AppContent = () => {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { isDefaultFormat } = useFormat();
 
-  const getCurrentTabForPath = (path) => (
-    path === '/' ? 0 :
-    path === '/search' ? 1 :
-    path === '/venue' ? 2 :
-    path === '/player' ? 3 :
-    path === '/comparison' ? 4 :
-    path === '/matchups' ? 5 :
-    path === '/query' ? 6 :
-    path === '/team' ? 7 :
-    path === '/team-comparison' ? 8 :
-    path === '/doppelgangers' ? 9 :
-    path === '/ipl-predictions' ? 10 :
-    path === '/rankings' ? 11 :
-    path === '/games/guess-innings' ? 12 :
-    path === '/games/player-journeys' ? 13 :
-    path === '/fantasy-planner' ? 14 :
-    path === '/credits' ? false :
-    path.startsWith('/scorecard') ? false :
-    path.startsWith('/wrapped') ? false : 0
-  );
 
-  const getPageTitleForPath = (path) => (
-    path === '/' ? 'Home' :
-    path === '/search' ? 'Search' :
-    path === '/venue' ? 'Match Preview' :
-    path === '/player' ? 'Player Profile' :
-    path === '/comparison' ? 'Batter Comparison' :
-    path === '/matchups' ? 'Matchups' :
-    path === '/query' ? 'Query Builder' :
-    path === '/team' ? 'Team Profile' :
-    path === '/team-comparison' ? 'Team Comparison' :
-    path === '/doppelgangers' ? 'Doppelgangers' :
-    path === '/ipl-predictions' ? 'IPL Predictions' :
-    path === '/rankings' ? 'Global Rankings' :
-    path === '/games/guess-innings' ? 'Guess the Innings' :
-    path === '/games/player-journeys' ? 'Player Journeys' :
-    path === '/fantasy-planner' ? 'Fantasy Planner' :
-    path === '/credits' ? 'Credits & Acknowledgements' :
-    path.startsWith('/scorecard') ? 'Match Scorecard' :
-    path.startsWith('/wrapped') ? '2025 Wrapped' : 'Home'
-  );
   
   // Helper function to get query parameters from URL
   const getQueryParam = (param) => {
@@ -629,50 +592,15 @@ const AppContent = () => {
               open={open}
               onClose={handleMenuClose}
             >
-              <MenuItem onClick={() => handleNavigate('/')}>
-                Home
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/search')}>
-                Search
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/venue')}>
-                Match Preview
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/player')}>
-                Player Profile
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/comparison')}>
-                Batter Comparison
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/matchups')}>
-                Matchups
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/query')}>
-                Query Builder
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/team')}>
-                Team Profile
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/team-comparison')}>                Team Comparison
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/doppelgangers')}>
-                Doppelgangers
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/ipl-predictions')}>
-                IPL Predictions
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/rankings')}>
-                Global Rankings
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/games/guess-innings')}>
-                🎯 Guess the Innings
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/games/player-journeys')}>
-                🛤️ Player Journeys
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/fantasy-planner')}>
-                Fantasy Planner
-              </MenuItem>
+              {NAV_ITEMS.map((item) => (
+                <MenuItem
+                  key={item.path}
+                  onClick={() => handleNavigate(item.path)}
+                  disabled={item.t20Only && !isDefaultFormat}
+                >
+                  {item.label}
+                </MenuItem>
+              ))}
             </Menu>
             {location.pathname === '/' ? (
               <Box
@@ -748,21 +676,15 @@ const AppContent = () => {
                 },
               }}
             >
-              <Tab label="Home" component={Link} to="/" />
-              <Tab label="Search" component={Link} to="/search" />
-              <Tab label="Match Preview" component={Link} to="/venue" />
-              <Tab label="Player Profile" component={Link} to="/player" />
-              <Tab label="Batter Comparison" component={Link} to="/comparison" />
-              <Tab label="Matchups" component={Link} to="/matchups" />
-              <Tab label="Query Builder" component={Link} to="/query" />
-              <Tab label="Team Profile" component={Link} to="/team" />
-              <Tab label="Team Comparison" component={Link} to="/team-comparison" />
-              <Tab label="Doppelgangers" component={Link} to="/doppelgangers" />
-              <Tab label="IPL Predictions" component={Link} to="/ipl-predictions" />
-              <Tab label="Global Rankings" component={Link} to="/rankings" />
-              <Tab label="🎯 Guess the Innings" component={Link} to="/games/guess-innings" />
-              <Tab label="🛤️ Player Journeys" component={Link} to="/games/player-journeys" />
-              <Tab label="Fantasy Planner" component={Link} to="/fantasy-planner" />
+              {NAV_ITEMS.map((item) => (
+                <Tab
+                  key={item.path}
+                  label={item.label}
+                  component={Link}
+                  to={item.path}
+                  disabled={item.t20Only && !isDefaultFormat}
+                />
+              ))}
             </Tabs>
             <Box sx={{ ml: 1, display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
               <FormatSwitcher />
