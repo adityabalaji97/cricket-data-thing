@@ -10,6 +10,7 @@ actually exist, so the UI can show Tests as "coming soon" without a separate fea
 
 from __future__ import annotations
 
+import time
 from datetime import date
 from typing import Dict, Optional, Tuple
 
@@ -22,14 +23,18 @@ from format_config import Phase, all_formats, effective_over_max
 
 router = APIRouter(prefix="/formats", tags=["formats"])
 
-# Coverage changes only when a data load runs, so a process-lifetime cache is plenty and
-# saves a GROUP BY over `matches` on every page load.
+# Coverage changes only when a data load runs, so this is cached rather than counted on every
+# page load. It expires on a timer rather than living for the process lifetime: a load finishing
+# in the background is exactly when the answer changes, and a cache that never expires would
+# keep reporting a format as unavailable until someone restarted the dyno.
 _coverage_cache: Optional[Dict[Tuple[str, str], Dict]] = None
+_coverage_cached_at: float = 0.0
+COVERAGE_TTL_SECONDS = 300
 
 
 def _load_coverage(db: Session) -> Dict[Tuple[str, str], Dict]:
-    global _coverage_cache
-    if _coverage_cache is not None:
+    global _coverage_cache, _coverage_cached_at
+    if _coverage_cache is not None and (time.time() - _coverage_cached_at) < COVERAGE_TTL_SECONDS:
         return _coverage_cache
 
     rows = db.execute(
@@ -45,6 +50,7 @@ def _load_coverage(db: Session) -> Dict[Tuple[str, str], Dict]:
         )
     ).mappings().all()
 
+    _coverage_cached_at = time.time()
     _coverage_cache = {
         (row["format"], row["gender"]): {
             "min_date": row["min_date"],
@@ -57,9 +63,11 @@ def _load_coverage(db: Session) -> Dict[Tuple[str, str], Dict]:
 
 
 def reset_coverage_cache() -> None:
-    """Call after a data load so newly added formats appear without a restart."""
-    global _coverage_cache
+    """Force the next request to recount. The TTL handles this on its own; this is for a
+    caller that has just loaded data and wants the change visible immediately."""
+    global _coverage_cache, _coverage_cached_at
     _coverage_cache = None
+    _coverage_cached_at = 0.0
 
 
 def _phase_payload(phase: Phase) -> Dict:
