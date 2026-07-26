@@ -19,6 +19,11 @@ from utils.league_utils import expand_league_abbreviations
 # Migrating a T20 call site must be a no-op -- the regression goldens enforce that.
 
 
+#: Sentinel meaning "do not pin to a single format" -- a deliberate cross-format query, as
+#: opposed to the accidental format leakage the pin exists to prevent.
+ALL_FORMATS = "ALL"
+
+
 def phase_bounds(
     fmt: Optional[str] = None,
     gender: Optional[str] = None,
@@ -26,6 +31,11 @@ def phase_bounds(
     n_phases: int = 3,
 ) -> Tuple[Phase, ...]:
     """The ordered phases for a format: 3-way (default) or the finer 4-way preview split."""
+    # Phase boundaries are format-specific, so a cross-format query has to pick one; T20 is
+    # the sensible default since it is the dominant data set.
+    if (fmt or "").upper() == ALL_FORMATS:
+        fmt, gender = "T20", gender if gender and gender != ALL_FORMATS else "male"
+
     spec = get_format(fmt, gender)
     if n_phases == 3:
         return spec.phases
@@ -76,6 +86,11 @@ def table_routing(
 
     Returns ``{"legacy": bool, "details": bool}``.
     """
+    if (fmt or "").upper() == ALL_FORMATS:
+        # Cross-format: delivery_details holds every format, and the legacy table adds the
+        # pre-2015 men's T20 tail, so both are in play.
+        return {"legacy": True, "details": True}
+
     spec = get_format(fmt, gender)
     cutoff = spec.legacy_table_before
 
@@ -102,7 +117,14 @@ def format_filter_sql(
 
     Pass ``params`` to bind values; otherwise the values are inlined (they come from a
     closed, validated set, so there is no injection surface either way).
+
+    ``fmt=ALL_FORMATS`` returns a no-op predicate so a caller can query across formats on
+    purpose -- comparing a batter's T20 and ODI records, say. Callers must opt in explicitly;
+    the default remains a single pinned format.
     """
+    if (fmt or "").upper() == ALL_FORMATS:
+        return "1=1"
+
     spec = get_format(fmt, gender)
     if params is None:
         return f"{alias}.format = '{spec.format}' AND {alias}.gender = '{spec.gender}'"

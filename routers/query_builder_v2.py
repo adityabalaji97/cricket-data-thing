@@ -159,8 +159,10 @@ def query_deliveries(
     ),
 
     # Format selection. Defaults to men's T20 so existing links and saved URLs keep working.
-    format: Literal["T20", "ODI", "TEST"] = Query(
-        default="T20", description="Cricket format"
+    format: Literal["T20", "ODI", "TEST", "ALL"] = Query(
+        default="T20",
+        description="Cricket format. 'ALL' queries across formats -- pair it with "
+                    "group_by=format so the rows stay comparable."
     ),
     gender: Literal["male", "female"] = Query(
         default="male", description="Men's or women's cricket"
@@ -216,7 +218,8 @@ def query_deliveries(
 
         # Validate over and innings bounds against the requested format. A 40th over is a normal
         # ODI filter and a nonsense T20 one, so the limits cannot live on the Query() declarations.
-        spec = get_format(format, gender)
+        # 'ALL' spans formats, so per-format bounds do not apply; use the widest.
+        spec = get_format("TEST" if format == "ALL" else format, gender)
         over_cap = effective_over_max(spec)
         for name, value in (("over_min", over_min), ("over_max", over_max)):
             if value is not None and value > over_cap:

@@ -57,9 +57,17 @@ VOLATILE_KEYS = {
     "execution_time_ms",
     "request_id",
     # LLM-generated prose is non-deterministic; the numbers around it are what we guard.
+    # The match preview falls back to a deterministic template when the LLM is unavailable,
+    # so both the prose and the flags recording which path ran will flip between runs for
+    # reasons that have nothing to do with our code. The `sections` block carries the same
+    # figures in structured form and stays under test.
     "ai_preview",
     "summary_text",
     "narrative",
+    "preview",
+    "llm_used",
+    "llm_model",
+    "llm_strategy",
 }
 
 
@@ -419,7 +427,10 @@ def cmd_check(args: argparse.Namespace) -> int:
             print(f"  ?? {endpoint['name']:32} no golden (new endpoint)")
             continue
 
-        expected = json.loads(golden_file.read_text())
+        # Strip volatile keys from the stored golden too, not just the fresh response. Goldens
+        # captured before a key was marked volatile still contain it, and without this every
+        # addition to VOLATILE_KEYS would force a full re-capture just to clear phantom diffs.
+        expected = strip_volatile(json.loads(golden_file.read_text()))
         actual = fetch(args.base_url, endpoint, args.timeout)
         diffs = diff_json(expected, actual)
 

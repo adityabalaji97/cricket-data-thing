@@ -299,13 +299,25 @@ def analyze_query_requirements(
     # format lives entirely in delivery_details regardless of date -- which matters because ODI
     # data goes back to 2000, and a date-only fork would route all of it to a table that has
     # never contained an ODI, silently returning nothing.
-    from services.analytics_common import table_routing
+    from services.analytics_common import ALL_FORMATS, table_routing
 
     routing = table_routing(fmt, gender, start_date=start_date, end_date=end_date)
     if not routing['legacy']:
         result['use_legacy'] = False
         result['use_new'] = True
         result['new_date_range'] = (query_start, query_end)
+        return result
+
+    if (fmt or "").upper() == ALL_FORMATS:
+        # Cross-format. The usual "delivery_details starts in 2015" split is a fact about men's
+        # T20, not about the table: it holds ODIs back to 2000. So give delivery_details the
+        # full requested window and let the legacy table supply only the pre-2015 men's T20
+        # tail it uniquely holds. The two do not overlap, so nothing is double counted.
+        result['use_new'] = True
+        result['new_date_range'] = (query_start, query_end)
+        if query_start < DELIVERY_DETAILS_START_DATE and not advanced_used:
+            result['use_legacy'] = True
+            result['legacy_date_range'] = (query_start, min(query_end, date(2014, 12, 31)))
         return result
 
     has_pre_2015 = query_start < DELIVERY_DETAILS_START_DATE
@@ -490,6 +502,13 @@ def get_legacy_grouping_columns_map():
         # Legacy `deliveries` holds men's T20 before 2015 and nothing else, so the T20 phase
         # split is correct here by construction and needs no format lookup.
         "phase": "CASE WHEN d.over < 6 THEN 'powerplay' WHEN d.over < 15 THEN 'middle' ELSE 'death' END",
+
+        # The legacy table has no format columns because everything in it is men's T20; emit
+        # literals so results merge cleanly with delivery_details rows when grouping by format.
+        # Cast them: Postgres reads a bare string constant in GROUP BY as a positional
+        # reference and rejects it ("non-integer constant in GROUP BY").
+        "format": "CAST('T20' AS VARCHAR)",
+        "gender": "CAST('male' AS VARCHAR)",
         # Over is stored on legacy deliveries; the nth-ball variants are
         # delivery_details-only (see ADVANCED_COLUMNS — they force use_new=True).
         "over": "d.over",
@@ -3025,6 +3044,11 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
         # Innings/Phase
         "innings": "dd.inns",
         "phase": phase_case_sql(fmt, gender, over_column="dd.over"),
+
+        # Format/gender. Only meaningful alongside format=ALL, which lifts the single-format
+        # pin; with a specific format selected these collapse to one row, which is harmless.
+        "format": "dd.format",
+        "gender": "dd.gender",
         # Delivery-position groupings.
         # `over` is a stored column. `ball_in_over` / `ball` / `ball_in_spell`
         # are computed via auxiliary CTEs (see COMPUTED_GROUP_BY_COLUMNS) and
