@@ -12,14 +12,18 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 - **Active chunk:** **0.4, 0.5 and 0.6 COMPLETE.** ODIs are queryable end to end locally.
   Next is **0.7** (frontend foundation: theme consolidation, FormatContext, API client) and
   **0.8** (sunset gating + NavMenu).
-- **Carried over from 0.6:** `/query/deliveries/columns` is **not** format-scoped yet. It reads
-  the `query_builder_metadata` cache, which is a `SELECT DISTINCT` with no format partition, so
-  **refreshing that cache now would mix ODI competitions into the T20 dropdown**. Partition the
-  cache keys by (format, gender) before running `scripts/refresh_query_builder_metadata.py`
-  against a multi-format database.
-- ⚠️ **OPEN PRODUCTION ISSUE — needs a decision, see the 2026-07-26 entry below:** 34% of stored
-  `batting_stats` rows (21,905 of 63,704) hold impossible wicket counts, rising to 93% of 2026
-  rows. The code bug is fixed; the **stored data is still wrong** and needs a backfill.
+- **Both former blockers are now resolved in code, locally:**
+  - The dropdown cache is partitioned by (format, gender); `/deliveries/columns` takes a format
+    parameter. Fixing it exposed that the loader left `delivery_details.competition` raw while
+    `matches.competition` was normalised, so `leagues=ODI` matched nothing — the league filter
+    was simply broken for non-T20. The loader now normalises on load.
+  - The corrupted stats are repaired by `scripts/backfill_recompute_stats.py`. Locally this took
+    impossible wicket counts from 21,905 to 19 and batting averages from absurd (Sikandar Raza
+    2.61) to correct (Kohli 57.58, top of the list).
+- ⚠️ **Still to do on PRODUCTION:** the backfill has only been run against `hindsight_local`.
+  Production still holds the corrupt rows, and its batting averages in the query builder's
+  `batting_stats` mode are visibly wrong today. Run `scripts/backfill_recompute_stats.py`
+  there — after a `heroku pg:backups:capture` — as part of the deploy.
 - **Branch:** `multi-format` (branched from `main` @ `29b61c1`)
 - **Local DB:** `hindsight_local` on localhost:5432 (PG14 server), 644 MB subset of prod, healthy.
   Rebuild any time with `scripts/dev/setup_local_db.sh`.
