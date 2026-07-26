@@ -9,7 +9,7 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-- **Active chunk:** **Phase 0 complete, plus A3, A5 and A9.** ODIs are usable in the query
+- **Active chunk:** **Phase 0 complete, plus A3, A5, A9 and most of A11.** ODIs are usable in the query
   builder UI and render correct scorecards, all against local data. Next is **Phase A**, which opens with
   the Heroku essential-2 upgrade and the real ODI backfill (A1), then the workflow matrix (A2).
 - **Before A1:** production still needs migration `002`, and the branch is **unpushed and
@@ -51,6 +51,26 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-26 — Chunk A11 (partial) — Claude
+
+**A9 introduced a bug that this fixed.** Making ELO per-format left the rankings query
+partitioning by team alone, so a team's "latest" rating became whichever format it played most
+recently and one table mixed T20 and ODI ratings. `services/elo.py` and `/teams/elo-rankings` are
+now scoped, and the landing page sends the format and re-fetches on change. T20 now tops with
+England 1716 over 112 teams; ODI with South Africa 1611 over 16.
+
+Worth generalising from: **each chunk that makes something format-aware can leave a consumer
+reading the now-ambiguous column.** After a change like A9, grep for readers of the affected
+column rather than assuming the write side is the whole job.
+
+Also unified the landing page's mobile breakpoint — it used a hand-picked `max-width:759px` while
+`App.js` uses the theme's `sm`.
+
+**Still T20-shaped, so A11 is not finished:** `/recent-matches/discover` and
+`/landing/featured-innings`. The match tiles and featured innings do not follow the format
+selection yet. The frontend passes the parameter and it is currently ignored. Both carry hardcoded
+competition whitelists (`routers/landing.py` `FEATURED_COMPETITIONS`) and need their own pass.
 
 ### 2026-07-26 — Chunk A9 — Claude — per-format ELO
 

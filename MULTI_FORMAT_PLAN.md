@@ -37,7 +37,7 @@ explicit promotion steps.
 | **A8** | Match preview redesign 3: children + mobile pass | [ ] |
 | **A9** | Per-format ELO | [x] 2026-07-26 |
 | **A10** | ODI fantasy points | [ ] |
-| **A11** | Landing page multi-format | [ ] |
+| **A11** | Landing page multi-format | [~] 2026-07-26 (ELO + breakpoint done; recent-matches and featured-innings endpoints still T20-shaped) |
 | **B1** | WT20 load + player name collisions | [ ] |
 | **B2** | WT20 pipeline leg + UI enable | [ ] |
 | **C0** | Test data recon (read-only) | [ ] |
