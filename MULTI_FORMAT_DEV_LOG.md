@@ -189,10 +189,10 @@ Sweep progress against that list:
 |---|---|---|
 | `services/relative_metrics.py` | 8 | **FIXED** (v384) — see below |
 | `services/resource_benchmark.py` | 3 | safe, match-keyed |
+| `routers/player_line_length.py` | 7 | **FIXED** (v385) — was 68% wrong for Kohli, see below |
 | `services/rolling_form.py` | 10 | **still to check** — 4 competition-scoped, 6 not |
 | `services/search.py` | 10 | **still to check** — heavily competition-scoped, verify `:leagues` empty is not a no-op |
 | `services/venue_similarity.py` | 9 | **still to check** |
-| `routers/player_line_length.py` | 7 | **still to check** — only 1 of 7 scoped |
 | `services/bowling_context.py` | 3 | **still to check** |
 | `services/venue_boundary_shape.py` | 2 | **still to check** |
 
@@ -202,6 +202,22 @@ cohort held 89 ODI innings (avg 28.07 balls) beside 353 T20 innings (avg 13.67) 
 inflated baseline that depressed every T20 player's percentile. Eight aggregates pinned, plus
 `_resolve_effective_start_date`, where "the last N matches" was being computed across formats
 (observable: the window start moved 2026-07-14 → 2026-07-12 at the default window of 50).
+
+**`player_line_length.py` was the most badly wrong endpoint found.** Virat Kohli's *T20* line
+and length profile was built from 22,982 balls — 15,653 of them ODI, so **68% wrong format**.
+Because the global baseline was equally contaminated, the error was invisible from the numbers
+alone: his good-length strike rate read 98.0 against a benchmark of 91.4. Pinned, they read
+123.2 against 107.4. Verified to the ball: 7,329 / 7,305 / 7,304 matches the T20-only counts.
+
+**Two traps this file demonstrated, both worth checking for in the remaining files:**
+
+1. **A pin inside a plain string does nothing but break the query.** Six of the seven sites were
+   f-strings; the seventh was not, so it would have sent a literal `{FORMAT_PIN_SQL_BARE}` to
+   Postgres and 500'd the endpoint. Always verify the placeholder is inside an f-string —
+   `grep` for the constant is not enough.
+2. **A contaminated metric and a contaminated baseline hide each other.** Both moved by roughly
+   the same proportion here, so the *shape* of the profile looked plausible throughout. Do not
+   sanity-check these by eye; compare against a format-pinned count from the database.
 
 **Watch for this shape when checking the rest:** a filter parameter that is a no-op when empty.
 `build_matches_filter_sql` with `leagues=[]` and `include_international=False` returns nothing at
