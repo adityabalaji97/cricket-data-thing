@@ -28,6 +28,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # format mismatch would produce.
 OVER_CAP_BREACH_LIMIT = 0.01
 
+# Database columns typed INTEGER/SMALLINT that the source may present as decimals.
+INTEGER_COLUMNS = [
+    'control', 'wagon_x', 'wagon_y', 'wagon_zone',
+    'day', 'session', 'trail_by', 'lead_by',
+]
+
 # Column mapping from CSV names to DB names
 COL_MAP = {
     'p_match': 'p_match',
@@ -243,11 +249,24 @@ def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=No
         # Handle NaN
         df = df.where(pd.notnull(df), None)
 
-        # Normalize control to integer values (0/1).
-        # Some source rows provide strings like "0.0"/"1.0", which fail on INTEGER inserts.
-        if 'control' in df.columns:
-            control_numeric = pd.to_numeric(df['control'], errors='coerce')
-            df['control'] = control_numeric.apply(lambda value: int(value) if pd.notna(value) else None)
+        # Coerce the integer-typed columns.
+        #
+        # The feed writes these as decimals ("322.0", "1.0"), and pandas widens a column to
+        # float64 as soon as one value in the chunk is missing. Postgres then rejects "322.0"
+        # for an INTEGER column. This bit the load 97% of the way in: early chunks had no wagon
+        # data at all, so the column arrived as nulls and inserted fine, and only later chunks
+        # carried real values.
+        # Build an object-dtype column explicitly. Assigning the result of .apply() is not
+        # enough: pandas re-infers a column of ints and Nones back to float64, so the coercion
+        # silently undoes itself in exactly the chunks that have missing values.
+        for column in INTEGER_COLUMNS:
+            if column in df.columns:
+                numeric = pd.to_numeric(df[column], errors='coerce')
+                df[column] = pd.Series(
+                    [int(value) if pd.notna(value) else None for value in numeric],
+                    index=df.index,
+                    dtype=object,
+                )
         
         if dry_run:
             total_inserted += len(df)
