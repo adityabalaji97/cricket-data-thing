@@ -344,7 +344,15 @@ def get_available_columns(
                 for meta_key, entry in metadata.items():
                     if meta_key != key and not meta_key.startswith(f"{key}:"):
                         continue
-                    for value in entry.get("values") or []:
+                    raw = entry.get("values")
+                    # Not every metadata entry is a list -- some hold a scalar count, and
+                    # iterating one raised "'int' object is not iterable" for the whole
+                    # endpoint. Scalars have nothing to union, so take the first as-is.
+                    if not isinstance(raw, list):
+                        if raw is not None and not merged:
+                            return {"values": raw, "coverage": entry.get("coverage")}
+                        continue
+                    for value in raw:
                         marker = str(value)
                         if marker not in seen:
                             seen.add(marker)
