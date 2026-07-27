@@ -298,7 +298,7 @@ def query_deliveries(
 
 @router.get("/deliveries/columns")
 def get_available_columns(
-    format: Literal["T20", "ODI", "TEST"] = Query(default="T20", description="Cricket format"),
+    format: Literal["T20", "ODI", "TEST", "ALL"] = Query(default="ALL", description="Cricket format"),
     gender: Literal["male", "female"] = Query(default="male", description="Men's or women's"),
     db: Session = Depends(get_session),
 ):
@@ -331,9 +331,29 @@ def get_available_columns(
         
         # Scoped entries win; the unscoped key is the men's T20 fallback, and also covers a
         # format whose cache has not been refreshed yet.
-        scoped_suffix = "" if (format, gender) == ("T20", "male") else f":{format}:{gender}"
+        scoped_suffix = "" if (format, gender) in (("T20", "male"), ("ALL", "male")) else f":{format}:{gender}"
 
         def _entry(key):
+            # 'ALL' unions every format's cached values, so the dropdowns offer ODI
+            # competitions and venues alongside the T20 ones. Without this the endpoint
+            # 422'd on format=ALL and the query builder showed "Failed to load column
+            # metadata" with every filter empty.
+            if format == "ALL":
+                merged, coverage = [], None
+                seen = set()
+                for meta_key, entry in metadata.items():
+                    if meta_key != key and not meta_key.startswith(f"{key}:"):
+                        continue
+                    for value in entry.get("values") or []:
+                        marker = str(value)
+                        if marker not in seen:
+                            seen.add(marker)
+                            merged.append(value)
+                    if entry.get("coverage") is not None:
+                        coverage = entry["coverage"] if coverage is None else min(coverage, entry["coverage"])
+                if merged or coverage is not None:
+                    return {"values": merged, "coverage": coverage}
+                return {}
             return metadata.get(f"{key}{scoped_suffix}") or metadata.get(key, {})
 
         def get_values(key):
