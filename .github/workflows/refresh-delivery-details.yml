@@ -5,9 +5,16 @@ on:
     - cron: "30 23 * * *"  # Daily, 5am IST (11:30pm UTC)
   workflow_dispatch:
 
+# Never let two refreshes overlap. They write the same tables, and a manual
+# workflow_dispatch during the nightly window would otherwise race it.
+concurrency:
+  group: refresh-delivery-details
+  cancel-in-progress: false
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 300
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
@@ -24,23 +31,70 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Download latest CSV from Dropbox
-        run: |
-          curl -L -o t20_bbb.csv "${{ secrets.DROPBOX_CSV_URL }}"
-          echo "Downloaded $(du -sh t20_bbb.csv | cut -f1) CSV"
+      # ------------------------------------------------------------------
+      # Per-format legs: load + backfill only.
+      #
+      # Steps 3-7 (columns, players, metadata, sync, ELO) are table-wide, not
+      # per-format -- running them once per leg would repeat the same work and
+      # have two legs writing the same rows. So every leg but the last skips
+      # them, and the last leg runs them once for everything loaded above.
+      #
+      # Sequential, not a matrix: matrix jobs run in parallel and these all
+      # write delivery_details.
+      #
+      # Each CSV is deleted after its leg -- the runner has ~14GB free and the
+      # ODI file alone is ~700MB.
+      # ------------------------------------------------------------------
 
-      # --format/--gender are required and authoritative: the loader never infers format from
-      # the data. Adding the ODI, women's T20 and Test legs is chunk A2, and must wait until
-      # the production database has migrations 001/002 applied and enough headroom for the
-      # extra data (see MULTI_FORMAT_PLAN.md).
-      - name: Run delivery details pipeline
+      - name: "T20 (men): download"
+        run: |
+          curl -sSL -o t20_bbb.csv "${{ secrets.DROPBOX_T20_URL }}"
+          echo "T20 CSV: $(du -sh t20_bbb.csv | cut -f1)"
+
+      - name: "T20 (men): load + backfill"
         run: |
           python scripts/load_delivery_details_pipeline.py \
             --csv t20_bbb.csv \
             --format T20 \
             --gender male \
-            --skip-validation
+            --skip-validation \
+            --skip-columns --skip-players --skip-metadata --skip-sync --skip-elo
+          rm -f t20_bbb.csv
 
-      - name: Update ELO ratings
+      - name: "ODI (men): download"
         run: |
-          python elo_update_service.py --calculate-missing
+          curl -sSL -o odi_bbb.csv "${{ secrets.DROPBOX_ODI_URL }}"
+          echo "ODI CSV: $(du -sh odi_bbb.csv | cut -f1)"
+
+      # Last leg, so this one runs the table-wide steps for every format loaded
+      # above. ELO is included here and partitions by (format, gender) itself.
+      - name: "ODI (men): load + backfill, then table-wide steps"
+        run: |
+          python scripts/load_delivery_details_pipeline.py \
+            --csv odi_bbb.csv \
+            --format ODI \
+            --gender male \
+            --skip-validation
+          rm -f odi_bbb.csv
+
+      # Women's T20 and Test legs are deliberately absent: their data has not
+      # been loaded yet (phases B and C). Adding a leg here is what loads a
+      # format for the first time, so do not add one before its chunk is ready.
+      # Women's T20 additionally needs the gender-blind middle steps fixed --
+      # update_players would create women's players as male. See
+      # MULTI_FORMAT_PLAN.md.
+
+      - name: Verify formats after refresh
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          from sqlalchemy import create_engine, text
+          url = os.environ["DATABASE_URL"].replace("postgres://", "postgresql://", 1)
+          with create_engine(url).connect() as c:
+              for row in c.execute(text(
+                  "SELECT format, gender, count(*) AS matches, max(date) AS latest "
+                  "FROM matches GROUP BY 1,2 ORDER BY 1,2"
+              )):
+                  print(f"{row.format}/{row.gender}: {row.matches} matches, latest {row.latest}")
+          PY
