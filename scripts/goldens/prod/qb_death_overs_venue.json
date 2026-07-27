@@ -3,40 +3,40 @@
   "body": {
     "data": [
       {
-        "average": 19.38,
-        "balls": 4722,
-        "balls_per_dismissal": 12.33,
-        "boundaries": 940,
-        "boundary_percentage": 19.91,
+        "average": 19.44,
+        "balls": 4845,
+        "balls_per_dismissal": 12.52,
+        "boundaries": 951,
+        "boundary_percentage": 19.63,
         "bowl_kind": "pace bowler",
-        "control_percentage": 61.910788,
-        "dot_percentage": 29.82,
-        "dots": 1408,
-        "fours": 581,
-        "innings_count": 207,
-        "percent_balls": 80.21,
-        "runs": 7421,
-        "sixes": 359,
-        "strike_rate": 157.16,
-        "wickets": 383
+        "control_percentage": 62.176166,
+        "dot_percentage": 30.3,
+        "dots": 1468,
+        "fours": 590,
+        "innings_count": 216,
+        "percent_balls": 77.5,
+        "runs": 7525,
+        "sixes": 361,
+        "strike_rate": 155.31,
+        "wickets": 387
       },
       {
-        "average": 16.81,
-        "balls": 1141,
-        "balls_per_dismissal": 12.14,
-        "boundaries": 174,
-        "boundary_percentage": 15.25,
+        "average": 18.81,
+        "balls": 1383,
+        "balls_per_dismissal": 14.41,
+        "boundaries": 199,
+        "boundary_percentage": 14.39,
         "bowl_kind": "spin bowler",
-        "control_percentage": 71.323529,
-        "dot_percentage": 32.43,
-        "dots": 370,
-        "fours": 82,
-        "innings_count": 134,
-        "percent_balls": 19.38,
-        "runs": 1580,
-        "sixes": 92,
-        "strike_rate": 138.48,
-        "wickets": 94
+        "control_percentage": 75.16269,
+        "dot_percentage": 35.21,
+        "dots": 487,
+        "fours": 100,
+        "innings_count": 145,
+        "percent_balls": 22.12,
+        "runs": 1806,
+        "sixes": 99,
+        "strike_rate": 130.59,
+        "wickets": 96
       },
       {
         "average": 2.25,
@@ -50,7 +50,7 @@
         "dots": 11,
         "fours": 1,
         "innings_count": 3,
-        "percent_balls": 0.41,
+        "percent_balls": 0.38,
         "runs": 18,
         "sixes": 0,
         "strike_rate": 75.0,
@@ -61,7 +61,7 @@
       "ball_aggregation": "snapshot",
       "data_source": "delivery_details+deliveries",
       "data_sources": [
-        "delivery_details (2015-2026)",
+        "delivery_details (2005-2026)",
         "deliveries (2005-2014)"
       ],
       "filters_applied": {
@@ -109,12 +109,10 @@
       "query_mode_used": "delivery",
       "recommended_chart": null,
       "returned_groups": 3,
-      "total_balls_in_query": 5887,
+      "total_balls_in_query": 6252,
       "total_groups": 3,
-      "total_innings_in_query": 344,
-      "warnings": [
-        "Legacy bowl classification is inferred using deliveries.bowler_type with players-table fallback; unknown styles are grouped as mixture/unknown."
-      ]
+      "total_innings_in_query": 364,
+      "warnings": []
     },
     "percentages": null,
     "summary_data": null

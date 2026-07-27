@@ -369,6 +369,7 @@
       "Akshay Naidoo",
       "Akshay Puri",
       "Akshay Wadkar",
+      "Akshay Wagh",
       "Akshay Wakhare",
       "Akshdeep Nath",
       "Akshu Fernando",
@@ -2471,6 +2472,7 @@
       "Gurinder Sandhu",
       "Gurjapneet Singh",
       "Gurjit Sandhu",
+      "Gurkan Tuskan",
       "Gurkeerat Singh Mann",
       "Gurnoor Brar",
       "Gurpratap Singh",
@@ -3329,6 +3331,7 @@
       "Jonathan Tattersall",
       "Jonathan Trott",
       "Jonathan Vandiar",
+      "Jonathan van Lange",
       "Jonathan Wells",
       "Jonathan West",
       "Jonathon Dunn",
@@ -5327,6 +5330,7 @@
       "Omar Rassol",
       "Omar Willis",
       "Omary Kitunda",
+      "Omer Kutuk",
       "Omesh Mendis",
       "Omesh Wijesiriwardene",
       "Omid Mailk Khel",
@@ -8017,6 +8021,7 @@
       "Yves Cyusa",
       "Zabiullah Zahid",
       "Zac Cumming",
+      "Zachary Carter",
       "Zachary McLaughlin",
       "Zacheo van Vuuren",
       "Zach Lion-Cachet",
@@ -10432,6 +10437,7 @@
       "Gihan Dilruk",
       "Gihan Koralage",
       "Gihan Rupasinghe",
+      "Gihan Sanjeewa",
       "Gimandu Malcom",
       "Gino Vries",
       "Gionne Koopman",
@@ -14282,6 +14288,7 @@
       "Umaid Asif",
       "Umair Ali",
       "Umair Qasim",
+      "Umair Safi",
       "Umair Sharif",
       "Umair Tariq",
       "Umar Adam",
@@ -15361,7 +15368,7 @@
       1,
       2
     ],
-    "length_coverage": 39.2,
+    "length_coverage": 39.3,
     "length_options": [
       "FULL",
       "FULL_TOSS",
@@ -15370,7 +15377,7 @@
       "SHORT_OF_A_GOOD_LENGTH",
       "YORKER"
     ],
-    "line_coverage": 39.2,
+    "line_coverage": 39.3,
     "line_options": [
       "DOWN_LEG",
       "ON_THE_STUMPS",
@@ -15389,7 +15396,7 @@
       "batting_stats",
       "bowling_stats"
     ],
-    "shot_coverage": 50.1,
+    "shot_coverage": 50.2,
     "shot_options": [
       "BACK_DEFENCE",
       "COVER_DRIVE",
@@ -15891,7 +15898,7 @@
       "bat",
       "field"
     ],
-    "total_deliveries": 2327813,
+    "total_deliveries": 2329864,
     "venues": [
       "7he Sevens Stadium, Dubai",
       "Abhimanyu Cricket Academy, Dehradun",
