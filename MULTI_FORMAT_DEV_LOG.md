@@ -43,20 +43,33 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > ```
 > Claude/Codex cannot do this — Actions secrets are write-only to the API.
 >
-> **Contamination status.** 716,791 ODI balls now sit in the post-2015 window the live app
-> reads, so the format pins are finally under real test rather than being masked by the date
-> fork. `/query/deliveries` **verified clean**: grouped by over it returns exactly one ball at
-> over 20 (a genuine T20 super-over delivery) and nothing at overs 21-50, where the database
-> holds 36,155 ODI balls at over 20 alone.
+> **A1 IS COMPLETE.** Pipeline finished in 50m23s. Production now holds 3,053 ODI matches
+> (2000-01-09 to 2026-07-25) with ELO, 1,647,737 ODI balls, and ODI batting/bowling stats.
+> ELO ran as a separate `ODI/male` pass and reported "all matches already have ELO" for T20 —
+> the per-format streams do not disturb each other.
 >
-> **The remaining exposure arrives with the match sync**, not the ball load: `matches` having no
-> ODI rows is what currently protects every endpoint that joins `delivery_details`→`matches`.
-> A production golden baseline was captured **before** the sync for exactly this reason:
-> ```
-> python3 scripts/regression_snapshot.py --base-url <heroku-url> --env prod check
-> ```
-> 13 endpoints in `scripts/goldens/prod/`. **Any diff there is ODI data leaking into a T20
-> response** — that is the whole point of the baseline, so run it once the sync lands.
+> **Two live contamination bugs were found and fixed** (deployed v382, v383):
+>
+> * **`services/matchups.py` had no format handling at all.** It fed match preview's fantasy
+>   projections. Mahmudullah's avg balls per innings went 16.81 → 24.23 (286 T20 innings →
+>   478 mixed), pushing his projection from 63 to 71 expected points. Four pins added: the two
+>   avg-balls lookups, the `recent_matches` CTE (which cascades to all six delivery reads that
+>   join it), and the head-to-head `raw_stats` read.
+> * **`services/global_t20_rankings.py` had no format handling.** 588,732 ODI balls — **39% of
+>   the ranking pool** — were counting toward "global T20 rankings", via ODI, ICC World Cup,
+>   Champions Trophy and Asia Cup.
+>
+> **Read this before trusting the old goldens.** The first `prod` baseline was captured *after*
+> the ODI ball load, so it was only clean for paths that join `matches`. Anything reading
+> `delivery_details` directly — the rankings, the head-to-head query — was **already
+> contaminated in the baseline itself**. That is why the post-fix numbers moved *away* from the
+> golden (372b → 356b was the pin removing 16 ODI balls, i.e. the fix, not a regression). The
+> goldens have been re-captured post-fix and now pass 13/13. Judge future diffs on whether the
+> pinned value is right, not on whether it matches a stored number.
+>
+> `/query/deliveries` was verified clean throughout: grouped by over it returns exactly one ball
+> at over 20 (a genuine T20 super-over) and nothing at overs 21-50, where the database holds
+> 36,155 ODI balls at over 20 alone.
 
 
 - **Active chunk:** **Phase 0 complete, plus A3, A5, A9 and most of A11.** ODIs are usable in the query
@@ -142,6 +155,43 @@ my first probe reported "STILL BROKEN" purely because it compared type names.
 **Data note, not acted on:** the ODI feed uses `-1` as a sentinel in `pred_score` and `win_prob`
 (first-innings early balls). Stored as-is, matching how T20 already behaves. Consistency with
 T20 was judged more valuable than cleanliness; revisit if either column is ever surfaced in UI.
+
+**Expected gap, not a bug: 195 ODI matches have balls but no `matches` row.**
+
+`delivery_details` holds 3,248 distinct ODI `p_match`; `matches` got 3,053. The sync reported
+`Errors: 0` because it skipped them deliberately. All 195 fail the `HAVING MIN(over) = 0` gate
+on innings 1 — the feed's coverage starts partway through (over 3, 4, 8, in one case 49), and 16
+have no innings 1 at all. 65,708 balls, spread 2000-2024 across every ODI competition, so it is
+source incompleteness rather than a boundary artifact. The gate is right: building a match row
+from partial ball-by-ball data would produce wrong totals. Leave it. If these are ever wanted,
+they need a `partial_coverage` flag, not a relaxed gate.
+
+**OPEN: the format-pin surface is far larger than chunk 0.4g assumed.**
+
+A crude audit (`(FROM|JOIN) (delivery_details|batting_stats|bowling_stats)` vs any format
+predicate) reports **46 of 53 service/router files with zero pins**. Do **not** read that as 46
+bugs — it is a lead list, and most entries are safe for one of three reasons:
+
+* **Keyed by `match_id`/`p_match`** — a single match is inherently one format. This is why both
+  scorecard goldens stayed identical despite `match_scorecard.py` showing 5 unpinned reads.
+* **Scoped by competition** — `team_roster.py` and all the `wrapped/*` cards filter to
+  `competition = 'Indian Premier League'`, which is T20 by construction.
+* **Pinned through a helper the regex cannot see** — `delivery_data_service.py` embeds
+  `format_filter_sql("dd", ...)` inside `build_competition_filter_delivery_details`, so its
+  reads are pinned via `{competition_filter}`.
+
+**The real risk is cross-match aggregates that are neither competition-scoped nor match-keyed.**
+Both bugs found this session were exactly that shape. Worth auditing next, in rough priority:
+`services/rolling_form.py`, `services/search.py`, `services/venue_similarity.py`,
+`services/relative_metrics.py`, `routers/player_line_length.py`, `services/resource_benchmark.py`,
+`services/bowling_context.py`, `services/venue_boundary_shape.py`.
+
+`services/ipl_prediction.py` (18 reads) and `services/wrapped_legacy.py` (38) are large but
+IPL-scoped; check the scoping holds rather than pinning blindly.
+
+**Method that worked, use it again:** grepping for unpinned SQL found nothing on its own — both
+bugs were caught by *diffing live endpoint responses* against a captured baseline and then
+tracing the moved number back to its query. Reading code missed `matchups.py` entirely.
 
 ### 2026-07-26 — Chunk A11 (partial) — Claude
 
