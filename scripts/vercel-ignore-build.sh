@@ -37,7 +37,19 @@ if ! git rev-parse --verify "${BASE_REF}" >/dev/null 2>&1; then
   exit 1
 fi
 
-changed_files="$(git diff --name-only "${BASE_REF}" "${HEAD_REF}" || true)"
+# The diff has to be guarded separately from the rev-parse above, and this is the part that
+# actually bit. Vercel clones shallowly, so rev-parse can resolve the previous SHA while the
+# object itself is absent -- git then fails with "fatal: bad object <sha>". The old form,
+#     changed_files="$(git diff ... || true)"
+# swallowed that failure into an empty string, which the emptiness check below read as "no
+# files changed" and skipped the build. That is what kept cancelling every deployment while
+# the frontend sat undeployed.
+#
+# So: distinguish "diff failed" from "diff returned nothing", and build on failure.
+if ! changed_files="$(git diff --name-only "${BASE_REF}" "${HEAD_REF}" 2>/dev/null)"; then
+  echo "Could not diff ${BASE_REF}..${HEAD_REF} (shallow clone, missing object). Building."
+  exit 1
+fi
 
 if [[ -z "${changed_files}" ]]; then
   echo "No changed files detected; skipping build."
