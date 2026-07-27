@@ -86,9 +86,16 @@ def backfill(csv_path, engine, dry_run=False):
     # Replace "-" with NaN (treat as missing)
     df = df.replace('-', pd.NA)
 
-    # Normalize control to nullable int
-    if 'control' in df.columns:
-        df['control'] = pd.to_numeric(df['control'], errors='coerce').astype('Int64')
+    # Normalize the integer-typed columns to a nullable int dtype.
+    #
+    # These arrive as decimals ("322.0") and sometimes "-", so pandas leaves them as object,
+    # and to_sql then creates the temp table column as TEXT. The bulk UPDATE below does
+    # COALESCE(dd.col, t.col) against an INTEGER column, which Postgres rejects outright:
+    # "COALESCE types integer and text cannot be matched". Only `control` was handled here,
+    # which held for the T20 feed where the wagon columns are clean integers.
+    for column in ('control', 'wagon_x', 'wagon_y', 'wagon_zone'):
+        if column in df.columns:
+            df[column] = pd.to_numeric(df[column], errors='coerce').astype('Int64')
 
     # Convert NaN in string-typed cols to None (so to_sql inserts NULL, not 'NaN')
     for col in ('line', 'length', 'shot'):
