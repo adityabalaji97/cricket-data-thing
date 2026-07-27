@@ -183,7 +183,7 @@ def step_update_players(db_url, dry_run=False):
     print(f"\n✓ Players update complete")
 
 
-def step_refresh_metadata(db_url, dry_run=False):
+def step_refresh_metadata(db_url, dry_run=False, fmt="T20", gender="male"):
     """Step 5: Refresh query builder metadata."""
     print_header("STEP 5: REFRESH METADATA")
 
@@ -195,7 +195,10 @@ def step_refresh_metadata(db_url, dry_run=False):
     from refresh_query_builder_metadata import refresh_metadata, show_metadata
 
     engine = create_engine(db_url)
-    refresh_metadata(engine)
+    # fmt/gender must be forwarded: refresh_metadata defaults to men's T20, so an ODI run
+    # silently refreshed the T20 cache and wrote no ODI-scoped keys. The query builder then
+    # showed no ODI competitions, venues or players in its dropdowns.
+    refresh_metadata(engine, fmt=fmt, gender=gender)
     show_metadata(engine)
 
     print(f"\n✓ Metadata refresh complete")
@@ -319,7 +322,7 @@ Examples:
         
         # Step 5: Refresh metadata
         if not args.skip_metadata:
-            step_refresh_metadata(db_url, dry_run=args.dry_run)
+            step_refresh_metadata(db_url, dry_run=args.dry_run, fmt=args.fmt, gender=args.gender)
         else:
             print("\n[SKIPPED] Step 5: Refresh Metadata")
 
