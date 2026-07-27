@@ -300,7 +300,7 @@ Examples:
         if not args.skip_backfill:
             step_backfill_advanced(
                 args.csv, db_url, dry_run=args.dry_run,
-                fmt=args.format, gender=args.gender,
+                fmt=args.fmt, gender=args.gender,
             )
         else:
             print("\n[SKIPPED] Step 2b: Backfill Advanced Data")
