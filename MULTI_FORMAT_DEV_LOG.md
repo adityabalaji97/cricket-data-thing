@@ -181,10 +181,32 @@ bugs — it is a lead list, and most entries are safe for one of three reasons:
   reads are pinned via `{competition_filter}`.
 
 **The real risk is cross-match aggregates that are neither competition-scoped nor match-keyed.**
-Both bugs found this session were exactly that shape. Worth auditing next, in rough priority:
-`services/rolling_form.py`, `services/search.py`, `services/venue_similarity.py`,
-`services/relative_metrics.py`, `routers/player_line_length.py`, `services/resource_benchmark.py`,
-`services/bowling_context.py`, `services/venue_boundary_shape.py`.
+All three bugs found so far were exactly that shape.
+
+Sweep progress against that list:
+
+| file | reads | verdict |
+|---|---|---|
+| `services/relative_metrics.py` | 8 | **FIXED** (v384) — see below |
+| `services/resource_benchmark.py` | 3 | safe, match-keyed |
+| `services/rolling_form.py` | 10 | **still to check** — 4 competition-scoped, 6 not |
+| `services/search.py` | 10 | **still to check** — heavily competition-scoped, verify `:leagues` empty is not a no-op |
+| `services/venue_similarity.py` | 9 | **still to check** |
+| `routers/player_line_length.py` | 7 | **still to check** — only 1 of 7 scoped |
+| `services/bowling_context.py` | 3 | **still to check** |
+| `services/venue_boundary_shape.py` | 2 | **still to check** |
+
+**`relative_metrics.py` was the worst found so far**, because the contamination was in the
+*comparison cohort*, not the player's own numbers. In the default last-50-matches window the
+cohort held 89 ODI innings (avg 28.07 balls) beside 353 T20 innings (avg 13.67) — a ~21%
+inflated baseline that depressed every T20 player's percentile. Eight aggregates pinned, plus
+`_resolve_effective_start_date`, where "the last N matches" was being computed across formats
+(observable: the window start moved 2026-07-14 → 2026-07-12 at the default window of 50).
+
+**Watch for this shape when checking the rest:** a filter parameter that is a no-op when empty.
+`build_matches_filter_sql` with `leagues=[]` and `include_international=False` returns nothing at
+all, so an endpoint can look competition-scoped while actually being unscoped for the default
+call. That is why the crude audit's `comp_scope` count cannot be trusted on its own.
 
 `services/ipl_prediction.py` (18 reads) and `services/wrapped_legacy.py` (38) are large but
 IPL-scoped; check the scoping holds rather than pinning blindly.
