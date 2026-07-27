@@ -1,1 +1,31 @@
+# Vercel builds only the React frontend. Everything below is backend, data, or local
+# output, and is excluded so a CLI deploy does not try to upload it.
+#
+# Git deploys never needed this (these paths are gitignored), but `vercel --prod` packages
+# the working directory and hit the 100MB file limit on a ~2GB upload: data/ holds the
+# ball-by-ball CSVs and ml/ the model artefacts.
+#
+# Note scripts/ is deliberately NOT excluded -- vercel.json's ignoreCommand runs
+# scripts/vercel-ignore-build.sh, so excluding it would break build skipping entirely.
+
+# Large local data and model artefacts
+data/
+ml/
+*.csv
+
+# Installed by Vercel from package.json
+node_modules/
+
+# Local build output
+build/
+
+# Python backend -- runs on Heroku, not Vercel
 requirements.txt
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Local env
+.env
+.env.*
