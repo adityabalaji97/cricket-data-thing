@@ -23,6 +23,11 @@ from sqlalchemy import create_engine, text
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Share of balls past the format's over cap that indicates a genuinely wrong file rather than
+# stray bad rows. One in a hundred is far above any real anomaly rate and far below what a
+# format mismatch would produce.
+OVER_CAP_BREACH_LIMIT = 0.01
+
 # Column mapping from CSV names to DB names
 COL_MAP = {
     'p_match': 'p_match',
@@ -144,6 +149,8 @@ def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=No
     total_skipped = 0
     total_inserted = 0
     max_over_seen = -1
+    over_cap_breaches = 0
+    total_rows_seen = 0
 
     for i, chunk in enumerate(pd.read_csv(csv_path, chunksize=chunk_size, low_memory=False)):
         total_in_csv += len(chunk)
@@ -163,14 +170,25 @@ def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=No
 
         # The one guard the --format flag cannot provide: if the file really is another format
         # (a rotated Dropbox secret pasted into the wrong slot), the overs give it away.
-        chunk_max_over = pd.to_numeric(df['over'], errors='coerce').max()
+        #
+        # Proportional, not absolute. Real data contains rare anomalies -- one 2005 ODI in this
+        # feed has an innings recorded out to 51 overs -- and an absolute check turns 11 balls
+        # in 1.6 million into a hard abort. A genuinely mismatched file would put a large
+        # fraction of its balls past the cap, not a handful.
+        overs_numeric = pd.to_numeric(df['over'], errors='coerce')
+        chunk_max_over = overs_numeric.max()
         if pd.notna(chunk_max_over):
             max_over_seen = max(max_over_seen, int(chunk_max_over))
-        if max_over_seen > over_cap:
+        over_cap_breaches += int((overs_numeric > over_cap).sum())
+        total_rows_seen += len(df)
+
+        breach_share = over_cap_breaches / total_rows_seen if total_rows_seen else 0
+        if breach_share > OVER_CAP_BREACH_LIMIT:
             raise SystemExit(
-                f"ABORTING: over {max_over_seen} exceeds the maximum of {over_cap} for "
-                f"{spec.label}. This file does not look like {spec.format} data — check that "
-                f"--format matches the source before loading."
+                f"ABORTING: {over_cap_breaches:,} of {total_rows_seen:,} balls "
+                f"({breach_share:.1%}) are past over {over_cap}, the maximum for {spec.label}. "
+                f"This file does not look like {spec.format} data — check that --format matches "
+                f"the source before loading."
             )
 
         # Stamp the format from the flags, not from the data.
@@ -242,6 +260,9 @@ def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=No
     
     print(f"\n")
     print(f"  Highest over seen: {max_over_seen} (cap for {spec.label}: {over_cap})")
+    if over_cap_breaches:
+        print(f"  NOTE: {over_cap_breaches:,} ball(s) past the cap — below the "
+              f"{OVER_CAP_BREACH_LIMIT:.0%} mismatch threshold, so treated as data anomalies.")
     return {
         'total_in_csv': total_in_csv,
         'total_skipped': total_skipped,
