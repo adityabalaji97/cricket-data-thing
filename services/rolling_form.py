@@ -394,8 +394,10 @@ def _fetch_batting_timeline(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> List[Dict]:
-    params: Dict = {"player_variants": player_variants}
+    params: Dict = {"player_variants": player_variants, "fmt": fmt, "gender": gender}
     match_filter = build_matches_filter_sql(
         alias="m",
         start_date=start_date,
@@ -420,6 +422,7 @@ def _fetch_batting_timeline(
         FROM batting_stats bs
         JOIN matches m ON m.id = bs.match_id
         WHERE bs.striker = ANY(:player_variants)
+          AND bs.format = :fmt AND bs.gender = :gender
           {match_filter}
         ORDER BY m.date, bs.match_id
         """
@@ -436,8 +439,10 @@ def _fetch_bowling_timeline(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> List[Dict]:
-    params: Dict = {"player_variants": player_variants}
+    params: Dict = {"player_variants": player_variants, "fmt": fmt, "gender": gender}
     match_filter = build_matches_filter_sql(
         alias="m",
         start_date=start_date,
@@ -463,6 +468,7 @@ def _fetch_bowling_timeline(
         FROM bowling_stats bs
         JOIN matches m ON m.id = bs.match_id
         WHERE bs.bowler = ANY(:player_variants)
+          AND bs.format = :fmt AND bs.gender = :gender
           {match_filter}
         ORDER BY m.date, bs.match_id
         """
@@ -479,6 +485,8 @@ def _fetch_batting_timeline_dd(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> List[Dict]:
     if not player_variants:
         return []
@@ -562,6 +570,8 @@ def _fetch_bowling_timeline_dd(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> List[Dict]:
     if not player_variants:
         return []
@@ -833,6 +843,8 @@ def get_form_flags_for_players(
     db: Session,
     player_names: List[str],
     window: int = 10,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, str]:
     """
     Lightweight helper for badge enrichment in match-preview/fantasy APIs.
@@ -857,11 +869,13 @@ def get_form_flags_for_players(
                 FROM batting_stats bs
                 JOIN matches m ON m.id = bs.match_id
                 WHERE bs.striker = :player AND bs.fantasy_points IS NOT NULL
+                  AND bs.format = :fmt AND bs.gender = :gender
                 UNION ALL
                 SELECT m.date, bw.fantasy_points
                 FROM bowling_stats bw
                 JOIN matches m ON m.id = bw.match_id
                 WHERE bw.bowler = :player AND bw.fantasy_points IS NOT NULL
+                  AND bw.format = :fmt AND bw.gender = :gender
             )
             SELECT fantasy_points
             FROM combined
@@ -869,7 +883,8 @@ def get_form_flags_for_players(
             LIMIT :limit
             """
         )
-        rows = db.execute(query, {"player": legacy, "limit": limit}).fetchall()
+        rows = db.execute(query, {"player": legacy, "limit": limit,
+                                  "fmt": fmt, "gender": gender}).fetchall()
         values = [float(r[0]) for r in rows if r and r[0] is not None]
         out[name] = _derive_recent_form_flag(list(reversed(values)), window)
 
