@@ -8,16 +8,19 @@
 # Note scripts/ is deliberately NOT excluded -- vercel.json's ignoreCommand runs
 # scripts/vercel-ignore-build.sh, so excluding it would break build skipping entirely.
 
-# Large local data and model artefacts
-data/
-ml/
+# Large local data and model artefacts.
+# Leading slashes matter: an unanchored `data/` also matches src/data/, which holds
+# iplSchedule.js and is imported by LandingPage.jsx -- excluding it broke the build with
+# "Can't resolve '../data/iplSchedule'". Anchor every directory rule to the repo root.
+/data/
+/ml/
 *.csv
 
 # Installed by Vercel from package.json
-node_modules/
+/node_modules/
 
 # Local build output
-build/
+/build/
 
 # Python backend -- runs on Heroku, not Vercel
 requirements.txt
