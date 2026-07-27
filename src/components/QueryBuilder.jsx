@@ -25,6 +25,7 @@ import axios from 'axios';
 import config from '../config';
 import { qbButtonSx, qbCardSx, qbColors, qbFonts, qbGhostButtonSx } from './queryBuilderTheme';
 import { useFormat } from '../context/FormatContext';
+import FormatSwitcher from './FormatSwitcher';
 
 const getDefaultFilters = () => ({
   // Basic filters
@@ -633,6 +634,10 @@ const QueryBuilder = ({ isMobile }) => {
                   Filters & Grouping
                 </Typography>
               </Box>
+              {/* Format lives here, not in the site nav: it is a query filter like any other,
+                  and its only real consumer is this page. Elsewhere the format is implied by
+                  what you are looking at -- a scorecard is one match, a preview one fixture. */}
+              <FormatSwitcher />
               <Chip
                 label={`${activeCount} active`}
                 sx={{

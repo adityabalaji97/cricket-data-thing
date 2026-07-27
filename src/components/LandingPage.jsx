@@ -770,7 +770,9 @@ const FeaturedInningsSection = ({ innings, loading, isMobile }) => {
 };
 
 const EloSection = ({ isMobile, openDropdown, setOpenDropdown }) => {
-  const { formatParams } = useFormat();
+  // Pinned, not the raw selection: ELO is one rating stream per format, so "All formats" has
+  // no meaning here and /teams/elo-rankings cannot resolve it. Falls back to men's T20.
+  const { pinnedFormatParams: formatParams } = useFormat();
   const [eloComp, setEloComp] = useState('international');
   const [eloRange, setEloRange] = useState('all');
   const [rankings, setRankings] = useState([]);
@@ -1157,7 +1159,9 @@ const LandingPage = ({ showLeagueCounts = true }) => {
   // three different mobile thresholds across the hero pages made behaviour inconsistent.
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const { formatParams } = useFormat();
+  // Pinned: /landing/featured-innings 500s on format=ALL (verified), because it resolves a
+  // FormatSpec to pick strike-rate bands. The landing showcase is single-format by nature.
+  const { pinnedFormatParams: formatParams } = useFormat();
   const [navOpen, setNavOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [fixtures, setFixtures] = useState([]);

@@ -50,7 +50,6 @@ import axios from 'axios';
 
 import config from './config';
 import { DEFAULT_START_DATE, TODAY } from './utils/dateDefaults';
-import FormatSwitcher from './components/FormatSwitcher';
 import { NAV_ITEMS, getCurrentTabForPath, getPageTitleForPath } from './navItems';
 import { useFormat } from './context/FormatContext';
 
@@ -638,7 +637,6 @@ const AppContent = () => {
               </Typography>
             )}
             <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <FormatSwitcher isMobile />
               <IconButton
                 onClick={() => setSearchExpanded(true)}
                 size="small"
@@ -687,7 +685,6 @@ const AppContent = () => {
               ))}
             </Tabs>
             <Box sx={{ ml: 1, display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-              <FormatSwitcher />
               <IconButton
                 onClick={() => setSearchExpanded(true)}
                 size="small"

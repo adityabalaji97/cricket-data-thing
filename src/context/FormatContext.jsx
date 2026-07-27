@@ -23,9 +23,38 @@ import { clearAnalyticsCache, setActiveFormatParams } from '../utils/analyticsAp
 const STORAGE_KEY = 'hindsight.format';
 const URL_PARAM = 'fmt';
 
+// "Across every format" is a first-class choice, not the absence of one: comparing a player's
+// T20 and ODI records is one of the main questions the query builder exists to answer, and
+// pinning to a single format made it unaskable. Synthesised here rather than served by
+// /formats because it is a UI affordance, not a format the backend has a FormatSpec for --
+// get_format('ALL') deliberately raises.
+//
+// Carries T20 phase definitions because a cross-format query has to label phases with
+// something, and the backend makes the same choice (see analytics_common.phase_bounds).
+export const ALL_FORMATS_ENTRY = {
+  format: 'ALL',
+  gender: 'male',
+  slug: 'all',
+  label: 'All formats',
+  innings_count: 2,
+  balls_per_innings: 120,
+  chase_innings: 2,
+  over_max: 49,
+  has_fixed_over_cap: false,
+  phases: [
+    { key: 'powerplay', label: 'Powerplay', start_over: 0, end_over: 5, display_overs: '1-6' },
+    { key: 'middle', label: 'Middle', start_over: 6, end_over: 14, display_overs: '7-15' },
+    { key: 'death', label: 'Death', start_over: 15, end_over: 19, display_overs: '16-20' },
+  ],
+  phases_4: [],
+  available: true,
+  isAllFormats: true,
+};
+
 // Enough to render the shell before /formats resolves. Men's T20 only, because that is the one
 // format guaranteed to have data.
 const FALLBACK_FORMATS = [
+  ALL_FORMATS_ENTRY,
   {
     format: 'T20',
     gender: 'male',
@@ -53,9 +82,12 @@ const readInitialSlug = () => {
   try {
     const fromUrl = new URLSearchParams(window.location.search).get(URL_PARAM);
     if (fromUrl) return fromUrl;
-    return window.localStorage.getItem(STORAGE_KEY) || 'mens-t20';
+    // Defaults to every format, matching the /query/deliveries default. A career line that
+    // silently blends T20 with ODI is worse than one that shows both, so the default is to
+    // span formats and let the grouping split them.
+    return window.localStorage.getItem(STORAGE_KEY) || 'all';
   } catch {
-    return 'mens-t20';
+    return 'all';
   }
 };
 
@@ -70,7 +102,9 @@ export const FormatProvider = ({ children }) => {
       .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
       .then((data) => {
         if (cancelled || !data?.formats?.length) return;
-        setFormats(data.formats);
+        // Synthetic, so it is prepended rather than served: the backend has no FormatSpec
+        // for 'ALL' by design.
+        setFormats([ALL_FORMATS_ENTRY, ...data.formats]);
       })
       .catch(() => {
         // Keep the fallback. A failed lookup should not stop the app rendering men's T20.
@@ -121,8 +155,16 @@ export const FormatProvider = ({ children }) => {
       loading,
       active,
       selectFormat,
-      // Ready to spread into a request: `{ ...formatParams }`.
+      // Ready to spread into a request: `{ ...formatParams }`. May be format: 'ALL'.
       formatParams: { format: active?.format || 'T20', gender: active?.gender || 'male' },
+      // For endpoints that require a single real format. ELO, phase benchmarks and anything
+      // resolving a FormatSpec cannot accept 'ALL' -- get_format('ALL') raises -- so those
+      // callers use this and fall back to men's T20 rather than 500.
+      pinnedFormatParams: {
+        format: active?.format && active.format !== 'ALL' ? active.format : 'T20',
+        gender: active?.gender || 'male',
+      },
+      isAllFormats: (active?.format || 'T20') === 'ALL',
       isDefaultFormat: (active?.format || 'T20') === 'T20' && (active?.gender || 'male') === 'male',
       phaseLabel: (key) => active?.phases?.find((p) => p.key === key)?.label || key,
       phaseOvers: (key) => active?.phases?.find((p) => p.key === key)?.display_overs || '',
