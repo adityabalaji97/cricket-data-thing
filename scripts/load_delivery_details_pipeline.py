@@ -107,7 +107,7 @@ def step_load(csv_path, db_url, dry_run=False, fmt="T20", gender="male"):
     return results
 
 
-def step_backfill_advanced(csv_path, db_url, dry_run=False):
+def step_backfill_advanced(csv_path, db_url, dry_run=False, fmt="T20", gender="male"):
     """Step 2b: Backfill advanced data columns from CSV."""
     print_header("STEP 2b: BACKFILL ADVANCED DATA")
 
@@ -115,7 +115,7 @@ def step_backfill_advanced(csv_path, db_url, dry_run=False):
     from load_delivery_details_full import get_engine
 
     engine = get_engine(db_url)
-    updated = backfill(csv_path, engine, dry_run=dry_run)
+    updated = backfill(csv_path, engine, dry_run=dry_run, fmt=fmt, gender=gender)
 
     print(f"\n✓ Backfill complete")
     print(f"  - {'Would update' if dry_run else 'Updated'}: {updated:,} rows")
@@ -298,7 +298,10 @@ Examples:
         
         # Step 2b: Backfill advanced data
         if not args.skip_backfill:
-            step_backfill_advanced(args.csv, db_url, dry_run=args.dry_run)
+            step_backfill_advanced(
+                args.csv, db_url, dry_run=args.dry_run,
+                fmt=args.format, gender=args.gender,
+            )
         else:
             print("\n[SKIPPED] Step 2b: Backfill Advanced Data")
 

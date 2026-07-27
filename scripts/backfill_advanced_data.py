@@ -32,24 +32,47 @@ ADVANCED_COLS = [
 DB_TO_CSV = {v: k for k, v in COL_MAP.items()}
 
 
-def get_null_advanced_keys(engine):
-    """Fetch (p_match, inns, over, ball) where any advanced column is NULL."""
-    conditions = " OR ".join(f"{col} IS NULL" for col in ADVANCED_COLS)
+def get_null_advanced_keys(engine, fmt=None, gender=None):
+    """Fetch (p_match, inns, over, ball) for rows that have never been backfilled.
+
+    "Never backfilled" means *every* advanced column is NULL, not *any* of them.
+
+    The difference is the whole cost of this step. The feed simply has no value for some
+    columns on some balls -- 1,431,572 T20 rows carry partial advanced data and always
+    will. Under an ANY test those rows stay eligible forever, so each nightly run
+    rebuilt a 2.2M-row temp table and re-ran an UPDATE that could not change them. That
+    is what timed out once ODI data pushed the table over the threshold. Under an ALL
+    test the same database yields 4,134 T20 and 2,064 ODI rows.
+
+    The trade: if the source later gains a value for a column on a row that already has
+    some other column populated, it is not picked up. That is rare, and far cheaper than
+    an unbounded nightly job. Backfilling it would need a re-check pass keyed on source
+    revision, not a wider predicate here.
+    """
+    conditions = " AND ".join(f"{col} IS NULL" for col in ADVANCED_COLS)
+    params = {}
+    format_filter = ""
+    if fmt:
+        # A T20 run has nothing to say about ODI rows; without this the key set spans
+        # every format and the CSV filter below silently discards the difference.
+        format_filter = " AND format = :fmt AND gender = :gender"
+        params = {"fmt": fmt, "gender": gender or "male"}
+
     query = text(f"""
         SELECT p_match, inns, over, ball
         FROM delivery_details
-        WHERE {conditions}
+        WHERE ({conditions}){format_filter}
     """)
 
     with engine.connect() as conn:
-        result = conn.execute(query)
+        result = conn.execute(query, params)
         rows = [(str(r[0]), int(r[1]), int(r[2]), int(r[3])) for r in result]
 
-    print(f"  Found {len(rows):,} deliveries with NULL advanced data in DB")
+    print(f"  Found {len(rows):,} deliveries with no advanced data in DB")
     return rows
 
 
-def backfill(csv_path, engine, dry_run=False):
+def backfill(csv_path, engine, dry_run=False, fmt=None, gender=None):
     """Backfill advanced columns from CSV into DB rows that have NULLs.
 
     Uses a temp table + single bulk UPDATE with COALESCE to preserve existing
@@ -57,7 +80,7 @@ def backfill(csv_path, engine, dry_run=False):
     """
 
     print("Finding deliveries with NULL advanced data...")
-    null_keys = get_null_advanced_keys(engine)
+    null_keys = get_null_advanced_keys(engine, fmt=fmt, gender=gender)
     if not null_keys:
         print("  Nothing to backfill — all advanced columns are populated.")
         return 0
@@ -154,7 +177,7 @@ def backfill(csv_path, engine, dry_run=False):
     set_clauses = ", ".join(
         f"{col} = COALESCE(dd.{col}, t.{col})" for col in advanced_in_csv
     )
-    null_filter = " OR ".join(f"dd.{col} IS NULL" for col in advanced_in_csv)
+    null_filter = " AND ".join(f"dd.{col} IS NULL" for col in advanced_in_csv)
 
     match_list = sorted(match_ids_needed)
     BATCH_SIZE = 500
