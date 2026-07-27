@@ -89,6 +89,13 @@ _TRAJECTORY_CACHE: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
 _DELIVERY_SCHEMA_CACHE: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
 
 
+# These rankings are men's T20 by definition -- the module name says so, and the buckets and
+# thresholds below are calibrated for it. delivery_details now also holds ODI rows, so without
+# this pin an ODI innings counts toward a T20 ranking. Pinned to a literal rather than a
+# parameter because there is no such thing as an ODI "global T20 ranking"; a genuinely
+# multi-format ranking would need its own thresholds, not just a different filter value.
+FORMAT_PIN_SQL = "dd.format = 'T20' AND dd.gender = 'male'"
+
 LENGTH_BUCKET_SQL = """
 CASE
   WHEN UPPER(TRIM(dd.length)) IN ('FULL_TOSS', 'YORKER', 'FULL') THEN 'FULL'
@@ -423,7 +430,8 @@ def _fetch_batting_cells(db: Session, start: date, end: date) -> List[Dict[str, 
                 COALESCE(dd.score, 0)::float AS runs_scored,
                 CASE WHEN COALESCE(dd.control, 0) = 1 THEN 1 ELSE 0 END::float AS controlled_ball
             FROM delivery_details dd
-            WHERE {date_filter_sql}
+            WHERE {FORMAT_PIN_SQL}
+              AND {date_filter_sql}
               AND dd.length IS NOT NULL
               AND {schema_cfg["batter_expr"]} IS NOT NULL
               AND dd.competition IS NOT NULL
@@ -483,7 +491,8 @@ def _fetch_batting_totals(db: Session, start: date, end: date) -> Dict[Tuple[str
                 COALESCE(dd.score, 0)::float AS runs_scored,
                 CASE WHEN COALESCE(dd.control, 0) = 1 THEN 1 ELSE 0 END::float AS controlled_ball
             FROM delivery_details dd
-            WHERE {date_filter_sql}
+            WHERE {FORMAT_PIN_SQL}
+              AND {date_filter_sql}
               AND dd.length IS NOT NULL
               AND dd.competition IS NOT NULL
               AND TRIM(dd.competition) <> ''
@@ -531,7 +540,8 @@ def _fetch_bowling_cells(db: Session, start: date, end: date) -> List[Dict[str, 
                 COALESCE(dd.score, 0)::float AS runs_conceded,
                 CASE WHEN COALESCE(dd.score, 0) = 0 THEN 1 ELSE 0 END::float AS dot_ball
             FROM delivery_details dd
-            WHERE {date_filter_sql}
+            WHERE {FORMAT_PIN_SQL}
+              AND {date_filter_sql}
               AND dd.length IS NOT NULL
               AND {schema_cfg["bowler_expr"]} IS NOT NULL
               AND dd.competition IS NOT NULL
@@ -591,7 +601,8 @@ def _fetch_bowling_totals(db: Session, start: date, end: date) -> Dict[Tuple[str
                 COALESCE(dd.score, 0)::float AS runs_conceded,
                 CASE WHEN COALESCE(dd.score, 0) = 0 THEN 1 ELSE 0 END::float AS dot_ball
             FROM delivery_details dd
-            WHERE {date_filter_sql}
+            WHERE {FORMAT_PIN_SQL}
+              AND {date_filter_sql}
               AND dd.length IS NOT NULL
               AND dd.competition IS NOT NULL
               AND TRIM(dd.competition) <> ''
