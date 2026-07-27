@@ -86,16 +86,29 @@ def backfill(csv_path, engine, dry_run=False):
     # Replace "-" with NaN (treat as missing)
     df = df.replace('-', pd.NA)
 
-    # Normalize the integer-typed columns to a nullable int dtype.
+    # Coerce every column to the type delivery_details actually declares.
     #
-    # These arrive as decimals ("322.0") and sometimes "-", so pandas leaves them as object,
-    # and to_sql then creates the temp table column as TEXT. The bulk UPDATE below does
-    # COALESCE(dd.col, t.col) against an INTEGER column, which Postgres rejects outright:
-    # "COALESCE types integer and text cannot be matched". Only `control` was handled here,
-    # which held for the T20 feed where the wagon columns are clean integers.
-    for column in ('control', 'wagon_x', 'wagon_y', 'wagon_zone'):
-        if column in df.columns:
+    # The bulk UPDATE below does COALESCE(dd.col, t.col). If the temp table column comes out as
+    # TEXT while the real one is INTEGER or DOUBLE PRECISION, Postgres rejects the statement
+    # outright. That happens whenever this feed writes a number as a decimal or uses "-" for a
+    # gap, because pandas then leaves the column as object and to_sql makes it TEXT.
+    #
+    # Deriving the target types from information_schema rather than listing columns by hand:
+    # fixing them one at a time just surfaces the next one, and a new column added to
+    # ADVANCED_COLS later would reintroduce the same failure silently.
+    db_types = {
+        row[0]: row[1]
+        for row in engine.connect().execute(text(
+            "SELECT column_name, data_type FROM information_schema.columns "
+            "WHERE table_name = 'delivery_details'"
+        )).fetchall()
+    }
+    for column in advanced_in_csv:
+        db_type = db_types.get(column, '')
+        if db_type in ('integer', 'smallint', 'bigint'):
             df[column] = pd.to_numeric(df[column], errors='coerce').astype('Int64')
+        elif db_type in ('double precision', 'real', 'numeric'):
+            df[column] = pd.to_numeric(df[column], errors='coerce').astype('Float64')
 
     # Convert NaN in string-typed cols to None (so to_sql inserts NULL, not 'NaN')
     for col in ('line', 'length', 'shot'):
