@@ -23,6 +23,14 @@ from database import get_session
 from utils.league_utils import expand_league_abbreviations
 
 router = APIRouter(tags=["Player Line & Length"])
+
+# Every query here aggregates delivery_details across matches, so each one needs pinning
+# now that the table holds more than one format -- otherwise ODI balls land in a T20
+# player's line-and-length profile, and in the population baselines they are compared
+# against. Pinned to a literal because these buckets and thresholds are T20-calibrated;
+# an ODI version needs its own, not just a different filter value.
+FORMAT_PIN_SQL = "dd.format = 'T20' AND dd.gender = 'male'"
+FORMAT_PIN_SQL_BARE = "format = 'T20' AND gender = 'male'"  # for queries with no alias
 logger = logging.getLogger(__name__)
 
 TOP_INTERNATIONAL_TEAMS = [
@@ -231,7 +239,8 @@ def _resolve_player_names_for_delivery_details(
             text(f"""
                 SELECT DISTINCT dd.{player_col} AS resolved_name
                 FROM delivery_details dd
-                WHERE LOWER(dd.{player_col}) = LOWER(:name)
+                WHERE {FORMAT_PIN_SQL}
+                  AND LOWER(dd.{player_col}) = LOWER(:name)
                 LIMIT 5
             """),
             {"name": requested},
@@ -251,7 +260,8 @@ def _resolve_player_names_for_delivery_details(
                 text(f"""
                     SELECT dd.{player_col} AS candidate_name, COUNT(*) AS cnt
                     FROM delivery_details dd
-                    WHERE LOWER(dd.{player_col}) LIKE LOWER(:surname_pattern)
+                    WHERE {FORMAT_PIN_SQL}
+                      AND LOWER(dd.{player_col}) LIKE LOWER(:surname_pattern)
                     GROUP BY dd.{player_col}
                     ORDER BY cnt DESC
                     LIMIT 50
@@ -294,7 +304,8 @@ def _fetch_player_bat_hand(
         sql = text(f"""
             SELECT dd.bat_hand AS bat_hand, COUNT(*) AS cnt
             FROM delivery_details dd
-            WHERE dd.bat = ANY(:player_names)
+            WHERE {FORMAT_PIN_SQL}
+              AND dd.bat = ANY(:player_names)
             AND dd.bat_hand IS NOT NULL
             AND dd.bat_hand != ''
             AND (:start_year IS NULL OR dd.year >= :start_year)
@@ -334,7 +345,8 @@ def _aggregate_line_length_sql(player_filter: str, comp_filter: str) -> str:
             SUM(CASE WHEN dd.batruns = 0 AND COALESCE(dd.wide, 0) = 0
                          AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) AS dot_balls
         FROM delivery_details dd
-        WHERE dd.line IS NOT NULL
+        WHERE {FORMAT_PIN_SQL}
+          AND dd.line IS NOT NULL
         AND dd.length IS NOT NULL
         {player_filter}
         AND (:start_year IS NULL OR dd.year >= :start_year)
@@ -485,7 +497,8 @@ def _aggregate_sql(group_col: str, player_filter: str, comp_filter: str) -> str:
                               AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) * 100.0 AS FLOAT)
                 / NULLIF(COUNT(*), 0)                           AS dot_pct
         FROM delivery_details dd
-        WHERE dd.{group_col} IS NOT NULL
+        WHERE {FORMAT_PIN_SQL}
+          AND dd.{group_col} IS NOT NULL
         {player_filter}
         AND (:start_year IS NULL OR dd.year >= :start_year)
         AND (:end_year IS NULL OR dd.year <= :end_year)
@@ -587,10 +600,11 @@ def get_player_line_length_profile(
         bk_line_length_cells, bs_line_length_cells = {}, {}
 
         if mode == "bowling":
-            detect_sql = text("""
+            detect_sql = text(f"""
                 SELECT bowl_kind, bowl_style, COUNT(*) as cnt
                 FROM delivery_details
-                WHERE bowl = ANY(:player_names) AND bowl_kind IS NOT NULL
+                WHERE {FORMAT_PIN_SQL_BARE}
+                  AND bowl = ANY(:player_names) AND bowl_kind IS NOT NULL
                 GROUP BY bowl_kind, bowl_style
                 ORDER BY cnt DESC LIMIT 1
             """)
@@ -657,7 +671,8 @@ def get_player_line_length_profile(
                    COUNT(CASE WHEN dd.length IS NOT NULL THEN 1 END) as with_length,
                    COUNT(CASE WHEN dd.line IS NOT NULL THEN 1 END) as with_line
             FROM delivery_details dd
-            WHERE dd.{player_col} = ANY(:player_names)
+            WHERE {FORMAT_PIN_SQL}
+              AND dd.{player_col} = ANY(:player_names)
             AND (:start_year IS NULL OR dd.year >= :start_year)
             AND (:end_year IS NULL OR dd.year <= :end_year)
             AND (:venue IS NULL OR dd.ground = :venue)
