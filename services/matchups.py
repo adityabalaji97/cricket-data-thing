@@ -152,6 +152,8 @@ def _build_batter_avg_balls_lookup(
     innings_position: Optional[int] = None,
     venue_filter: Optional[str] = None,
     day_or_night: Optional[str] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, float]:
     unique_batters = _dedupe_player_names(batter_names)
     if not unique_batters:
@@ -180,6 +182,7 @@ def _build_batter_avg_balls_lookup(
         JOIN matches m ON bs.match_id = m.id
         LEFT JOIN alias_map am ON LOWER(bs.striker) = am.name_key
         WHERE COALESCE(am.canonical_name, bs.striker) = ANY(:batters)
+          AND bs.format = :fmt AND bs.gender = :gender
           AND bs.balls_faced IS NOT NULL
           AND bs.balls_faced > 0
           AND (:start_date IS NULL OR m.date >= :start_date)
@@ -200,6 +203,8 @@ def _build_batter_avg_balls_lookup(
             "innings_position": innings_position,
             "venue_filter": venue_filter,
             "day_or_night": day_or_night,
+            "fmt": fmt,
+            "gender": gender,
         },
     ).fetchall()
 
@@ -218,6 +223,8 @@ def _build_bowler_avg_balls_lookup(
     innings_position: Optional[int] = None,
     venue_filter: Optional[str] = None,
     day_or_night: Optional[str] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, float]:
     unique_bowlers = _dedupe_player_names(bowler_names)
     if not unique_bowlers:
@@ -251,6 +258,7 @@ def _build_bowler_avg_balls_lookup(
         JOIN matches m ON bw.match_id = m.id
         LEFT JOIN alias_map am ON LOWER(bw.bowler) = am.name_key
         WHERE COALESCE(am.canonical_name, bw.bowler) = ANY(:bowlers)
+          AND bw.format = :fmt AND bw.gender = :gender
           AND bw.overs IS NOT NULL
           AND bw.overs > 0
           AND (:start_date IS NULL OR m.date >= :start_date)
@@ -271,6 +279,8 @@ def _build_bowler_avg_balls_lookup(
             "innings_position": innings_position,
             "venue_filter": venue_filter,
             "day_or_night": day_or_night,
+            "fmt": fmt,
+            "gender": gender,
         },
     ).fetchall()
 
@@ -592,8 +602,15 @@ def get_team_matchups_service(
     venue_filter: Optional[str] = None,
     min_balls: int = 6,
     day_or_night: Optional[str] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ):
     """
+    fmt/gender pin every underlying query to one format. They default to men's T20 so
+    existing callers keep their behaviour; a multi-format caller passes them explicitly.
+    Without the pin, ODI rows in matches/batting_stats/bowling_stats/delivery_details are
+    averaged into T20 projections -- ODI innings are longer, so fantasy points inflate.
+
     innings_position: when set to 1 or 2, restricts all underlying historical
     queries (deliveries, delivery_details, batting_stats, bowling_stats) to
     that innings only. None (default) returns Overall stats. Used by the
@@ -659,10 +676,14 @@ def get_team_matchups_service(
             team2_names = get_all_team_name_variations(team2)
             recent_matches_query = text("""
                 WITH recent_matches AS (
-                    SELECT id 
+                    SELECT id
                     FROM matches
-                    WHERE ((team1 = ANY(:team1_names) OR team2 = ANY(:team1_names)) 
+                    WHERE ((team1 = ANY(:team1_names) OR team2 = ANY(:team1_names))
                            OR (team1 = ANY(:team2_names) OR team2 = ANY(:team2_names)))
+                    -- Pinned here rather than on each delivery join below: every player CTE
+                    -- hangs off recent_matches, so one predicate covers all six. Without it
+                    -- "last 10 matches" mixes formats and a T20 XI is inferred from ODIs.
+                    AND format = :fmt AND gender = :gender
                     AND (:start_date IS NULL OR date >= :start_date)
                     AND (:end_date IS NULL OR date <= :end_date)
                     AND (:day_or_night IS NULL OR day_or_night = :day_or_night)
@@ -755,6 +776,8 @@ def get_team_matchups_service(
                 "end_date": end_date,
                 "day_or_night": day_or_night,
                 "venue_filter": venue_filter,
+                "fmt": fmt,
+                "gender": gender,
             }).fetchall()
             team1_players = _dedupe_player_names([row[0] for row in recent_players if row[1] == team1])
             team2_players = _dedupe_player_names([row[0] for row in recent_players if row[1] == team2])
@@ -817,6 +840,9 @@ def get_team_matchups_service(
                 LEFT JOIN alias_map bowl_alias ON LOWER(dd.bowl) = bowl_alias.name_key
                 WHERE
                     :use_delivery_details = true
+                    -- On dd, not m2: the join is a LEFT JOIN, so pinning the match side
+                    -- would also drop deliveries whose match row is missing.
+                    AND dd.format = :fmt AND dd.gender = :gender
                     AND
                     ((COALESCE(bat_alias.canonical_name, dd.bat) = ANY(:team1_players)
                       AND COALESCE(bowl_alias.canonical_name, dd.bowl) = ANY(:team2_players))
@@ -889,6 +915,8 @@ def get_team_matchups_service(
             "innings_position": innings_position,
             "day_or_night": day_or_night,
             "min_balls": min_balls,
+            "fmt": fmt,
+            "gender": gender,
         }).fetchall()
 
         team1_batting = {}
@@ -923,6 +951,8 @@ def get_team_matchups_service(
             innings_position=innings_position,
             venue_filter=venue_filter,
             day_or_night=day_or_night,
+            fmt=fmt,
+            gender=gender,
         )
         bowler_avg_balls_lookup = _build_bowler_avg_balls_lookup(
             db=db,
@@ -932,6 +962,8 @@ def get_team_matchups_service(
             innings_position=innings_position,
             venue_filter=venue_filter,
             day_or_night=day_or_night,
+            fmt=fmt,
+            gender=gender,
         )
 
         # Add "Overall" entry for each batter in team1_batting
