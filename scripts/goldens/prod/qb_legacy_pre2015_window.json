@@ -1,0 +1,116 @@
+{
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "average": 27.68,
+        "balls": 54342,
+        "balls_per_dismissal": 22.94,
+        "boundaries": 6362,
+        "boundary_percentage": 11.71,
+        "dot_percentage": 31.61,
+        "dots": 17177,
+        "fours": 4306,
+        "innings_count": 996,
+        "percent_balls": 45.98,
+        "phase": "middle",
+        "runs": 65570,
+        "sixes": 2056,
+        "strike_rate": 120.66,
+        "wickets": 2369
+      },
+      {
+        "average": 29.34,
+        "balls": 37420,
+        "balls_per_dismissal": 24.44,
+        "boundaries": 6505,
+        "boundary_percentage": 17.38,
+        "dot_percentage": 46.19,
+        "dots": 17284,
+        "fours": 5442,
+        "innings_count": 1011,
+        "percent_balls": 31.66,
+        "phase": "powerplay",
+        "runs": 44920,
+        "sixes": 1063,
+        "strike_rate": 120.04,
+        "wickets": 1531
+      },
+      {
+        "average": 18.03,
+        "balls": 26415,
+        "balls_per_dismissal": 11.91,
+        "boundaries": 4591,
+        "boundary_percentage": 17.38,
+        "dot_percentage": 27.06,
+        "dots": 7149,
+        "fours": 2827,
+        "innings_count": 932,
+        "percent_balls": 22.35,
+        "phase": "death",
+        "runs": 39980,
+        "sixes": 1764,
+        "strike_rate": 151.35,
+        "wickets": 2218
+      }
+    ],
+    "metadata": {
+      "ball_aggregation": "snapshot",
+      "data_source": "deliveries",
+      "data_sources": [
+        "deliveries (2013-2014)"
+      ],
+      "filters_applied": {
+        "bat_hand": null,
+        "batters": [],
+        "batting_teams": [],
+        "bowl_kind": [],
+        "bowl_style": [],
+        "bowlers": [],
+        "bowling_teams": [],
+        "chase_outcome": [],
+        "control": null,
+        "crease_combo": [],
+        "dismissal": [],
+        "end_date": "2014-12-31",
+        "group_by": [
+          "phase"
+        ],
+        "innings": null,
+        "is_chase": null,
+        "leagues": [],
+        "length": [],
+        "line": [],
+        "match_outcome": [],
+        "max_wickets": null,
+        "min_wickets": null,
+        "over_range": null,
+        "players": [],
+        "query_mode": "delivery",
+        "shot": [],
+        "start_date": "2013-01-01",
+        "teams": [],
+        "toss_decision": [],
+        "venue": null,
+        "wagon_zone": []
+      },
+      "grouped_by": [
+        "phase"
+      ],
+      "has_more": false,
+      "has_summaries": false,
+      "limit": 100,
+      "note": "Grouped data with cricket aggregations",
+      "offset": 0,
+      "query_mode_used": "delivery",
+      "recommended_chart": null,
+      "returned_groups": 3,
+      "total_balls_in_query": 118177,
+      "total_groups": 3,
+      "total_innings_in_query": 2939,
+      "warnings": []
+    },
+    "percentages": null,
+    "summary_data": null
+  }
+}

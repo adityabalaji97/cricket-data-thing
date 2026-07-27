@@ -1,0 +1,1941 @@
+{
+  "status": 200,
+  "body": [
+    {
+      "balls": 63,
+      "batter": "Adam Lyth",
+      "competition": "T20 Blast",
+      "date": "2026-07-05",
+      "deliveries": [
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        }
+      ],
+      "fours": 16,
+      "match_id": "1512855",
+      "opponent": "Leicestershire",
+      "runs": 131,
+      "sixes": 6,
+      "strike_rate": 207.94,
+      "team": "Yorkshire",
+      "venue": "Headingley, Leeds"
+    },
+    {
+      "balls": 64,
+      "batter": "Jos Buttler",
+      "competition": "T20I",
+      "date": "2026-07-11",
+      "deliveries": [
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 288,
+          "wagon_y": 196
+        },
+        {
+          "runs": 0,
+          "wagon_x": 108,
+          "wagon_y": 180
+        },
+        {
+          "runs": 0,
+          "wagon_x": 123,
+          "wagon_y": 183
+        },
+        {
+          "runs": 1,
+          "wagon_x": 286,
+          "wagon_y": 94
+        },
+        {
+          "runs": 4,
+          "wagon_x": 347,
+          "wagon_y": 275
+        },
+        {
+          "runs": 1,
+          "wagon_x": 283,
+          "wagon_y": 71
+        },
+        {
+          "runs": 4,
+          "wagon_x": 242,
+          "wagon_y": 9
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 270,
+          "wagon_y": 339
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 102,
+          "wagon_y": 183
+        },
+        {
+          "runs": 1,
+          "wagon_x": 327,
+          "wagon_y": 141
+        },
+        {
+          "runs": 2,
+          "wagon_x": 325,
+          "wagon_y": 142
+        },
+        {
+          "runs": 4,
+          "wagon_x": 102,
+          "wagon_y": 21
+        },
+        {
+          "runs": 6,
+          "wagon_x": 362,
+          "wagon_y": 282
+        },
+        {
+          "runs": 2,
+          "wagon_x": 80,
+          "wagon_y": 288
+        },
+        {
+          "runs": 0,
+          "wagon_x": 125,
+          "wagon_y": 195
+        },
+        {
+          "runs": 1,
+          "wagon_x": 267,
+          "wagon_y": 78
+        },
+        {
+          "runs": 1,
+          "wagon_x": 290,
+          "wagon_y": 68
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 59,
+          "wagon_y": 117
+        },
+        {
+          "runs": 1,
+          "wagon_x": 306,
+          "wagon_y": 90
+        },
+        {
+          "runs": 0,
+          "wagon_x": 118,
+          "wagon_y": 184
+        },
+        {
+          "runs": 0,
+          "wagon_x": 227,
+          "wagon_y": 253
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 113,
+          "wagon_y": 206
+        },
+        {
+          "runs": 2,
+          "wagon_x": 58,
+          "wagon_y": 93
+        },
+        {
+          "runs": 1,
+          "wagon_x": 127,
+          "wagon_y": 198
+        },
+        {
+          "runs": 1,
+          "wagon_x": 299,
+          "wagon_y": 248
+        },
+        {
+          "runs": 4,
+          "wagon_x": 231,
+          "wagon_y": 7
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 48,
+          "wagon_y": 257
+        },
+        {
+          "runs": 1,
+          "wagon_x": 94,
+          "wagon_y": 185
+        },
+        {
+          "runs": 2,
+          "wagon_x": 56,
+          "wagon_y": 110
+        },
+        {
+          "runs": 4,
+          "wagon_x": 15,
+          "wagon_y": 222
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 26,
+          "wagon_y": 102
+        },
+        {
+          "runs": 1,
+          "wagon_x": 126,
+          "wagon_y": 276
+        },
+        {
+          "runs": 2,
+          "wagon_x": 37,
+          "wagon_y": 227
+        },
+        {
+          "runs": 4,
+          "wagon_x": 360,
+          "wagon_y": 211
+        },
+        {
+          "runs": 1,
+          "wagon_x": 265,
+          "wagon_y": 124
+        },
+        {
+          "runs": 0,
+          "wagon_x": 119,
+          "wagon_y": 189
+        },
+        {
+          "runs": 0,
+          "wagon_x": 250,
+          "wagon_y": 211
+        },
+        {
+          "runs": 6,
+          "wagon_x": 342,
+          "wagon_y": 76
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 251,
+          "wagon_y": 306
+        },
+        {
+          "runs": 4,
+          "wagon_x": 27,
+          "wagon_y": 281
+        },
+        {
+          "runs": 6,
+          "wagon_x": 269,
+          "wagon_y": 338
+        },
+        {
+          "runs": 6,
+          "wagon_x": 355,
+          "wagon_y": 228
+        },
+        {
+          "runs": 4,
+          "wagon_x": 69,
+          "wagon_y": 41
+        },
+        {
+          "runs": 1,
+          "wagon_x": 76,
+          "wagon_y": 106
+        },
+        {
+          "runs": 2,
+          "wagon_x": 100,
+          "wagon_y": 196
+        },
+        {
+          "runs": 6,
+          "wagon_x": 359,
+          "wagon_y": 96
+        },
+        {
+          "runs": 1,
+          "wagon_x": 65,
+          "wagon_y": 304
+        },
+        {
+          "runs": 4,
+          "wagon_x": 318,
+          "wagon_y": 65
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 126,
+          "wagon_y": 285
+        },
+        {
+          "runs": 1,
+          "wagon_x": 100,
+          "wagon_y": 189
+        },
+        {
+          "runs": 0,
+          "wagon_x": 196,
+          "wagon_y": 176
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 73,
+          "wagon_y": 210
+        },
+        {
+          "runs": 4,
+          "wagon_x": 247,
+          "wagon_y": 10
+        },
+        {
+          "runs": 1,
+          "wagon_x": 116,
+          "wagon_y": 125
+        },
+        {
+          "runs": 6,
+          "wagon_x": 33,
+          "wagon_y": 304
+        },
+        {
+          "runs": 6,
+          "wagon_x": 69,
+          "wagon_y": 327
+        },
+        {
+          "runs": 4,
+          "wagon_x": 361,
+          "wagon_y": 186
+        },
+        {
+          "runs": 0,
+          "wagon_x": 163,
+          "wagon_y": 232
+        }
+      ],
+      "fours": 12,
+      "match_id": "1496578",
+      "opponent": "India",
+      "runs": 131,
+      "sixes": 8,
+      "strike_rate": 204.69,
+      "team": "England",
+      "venue": "The Rose Bowl, Southampton"
+    },
+    {
+      "balls": 60,
+      "batter": "James Vince",
+      "competition": "T20 Blast",
+      "date": "2026-07-15",
+      "deliveries": [
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        }
+      ],
+      "fours": 14,
+      "match_id": "1512883",
+      "opponent": "Essex",
+      "runs": 125,
+      "sixes": 7,
+      "strike_rate": 208.33,
+      "team": "Hampshire",
+      "venue": "The Rose Bowl, Southampton"
+    },
+    {
+      "balls": 55,
+      "batter": "Chris Lynn",
+      "competition": "T20 Blast",
+      "date": "2026-07-08",
+      "deliveries": [
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 3,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        }
+      ],
+      "fours": 10,
+      "match_id": "1512861",
+      "opponent": "Glamorgan",
+      "runs": 117,
+      "sixes": 7,
+      "strike_rate": 212.73,
+      "team": "Northamptonshire",
+      "venue": "Sophia Gardens, Cardiff"
+    },
+    {
+      "balls": 52,
+      "batter": "Daniel Hughes",
+      "competition": "T20 Blast",
+      "date": "2026-07-10",
+      "deliveries": [
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        }
+      ],
+      "fours": 11,
+      "match_id": "1512869",
+      "opponent": "Middlesex",
+      "runs": 108,
+      "sixes": 6,
+      "strike_rate": 207.69,
+      "team": "Sussex",
+      "venue": "Merchant Taylors' School Ground, Northwood"
+    },
+    {
+      "balls": 58,
+      "batter": "Jason Roy",
+      "competition": "T20 Blast",
+      "date": "2026-07-08",
+      "deliveries": [
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 0,
+          "wagon_y": 0
+        }
+      ],
+      "fours": 6,
+      "match_id": "1512860",
+      "opponent": "Sussex",
+      "runs": 103,
+      "sixes": 8,
+      "strike_rate": 177.59,
+      "team": "Surrey",
+      "venue": "Kennington Oval, London"
+    }
+  ]
+}

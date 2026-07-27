@@ -1,0 +1,122 @@
+{
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "average": 19.38,
+        "balls": 4722,
+        "balls_per_dismissal": 12.33,
+        "boundaries": 940,
+        "boundary_percentage": 19.91,
+        "bowl_kind": "pace bowler",
+        "control_percentage": 61.910788,
+        "dot_percentage": 29.82,
+        "dots": 1408,
+        "fours": 581,
+        "innings_count": 207,
+        "percent_balls": 80.21,
+        "runs": 7421,
+        "sixes": 359,
+        "strike_rate": 157.16,
+        "wickets": 383
+      },
+      {
+        "average": 16.81,
+        "balls": 1141,
+        "balls_per_dismissal": 12.14,
+        "boundaries": 174,
+        "boundary_percentage": 15.25,
+        "bowl_kind": "spin bowler",
+        "control_percentage": 71.323529,
+        "dot_percentage": 32.43,
+        "dots": 370,
+        "fours": 82,
+        "innings_count": 134,
+        "percent_balls": 19.38,
+        "runs": 1580,
+        "sixes": 92,
+        "strike_rate": 138.48,
+        "wickets": 94
+      },
+      {
+        "average": 2.25,
+        "balls": 24,
+        "balls_per_dismissal": 3.0,
+        "boundaries": 1,
+        "boundary_percentage": 4.17,
+        "bowl_kind": "mixture/unknown",
+        "control_percentage": 83.333333,
+        "dot_percentage": 45.83,
+        "dots": 11,
+        "fours": 1,
+        "innings_count": 3,
+        "percent_balls": 0.41,
+        "runs": 18,
+        "sixes": 0,
+        "strike_rate": 75.0,
+        "wickets": 8
+      }
+    ],
+    "metadata": {
+      "ball_aggregation": "snapshot",
+      "data_source": "delivery_details+deliveries",
+      "data_sources": [
+        "delivery_details (2015-2026)",
+        "deliveries (2005-2014)"
+      ],
+      "filters_applied": {
+        "bat_hand": null,
+        "batters": [],
+        "batting_teams": [],
+        "bowl_kind": [],
+        "bowl_style": [],
+        "bowlers": [],
+        "bowling_teams": [],
+        "chase_outcome": [],
+        "control": null,
+        "crease_combo": [],
+        "dismissal": [],
+        "end_date": null,
+        "group_by": [
+          "bowl_kind"
+        ],
+        "innings": null,
+        "is_chase": null,
+        "leagues": [],
+        "length": [],
+        "line": [],
+        "match_outcome": [],
+        "max_wickets": null,
+        "min_wickets": null,
+        "over_range": "15-19",
+        "players": [],
+        "query_mode": "delivery",
+        "shot": [],
+        "start_date": null,
+        "teams": [],
+        "toss_decision": [],
+        "venue": "Sylhet International Cricket Stadium",
+        "wagon_zone": []
+      },
+      "grouped_by": [
+        "bowl_kind"
+      ],
+      "has_more": false,
+      "has_summaries": false,
+      "limit": 100,
+      "note": "Grouped data with cricket aggregations (merged from multiple sources)",
+      "offset": 0,
+      "query_mode_used": "delivery",
+      "recommended_chart": null,
+      "returned_groups": 3,
+      "total_balls_in_query": 5887,
+      "total_groups": 3,
+      "total_innings_in_query": 344,
+      "warnings": [
+        "Legacy bowl classification is inferred using deliveries.bowler_type with players-table fallback; unknown styles are grouped as mixture/unknown."
+      ]
+    },
+    "percentages": null,
+    "summary_data": null
+  }
+}

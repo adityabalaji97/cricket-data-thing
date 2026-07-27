@@ -1,0 +1,3889 @@
+{
+  "status": 200,
+  "body": {
+    "innings": [
+      {
+        "batting": [
+          {
+            "balls": 2,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": false,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 2,
+                    "boundary_runs": 0,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 0,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "phase": {
+                "available": false,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 2,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 2,
+                    "bar_pct": 0,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "kane-richardson",
+                    "linkable": true,
+                    "name": "Kane Richardson",
+                    "runs": 0,
+                    "sixes": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "caught",
+            "dots": 2,
+            "fours": 0,
+            "id": "ben-dunk",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Ben Dunk",
+            "not_out": false,
+            "runs": 0,
+            "sixes": 0,
+            "strike_rate": 0,
+            "team": "Hobart Hurricanes"
+          },
+          {
+            "balls": 14,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": true,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 10,
+                    "boundary_runs": 4,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 7,
+                    "sr": 70
+                  },
+                  {
+                    "balls": 0,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 14,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 12,
+                    "sr": 86
+                  },
+                  {
+                    "balls": 0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 7,
+                    "bar_pct": 48,
+                    "dots": 3,
+                    "fours": 1,
+                    "id": "kane-richardson",
+                    "linkable": true,
+                    "name": "Kane Richardson",
+                    "runs": 7,
+                    "sixes": 0,
+                    "sr": 100
+                  },
+                  {
+                    "balls": 4,
+                    "bar_pct": 60,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "craig-simmons",
+                    "linkable": true,
+                    "name": "Craig Simmons",
+                    "runs": 5,
+                    "sixes": 0,
+                    "sr": 125
+                  },
+                  {
+                    "balls": 3,
+                    "bar_pct": 0,
+                    "dots": 3,
+                    "fours": 0,
+                    "id": "ben-laughlin",
+                    "linkable": true,
+                    "name": "Ben Laughlin",
+                    "runs": 0,
+                    "sixes": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "caught",
+            "dots": 6,
+            "fours": 1,
+            "id": "tim-paine",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Tim Paine",
+            "not_out": false,
+            "runs": 12,
+            "sixes": 0,
+            "strike_rate": 86,
+            "team": "Hobart Hurricanes"
+          },
+          {
+            "balls": 24,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": true,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 11,
+                    "boundary_runs": 6,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 19,
+                    "sr": 173
+                  },
+                  {
+                    "balls": 5,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 2,
+                    "sr": 40
+                  }
+                ]
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 19,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 27,
+                    "sr": 142
+                  },
+                  {
+                    "balls": 5,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 2,
+                    "sr": 40
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 8,
+                    "bar_pct": 48,
+                    "dots": 4,
+                    "fours": 1,
+                    "id": "craig-simmons",
+                    "linkable": true,
+                    "name": "Craig Simmons",
+                    "runs": 8,
+                    "sixes": 0,
+                    "sr": 100
+                  },
+                  {
+                    "balls": 6,
+                    "bar_pct": 100,
+                    "dots": 1,
+                    "fours": 0,
+                    "id": "shaun-tait",
+                    "linkable": true,
+                    "name": "Shaun Tait",
+                    "runs": 14,
+                    "sixes": 1,
+                    "sr": 233
+                  },
+                  {
+                    "balls": 3,
+                    "bar_pct": 16,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "adam-zampa",
+                    "linkable": true,
+                    "name": "Adam Zampa",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 33
+                  },
+                  {
+                    "balls": 3,
+                    "bar_pct": 80,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "kane-richardson",
+                    "linkable": true,
+                    "name": "Kane Richardson",
+                    "runs": 5,
+                    "sixes": 0,
+                    "sr": 167
+                  },
+                  {
+                    "balls": 2,
+                    "bar_pct": 0,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "ben-laughlin",
+                    "linkable": true,
+                    "name": "Ben Laughlin",
+                    "runs": 0,
+                    "sixes": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_pct": 24,
+                    "dots": 1,
+                    "fours": 0,
+                    "id": "johan-botha",
+                    "linkable": true,
+                    "name": "Johan Botha",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 50
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "stumped",
+            "dots": 10,
+            "fours": 1,
+            "id": "alex-hales",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Alex Hales",
+            "not_out": false,
+            "runs": 29,
+            "sixes": 1,
+            "strike_rate": 121,
+            "team": "Hobart Hurricanes"
+          },
+          {
+            "balls": 14,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": true,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 2,
+                    "boundary_runs": 0,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 2,
+                    "sr": 100
+                  },
+                  {
+                    "balls": 12,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 10,
+                    "sr": 83
+                  }
+                ]
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 1,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 1,
+                    "sr": 100
+                  },
+                  {
+                    "balls": 13,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 11,
+                    "sr": 85
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 6,
+                    "bar_pct": 32,
+                    "dots": 3,
+                    "fours": 0,
+                    "id": "adam-zampa",
+                    "linkable": true,
+                    "name": "Adam Zampa",
+                    "runs": 4,
+                    "sixes": 0,
+                    "sr": 67
+                  },
+                  {
+                    "balls": 6,
+                    "bar_pct": 48,
+                    "dots": 1,
+                    "fours": 0,
+                    "id": "johan-botha",
+                    "linkable": true,
+                    "name": "Johan Botha",
+                    "runs": 6,
+                    "sixes": 0,
+                    "sr": 100
+                  },
+                  {
+                    "balls": 1,
+                    "bar_pct": 48,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "ben-laughlin",
+                    "linkable": true,
+                    "name": "Ben Laughlin",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 100
+                  },
+                  {
+                    "balls": 1,
+                    "bar_pct": 48,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "shaun-tait",
+                    "linkable": true,
+                    "name": "Shaun Tait",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 100
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "caught",
+            "dots": 4,
+            "fours": 0,
+            "id": "george-bailey",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "George Bailey",
+            "not_out": false,
+            "runs": 12,
+            "sixes": 0,
+            "strike_rate": 86,
+            "team": "Hobart Hurricanes"
+          },
+          {
+            "balls": 3,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": false,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 2,
+                    "boundary_runs": 0,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 1,
+                    "sr": 50
+                  },
+                  {
+                    "balls": 1,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 1,
+                    "sr": 100
+                  }
+                ]
+              },
+              "phase": {
+                "available": false,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 3,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 2,
+                    "sr": 67
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 2,
+                    "bar_pct": 24,
+                    "dots": 1,
+                    "fours": 0,
+                    "id": "shaun-tait",
+                    "linkable": true,
+                    "name": "Shaun Tait",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 50
+                  },
+                  {
+                    "balls": 1,
+                    "bar_pct": 48,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "johan-botha",
+                    "linkable": true,
+                    "name": "Johan Botha",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 100
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "caught",
+            "dots": 1,
+            "fours": 0,
+            "id": "evan-gulbis",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Evan Gulbis",
+            "not_out": false,
+            "runs": 2,
+            "sixes": 0,
+            "strike_rate": 67,
+            "team": "Hobart Hurricanes"
+          },
+          {
+            "balls": 37,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": true,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 16,
+                    "boundary_runs": 14,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 24,
+                    "sr": 150
+                  },
+                  {
+                    "balls": 17,
+                    "boundary_runs": 18,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 31,
+                    "sr": 182
+                  }
+                ]
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 21,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 16,
+                    "sr": 76
+                  },
+                  {
+                    "balls": 16,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 42,
+                    "sr": 262
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 10,
+                    "bar_pct": 43,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "adam-zampa",
+                    "linkable": true,
+                    "name": "Adam Zampa",
+                    "runs": 9,
+                    "sixes": 0,
+                    "sr": 90
+                  },
+                  {
+                    "balls": 8,
+                    "bar_pct": 100,
+                    "dots": 1,
+                    "fours": 2,
+                    "id": "ben-laughlin",
+                    "linkable": true,
+                    "name": "Ben Laughlin",
+                    "runs": 20,
+                    "sixes": 1,
+                    "sr": 250
+                  },
+                  {
+                    "balls": 8,
+                    "bar_pct": 24,
+                    "dots": 3,
+                    "fours": 0,
+                    "id": "shaun-tait",
+                    "linkable": true,
+                    "name": "Shaun Tait",
+                    "runs": 4,
+                    "sixes": 0,
+                    "sr": 50
+                  },
+                  {
+                    "balls": 7,
+                    "bar_pct": 100,
+                    "dots": 0,
+                    "fours": 3,
+                    "id": "johan-botha",
+                    "linkable": true,
+                    "name": "Johan Botha",
+                    "runs": 22,
+                    "sixes": 1,
+                    "sr": 314
+                  },
+                  {
+                    "balls": 4,
+                    "bar_pct": 36,
+                    "dots": 1,
+                    "fours": 0,
+                    "id": "craig-simmons",
+                    "linkable": true,
+                    "name": "Craig Simmons",
+                    "runs": 3,
+                    "sixes": 0,
+                    "sr": 75
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "not out",
+            "dots": 7,
+            "fours": 5,
+            "id": "jonathan-wells",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Jonathan Wells",
+            "not_out": true,
+            "runs": 58,
+            "sixes": 2,
+            "strike_rate": 157,
+            "team": "Hobart Hurricanes"
+          },
+          {
+            "balls": 4,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": false,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 1,
+                    "boundary_runs": 0,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 0,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "phase": {
+                "available": false,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 4,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 1,
+                    "sr": 25
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 3,
+                    "bar_pct": 16,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "craig-simmons",
+                    "linkable": true,
+                    "name": "Craig Simmons",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 33
+                  },
+                  {
+                    "balls": 1,
+                    "bar_pct": 0,
+                    "dots": 1,
+                    "fours": 0,
+                    "id": "shaun-tait",
+                    "linkable": true,
+                    "name": "Shaun Tait",
+                    "runs": 0,
+                    "sixes": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "bowled",
+            "dots": 3,
+            "fours": 0,
+            "id": "daren-sammy",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Daren Sammy",
+            "not_out": false,
+            "runs": 1,
+            "sixes": 0,
+            "strike_rate": 25,
+            "team": "Hobart Hurricanes"
+          },
+          {
+            "balls": 6,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": true,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 3,
+                    "boundary_runs": 0,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 1,
+                    "sr": 33
+                  },
+                  {
+                    "balls": 3,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 2,
+                    "sr": 67
+                  }
+                ]
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 6,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 3,
+                    "sr": 50
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 3,
+                    "bar_pct": 32,
+                    "dots": 1,
+                    "fours": 0,
+                    "id": "adam-zampa",
+                    "linkable": true,
+                    "name": "Adam Zampa",
+                    "runs": 2,
+                    "sixes": 0,
+                    "sr": 67
+                  },
+                  {
+                    "balls": 3,
+                    "bar_pct": 16,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "shaun-tait",
+                    "linkable": true,
+                    "name": "Shaun Tait",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 33
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "lbw",
+            "dots": 3,
+            "fours": 0,
+            "id": "joe-mennie",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Joe Mennie",
+            "not_out": false,
+            "runs": 3,
+            "sixes": 0,
+            "strike_rate": 50,
+            "team": "Hobart Hurricanes"
+          },
+          {
+            "balls": 9,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": true,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 6,
+                    "boundary_runs": 0,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 3,
+                    "sr": 50
+                  },
+                  {
+                    "balls": 3,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 2,
+                    "sr": 67
+                  }
+                ]
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 3,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 1,
+                    "sr": 33
+                  },
+                  {
+                    "balls": 6,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 4,
+                    "sr": 67
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 3,
+                    "bar_pct": 32,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "adam-zampa",
+                    "linkable": true,
+                    "name": "Adam Zampa",
+                    "runs": 2,
+                    "sixes": 0,
+                    "sr": 67
+                  },
+                  {
+                    "balls": 3,
+                    "bar_pct": 32,
+                    "dots": 1,
+                    "fours": 0,
+                    "id": "ben-laughlin",
+                    "linkable": true,
+                    "name": "Ben Laughlin",
+                    "runs": 2,
+                    "sixes": 0,
+                    "sr": 67
+                  },
+                  {
+                    "balls": 3,
+                    "bar_pct": 16,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "shaun-tait",
+                    "linkable": true,
+                    "name": "Shaun Tait",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 33
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "caught",
+            "dots": 5,
+            "fours": 0,
+            "id": "ben-hilfenhaus",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Ben Hilfenhaus",
+            "not_out": false,
+            "runs": 5,
+            "sixes": 0,
+            "strike_rate": 56,
+            "team": "Hobart Hurricanes"
+          },
+          {
+            "balls": 9,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": true,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 2,
+                    "boundary_runs": 0,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 2,
+                    "sr": 100
+                  },
+                  {
+                    "balls": 2,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 3,
+                    "sr": 150
+                  }
+                ]
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 9,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 9,
+                    "sr": 100
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 5,
+                    "bar_pct": 38,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "craig-simmons",
+                    "linkable": true,
+                    "name": "Craig Simmons",
+                    "runs": 4,
+                    "sixes": 0,
+                    "sr": 80
+                  },
+                  {
+                    "balls": 2,
+                    "bar_pct": 48,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "ben-laughlin",
+                    "linkable": true,
+                    "name": "Ben Laughlin",
+                    "runs": 2,
+                    "sixes": 0,
+                    "sr": 100
+                  },
+                  {
+                    "balls": 2,
+                    "bar_pct": 71,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "johan-botha",
+                    "linkable": true,
+                    "name": "Johan Botha",
+                    "runs": 3,
+                    "sixes": 0,
+                    "sr": 150
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "not out",
+            "dots": 2,
+            "fours": 0,
+            "id": "timm-van-der-gugten",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Timm van der Gugten",
+            "not_out": true,
+            "runs": 9,
+            "sixes": 0,
+            "strike_rate": 100,
+            "team": "Hobart Hurricanes"
+          }
+        ],
+        "batting_team": "Hobart Hurricanes",
+        "bowling": [
+          {
+            "balls": 12,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 10,
+                    "econ": 7.8,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 13,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "econ": 0.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 0,
+                    "wkts": 1
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 12,
+                    "econ": 6.5,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 13,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 7,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 49,
+                    "dots": 3,
+                    "econ": 6.9,
+                    "fours": 1,
+                    "id": "tim-paine",
+                    "linkable": true,
+                    "name": "Tim Paine",
+                    "runs": 8,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 71,
+                    "dots": 0,
+                    "econ": 10.0,
+                    "fours": 0,
+                    "id": "alex-hales",
+                    "linkable": true,
+                    "name": "Alex Hales",
+                    "runs": 5,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 0,
+                    "dots": 2,
+                    "econ": 0.0,
+                    "fours": 0,
+                    "id": "ben-dunk",
+                    "linkable": true,
+                    "name": "Ben Dunk",
+                    "runs": 0,
+                    "sixes": 0,
+                    "wkts": 1
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 5,
+            "economy": 6.5,
+            "figures": "2.0-0-13",
+            "id": "kane-richardson",
+            "legal_balls": 12,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Kane Richardson",
+            "overs": "2.0",
+            "runs": 13,
+            "style": "RM",
+            "team": "Adelaide Strikers",
+            "wickets": 1
+          },
+          {
+            "balls": 24,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 24,
+                    "econ": 5.5,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 22,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 12,
+                    "econ": 7.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 14,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 6,
+                    "econ": 3.0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 3,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 6,
+                    "econ": 5.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 5,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 8,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 4,
+                    "econ": 6.0,
+                    "fours": 1,
+                    "id": "alex-hales",
+                    "linkable": true,
+                    "name": "Alex Hales",
+                    "runs": 8,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 5,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 34,
+                    "dots": 2,
+                    "econ": 4.8,
+                    "fours": 0,
+                    "id": "timm-van-der-gugten",
+                    "linkable": true,
+                    "name": "Timm van der Gugten",
+                    "runs": 4,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 4,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 32,
+                    "dots": 1,
+                    "econ": 4.5,
+                    "fours": 0,
+                    "id": "jonathan-wells",
+                    "linkable": true,
+                    "name": "Jonathan Wells",
+                    "runs": 3,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 4,
+                    "bar_color": "#f0b429",
+                    "bar_pct": 64,
+                    "dots": 0,
+                    "econ": 9.0,
+                    "fours": 0,
+                    "id": "tim-paine",
+                    "linkable": true,
+                    "name": "Tim Paine",
+                    "runs": 6,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 14,
+                    "dots": 2,
+                    "econ": 2.0,
+                    "fours": 0,
+                    "id": "daren-sammy",
+                    "linkable": true,
+                    "name": "Daren Sammy",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 9,
+            "economy": 5.5,
+            "figures": "4.0-0-22",
+            "id": "craig-simmons",
+            "legal_balls": 24,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Craig Simmons",
+            "overs": "4.0",
+            "runs": 22,
+            "style": "NaN",
+            "team": "Adelaide Strikers",
+            "wickets": 0
+          },
+          {
+            "balls": 24,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 24,
+                    "econ": 5.8,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 23,
+                    "wkts": 3
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 6,
+                    "econ": 14.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 14,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 18,
+                    "econ": 3.0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 9,
+                    "wkts": 3
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 8,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 27,
+                    "dots": 3,
+                    "econ": 3.8,
+                    "fours": 0,
+                    "id": "jonathan-wells",
+                    "linkable": true,
+                    "name": "Jonathan Wells",
+                    "runs": 5,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 6,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 100,
+                    "dots": 1,
+                    "econ": 14.0,
+                    "fours": 0,
+                    "id": "alex-hales",
+                    "linkable": true,
+                    "name": "Alex Hales",
+                    "runs": 14,
+                    "sixes": 1,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 14,
+                    "dots": 2,
+                    "econ": 2.0,
+                    "fours": 0,
+                    "id": "ben-hilfenhaus",
+                    "linkable": true,
+                    "name": "Ben Hilfenhaus",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 14,
+                    "dots": 2,
+                    "econ": 2.0,
+                    "fours": 0,
+                    "id": "joe-mennie",
+                    "linkable": true,
+                    "name": "Joe Mennie",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 21,
+                    "dots": 1,
+                    "econ": 3.0,
+                    "fours": 0,
+                    "id": "evan-gulbis",
+                    "linkable": true,
+                    "name": "Evan Gulbis",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 1,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 0,
+                    "dots": 1,
+                    "econ": 0.0,
+                    "fours": 0,
+                    "id": "daren-sammy",
+                    "linkable": true,
+                    "name": "Daren Sammy",
+                    "runs": 0,
+                    "sixes": 0,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 1,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 0,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "george-bailey",
+                    "linkable": true,
+                    "name": "George Bailey",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 10,
+            "economy": 5.8,
+            "figures": "4.0-0-23",
+            "id": "shaun-tait",
+            "legal_balls": 24,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Shaun Tait",
+            "overs": "4.0",
+            "runs": 23,
+            "style": "RF",
+            "team": "Adelaide Strikers",
+            "wickets": 3
+          },
+          {
+            "balls": 19,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 19,
+                    "econ": 8.2,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 26,
+                    "wkts": 2
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 6,
+                    "econ": 1.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 1,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 13,
+                    "econ": 11.5,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 25,
+                    "wkts": 1
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 8,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 100,
+                    "dots": 1,
+                    "econ": 15.0,
+                    "fours": 2,
+                    "id": "jonathan-wells",
+                    "linkable": true,
+                    "name": "Jonathan Wells",
+                    "runs": 20,
+                    "sixes": 1,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 1,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "ben-hilfenhaus",
+                    "linkable": true,
+                    "name": "Ben Hilfenhaus",
+                    "runs": 3,
+                    "sixes": 0,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 0,
+                    "dots": 3,
+                    "econ": 0.0,
+                    "fours": 0,
+                    "id": "tim-paine",
+                    "linkable": true,
+                    "name": "Tim Paine",
+                    "runs": 0,
+                    "sixes": 0,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 0,
+                    "dots": 2,
+                    "econ": 0.0,
+                    "fours": 0,
+                    "id": "alex-hales",
+                    "linkable": true,
+                    "name": "Alex Hales",
+                    "runs": 0,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 0,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "timm-van-der-gugten",
+                    "linkable": true,
+                    "name": "Timm van der Gugten",
+                    "runs": 2,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 1,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 0,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "george-bailey",
+                    "linkable": true,
+                    "name": "George Bailey",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 7,
+            "economy": 8.7,
+            "figures": "3.0-0-26",
+            "id": "ben-laughlin",
+            "legal_balls": 18,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Ben Laughlin",
+            "overs": "3.0",
+            "runs": 26,
+            "style": "RM",
+            "team": "Adelaide Strikers",
+            "wickets": 2
+          },
+          {
+            "balls": 25,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 25,
+                    "econ": 4.6,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 19,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 19,
+                    "econ": 3.8,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 12,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 6,
+                    "econ": 7.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 7,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 10,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 2,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "jonathan-wells",
+                    "linkable": true,
+                    "name": "Jonathan Wells",
+                    "runs": 10,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 6,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 29,
+                    "dots": 3,
+                    "econ": 4.0,
+                    "fours": 0,
+                    "id": "george-bailey",
+                    "linkable": true,
+                    "name": "George Bailey",
+                    "runs": 4,
+                    "sixes": 0,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 14,
+                    "dots": 2,
+                    "econ": 2.0,
+                    "fours": 0,
+                    "id": "alex-hales",
+                    "linkable": true,
+                    "name": "Alex Hales",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 29,
+                    "dots": 2,
+                    "econ": 4.0,
+                    "fours": 0,
+                    "id": "ben-hilfenhaus",
+                    "linkable": true,
+                    "name": "Ben Hilfenhaus",
+                    "runs": 2,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 29,
+                    "dots": 1,
+                    "econ": 4.0,
+                    "fours": 0,
+                    "id": "joe-mennie",
+                    "linkable": true,
+                    "name": "Joe Mennie",
+                    "runs": 2,
+                    "sixes": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 10,
+            "economy": 4.8,
+            "figures": "4.0-0-19",
+            "id": "adam-zampa",
+            "legal_balls": 24,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Adam Zampa",
+            "overs": "4.0",
+            "runs": 19,
+            "style": "RL",
+            "team": "Adelaide Strikers",
+            "wickets": 1
+          },
+          {
+            "balls": 18,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 18,
+                    "econ": 11.0,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 33,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 12,
+                    "econ": 7.0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 14,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 6,
+                    "econ": 19.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 19,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 7,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 100,
+                    "dots": 0,
+                    "econ": 18.9,
+                    "fours": 3,
+                    "id": "jonathan-wells",
+                    "linkable": true,
+                    "name": "Jonathan Wells",
+                    "runs": 22,
+                    "sixes": 1,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 6,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 1,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "george-bailey",
+                    "linkable": true,
+                    "name": "George Bailey",
+                    "runs": 6,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 21,
+                    "dots": 1,
+                    "econ": 3.0,
+                    "fours": 0,
+                    "id": "alex-hales",
+                    "linkable": true,
+                    "name": "Alex Hales",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#f0b429",
+                    "bar_pct": 64,
+                    "dots": 0,
+                    "econ": 9.0,
+                    "fours": 0,
+                    "id": "timm-van-der-gugten",
+                    "linkable": true,
+                    "name": "Timm van der Gugten",
+                    "runs": 3,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 1,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 0,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "evan-gulbis",
+                    "linkable": true,
+                    "name": "Evan Gulbis",
+                    "runs": 1,
+                    "sixes": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 2,
+            "economy": 11.0,
+            "figures": "3.0-0-33",
+            "id": "johan-botha",
+            "legal_balls": 18,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Johan Botha",
+            "overs": "3.0",
+            "runs": 33,
+            "style": "RO",
+            "team": "Adelaide Strikers",
+            "wickets": 1
+          }
+        ],
+        "bowling_team": "Adelaide Strikers",
+        "innings": 1,
+        "score": {
+          "balls": 120,
+          "batting_team": "Hobart Hurricanes",
+          "bowling_team": "Adelaide Strikers",
+          "innings": 1,
+          "overs": "20.0",
+          "run_rate": 6.8,
+          "runs": 136,
+          "target": null,
+          "team": "Hobart Hurricanes",
+          "wickets": 8
+        },
+        "worm": [
+          3,
+          8,
+          18,
+          27,
+          41,
+          42,
+          45,
+          49,
+          52,
+          62,
+          66,
+          69,
+          72,
+          77,
+          80,
+          87,
+          103,
+          108,
+          117,
+          136
+        ]
+      },
+      {
+        "batting": [
+          {
+            "balls": 33,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": true,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 28,
+                    "boundary_runs": 40,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 51,
+                    "sr": 182
+                  },
+                  {
+                    "balls": 5,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 3,
+                    "sr": 60
+                  }
+                ]
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 16,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 32,
+                    "sr": 200
+                  },
+                  {
+                    "balls": 17,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 22,
+                    "sr": 129
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 11,
+                    "bar_pct": 74,
+                    "dots": 5,
+                    "fours": 2,
+                    "id": "timm-van-der-gugten",
+                    "linkable": true,
+                    "name": "Timm van der Gugten",
+                    "runs": 17,
+                    "sixes": 1,
+                    "sr": 155
+                  },
+                  {
+                    "balls": 7,
+                    "bar_pct": 34,
+                    "dots": 4,
+                    "fours": 0,
+                    "id": "daren-sammy",
+                    "linkable": true,
+                    "name": "Daren Sammy",
+                    "runs": 5,
+                    "sixes": 0,
+                    "sr": 71
+                  },
+                  {
+                    "balls": 5,
+                    "bar_pct": 100,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "ben-hilfenhaus",
+                    "linkable": true,
+                    "name": "Ben Hilfenhaus",
+                    "runs": 18,
+                    "sixes": 3,
+                    "sr": 360
+                  },
+                  {
+                    "balls": 5,
+                    "bar_pct": 29,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "cameron-boyce",
+                    "linkable": true,
+                    "name": "Cameron Boyce",
+                    "runs": 3,
+                    "sixes": 0,
+                    "sr": 60
+                  },
+                  {
+                    "balls": 3,
+                    "bar_pct": 100,
+                    "dots": 0,
+                    "fours": 2,
+                    "id": "joe-mennie",
+                    "linkable": true,
+                    "name": "Joe Mennie",
+                    "runs": 9,
+                    "sixes": 0,
+                    "sr": 300
+                  },
+                  {
+                    "balls": 2,
+                    "bar_pct": 48,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "evan-gulbis",
+                    "linkable": true,
+                    "name": "Evan Gulbis",
+                    "runs": 2,
+                    "sixes": 0,
+                    "sr": 100
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "caught",
+            "dots": 13,
+            "fours": 4,
+            "id": "tim-ludeman",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Tim Ludeman",
+            "not_out": false,
+            "runs": 54,
+            "sixes": 4,
+            "strike_rate": 164,
+            "team": "Adelaide Strikers"
+          },
+          {
+            "balls": 17,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": true,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 17,
+                    "boundary_runs": 18,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 22,
+                    "sr": 129
+                  },
+                  {
+                    "balls": 0,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 17,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 22,
+                    "sr": 129
+                  },
+                  {
+                    "balls": 0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 9,
+                    "bar_pct": 48,
+                    "dots": 6,
+                    "fours": 2,
+                    "id": "joe-mennie",
+                    "linkable": true,
+                    "name": "Joe Mennie",
+                    "runs": 9,
+                    "sixes": 0,
+                    "sr": 100
+                  },
+                  {
+                    "balls": 5,
+                    "bar_pct": 100,
+                    "dots": 1,
+                    "fours": 1,
+                    "id": "timm-van-der-gugten",
+                    "linkable": true,
+                    "name": "Timm van der Gugten",
+                    "runs": 13,
+                    "sixes": 1,
+                    "sr": 260
+                  },
+                  {
+                    "balls": 3,
+                    "bar_pct": 0,
+                    "dots": 3,
+                    "fours": 0,
+                    "id": "daren-sammy",
+                    "linkable": true,
+                    "name": "Daren Sammy",
+                    "runs": 0,
+                    "sixes": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "caught",
+            "dots": 10,
+            "fours": 3,
+            "id": "craig-simmons",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Craig Simmons",
+            "not_out": false,
+            "runs": 22,
+            "sixes": 1,
+            "strike_rate": 129,
+            "team": "Adelaide Strikers"
+          },
+          {
+            "balls": 36,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": true,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 17,
+                    "boundary_runs": 6,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 15,
+                    "sr": 88
+                  },
+                  {
+                    "balls": 19,
+                    "boundary_runs": 34,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 39,
+                    "sr": 205
+                  }
+                ]
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 3,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 2,
+                    "sr": 67
+                  },
+                  {
+                    "balls": 33,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 52,
+                    "sr": 158
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 19,
+                    "bar_pct": 98,
+                    "dots": 7,
+                    "fours": 1,
+                    "id": "cameron-boyce",
+                    "linkable": true,
+                    "name": "Cameron Boyce",
+                    "runs": 39,
+                    "sixes": 5,
+                    "sr": 205
+                  },
+                  {
+                    "balls": 8,
+                    "bar_pct": 30,
+                    "dots": 5,
+                    "fours": 0,
+                    "id": "daren-sammy",
+                    "linkable": true,
+                    "name": "Daren Sammy",
+                    "runs": 5,
+                    "sixes": 0,
+                    "sr": 62
+                  },
+                  {
+                    "balls": 5,
+                    "bar_pct": 10,
+                    "dots": 2,
+                    "fours": 0,
+                    "id": "evan-gulbis",
+                    "linkable": true,
+                    "name": "Evan Gulbis",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 20
+                  },
+                  {
+                    "balls": 2,
+                    "bar_pct": 100,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "ben-hilfenhaus",
+                    "linkable": true,
+                    "name": "Ben Hilfenhaus",
+                    "runs": 7,
+                    "sixes": 1,
+                    "sr": 350
+                  },
+                  {
+                    "balls": 2,
+                    "bar_pct": 48,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "timm-van-der-gugten",
+                    "linkable": true,
+                    "name": "Timm van der Gugten",
+                    "runs": 2,
+                    "sixes": 0,
+                    "sr": 100
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "not out",
+            "dots": 14,
+            "fours": 1,
+            "id": "jono-dean",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Jono Dean",
+            "not_out": true,
+            "runs": 54,
+            "sixes": 6,
+            "strike_rate": 150,
+            "team": "Adelaide Strikers"
+          },
+          {
+            "balls": 2,
+            "breakdowns": {
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length grid needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "pace_spin": {
+                "available": false,
+                "empty": "Not enough balls to split pace vs spin.",
+                "rows": [
+                  {
+                    "balls": 2,
+                    "boundary_runs": 6,
+                    "key": "pace",
+                    "label": "vs Pace",
+                    "runs": 7,
+                    "sr": 350
+                  },
+                  {
+                    "balls": 0,
+                    "boundary_runs": 0,
+                    "key": "spin",
+                    "label": "vs Spin",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "phase": {
+                "available": false,
+                "empty": "Not enough balls faced to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "sr": 0
+                  },
+                  {
+                    "balls": 2,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 7,
+                    "sr": 350
+                  },
+                  {
+                    "balls": 0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "sr": 0
+                  }
+                ]
+              },
+              "vs_bowler": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 2,
+                    "bar_pct": 100,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "ben-hilfenhaus",
+                    "linkable": true,
+                    "name": "Ben Hilfenhaus",
+                    "runs": 7,
+                    "sixes": 1,
+                    "sr": 350
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this innings.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dismissal": "not out",
+            "dots": 0,
+            "fours": 0,
+            "id": "kieron-pollard",
+            "links": {
+              "bowling_card_id": null
+            },
+            "name": "Kieron Pollard",
+            "not_out": true,
+            "runs": 7,
+            "sixes": 1,
+            "strike_rate": 350,
+            "team": "Adelaide Strikers"
+          }
+        ],
+        "batting_team": "Adelaide Strikers",
+        "bowling": [
+          {
+            "balls": 18,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 13,
+                    "econ": 9.2,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 20,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 5,
+                    "econ": 15.6,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 13,
+                    "wkts": 0
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 12,
+                    "econ": 9.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 18,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 6,
+                    "econ": 15.0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 15,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 11,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 70,
+                    "dots": 5,
+                    "econ": 9.8,
+                    "fours": 2,
+                    "id": "tim-ludeman",
+                    "linkable": true,
+                    "name": "Tim Ludeman",
+                    "runs": 18,
+                    "sixes": 1,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 5,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 100,
+                    "dots": 1,
+                    "econ": 15.6,
+                    "fours": 1,
+                    "id": "craig-simmons",
+                    "linkable": true,
+                    "name": "Craig Simmons",
+                    "runs": 13,
+                    "sixes": 1,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 0,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "jono-dean",
+                    "linkable": true,
+                    "name": "Jono Dean",
+                    "runs": 2,
+                    "sixes": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 6,
+            "economy": 11.0,
+            "figures": "3.0-0-33",
+            "id": "timm-van-der-gugten",
+            "legal_balls": 18,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Timm van der Gugten",
+            "overs": "3.0",
+            "runs": 33,
+            "style": "RM",
+            "team": "Hobart Hurricanes",
+            "wickets": 0
+          },
+          {
+            "balls": 12,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 3,
+                    "econ": 18.0,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 9,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 9,
+                    "econ": 6.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 9,
+                    "wkts": 0
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 12,
+                    "econ": 9.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 18,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 9,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 6,
+                    "econ": 6.0,
+                    "fours": 2,
+                    "id": "craig-simmons",
+                    "linkable": true,
+                    "name": "Craig Simmons",
+                    "runs": 9,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 100,
+                    "dots": 0,
+                    "econ": 18.0,
+                    "fours": 2,
+                    "id": "tim-ludeman",
+                    "linkable": true,
+                    "name": "Tim Ludeman",
+                    "runs": 9,
+                    "sixes": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 6,
+            "economy": 9.0,
+            "figures": "2.0-0-18",
+            "id": "joe-mennie",
+            "legal_balls": 12,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Joe Mennie",
+            "overs": "2.0",
+            "runs": 18,
+            "style": "RM",
+            "team": "Hobart Hurricanes",
+            "wickets": 0
+          },
+          {
+            "balls": 18,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 15,
+                    "econ": 4.0,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 10,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "econ": 0.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 0,
+                    "wkts": 1
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 6,
+                    "econ": 2.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 2,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 12,
+                    "econ": 4.0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 8,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 8,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 27,
+                    "dots": 5,
+                    "econ": 3.8,
+                    "fours": 0,
+                    "id": "jono-dean",
+                    "linkable": true,
+                    "name": "Jono Dean",
+                    "runs": 5,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 7,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 31,
+                    "dots": 4,
+                    "econ": 4.3,
+                    "fours": 0,
+                    "id": "tim-ludeman",
+                    "linkable": true,
+                    "name": "Tim Ludeman",
+                    "runs": 5,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 0,
+                    "dots": 3,
+                    "econ": 0.0,
+                    "fours": 0,
+                    "id": "craig-simmons",
+                    "linkable": true,
+                    "name": "Craig Simmons",
+                    "runs": 0,
+                    "sixes": 0,
+                    "wkts": 1
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 12,
+            "economy": 3.3,
+            "figures": "3.0-0-10",
+            "id": "daren-sammy",
+            "legal_balls": 18,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Daren Sammy",
+            "overs": "3.0",
+            "runs": 10,
+            "style": "RM",
+            "team": "Hobart Hurricanes",
+            "wickets": 1
+          },
+          {
+            "balls": 9,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 9,
+                    "econ": 21.3,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 32,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 6,
+                    "econ": 19.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 19,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 3,
+                    "econ": 26.0,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 13,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 5,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 100,
+                    "dots": 2,
+                    "econ": 21.6,
+                    "fours": 0,
+                    "id": "tim-ludeman",
+                    "linkable": true,
+                    "name": "Tim Ludeman",
+                    "runs": 18,
+                    "sixes": 3,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 100,
+                    "dots": 0,
+                    "econ": 21.0,
+                    "fours": 0,
+                    "id": "jono-dean",
+                    "linkable": true,
+                    "name": "Jono Dean",
+                    "runs": 7,
+                    "sixes": 1,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 100,
+                    "dots": 0,
+                    "econ": 21.0,
+                    "fours": 0,
+                    "id": "kieron-pollard",
+                    "linkable": true,
+                    "name": "Kieron Pollard",
+                    "runs": 7,
+                    "sixes": 1,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 2,
+            "economy": 21.3,
+            "figures": "1.3-0-32",
+            "id": "ben-hilfenhaus",
+            "legal_balls": 9,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Ben Hilfenhaus",
+            "overs": "1.3",
+            "runs": 32,
+            "style": "RM",
+            "team": "Hobart Hurricanes",
+            "wickets": 0
+          },
+          {
+            "balls": 24,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 24,
+                    "econ": 10.8,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 43,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 24,
+                    "econ": 10.8,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 43,
+                    "wkts": 1
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 19,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 90,
+                    "dots": 7,
+                    "econ": 12.6,
+                    "fours": 1,
+                    "id": "jono-dean",
+                    "linkable": true,
+                    "name": "Jono Dean",
+                    "runs": 40,
+                    "sixes": 5,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 5,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 26,
+                    "dots": 2,
+                    "econ": 3.6,
+                    "fours": 0,
+                    "id": "tim-ludeman",
+                    "linkable": true,
+                    "name": "Tim Ludeman",
+                    "runs": 3,
+                    "sixes": 0,
+                    "wkts": 1
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 9,
+            "economy": 10.8,
+            "figures": "4.0-0-43",
+            "id": "cameron-boyce",
+            "legal_balls": 24,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Cameron Boyce",
+            "overs": "4.0",
+            "runs": 43,
+            "style": "RL",
+            "team": "Hobart Hurricanes",
+            "wickets": 1
+          },
+          {
+            "balls": 7,
+            "breakdowns": {
+              "hand": {
+                "available": true,
+                "empty": "Not enough balls to split by batter hand.",
+                "rows": [
+                  {
+                    "balls": 7,
+                    "econ": 4.3,
+                    "key": "RHB",
+                    "label": "vs Right-hand",
+                    "runs": 5,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "LHB",
+                    "label": "vs Left-hand",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ],
+                "unsupported": false
+              },
+              "line_length": {
+                "available": false,
+                "cells": [],
+                "empty": "Line & length map needs more tracked balls.",
+                "rows": {
+                  "lengths": [],
+                  "lines": []
+                },
+                "unsupported": true
+              },
+              "phase": {
+                "available": true,
+                "empty": "Not enough balls to split by phase.",
+                "rows": [
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "powerplay",
+                    "label": "Powerplay",
+                    "overs": "1-6",
+                    "runs": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 7,
+                    "econ": 4.3,
+                    "key": "middle",
+                    "label": "Middle",
+                    "overs": "7-15",
+                    "runs": 5,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 0,
+                    "econ": 0.0,
+                    "key": "death",
+                    "label": "Death",
+                    "overs": "16-20",
+                    "runs": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "vs_batter": {
+                "available": true,
+                "rows": [
+                  {
+                    "balls": 5,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 26,
+                    "dots": 2,
+                    "econ": 3.6,
+                    "fours": 0,
+                    "id": "jono-dean",
+                    "linkable": true,
+                    "name": "Jono Dean",
+                    "runs": 3,
+                    "sixes": 0,
+                    "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 43,
+                    "dots": 0,
+                    "econ": 6.0,
+                    "fours": 0,
+                    "id": "tim-ludeman",
+                    "linkable": true,
+                    "name": "Tim Ludeman",
+                    "runs": 2,
+                    "sixes": 0,
+                    "wkts": 0
+                  }
+                ]
+              },
+              "zones": {
+                "available": false,
+                "empty": "No wagon-wheel data for this spell.",
+                "rows": [],
+                "unsupported": true
+              }
+            },
+            "dots": 2,
+            "economy": 5.0,
+            "figures": "1.0-0-5",
+            "id": "evan-gulbis",
+            "legal_balls": 6,
+            "links": {
+              "batting_card_id": null
+            },
+            "name": "Evan Gulbis",
+            "overs": "1.0",
+            "runs": 5,
+            "style": "RM",
+            "team": "Hobart Hurricanes",
+            "wickets": 0
+          }
+        ],
+        "bowling_team": "Hobart Hurricanes",
+        "innings": 2,
+        "score": {
+          "balls": 87,
+          "batting_team": "Adelaide Strikers",
+          "bowling_team": "Hobart Hurricanes",
+          "innings": 2,
+          "overs": "14.3",
+          "run_rate": 9.72,
+          "runs": 141,
+          "target": null,
+          "team": "Adelaide Strikers",
+          "wickets": 2
+        },
+        "worm": [
+          4,
+          9,
+          23,
+          36,
+          38,
+          57,
+          60,
+          75,
+          80,
+          89,
+          92,
+          100,
+          105,
+          128,
+          141,
+          141,
+          141,
+          141,
+          141,
+          141
+        ]
+      }
+    ],
+    "match": {
+      "chase_note": "Chased 137 with 33 balls to spare",
+      "city": null,
+      "competition": "Big Bash League",
+      "date": "2014-12-31",
+      "event_match_number": null,
+      "event_name": "Big Bash League",
+      "id": "756757",
+      "player_of_match": "TP Ludeman",
+      "result_text": "Adelaide Strikers won by 8 wickets",
+      "team1": "Adelaide Strikers",
+      "team2": "Hobart Hurricanes",
+      "teams": [
+        {
+          "accent": "#f0b429",
+          "name": "Hobart Hurricanes"
+        },
+        {
+          "accent": "#5b8def",
+          "name": "Adelaide Strikers"
+        }
+      ],
+      "toss": {
+        "decision": "bat",
+        "winner": "Hobart Hurricanes"
+      },
+      "venue": "Adelaide Oval",
+      "winner": "Adelaide Strikers"
+    },
+    "meta": {
+      "capabilities": {
+        "control": false,
+        "core_scorecard": true,
+        "hand": true,
+        "line_length": false,
+        "pace_spin": true,
+        "phase": true,
+        "vs_player": true,
+        "zones": false
+      },
+      "data_source": "deliveries",
+      "min_balls": 6,
+      "warnings": [
+        "Legacy deliveries data does not include wagon zone, line/length, shot, or control tracking."
+      ]
+    },
+    "summary": {
+      "innings_scores": [
+        {
+          "balls": 120,
+          "batting_team": "Hobart Hurricanes",
+          "bowling_team": "Adelaide Strikers",
+          "innings": 1,
+          "overs": "20.0",
+          "run_rate": 6.8,
+          "runs": 136,
+          "target": null,
+          "team": "Hobart Hurricanes",
+          "wickets": 8
+        },
+        {
+          "balls": 87,
+          "batting_team": "Adelaide Strikers",
+          "bowling_team": "Hobart Hurricanes",
+          "innings": 2,
+          "overs": "14.3",
+          "run_rate": 9.72,
+          "runs": 141,
+          "target": null,
+          "team": "Adelaide Strikers",
+          "wickets": 2
+        }
+      ],
+      "moment": null,
+      "player_of_match": "TP Ludeman",
+      "top_performers": [
+        {
+          "innings": 1,
+          "kind": "top_bat",
+          "label": "58*",
+          "lens": "bowler",
+          "player": "Jonathan Wells",
+          "player_id": "jonathan-wells",
+          "screen": "batting",
+          "team": "Hobart Hurricanes"
+        },
+        {
+          "innings": 1,
+          "kind": "top_bowl",
+          "label": "3/23",
+          "lens": "batter",
+          "player": "Shaun Tait",
+          "player_id": "shaun-tait",
+          "screen": "bowling",
+          "team": "Adelaide Strikers"
+        },
+        {
+          "innings": 2,
+          "kind": "top_bat",
+          "label": "54",
+          "lens": "bowler",
+          "player": "Tim Ludeman",
+          "player_id": "tim-ludeman",
+          "screen": "batting",
+          "team": "Adelaide Strikers"
+        },
+        {
+          "innings": 2,
+          "kind": "top_bowl",
+          "label": "1/10",
+          "lens": "batter",
+          "player": "Daren Sammy",
+          "player_id": "daren-sammy",
+          "screen": "bowling",
+          "team": "Hobart Hurricanes"
+        }
+      ],
+      "worm": [
+        {
+          "innings": 1,
+          "points": "0.00,58.76 5.26,56.71 10.53,52.59 15.79,48.88 21.05,43.12 26.32,42.71 31.58,41.47 36.84,39.82 42.11,38.59 47.37,34.47 52.63,32.82 57.89,31.59 63.16,30.35 68.42,28.29 73.68,27.06 78.95,24.18 84.21,17.59 89.47,15.53 94.74,11.82 100.00,4.00",
+          "team": "Hobart Hurricanes",
+          "values": [
+            3,
+            8,
+            18,
+            27,
+            41,
+            42,
+            45,
+            49,
+            52,
+            62,
+            66,
+            69,
+            72,
+            77,
+            80,
+            87,
+            103,
+            108,
+            117,
+            136
+          ]
+        },
+        {
+          "innings": 2,
+          "points": "0.00,58.41 5.26,56.43 10.53,50.87 15.79,45.70 21.05,44.91 26.32,37.36 31.58,36.17 36.84,30.21 42.11,28.23 47.37,24.65 52.63,23.46 57.89,20.28 63.16,18.30 68.42,9.16 73.68,4.00 78.95,4.00 84.21,4.00 89.47,4.00 94.74,4.00 100.00,4.00",
+          "team": "Adelaide Strikers",
+          "values": [
+            4,
+            9,
+            23,
+            36,
+            38,
+            57,
+            60,
+            75,
+            80,
+            89,
+            92,
+            100,
+            105,
+            128,
+            141,
+            141,
+            141,
+            141,
+            141,
+            141
+          ]
+        }
+      ]
+    }
+  }
+}

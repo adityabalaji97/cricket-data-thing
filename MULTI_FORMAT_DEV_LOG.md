@@ -9,54 +9,54 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-> ### ☀️ START HERE IN THE MORNING (2026-07-27)
+> ### START HERE (2026-07-27)
 >
-> ### 🛑 ORDER CHANGED — DEPLOY BEFORE RESUMING THE LOAD
+> Deploy is **done** (v381, migrations 001 + 002 applied, `main` current). The ODI ball-by-ball
+> load is **done**: 1,647,737 balls, 3,248 matches, 2000-01-09 to 2026-07-25.
 >
-> The ODI load **stopped early at 500,000 of 1,647,737 rows**. The rows that landed cover
-> **2000-01-09 to 2010-03-02 — every one of them pre-2015.**
->
-> Production is *currently* uncontaminated, but only by accident. The deployed code on `main`
-> has no format filters; what saves it is the old 2015 date fork, which routes pre-2015 queries
-> to the legacy `deliveries` table and only reads `delivery_details` from 2015 onward. The loaded
-> ODI rows are therefore unreachable. Verified live: grouping by over returns nothing above over
-> 19 except a single pre-existing artifact.
->
-> **Resuming the load would break that.** The remaining ~1.1M rows include ODIs from 2015 to
-> 2026, which land exactly where the live, un-pinned code reads. Those would be mixed into T20
-> results — the contamination chunk 0.4g exists to prevent, whose guards are on the branch and
-> **not deployed**.
->
-> **So, in this order:**
->
-> **1. Push and deploy first.**
+> **A1 is not finished.** The load is only step 2 of an eight-step pipeline. Steps 2b→6 —
+> backfill, columns, players, metadata, match sync, ELO — were running at the end of this
+> session:
 > ```
-> git push -u origin multi-format
-> # merge to main, then:
-> git push heroku main
+> export DATABASE_URL="$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2- | tr -d '"'"'"'\r')"
+> nohup caffeinate -i env DATABASE_URL="$DATABASE_URL" python3 \
+>   scripts/load_delivery_details_pipeline.py --csv data/odi_bbb.csv \
+>   --format ODI --gender male --skip-validation --skip-load &
 > ```
+> `--csv/--format/--gender` are **required even with `--skip-load`**, and the script does not
+> read `.env` itself — it needs `DATABASE_URL` exported. Getting either wrong makes it exit in
+> under a second, which is easy to mistake for a job that is still running.
 >
-> **2. Then finish the load** (it skips duplicates, so just re-run it):
+> **How to tell whether it finished:** `matches` should hold ODI rows.
 > ```
-> python3 scripts/load_delivery_details_full.py --csv data/odi_bbb.csv --format ODI --gender male
+> heroku pg:psql -a cricket-data-thing -c \
+>   "SELECT format, count(*) FROM matches GROUP BY 1;"
 > ```
-> Run it detached (`nohup ... &`) — the first attempt died when its parent session ended.
+> Until that shows ODI, `/formats` correctly reports `mens-odi` as unavailable, because
+> availability is data-driven off `matches`.
 >
-> **3. Then push and deploy** (deliberately left for the morning):
-> ```
-> git push -u origin multi-format      # 40+ commits, never pushed
-> # merge to main, then: git push heroku main
-> ```
->
-> **4. ⚠️ ONLY AFTER MERGING TO MAIN, update the GitHub Actions secret:**
+> **⚠️ Still needs the user — GitHub Actions secret.** Safe to run now (`main` has the corrected
+> sync code), and the nightly refresh is failing on authentication until it is:
 > ```
 > gh secret set DATABASE_URL -R adityabalaji97/cricket-data-thing \
 >   -b "$(heroku config:get DATABASE_URL -a cricket-data-thing)"
 > ```
-> The Heroku plan change rotated the database credentials and **GitHub was not updated**, so the
-> nightly refresh is currently failing on authentication. Do not fix it before merging: the
-> workflow runs from `main`, which still has the old `sync_stats_from_dd.py` with the wicket bug,
-> so a successful run would write corrupt stats again and partially undo the backfill.
+> Claude/Codex cannot do this — Actions secrets are write-only to the API.
+>
+> **Contamination status.** 716,791 ODI balls now sit in the post-2015 window the live app
+> reads, so the format pins are finally under real test rather than being masked by the date
+> fork. `/query/deliveries` **verified clean**: grouped by over it returns exactly one ball at
+> over 20 (a genuine T20 super-over delivery) and nothing at overs 21-50, where the database
+> holds 36,155 ODI balls at over 20 alone.
+>
+> **The remaining exposure arrives with the match sync**, not the ball load: `matches` having no
+> ODI rows is what currently protects every endpoint that joins `delivery_details`→`matches`.
+> A production golden baseline was captured **before** the sync for exactly this reason:
+> ```
+> python3 scripts/regression_snapshot.py --base-url <heroku-url> --env prod check
+> ```
+> 13 endpoints in `scripts/goldens/prod/`. **Any diff there is ODI data leaking into a T20
+> response** — that is the whole point of the baseline, so run it once the sync lands.
 
 
 - **Active chunk:** **Phase 0 complete, plus A3, A5, A9 and most of A11.** ODIs are usable in the query
@@ -101,6 +101,47 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-07-27 — Chunk A1 — Claude — ODI load complete, pipeline running
+
+**Done**
+- **Full ODI load: 1,647,737 balls, 3,248 matches, 2000-01-09 to 2026-07-25.**
+- Production golden baseline captured (`scripts/goldens/prod/`, 13 endpoints) while `matches`
+  was still T20-only, so the match sync has a clean before-state to diff against.
+- Verified the format pins hold against real post-2015 ODI data — see CURRENT STATE.
+
+**Four failures on this load, four distinct bugs, all in ingest code**
+
+Worth reading as a group, because they share one cause: **the ODI feed differs from the T20
+feed in ways the 349-match dev slice did not contain.** The slice was too small and drawn from
+too early in the file to hold any of them. Code was tested against data easier than reality.
+
+1. **Over-cap guard aborted on any ball past the cap.** One 2005 West Indies innings runs to 51
+   overs — 11 balls out of 1,647,737. Made proportional (`OVER_CAP_BREACH_LIMIT = 0.01`);
+   confirmed a genuinely mislabelled file still aborts, at 56.7%.
+2. **Same guard, second run.** Both attempts stopped at exactly 500,000 rows. I wrongly blamed
+   the Mac sleeping; an identical stopping point should have ruled that out immediately.
+3. **`load_delivery_details_full.py` — pandas re-inferred coerced integers back to float64**
+   when nulls were present, so `"322.0"` was rejected for an INTEGER column 1.6M rows in. Fixed
+   by building the Series with `dtype=object`.
+4. **`backfill_advanced_data.py` — temp-table column types did not match the real table.**
+   The bulk update does `COALESCE(dd.col, t.col)`; when a numeric column arrives as a decimal or
+   uses `"-"` for a gap, pandas leaves it as object and `to_sql` creates TEXT. Postgres rejects
+   the statement outright.
+
+**On bug 4, note what fixing it column-by-column cost:** `control` was already handled, then the
+run failed on the wagon trio, then on `pred_score`/`win_prob` — three round trips through a
+multi-hour job. The fix now reads target types from `information_schema` and coerces to match,
+which covers all nine advanced columns and any added later. Verified by round-tripping real ODI
+rows through `to_sql` and running the actual `UPDATE ... COALESCE` against `delivery_details`.
+
+**Trap for whoever picks this up:** judge that fix by whether the `COALESCE` type-checks, not by
+whether the types match exactly. `text` vs `varchar` and `bigint` vs `integer` are both fine —
+my first probe reported "STILL BROKEN" purely because it compared type names.
+
+**Data note, not acted on:** the ODI feed uses `-1` as a sentinel in `pred_score` and `win_prob`
+(first-innings early balls). Stored as-is, matching how T20 already behaves. Consistency with
+T20 was judged more valuable than cleanliness; revisit if either column is ever surfaced in UI.
 
 ### 2026-07-26 — Chunk A11 (partial) — Claude
 
