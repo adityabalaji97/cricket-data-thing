@@ -152,6 +152,29 @@ def resolve_event_name(
     return _clean(raw_competition) or _clean(tournament)
 
 
+def international_competitions(fmt: str = "T20") -> List[str]:
+    """Competition buckets that count as international, for filtering by competition name.
+
+    ``is_international`` above classifies a *match* while syncing. This answers the different
+    question a query needs: which values of ``delivery_details.competition`` are international
+    for this format. They are not interchangeable -- the sync has team names to work with, a
+    WHERE clause only has the bucket string.
+
+    Needed because ``include_international`` filtered on the literal ``'T20I'``. For ODI the
+    buckets are 'ODI', 'ICC World Cup', 'ICC Champions Trophy' and 'Asia Cup', so the filter
+    matched nothing and the query builder returned zero rows for every ODI international.
+
+    Men's T20 deliberately stays exactly as it was: every men's T20 international collapses
+    into 'T20I' (verified -- no T20 row carries a major-event bucket), and widening it would
+    change existing results for no gain.
+    """
+    fmt = (fmt or "T20").upper()
+    default = DEFAULT_BUCKET.get(fmt, "T20I")
+    if fmt == "T20":
+        return [default]
+    return [default, *sorted(set(_MAJOR_EVENT_BY_TROPHY.values()))]
+
+
 def is_international(
     competition: Optional[str],
     teams: Optional[Iterable[str]] = None,

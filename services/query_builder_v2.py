@@ -2545,12 +2545,19 @@ def build_where_clause(
         params["leagues"] = expanded_leagues
     
     if include_international:
+        # Was the literal 'T20I'. ODI internationals live under 'ODI', 'ICC World Cup',
+        # 'ICC Champions Trophy' and 'Asia Cup', so the old predicate matched nothing and an
+        # ODI query with include_international=true returned zero rows. Resolves to exactly
+        # ['T20I'] for men's T20, so that path is unchanged.
+        from services.competition_normalizer import international_competitions
+
+        params["intl_comps"] = international_competitions(fmt)
         if top_teams:
             top_team_list = INTERNATIONAL_TEAMS_RANKED[:top_teams]
-            competition_conditions.append("(dd.competition = 'T20I' AND dd.team_bat = ANY(:top_teams) AND dd.team_bowl = ANY(:top_teams))")
+            competition_conditions.append("(dd.competition = ANY(:intl_comps) AND dd.team_bat = ANY(:top_teams) AND dd.team_bowl = ANY(:top_teams))")
             params["top_teams"] = top_team_list
         else:
-            competition_conditions.append("dd.competition = 'T20I'")
+            competition_conditions.append("dd.competition = ANY(:intl_comps)")
     
     # Combine competition conditions with OR
     if competition_conditions:
