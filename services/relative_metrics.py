@@ -25,22 +25,28 @@ def _resolve_effective_start_date(
     db: Session,
     start_date: Optional[date],
     benchmark_window_matches: int,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Optional[date]:
     if start_date is not None:
         return start_date
     if benchmark_window_matches <= 0:
         return None
+    # Pinned like every other query here: "the last N matches" has to mean the last N
+    # matches *of this format*. Unpinned, loading ODI data silently moved the benchmark
+    # window for every player, because recent ODIs displaced recent T20s in the ordering.
     row = db.execute(
         text(
             """
             SELECT date
             FROM matches
+            WHERE format = :fmt AND gender = :gender
             ORDER BY date DESC
             OFFSET :offset
             LIMIT 1
             """
         ),
-        {"offset": max(0, benchmark_window_matches - 1)},
+        {"offset": max(0, benchmark_window_matches - 1), "fmt": fmt, "gender": gender},
     ).fetchone()
     return row[0] if row else None
 
@@ -116,8 +122,11 @@ def _player_batting_agg(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Optional[Dict]:
-    params: Dict = {"player_variants": player_variants, "innings": innings}
+    params: Dict = {"player_variants": player_variants, "innings": innings,
+                    "fmt": fmt, "gender": gender}
     match_filter = build_matches_filter_sql(
         alias="m",
         start_date=start_date,
@@ -138,6 +147,7 @@ def _player_batting_agg(
         JOIN matches m ON m.id = bs.match_id
         WHERE bs.striker = ANY(:player_variants)
           AND bs.innings = :innings
+          AND bs.format = :fmt AND bs.gender = :gender
           {match_filter}
         """
     )
@@ -155,8 +165,11 @@ def _player_bowling_agg(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Optional[Dict]:
-    params: Dict = {"player_variants": player_variants, "innings": innings}
+    params: Dict = {"player_variants": player_variants, "innings": innings,
+                    "fmt": fmt, "gender": gender}
     match_filter = build_matches_filter_sql(
         alias="m",
         start_date=start_date,
@@ -178,6 +191,7 @@ def _player_bowling_agg(
         JOIN matches m ON m.id = bs.match_id
         WHERE bs.bowler = ANY(:player_variants)
           AND bs.innings = :innings
+          AND bs.format = :fmt AND bs.gender = :gender
           {match_filter}
         """
     )
@@ -194,8 +208,10 @@ def _population_batting_values(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, List[Optional[float]]]:
-    params: Dict = {"innings": innings}
+    params: Dict = {"innings": innings, "fmt": fmt, "gender": gender}
     match_filter = build_matches_filter_sql(
         alias="m",
         start_date=start_date,
@@ -216,6 +232,7 @@ def _population_batting_values(
         FROM batting_stats bs
         JOIN matches m ON m.id = bs.match_id
         WHERE bs.innings = :innings
+          AND bs.format = :fmt AND bs.gender = :gender
           {match_filter}
         GROUP BY bs.striker
         HAVING COUNT(*) >= 3
@@ -249,8 +266,10 @@ def _population_bowling_values(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, List[Optional[float]]]:
-    params: Dict = {"innings": innings}
+    params: Dict = {"innings": innings, "fmt": fmt, "gender": gender}
     match_filter = build_matches_filter_sql(
         alias="m",
         start_date=start_date,
@@ -272,6 +291,7 @@ def _population_bowling_values(
         FROM bowling_stats bs
         JOIN matches m ON m.id = bs.match_id
         WHERE bs.innings = :innings
+          AND bs.format = :fmt AND bs.gender = :gender
           {match_filter}
         GROUP BY bs.bowler
         HAVING COUNT(*) >= 3
@@ -367,11 +387,15 @@ def get_player_relative_metrics(
     leagues: Optional[List[str]],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict:
     effective_start_date = _resolve_effective_start_date(
         db=db,
         start_date=start_date,
         benchmark_window_matches=benchmark_window_matches,
+        fmt=fmt,
+        gender=gender,
     )
     names = get_player_names(player_name, db)
     variants = get_all_name_variants(
@@ -398,6 +422,8 @@ def get_player_relative_metrics(
                 leagues=expanded,
                 include_international=include_international,
                 venue=venue,
+                fmt=fmt,
+                gender=gender,
             )
         )
         bowling_target = _bowling_metrics_from_row(
@@ -410,6 +436,8 @@ def get_player_relative_metrics(
                 leagues=expanded,
                 include_international=include_international,
                 venue=venue,
+                fmt=fmt,
+                gender=gender,
             )
         )
         batting_pop = _population_batting_values(
@@ -420,6 +448,8 @@ def get_player_relative_metrics(
             leagues=expanded,
             include_international=include_international,
             venue=venue,
+            fmt=fmt,
+            gender=gender,
         )
         bowling_pop = _population_bowling_values(
             db=db,
@@ -429,6 +459,8 @@ def get_player_relative_metrics(
             leagues=expanded,
             include_international=include_international,
             venue=venue,
+            fmt=fmt,
+            gender=gender,
         )
         payload[f"innings_{innings}"] = _inning_payload(
             batting_metrics=batting_target,
@@ -449,8 +481,11 @@ def _team_batting_agg(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Optional[Dict]:
-    params: Dict = {"team_variants": team_variants, "innings": innings}
+    params: Dict = {"team_variants": team_variants, "innings": innings,
+                    "fmt": fmt, "gender": gender}
     match_filter = build_matches_filter_sql(
         alias="m",
         start_date=start_date,
@@ -471,6 +506,7 @@ def _team_batting_agg(
         JOIN matches m ON m.id = bs.match_id
         WHERE bs.batting_team = ANY(:team_variants)
           AND bs.innings = :innings
+          AND bs.format = :fmt AND bs.gender = :gender
           {match_filter}
         """
     )
@@ -488,8 +524,11 @@ def _team_bowling_agg(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Optional[Dict]:
-    params: Dict = {"team_variants": team_variants, "innings": innings}
+    params: Dict = {"team_variants": team_variants, "innings": innings,
+                    "fmt": fmt, "gender": gender}
     match_filter = build_matches_filter_sql(
         alias="m",
         start_date=start_date,
@@ -511,6 +550,7 @@ def _team_bowling_agg(
         JOIN matches m ON m.id = bs.match_id
         WHERE bs.bowling_team = ANY(:team_variants)
           AND bs.innings = :innings
+          AND bs.format = :fmt AND bs.gender = :gender
           {match_filter}
         """
     )
@@ -527,8 +567,10 @@ def _team_population_batting_values(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, List[Optional[float]]]:
-    params: Dict = {"innings": innings}
+    params: Dict = {"innings": innings, "fmt": fmt, "gender": gender}
     match_filter = build_matches_filter_sql(
         alias="m",
         start_date=start_date,
@@ -549,6 +591,7 @@ def _team_population_batting_values(
         FROM batting_stats bs
         JOIN matches m ON m.id = bs.match_id
         WHERE bs.innings = :innings
+          AND bs.format = :fmt AND bs.gender = :gender
           {match_filter}
         GROUP BY bs.batting_team
         HAVING COUNT(*) >= 5
@@ -582,8 +625,10 @@ def _team_population_bowling_values(
     leagues: List[str],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, List[Optional[float]]]:
-    params: Dict = {"innings": innings}
+    params: Dict = {"innings": innings, "fmt": fmt, "gender": gender}
     match_filter = build_matches_filter_sql(
         alias="m",
         start_date=start_date,
@@ -605,6 +650,7 @@ def _team_population_bowling_values(
         FROM bowling_stats bs
         JOIN matches m ON m.id = bs.match_id
         WHERE bs.innings = :innings
+          AND bs.format = :fmt AND bs.gender = :gender
           {match_filter}
         GROUP BY bs.bowling_team
         HAVING COUNT(*) >= 5
@@ -643,11 +689,15 @@ def get_team_relative_metrics(
     leagues: Optional[List[str]],
     include_international: bool,
     venue: Optional[str],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict:
     effective_start_date = _resolve_effective_start_date(
         db=db,
         start_date=start_date,
         benchmark_window_matches=benchmark_window_matches,
+        fmt=fmt,
+        gender=gender,
     )
     team_variants = get_all_team_name_variations(team_name)
     expanded = normalize_leagues(leagues)
@@ -670,6 +720,8 @@ def get_team_relative_metrics(
                 leagues=expanded,
                 include_international=include_international,
                 venue=venue,
+                fmt=fmt,
+                gender=gender,
             )
         )
         bowling_target = _bowling_metrics_from_row(
@@ -682,6 +734,8 @@ def get_team_relative_metrics(
                 leagues=expanded,
                 include_international=include_international,
                 venue=venue,
+                fmt=fmt,
+                gender=gender,
             )
         )
         batting_pop = _team_population_batting_values(
@@ -692,6 +746,8 @@ def get_team_relative_metrics(
             leagues=expanded,
             include_international=include_international,
             venue=venue,
+            fmt=fmt,
+            gender=gender,
         )
         bowling_pop = _team_population_bowling_values(
             db=db,
@@ -701,6 +757,8 @@ def get_team_relative_metrics(
             leagues=expanded,
             include_international=include_international,
             venue=venue,
+            fmt=fmt,
+            gender=gender,
         )
         payload[f"innings_{innings}"] = _inning_payload(
             batting_metrics=batting_target,
