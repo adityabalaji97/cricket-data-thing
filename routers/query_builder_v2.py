@@ -158,10 +158,17 @@ def query_deliveries(
         description="Query source mode: delivery (default), batting_stats, bowling_stats"
     ),
 
-    # Format selection. Defaults to men's T20 so existing links and saved URLs keep working.
+    # Cross-format by default: "how does he compare across formats" is a first-class question
+    # here, and pinning to T20 made it unaskable. Every other endpoint still defaults to men's
+    # T20 -- a scorecard or preview is structurally one format, and get_format('ALL') raises.
+    #
+    # Caveat worth knowing: phase boundaries differ per format (T20 0-5/6-14/15-19 vs ODI
+    # 0-9/10-39/40-49), and a cross-format query has to pick one, so group_by=phase under
+    # format=ALL labels everything with T20 phases. Group by format alongside it, or pin the
+    # format, when phases matter.
     format: Literal["T20", "ODI", "TEST", "ALL"] = Query(
-        default="T20",
-        description="Cricket format. 'ALL' queries across formats -- pair it with "
+        default="ALL",
+        description="Cricket format. Defaults to 'ALL' (across formats); pair it with "
                     "group_by=format so the rows stay comparable."
     ),
     gender: Literal["male", "female"] = Query(

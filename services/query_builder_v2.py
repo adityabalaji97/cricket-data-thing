@@ -1259,7 +1259,8 @@ def query_batting_stats_service(
         raise HTTPException(status_code=400, detail="bowlers filter is unsupported for query_mode=batting_stats")
 
     allowed_group_by = {
-        "venue", "competition", "year", "batting_team", "bowling_team",
+        # "format" so a cross-format query can split rows instead of blending T20 with ODI.
+        "format", "venue", "competition", "year", "batting_team", "bowling_team",
         "batter", "innings", "match_outcome", "chase_outcome", "toss_decision",
         "match_id", "toss_match_outcome"
     }
@@ -1454,6 +1455,7 @@ def query_batting_stats_service(
         }
 
     grouping_columns = {
+        "format": "bs.format",
         "venue": "m.venue",
         "competition": "m.competition",
         "year": "EXTRACT(YEAR FROM m.date)",
@@ -1622,7 +1624,8 @@ def query_bowling_stats_service(
         raise HTTPException(status_code=400, detail="batters filter is unsupported for query_mode=bowling_stats")
 
     allowed_group_by = {
-        "venue", "competition", "year", "batting_team", "bowling_team",
+        # "format" so a cross-format query can split rows instead of blending T20 with ODI.
+        "format", "venue", "competition", "year", "batting_team", "bowling_team",
         "bowler", "innings", "match_outcome", "chase_outcome", "toss_decision",
         "match_id", "toss_match_outcome"
     }
@@ -1826,6 +1829,7 @@ def query_bowling_stats_service(
         }
 
     grouping_columns = {
+        "format": "bs.format",
         "venue": "m.venue",
         "competition": "m.competition",
         "year": "EXTRACT(YEAR FROM m.date)",

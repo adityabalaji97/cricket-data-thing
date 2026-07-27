@@ -168,7 +168,11 @@ Return null if the data isn't suitable for charting (for example, ungrouped or s
 Bar charts work well for comparing grouped categories. Scatter plots work for showing relationships between two metrics.
 
 ## Available group_by columns
-venue, country, match_id, competition, year, batting_team, bowling_team, batter, bowler, non_striker, partnership, batting_position, innings, phase, match_outcome, chase_outcome, toss_decision, toss_match_outcome, bat_hand, bowl_style, bowl_kind, crease_combo, line, length, shot, control, wagon_zone, dismissal
+format, venue, country, match_id, competition, year, batting_team, bowling_team, batter, bowler, non_striker, partnership, batting_position, innings, phase, match_outcome, chase_outcome, toss_decision, toss_match_outcome, bat_hand, bowl_style, bowl_kind, crease_combo, line, length, shot, control, wagon_zone, dismissal
+
+- "format": T20 / ODI / Test. This is the cricket format, NOT the competition. "by format",
+  "across formats", "T20 vs ODI" all mean group_by ["format"] — do not use "competition" for
+  these, since competition splits by tournament (IPL, T20I, ICC World Cup) instead.
 
 - "non_striker": directional grouping by non-striker batter name.
 - "partnership": bidirectional pair grouping — (Kohli, ABD) and (ABD, Kohli) collapse to one row labelled "AB de Villiers & Virat Kohli". Use for partnership analysis.
@@ -195,6 +199,12 @@ venue, country, match_id, competition, year, batting_team, bowling_team, batter,
 
 ## Rules
 1. Always include a sensible "group_by" for the query. If the user asks about a specific batter, group by "batter" at minimum.
+1a. Queries span all formats by default, so a player's numbers would otherwise silently blend
+   T20, ODI and Test cricket into one meaningless row. Include "format" in group_by whenever the
+   query covers a player's or team's record and the user has not already asked for a specific
+   split (e.g. "virat kohli batting since 2023" -> group_by ["batter", "format"]). Omit it only
+   when the user pins one format ("his T20 record", "in ODIs") or asks for a different breakdown
+   that would make format redundant.
 2. Set "min_balls" to a reasonable value (20-50) for statistical significance unless the user specifies otherwise.
 3. For "vs spin" queries, use "bowl_kind": ["spin bowler"]. For specific types like "vs leg spin", use "bowl_style": ["RL", "LC"].
 4. For "vs pace" queries, use "bowl_kind": ["pace bowler"].

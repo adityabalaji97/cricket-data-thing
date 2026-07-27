@@ -169,6 +169,13 @@ def international_competitions(fmt: str = "T20") -> List[str]:
     change existing results for no gain.
     """
     fmt = (fmt or "T20").upper()
+
+    # A deliberate cross-format query wants every international bucket, not one format's.
+    # Without this, fmt='ALL' fell through to the "T20I" default and silently dropped every
+    # plain ODI and Test international.
+    if fmt == "ALL":
+        return [*sorted(DEFAULT_BUCKET.values()), *sorted(set(_MAJOR_EVENT_BY_TROPHY.values()))]
+
     default = DEFAULT_BUCKET.get(fmt, "T20I")
     if fmt == "T20":
         return [default]
