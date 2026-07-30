@@ -43,7 +43,44 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > ```
 > Claude/Codex cannot do this — Actions secrets are write-only to the API.
 >
-> **A1 IS COMPLETE.** Pipeline finished in 50m23s. Production now holds 3,053 ODI matches
+> **ODIs are live end to end** — API, nightly refresh and UI. Heroku v391, Vercel current,
+> `mens-odi` reports available. A1 and A2 are done; so are 0.7, A9, and the cross-format work
+> below. Five live format-contamination bugs were found and fixed (see the sweep table further
+> down); four files remain unchecked.
+>
+> **The query builder is cross-format by default now**, at the user's direction: the format
+> control moved out of the site nav into Filters & Grouping, "All formats" is the default, and
+> `group_by=format` works in delivery and both stats modes. `nl2query` knows `format` is a
+> column distinct from `competition`. Kohli since 2023 returns ODI 2,430 @ SR 96.5 beside T20
+> 2,892 @ SR 143.3 in one query.
+>
+> **Three traps this exposed, all worth knowing before touching format defaults again:**
+>
+> 1. **`get_format('ALL')` raises by design.** Any consumer resolving a FormatSpec must use
+>    `pinnedFormatParams` from FormatContext, not `formatParams`. `/landing/featured-innings`
+>    500s on `format=ALL` (verified) — it resolves a spec for strike-rate bands.
+> 2. **Endpoint `Literal`s must list `"ALL"` explicitly** or FastAPI 422s. That is what produced
+>    "Failed to load column metadata" with every filter dropdown empty.
+> 3. **Pipeline steps silently drop the format.** Twice in one day: `step_backfill_advanced` and
+>    `step_refresh_metadata` both called helpers that take `fmt`/`gender` without passing them,
+>    so an ODI run refreshed the T20 cache. **`step_populate_columns` and `step_update_players`
+>    still take no format at all** — check those next; `update_players` ignoring gender is
+>    already the recorded women's-T20 blocker.
+>
+> **Vercel was not deploying for nine days** and nothing said so. `scripts/vercel-ignore-build.sh`
+> skipped every build because Vercel clones shallowly: `git rev-parse --verify` passes on the
+> previous SHA while the object is absent, so `git diff` fails with "fatal: bad object" and a
+> `|| true` turned that into an empty diff, read as "nothing changed". It now builds when the
+> diff *fails*, verified against a real `--depth 1` clone. Note the live project is **hindsight**,
+> not `cricket-data-thing` — `.vercel/project.json` points at the wrong, stale project, so a
+> bare `vercel` deploys somewhere nobody looks. Worth relinking.
+>
+> **Known slow, not fixed:** an unfiltered delivery aggregate takes ~23s for T20 alone and
+> exceeds Heroku's 30s router timeout under `ALL`. Only reachable by executing with no filters,
+> which is not a real user flow, but the 23s baseline is a genuine defect that will worsen as
+> formats are added.
+>
+> **A1 detail.** Pipeline finished in 50m23s. Production now holds 3,053 ODI matches
 > (2000-01-09 to 2026-07-25) with ELO, 1,647,737 ODI balls, and ODI batting/bowling stats.
 > ELO ran as a separate `ODI/male` pass and reported "all matches already have ELO" for T20 —
 > the per-format streams do not disturb each other.
