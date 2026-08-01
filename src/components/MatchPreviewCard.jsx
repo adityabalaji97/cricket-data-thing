@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import config from '../config';
+import { useFormat } from '../context/FormatContext';
 import CondensedName from './common/CondensedName';
 
 const MatchPreviewCard = ({
@@ -25,6 +26,9 @@ const MatchPreviewCard = ({
   dayNightFilter = 'all',
   onDayNightFilterChange = null,
 }) => {
+  // Pinned: a preview is a single fixture, so 'ALL' has no meaning and the endpoint
+  // rejects it.
+  const { pinnedFormatParams: previewFormat } = useFormat();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -95,6 +99,9 @@ const MatchPreviewCard = ({
               ...(endDate ? { end_date: endDate } : {}),
               include_international: includeInternational,
               top_teams: topTeams,
+              // A fixture is one format; the preview endpoint rejects 'ALL'.
+              format: previewFormat.format,
+              gender: previewFormat.gender,
               ...(dayNightFilter !== 'all' ? { day_or_night: dayNightFilter } : {}),
             }
           }
@@ -114,7 +121,8 @@ const MatchPreviewCard = ({
     return () => {
       cancelled = true;
     };
-  }, [enabled, requestKey, venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams, dayNightFilter]);
+  }, [enabled, requestKey, venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams, dayNightFilter,
+      previewFormat.format, previewFormat.gender]);
 
   if (!enabled || !venue || !team1Identifier || !team2Identifier) return null;
 

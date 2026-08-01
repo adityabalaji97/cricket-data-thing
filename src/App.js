@@ -126,7 +126,9 @@ const AppContent = () => {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const { isDefaultFormat } = useFormat();
+  // Pinned, not the raw selection: a venue preview is one format's record at a ground,
+  // and the venue endpoints reject 'ALL'.
+  const { isDefaultFormat, pinnedFormatParams } = useFormat();
 
 
   
@@ -366,6 +368,8 @@ const AppContent = () => {
         }
 
         params.append('include_international', competitions.international);
+        params.append('format', pinnedFormatParams.format);
+        params.append('gender', pinnedFormatParams.gender);
         if (competitions.international && competitions.topTeams) {
           params.append('top_teams', competitions.topTeams);
         }
@@ -473,7 +477,10 @@ const AppContent = () => {
     fetchMatchHistory();
     return () => abortController.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedVenue, selectedTeam1, selectedTeam2, startDate, endDate, showVisualizations, dayNightFilter]);
+  // Format is a dependency: switching it has to refetch, or the preview would keep showing
+  // the previous format's venue record.
+  }, [selectedVenue, selectedTeam1, selectedTeam2, startDate, endDate, showVisualizations, dayNightFilter,
+      pinnedFormatParams.format, pinnedFormatParams.gender]);
 
   // Collapse filters after data has loaded
   useEffect(() => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useFormat } from '../context/FormatContext';
 import { 
     Box, 
     Card, 
@@ -812,19 +813,30 @@ const ScoresBarChart = ({ data }) => {
 };
 
 const PhaseWiseStrategy = ({ data, isMobile }) => {
-    const PHASE_OVERS = [
-        { start: 0, end: 6, label: 'powerplay' },
-        { start: 6, end: 10, label: 'middle1' },
-        { start: 10, end: 15, label: 'middle2' },
-        { start: 15, end: 20, label: 'death' }
-    ];
-    
+    // Phase boundaries come from the selected format, not T20 literals. An ODI splits
+    // 0-9/10-24/25-39/40-49 over 50, so the old hardcoded bounds mislabelled every phase and
+    // the /20 divisor made the bars overflow the track by 2.5x.
+    const { active } = useFormat();
+    const phases4 = (active?.phases_4?.length ? active.phases_4 : [
+        { key: 'powerplay', start_over: 0, end_over: 5 },
+        { key: 'middle1', start_over: 6, end_over: 9 },
+        { key: 'middle2', start_over: 10, end_over: 14 },
+        { key: 'death', start_over: 15, end_over: 19 },
+    ]);
+    // end_over is inclusive; the exclusive edge is +1, which is what the widths need.
+    const PHASE_OVERS = phases4.map((p) => ({
+        start: p.start_over,
+        end: p.end_over + 1,
+        label: p.key,
+    }));
+    const totalOvers = PHASE_OVERS.length ? PHASE_OVERS[PHASE_OVERS.length - 1].end : 20;
+
     const processPhaseData = (phaseStats) => {
         if (!phaseStats) return [];
         
         return PHASE_OVERS.map(phase => ({
             ...phase,
-            width: ((phase.end - phase.start) / 20) * 100,
+            width: ((phase.end - phase.start) / totalOvers) * 100,
             stats: phaseStats[phase.label] || {
                 runs_per_innings: 0,
                 wickets_per_innings: 0,

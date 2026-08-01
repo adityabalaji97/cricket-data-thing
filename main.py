@@ -597,6 +597,11 @@ def get_venue_notes(
     include_international: bool = Query(default=False),
     top_teams: Optional[int] = Query(default=None),
     day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$"),
+    # A venue preview describes one format's record at that ground. 'ALL' is excluded on
+    # purpose: mixing T20 and ODI totals produces an average that describes neither, and
+    # get_format('ALL') raises anyway.
+    format: str = Query(default="T20", pattern="^(T20|ODI|TEST)$"),
+    gender: str = Query(default="male", pattern="^(male|female)$"),
     db: Session = Depends(get_session)
 ):
     try:
@@ -622,6 +627,8 @@ def get_venue_notes(
             top_teams=top_teams,
             db=db,
             day_or_night=day_or_night,
+            fmt=format,
+            gender=gender,
         )
 
         if not match_stats:
@@ -654,6 +661,8 @@ def get_venue_notes(
             top_teams=top_teams,
             db=db,
             day_or_night=day_or_night,
+            fmt=format,
+            gender=gender,
         )
 
         return {

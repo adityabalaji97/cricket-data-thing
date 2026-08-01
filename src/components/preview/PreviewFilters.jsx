@@ -26,6 +26,7 @@ import {
 } from '@mui/material';
 
 import CompetitionFilter from '../CompetitionFilter';
+import { useFormat } from '../../context/FormatContext';
 import { buttonSx, cardSx, colors, fonts } from '../../theme/hindsightDark';
 
 // MUI's outlined inputs default to light-theme greys, so each surface needs restating.
@@ -109,7 +110,16 @@ const PreviewFilters = ({
   setSelectedTeam1,
   selectedTeam2,
   setSelectedTeam2,
-}) => (
+}) => {
+  // A preview describes one fixture, so it is always a single format -- "All formats" is
+  // excluded here, unlike the query builder where comparing across formats is the point.
+  // Mixing a T20 and an ODI record at the same ground averages into something that
+  // describes neither.
+  const { formats, active, selectFormat } = useFormat();
+  const realFormats = (formats || []).filter((f) => f.format !== 'ALL' && f.available);
+  const activeSlug = active?.format === 'ALL' ? 'mens-t20' : active?.slug;
+
+  return (
   <>
     {error && (
       <Alert severity="error" sx={{ mb: 2 }}>
@@ -206,6 +216,28 @@ const PreviewFilters = ({
           </ToggleButtonGroup>
         </Box>
 
+        <Box sx={{ mb: 2 }}>
+          <Typography sx={labelSx}>Format</Typography>
+          <ToggleButtonGroup
+            size="small"
+            value={activeSlug}
+            exclusive
+            onChange={(event, next) => {
+              if (next) {
+                selectFormat(next);
+                setShowVisualizations(false);
+              }
+            }}
+            sx={toggleSx}
+          >
+            {realFormats.map((f) => (
+              <ToggleButton key={f.slug} value={f.slug}>
+                {f.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </Box>
+
         <CompetitionFilter
           onFilterChange={handleFilterChange}
           isMobile={isMobile}
@@ -284,6 +316,7 @@ const PreviewFilters = ({
       </Box>
     </Collapse>
   </>
-);
+  );
+};
 
 export default PreviewFilters;
