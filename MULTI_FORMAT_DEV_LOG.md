@@ -9,41 +9,11 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-> ### START HERE (2026-07-27)
+> ### START HERE (2026-08-01)
 >
-> Deploy is **done** (v381, migrations 001 + 002 applied, `main` current). The ODI ball-by-ball
-> load is **done**: 1,647,737 balls, 3,248 matches, 2000-01-09 to 2026-07-25.
->
-> **A1 is not finished.** The load is only step 2 of an eight-step pipeline. Steps 2b→6 —
-> backfill, columns, players, metadata, match sync, ELO — were running at the end of this
-> session:
-> ```
-> export DATABASE_URL="$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2- | tr -d '"'"'"'\r')"
-> nohup caffeinate -i env DATABASE_URL="$DATABASE_URL" python3 \
->   scripts/load_delivery_details_pipeline.py --csv data/odi_bbb.csv \
->   --format ODI --gender male --skip-validation --skip-load &
-> ```
-> `--csv/--format/--gender` are **required even with `--skip-load`**, and the script does not
-> read `.env` itself — it needs `DATABASE_URL` exported. Getting either wrong makes it exit in
-> under a second, which is easy to mistake for a job that is still running.
->
-> **How to tell whether it finished:** `matches` should hold ODI rows.
-> ```
-> heroku pg:psql -a cricket-data-thing -c \
->   "SELECT format, count(*) FROM matches GROUP BY 1;"
-> ```
-> Until that shows ODI, `/formats` correctly reports `mens-odi` as unavailable, because
-> availability is data-driven off `matches`.
->
-> **⚠️ Still needs the user — GitHub Actions secret.** Safe to run now (`main` has the corrected
-> sync code), and the nightly refresh is failing on authentication until it is:
-> ```
-> gh secret set DATABASE_URL -R adityabalaji97/cricket-data-thing \
->   -b "$(heroku config:get DATABASE_URL -a cricket-data-thing)"
-> ```
-> Claude/Codex cannot do this — Actions secrets are write-only to the API.
->
-> **ODIs are live end to end** — API, nightly refresh and UI. Heroku v391, Vercel current,
+> **ODIs are live end to end** — API, nightly refresh and UI. **A1, A2, A6, A7 and A8 are
+> complete**, so all three hero features (query builder, scorecard, match preview) now work
+> for ODIs, and the preview is on the dark design system. Heroku v391, Vercel current,
 > `mens-odi` reports available. A1 and A2 are done; so are 0.7, A9, and the cross-format work
 > below. Five live format-contamination bugs were found and fixed (see the sweep table further
 > down); four files remain unchecked.
