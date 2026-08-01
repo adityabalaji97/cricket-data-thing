@@ -97,12 +97,15 @@ def _get_h2h_last_n(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     venue: Optional[str] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> List[Dict[str, Any]]:
     query = text(
         """
         SELECT date, winner, team1, team2, team1_elo, team2_elo, venue
         FROM matches
-        WHERE (
+        WHERE format = :fmt AND gender = :gender
+          AND (
           (team1 = :team1 AND team2 = :team2)
           OR (team1 = :team2 AND team2 = :team1)
         )
@@ -115,7 +118,8 @@ def _get_h2h_last_n(
     )
     rows = db.execute(
         query,
-        {"team1": team1, "team2": team2, "limit": n, "start_date": start_date, "end_date": end_date, "venue": venue},
+        {"team1": team1, "team2": team2, "limit": n, "start_date": start_date, "end_date": end_date, "venue": venue,
+         "fmt": fmt, "gender": gender},
     ).fetchall()
     return [
         {
@@ -241,6 +245,8 @@ def _get_match_history_bundle(
     team2: str,
     start_date: Optional[date],
     end_date: Optional[date],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, Any]:
     team1_names = get_all_team_name_variations(team1)
     team2_names = get_all_team_name_variations(team2)
@@ -250,14 +256,16 @@ def _get_match_history_bundle(
             """
             SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
             FROM matches m
-            WHERE (:start_date IS NULL OR m.date >= :start_date)
+            WHERE m.format = :fmt AND m.gender = :gender
+              AND (:start_date IS NULL OR m.date >= :start_date)
               AND (:end_date IS NULL OR m.date <= :end_date)
               AND (:venue IS NULL OR m.venue = :venue)
             ORDER BY m.date DESC
             LIMIT 7
             """
         ),
-        {"venue": None if venue == "All Venues" else venue, "start_date": start_date, "end_date": end_date},
+        {"venue": None if venue == "All Venues" else venue, "start_date": start_date, "end_date": end_date,
+         "fmt": fmt, "gender": gender},
     ).fetchall()
 
     team1_matches = db.execute(
@@ -265,14 +273,16 @@ def _get_match_history_bundle(
             """
             SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
             FROM matches m
-            WHERE (:start_date IS NULL OR m.date >= :start_date)
+            WHERE m.format = :fmt AND m.gender = :gender
+              AND (:start_date IS NULL OR m.date >= :start_date)
               AND (:end_date IS NULL OR m.date <= :end_date)
               AND (m.team1 = ANY(:team_names) OR m.team2 = ANY(:team_names))
             ORDER BY m.date DESC
             LIMIT 5
             """
         ),
-        {"team_names": team1_names, "start_date": start_date, "end_date": end_date},
+        {"team_names": team1_names, "start_date": start_date, "end_date": end_date,
+         "fmt": fmt, "gender": gender},
     ).fetchall()
 
     team2_matches = db.execute(
@@ -280,14 +290,16 @@ def _get_match_history_bundle(
             """
             SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
             FROM matches m
-            WHERE (:start_date IS NULL OR m.date >= :start_date)
+            WHERE m.format = :fmt AND m.gender = :gender
+              AND (:start_date IS NULL OR m.date >= :start_date)
               AND (:end_date IS NULL OR m.date <= :end_date)
               AND (m.team1 = ANY(:team_names) OR m.team2 = ANY(:team_names))
             ORDER BY m.date DESC
             LIMIT 5
             """
         ),
-        {"team_names": team2_names, "start_date": start_date, "end_date": end_date},
+        {"team_names": team2_names, "start_date": start_date, "end_date": end_date,
+         "fmt": fmt, "gender": gender},
     ).fetchall()
 
     h2h_matches = db.execute(
@@ -295,7 +307,8 @@ def _get_match_history_bundle(
             """
             SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.won_batting_first, m.won_fielding_first
             FROM matches m
-            WHERE (:start_date IS NULL OR m.date >= :start_date)
+            WHERE m.format = :fmt AND m.gender = :gender
+              AND (:start_date IS NULL OR m.date >= :start_date)
               AND (:end_date IS NULL OR m.date <= :end_date)
               AND (
                 (m.team1 = ANY(:team1_names) AND m.team2 = ANY(:team2_names))
@@ -305,7 +318,8 @@ def _get_match_history_bundle(
             LIMIT 10
             """
         ),
-        {"team1_names": team1_names, "team2_names": team2_names, "start_date": start_date, "end_date": end_date},
+        {"team1_names": team1_names, "team2_names": team2_names, "start_date": start_date, "end_date": end_date,
+         "fmt": fmt, "gender": gender},
     ).fetchall()
 
     all_match_ids = list({m.id for m in [*venue_matches, *team1_matches, *team2_matches, *h2h_matches]})
@@ -1645,15 +1659,18 @@ def gather_preview_context(
         fmt=fmt,
         gender=gender,
     )
-    h2h = _get_h2h_last_n(db, team1, team2, 10, start_date=start_date, end_date=end_date)
+    h2h = _get_h2h_last_n(db, team1, team2, 10, start_date=start_date, end_date=end_date, fmt=fmt, gender=gender)
     venue_h2h = _get_h2h_last_n(
-        db, team1, team2, 10, start_date=start_date, end_date=end_date, venue=venue if venue != "All Venues" else None
+        db, team1, team2, 10, start_date=start_date, end_date=end_date, venue=venue if venue != "All Venues" else None,
+        fmt=fmt, gender=gender
     )
     form1 = _get_recent_form(db, team1, 5, end_date=end_date)
     form2 = _get_recent_form(db, team2, 5, end_date=end_date)
     elo1 = _get_latest_elo(db, team1)
     elo2 = _get_latest_elo(db, team2)
-    match_history_bundle = _get_match_history_bundle(db, venue, team1, team2, start_date, end_date)
+    match_history_bundle = _get_match_history_bundle(
+        db, venue, team1, team2, start_date, end_date, fmt=fmt, gender=gender
+    )
 
     avg_winning_score = (venue_stats or {}).get("average_winning_score")
     avg_chasing_score = (venue_stats or {}).get("average_chasing_score")
