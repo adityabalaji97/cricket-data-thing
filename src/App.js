@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+// The preview's filter controls moved to components/preview/PreviewFilters.jsx (A6), which
+// took Autocomplete, TextField, Collapse, Card/CardContent, ToggleButton(Group),
+// CircularProgress, Alert and Button with them.
 import {
   Container,
-  TextField,
   Box,
-  Autocomplete,
-  CircularProgress,
-  Alert,
   Typography,
-  Button,
   Tabs,
   Tab,
   IconButton,
@@ -15,11 +13,6 @@ import {
   MenuItem,
   useMediaQuery,
   useTheme,
-  Collapse,
-  Card,
-  CardContent,
-  ToggleButton,
-  ToggleButtonGroup,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
@@ -27,6 +20,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import VenueNotes from './components/VenueNotes';
+import PreviewFilters from './components/preview/PreviewFilters';
 import MatchupsTab from './components/MatchupsTab';
 import CompetitionFilter from './components/CompetitionFilter';
 import LandingPage from './components/LandingPage';
@@ -719,165 +713,31 @@ const AppContent = () => {
         <Route path="/scorecard/:matchId" element={<MatchScorecardPage />} />
         <Route path="/venue" element={
           <Box sx={{ my: { xs: 1.5, md: 3 } }}>
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
-
-            <Collapse in={filtersExpanded || !showVisualizations}>
-              <Card sx={{ mb: 2, boxShadow: showVisualizations ? 2 : 0, backgroundColor: showVisualizations ? undefined : 'transparent' }}>
-                <CardContent sx={{ p: showVisualizations ? 2 : 0 }}>
-                  <Box sx={{
-                    display: 'flex',
-                    flexDirection: { xs: 'column', md: 'row' },
-                    gap: 2,
-                    mb: 2
-                  }}>
-                    <Autocomplete
-                      value={selectedVenue}
-                      onChange={(event, newValue) => {
-                        setSelectedVenue(newValue || "All Venues");
-                        setShowVisualizations(false);
-                      }}
-                      options={venues}
-                      sx={{ width: '100%' }}
-                      loading={loading}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Select Venue"
-                          required
-                          fullWidth
-                          InputProps={{
-                            ...params.InputProps,
-                            endAdornment: (
-                              <>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                              </>
-                            ),
-                          }}
-                        />
-                      )}
-                    />
-
-                    <TextField
-                      label="Start Date"
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => handleDateChange(e.target.value, true)}
-                      InputLabelProps={{ shrink: true }}
-                      inputProps={{ max: endDate }}
-                      required
-                      fullWidth
-                    />
-
-                    <TextField
-                      label="End Date"
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => handleDateChange(e.target.value, false)}
-                      InputLabelProps={{ shrink: true }}
-                      inputProps={{ max: TODAY }}
-                      required
-                      fullWidth
-                    />
-                  </Box>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
-                      Match Time Slice
-                    </Typography>
-                    <ToggleButtonGroup
-                      size="small"
-                      value={dayNightFilter}
-                      exclusive
-                      onChange={handleDayNightChange}
-                    >
-                      <ToggleButton value="all">All</ToggleButton>
-                      <ToggleButton value="day">Day</ToggleButton>
-                      <ToggleButton value="night">Night</ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
-
-                  <CompetitionFilter onFilterChange={handleFilterChange} isMobile={isMobile} value={competitions} />
-
-                  {startDate && endDate && !error && (
-                    <Box sx={{
-                      display: 'flex',
-                      flexDirection: { xs: 'column', md: 'row' },
-                      gap: 2,
-                      mb: 0
-                    }}>
-                      <Autocomplete
-                        value={selectedTeam1}
-                        onChange={(event, newValue) => {
-                          setSelectedTeam1(newValue);
-                          setShowVisualizations(false);
-                        }}
-                        options={teams}
-                        sx={{ width: '100%' }}
-                        getOptionLabel={(option) => option?.abbreviated_name || ''}
-                        renderOption={(props, option) => (
-                          <li {...props}>
-                            <Typography>
-                              {option.abbreviated_name} - {option.full_name}
-                            </Typography>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} label="Team 1" fullWidth />
-                        )}
-                        isOptionEqualToValue={(option, value) =>
-                          option?.full_name === value?.full_name
-                        }
-                      />
-
-                      <Autocomplete
-                        value={selectedTeam2}
-                        onChange={(event, newValue) => {
-                          setSelectedTeam2(newValue);
-                          setShowVisualizations(false);
-                        }}
-                        options={teams.filter(team => team?.full_name !== selectedTeam1?.full_name)}
-                        sx={{ width: '100%' }}
-                        getOptionLabel={(option) => option?.abbreviated_name || ''}
-                        renderOption={(props, option) => (
-                          <li {...props}>
-                            <Typography>
-                              {option.abbreviated_name} - {option.full_name}
-                            </Typography>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} label="Team 2" fullWidth />
-                        )}
-                        isOptionEqualToValue={(option, value) =>
-                          option?.full_name === value?.full_name
-                        }
-                      />
-
-                      <Button
-                        variant="contained"
-                        onClick={() => {
-                          hasFetchedRef.current = false;
-                          setShowVisualizations(true);
-                        }}
-                        disabled={loading || error}
-                        sx={{
-                          mt: { xs: 1, md: 0 },
-                          width: { xs: '100%', md: 'auto' },
-                          height: { xs: 'auto', md: '56px' }
-                        }}
-                      >
-                        Go
-                      </Button>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Collapse>
+            <PreviewFilters
+              error={error}
+              loading={loading}
+              isMobile={isMobile}
+              filtersExpanded={filtersExpanded}
+              showVisualizations={showVisualizations}
+              setShowVisualizations={setShowVisualizations}
+              hasFetchedRef={hasFetchedRef}
+              venues={venues}
+              selectedVenue={selectedVenue}
+              setSelectedVenue={setSelectedVenue}
+              startDate={startDate}
+              endDate={endDate}
+              handleDateChange={handleDateChange}
+              today={TODAY}
+              dayNightFilter={dayNightFilter}
+              handleDayNightChange={handleDayNightChange}
+              competitions={competitions}
+              handleFilterChange={handleFilterChange}
+              teams={teams}
+              selectedTeam1={selectedTeam1}
+              setSelectedTeam1={setSelectedTeam1}
+              selectedTeam2={selectedTeam2}
+              setSelectedTeam2={setSelectedTeam2}
+            />
 
             {showVisualizations && !loading && !error && (
               <>
