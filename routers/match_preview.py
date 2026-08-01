@@ -3,7 +3,7 @@ import hashlib
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Literal, Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -244,6 +244,8 @@ def _cache_key(
     top_teams: int,
     preview_mode: str,
     day_or_night: Optional[str],
+    fmt: str,
+    gender: str,
 ) -> str:
     payload = json.dumps(
         {
@@ -255,6 +257,10 @@ def _cache_key(
             "include_international": include_international,
             "top_teams": top_teams,
             "day_or_night": day_or_night,
+            # Format is part of the key or an ODI preview would be served from a T20 entry.
+            # This has bitten three separate caches in this project already.
+            "format": fmt,
+            "gender": gender,
             "preview_version": PREVIEW_ENGINE_VERSION,
             "openai_model": OPENAI_MODEL,
             "preview_mode": preview_mode,
@@ -337,6 +343,10 @@ def get_match_preview(
     include_international: bool = Query(True),
     top_teams: int = Query(20, ge=1, le=50),
     day_or_night: Optional[str] = Query(None, pattern="^(day|night)$"),
+    # A preview is one fixture, so it is always a single format -- 'ALL' is meaningless here
+    # and get_format('ALL') raises. Defaults to men's T20 so existing links keep working.
+    format: Literal["T20", "ODI", "TEST"] = Query("T20", description="Cricket format"),
+    gender: Literal["male", "female"] = Query("male", description="Men's or women's"),
     debug: bool = Query(False),
     db: Session = Depends(get_session),
 ):
@@ -352,6 +362,8 @@ def get_match_preview(
             top_teams,
             preview_mode,
             day_or_night,
+            format,
+            gender,
         )
         if key in preview_cache:
             cached = preview_cache[key]
@@ -367,6 +379,8 @@ def get_match_preview(
             include_international=include_international,
             top_teams=top_teams,
             day_or_night=day_or_night,
+            fmt=format,
+            gender=gender,
         )
         try:
             _inject_form_flags(context, db)

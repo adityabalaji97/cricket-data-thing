@@ -469,6 +469,8 @@ def get_venue_phase_stats(
     top_teams: Optional[int],
     db: Session,
     day_or_night: Optional[str] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, Any]:
     """
     Get phase-wise statistics for a venue.
@@ -519,6 +521,26 @@ def get_venue_phase_stats(
             "day_or_night": day_or_night,
         }
 
+        # Phase splits come from format_config rather than inline literals, so an ODI preview
+        # gets 0-9/10-24/25-39/40-49 instead of T20's 0-5/6-9/10-14/15-19. For men's T20 the
+        # generated SQL is semantically identical to the literals it replaces -- the old
+        # "WHEN over >= 6 AND over < 10" was redundant, since CASE already stops at the first
+        # match -- so T20 preview numbers are unchanged.
+        from services.analytics_common import phase_bounds, phase_case_sql
+
+        phase_case_dd = phase_case_sql(fmt, gender, over_column="dd.over", n_phases=4)
+        # The legacy `deliveries` table holds men's T20 only, from before 2015, so it is pinned
+        # regardless of the format being previewed.
+        phase_case_legacy = phase_case_sql("T20", "male", over_column="d.over", n_phases=4)
+
+        # Sort order follows the phase sequence for this format. The keys happen to match
+        # across formats today, but deriving it keeps the two in step if that changes.
+        _order_whens = " ".join(
+            f"WHEN '{phase.key}' THEN {index}"
+            for index, phase in enumerate(phase_bounds(fmt, gender, n_phases=4), start=1)
+        )
+        phase_order_sql = f"CASE i.phase {_order_whens} END"
+
         if source == "delivery_details":
             venue_filter = build_venue_filter_delivery_details(venue, params)
             competition_filter = build_competition_filter_delivery_details(
@@ -531,12 +553,7 @@ def get_venue_phase_stats(
                         dd.p_match as match_id,
                         m.won_batting_first,
                         m.won_fielding_first,
-                        CASE
-                            WHEN dd.over < 6 THEN 'powerplay'
-                            WHEN dd.over >= 6 AND dd.over < 10 THEN 'middle1'
-                            WHEN dd.over >= 10 AND dd.over < 15 THEN 'middle2'
-                            ELSE 'death'
-                        END as phase,
+                        {phase_case_dd} as phase,
                         SUM(dd.score) as runs,
                         COUNT(*) as balls,
                         SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets
@@ -599,12 +616,7 @@ def get_venue_phase_stats(
                 LEFT JOIN batting_first_stats b ON i.innings = b.innings AND i.phase = b.phase
                 LEFT JOIN chasing_stats c ON i.innings = c.innings AND i.phase = c.phase
                 ORDER BY i.innings,
-                    CASE i.phase
-                        WHEN 'powerplay' THEN 1
-                        WHEN 'middle1' THEN 2
-                        WHEN 'middle2' THEN 3
-                        WHEN 'death' THEN 4
-                    END
+                    {phase_order_sql}
             """)
         else:
             venue_filter = build_venue_filter_deliveries(venue, params)
@@ -618,12 +630,7 @@ def get_venue_phase_stats(
                 d.match_id,
                 m.won_batting_first,
                 m.won_fielding_first,
-                CASE
-                    WHEN d.over < 6 THEN 'powerplay'
-                    WHEN d.over >= 6 AND d.over < 10 THEN 'middle1'
-                    WHEN d.over >= 10 AND d.over < 15 THEN 'middle2'
-                    ELSE 'death'
-                END as phase,
+                {phase_case_legacy} as phase,
                 SUM(d.runs_off_bat + d.extras) as runs,
                 COUNT(*) as balls,
                 SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) as wickets

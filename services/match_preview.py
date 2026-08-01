@@ -638,9 +638,13 @@ def _summarize_matchups_and_fantasy(
     team1_players: Optional[List[str]] = None,
     team2_players: Optional[List[str]] = None,
     use_current_roster: bool = False,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, Any]:
     try:
         matchup_data = get_team_matchups_service(
+            fmt=fmt,
+            gender=gender,
             team1=team1,
             team2=team2,
             start_date=start_date,
@@ -1611,6 +1615,8 @@ def gather_preview_context(
     include_international: bool = True,
     top_teams: int = 20,
     day_or_night: Optional[str] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, Any]:
     team1 = resolve_team_identifier(team1_identifier)
     team2 = resolve_team_identifier(team2_identifier)
@@ -1634,6 +1640,8 @@ def gather_preview_context(
         top_teams=top_teams,
         db=db,
         day_or_night=day_or_night,
+        fmt=fmt,
+        gender=gender,
     )
     h2h = _get_h2h_last_n(db, team1, team2, 10, start_date=start_date, end_date=end_date)
     venue_h2h = _get_h2h_last_n(
@@ -1663,6 +1671,8 @@ def gather_preview_context(
         start_date,
         end_date,
         use_current_roster=use_current_roster,
+        fmt=fmt,
+        gender=gender,
     )
     lineup_sources = (matchup_fantasy or {}).get("lineup_sources") or {}
     top_ranked_players = _summarize_top_ranked_lineup_players(
