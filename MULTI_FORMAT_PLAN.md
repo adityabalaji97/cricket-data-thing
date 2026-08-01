@@ -32,9 +32,9 @@ explicit promotion steps.
 | **A3** | Query builder ODI (frontend) | [x] 2026-07-26 |
 | **A4** | nl2query + summarizer ODI | [ ] |
 | **A5** | Scorecard ODI | [x] 2026-07-26 |
-| **A6** | Match preview redesign 1: shell | [ ] |
-| **A7** | Match preview redesign 2: core blocks + format phases | [ ] |
-| **A8** | Match preview redesign 3: children + mobile pass | [ ] |
+| **A6** | Match preview redesign 1: shell | [x] 2026-08-01 |
+| **A7** | Match preview redesign 2: core blocks + format phases | [x] 2026-08-01 |
+| **A8** | Match preview redesign 3: children + mobile pass | [x] 2026-08-01 |
 | **A9** | Per-format ELO | [x] 2026-07-26 |
 | **A10** | ODI fantasy points | [ ] |
 | **A11** | Landing page multi-format | [~] 2026-07-26 (ELO + breakpoint done; recent-matches and featured-innings endpoints still T20-shaped) |

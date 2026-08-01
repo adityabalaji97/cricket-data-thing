@@ -152,6 +152,48 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## Log entries (newest first)
 
+### 2026-08-01 — Chunks A6, A7, A8 — Claude — match preview redesign complete
+
+**Done** — the preview is dark-themed and format-aware end to end. T20 goldens stayed 13/13
+throughout.
+
+* **A6** — filters extracted from the `/venue` route in App.js into
+  `components/preview/PreviewFilters.jsx`, restyled dark. Verbatim extraction, so T20 output
+  was provably unchanged going into A7. App.js 947 → 807 lines.
+* **A7** — the 4-phase split now comes from `format_config` via `phase_case_sql` instead of
+  three inlined T20 literals. `fmt`/`gender` threaded through `gather_preview_context` to phase
+  stats, venue stats, team form, H2H and matchups. **Format added to the preview cache key.**
+* **A8** — `/venue_notes` accepts a format; the frontend sends one; `PhaseWiseStrategy` derives
+  its bars from config; and the child components are dark-themed via a scoped MUI theme.
+
+**Two gaps A7 left that only showed up by reading the ODI output**
+
+Neither was in the chunk brief, and both would have passed a "does it deploy" check:
+
+1. **Venue stats reported T20 numbers in an ODI preview** — "avg winning score 197" at Wankhede.
+   Not contamination: `build_competition_filter_delivery_details` pins correctly but defaults to
+   T20, and nothing passed a format.
+2. **Then ODI venue stats were paired with T20 team form** — "India WWWLL; batting first scored
+   192, 219, 233" against an ODI benchmark of 395. Five `matches` queries in the history and H2H
+   path had no format predicate at all.
+
+**And a gap A7 left overall:** the backend was format-aware but *unreachable* — the frontend sent
+no format and `/venue_notes` did not accept one. Backend format-awareness is not done until a
+caller can actually select it.
+
+**On the restyle approach.** ~370 MUI surfaces across a dozen components versus ~14 hardcoded
+light literals. A scoped `ThemeProvider` on the `/venue` route handles the 370; the literals were
+fixed by hand. Global theming was rejected deliberately — it would restyle every page in one
+untested step. White text on coloured backgrounds (W/L/NR badges, boundary chips, phase strip)
+was left alone; it is already correct on dark.
+
+**Open, not fixed:**
+* An ODI phase response returned only two of four buckets at Wankhede. May be legitimate sparse
+  data in the default window, may be real. **Check before trusting the ODI preview.**
+* Avg winning score of 395 at Wankhede looks high even for ODIs, off a 9-match sample.
+* `MULTI_FORMAT_PLAN.md` line references for A6-A8 were all stale. Verify before trusting others.
+
+
 ### 2026-07-27 — Chunk A1 — Claude — ODI load complete, pipeline running
 
 **Done**
