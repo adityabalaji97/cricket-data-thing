@@ -1630,6 +1630,8 @@ def gather_preview_context(
         top_teams=top_teams,
         db=db,
         day_or_night=day_or_night,
+        fmt=fmt,
+        gender=gender,
     )
     phase_stats = get_venue_phase_stats(
         venue=venue if venue != "All Venues" else None,

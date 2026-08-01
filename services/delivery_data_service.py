@@ -337,7 +337,9 @@ def get_match_totals_from_delivery_details(
     include_international: bool,
     top_teams: Optional[int],
     day_or_night: Optional[str],
-    db: Session
+    db: Session,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, Any]:
     """
     Get match totals and statistics from delivery_details table.
@@ -352,7 +354,9 @@ def get_match_totals_from_delivery_details(
     }
 
     venue_filter = build_venue_filter_delivery_details(venue, params)
-    competition_filter = build_competition_filter_delivery_details(leagues, include_international, top_teams, params)
+    competition_filter = build_competition_filter_delivery_details(
+        leagues, include_international, top_teams, params, fmt=fmt, gender=gender
+    )
 
     query = f"""
         WITH match_totals AS (
@@ -428,6 +432,8 @@ def get_venue_match_stats(
     top_teams: Optional[int],
     db: Session,
     day_or_night: Optional[str] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, Any]:
     """
     Get venue match statistics, automatically routing to correct table(s) based on date range.
@@ -442,7 +448,8 @@ def get_venue_match_stats(
     if routing['use_delivery_details']:
         dd_start, dd_end = routing['delivery_details_date_range']
         result = get_match_totals_from_delivery_details(
-            venue, dd_start, dd_end, leagues, include_international, top_teams, day_or_night, db
+            venue, dd_start, dd_end, leagues, include_international, top_teams, day_or_night, db,
+            fmt=fmt, gender=gender,
         )
         if result:
             return result
