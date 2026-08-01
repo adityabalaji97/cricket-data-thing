@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useFormat } from '../context/FormatContext';
+import { colors as hsColors } from '../theme/hindsightDark';
 import { 
     Box, 
     Card, 
@@ -96,7 +97,7 @@ const BattingScatter = ({ data, isMobile }) => {
             const boundaryPercent = data[`${phasePrefix}boundary_percent`];
 
             return (
-                <Box sx={{ bgcolor: 'white', p: isMobile ? 1 : 2, border: '1px solid #ccc', borderRadius: 1 }}>
+                <Box sx={{ bgcolor: hsColors.surface1, p: isMobile ? 1 : 2, border: `1px solid ${hsColors.border}`, borderRadius: 1 }}>
                     <Typography variant="subtitle2" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem', fontWeight: 600 }}>
                         {data.name}
                     </Typography>
@@ -612,7 +613,7 @@ const WinPercentagesPie = ({ data }) => {
                     height: isMobile ? 18 : 20,
                     borderRadius: 999,
                     overflow: 'hidden',
-                    bgcolor: 'grey.200',
+                    bgcolor: hsColors.surface3,
                 }}>
                     {totalMatches > 0 ? segments.map((segment) => (
                         segment.value > 0 ? (
@@ -857,7 +858,7 @@ const PhaseWiseStrategy = ({ data, isMobile }) => {
                     display: 'flex',
                     width: '100%',
                     height: isMobile ? 40 : 50,
-                    backgroundColor: '#f5f5f5',
+                    backgroundColor: hsColors.surface2,
                     borderRadius: '4px 4px 0 0',
                     overflow: 'hidden'
                 }}>

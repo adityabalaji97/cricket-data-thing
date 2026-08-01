@@ -46,6 +46,8 @@ import config from './config';
 import { DEFAULT_START_DATE, TODAY } from './utils/dateDefaults';
 import { NAV_ITEMS, getCurrentTabForPath, getPageTitleForPath } from './navItems';
 import { useFormat } from './context/FormatContext';
+import { ThemeProvider } from '@mui/material/styles';
+import previewDark from './theme/previewDark';
 
 const TEAM_NAME_TO_ABBREVIATION = {
   'chennai super kings': 'CSK',
@@ -719,7 +721,11 @@ const AppContent = () => {
         <Route path="/fantasy-planner" element={<FantasyPlanner isMobile={isMobile} />} />
         <Route path="/scorecard/:matchId" element={<MatchScorecardPage />} />
         <Route path="/venue" element={
-          <Box sx={{ my: { xs: 1.5, md: 3 } }}>
+          // Scoped dark theme: restyles the dozen preview child components at once rather
+          // than editing ~370 sx blocks by hand. The rest of the app stays on the default
+          // theme until each page is migrated deliberately.
+          <ThemeProvider theme={previewDark}>
+          <Box sx={{ my: { xs: 1.5, md: 3 }, bgcolor: 'background.default', color: 'text.primary' }}>
             <PreviewFilters
               error={error}
               loading={loading}
@@ -770,6 +776,7 @@ const AppContent = () => {
               </>
             )}
           </Box>
+          </ThemeProvider>
         } />
       </Routes>
       {!location.pathname.startsWith('/wrapped') && (

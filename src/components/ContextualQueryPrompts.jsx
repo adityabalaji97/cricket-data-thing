@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { colors as hsColors } from '../theme/hindsightDark';
 import { 
   Box, 
   Typography, 
@@ -138,11 +139,11 @@ const ContextualQueryPrompts = ({
                 p: 1.5,
                 minHeight: 44,
                 borderRadius: 1,
-                backgroundColor: 'white',
+                backgroundColor: hsColors.surface1,
                 textDecoration: 'none',
                 color: 'inherit',
                 border: '1px solid',
-                borderColor: 'grey.200',
+                borderColor: hsColors.border,
                 transition: 'all 0.2s',
                 '&:hover': {
                   borderColor: 'primary.main',
