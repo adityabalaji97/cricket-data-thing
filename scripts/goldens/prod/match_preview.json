@@ -82,19 +82,19 @@
             {
               "form_flag": "cold",
               "player": "Towhid Hridoy",
-              "quality_score": 86.4,
+              "quality_score": 88.3,
               "rank": 6
             },
             {
               "form_flag": "neutral",
               "player": "Litton Das",
-              "quality_score": 59.4,
+              "quality_score": 58.6,
               "rank": 34
             },
             {
               "form_flag": "neutral",
               "player": "Iftikhar Ahmed",
-              "quality_score": 36.9,
+              "quality_score": 39.6,
               "rank": 57
             }
           ],
@@ -102,49 +102,49 @@
             {
               "form_flag": "hot",
               "player": "Nahid Rana",
-              "quality_score": 97.5,
+              "quality_score": 97.4,
               "rank": 3
             },
             {
               "form_flag": "hot",
               "player": "Akif Javed",
-              "quality_score": 89.3,
-              "rank": 8
+              "quality_score": 81.5,
+              "rank": 11
             },
             {
               "form_flag": "cold",
               "player": "Mustafizur Rahman",
-              "quality_score": 61.2,
+              "quality_score": 61.5,
               "rank": 37
             }
           ],
           "top_overall": [
             {
               "batting_quality": null,
-              "bowling_quality": 97.5,
+              "bowling_quality": 97.4,
               "discipline": "bowling",
               "form_flag": "hot",
               "player": "Nahid Rana",
-              "quality_score": 97.5,
+              "quality_score": 97.4,
               "rank": 3
             },
             {
-              "batting_quality": null,
-              "bowling_quality": 89.3,
-              "discipline": "bowling",
-              "form_flag": "hot",
-              "player": "Akif Javed",
-              "quality_score": 89.3,
-              "rank": 8
-            },
-            {
-              "batting_quality": 86.4,
+              "batting_quality": 88.3,
               "bowling_quality": null,
               "discipline": "batting",
               "form_flag": "cold",
               "player": "Towhid Hridoy",
-              "quality_score": 86.4,
+              "quality_score": 88.3,
               "rank": 6
+            },
+            {
+              "batting_quality": null,
+              "bowling_quality": 81.5,
+              "discipline": "bowling",
+              "form_flag": "hot",
+              "player": "Akif Javed",
+              "quality_score": 81.5,
+              "rank": 11
             }
           ]
         },
@@ -154,57 +154,57 @@
             {
               "form_flag": "hot",
               "player": "Moeen Ali",
-              "quality_score": 17.9,
-              "rank": 85
+              "quality_score": 20.6,
+              "rank": 84
             },
             {
               "form_flag": "neutral",
               "player": "Mehidy Hasan Miraz",
-              "quality_score": 13.4,
-              "rank": 88
+              "quality_score": 15.7,
+              "rank": 89
             }
           ],
           "top_bowling": [
             {
               "form_flag": "neutral",
               "player": "Salman Irshad",
-              "quality_score": 57.9,
+              "quality_score": 57.7,
               "rank": 43
             },
             {
               "form_flag": "hot",
               "player": "Azmatullah Omarzai",
-              "quality_score": 54.8,
+              "quality_score": 54.7,
               "rank": 49
             }
           ],
           "top_overall": [
             {
               "batting_quality": null,
-              "bowling_quality": 57.9,
+              "bowling_quality": 57.7,
               "discipline": "bowling",
               "form_flag": "neutral",
               "player": "Salman Irshad",
-              "quality_score": 57.9,
+              "quality_score": 57.7,
               "rank": 43
             },
             {
               "batting_quality": null,
-              "bowling_quality": 54.8,
+              "bowling_quality": 54.7,
               "discipline": "bowling",
               "form_flag": "hot",
               "player": "Azmatullah Omarzai",
-              "quality_score": 54.8,
+              "quality_score": 54.7,
               "rank": 49
             },
             {
-              "batting_quality": 17.9,
+              "batting_quality": 20.6,
               "bowling_quality": null,
               "discipline": "batting",
               "form_flag": "hot",
               "player": "Moeen Ali",
-              "quality_score": 17.9,
-              "rank": 85
+              "quality_score": 20.6,
+              "rank": 84
             }
           ]
         }
