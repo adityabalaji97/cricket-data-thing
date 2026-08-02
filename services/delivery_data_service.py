@@ -75,9 +75,16 @@ def get_venue_aliases(venue: Optional[str]) -> List[str]:
     return sorted(a for a in expanded if a)
 
 
-def should_use_delivery_details(start_date: Optional[date], end_date: Optional[date]) -> Dict[str, bool]:
+def should_use_delivery_details(start_date: Optional[date], end_date: Optional[date],
+                                fmt: str = "T20", gender: str = "male") -> Dict[str, bool]:
     """
     Determine which table(s) to query based on date range.
+
+    The 2015 split below only applies to men's T20: the legacy `deliveries` table holds nothing
+    else. For any other format delivery_details is the sole source across all dates, so the
+    split must not be applied -- doing so silently discarded every pre-2015 ODI, which is why
+    Wankhede reported 9 ODIs instead of 17 and why its phase and scoring benchmarks were drawn
+    from a truncated, high-scoring modern subset.
 
     Returns:
         {
@@ -89,6 +96,17 @@ def should_use_delivery_details(start_date: Optional[date], end_date: Optional[d
     """
     query_start = start_date or date(2005, 1, 1)
     query_end = end_date or date.today()
+
+    if (fmt or "T20").upper() != "T20":
+        # The 2005 default floor above is a men's T20 assumption (the legacy table starts
+        # there). ODI ball-by-ball goes back to 2000, so reusing it would keep clipping the
+        # earliest matches -- Wankhede's first ODI is 2002.
+        return {
+            'use_deliveries': False,
+            'use_delivery_details': True,
+            'deliveries_date_range': None,
+            'delivery_details_date_range': (start_date or date(1971, 1, 1), query_end),
+        }
 
     result = {
         'use_deliveries': False,
@@ -440,7 +458,7 @@ def get_venue_match_stats(
 
     This is the main entry point for venue statistics. It handles dual-table logic internally.
     """
-    routing = should_use_delivery_details(start_date, end_date)
+    routing = should_use_delivery_details(start_date, end_date, fmt=fmt, gender=gender)
 
     logger.info(f"Venue stats routing: {routing}")
 
@@ -710,7 +728,7 @@ def get_venue_phase_stats(
         return db.execute(phase_query, params).fetchall()
 
     try:
-        routing = should_use_delivery_details(start_date, end_date)
+        routing = should_use_delivery_details(start_date, end_date, fmt=fmt, gender=gender)
         logger.info(f"Venue phase stats routing: {routing}")
 
         if routing['use_delivery_details']:
@@ -838,7 +856,9 @@ def get_match_scores(
     match_ids: List[str],
     start_date: Optional[date],
     end_date: Optional[date],
-    db: Session
+    db: Session,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, Dict[int, str]]:
     """
     Get match scores with automatic dual-table routing.
@@ -855,7 +875,7 @@ def get_match_scores(
     if not match_ids:
         return {}
 
-    routing = should_use_delivery_details(start_date, end_date)
+    routing = should_use_delivery_details(start_date, end_date, fmt=fmt, gender=gender)
 
     # Try delivery_details first for recent data
     if routing['use_delivery_details']:
