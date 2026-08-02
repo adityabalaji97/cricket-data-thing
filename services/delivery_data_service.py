@@ -568,8 +568,12 @@ def get_venue_phase_stats(
 
         if source == "delivery_details":
             venue_filter = build_venue_filter_delivery_details(venue, params)
+            # fmt/gender must be passed: this helper pins dd.format and defaults to men's T20,
+            # so omitting them ran ODI phase boundaries over T20 rows. Every ball then fell into
+            # powerplay or middle1 (a T20 innings stops at over 19), which is why only two of
+            # four phase buckets came back.
             competition_filter = build_competition_filter_delivery_details(
-                leagues, include_international, top_teams, params
+                leagues, include_international, top_teams, params, fmt=fmt, gender=gender
             )
             phase_query = text(f"""
                 WITH phase_stats AS (
