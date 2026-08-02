@@ -180,12 +180,25 @@ def _competition_stats_from_rows(rows: List[Any]) -> Dict[str, Dict[str, Any]]:
     return stats
 
 
+#: Pinned to the top of the competition filter, in this order, ahead of everything else.
+#: Internationals first, then the leagues people actually look for. Everything below these is
+#: alphabetical -- the previous ordering was by match count, which buried a league the moment a
+#: busier domestic competition appeared, and left an 80-entry list in no discoverable order.
+PINNED_COMPETITIONS = ("T20I", "ODI", "Test", "IPL", "Big Bash League", "Pakistan Super League",
+                       "Caribbean Premier League", "Vitality Blast")
+
+
 def _discover_filters(competition_stats: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
     filters = [{"key": "all", "label": "All", "match_count": sum(s["match_count"] for s in competition_stats.values())}]
-    for key, stat in sorted(
-        competition_stats.items(),
-        key=lambda item: (item[1].get("priority", 9), -(item[1].get("match_count") or 0), item[1].get("competition_display") or item[0]),
-    ):
+
+    def _sort_key(item):
+        key, stat = item
+        label = stat.get("competition_display") or key
+        if key in PINNED_COMPETITIONS:
+            return (0, PINNED_COMPETITIONS.index(key), "")
+        return (1, 0, str(label).casefold())
+
+    for key, stat in sorted(competition_stats.items(), key=_sort_key):
         filters.append({
             "key": key,
             "label": stat["competition_display"],
