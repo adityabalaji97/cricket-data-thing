@@ -1198,6 +1198,10 @@ const LandingPage = ({ showLeagueCounts = true }) => {
         limit: '18',
         offset: '0',
         per_group: '4',
+        // One date-sorted list across every competition and format. Without this the carousel
+        // renders group-major and shows a run of ODIs, then a run of Hundred matches, instead
+        // of the most recent cricket.
+        flat: 'true',
         window: dateFilter,
       });
       if (teamFilter !== 'all') params.set('team', teamFilter);
