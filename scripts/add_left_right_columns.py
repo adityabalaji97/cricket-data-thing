@@ -233,6 +233,9 @@ def populate_non_striker_batter_type(engine):
         SET non_striker_batter_type = p.batting_hand
         FROM players p
         WHERE dd.non_striker = p.name
+          -- Match on gender too: players is UNIQUE(name, gender), so a name can belong to both
+          -- a male and a female player and a name-only join takes whichever row it finds.
+          AND p.gender = dd.gender
           AND dd.non_striker_batter_type IS NULL
           AND p.batting_hand IS NOT NULL
     """

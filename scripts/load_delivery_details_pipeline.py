@@ -162,20 +162,24 @@ def step_populate_columns(db_url, dry_run=False):
     print(f"\n✓ Column population complete")
 
 
-def step_update_players(db_url, dry_run=False):
+def step_update_players(db_url, dry_run=False, fmt="T20", gender="male"):
     """Step 4: Update players table with bat_hand/bowl_style."""
     print_header("STEP 4: UPDATE PLAYERS TABLE")
-    
+
     from sqlalchemy import create_engine
     from update_players_from_new_data import (
-        create_aliases_table, build_player_mapping, update_players, print_summary
+        create_aliases_table, build_player_mapping, update_players, print_summary,
+        insert_missing_players,
     )
-    
+
     engine = create_engine(db_url)
-    
+
     create_aliases_table(engine)
-    batters, bowlers = build_player_mapping(engine)
-    update_players(engine, batters, bowlers, dry_run=dry_run)
+    # Create players seen only in delivery_details first, so the attribute updates below have
+    # rows to write to. Without this a women's T20 or ODI-only player never existed at all.
+    insert_missing_players(engine, fmt=fmt, gender=gender, dry_run=dry_run)
+    batters, bowlers = build_player_mapping(engine, fmt=fmt, gender=gender)
+    update_players(engine, batters, bowlers, dry_run=dry_run, gender=gender)
     
     if not dry_run:
         print_summary(engine)
@@ -316,7 +320,7 @@ Examples:
         
         # Step 4: Update players
         if not args.skip_players:
-            step_update_players(db_url, dry_run=args.dry_run)
+            step_update_players(db_url, dry_run=args.dry_run, fmt=args.fmt, gender=args.gender)
         else:
             print("\n[SKIPPED] Step 4: Update Players")
         

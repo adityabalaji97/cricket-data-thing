@@ -67,7 +67,7 @@ def is_valid_alias(existing_name, new_name):
     return existing_last == new_last
 
 
-def build_player_mapping(engine):
+def build_player_mapping(engine, fmt="T20", gender="male"):
     """
     Join deliveries with delivery_details to map player names and get bat_hand/bowl_style.
 
@@ -147,7 +147,50 @@ def build_player_mapping(engine):
     return batters, bowlers
 
 
-def update_players(engine, batters, bowlers, dry_run=False):
+def insert_missing_players(engine, fmt="T20", gender="male", dry_run=False):
+    """Create players that appear in delivery_details but not in the players table.
+
+    Nothing else does this. build_player_mapping joins the legacy `deliveries` table, which
+    holds only men's T20, so a player who appears solely in delivery_details -- every women's
+    T20 player, and every ODI-only player such as Andrew Strauss -- was never created. The
+    step then "updated" zero rows and reported success.
+
+    Inserted with the format's gender, which the UNIQUE(name, gender) constraint keeps distinct
+    from a male namesake.
+    """
+    from sqlalchemy import text as _text
+
+    select_missing = _text("""
+        WITH seen AS (
+            SELECT DISTINCT bat AS name FROM delivery_details
+            WHERE format = :fmt AND gender = :gender AND bat IS NOT NULL
+            UNION
+            SELECT DISTINCT bowl FROM delivery_details
+            WHERE format = :fmt AND gender = :gender AND bowl IS NOT NULL
+        )
+        SELECT s.name FROM seen s
+        LEFT JOIN players p ON p.name = s.name AND p.gender = :gender
+        WHERE p.id IS NULL AND TRIM(s.name) <> ''
+        ORDER BY s.name
+    """)
+
+    with engine.begin() as conn:
+        missing = [r[0] for r in conn.execute(select_missing, {"fmt": fmt, "gender": gender})]
+        print(f"  Players in delivery_details missing from players ({fmt}/{gender}): {len(missing):,}")
+        if dry_run:
+            print(f"  [DRY RUN] Would insert {len(missing):,}")
+            return 0
+        for name in missing:
+            conn.execute(
+                _text("INSERT INTO players (name, gender) VALUES (:name, :gender) "
+                      "ON CONFLICT (name, gender) DO NOTHING"),
+                {"name": name, "gender": gender},
+            )
+    print(f"  \u2713 Inserted {len(missing):,} players")
+    return len(missing)
+
+
+def update_players(engine, batters, bowlers, dry_run=False, gender="male"):
     """Update players table using batch operations for speed."""
 
     print("\n" + "="*60)
@@ -224,7 +267,10 @@ def update_players(engine, batters, bowlers, dry_run=False):
                 SET batter_type = t.batter_type
                 FROM tmp_batter_updates t
                 WHERE p.name = t.name
-            """))
+                  -- players is UNIQUE(name, gender): the same name can belong to a male and a
+                  -- female player, and without this both rows get the same attributes.
+                  AND p.gender = :gender
+            """), {"gender": gender})
             print(f"    ✓ Updated {result.rowcount:,} batter types")
             conn.execute(text("DROP TABLE tmp_batter_updates"))
 
@@ -247,7 +293,8 @@ def update_players(engine, batters, bowlers, dry_run=False):
                 SET bowler_type = t.bowler_type
                 FROM tmp_bowler_updates t
                 WHERE p.name = t.name
-            """))
+                  AND p.gender = :gender
+            """), {"gender": gender})
             print(f"    ✓ Updated {result.rowcount:,} bowler types")
             conn.execute(text("DROP TABLE tmp_bowler_updates"))
 
