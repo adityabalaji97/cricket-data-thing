@@ -158,7 +158,7 @@ class StatsFromDeliveryDetails:
         
         self._stamp_format(stats, deliveries)
         if self._fantasy_applies(deliveries):
-            stats.fantasy_points = self.fantasy_calculator.calculate_batting_points(stats)
+            stats.fantasy_points = self._calculator_for(deliveries).calculate_batting_points(stats)
         return stats
 
     @staticmethod
@@ -209,8 +209,25 @@ class StatsFromDeliveryDetails:
     # Fantasy rulesets that are actually implemented. format_config declares 'odi' for men's
     # ODIs, but that is a statement of intent for a later chunk, not a promise that a calculator
     # exists -- so the gate below keys off this registry rather than off the declared name.
-    # Add 'odi' here when fantasy_points_odi lands.
-    IMPLEMENTED_FANTASY_RULESETS = {'t20'}
+    IMPLEMENTED_FANTASY_RULESETS = {'t20', 'odi'}
+
+    def _calculator_for(self, deliveries: List[Dict]):
+        """The scoring calculator matching these deliveries' format.
+
+        Cached per (format, gender). Previously a single T20 calculator was used for every
+        row, which is how an ODI innings would have been scored on T20 bands -- 25 a wicket
+        instead of 30, a dot worth a point instead of a third of one.
+        """
+        from fantasy_points_odi import get_calculator
+
+        fmt = (deliveries[0].get('format') if deliveries else None) or 'T20'
+        gender = (deliveries[0].get('gender') if deliveries else None) or 'male'
+        key = (fmt.upper(), gender)
+        if not hasattr(self, '_calculator_cache'):
+            self._calculator_cache = {}
+        if key not in self._calculator_cache:
+            self._calculator_cache[key] = get_calculator(fmt, gender)
+        return self._calculator_cache[key]
 
     @classmethod
     def _fantasy_applies(cls, deliveries: List[Dict]) -> bool:
@@ -287,7 +304,7 @@ class StatsFromDeliveryDetails:
         
         self._stamp_format(stats, deliveries)
         if self._fantasy_applies(deliveries):
-            stats.fantasy_points = self.fantasy_calculator.calculate_bowling_points(stats)
+            stats.fantasy_points = self._calculator_for(deliveries).calculate_bowling_points(stats)
         return stats
 
     def process_match_stats(self, session: Session, match_id: str) -> Dict:

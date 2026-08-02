@@ -40,6 +40,19 @@ class FantasyPointsCalculator:
         self.ECONOMY_11_TO_12 = -4
         self.ECONOMY_ABOVE_12 = -6
 
+        # Structural knobs. Defaults are men's T20; fantasy_points_odi.py overrides them.
+        # Parameterised rather than branching on format inside each method, so the ODI
+        # ruleset is a data change and the scoring logic stays single-sourced.
+        #
+        # Dot balls: T20 scores every dot, ODI only every 3rd.
+        self.DOTS_PER_POINT = 1
+        # Descending (threshold, bonus). First match wins, mirroring the if/elif chain.
+        self.BATTING_MILESTONES = [(100, 16), (75, 12), (50, 8), (25, 4)]
+        self.WICKET_MILESTONES = [(5, 12), (4, 8), (3, 4)]
+        # Minimum workload before rate-based points apply.
+        self.MIN_OVERS_FOR_ECONOMY = 2
+        self.MIN_BALLS_FOR_SR = 10
+
         # Strike rate points (min 10 balls)
         self.SR_ABOVE_170 = 6
         self.SR_150_TO_170 = 4
@@ -80,18 +93,11 @@ class FantasyPointsCalculator:
         
         # Run milestones
         milestone_points = 0
-        if stats.runs >= 100:
-            milestone_points = self.RUNS_100_BONUS
-            point_breakdown['milestone'] = 'century'
-        elif stats.runs >= 75:
-            milestone_points = self.RUNS_75_BONUS
-            point_breakdown['milestone'] = '75_runs'
-        elif stats.runs >= 50:
-            milestone_points = self.RUNS_50_BONUS
-            point_breakdown['milestone'] = 'half_century'
-        elif stats.runs >= 25:
-            milestone_points = self.RUNS_25_BONUS
-            point_breakdown['milestone'] = '25_runs'
+        for threshold, bonus in self.BATTING_MILESTONES:
+            if stats.runs >= threshold:
+                milestone_points = bonus
+                point_breakdown['milestone'] = f'{threshold}_runs'
+                break
         
         points += milestone_points
         point_breakdown['milestone_points'] = milestone_points
@@ -105,7 +111,7 @@ class FantasyPointsCalculator:
         
         # Strike rate points (min 10 balls)
         sr_points = 0
-        if stats.balls_faced >= 10:
+        if stats.balls_faced >= self.MIN_BALLS_FOR_SR:
             sr = stats.strike_rate
             if sr > 170:
                 sr_points = self.SR_ABOVE_170
@@ -146,7 +152,7 @@ class FantasyPointsCalculator:
         point_breakdown = {}
         
         # Dots
-        dot_points = stats.dots * self.DOT_BALL_POINT
+        dot_points = (stats.dots // self.DOTS_PER_POINT) * self.DOT_BALL_POINT
         points += dot_points
         point_breakdown['dot_points'] = dot_points
         
@@ -157,22 +163,18 @@ class FantasyPointsCalculator:
         
         # Wicket milestones
         milestone_points = 0
-        if stats.wickets >= 5:
-            milestone_points = self.WICKETS_5_BONUS
-            point_breakdown['milestone'] = '5_wickets'
-        elif stats.wickets >= 4:
-            milestone_points = self.WICKETS_4_BONUS
-            point_breakdown['milestone'] = '4_wickets'
-        elif stats.wickets >= 3:
-            milestone_points = self.WICKETS_3_BONUS
-            point_breakdown['milestone'] = '3_wickets'
+        for threshold, bonus in self.WICKET_MILESTONES:
+            if stats.wickets >= threshold:
+                milestone_points = bonus
+                point_breakdown['milestone'] = f'{threshold}_wickets'
+                break
         
         points += milestone_points
         point_breakdown['milestone_points'] = milestone_points
         
         # Economy rate points (min 2 overs)
         economy_points = 0
-        if stats.overs >= 2:
+        if stats.overs >= self.MIN_OVERS_FOR_ECONOMY:
             economy = stats.economy
             if economy < 5:
                 economy_points = self.ECONOMY_BELOW_5
@@ -506,7 +508,7 @@ class FantasyPointsCalculator:
 
         # Strike rate points (min 10 balls)
         sr_points = 0
-        if capped_balls >= 10:
+        if capped_balls >= self.MIN_BALLS_FOR_SR:
             if strike_rate > 170:
                 sr_points = self.SR_ABOVE_170
                 breakdown['sr_category'] = '>170'
