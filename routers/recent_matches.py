@@ -34,6 +34,8 @@ def get_recent_matches_discover(
     limit: int = Query(12, ge=1, le=48),
     offset: int = Query(0, ge=0),
     per_group: int = Query(3, ge=1, le=6),
+    flat: bool = Query(False, description="With competition=all, return one date-sorted list "
+                                          "instead of per-competition groups"),
     team: Optional[str] = Query(None, description="Team abbreviation or full name, matched against either side"),
     window: str = Query("all", description="all, 7, 30, or 90 day recency window"),
     date_from: Optional[str] = Query(None, description="Inclusive ISO start date"),
@@ -57,6 +59,7 @@ def get_recent_matches_discover(
             window=window,
             date_from=date_from,
             date_to=date_to,
+            flat=flat,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

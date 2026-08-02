@@ -557,6 +557,7 @@ def get_recent_matches_discover_service(
     window: str = "all",
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    flat: bool = False,
 ) -> Dict[str, Any]:
     """
     Discover recent scorecard-ready matches.
@@ -716,8 +717,26 @@ def get_recent_matches_discover_service(
 
             groups = sorted(grouped.values(), key=_group_order, reverse=True)
 
+            if flat:
+                # A true recency carousel: one list across every competition and format, newest
+                # first. Grouping is right for browsing a league but wrong for "Recent Matches",
+                # where per-competition groups produced a run of ODIs, then a run of Hundred
+                # matches, rather than what actually happened most recently.
+                #
+                # Still sourced from the per-group query, so each competition contributes at
+                # most per_group matches. That caps how deep a single busy competition can
+                # dominate the carousel, which is the desired behaviour here.
+                flat_matches = [m for group in groups for m in (group.get("matches") or [])]
+                flat_matches.sort(key=lambda m: (m.get("date") or ""), reverse=True)
+            else:
+                flat_matches = None
+
             return {
-                "mode": "grouped",
+                # flattenRecentMatches on the client prefers `matches` when present, so the
+                # carousel picks up the flat list without further changes; `groups` stays for
+                # the browse view.
+                **({"matches": flat_matches[:limit]} if flat_matches is not None else {}),
+                "mode": "flat_recent" if flat_matches is not None else "grouped",
                 "competition": "all",
                 "per_group": per_group,
                 "groups": groups,
