@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from typing import Any, Dict, List, Optional
 from datetime import date, datetime, timedelta
 from models import teams_mapping, leagues_mapping, INTERNATIONAL_TEAMS_RANKED
+from services.competition_aliases import canonical_competition, canonical_sql, variants_for
 
 
 DETAILS_START_DATE = date(2015, 1, 1)
@@ -23,6 +24,9 @@ INTERNATIONAL_LABEL_SQL = """
                             END"""
 
 INTERNATIONAL_BUCKETS = ("T20I", "ODI", "Test")
+
+#: Generated from services.competition_aliases so SQL grouping and Python labelling agree.
+COMPETITION_CANONICAL_SQL = canonical_sql("m.competition")
 
 
 def _international_label(fmt: Optional[str]) -> str:
@@ -48,19 +52,23 @@ def _display_competition(competition: Optional[str], is_t20i: bool = False,
 
 
 def _canonical_competition_key(competition: Optional[str]) -> Optional[str]:
+    """Collapse the feed's competition aliases to one key.
+
+    Previously only IPL was special-cased, so "Big Bash League" and "BBL" were separate groups
+    with separate filter entries, and each returned only its own share of the league's matches.
+    """
     if not competition:
         return competition
-    value = str(competition).strip()
-    if value.lower() in {"ipl", "indian premier league"}:
-        return "IPL"
-    return value
+    return canonical_competition(str(competition).strip())
 
 
 def _competition_values_for_key(competition: str) -> List[str]:
+    """Every raw competition value a canonical key should match in the WHERE clause."""
     key = _canonical_competition_key(competition)
     if key == "IPL":
-        return list(IPL_COMPETITIONS)
-    return [competition]
+        # IPL_COMPETITIONS additionally covers the franchise's historical names.
+        return list(dict.fromkeys([*IPL_COMPETITIONS, *variants_for(key)]))
+    return variants_for(key) or [competition]
 
 
 def _balls_to_overs(balls: int) -> str:
@@ -590,7 +598,7 @@ def get_recent_matches_discover_service(
             SELECT
                 CASE
                     WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
-                    ELSE m.competition
+                    ELSE {COMPETITION_CANONICAL_SQL}
                 END AS competition,
                 m.match_type,
                 COUNT(*) AS match_count,
@@ -602,7 +610,7 @@ def get_recent_matches_discover_service(
             GROUP BY
                 CASE
                     WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
-                    ELSE m.competition
+                    ELSE {COMPETITION_CANONICAL_SQL}
                 END,
                 m.match_type
         """)
@@ -632,13 +640,13 @@ def get_recent_matches_discover_service(
                             WHEN m.match_type = 'international' THEN
                         {INTERNATIONAL_LABEL_SQL}
                             WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
-                            ELSE m.competition
+                            ELSE {COMPETITION_CANONICAL_SQL}
                         END AS competition_key,
                         CASE
                             WHEN m.match_type = 'international' THEN
                         {INTERNATIONAL_LABEL_SQL}
                             WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
-                            ELSE m.competition
+                            ELSE {COMPETITION_CANONICAL_SQL}
                         END AS competition,
                         m.match_type,
                         m.format,
