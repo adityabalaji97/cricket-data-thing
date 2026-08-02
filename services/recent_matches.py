@@ -9,13 +9,40 @@ DETAILS_START_DATE = date(2015, 1, 1)
 IPL_COMPETITIONS = ("IPL", "Indian Premier League")
 
 
+# `matches.match_type` distinguishes international from league cricket -- it says nothing about
+# format. Labelling every international "T20I" is why ODIs showed up on the landing page as
+# T20Is, scores of 183/10 (48.5) and all. The bucket has to come from m.format.
+#
+# Mirrors competition_normalizer.DEFAULT_BUCKET; kept as SQL here because the grouping and the
+# label are both decided inside the query.
+INTERNATIONAL_LABEL_SQL = """
+                            CASE UPPER(COALESCE(m.format, 'T20'))
+                                WHEN 'ODI' THEN 'ODI'
+                                WHEN 'TEST' THEN 'Test'
+                                ELSE 'T20I'
+                            END"""
+
+INTERNATIONAL_BUCKETS = ("T20I", "ODI", "Test")
+
+
+def _international_label(fmt: Optional[str]) -> str:
+    """Python-side twin of INTERNATIONAL_LABEL_SQL."""
+    normalized = (fmt or "T20").upper()
+    if normalized == "ODI":
+        return "ODI"
+    if normalized == "TEST":
+        return "Test"
+    return "T20I"
+
+
 def _iso_date(value: Any) -> Optional[str]:
     return value.isoformat() if value else None
 
 
-def _display_competition(competition: Optional[str], is_t20i: bool = False) -> Optional[str]:
+def _display_competition(competition: Optional[str], is_t20i: bool = False,
+                         fmt: Optional[str] = None) -> Optional[str]:
     if is_t20i:
-        return "T20I"
+        return _international_label(fmt)
     competition = _canonical_competition_key(competition)
     return leagues_mapping.get(competition, competition)
 
@@ -87,8 +114,9 @@ def _result_text_from_summary(row: Any, innings_scores: List[Dict[str, Any]]) ->
 
 
 def _format_match(row: Any, *, is_t20i: bool = False, score_summary: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    competition_key = "T20I" if is_t20i else _canonical_competition_key(row.competition)
-    competition_display = _display_competition(competition_key, is_t20i=is_t20i)
+    row_format = getattr(row, "format", None)
+    competition_key = _international_label(row_format) if is_t20i else _canonical_competition_key(row.competition)
+    competition_display = _display_competition(competition_key, is_t20i=is_t20i, fmt=row_format)
     innings_scores = (score_summary or {}).get("innings_scores") or []
     innings1_score = _score_label(innings_scores[0]) if len(innings_scores) >= 1 else None
     innings2_score = _score_label(innings_scores[1]) if len(innings_scores) >= 2 else None
@@ -122,7 +150,10 @@ def _competition_stats_from_rows(rows: List[Any]) -> Dict[str, Dict[str, Any]]:
     stats: Dict[str, Dict[str, Any]] = {}
     for row in rows:
         is_t20i = row.match_type == "international"
-        key = "T20I" if is_t20i else _canonical_competition_key(row.competition)
+        # The stats query already emits the correct bucket ('T20I' / 'ODI' / 'Test') as
+        # `competition`, so trust it rather than re-deriving from a format column this row
+        # does not carry -- doing so would resolve every international back to T20I.
+        key = row.competition if is_t20i else _canonical_competition_key(row.competition)
         if not key:
             continue
         current = stats.get(key)
@@ -528,9 +559,11 @@ def get_recent_matches_discover_service(
         filtered_base_where = " AND ".join([base_where, *team_clauses])
         filtered_base_params = {**base_params, **team_params}
 
-        stats_query = text("""
+        # Internationals split by format rather than collapsing into one 'T20I' bucket, so the
+        # competition filter offers ODI and Test alongside T20I with their own counts.
+        stats_query = text(f"""
             SELECT
-                'T20I' AS competition,
+                {INTERNATIONAL_LABEL_SQL} AS competition,
                 'international' AS match_type,
                 COUNT(*) AS match_count,
                 MIN(m.date) AS earliest_date,
@@ -539,6 +572,7 @@ def get_recent_matches_discover_service(
             WHERE m.match_type = 'international'
               AND m.team1 = ANY(:international_teams)
               AND m.team2 = ANY(:international_teams)
+            GROUP BY 1
             UNION ALL
             SELECT
                 CASE
@@ -582,16 +616,19 @@ def get_recent_matches_discover_service(
                         m.winner,
                         m.outcome,
                         CASE
-                            WHEN m.match_type = 'international' THEN 'T20I'
+                            WHEN m.match_type = 'international' THEN
+                        {INTERNATIONAL_LABEL_SQL}
                             WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
                             ELSE m.competition
                         END AS competition_key,
                         CASE
-                            WHEN m.match_type = 'international' THEN 'T20I'
+                            WHEN m.match_type = 'international' THEN
+                        {INTERNATIONAL_LABEL_SQL}
                             WHEN m.competition = ANY(:ipl_competitions) THEN 'IPL'
                             ELSE m.competition
                         END AS competition,
                         m.match_type,
+                        m.format,
                         CASE WHEN m.match_type = 'international' THEN 1 ELSE 2 END AS priority
                     FROM matches m
                     WHERE {filtered_base_where}
@@ -623,7 +660,7 @@ def get_recent_matches_discover_service(
                 stat = competition_stats.get(key, {})
                 group = grouped.setdefault(key, {
                     "key": key,
-                    "label": _display_competition(None, is_t20i=key == "T20I") if key == "T20I" else leagues_mapping.get(key, key),
+                    "label": key if key in INTERNATIONAL_BUCKETS else leagues_mapping.get(key, key),
                     "match_type": row.match_type,
                     "total": stat.get("match_count", 0),
                     "latest_date": stat.get("latest_date"),
@@ -632,14 +669,14 @@ def get_recent_matches_discover_service(
                 })
                 group["matches"].append(_format_match(
                     row,
-                    is_t20i=key == "T20I",
+                    is_t20i=key in INTERNATIONAL_BUCKETS,
                     score_summary=score_summaries.get(row.id),
                 ))
 
             groups = sorted(
                 grouped.values(),
                 key=lambda group: (
-                    0 if group["key"] == "T20I" else 1,
+                    INTERNATIONAL_BUCKETS.index(group["key"]) if group["key"] in INTERNATIONAL_BUCKETS else len(INTERNATIONAL_BUCKETS),
                     -(competition_stats.get(group["key"], {}).get("match_count") or 0),
                     group["label"],
                 ),
@@ -658,16 +695,22 @@ def get_recent_matches_discover_service(
                 "total_matches": sum(stat["match_count"] for stat in competition_stats.values()),
             }
 
-        is_t20i = requested_competition.upper() == "T20I"
+        is_t20i = requested_competition.upper() in {b.upper() for b in INTERNATIONAL_BUCKETS}
         if is_t20i:
+            key = next(b for b in INTERNATIONAL_BUCKETS if b.upper() == requested_competition.upper())
+            label = key
+            # Restricted by format as well as match_type: without this, asking for ODI would
+            # return every international ever played, T20Is included.
             comp_clause = """
                 m.match_type = 'international'
+                AND UPPER(COALESCE(m.format, 'T20')) = :international_format
                 AND m.team1 = ANY(:international_teams)
                 AND m.team2 = ANY(:international_teams)
             """
-            params = {"international_teams": INTERNATIONAL_TEAMS_RANKED}
-            key = "T20I"
-            label = "T20I"
+            params = {
+                "international_teams": INTERNATIONAL_TEAMS_RANKED,
+                "international_format": {"T20I": "T20", "ODI": "ODI", "Test": "TEST"}[key],
+            }
         else:
             key = _canonical_competition_key(requested_competition)
             comp_clause = "m.match_type = 'league' AND m.competition = ANY(:competition_values)"
