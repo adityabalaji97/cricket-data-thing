@@ -694,14 +694,27 @@ def get_recent_matches_discover_service(
                     score_summary=score_summaries.get(row.id),
                 ))
 
-            groups = sorted(
-                grouped.values(),
-                key=lambda group: (
-                    INTERNATIONAL_BUCKETS.index(group["key"]) if group["key"] in INTERNATIONAL_BUCKETS else len(INTERNATIONAL_BUCKETS),
-                    -(competition_stats.get(group["key"], {}).get("match_count") or 0),
-                    group["label"],
-                ),
-            )
+            def _group_order(group):
+                """Most recently active competition first.
+
+                Ordering by a fixed bucket sequence (T20I, then ODI, then leagues) meant the
+                newest match was not necessarily the first card: splitting ODIs out of the
+                T20I bucket pushed a 31 Jul ODI behind a 26 Jul T20I. Matches are already
+                date-sorted within a group, so keying on each group's latest date makes the
+                first card the most recent overall, which is what "Recent Matches" promises.
+                """
+                matches = group.get("matches") or []
+                latest = matches[0].get("date") if matches else None
+                # dates arrive as ISO strings, which sort correctly lexicographically; the
+                # empty string keeps a group with no dated matches at the bottom.
+                # Not negated: reverse=True below already gives descending on both, so a
+                # negative here would flip the tie-break back to fewest-matches-first.
+                return (
+                    latest or "",
+                    competition_stats.get(group["key"], {}).get("match_count") or 0,
+                )
+
+            groups = sorted(grouped.values(), key=_group_order, reverse=True)
 
             return {
                 "mode": "grouped",
