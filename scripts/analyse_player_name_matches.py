@@ -66,6 +66,62 @@ def initials_match(players_lead, dd_lead):
     return players_lead.lower() == dd_lead.lower()
 
 
+def classify_names(conn, fmt="T20", gender="male"):
+    """Sort delivery_details names into exact / alias / initials / ambiguous / new.
+
+    Shared by this report and by the pipeline's player insertion, so what gets written is
+    always what the analysis described. Duplicating the matching in two places is how the
+    two would drift, and a drift here silently merges or duplicates players.
+    """
+    dd_names = [r[0] for r in conn.execute(text("""
+        SELECT DISTINCT bat FROM delivery_details
+        WHERE format = :fmt AND gender = :gender AND bat IS NOT NULL AND TRIM(bat) <> ''
+        UNION
+        SELECT DISTINCT bowl FROM delivery_details
+        WHERE format = :fmt AND gender = :gender AND bowl IS NOT NULL AND TRIM(bowl) <> ''
+    """), {"fmt": fmt, "gender": gender})]
+
+    players = [r[0] for r in conn.execute(text(
+        "SELECT name FROM players WHERE gender = :gender"), {"gender": gender})]
+
+    aliased = set()
+    for player_name, alias_name in conn.execute(text(
+            "SELECT player_name, alias_name FROM player_aliases "
+            "WHERE player_name IS NOT NULL AND alias_name IS NOT NULL")):
+        aliased.add(player_name)
+        aliased.add(alias_name)
+
+    player_names = set(players)
+    by_surname = defaultdict(list)
+    for name in players:
+        lead, surname = split_name(name)
+        by_surname[surname].append((name, lead))
+
+    buckets = defaultdict(list)
+    for dd_name in dd_names:
+        if dd_name in player_names:
+            buckets["exact"].append(dd_name)
+            continue
+        if dd_name in aliased:
+            buckets["alias"].append(dd_name)
+            continue
+        dd_lead, dd_surname = split_name(dd_name)
+        candidates = [
+            pname for pname, plead in by_surname.get(dd_surname, [])
+            if initials_match(plead, dd_lead)
+        ]
+        if len(candidates) == 1:
+            single_letter = looks_like_initials(candidates[0].split()[0]) and len(candidates[0].split()[0]) == 1
+            # A single initial on a shared surname is coincidence, not evidence: 'A Khan'
+            # could be Akram, Arslan, Ayaan or Aizaz, all of which exist separately.
+            buckets["initials_weak" if single_letter else "initials"].append((dd_name, candidates[0]))
+        elif len(candidates) > 1:
+            buckets["ambiguous"].append((dd_name, candidates))
+        else:
+            buckets["new"].append(dd_name)
+    return buckets
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--format", dest="fmt", default="T20", choices=["T20", "ODI", "TEST"])

@@ -148,46 +148,51 @@ def build_player_mapping(engine, fmt="T20", gender="male"):
 
 
 def insert_missing_players(engine, fmt="T20", gender="male", dry_run=False):
-    """Create players that appear in delivery_details but not in the players table.
+    """Create players that appear in delivery_details and match nothing in the players table.
 
     Nothing else does this. build_player_mapping joins the legacy `deliveries` table, which
-    holds only men's T20, so a player who appears solely in delivery_details -- every women's
-    T20 player, and every ODI-only player such as Andrew Strauss -- was never created. The
-    step then "updated" zero rows and reported success.
+    holds men's T20 only, so a player appearing solely in delivery_details -- every women's T20
+    player, and every ODI-only player such as Andrew Strauss -- was never created, and the step
+    reported success having updated nothing.
 
-    Inserted with the format's gender, which the UNIQUE(name, gender) constraint keeps distinct
-    from a male namesake.
+    Only the "new" bucket is inserted: names with no candidate in players at all. Everything
+    else is left alone on purpose.
+
+      - exact / alias      already resolvable, inserting would duplicate
+      - initials           a strong match (2+ initials or an exact first name); wants an alias
+                           row, not a new player
+      - initials_weak      a single initial on a shared surname -- 'Afaq Khan' -> 'A Khan' where
+                           Akram, Arslan, Ayaan and Aizaz Khan all exist separately. Coincidence
+                           of alphabet, not evidence.
+      - ambiguous          several candidates; picking one merges two careers invisibly
+
+    A naive name comparison called 3,389 men's T20 players missing; classification puts the
+    genuinely absent figure at 2,488. The difference is what would have been duplicated.
     """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from analyse_player_name_matches import classify_names
     from sqlalchemy import text as _text
 
-    select_missing = _text("""
-        WITH seen AS (
-            SELECT DISTINCT bat AS name FROM delivery_details
-            WHERE format = :fmt AND gender = :gender AND bat IS NOT NULL
-            UNION
-            SELECT DISTINCT bowl FROM delivery_details
-            WHERE format = :fmt AND gender = :gender AND bowl IS NOT NULL
-        )
-        SELECT s.name FROM seen s
-        LEFT JOIN players p ON p.name = s.name AND p.gender = :gender
-        WHERE p.id IS NULL AND TRIM(s.name) <> ''
-        ORDER BY s.name
-    """)
-
     with engine.begin() as conn:
-        missing = [r[0] for r in conn.execute(select_missing, {"fmt": fmt, "gender": gender})]
-        print(f"  Players in delivery_details missing from players ({fmt}/{gender}): {len(missing):,}")
+        buckets = classify_names(conn, fmt=fmt, gender=gender)
+        new_names = buckets.get("new", [])
+        held = {k: len(buckets.get(k, [])) for k in ("initials", "initials_weak", "ambiguous")}
+        print(f"  Genuinely absent from players ({fmt}/{gender}): {len(new_names):,}")
+        print(f"  Held back for review -- strong initials {held['initials']:,}, "
+              f"single-letter {held['initials_weak']:,}, ambiguous {held['ambiguous']:,}")
+
         if dry_run:
-            print(f"  [DRY RUN] Would insert {len(missing):,}")
+            print(f"  [DRY RUN] Would insert {len(new_names):,}")
             return 0
-        for name in missing:
+
+        for name in new_names:
             conn.execute(
                 _text("INSERT INTO players (name, gender) VALUES (:name, :gender) "
                       "ON CONFLICT (name, gender) DO NOTHING"),
                 {"name": name, "gender": gender},
             )
-    print(f"  \u2713 Inserted {len(missing):,} players")
-    return len(missing)
+    print(f"  Inserted {len(new_names):,} players")
+    return len(new_names)
 
 
 def update_players(engine, batters, bowlers, dry_run=False, gender="male"):
