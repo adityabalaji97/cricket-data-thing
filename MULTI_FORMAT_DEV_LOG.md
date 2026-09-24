@@ -9,15 +9,23 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-> ### START HERE (2026-09-24) — UI/UX track U1 on branch `u1-ui-bugfixes` (not yet deployed)
+> ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
-> A mobile-first UI/UX sweep found five live bugs; U1 fixes them on branch `u1-ui-bugfixes`
-> (uncommitted at time of writing — see the 2026-09-24 log entry). Plan of record for the wider
-> work (cost trim, query-builder MCP, T20 Primer metrics, dark-theme/mobile U2–U4) lives in
-> `~/.claude/plans/can-you-look-at-iterative-plum.md`; order is U1+Phase 0 → U2 → MCP → U3 →
-> Primer metrics → U4. **Not yet done:** Heroku Postgres essential-2 → essential-1 downgrade and
-> `DB_POOL_SIZE=4 / DB_MAX_OVERFLOW=2` config — the downgrade **changes DATABASE_URL**, so the
-> GitHub secret and local `.env` must be updated in the same step.
+> **U1 (five UI bugs) is deployed**: commit ab453ab on main; Heroku v411/v412, Vercel `hindsight`
+> Ready. **Phase 0 done**: Heroku Postgres is now **essential-1** ($9/mo, 10 GB, 20 connections;
+> 3.73 GB used after the copy dropped bloat). The plan change moved the database, so
+> **DATABASE_URL changed** — Heroku config, the GitHub secret and local `.env` all point at the
+> new host (`c1rqglkbf2a14o…`). Pool is `DB_POOL_SIZE=4 / DB_MAX_OVERFLOW=2` (12 of 20
+> connections). Backup `b004` taken before the change. Row counts verified identical.
+>
+> Plan of record for the wider work lives in `~/.claude/plans/can-you-look-at-iterative-plum.md`:
+> U1+Phase 0 (done) → U2 global dark theme + mobile bottom nav → query-builder MCP → U3 →
+> T20 Primer metrics → U4. **UI checks:** `node scripts/dev/ui_sweep.mjs <out>` (CDP phone
+> emulation; see its header for why plain headless screenshots are wrong at 390px).
+>
+> **Known, not fixed:** `/rankings/player/{name}?snapshots=6` still exceeds 30s for long windows
+> (Player page Global T20 Rank section). Golden check has 5 pre-existing diffs (see 2026-09-24
+> entry) — re-capture goldens once confirmed intended.
 >
 > ### Previous state (2026-08-01)
 >
@@ -181,10 +189,17 @@ right-edge clipping on every page at 390px; use CDP `Emulation.setDeviceMetricsO
 (mobile sweep script to be promoted to `scripts/dev/ui_sweep.mjs`). Essential-tier plan changes
 move the DB and rewrite DATABASE_URL.
 
-**Next:** commit + deploy (Heroku API, Vercel frontend); Phase 0 downgrade + pool config +
-update GH secret `DATABASE_URL` and local `.env`; after the next nightly run confirm
-`total_deliveries` + `total_deliveries:ODI:male` keys exist. Then U2 (global dark theme + mobile
-bottom nav).
+**Deployed + Phase 0 (same day):** merged to main (ab453ab), `git push heroku main` (v411),
+Vercel `hindsight` production Ready. `pg:backups:capture` → b004 (5.15 GB → 349 MB). `heroku
+addons:upgrade … heroku-postgresql:essential-1` (~20 min read-only; DATABASE_URL rewritten to a
+new host). Row counts identical for matches, batting_stats, bowling_stats, players, nl_query_log,
+delivery_details (4,164,765), deliveries (1,835,431); pg_trgm and guess_innings_pool present.
+`DB_POOL_SIZE=4 DB_MAX_OVERFLOW=2` (v412). GH secret `DATABASE_URL` and local `.env` updated.
+Post-deploy phone sweep of home/player/venue_full/iplpred on the live site: one 503 left
+(`/rankings/player/V Kohli?snapshots=6`, a slow query), down from bursts of five.
+
+**Next:** after tonight's run confirm keys `total_deliveries` + `total_deliveries:ODI:male` exist
+and the nightly job succeeds on the new secret. Then U2 (global dark theme + mobile bottom nav).
 
 ### 2026-08-01 — Chunks A6, A7, A8 — Claude — match preview redesign complete
 
