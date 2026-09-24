@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hindsight query result</title>
+<!--
+  MCP Apps view for the query_cricket_data tool (served as ui://hindsight/query-result).
+  Self-contained on purpose: hosts sandbox this iframe with a CSP that blocks external scripts
+  and network by default, so charts are drawn as inline SVG rather than with a charting library.
+  Protocol: ui/initialize -> ui/notifications/initialized, then render each
+  ui/notifications/tool-result (structuredContent built by mcp_server/server.py).
+-->
+<style>
+  :root {
+    --bg: #0a0c11; --surface: #101319; --surface2: #14171e; --border: rgba(255,255,255,0.08);
+    --hi: #f3f4f6; --med: #c3c8d0; --lo: #9aa1ac; --accent: #b6f24a; --accent-ink: #0a0c11;
+    --grid: rgba(255,255,255,0.07);
+    --series: #b6f24a, #5b8def, #f0b429, #c99cf0, #e5484d, #22c55e;
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff; --surface: #f7f8fa; --surface2: #eef0f3; --border: rgba(0,0,0,0.08);
+    --hi: #111827; --med: #374151; --lo: #6b7280; --accent: #4d7c0f; --accent-ink: #ffffff;
+    --grid: rgba(0,0,0,0.07);
+    --series: #4d7c0f, #2563eb, #b45309, #7c3aed, #dc2626, #15803d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--hi);
+    font: 14px/1.4 "Barlow", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wrap { padding: 14px 16px 16px; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .kicker { font: 600 10px/1 ui-monospace, "IBM Plex Mono", monospace; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+  h1 { font-size: 16px; margin: 0; font-weight: 700; }
+  .sub { color: var(--lo); font-size: 12px; margin-top: 3px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
+  .chip { font-size: 11px; color: var(--med); background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 2px 8px; }
+  button.open { flex-shrink: 0; border: 0; border-radius: 10px; padding: 8px 12px; min-height: 36px;
+    background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 12px; cursor: pointer; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+  .tab { border: 1px solid var(--border); background: transparent; color: var(--lo); border-radius: 8px;
+    padding: 5px 10px; font-size: 12px; cursor: pointer; min-height: 30px; }
+  .tab[aria-selected="true"] { color: var(--accent-ink); background: var(--accent); border-color: transparent; font-weight: 700; }
+  select { background: var(--surface2); color: var(--hi); border: 1px solid var(--border); border-radius: 8px;
+    padding: 4px 6px; font-size: 12px; min-height: 30px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .tablewrap { overflow-x: auto; max-height: 420px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; text-align: right; }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); }
+  th { position: sticky; top: 0; background: var(--surface2); color: var(--lo); font: 600 10.5px ui-monospace, monospace;
+    letter-spacing: .06em; text-transform: uppercase; z-index: 1; }
+  th:first-child { z-index: 2; background: var(--surface2); }
+  svg text { fill: var(--lo); font-size: 11px; }
+  .note { color: var(--lo); font-size: 11.5px; margin-top: 8px; }
+  .empty { padding: 28px; text-align: center; color: var(--lo); }
+  .err { padding: 16px; color: #e5484d; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="empty">Running query…</div></div>
+<script>
+(function () {
+  "use strict";
+  var pending = {};
+  var nextId = 1;
+  var state = { result: null, view: null, metric: null };
+
+  function send(msg) { window.parent.postMessage(msg, "*"); }
+  function request(method, params) {
+    var id = nextId++;
+    send({ jsonrpc: "2.0", id: id, method: method, params: params || {} });
+    return new Promise(function (resolve) { pending[id] = resolve; });
+  }
+  function notify(method, params) { send({ jsonrpc: "2.0", method: method, params: params || {} }); }
+
+  function applyHostContext(ctx) {
+    if (!ctx) return;
+    if (ctx.theme === "light" || ctx.theme === "dark") document.documentElement.dataset.theme = ctx.theme;
+  }
+
+  window.addEventListener("message", function (event) {
+    var msg = event.data;
+    if (!msg || msg.jsonrpc !== "2.0") return;
+    if (msg.id != null && pending[msg.id]) { pending[msg.id](msg.result || msg.error); delete pending[msg.id]; return; }
+    if (msg.method === "ui/notifications/tool-result") { onResult(msg.params); }
+    else if (msg.method === "ui/notifications/host-context-changed") { applyHostContext(msg.params); }
+    else if (msg.method === "ui/notifications/tool-cancelled") { show('<div class="empty">Query cancelled.</div>'); }
+  });
+
+  // Report the content's own height. documentElement.scrollHeight is never smaller than the
+  // iframe viewport, so it would only ever let the host grow the frame, never shrink it.
+  function reportSize() {
+    var rect = document.body.getBoundingClientRect();
+    notify("ui/notifications/size-changed", {
+      width: Math.ceil(rect.width),
+      height: Math.ceil(rect.height)
+    });
+  }
+  if (window.ResizeObserver) new ResizeObserver(reportSize).observe(document.body);
+  // Redraw charts at the new width when the host resizes the frame (rotation, fullscreen).
+  var lastWidth = 0, resizeTimer = null;
+  window.addEventListener("resize", function () {
+    if (!state.result || Math.abs(window.innerWidth - lastWidth) < 8) return;
+    lastWidth = window.innerWidth;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(render, 120);
+  });
+
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  // Label columns (year, over, match_id...) print as-is; only measures get separators, so a year
+  // reads 2016 rather than 2,016.
+  function fmt(v, isLabel) {
+    if (typeof v === "number") {
+      if (isLabel) return String(v);
+      return Number.isInteger(v) ? v.toLocaleString() : v.toFixed(2);
+    }
+    return v == null ? "–" : v;
+  }
+  function show(html) { document.getElementById("app").innerHTML = html; reportSize(); }
+
+  function onResult(res) {
+    if (res && res.isError) {
+      var t = (res.content || []).map(function (c) { return c.text || ""; }).join("\n");
+      show('<div class="err">' + esc(t || "The query failed.") + "</div>");
+      return;
+    }
+    var sc = res && (res.structuredContent || res.structured_content);
+    if (!sc || !sc.rows) { show('<div class="empty">No structured result to display.</div>'); return; }
+    state.result = sc;
+    state.view = sc.chart && sc.chart.type && sc.chart.type !== "table" ? "chart" : "table";
+    state.metric = (sc.chart && sc.chart.metric) || (sc.metric_columns || [])[0] || null;
+    render();
+  }
+
+  function seriesColors() {
+    return getComputedStyle(document.documentElement).getPropertyValue("--series").split(",").map(function (s) { return s.trim(); });
+  }
+
+  // Charts are drawn at the container's real pixel width (not a fixed viewBox scaled down), so
+  // axis text stays 11px on a phone instead of shrinking to ~7px.
+  function chartWidth() {
+    var el = document.getElementById("app");
+    return Math.max(300, Math.min(900, (el ? el.clientWidth : 640) - 20));
+  }
+
+  function barChart(rows, labelKey, metric) {
+    var w = chartWidth(), rowH = 24, padL = Math.min(150, Math.round(w * 0.36)), padR = 52;
+    var h = rows.length * rowH + 10;
+    var max = Math.max.apply(null, rows.map(function (r) { return Math.abs(+r[metric] || 0); })) || 1;
+    var accent = seriesColors()[0];
+    var bars = rows.map(function (r, i) {
+      var v = +r[metric] || 0, bw = Math.max(1, (w - padL - padR) * Math.abs(v) / max), y = 5 + i * rowH;
+      return '<text x="' + (padL - 8) + '" y="' + (y + 14) + '" text-anchor="end">' + esc(String(r[labelKey]).slice(0, 22)) + '</text>' +
+        '<rect x="' + padL + '" y="' + (y + 3) + '" width="' + bw + '" height="' + (rowH - 8) + '" rx="3" fill="' + accent + '"></rect>' +
+        '<text x="' + (padL + bw + 6) + '" y="' + (y + 14) + '">' + esc(fmt(v)) + '</text>';
+    }).join("");
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" role="img" aria-label="' + esc(metric) + ' by ' + esc(labelKey) + '">' + bars + '</svg>';
+  }
+
+  function lineChart(rows, labelKey, metric) {
+    var w = chartWidth(), h = w < 500 ? 200 : 240, pl = 44, pr = 16, pt = 12, pb = 30;
+    var pts = rows.map(function (r) { return { x: r[labelKey], y: +r[metric] || 0 }; });
+    var ys = pts.map(function (p) { return p.y; });
+    var min = Math.min.apply(null, ys), max = Math.max.apply(null, ys);
+    if (min === max) { min -= 1; max += 1; }
+    var sx = function (i) { return pl + (w - pl - pr) * (pts.length === 1 ? 0.5 : i / (pts.length - 1)); };
+    var sy = function (v) { return pt + (h - pt - pb) * (1 - (v - min) / (max - min)); };
+    var accent = seriesColors()[0];
+    var grid = [0, 0.5, 1].map(function (f) {
+      var v = min + (max - min) * f, y = sy(v);
+      return '<line x1="' + pl + '" x2="' + (w - pr) + '" y1="' + y + '" y2="' + y + '" stroke="var(--grid)"></line>' +
+        '<text x="' + (pl - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + esc(fmt(v)) + '</text>';
+    }).join("");
+    var path = pts.map(function (p, i) { return (i ? "L" : "M") + sx(i) + " " + sy(p.y); }).join(" ");
+    var step = Math.ceil(pts.length / Math.max(3, Math.floor(w / 70)));
+    var labels = pts.map(function (p, i) {
+      return i % step ? "" : '<text x="' + sx(i) + '" y="' + (h - 8) + '" text-anchor="middle">' + esc(p.x) + '</text>';
+    }).join("");
+    var dots = pts.map(function (p, i) { return '<circle cx="' + sx(i) + '" cy="' + sy(p.y) + '" r="3" fill="' + accent + '"><title>' + esc(p.x) + ": " + esc(fmt(p.y)) + '</title></circle>'; }).join("");
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" role="img" aria-label="' + esc(metric) + ' over ' + esc(labelKey) + '">' +
+      grid + '<path d="' + path + '" fill="none" stroke="' + accent + '" stroke-width="2"></path>' + dots + labels + '</svg>';
+  }
+
+  function scatterChart(rows, labelKey, xKey, yKey) {
+    var w = chartWidth(), h = w < 500 ? 260 : 300, pl = 48, pr = 16, pt = 12, pb = 34;
+    var pts = rows.filter(function (r) { return r[xKey] != null && r[yKey] != null; });
+    if (!pts.length) return '<div class="empty">Not enough data for a scatter plot.</div>';
+    var xs = pts.map(function (r) { return +r[xKey]; }), ys = pts.map(function (r) { return +r[yKey]; });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    if (x0 === x1) { x0 -= 1; x1 += 1; } if (y0 === y1) { y0 -= 1; y1 += 1; }
+    var sx = function (v) { return pl + (w - pl - pr) * (v - x0) / (x1 - x0); };
+    var sy = function (v) { return pt + (h - pt - pb) * (1 - (v - y0) / (y1 - y0)); };
+    var accent = seriesColors()[1];
+    var dots = pts.map(function (r) {
+      return '<circle cx="' + sx(+r[xKey]) + '" cy="' + sy(+r[yKey]) + '" r="4" fill="' + accent + '" fill-opacity=".85"><title>' +
+        esc(r[labelKey]) + " — " + esc(xKey) + " " + esc(fmt(+r[xKey])) + ", " + esc(yKey) + " " + esc(fmt(+r[yKey])) + '</title></circle>' +
+        (pts.length <= 20 ? '<text x="' + (sx(+r[xKey]) + 6) + '" y="' + (sy(+r[yKey]) + 4) + '">' + esc(String(r[labelKey]).slice(0, 16)) + '</text>' : "");
+    }).join("");
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" role="img" aria-label="' + esc(yKey) + ' vs ' + esc(xKey) + '">' +
+      '<line x1="' + pl + '" x2="' + (w - pr) + '" y1="' + (h - pb) + '" y2="' + (h - pb) + '" stroke="var(--grid)"></line>' +
+      '<line x1="' + pl + '" x2="' + pl + '" y1="' + pt + '" y2="' + (h - pb) + '" stroke="var(--grid)"></line>' +
+      '<text x="' + ((w + pl) / 2) + '" y="' + (h - 6) + '" text-anchor="middle">' + esc(xKey) + '</text>' +
+      '<text x="12" y="' + ((h - pb) / 2) + '" transform="rotate(-90 12 ' + ((h - pb) / 2) + ')" text-anchor="middle">' + esc(yKey) + '</text>' +
+      dots + '</svg>';
+  }
+
+  function tableHtml(sc) {
+    var cols = sc.columns;
+    var labels = {};
+    (sc.group_by || []).forEach(function (g) { labels[g] = true; });
+    var head = cols.map(function (c) { return "<th>" + esc(c.replace(/_/g, " ")) + "</th>"; }).join("");
+    var body = sc.rows.map(function (r) {
+      return "<tr>" + cols.map(function (c) { return "<td>" + esc(fmt(r[c], labels[c])) + "</td>"; }).join("") + "</tr>";
+    }).join("");
+    return '<div class="tablewrap"><table><thead><tr>' + head + "</tr></thead><tbody>" + body + "</tbody></table></div>";
+  }
+
+  function chartHtml(sc) {
+    var chart = sc.chart || {};
+    var label = chart.label_key || (sc.group_by || [])[0];
+    if (!label || !sc.rows.length) return '<div class="empty">Nothing to chart — see the table.</div>';
+    if (chart.type === "scatter" && chart.x && chart.y) return scatterChart(sc.rows, label, chart.x, chart.y);
+    if (!state.metric) return '<div class="empty">No numeric column to chart.</div>';
+    if (chart.type === "line") return lineChart(sc.rows, label, state.metric);
+    return barChart(sc.rows.slice(0, 40), label, state.metric);
+  }
+
+  function render() {
+    var sc = state.result;
+    var chips = (sc.filter_chips || []).map(function (c) { return '<span class="chip">' + esc(c) + "</span>"; }).join("");
+    var canChart = sc.chart && sc.chart.type && sc.chart.type !== "table" && (sc.group_by || []).length;
+    var tabs = canChart
+      ? '<div class="tabs"><button class="tab" data-view="chart" aria-selected="' + (state.view === "chart") + '">Chart</button>' +
+        '<button class="tab" data-view="table" aria-selected="' + (state.view === "table") + '">Table</button>' +
+        (state.view === "chart" && sc.chart.type !== "scatter" && (sc.metric_columns || []).length > 1
+          ? '<select id="metric" aria-label="Metric">' + sc.metric_columns.map(function (m) {
+              return '<option value="' + esc(m) + '"' + (m === state.metric ? " selected" : "") + ">" + esc(m.replace(/_/g, " ")) + "</option>";
+            }).join("") + "</select>"
+          : "") + "</div>"
+      : "";
+    var body = sc.rows.length
+      ? (state.view === "chart" && canChart ? '<div style="padding:10px 8px 4px">' + chartHtml(sc) + "</div>" : tableHtml(sc))
+      : '<div class="empty">No rows match these filters.</div>';
+    show(
+      '<div class="head"><div><div class="kicker">Hindsight · query builder</div>' +
+      "<h1>" + esc(sc.title || "Query result") + "</h1>" +
+      '<div class="sub">' + esc(sc.subtitle || "") + "</div></div>" +
+      (sc.hindsight_url ? '<button class="open" id="open">Open in Hindsight ↗</button>' : "") + "</div>" +
+      '<div class="chips">' + chips + "</div>" + tabs + '<div class="panel">' + body + "</div>" +
+      (sc.note ? '<div class="note">' + esc(sc.note) + "</div>" : "")
+    );
+    var open = document.getElementById("open");
+    if (open) open.onclick = function () { request("ui/open-link", { url: sc.hindsight_url }); };
+    Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (b) {
+      b.onclick = function () { state.view = b.getAttribute("data-view"); render(); };
+    });
+    var sel = document.getElementById("metric");
+    if (sel) sel.onchange = function () { state.metric = sel.value; render(); };
+  }
+
+  request("ui/initialize", {
+    protocolVersion: "2026-01-26",
+    clientInfo: { name: "hindsight-query-result", version: "1.0.0" },
+    appCapabilities: {}
+  }).then(function (result) {
+    if (result && result.hostContext) applyHostContext(result.hostContext);
+    notify("ui/notifications/initialized", {});
+  });
+})();
+</script>
+</body>
+</html>

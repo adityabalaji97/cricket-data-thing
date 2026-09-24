@@ -3657,3 +3657,157 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
     except Exception as e:
         logger.error(f"Error generating summary data: {str(e)}")
         return None, None
+
+
+# ---------------------------------------------------------------------------------------------
+# Keyword entry point shared by the HTTP route (routers/query_builder_v2.py) and the MCP
+# connector (mcp_server/). query_deliveries_service takes every filter positionally with no
+# defaults; this wrapper supplies the same defaults as the route's Query() declarations and
+# owns the per-format bounds check, so the two callers cannot drift apart.
+# ---------------------------------------------------------------------------------------------
+
+
+#: Columns the query builder can group by. Advertised by /query/deliveries/columns and used as
+#: the MCP tool's enum, so both stay in step with what the service supports.
+GROUP_BY_COLUMNS = (
+    "venue", "country", "match_id", "competition", "year",
+    "batting_team", "bowling_team",
+    "batter", "bowler", "non_striker", "partnership", "batting_position",
+    "innings", "phase",
+    "over", "ball_in_over", "ball", "ball_in_spell",
+    "match_outcome", "chase_outcome", "toss_decision",
+    "bat_hand", "striker_batter_type",
+    "bowl_style", "bowl_kind", "crease_combo",
+    "line", "length", "shot", "control", "wagon_zone", "dismissal",
+    "format",
+)
+
+
+class QueryValidationError(ValueError):
+    """A request the query builder rejects as invalid (the route maps this to HTTP 422)."""
+
+
+def validate_format_bounds(
+    fmt: str,
+    gender: str,
+    over_min: Optional[int],
+    over_max: Optional[int],
+    innings: Optional[int],
+) -> None:
+    """
+    Reject over/innings values outside the requested format. A 40th over is a normal ODI filter
+    and a nonsense T20 one, so the limits cannot be static. 'ALL' spans formats, so the widest
+    (Test) bounds apply.
+    """
+    from format_config import effective_over_max, get_format
+
+    spec = get_format("TEST" if fmt == "ALL" else fmt, gender)
+    over_cap = effective_over_max(spec)
+    for name, value in (("over_min", over_min), ("over_max", over_max)):
+        if value is not None and value > over_cap:
+            raise QueryValidationError(
+                f"{name}={value} is out of range for {spec.label}: valid overs are 0-{over_cap}."
+            )
+    if innings is not None and not (1 <= innings <= spec.innings_count):
+        raise QueryValidationError(
+            f"innings={innings} is invalid for {spec.label}: valid innings are 1-{spec.innings_count}."
+        )
+
+
+def run_deliveries_query(
+    db,
+    *,
+    venue: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    leagues: Optional[List[str]] = None,
+    teams: Optional[List[str]] = None,
+    batting_teams: Optional[List[str]] = None,
+    bowling_teams: Optional[List[str]] = None,
+    players: Optional[List[str]] = None,
+    batters: Optional[List[str]] = None,
+    bowlers: Optional[List[str]] = None,
+    bat_hand: Optional[str] = None,
+    bowl_style: Optional[List[str]] = None,
+    bowl_kind: Optional[List[str]] = None,
+    crease_combo: Optional[List[str]] = None,
+    line: Optional[List[str]] = None,
+    length: Optional[List[str]] = None,
+    shot: Optional[List[str]] = None,
+    control: Optional[int] = None,
+    wagon_zone: Optional[List[int]] = None,
+    dismissal: Optional[List[str]] = None,
+    innings: Optional[int] = None,
+    over_min: Optional[int] = None,
+    over_max: Optional[int] = None,
+    match_outcome: Optional[List[str]] = None,
+    is_chase: Optional[bool] = None,
+    chase_outcome: Optional[List[str]] = None,
+    toss_decision: Optional[List[str]] = None,
+    day_or_night: Optional[str] = None,
+    group_by: Optional[List[str]] = None,
+    show_summary_rows: bool = False,
+    ball_aggregation: str = "snapshot",
+    min_balls: Optional[int] = None,
+    max_balls: Optional[int] = None,
+    min_runs: Optional[int] = None,
+    max_runs: Optional[int] = None,
+    min_wickets: Optional[int] = None,
+    max_wickets: Optional[int] = None,
+    limit: int = 1000,
+    offset: int = 0,
+    include_international: bool = False,
+    top_teams: Optional[int] = None,
+    query_mode: str = "delivery",
+    fmt: str = "ALL",
+    gender: str = "male",
+) -> Dict[str, Any]:
+    """Validate and run a query-builder request. Raises QueryValidationError on bad bounds."""
+    validate_format_bounds(fmt, gender, over_min, over_max, innings)
+    return query_deliveries_service(
+        venue=venue,
+        start_date=start_date,
+        end_date=end_date,
+        leagues=leagues or [],
+        teams=teams or [],
+        batting_teams=batting_teams or [],
+        bowling_teams=bowling_teams or [],
+        players=players or [],
+        batters=batters or [],
+        bowlers=bowlers or [],
+        bat_hand=bat_hand,
+        bowl_style=bowl_style or [],
+        bowl_kind=bowl_kind or [],
+        crease_combo=crease_combo or [],
+        line=line or [],
+        length=length or [],
+        shot=shot or [],
+        control=control,
+        wagon_zone=wagon_zone or [],
+        dismissal=dismissal or [],
+        innings=innings,
+        over_min=over_min,
+        over_max=over_max,
+        match_outcome=match_outcome or [],
+        is_chase=is_chase,
+        chase_outcome=chase_outcome or [],
+        toss_decision=toss_decision or [],
+        group_by=group_by or [],
+        show_summary_rows=show_summary_rows,
+        min_balls=min_balls,
+        max_balls=max_balls,
+        min_runs=min_runs,
+        max_runs=max_runs,
+        min_wickets=min_wickets,
+        max_wickets=max_wickets,
+        limit=limit,
+        offset=offset,
+        include_international=include_international,
+        top_teams=top_teams,
+        query_mode=query_mode,
+        db=db,
+        ball_aggregation=ball_aggregation,
+        day_or_night=day_or_night,
+        fmt=fmt,
+        gender=gender,
+    )

@@ -10,8 +10,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Literal
 from datetime import date
 from database import get_session
-from format_config import effective_over_max, get_format
-from services.query_builder_v2 import query_deliveries_service
+from services.query_builder_v2 import GROUP_BY_COLUMNS, QueryValidationError, run_deliveries_query
 try:
     from venue_standardization import VENUE_STANDARDIZATION
 except Exception:  # pragma: no cover - defensive fallback
@@ -223,26 +222,8 @@ def query_deliveries(
         if not bat_hand and striker_batter_type:
             bat_hand = striker_batter_type
 
-        # Validate over and innings bounds against the requested format. A 40th over is a normal
-        # ODI filter and a nonsense T20 one, so the limits cannot live on the Query() declarations.
-        # 'ALL' spans formats, so per-format bounds do not apply; use the widest.
-        spec = get_format("TEST" if format == "ALL" else format, gender)
-        over_cap = effective_over_max(spec)
-        for name, value in (("over_min", over_min), ("over_max", over_max)):
-            if value is not None and value > over_cap:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"{name}={value} is out of range for {spec.label}: "
-                           f"valid overs are 0-{over_cap}.",
-                )
-        if innings is not None and not (1 <= innings <= spec.innings_count):
-            raise HTTPException(
-                status_code=422,
-                detail=f"innings={innings} is invalid for {spec.label}: "
-                       f"valid innings are 1-{spec.innings_count}.",
-            )
-
-        result = query_deliveries_service(
+        result = run_deliveries_query(
+            db,
             venue=venue,
             start_date=start_date,
             end_date=end_date,
@@ -270,8 +251,10 @@ def query_deliveries(
             is_chase=is_chase,
             chase_outcome=chase_outcome,
             toss_decision=toss_decision,
+            day_or_night=day_or_night,
             group_by=group_by,
             show_summary_rows=show_summary_rows,
+            ball_aggregation=ball_aggregation,
             min_balls=min_balls,
             max_balls=max_balls,
             min_runs=min_runs,
@@ -283,13 +266,12 @@ def query_deliveries(
             include_international=include_international,
             top_teams=top_teams,
             query_mode=query_mode,
-            db=db,
-            ball_aggregation=ball_aggregation,
-            day_or_night=day_or_night,
             fmt=format,
             gender=gender,
         )
         return result
+    except QueryValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
@@ -414,17 +396,7 @@ def get_available_columns(
                 "grouped_filters": ["min_balls", "max_balls", "min_runs", "max_runs", "min_wickets", "max_wickets"]
             },
             
-            "group_by_columns": [
-                "venue", "country", "match_id", "competition", "year",
-                "batting_team", "bowling_team",
-                "batter", "bowler", "non_striker", "partnership", "batting_position",
-                "innings", "phase",
-                "over", "ball_in_over", "ball", "ball_in_spell",
-                "match_outcome", "chase_outcome", "toss_decision",
-                "bat_hand", "striker_batter_type",
-                "bowl_style", "bowl_kind", "crease_combo",
-                "line", "length", "shot", "control", "wagon_zone", "dismissal"
-            ],
+            "group_by_columns": list(GROUP_BY_COLUMNS),
 
             "query_mode_options": ["delivery", "batting_stats", "bowling_stats"],
             "match_outcome_options": ["win", "loss", "tie", "no_result"],

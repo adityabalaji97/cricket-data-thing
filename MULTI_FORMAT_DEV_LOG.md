@@ -20,7 +20,8 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 >
 > **U2 (global dark theme + mobile bottom nav) + first U3 pass is live** (2a3a18e on main,
 > Vercel `hindsight` production Ready; live phone sweep clean). User validating on device.
-> Next: Phase 1 (query-builder MCP), then remaining U3 literals and U4.
+> **Phase 1 (MCP connector)** built on branch `phase1-mcp` — see its entry and
+> `docs/mcp-connector.md`. Next: remaining U3 literals and U4, then Primer metrics.
 >
 > Plan of record for the wider work lives in `~/.claude/plans/can-you-look-at-iterative-plum.md`:
 > U1+Phase 0 (done) → U2 global dark theme + mobile bottom nav → query-builder MCP → U3 →
@@ -143,6 +144,42 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-09-24 — Phase 1: Hindsight MCP connector (query builder for Claude/ChatGPT) — Claude
+
+**Done** (branch `phase1-mcp`; see `docs/mcp-connector.md`):
+* `mcp_server/server.py`: MCP Python SDK 2.2 `MCPServer` + `Apps` extension. Tools
+  `find_entities` (players/teams/venues via services/search.py + competitions incl. aliases),
+  `get_query_options` (enum values from /query/deliveries/columns), `query_cricket_data`
+  (filters, group_by, sort_by, chart hints; returns a markdown table for the model,
+  structuredContent for the view, and a /query deep link). All read-only.
+* `mcp_server/widget.html`: MCP Apps view `ui://hindsight/query-result` — self-contained
+  table/bar/line/scatter (inline SVG, no CDN), host light/dark theme, size-changed reporting.
+* Mounted at exactly `/mcp` (SDK route added to FastAPI's router), stateless + JSON responses
+  (main.py's BaseHTTPMiddleware breaks SSE). `main.py` now uses a `lifespan` (replaces the
+  deprecated `on_event("startup")`) that also runs the MCP session manager.
+* Guardrails: READ ONLY transaction + `statement_timeout` per call, 500-row cap, global
+  60 calls/min budget, generic user-facing errors (details logged), `mcp_call` JSON log lines.
+* `services/query_builder_v2.py`: `run_deliveries_query()` keyword entry point +
+  `validate_format_bounds()` / `QueryValidationError` (route maps to 422, unchanged) +
+  `GROUP_BY_COLUMNS` (route + tool share it; **adds `format`** to the advertised group-by list).
+* `requirements.txt`: `mcp==2.2.0`; numerical/ML stack pinned to production's pip freeze
+  (pandas 2.3.3, numpy 1.26.4, scipy 1.15.3, statsmodels 0.15.0, scikit-learn 1.7.2,
+  xgboost 3.2.0, joblib 1.6.0). The nightly GH Action (Python 3.11) was silently getting
+  pandas 3 / sklearn 1.9 from the unbounded requirements; it now matches production.
+
+**Verified:** JSON-RPC tests (initialize, tools/list, resources/read, tools/call x9) against a
+local server on the prod DB (read-only). A/B golden check vs the live API: 11/13 identical;
+`qb_columns` differs only by `+format`; `match_preview` top_ranked_players differ **identically
+on unmodified main** in the same local env (macOS x86 numerics in the rankings mixed model) —
+environmental, not this change. Widget rendered in a test host at 390px and 720px, dark + light.
+
+**Decisions / surprises:** Postgres.app blocks new local binaries behind a GUI permission
+prompt, so local MCP tests ran against prod with READ ONLY sessions. Rate limit is global, not
+per-IP (hosts call from shared IPs).
+
+**Next:** deploy + add the connector in Claude and ChatGPT; OAuth before wider sharing;
+Primer metrics become query-builder columns (and so connector columns).
 
 ### 2026-09-24 — Track U2 (+ first U3 pass): one dark theme, mobile bottom nav — Claude
 

@@ -72,8 +72,21 @@ from utils.league_utils import expand_league_abbreviations
 logging.basicConfig(filename='venue_stats.log', level=logging.INFO)
 
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from contextlib import asynccontextmanager
+from mcp_server.server import mount_mcp
 
-app = FastAPI(title="Cricket Stats API")
+@asynccontextmanager
+async def lifespan(_app):
+    # Replaces the deprecated @app.on_event("startup"). FastAPI ignores on_event handlers once a
+    # lifespan is set, and the MCP connector needs one: its session manager must be running for
+    # /mcp requests, and a mounted app's own lifespan never runs.
+    initialize_database()
+    async with mcp_session_manager.run():
+        logging.info("Application startup complete")
+        yield
+
+
+app = FastAPI(title="Cricket Stats API", lifespan=lifespan)
 app.include_router(matchups_router)
 #app.include_router(query_builder_router)
 app.include_router(query_builder_router_v2)
@@ -98,6 +111,9 @@ app.include_router(analytics_router)
 app.include_router(nl2query_router)
 app.include_router(ml_predictions_router)
 app.include_router(query_summarizer_router)
+
+# MCP connector for Claude / ChatGPT: POST /mcp (see mcp_server/server.py).
+mcp_session_manager = mount_mcp(app)
 
 # Add CORS middleware
 app.add_middleware(
@@ -145,10 +161,6 @@ async def db_error_middleware(request, call_next):
             content={"detail": error_detail}
         )
 
-@app.on_event("startup")
-def startup():
-    initialize_database()
-    logging.info("Application startup complete")
 
 
 
