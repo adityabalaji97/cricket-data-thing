@@ -9,15 +9,11 @@ import {
   Tabs,
   Tab,
   IconButton,
-  Menu,
-  MenuItem,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
-import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import VenueNotes from './components/VenueNotes';
 import PreviewFilters from './components/preview/PreviewFilters';
@@ -39,15 +35,14 @@ import PlayerJourneysGame from './components/games/PlayerJourneysGame';
 import CreditsPage from './components/CreditsPage';
 import FantasyPlanner from './components/FantasyPlanner';
 import MatchScorecardPage from './components/scorecard/MatchScorecardPage';
-import { qbColors, qbFonts } from './components/queryBuilderTheme';
+import MobileBottomNav, { MobileNavSpacer } from './components/nav/MobileBottomNav';
+import { colors as hsColors, fonts as hsFonts } from './theme/hindsightDark';
 import axios from 'axios';
 
 import config from './config';
 import { DEFAULT_START_DATE, TODAY } from './utils/dateDefaults';
 import { NAV_ITEMS, getCurrentTabForPath, getPageTitleForPath } from './navItems';
 import { useFormat } from './context/FormatContext';
-import { ThemeProvider } from '@mui/material/styles';
-import previewDark from './theme/previewDark';
 
 const TEAM_NAME_TO_ABBREVIATION = {
   'chennai super kings': 'CSK',
@@ -128,6 +123,8 @@ const AppContent = () => {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  // Phone + small tablet: compact header and bottom nav. The 15-tab strip does not fit below md.
+  const isCompactNav = useMediaQuery(theme.breakpoints.down('md'));
   // Pinned, not the raw selection: a venue preview is one format's record at a ground,
   // and the venue endpoints reject 'ALL'.
   const { supportsT20OnlyPages, pinnedFormatParams } = useFormat();
@@ -160,8 +157,6 @@ const AppContent = () => {
   });
   const [statsData, setStatsData] = useState(null);
   const [currentTab, setCurrentTab] = useState(0);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const open = Boolean(anchorEl);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [dayNightFilter, setDayNightFilter] = useState('all');
@@ -170,13 +165,7 @@ const AppContent = () => {
   const dateManuallyAdjustedRef = useRef(false);
   const isQueryRoute = location.pathname === '/query';
 
-  const handleMenuClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
 
   // Handle header search selection
   const handleHeaderSearchSelect = (item) => {
@@ -190,11 +179,6 @@ const AppContent = () => {
     }
   };
 
-  const handleNavigate = (path) => {
-    handleMenuClose();
-    navigate(path);
-    setCurrentTab(getCurrentTabForPath(path));
-  };
 
   useEffect(() => {
     setCurrentTab(getCurrentTabForPath(location.pathname));
@@ -513,8 +497,20 @@ const AppContent = () => {
     return getPageTitleForPath(location.pathname);
   };
 
+  const showBottomNav = isCompactNav && !location.pathname.startsWith('/wrapped');
+
   if (location.pathname === '/') {
-    return <LandingPage />;
+    return (
+      <>
+        <LandingPage />
+        {showBottomNav && (
+          <>
+            <MobileNavSpacer />
+            <MobileBottomNav />
+          </>
+        )}
+      </>
+    );
   }
 
   return (
@@ -522,21 +518,26 @@ const AppContent = () => {
       maxWidth={isQueryRoute ? false : "xl"}
       sx={{
         px: { xs: isQueryRoute ? 0 : 1, sm: isQueryRoute ? 0 : 2, md: isQueryRoute ? 0 : 3 },
-        bgcolor: isQueryRoute ? qbColors.bg : 'transparent',
         minHeight: isQueryRoute ? '100vh' : 'auto',
       }}
     >
-      <Box sx={{ 
-        borderBottom: 1, 
-        borderColor: isQueryRoute ? qbColors.border : 'divider',
-        mb: isQueryRoute ? 0 : 3,
+      {/* Wrapped is a full-screen story with its own chrome. */}
+      {!location.pathname.startsWith('/wrapped') && (
+      <Box sx={{
+        borderBottom: 1,
+        borderColor: 'divider',
+        mb: isQueryRoute ? 0 : { xs: 1.5, md: 3 },
         px: isQueryRoute ? { xs: 1.5, md: 3 } : 0,
-        bgcolor: isQueryRoute ? qbColors.bg : 'transparent',
+        bgcolor: 'background.default',
         display: 'flex',
         alignItems: 'center',
         flexDirection: 'row',
         flexWrap: 'nowrap',
-        position: 'relative'
+        // Sticky on phones so search and the page title stay in reach while scrolling.
+        position: isCompactNav ? 'sticky' : 'relative',
+        top: 0,
+        zIndex: (t) => t.zIndex.appBar,
+        minHeight: isCompactNav ? 52 : undefined,
       }}>
         {/* Expandable Search Bar Overlay */}
         {searchExpanded && (
@@ -547,7 +548,7 @@ const AppContent = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              bgcolor: isQueryRoute ? qbColors.surface1 : 'background.paper',
+              bgcolor: 'background.paper',
               zIndex: 1200,
               display: 'flex',
               alignItems: 'center',
@@ -556,131 +557,70 @@ const AppContent = () => {
             }}
           >
             <Box sx={{ flexGrow: 1 }}>
-              <SearchBar 
+              <SearchBar
                 onSelect={handleHeaderSearchSelect}
                 onFallback={(term) => {
                   setSearchExpanded(false);
                   navigate(`/query?nl=${encodeURIComponent(term)}`);
                 }}
                 placeholder="Search players, teams, venues..."
-                variant={isQueryRoute ? 'dark' : 'light'}
+                variant="dark"
               />
             </Box>
-            <IconButton 
+            <IconButton
               onClick={() => setSearchExpanded(false)}
               size="small"
-              sx={{ color: isQueryRoute ? qbColors.textLo : undefined }}
+              aria-label="close search"
+              sx={{ color: 'text.secondary' }}
             >
               <CloseIcon />
             </IconButton>
           </Box>
         )}
-        
-        {isMobile ? (
+
+        {isCompactNav ? (
           <>
-            <IconButton
-              aria-label="menu"
-              aria-controls="navigation-menu"
-              aria-haspopup="true"
-              onClick={handleMenuClick}
-              size="large"
-              sx={{ color: isQueryRoute ? qbColors.textMed : undefined }}
+            <Box
+              component={Link}
+              to="/"
+              aria-label="Hindsight home"
+              sx={{ display: 'flex', alignItems: 'center', p: 1, ml: 0.5 }}
             >
-              <MenuIcon />
-            </IconButton>
-            <Menu
-              id="navigation-menu"
-              anchorEl={anchorEl}
-              open={open}
-              onClose={handleMenuClose}
-            >
-              {NAV_ITEMS.map((item) => (
-                <MenuItem
-                  key={item.path}
-                  onClick={() => handleNavigate(item.path)}
-                  disabled={item.t20Only && !supportsT20OnlyPages}
-                >
-                  {item.label}
-                  {item.t20Only && !supportsT20OnlyPages && (
-                    <Typography component="span" variant="caption" sx={{ ml: 1 }}>
-                      Men's T20 only
-                    </Typography>
-                  )}
-                </MenuItem>
-              ))}
-            </Menu>
-            {location.pathname === '/' ? (
-              <Box
-                component={Link}
-                to="/"
-                sx={{
-                  ml: 1,
-                  flexGrow: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.75,
-                  textDecoration: 'none',
-                  color: 'primary.main',
-                  minWidth: 0
-                }}
-              >
-                <SportsCricketIcon sx={{ fontSize: 24, transform: 'rotate(-35deg)' }} />
-                <Typography
-                  variant="h6"
-                  fontWeight={800}
-                  sx={{
-                    whiteSpace: 'nowrap',
-                    background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent'
-                  }}
-                >
-                  Hindsight
-                </Typography>
-              </Box>
-            ) : (
-              <Typography variant="h6" sx={{ ml: 1, flexGrow: 1, whiteSpace: 'nowrap', color: isQueryRoute ? qbColors.textHi : undefined, fontFamily: isQueryRoute ? qbFonts.display : undefined }}>
-                {getPageTitle()}
-              </Typography>
-            )}
-            <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <IconButton
-                onClick={() => setSearchExpanded(true)}
-                size="small"
-                sx={{ color: isQueryRoute ? qbColors.textMed : undefined }}
-                aria-label="search"
-              >
-                <SearchIcon />
-              </IconButton>
+              <Box component="img" src="/cricket-icon.svg" alt="" sx={{ width: 26, height: 26 }} />
             </Box>
+            <Typography
+              component="h1"
+              sx={{
+                ml: 0.5,
+                flexGrow: 1,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                fontFamily: hsFonts.display,
+                fontWeight: 700,
+                fontSize: 18,
+                color: hsColors.textHi,
+              }}
+            >
+              {getPageTitle()}
+            </Typography>
+            <IconButton
+              onClick={() => setSearchExpanded(true)}
+              aria-label="search"
+              sx={{ color: 'text.secondary', width: 44, height: 44, mr: 0.5 }}
+            >
+              <SearchIcon />
+            </IconButton>
           </>
         ) : (
           <>
-            <Tabs 
-              value={currentTab} 
+            <Tabs
+              value={currentTab}
               onChange={handleTabChange}
               variant="scrollable"
               scrollButtons="auto"
               allowScrollButtonsMobile
-              sx={{
-                flexGrow: 1,
-                minHeight: 60,
-                '& .MuiTabs-indicator': {
-                  bgcolor: isQueryRoute ? qbColors.accent : undefined,
-                },
-                '& .MuiTab-root': {
-                  color: isQueryRoute ? qbColors.textLo : undefined,
-                  fontFamily: isQueryRoute ? qbFonts.display : undefined,
-                  fontWeight: isQueryRoute ? 700 : undefined,
-                },
-                '& .MuiTab-root.Mui-selected': {
-                  color: isQueryRoute ? qbColors.accent : undefined,
-                },
-                '& .MuiTabs-scrollButtons': {
-                  color: isQueryRoute ? qbColors.textLo : undefined,
-                },
-              }}
+              sx={{ flexGrow: 1, minHeight: 60 }}
             >
               {NAV_ITEMS.map((item) => (
                 <Tab
@@ -696,7 +636,7 @@ const AppContent = () => {
               <IconButton
                 onClick={() => setSearchExpanded(true)}
                 size="small"
-                sx={{ color: isQueryRoute ? qbColors.textMed : undefined }}
+                sx={{ color: 'text.secondary' }}
                 aria-label="search"
               >
                 <SearchIcon />
@@ -705,6 +645,7 @@ const AppContent = () => {
           </>
         )}
       </Box>
+      )}
 
       <Routes>
         <Route path="/" element={<LandingPage />} />
@@ -726,10 +667,6 @@ const AppContent = () => {
         <Route path="/fantasy-planner" element={<FantasyPlanner isMobile={isMobile} />} />
         <Route path="/scorecard/:matchId" element={<MatchScorecardPage />} />
         <Route path="/venue" element={
-          // Scoped dark theme: restyles the dozen preview child components at once rather
-          // than editing ~370 sx blocks by hand. The rest of the app stays on the default
-          // theme until each page is migrated deliberately.
-          <ThemeProvider theme={previewDark}>
           <Box sx={{ my: { xs: 1.5, md: 3 }, bgcolor: 'background.default', color: 'text.primary' }}>
             <PreviewFilters
               error={error}
@@ -781,7 +718,6 @@ const AppContent = () => {
               </>
             )}
           </Box>
-          </ThemeProvider>
         } />
       </Routes>
       {!location.pathname.startsWith('/wrapped') && (
@@ -810,6 +746,12 @@ const AppContent = () => {
             Credits & Acknowledgements
           </Typography>
         </Box>
+      )}
+      {showBottomNav && (
+        <>
+          <MobileNavSpacer />
+          <MobileBottomNav />
+        </>
       )}
     </Container>
   );

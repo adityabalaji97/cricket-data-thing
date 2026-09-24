@@ -24,7 +24,7 @@ const ExploreLink = ({ label, to, onClick }) => {
         color: 'primary.main',
         '&:hover': {
           bgcolor: 'primary.light',
-          color: 'primary.contrastText'
+          color: 'primary.main'
         }
       }}
     />

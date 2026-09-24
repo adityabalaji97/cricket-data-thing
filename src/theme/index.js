@@ -1,7 +1,8 @@
-import { createTheme } from '@mui/material/styles';
-import designSystem, { muiTheme, typography } from './designSystem';
+import hindsightTheme from './hindsightTheme';
+import designSystem, { typography } from './designSystem';
 
-const theme = createTheme(muiTheme);
+// The single app-wide theme (dark). See hindsightTheme.js for why there is only one.
+const theme = hindsightTheme;
 
 theme.typography.h3 = {
   ...theme.typography.h3,

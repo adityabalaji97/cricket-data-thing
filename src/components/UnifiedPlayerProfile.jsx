@@ -26,6 +26,7 @@ import BoundaryAnalysis from './BoundaryAnalysis';
 import LazySection from './ui/LazySection';
 import usePlayerData from '../hooks/usePlayerData';
 import config from '../config';
+import { SECTION_SCROLL_MARGIN } from '../theme/layout';
 
 const DEFAULT_START_DATE = "2020-01-01";
 const TODAY = new Date().toISOString().split('T')[0];
@@ -77,7 +78,7 @@ const GlobalT20RankSection = ({ mode, rankPayload, loading }) => {
             height: 30,
             borderRadius: '50%',
             bgcolor: 'primary.main',
-            color: 'white',
+            color: 'primary.contrastText',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -660,7 +661,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
                     key={section.id}
                     ref={(el) => { sectionRefs.current[section.id] = el; }}
                     data-section-id={section.id}
-                    sx={{ scrollMarginTop: '56px' }}
+                    sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN }}
                   >
                     <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, px: 0.5 }}>
                       {section.label}

@@ -12,7 +12,8 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-import { getTeamColor } from '../utils/teamColors';
+import { getTeamColor, readableOnDark } from '../utils/teamColors';
+import { colors as hsColors } from '../theme/hindsightDark';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
@@ -101,8 +102,9 @@ const MatchCompactRow = ({ match, indexPrefix, isMobile }) => {
     const team2Name = getTeam2Name(match);
     const team1Won = teamWonMatch(match, 'team1');
     const team2Won = teamWonMatch(match, 'team2');
-    const team1Color = team1Won ? (getTeamColor(team1Name) || '#1d4ed8') : '#0f172a';
-    const team2Color = team2Won ? (getTeamColor(team2Name) || '#1d4ed8') : '#0f172a';
+    // Loser was near-black (#0f172a), invisible on the dark surface; muted text instead.
+    const team1Color = team1Won ? readableOnDark(getTeamColor(team1Name) || hsColors.blue) : hsColors.textLo;
+    const team2Color = team2Won ? readableOnDark(getTeamColor(team2Name) || hsColors.blue) : hsColors.textLo;
 
     return (
         <Box
@@ -150,8 +152,8 @@ const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
     const draws = stats?.draws || 0;
     const total = team1Wins + team2Wins + draws;
     const recentH2H = stats?.recent_matches || [];
-    const team1Color = getTeamColor(team1) || '#1d4ed8';
-    const team2Color = getTeamColor(team2) || '#7c3aed';
+    const team1Color = readableOnDark(getTeamColor(team1) || hsColors.blue);
+    const team2Color = readableOnDark(getTeamColor(team2) || hsColors.purple);
 
     const percentages = {
         team1: total > 0 ? (team1Wins * 100.0) / total : 0,
@@ -177,10 +179,10 @@ const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
                     </Typography>
                 </Box>
                 <Box>
-                    <Typography sx={{ color: '#475569', fontWeight: 800, fontSize: isMobile ? '1.35rem' : '1.55rem' }}>
+                    <Typography sx={{ color: hsColors.textLo, fontWeight: 800, fontSize: isMobile ? '1.35rem' : '1.55rem' }}>
                         {draws}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700 }}>
+                    <Typography variant="caption" sx={{ color: hsColors.textLo, fontWeight: 700 }}>
                         NR
                     </Typography>
                     <Typography variant="caption" display="block" color="text.secondary">
@@ -200,7 +202,7 @@ const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
                 </Box>
             </Box>
             <Box sx={{ mt: 1.2 }}>
-                <Box sx={{ display: 'flex', width: '100%', height: 16, borderRadius: 999, overflow: 'hidden', bgcolor: '#e2e8f0' }}>
+                <Box sx={{ display: 'flex', width: '100%', height: 16, borderRadius: 999, overflow: 'hidden', bgcolor: hsColors.surface3 }}>
                     {total > 0 ? (
                         <>
                             {team1Wins > 0 && <Box sx={{ flex: `${team1Wins} 1 0`, bgcolor: team1Color }} />}
@@ -208,7 +210,7 @@ const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
                             {team2Wins > 0 && <Box sx={{ flex: `${team2Wins} 1 0`, bgcolor: team2Color }} />}
                         </>
                     ) : (
-                        <Box sx={{ flex: 1, bgcolor: '#cbd5e1' }} />
+                        <Box sx={{ flex: 1, bgcolor: hsColors.surface3 }} />
                     )}
                 </Box>
             </Box>

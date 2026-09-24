@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Box, Chip } from '@mui/material';
+import { STICKY_BELOW_HEADER } from '../theme/layout';
 
 const VenueSectionTabs = ({ sections, activeSectionId, onSectionSelect }) => {
   const chipRefs = useRef([]);
@@ -18,9 +19,10 @@ const VenueSectionTabs = ({ sections, activeSectionId, onSectionSelect }) => {
   return (
     <Box sx={{
       position: 'sticky',
-      top: 0,
-      zIndex: 1100,
-      bgcolor: 'rgba(255,255,255,0.95)',
+      top: STICKY_BELOW_HEADER,
+      // Just under the app header (appBar 1100) so the header stays on top when both stick.
+      zIndex: 1090,
+      bgcolor: 'rgba(10,12,17,0.92)',
       backdropFilter: 'blur(8px)',
       borderBottom: '1px solid',
       borderColor: 'divider',

@@ -47,6 +47,7 @@ import {
   DEFAULT_MIN_BALLS,
   MIN_BALLS_OPTIONS
 } from './pitchMapConstants';
+import { colors as hsColors } from '../../theme/hindsightDark';
 
 const PitchMapContainer = ({
   data,
@@ -207,7 +208,8 @@ const PitchMapContainer = ({
     
     try {
       const canvas = await html2canvas(containerRef.current, {
-        backgroundColor: '#ffffff',
+        // Export on the page colour so the saved image matches what is on screen.
+        backgroundColor: hsColors.bg,
         scale: 2,
         logging: false
       });
@@ -290,7 +292,7 @@ const PitchMapContainer = ({
       
       {/* Settings Panel */}
       <Collapse in={showSettings}>
-        <Box sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1, mb: 2 }}>
+        <Box sx={{ bgcolor: 'action.hover', p: 2, borderRadius: 1, mb: 2 }}>
           {/* Color Metric Selector */}
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
@@ -391,7 +393,7 @@ const PitchMapContainer = ({
       <Box 
         ref={containerRef} 
         sx={{ 
-          bgcolor: '#fff', 
+          bgcolor: 'background.paper', 
           p: 1,
           maxWidth: 420,
           mx: 'auto'

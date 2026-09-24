@@ -18,6 +18,9 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > new host (`c1rqglkbf2a14o…`). Pool is `DB_POOL_SIZE=4 / DB_MAX_OVERFLOW=2` (12 of 20
 > connections). Backup `b004` taken before the change. Row counts verified identical.
 >
+> **U2 (global dark theme + mobile bottom nav) + first U3 pass** is on branch
+> `u2-dark-theme-mobile-nav` — see its log entry; not yet merged/deployed.
+>
 > Plan of record for the wider work lives in `~/.claude/plans/can-you-look-at-iterative-plum.md`:
 > U1+Phase 0 (done) → U2 global dark theme + mobile bottom nav → query-builder MCP → U3 →
 > T20 Primer metrics → U4. **UI checks:** `node scripts/dev/ui_sweep.mjs <out>` (CDP phone
@@ -139,6 +142,48 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-09-24 — Track U2 (+ first U3 pass): one dark theme, mobile bottom nav — Claude
+
+**Done** (branch `u2-dark-theme-mobile-nav`):
+* **One theme.** `src/theme/hindsightTheme.js` (palette/overrides from the former scoped
+  `previewDark`, type scale/shape from designSystem) is the global MUI theme via
+  `src/theme/index.js`. `previewDark.js` deleted, the `/venue` ThemeProvider removed, and every
+  `isQueryRoute ? qbColors…` branch in the App.js nav dropped. CssBaseline + `src/index.css` set
+  `color-scheme: dark` and the page colour on html/body (no white first paint, no light iOS
+  overscroll, dark native date pickers); `index.html` theme-color + `manifest.json` dark.
+* **designSystem.colors remapped to dark equivalents** (neutral 0-100 surfaces, 200-300
+  hairlines, 400-950 text; primary = lime accent scale; semantic 50/100 tints, 600-900 readable
+  hues). ~40 components index these directly in sx; remapping flipped them without per-site edits.
+  Added the missing success/warning/error 100 and 900 keys.
+* **Mobile nav.** Below md: sticky compact header (logo, page title, search) +
+  `src/components/nav/MobileBottomNav.jsx` (Home · Search · Preview · Query · More; More is a
+  grouped bottom sheet: Explore / Compare / Play + Wrapped, Credits). Grouping lives in
+  `navItems.js` (`group`, `PRIMARY_NAV_PATHS`, `MORE_NAV_GROUPS`). Old hamburger popover removed.
+  Home shows the bottom nav too and hides its own Explore button below md. Header hidden on
+  /wrapped (full-screen story). Query builder's own "Hindsight / Query Builder + Explore" row
+  removed (duplicate of the app header at every width).
+* **Sticky offsets** in `src/theme/layout.js`: VenueSectionTabs sit under the 52px header
+  (`STICKY_BELOW_HEADER`), sections use `SECTION_SCROLL_MARGIN`.
+* **Charts.** `src/theme/chartTheme.js`: registered ECharts theme `hindsight` (passed in
+  VenueNotes + VenueSimilarity); Recharts axes/grid/legend/tooltip restyled globally in index.css.
+* **U3 literal pass:** tooltips, grey.50 fills, white gradients (VenueNotesCardShell — the Team
+  header card; RecentMatchesSummaryCard), primary-fill + white text → contrastText,
+  `primary.light` is now a soft tint (icon circles), Search page rebrand + SearchBar defaults to
+  dark, MatchHistory loser text (was #0f172a) + `readableOnDark()` in utils/teamColors.js for
+  team-coloured text, VenueSimilarity heat cells, PitchMap export background, ZoomableChart.
+* **Guard:** `scripts/check_theme_literals.sh [base]` fails on light backgrounds / near-black
+  text in lines added vs base (`// theme-literal-ok` to allow one).
+
+**Verified:** `npm run build` (pre-existing warnings only); literal check clean vs main;
+`scripts/dev/ui_sweep.mjs` against local dev: all 20 routes body `rgb(10,12,17)`, no overflow,
+no light islands in first screens; desktop 1440 sweep of home/search/query/preview/player/
+rankings consistent; More sheet opened via CDP (grouped, active item highlighted).
+
+**Known / next (U4):** Top Innings and team phase tables overflow/overlap on phones (need a
+ScrollTable); "Filters & Grouping" title wraps on phones; filter forms still take the first
+screen (bottom-sheet editor); Rankings still ~33k px on mobile; ~140 older literals remain in
+less-visited components (wrapped/cards, EloRacerChart, FantasyPlanner) — dark-safe but not audited.
 
 ### 2026-09-24 — Track U1 (UI bug fixes) — Claude
 

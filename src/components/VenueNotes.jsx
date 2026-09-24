@@ -35,6 +35,7 @@ import {
     ReferenceArea,
 } from 'recharts';
 import ReactECharts from 'echarts-for-react';
+import { ECHARTS_THEME } from '../theme/chartTheme';
 import MatchHistory from './MatchHistory';
 import Matchups from './Matchups';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
@@ -48,6 +49,7 @@ import VenueNotesDesktopNav from './VenueNotesDesktopNav';
 import BoundaryAnalysis from './BoundaryAnalysis';
 import ForesightCard from './ForesightCard';
 import EmptyState from './ui/EmptyState';
+import { SECTION_SCROLL_MARGIN } from '../theme/layout';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -803,6 +805,7 @@ const ScoresBarChart = ({ data }) => {
             </Typography>
             <Box sx={{ height: isMobile ? 214 : 272 }}>
                 <ReactECharts
+                    theme={ECHARTS_THEME}
                     option={chartOption}
                     notMerge
                     lazyUpdate
@@ -896,8 +899,8 @@ const PhaseWiseStrategy = ({ data, isMobile }) => {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 fontSize: isMobile ? '0.65rem' : '0.75rem',
-                                color: '#666',
-                                borderRight: index < phaseData.length - 1 ? '1px solid #ddd' : 'none'
+                                color: 'text.secondary',
+                                borderRight: index < phaseData.length - 1 ? `1px solid ${hsColors.border}` : 'none'
                             }}
                         >
                             {`${phase.start}-${phase.end}`}
@@ -1476,7 +1479,7 @@ return (
                             key={section.id}
                             ref={(el) => { sectionRefs.current[section.id] = el; }}
                             data-section-id={section.id}
-                            sx={{ scrollMarginTop: '56px' }}
+                            sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN }}
                         >
                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, px: 0.5 }}>
                                 {section.label}

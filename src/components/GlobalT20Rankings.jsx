@@ -21,6 +21,7 @@ import {
 
 import config from '../config';
 import VenueSectionTabs from './VenueSectionTabs';
+import { SECTION_SCROLL_MARGIN } from '../theme/layout';
 
 const SECTIONS = [
   { id: 'controls', label: 'Controls' },
@@ -121,7 +122,7 @@ const RankingCard = ({
               height: 28,
               borderRadius: '50%',
               bgcolor: 'primary.main',
-              color: 'white',
+              color: 'primary.contrastText',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -454,7 +455,7 @@ const GlobalT20Rankings = () => {
       <Box
         ref={(el) => { sectionRefs.current.controls = el; }}
         data-section-id="controls"
-        sx={{ scrollMarginTop: '56px', px: { xs: 2, sm: 2.5 }, pt: 2.5 }}
+        sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN, px: { xs: 2, sm: 2.5 }, pt: 2.5 }}
       >
         <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>Global T20 Rankings</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -554,7 +555,7 @@ const GlobalT20Rankings = () => {
       <Box
         ref={(el) => { sectionRefs.current.batting = el; }}
         data-section-id="batting"
-        sx={{ scrollMarginTop: '56px', px: { xs: 2, sm: 2.5 }, pt: 3 }}
+        sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN, px: { xs: 2, sm: 2.5 }, pt: 3 }}
       >
         <Typography variant="h6" sx={{ fontWeight: 700 }}>Batting Rankings</Typography>
         {renderSectionMeta(battingPayload)}
@@ -590,7 +591,7 @@ const GlobalT20Rankings = () => {
       <Box
         ref={(el) => { sectionRefs.current.bowling = el; }}
         data-section-id="bowling"
-        sx={{ scrollMarginTop: '56px', px: { xs: 2, sm: 2.5 }, pt: 3 }}
+        sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN, px: { xs: 2, sm: 2.5 }, pt: 3 }}
       >
         <Typography variant="h6" sx={{ fontWeight: 700 }}>Bowling Rankings</Typography>
         {renderSectionMeta(bowlingPayload)}

@@ -24,6 +24,7 @@ import {
 
 import config from '../config';
 import VenueSectionTabs from './VenueSectionTabs';
+import { SECTION_SCROLL_MARGIN } from '../theme/layout';
 
 const TEAM_COLORS = ['#1976d2', '#ef6c00', '#2e7d32'];
 
@@ -264,7 +265,7 @@ const IPLPredictions = () => {
       <Box
         ref={setSectionRef('controls')}
         data-section="controls"
-        sx={{ scrollMarginTop: '56px', px: { xs: 2, sm: 2.5 }, pt: 2.5 }}
+        sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN, px: { xs: 2, sm: 2.5 }, pt: 2.5 }}
       >
         <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
           IPL Championship Predictions
@@ -409,7 +410,7 @@ const IPLPredictions = () => {
       <Box
         ref={setSectionRef('leaderboard')}
         data-section="leaderboard"
-        sx={{ scrollMarginTop: '56px', px: { xs: 2, sm: 2.5 }, pt: 3 }}
+        sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN, px: { xs: 2, sm: 2.5 }, pt: 3 }}
       >
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
           Leaderboard
@@ -437,7 +438,7 @@ const IPLPredictions = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                     <Box sx={{
                       width: 28, height: 28, borderRadius: '50%',
-                      bgcolor: 'primary.main', color: 'white',
+                      bgcolor: 'primary.main', color: 'primary.contrastText',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '0.75rem', fontWeight: 700, flexShrink: 0,
                     }}>
@@ -547,7 +548,7 @@ const IPLPredictions = () => {
       <Box
         ref={setSectionRef('radar')}
         data-section="radar"
-        sx={{ scrollMarginTop: '56px', px: { xs: 2, sm: 2.5 }, pt: 3, pb: 2 }}
+        sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN, px: { xs: 2, sm: 2.5 }, pt: 3, pb: 2 }}
       >
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
           Top 3 Radar

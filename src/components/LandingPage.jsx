@@ -285,7 +285,7 @@ const LandingDropdown = ({ id, label, value, options, onChange, openDropdown, se
   );
 };
 
-const TopBar = ({ navOpen, setNavOpen, isMobile }) => {
+const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -337,6 +337,9 @@ const TopBar = ({ navOpen, setNavOpen, isMobile }) => {
             <SearchIcon sx={{ fontSize: 20 }} />
           </IconButton>
         )}
+        {/* Below md the app's bottom nav ("More") is the menu, so the Explore button would
+            be a second one. On desktop Home has no tab strip, so it stays. */}
+        {!hideExplore && (
         <Button
           type="button"
           onClick={() => setNavOpen(!navOpen)}
@@ -360,6 +363,7 @@ const TopBar = ({ navOpen, setNavOpen, isMobile }) => {
         >
           {isMobile ? '' : 'Explore'}
         </Button>
+        )}
       </Box>
       {isMobile && searchOpen && <Box sx={{ mt: 1.3 }}>{searchField}</Box>}
     </Box>
@@ -1159,6 +1163,7 @@ const LandingPage = ({ showLeagueCounts = true }) => {
   // three different mobile thresholds across the hero pages made behaviour inconsistent.
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isCompactNav = useMediaQuery(theme.breakpoints.down('md'));
   // Pinned: /landing/featured-innings 500s on format=ALL (verified), because it resolves a
   // FormatSpec to pick strike-rate bands. The landing showcase is single-format by nature.
   const { pinnedFormatParams: formatParams } = useFormat();
@@ -1258,7 +1263,7 @@ const LandingPage = ({ showLeagueCounts = true }) => {
     >
       {openDropdown && <Box onClick={() => setOpenDropdown(null)} sx={{ position: 'fixed', inset: 0, zIndex: 35 }} />}
       <Box sx={{ maxWidth: 1220, mx: 'auto' }}>
-        <TopBar navOpen={navOpen} setNavOpen={setNavOpen} isMobile={isMobile} />
+        <TopBar navOpen={navOpen} setNavOpen={setNavOpen} isMobile={isMobile} hideExplore={isCompactNav} />
         <TodaySection matches={fixtures} loading={fixturesLoading} isMobile={isMobile} />
         <RecentMatchesSection
           data={recentData}

@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ReactECharts from 'echarts-for-react';
+import { ECHARTS_THEME } from '../theme/chartTheme';
 import config from '../config';
 import EmptyState from './ui/EmptyState';
 
@@ -156,7 +157,7 @@ const getDivergingCellColors = (value, maxAbs, forceNeutral = false) => {
   if (forceNeutral || value === null || value === undefined) {
     return {
       backgroundColor: 'rgba(148, 163, 184, 0.12)',
-      color: '#475569',
+      color: '#c3c8d0',
       borderColor: 'rgba(148, 163, 184, 0.25)',
     };
   }
@@ -168,20 +169,20 @@ const getDivergingCellColors = (value, maxAbs, forceNeutral = false) => {
   if (value > 0) {
     return {
       backgroundColor: `rgba(22, 163, 74, ${alpha})`,
-      color: '#14532d',
+      color: '#86efac',
       borderColor: 'rgba(22, 163, 74, 0.38)',
     };
   }
   if (value < 0) {
     return {
       backgroundColor: `rgba(220, 38, 38, ${alpha})`,
-      color: '#7f1d1d',
+      color: '#fca5a5',
       borderColor: 'rgba(220, 38, 38, 0.35)',
     };
   }
   return {
     backgroundColor: 'rgba(148, 163, 184, 0.16)',
-    color: '#475569',
+    color: '#c3c8d0',
     borderColor: 'rgba(148, 163, 184, 0.28)',
   };
 };
@@ -437,7 +438,7 @@ const buildZoneRadarOption = (targetZoneProfile, similarZoneProfile, zoneMetric 
         max: maxValue,
       })),
       axisName: {
-        color: '#374151',
+        color: '#9aa1ac',
       },
     },
     series: [
@@ -849,7 +850,7 @@ const SimilarityInsightsView = ({
           </IconButton>
         </Box>
         <Box sx={{ width: '100%', height: isMobile ? 340 : 380 }}>
-          <ReactECharts option={radarOption} style={{ height: '100%', width: '100%' }} />
+          <ReactECharts option={radarOption} theme={ECHARTS_THEME} style={{ height: '100%', width: '100%' }} />
         </Box>
       </Card>
 
@@ -876,7 +877,7 @@ const SimilarityInsightsView = ({
 
         <Box sx={{ mt: 0.6, border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: '84px repeat(3, minmax(70px, 1fr))' }}>
-            <Box sx={{ borderRight: '1px solid', borderColor: 'divider', bgcolor: 'grey.50' }} />
+            <Box sx={{ borderRight: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }} />
             {EDGE_LINE_GROUPS.map((line) => (
               <Box
                 key={`pitch-head-${line.key}`}
@@ -885,7 +886,7 @@ const SimilarityInsightsView = ({
                   textAlign: 'center',
                   borderRight: line.key === 'LEG' ? 'none' : '1px solid',
                   borderColor: 'divider',
-                  bgcolor: 'grey.50',
+                  bgcolor: 'action.hover',
                 }}
               >
                 <Typography variant="caption" sx={{ fontWeight: 700 }}>{line.label}</Typography>
@@ -903,7 +904,7 @@ const SimilarityInsightsView = ({
                     borderTop: '1px solid',
                     borderRight: '1px solid',
                     borderColor: 'divider',
-                    bgcolor: 'grey.50',
+                    bgcolor: 'action.hover',
                   }}
                 >
                   <Typography variant="caption" sx={{ fontWeight: 700 }}>{length.label}</Typography>
@@ -1026,7 +1027,7 @@ const SimilarityInsightsView = ({
 
         <Box sx={{ mt: 1.1, border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: '84px repeat(3, minmax(70px, 1fr))' }}>
-            <Box sx={{ borderRight: '1px solid', borderColor: 'divider', bgcolor: 'grey.50' }} />
+            <Box sx={{ borderRight: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }} />
             {EDGE_LINE_GROUPS.map((line) => (
               <Box
                 key={`edge-head-${line.key}`}
@@ -1035,7 +1036,7 @@ const SimilarityInsightsView = ({
                   textAlign: 'center',
                   borderRight: line.key === 'LEG' ? 'none' : '1px solid',
                   borderColor: 'divider',
-                  bgcolor: 'grey.50',
+                  bgcolor: 'action.hover',
                 }}
               >
                 <Typography variant="caption" sx={{ fontWeight: 700 }}>{line.label}</Typography>
@@ -1053,7 +1054,7 @@ const SimilarityInsightsView = ({
                     borderTop: '1px solid',
                     borderRight: '1px solid',
                     borderColor: 'divider',
-                    bgcolor: 'grey.50',
+                    bgcolor: 'action.hover',
                   }}
                 >
                   <Typography variant="caption" sx={{ fontWeight: 700 }}>{length.label}</Typography>

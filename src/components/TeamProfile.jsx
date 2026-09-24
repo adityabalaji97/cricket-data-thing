@@ -33,6 +33,7 @@ import RecentFormStrip from './playerProfile/RecentFormStrip';
 import config from '../config';
 import { DEFAULT_START_DATE, TODAY } from '../utils/dateDefaults';
 import { fetchAnalyticsJson } from '../utils/analyticsApi';
+import { SECTION_SCROLL_MARGIN } from '../theme/layout';
 
 const OVERVIEW_SECTION_ID = 'overview';
 
@@ -779,7 +780,7 @@ const TeamProfile = ({ isMobile }) => {
                         sectionRefs.current[section.id] = element;
                       }}
                       data-section-id={section.id}
-                      sx={{ scrollMarginTop: '56px' }}
+                      sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN }}
                     >
                       <VenueNotesCardShell
                         groupLabel="Team Profile"

@@ -33,10 +33,10 @@ const ZoomableChart = ({
                 top: 8,
                 right: 8,
                 zIndex: 2,
-                bgcolor: 'rgba(255, 255, 255, 0.92)',
+                bgcolor: 'rgba(20, 23, 30, 0.92)',
                 border: '1px solid',
                 borderColor: 'divider',
-                '&:hover': { bgcolor: 'rgba(255, 255, 255, 1)' },
+                '&:hover': { bgcolor: 'rgba(22, 26, 34, 1)' },
               }}
             >
               <ZoomOutMapIcon fontSize={isMobile ? 'small' : 'medium'} />

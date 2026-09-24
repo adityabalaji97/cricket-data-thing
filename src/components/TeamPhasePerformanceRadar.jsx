@@ -102,10 +102,10 @@ const CustomTooltip = ({ active, payload, label }) => {
     const data = payload[0].payload;
     return (
       <Box sx={{ 
-        backgroundColor: 'white', 
+        backgroundColor: 'background.paper', 
         p: 1, 
         border: 1, 
-        borderColor: 'grey.300',
+        borderColor: 'divider',
         borderRadius: 1,
         boxShadow: 2
       }}>

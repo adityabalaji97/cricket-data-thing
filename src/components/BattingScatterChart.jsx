@@ -72,7 +72,7 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
             const boundaryPercent = data[`${phasePrefix}boundary_percent`];
 
             return (
-                <Box sx={{ bgcolor: 'white', p: isMobile ? 1 : 2, border: '1px solid #ccc', borderRadius: 1 }}>
+                <Box sx={{ bgcolor: 'background.paper', p: isMobile ? 1 : 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
                     <Typography variant="subtitle2" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem', fontWeight: 600 }}>
                         {data.name}
                     </Typography>

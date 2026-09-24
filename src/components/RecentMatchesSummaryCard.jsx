@@ -213,9 +213,9 @@ const RecentMatchesSummaryCard = () => {
     <Card
       sx={{
         mb: 4,
-        background: 'linear-gradient(135deg, #f5f9ff 0%, #e6eff8 100%)',
+        bgcolor: 'background.paper',
         borderRadius: 3,
-        boxShadow: '0 8px 28px rgba(16, 60, 110, 0.12)'
+        boxShadow: 'none'
       }}
     >
       <CardContent sx={{ p: { xs: 1.5, md: 3 } }}>

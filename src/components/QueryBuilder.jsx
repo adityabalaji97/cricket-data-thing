@@ -13,7 +13,6 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
-import MenuIcon from '@mui/icons-material/Menu';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import QueryFilters from './QueryFilters';
@@ -511,31 +510,9 @@ const QueryBuilder = ({ isMobile }) => {
         }}
       />
       <Box sx={{ width: '100%', maxWidth: 1180, mx: 'auto', minWidth: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, mb: { xs: 2.5, md: 4 }, minWidth: 0 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-            <Box component="img" src="/cricket-icon.svg" alt="" sx={{ width: 30, height: 30 }} />
-            <Typography sx={{ fontFamily: qbFonts.display, fontSize: 19, fontWeight: 700, color: qbColors.textHi, whiteSpace: 'nowrap' }}>
-              Hindsight
-            </Typography>
-            <Typography sx={{ color: qbColors.textGhost }}>/</Typography>
-            <Typography sx={{ fontFamily: qbFonts.display, fontSize: 15, fontWeight: 600, color: qbColors.textLo, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Query Builder
-            </Typography>
-          </Box>
-          <Button
-            href="/"
-            startIcon={<MenuIcon />}
-            sx={{
-              ...qbGhostButtonSx,
-              height: 38,
-              bgcolor: qbColors.surface1,
-              px: 1.6,
-              flexShrink: 0,
-            }}
-          >
-            Explore
-          </Button>
-        </Box>
+        {/* The app header (nav tabs / mobile top bar) now brands every page, so the query
+            builder's own "Hindsight / Query Builder" + Explore row was a duplicate. */}
+        <Box sx={{ height: { xs: 16, md: 28 } }} />
 
         {!hasResults && (
           <Box sx={{ mb: { xs: 2.8, md: 4 } }}>

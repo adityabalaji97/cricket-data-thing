@@ -60,7 +60,7 @@ const DismissalDonutChart = ({ data, title, isMobile }) => {
     if (active && payload && payload[0]) {
       const d = payload[0].payload;
       return (
-        <Box sx={{ bgcolor: 'white', p: 1.5, border: '1px solid #ccc', borderRadius: 1 }}>
+        <Box sx={{ bgcolor: 'background.paper', p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
           <Typography variant="subtitle2">{d.name}</Typography>
           <Typography variant="body2">{d.value} ({d.percentage}%)</Typography>
         </Box>

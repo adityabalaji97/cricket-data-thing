@@ -22,9 +22,7 @@ const VenueNotesCardShell = ({
       borderColor: 'divider',
       boxShadow: immersive && isMobile ? 'none' : 1,
       bgcolor: immersive && isMobile ? 'transparent' : 'background.paper',
-      backgroundImage: immersive && isMobile
-        ? 'none'
-        : 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(250,250,250,1) 100%)',
+      backgroundImage: 'none',
       overflow: fitContent && isMobile ? 'visible' : 'hidden',
     }}
   >

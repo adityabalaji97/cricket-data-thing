@@ -1,3 +1,5 @@
+import { colors as hsColors } from './hindsightDark';
+
 /**
  * Design System - Cricket Data Thing
  *
@@ -22,60 +24,74 @@ export const spacing = {
 };
 
 // Color palette
+//
+// Dark-mode values. These keys were a light palette (neutral[0] white cards, neutral[900] near-
+// black text, sky-blue primary) and ~40 components index them directly in sx, which bypasses the
+// MUI theme — so after the app went dark they rendered as white islands. Rather than edit ~200
+// call sites, each key now holds its dark-design equivalent from hindsightDark:
+//   neutral 0-100  -> surfaces (cards, subtle fills)      neutral 200-300 -> hairlines/borders
+//   neutral 400-950 -> text, faint to brightest            primary -> the lime accent scale
+//   success/warning/error 50 -> translucent tints; 500-700 -> hues readable on dark
+// So `backgroundColor: neutral[0]` is still "card surface" and `color: neutral[900]` is still
+// "strongest text"; only the rendering flipped. New code should prefer theme palette tokens
+// (background.paper, text.primary, divider) or hindsightDark `colors` directly.
 export const colors = {
-  // Brand colors
   primary: {
-    50: '#f0f9ff',
-    100: '#e0f2fe',
-    200: '#bae6fd',
-    300: '#7dd3fc',
-    400: '#38bdf8',
-    500: '#0ea5e9',
-    600: '#0284c7',
-    700: '#0369a1',
-    800: '#075985',
-    900: '#0c4a6e',
+    50: 'rgba(182,242,74,0.10)',
+    100: 'rgba(182,242,74,0.16)',
+    200: 'rgba(182,242,74,0.28)',
+    300: '#8fc93a',
+    400: '#a6e043',
+    500: hsColors.accent,
+    600: hsColors.accent,
+    700: hsColors.accentHover,
+    800: '#d6f79a',
+    900: '#e6fbc2',
   },
 
-  // Semantic colors
   success: {
-    50: '#f0fdf4',
+    50: 'rgba(74,222,128,0.12)',
+    100: 'rgba(74,222,128,0.20)',
     500: '#22c55e',
-    600: '#16a34a',
-    700: '#15803d',
+    600: '#4ade80',
+    700: '#86efac',
+    900: '#dcfce7',
   },
 
   warning: {
-    50: '#fffbeb',
-    500: '#f59e0b',
-    600: '#d97706',
-    700: '#b45309',
+    50: 'rgba(240,180,41,0.12)',
+    100: 'rgba(240,180,41,0.20)',
+    500: hsColors.gold,
+    600: '#f5c451',
+    700: '#fcd34d',
+    900: '#fef3c7',
   },
 
   error: {
-    50: '#fef2f2',
+    50: 'rgba(229,72,77,0.12)',
+    100: 'rgba(229,72,77,0.20)',
     500: '#ef4444',
-    600: '#dc2626',
-    700: '#b91c1c',
+    600: '#f87171',
+    700: '#fca5a5',
+    900: '#fee2e2',
   },
 
-  // Neutral scale
   neutral: {
-    0: '#ffffff',
-    50: '#fafafa',
-    100: '#f5f5f5',
-    200: '#e5e5e5',
-    300: '#d4d4d4',
-    400: '#a3a3a3',
-    500: '#737373',
-    600: '#525252',
-    700: '#404040',
-    800: '#262626',
-    900: '#171717',
-    950: '#0a0a0a',
+    0: hsColors.surface1,
+    50: hsColors.surface2,
+    100: hsColors.surface3,
+    200: '#252a33',
+    300: '#2f3540',
+    400: hsColors.textGhost,
+    500: hsColors.textFaint,
+    600: hsColors.textLo,
+    700: hsColors.textMed,
+    800: '#e2e5ea',
+    900: hsColors.textHi,
+    950: '#ffffff',
   },
 
-  // Data visualization
+  // Data visualization (saturated hues read fine on dark surfaces)
   chart: {
     blue: '#3b82f6',
     indigo: '#6366f1',

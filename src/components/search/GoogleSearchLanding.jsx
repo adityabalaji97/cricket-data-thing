@@ -7,7 +7,6 @@ import {
   Paper
 } from '@mui/material';
 import CasinoIcon from '@mui/icons-material/Casino';
-import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import SearchBar from './SearchBar';
@@ -138,17 +137,8 @@ const GoogleSearchLanding = () => {
       {/* Logo / Header */}
       <Box sx={{ textAlign: 'center', mb: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
-          <SportsCricketIcon sx={{ fontSize: 48, color: 'primary.main' }} />
-          <Typography
-            variant="h3"
-            fontWeight="bold"
-            sx={{
-              background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}
-          >
+          <Box component="img" src="/cricket-icon.svg" alt="" sx={{ width: 44, height: 44 }} />
+          <Typography variant="h3" sx={{ fontWeight: 700, color: 'text.primary' }}>
             Hindsight
           </Typography>
         </Box>
@@ -161,8 +151,8 @@ const GoogleSearchLanding = () => {
             <Typography 
               variant="caption" 
               sx={{ 
-                bgcolor: 'primary.main', 
-                color: 'white', 
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
                 px: 1.5, 
                 py: 0.5, 
                 borderRadius: 1,
@@ -213,7 +203,7 @@ const GoogleSearchLanding = () => {
 
       {/* Quick Links when no selection */}
       {!selectedEntity && (
-        <Paper elevation={0} sx={{ p: 3, bgcolor: 'grey.50', borderRadius: 2 }}>
+        <Paper elevation={0} sx={{ p: 3, bgcolor: 'action.hover', borderRadius: 2 }}>
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
             Quick Links
           </Typography>

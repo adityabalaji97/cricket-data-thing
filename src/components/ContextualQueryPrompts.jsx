@@ -81,7 +81,7 @@ const ContextualQueryPrompts = ({
                 },
                 '&:hover': { 
                   backgroundColor: 'primary.light',
-                  color: 'white'
+                  color: 'primary.main'
                 }
               }}
             />
@@ -93,7 +93,7 @@ const ContextualQueryPrompts = ({
   
   // Full card version (default)
   return (
-    <Card sx={{ mt: 3, mb: 3, backgroundColor: 'grey.50' }}>
+    <Card sx={{ mt: 3, mb: 3, backgroundColor: 'action.hover' }}>
       <CardContent>
         {/* Header with title and expand/collapse button */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>

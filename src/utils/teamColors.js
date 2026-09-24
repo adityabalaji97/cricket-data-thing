@@ -189,3 +189,30 @@ export default {
   TEAM_COLORS,
   FALLBACK_COLORS
 };
+
+/**
+ * Lighten a colour until it reads as text on the dark app background.
+ *
+ * Team brand colours were picked for white pages; several (navy, maroon, near-black) vanish on
+ * the dark surfaces. Mixes toward white only as far as needed to reach a minimum relative
+ * luminance, so bright brand colours pass through unchanged. Non-hex input is returned as-is.
+ */
+export const readableOnDark = (color, minLuminance = 0.28) => {
+  if (typeof color !== 'string' || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color)) return color;
+  let hex = color.slice(1);
+  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+  const rgb = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const channel = (v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = (c) => 0.2126 * channel(c[0]) + 0.7152 * channel(c[1]) + 0.0722 * channel(c[2]);
+  if (luminance(rgb) >= minLuminance) return color;
+  for (let t = 0.1; t <= 1.0001; t += 0.1) {
+    const mixed = rgb.map((v) => Math.round(v + (255 - v) * t));
+    if (luminance(mixed) >= minLuminance) {
+      return `#${mixed.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    }
+  }
+  return '#ffffff';
+};

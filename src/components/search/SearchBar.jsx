@@ -45,7 +45,8 @@ const SearchBar = ({
   onFallback,
   placeholder = "Search players, teams, or venues...",
   autoFocus = false,
-  variant = 'light',
+  // The app is dark throughout, so dark is the default; 'light' is kept for any light surface.
+  variant = 'dark',
 }) => {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');

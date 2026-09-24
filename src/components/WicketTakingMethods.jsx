@@ -48,9 +48,10 @@ const WicketTakingMethods = ({ stats }) => {
       return (
         <Box
           sx={{
-            backgroundColor: '#fff',
+            backgroundColor: 'background.paper',
             padding: 1.5,
-            border: '1px solid #ccc',
+            border: '1px solid',
+            borderColor: 'divider',
             borderRadius: 1,
             boxShadow: 2
           }}
