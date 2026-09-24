@@ -30,6 +30,7 @@ import {
   normalizeScoringZone,
   SCORING_ZONE_CLOCKWISE_FROM_TOP,
 } from '../utils/wagonZones';
+import { useFormat } from '../context/FormatContext';
 
 const DEFAULT_FILTERS = {
   phase: 'overall',
@@ -92,6 +93,9 @@ const DismissalFieldDesigner = ({
     return `${config.API_URL}/visualizations/player/${encodeURIComponent(targetValue)}/wagon-wheel`;
   }, [context, targetValue]);
 
+  // Venue points follow the preview's format (ODI previews must not plot T20 dismissals).
+  const { pinnedFormatParams } = useFormat();
+
   useEffect(() => {
     if (!endpoint) return;
     let cancelled = false;
@@ -118,6 +122,10 @@ const DismissalFieldDesigner = ({
         if (filters.bowlStyle !== 'all') params.append('bowl_style', filters.bowlStyle);
         if (filters.batHand !== 'all') params.append('bat_hand', filters.batHand);
 
+        if (context === 'venue') {
+          params.append('format', pinnedFormatParams.format);
+          params.append('gender', pinnedFormatParams.gender);
+        }
         params.append('dismissal', 'caught');
         params.append('dismissal_mode', 'exact');
         params.append('max_points', '2000');
@@ -155,6 +163,8 @@ const DismissalFieldDesigner = ({
     filters.bowlKind,
     filters.bowlStyle,
     filters.batHand,
+    pinnedFormatParams.format,
+    pinnedFormatParams.gender,
   ]);
 
   const deliveriesWithZone = useMemo(() => (

@@ -39,6 +39,7 @@ import {
 import { getFormBorderColor } from '../utils/playerNameUtils';
 import CondensedName from './common/CondensedName';
 import PostTossDrillLinks from './PostTossDrillLinks';
+import { useFormat } from '../context/FormatContext';
 
 const getPlayerFormFlag = (formFlagsByPlayer = {}, playerName = '') => (
     formFlagsByPlayer[playerName] || formFlagsByPlayer[normalizeAnalyticsName(playerName)] || null
@@ -621,6 +622,12 @@ const Matchups = ({
     postTossRaw = null,
     postTossPlayerDrillLinks = {},
 }) => {
+    // Matchups are one format's record: an ODI preview must not show T20 batter-vs-bowler numbers.
+    const { pinnedFormatParams } = useFormat();
+    const matchFormat = pinnedFormatParams.format;
+    const matchGender = pinnedFormatParams.gender;
+    // Fantasy projections use T20 (Dream11 T20) scoring, so they are only shown for T20.
+    const showFantasy = matchFormat === 'T20';
     const [matchupData, setMatchupData] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
@@ -738,6 +745,8 @@ const Matchups = ({
                 const params = new URLSearchParams();
                 if (startDate) params.append('start_date', startDate);
                 if (endDate) params.append('end_date', endDate);
+                params.append('format', matchFormat);
+                params.append('gender', matchGender);
 
                 const effectiveTeam1Players = dedupeNames(team1AxisAppliedPlayers || []);
                 const effectiveTeam2Players = dedupeNames(team2AxisAppliedPlayers || []);
@@ -774,7 +783,7 @@ const Matchups = ({
         };
 
         fetchMatchups();
-    }, [enabled, team1, team2, startDate, endDate, dayNightFilter, team1AxisAppliedPlayers, team2AxisAppliedPlayers]);
+    }, [enabled, team1, team2, startDate, endDate, dayNightFilter, team1AxisAppliedPlayers, team2AxisAppliedPlayers, matchFormat, matchGender]);
 
     React.useEffect(() => {
         if (!enabled) return;
@@ -819,6 +828,8 @@ const Matchups = ({
                     const params = new URLSearchParams();
                     if (rangeStartDate) params.append('start_date', rangeStartDate);
                     if (rangeEndDate) params.append('end_date', rangeEndDate);
+                    params.append('format', matchFormat);
+                    params.append('gender', matchGender);
                     battingXi.forEach((player) => params.append('team1_players', player));
                     bowlingXi.forEach((player) => params.append('team2_players', player));
                     params.append('use_current_roster', 'false');
@@ -894,7 +905,7 @@ const Matchups = ({
         return () => {
             cancelled = true;
         };
-    }, [enabled, hasPostTossContext, postTossMode, postTossRaw, startDate, endDate, venue, dayNightFilter]);
+    }, [enabled, hasPostTossContext, postTossMode, postTossRaw, startDate, endDate, venue, dayNightFilter, matchFormat, matchGender]);
 
     React.useEffect(() => {
         if (!enabled || !matchupData?.team1 || !matchupData?.team2) return;
@@ -1122,15 +1133,15 @@ const Matchups = ({
                 </Alert>
             )}
 
-            {/* Fantasy Analysis from server */}
-            <FantasyAnalysisCard
+            {/* Fantasy Analysis from server (T20 scoring, so T20 only) */}
+            {showFantasy && <FantasyAnalysisCard
                 fantasyData={matchupData?.fantasy_analysis}
                 isMobile={isMobile}
                 formFlagsByPlayer={formFlagsByPlayer}
                 postTossXpoints={postTossXpoints}
                 postTossDelta={postTossDelta}
                 postTossPlayerLinks={postTossPlayerLinks}
-            />
+            />}
 
             {postTossMode === 'off' && (
                 <>

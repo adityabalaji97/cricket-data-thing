@@ -7,6 +7,7 @@ import {
 import Card from './ui/Card';
 import { fetchAnalyticsJson } from '../utils/analyticsApi';
 import { colors as designColors } from '../theme/designSystem';
+import { useFormat } from '../context/FormatContext';
 
 const MIN_BALLS = 30;
 
@@ -206,6 +207,8 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
   const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
   const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
 
+  const { pinnedFormatParams } = useFormat();
+
   useEffect(() => {
     if (!enabled || !name || !context) return;
 
@@ -218,6 +221,8 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
     if (leagues?.length) params.leagues = leagues;
     if (includeInternational) params.include_international = true;
     if (includeInternational && topTeams) params.top_teams = topTeams;
+    params.format = pinnedFormatParams.format;
+    params.gender = pinnedFormatParams.gender;
 
     fetchAnalyticsJson('/boundary-analysis', params)
       .then((result) => {
@@ -228,7 +233,8 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
         setError(err.message);
         setLoading(false);
       });
-  }, [enabled, context, name, startDate, endDate, leagues, includeInternational, topTeams]);
+  }, [enabled, context, name, startDate, endDate, leagues, includeInternational, topTeams,
+      pinnedFormatParams.format, pinnedFormatParams.gender]);
 
   if (loading) {
     return (

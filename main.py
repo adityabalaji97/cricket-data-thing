@@ -2,7 +2,7 @@ from email.mime import base
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List, Dict, Optional
+from typing import List, Dict, Literal, Optional
 from datetime import date
 from sqlalchemy import func, desc, and_, or_
 from pydantic import BaseModel
@@ -969,6 +969,11 @@ def get_venue_stats(
     include_international: bool = Query(default=False),
     top_teams: Optional[int] = Query(default=None),
     day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$"),
+    # Men's T20 by default, as before. The match preview offers ODIs too, and every query below
+    # used to hard-code 'T20' -- so an ODI preview showed T20 leaders (e.g. 2007 World T20 at
+    # Kingsmead) under an ODI heading.
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    gender: Literal["male", "female"] = Query(default="male"),
     db: Session = Depends(get_session)
 ):
     try:
@@ -983,6 +988,8 @@ def get_venue_stats(
             "full_names": list(teams_mapping.keys()),
             "abbrev_names": list(teams_mapping.values()),
             "day_or_night": day_or_night,
+            "fmt": format,
+            "gender": gender,
         }
 
         if venue_aliases:
@@ -1029,6 +1036,7 @@ def get_venue_stats(
                     AND (:end_date IS NULL OR m.date <= :end_date)
                     {competition_filter}
                     {day_or_night_filter}
+                    AND m.format = :fmt AND m.gender = :gender
             )
             SELECT
                 bs.striker as name,
@@ -1038,7 +1046,7 @@ def get_venue_stats(
                 CAST(SUM(bs.runs)::float / NULLIF(COUNT(CASE WHEN bs.wickets > 0 THEN 1 END), 0) AS DECIMAL(10,2)) as average,
                 CAST((SUM(bs.runs)::float * 100 / NULLIF(SUM(bs.balls_faced), 0)) AS DECIMAL(10,2)) as strike_rate,
                 CAST(SUM(bs.balls_faced)::float / NULLIF(COUNT(CASE WHEN bs.wickets > 0 THEN 1 END), 0) AS DECIMAL(10,2)) as balls_per_dismissal
-            FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
+            FROM (SELECT * FROM batting_stats WHERE format = :fmt AND gender = :gender) bs
             JOIN match_filter mf ON bs.match_id = mf.id
             JOIN matches m ON bs.match_id = m.id
             LEFT JOIN team_mapping tm ON bs.batting_team = tm.full_name
@@ -1063,6 +1071,7 @@ def get_venue_stats(
                     AND (:end_date IS NULL OR m.date <= :end_date)
                     {competition_filter}
                     {day_or_night_filter}
+                    AND m.format = :fmt AND m.gender = :gender
             )
             SELECT
                 bw.bowler as name,
@@ -1072,7 +1081,7 @@ def get_venue_stats(
                 CAST((SUM(CAST(bw.overs AS float)) * 6 / NULLIF(SUM(bw.wickets)::float, 0)) AS DECIMAL(10,2)) as strike_rate,
                 CAST((SUM(bw.runs_conceded)::float / NULLIF(SUM(bw.wickets), 0)) AS DECIMAL(10,2)) as average,
                 CAST((SUM(bw.runs_conceded)::float / NULLIF(SUM(CAST(bw.overs AS float)), 0)) AS DECIMAL(10,2)) as economy
-            FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bw
+            FROM (SELECT * FROM bowling_stats WHERE format = :fmt AND gender = :gender) bw
             JOIN match_filter mf ON bw.match_id = mf.id
             JOIN matches m ON bw.match_id = m.id
             LEFT JOIN team_mapping tm ON bw.bowling_team = tm.full_name
@@ -1102,6 +1111,7 @@ def get_venue_stats(
                         AND (:end_date IS NULL OR m.date <= :end_date)
                         {competition_filter}
                         {day_or_night_filter}
+                        AND m.format = :fmt AND m.gender = :gender
                 )
                 SELECT
                     dd.bat as name,
@@ -1111,7 +1121,7 @@ def get_venue_stats(
                     CAST(SUM(dd.batruns)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as average,
                     CAST((SUM(dd.batruns)::float * 100 / NULLIF(COUNT(*), 0)) AS DECIMAL(10,2)) as strike_rate,
                     CAST(COUNT(*)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as balls_per_dismissal
-                FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
+                FROM (SELECT * FROM delivery_details WHERE format = :fmt AND gender = :gender) dd
                 JOIN match_filter mf ON dd.p_match = mf.id
                 LEFT JOIN team_mapping tm ON dd.team_bat = tm.full_name
                 WHERE dd.bat IS NOT NULL
@@ -1135,6 +1145,7 @@ def get_venue_stats(
                         AND (:end_date IS NULL OR m.date <= :end_date)
                         {competition_filter}
                         {day_or_night_filter}
+                        AND m.format = :fmt AND m.gender = :gender
                 )
                 SELECT
                     dd.bowl as name,
@@ -1144,7 +1155,7 @@ def get_venue_stats(
                     CAST(COUNT(*)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as strike_rate,
                     CAST(SUM(dd.score)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as average,
                     CAST((SUM(dd.score)::float * 6 / NULLIF(COUNT(*), 0)) AS DECIMAL(10,2)) as economy
-                FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
+                FROM (SELECT * FROM delivery_details WHERE format = :fmt AND gender = :gender) dd
                 JOIN match_filter mf ON dd.p_match = mf.id
                 LEFT JOIN team_mapping tm ON dd.team_bowl = tm.full_name
                 WHERE dd.bowl IS NOT NULL
@@ -1199,6 +1210,7 @@ def get_venue_stats(
                     AND (:end_date IS NULL OR m.date <= :end_date)
                     {competition_filter}
                     {day_or_night_filter}
+                    AND m.format = :fmt AND m.gender = :gender
             ),
             batter_stats AS (
                 SELECT 
@@ -1228,7 +1240,7 @@ def get_venue_stats(
                     SUM(bs.death_boundaries) as death_boundaries,
                     COUNT(DISTINCT CASE WHEN bs.death_balls > 0 THEN bs.match_id END) as death_innings,
                     CAST(SUM(bs.balls_faced)::float / COUNT(DISTINCT bs.match_id) AS DECIMAL(10,2)) as bpi
-                FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
+                FROM (SELECT * FROM batting_stats WHERE format = :fmt AND gender = :gender) bs
                 JOIN match_filter mf ON bs.match_id = mf.id
                 JOIN matches m ON bs.match_id = m.id
                 WHERE bs.batting_team != bs.striker
@@ -1240,7 +1252,7 @@ def get_venue_stats(
                     bs.striker,
                     COALESCE(tm.abbreviated_name, bs.batting_team) as team,
                     m.date
-                FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
+                FROM (SELECT * FROM batting_stats WHERE format = :fmt AND gender = :gender) bs
                 JOIN match_filter mf ON bs.match_id = mf.id
                 JOIN matches m ON bs.match_id = m.id
                 LEFT JOIN team_mapping tm ON bs.batting_team = tm.full_name
@@ -1275,7 +1287,7 @@ def get_venue_stats(
                     SUM(bs.death_dots) as death_dots,
                     SUM(bs.death_boundaries) as death_boundaries,
                     COUNT(DISTINCT CASE WHEN bs.death_balls > 0 THEN bs.match_id END) as death_innings
-                FROM (SELECT * FROM batting_stats WHERE format = 'T20' AND gender = 'male') bs
+                FROM (SELECT * FROM batting_stats WHERE format = :fmt AND gender = :gender) bs
                 JOIN match_filter mf ON bs.match_id = mf.id
                 JOIN matches m ON bs.match_id = m.id
                 WHERE bs.batting_team != bs.striker
@@ -1488,6 +1500,10 @@ def get_match_history(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$"),
+    # Every query here was format-blind: a T20 preview's head-to-head and recent form mixed in
+    # ODIs, and an ODI preview listed SA20 games as "recent at the venue".
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    gender: Literal["male", "female"] = Query(default="male"),
     db: Session = Depends(get_session)
 ):
     try:
@@ -1510,6 +1526,7 @@ def get_match_history(
                 WHERE (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
+                AND m.format = :fmt AND m.gender = :gender
                 {venue_filter_clause}
                 ORDER BY m.date DESC
                 LIMIT 7
@@ -1519,6 +1536,8 @@ def get_match_history(
                 "start_date": start_date,
                 "end_date": end_date,
                 "day_or_night": day_or_night,
+                "fmt": format,
+                "gender": gender,
             }
         ).fetchall()
 
@@ -1530,6 +1549,7 @@ def get_match_history(
                 WHERE (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
+                AND m.format = :fmt AND m.gender = :gender
                 AND (m.team1 = ANY(:team1_names) OR m.team2 = ANY(:team1_names))
                 ORDER BY m.date DESC
                 LIMIT 5
@@ -1539,6 +1559,8 @@ def get_match_history(
                 "start_date": start_date,
                 "end_date": end_date,
                 "day_or_night": day_or_night,
+                "fmt": format,
+                "gender": gender,
             }
         ).fetchall()
 
@@ -1550,6 +1572,7 @@ def get_match_history(
                 WHERE (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
+                AND m.format = :fmt AND m.gender = :gender
                 AND (m.team1 = ANY(:team2_names) OR m.team2 = ANY(:team2_names))
                 ORDER BY m.date DESC
                 LIMIT 5
@@ -1559,6 +1582,8 @@ def get_match_history(
                 "start_date": start_date,
                 "end_date": end_date,
                 "day_or_night": day_or_night,
+                "fmt": format,
+                "gender": gender,
             }
         ).fetchall()
 
@@ -1570,6 +1595,7 @@ def get_match_history(
                 WHERE (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 AND (:day_or_night IS NULL OR m.day_or_night = :day_or_night)
+                AND m.format = :fmt AND m.gender = :gender
                 AND ((m.team1 = ANY(:team1_names) AND m.team2 = ANY(:team2_names))
                      OR (m.team1 = ANY(:team2_names) AND m.team2 = ANY(:team1_names)))
                 ORDER BY m.date DESC
@@ -1581,6 +1607,8 @@ def get_match_history(
                 "start_date": start_date,
                 "end_date": end_date,
                 "day_or_night": day_or_night,
+                "fmt": format,
+                "gender": gender,
             }
         ).fetchall()
 
@@ -4483,14 +4511,29 @@ def get_venue_dismissals(
     leagues: List[str] = Query(default=[]),
     include_international: bool = Query(default=False),
     top_teams: Optional[int] = Query(default=None),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    gender: Literal["male", "female"] = Query(default="male"),
     db: Session = Depends(get_session)
 ):
-    """Get dismissal mode distribution at a venue."""
+    """
+    Dismissal mode distribution at a venue, overall and by phase.
+
+    Previously read only the legacy `deliveries` table, which holds men's T20 alone and stops in
+    2025 -- so ODI previews showed T20 dismissals and T20 missed the latest season. Now it uses
+    the same split as the query builder: legacy rows before 2015 (men's T20 only) and
+    delivery_details from 2015 (and for every other format, which lives there entirely).
+    Phases use the format's own boundaries.
+    """
+    from services.analytics_common import phase_case_sql
+
     try:
         params = {
             "venue": venue,
             "start_date": start_date,
             "end_date": end_date,
+            "fmt": format,
+            "gender": gender,
+            "split": date(2015, 1, 1),
         }
 
         if leagues:
@@ -4515,37 +4558,51 @@ def get_venue_dismissals(
                 competition_conditions.append("m.match_type = 'international'")
 
         match_filter = "AND (" + " OR ".join(competition_conditions) + ")"
-
-        overall_query = text(f"""
-            SELECT d.wicket_type, COUNT(*) as count
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            WHERE d.wicket_type IS NOT NULL
+        common_where = f"""
             {venue_filter}
             AND (:start_date IS NULL OR m.date >= :start_date)
             AND (:end_date IS NULL OR m.date <= :end_date)
+            AND m.format = :fmt AND m.gender = :gender
             {match_filter}
-            GROUP BY d.wicket_type
+        """
+
+        # delivery_details names two modes differently from the legacy table; map them so the
+        # union groups one way.
+        dd_type = """CASE dd.dismissal
+                WHEN 'leg before wicket' THEN 'lbw'
+                WHEN 'retired not out (hurt)' THEN 'retired hurt'
+                ELSE dd.dismissal END"""
+        sources = [f"""
+            SELECT {dd_type} AS wicket_type, dd.over AS over
+            FROM delivery_details dd
+            JOIN matches m ON dd.p_match = m.id
+            WHERE dd.dismissal IS NOT NULL AND dd.dismissal <> '' AND dd.dismissal <> 'not out'
+              AND dd.format = :fmt AND dd.gender = :gender
+              {"AND m.date >= :split" if format == "T20" and gender == "male" else ""}
+              {common_where}
+        """]
+        if format == "T20" and gender == "male":
+            sources.append(f"""
+            SELECT d.wicket_type AS wicket_type, d.over AS over
+            FROM deliveries d
+            JOIN matches m ON d.match_id = m.id
+            WHERE d.wicket_type IS NOT NULL AND m.date < :split
+              {common_where}
+            """)
+        wickets = " UNION ALL ".join(sources)
+        phase_sql = phase_case_sql(format, gender, over_column="w.over")
+
+        overall_query = text(f"""
+            SELECT w.wicket_type, COUNT(*) as count
+            FROM ({wickets}) w
+            GROUP BY w.wicket_type
             ORDER BY count DESC
         """)
 
         phase_query = text(f"""
-            SELECT
-                CASE
-                    WHEN d.over < 6 THEN 'powerplay'
-                    WHEN d.over >= 6 AND d.over < 15 THEN 'middle'
-                    ELSE 'death'
-                END as phase,
-                d.wicket_type,
-                COUNT(*) as count
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            WHERE d.wicket_type IS NOT NULL
-            {venue_filter}
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            {match_filter}
-            GROUP BY phase, d.wicket_type
+            SELECT {phase_sql} as phase, w.wicket_type, COUNT(*) as count
+            FROM ({wickets}) w
+            GROUP BY phase, w.wicket_type
             ORDER BY phase, count DESC
         """)
 

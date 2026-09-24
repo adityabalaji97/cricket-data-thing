@@ -194,13 +194,15 @@ export const getBatterContextualQueries = (playerName, context = {}) => {
  * @returns {Array} Array of query objects
  */
 export const getVenueContextualQueries = (venueName, context = {}) => {
-  const { startDate, endDate, leagues = [], team1, team2 } = context;
+  const { startDate, endDate, leagues = [], team1, team2, fmt } = context;
 
   const baseFilters = {
     venue: venueName,
     ...(startDate && { start_date: startDate }),
     ...(endDate && { end_date: endDate }),
     ...(leagues.length > 0 && { leagues }),
+    // Opens the query builder in the preview's format (FormatContext reads ?fmt=).
+    ...(fmt && { fmt }),
   };
 
   const shortVenue = getShortVenue(venueName);

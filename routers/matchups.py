@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Literal, Optional
 from datetime import date
 from database import get_session
 from services.matchups import get_team_matchups_service
@@ -20,6 +20,10 @@ def get_team_matchups(
     venue_filter: Optional[str] = Query(default=None),
     min_balls: int = Query(default=6, ge=1),
     day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$"),
+    # The service has taken fmt/gender since the multi-format work, but the route never passed
+    # them, so an ODI match preview showed T20 matchups.
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    gender: Literal["male", "female"] = Query(default="male"),
     db: Session = Depends(get_session)
 ):
     result = get_team_matchups_service(
@@ -35,5 +39,7 @@ def get_team_matchups(
         venue_filter=venue_filter,
         min_balls=min_balls,
         day_or_night=day_or_night,
+        fmt=format,
+        gender=gender,
     )
     return result

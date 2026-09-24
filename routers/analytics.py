@@ -10,7 +10,7 @@ Advanced analytics endpoints:
 from __future__ import annotations
 
 from datetime import date
-from typing import List, Optional
+from typing import Literal, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -245,6 +245,8 @@ def boundary_analysis(
     leagues: List[str] = Query(default=[]),
     include_international: bool = Query(default=False),
     top_teams: Optional[int] = Query(default=None, ge=1),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    gender: Literal["male", "female"] = Query(default="male"),
     db: Session = Depends(get_session),
 ):
     try:
@@ -257,6 +259,8 @@ def boundary_analysis(
             leagues=leagues if leagues else None,
             include_international=include_international,
             top_teams=top_teams,
+            fmt=format,
+            gender=gender,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

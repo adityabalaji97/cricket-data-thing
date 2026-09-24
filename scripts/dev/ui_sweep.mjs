@@ -42,6 +42,7 @@ const ROUTES = [
   ['credits', '/credits'],
   ['fantasy', '/fantasy-planner'],
   ['scorecard', '/scorecard/1530204'],
+  ['preview_odi', '/venue?venue=Kingsmead%2C%20Durban&team1=Australia&team2=South%20Africa&includeInternational=true&topTeams=10&autoload=true&fmt=mens-odi'],
 ];
 const W = Number(process.env.WIDTH || 390);
 const H = Number(process.env.HEIGHT || 844);
@@ -101,14 +102,19 @@ for (const [name, path] of ROUTES.filter(([n]) => !ONLY || ONLY.includes(n))) {
     for (const el of document.querySelectorAll('body *')) {
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.right <= vw + 1) continue;
-      // Skip elements inside an intentional horizontal scroller.
+      // Skip elements inside an intentional horizontal scroller (auto/scroll). Not 'hidden':
+      // that clips content, which is exactly the bug -- and body has overflow-x: hidden, so
+      // counting it hid every clipped card on the page.
       let p = el.parentElement, scrolled = false;
       while (p && p !== document.body) {
         const ox = getComputedStyle(p).overflowX;
-        if ((ox === 'auto' || ox === 'scroll' || ox === 'hidden') && p.getBoundingClientRect().right <= vw + 1) { scrolled = true; break; }
+        if ((ox === 'auto' || ox === 'scroll') && p.getBoundingClientRect().right <= vw + 1) { scrolled = true; break; }
         p = p.parentElement;
       }
       if (scrolled) continue;
+      // Report the outermost offender only.
+      const parentRect = el.parentElement && el.parentElement.getBoundingClientRect();
+      if (parentRect && parentRect.right > vw + 1) continue;
       const cls = (el.className && typeof el.className === 'string') ? el.className.split(' ').filter(c => !c.startsWith('css-')).slice(0, 3).join('.') : '';
       off.push({ tag: el.tagName.toLowerCase(), cls, right: Math.round(r.right), w: Math.round(r.width), text: (el.innerText || '').trim().slice(0, 40) });
     }
@@ -117,7 +123,7 @@ for (const [name, path] of ROUTES.filter(([n]) => !ONLY || ONLY.includes(n))) {
     const tiny = [...document.querySelectorAll('button, a, [role=button], input, [role=tab]')]
       .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (r.height < 32 || r.width < 32); }).length;
     const smallText = [...document.querySelectorAll('body *')].filter(e => e.childElementCount === 0 && (e.innerText||'').trim() && parseFloat(getComputedStyle(e).fontSize) < 11).length;
-    return { vw, sw, docH: document.documentElement.scrollHeight, overflow: sw > vw + 1, offenders: off.slice(0, 8), tinyTapTargets: tiny, textUnder11px: smallText, bg: getComputedStyle(document.body).backgroundColor };
+    return { vw, sw, docH: document.documentElement.scrollHeight, overflow: sw > vw + 1 || off.length > 0, offenders: off.slice(0, 8), tinyTapTargets: tiny, textUnder11px: smallText, bg: getComputedStyle(document.body).backgroundColor };
   })()` });
   const info = probe.result?.result?.value || {};
   const h = Math.min(info.docH || H, MAX_H);

@@ -4,7 +4,7 @@ Visualizations Router - Wagon Wheel and Pitch Map Endpoints
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Literal, List, Optional
 from datetime import date
 from database import get_session
 from services.visualizations import (
@@ -394,12 +394,16 @@ def get_venue_wagon_wheel(
     dismissal: Optional[str] = Query(default=None),
     dismissal_mode: str = Query(default="exact", pattern="^(exact|wicket)$"),
     max_points: int = Query(default=2000, ge=100, le=5000),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    gender: Literal["male", "female"] = Query(default="male"),
     db: Session = Depends(get_session)
 ):
     try:
         deliveries = get_venue_wagon_wheel_data(
             db=db,
             venue=venue,
+            fmt=format,
+            gender=gender,
             start_date=start_date,
             end_date=end_date,
             leagues=leagues,
@@ -451,12 +455,16 @@ def get_venue_pitch_map(
     line: Optional[str] = Query(default=None),
     length: Optional[str] = Query(default=None),
     shot: Optional[str] = Query(default=None),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    gender: Literal["male", "female"] = Query(default="male"),
     db: Session = Depends(get_session)
 ):
     try:
         cells = get_venue_pitch_map_data(
             db=db,
             venue=venue,
+            fmt=format,
+            gender=gender,
             start_date=start_date,
             end_date=end_date,
             leagues=leagues,

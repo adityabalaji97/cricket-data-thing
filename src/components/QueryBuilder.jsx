@@ -149,8 +149,19 @@ const getActiveFilterCount = (filters, groupBy) => {
 };
 
 const QueryBuilder = ({ isMobile }) => {
-  const { formatParams, active } = useFormat();
+  const { formatParams, active, selectFormat } = useFormat();
   const { getFiltersFromUrl, getGroupByFromUrl, currentParams } = useUrlParams();
+
+  // Links from elsewhere in the app (e.g. a match preview's Explore queries) carry ?fmt= so the
+  // query runs in the same format. FormatProvider only reads it on first page load, so apply it
+  // here when the query builder is reached by in-app navigation.
+  const urlFormatSlug = new URLSearchParams(currentParams || '').get('fmt');
+  useEffect(() => {
+    if (urlFormatSlug && active?.slug && urlFormatSlug !== active.slug) {
+      selectFormat(urlFormatSlug);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlFormatSlug]);
   
   const [filters, setFilters] = useState(getDefaultFilters);
   
@@ -547,7 +558,9 @@ const QueryBuilder = ({ isMobile }) => {
           </Box>
         )}
 
-        <Box sx={{ display: 'grid', gap: { xs: '18px', md: '28px' }, minWidth: 0 }}>
+        {/* minmax(0, 1fr): an implicit grid column sizes to its widest child's content, which
+            stretched every card to ~520px on a 390px phone and clipped the right edge. */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: { xs: '18px', md: '28px' }, minWidth: 0 }}>
           {(!hasResults || nlExpanded) ? (
             <NLQueryInput
               ref={nlInputRef}
@@ -599,15 +612,18 @@ const QueryBuilder = ({ isMobile }) => {
                 p: { xs: 1.6, md: 2.4 },
                 display: 'flex',
                 alignItems: 'center',
+                // Wraps on phones: the format switcher and chip drop under the title instead of
+                // squeezing "Filters & Grouping" into three lines.
+                flexWrap: 'wrap',
                 gap: 1.25,
                 cursor: 'pointer',
               }}
             >
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ flex: '1 1 180px', minWidth: 0 }}>
                 <Typography sx={{ fontFamily: qbFonts.mono, color: qbColors.accent, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
                   01 / Filters
                 </Typography>
-                <Typography sx={{ fontFamily: qbFonts.display, fontSize: { xs: 18, md: 23 }, fontWeight: 700 }}>
+                <Typography sx={{ fontFamily: qbFonts.display, fontSize: { xs: 18, md: 23 }, fontWeight: 700, whiteSpace: 'nowrap' }}>
                   Filters & Grouping
                 </Typography>
               </Box>

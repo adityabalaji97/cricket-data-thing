@@ -1307,6 +1307,7 @@ const QueryResults = ({
             sx: {
               mt: 1,
               minWidth: 260,
+              maxWidth: 'calc(100vw - 24px)',
               maxHeight: 360,
               bgcolor: qbColors.surface3,
               color: qbColors.textHi,

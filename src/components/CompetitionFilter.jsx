@@ -43,6 +43,13 @@ const normalizeLeagueToken = (value) => String(value || '').trim().toLowerCase()
 const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
     const [includeInternational, setIncludeInternational] = useState(value?.international ?? false);
     const [topTeams, setTopTeams] = useState(value?.topTeams ?? 10);
+    // What is typed, kept separately from the committed number. Clearing the box to type "20"
+    // used to parseInt('') -> NaN, which was stored, sent upstream and echoed back, so the field
+    // blanked itself and fought the user's typing.
+    const [topTeamsDraft, setTopTeamsDraft] = useState(String(value?.topTeams ?? 10));
+    useEffect(() => {
+        setTopTeamsDraft(String(topTeams));
+    }, [topTeams]);
     const [selectedLeagues, setSelectedLeagues] = useState([buildAllLeaguesOption()]);
     const [leagues, setLeagues] = useState([]); 
     const [loading, setLoading] = useState(true);
@@ -76,7 +83,7 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
         const resolvedFilters = {
             leagues: isAllLeagues ? [] : value.leagues,
             international: value?.international ?? false,
-            topTeams: value?.topTeams ?? 10,
+            topTeams: Number.isInteger(value?.topTeams) ? value.topTeams : 10,
         };
 
         const optionsByValue = new Map(leagues.map((league) => [league.value, league]));
@@ -198,13 +205,24 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
                         <TextField
                             type="number"
                             label="Top Teams"
-                            value={topTeams}
+                            value={topTeamsDraft}
                             onChange={(e) => {
-                                const newValue = parseInt(e.target.value);
-                                setTopTeams(newValue);
-                                handleSelectionChange(selectedLeagues, includeInternational, newValue);
+                                const raw = e.target.value;
+                                setTopTeamsDraft(raw);
+                                const newValue = Number.parseInt(raw, 10);
+                                if (Number.isInteger(newValue) && newValue >= 1 && newValue <= 20 && newValue !== topTeams) {
+                                    setTopTeams(newValue);
+                                    handleSelectionChange(selectedLeagues, includeInternational, newValue);
+                                }
                             }}
-                            inputProps={{ min: 1, max: 20 }}
+                            onBlur={() => {
+                                const newValue = Number.parseInt(topTeamsDraft, 10);
+                                if (!(Number.isInteger(newValue) && newValue >= 1 && newValue <= 20)) {
+                                    setTopTeamsDraft(String(topTeams));
+                                }
+                            }}
+                            helperText={isMobile ? '1-20' : undefined}
+                            inputProps={{ min: 1, max: 20, inputMode: 'numeric', pattern: '[0-9]*' }}
                             sx={{
                                 width: isMobile ? '100%' : 100,
                                 ...touchTargetStyles,

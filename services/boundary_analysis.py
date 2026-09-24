@@ -27,6 +27,15 @@ PHASE_CASE_SQL = """CASE
     ELSE 'other'
 END"""
 
+
+def _phase_case_sql(fmt: str, gender: str) -> str:
+    """Men's T20 keeps the original literal; other formats use their own phase boundaries."""
+    if (fmt, gender) == ("T20", "male"):
+        return PHASE_CASE_SQL
+    from services.analytics_common import phase_case_sql
+
+    return phase_case_sql(fmt, gender, over_column='dd."over"')
+
 # Use bowl_kind column (values like 'pace bowler', 'spin bowler') with ILIKE,
 # matching the pattern used across the codebase (venue_similarity, wrapped cards, etc.)
 BOWL_KIND_CASE_SQL = """CASE
@@ -53,6 +62,8 @@ def get_boundary_analysis(
     leagues: Optional[List[str]] = None,
     include_international: bool = False,
     top_teams: Optional[int] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> dict:
     """
     Unified boundary analysis for venue, batter, or bowler context.
@@ -109,7 +120,7 @@ def get_boundary_analysis(
     # to the top N sides, and passing None here made this section count games the summary above
     # it excluded (e.g. a venue showing "0 T20s" beside 327 powerplay pace balls).
     comp_filter = build_competition_filter_delivery_details(
-        expanded_leagues, include_international, top_teams, params
+        expanded_leagues, include_international, top_teams, params, fmt=fmt, gender=gender
     )
 
     where_clauses.append("(dd.wide IS NULL OR dd.wide = 0)")
@@ -117,7 +128,7 @@ def get_boundary_analysis(
 
     query = text(f"""
         SELECT
-            {PHASE_CASE_SQL} AS phase,
+            {_phase_case_sql(fmt, gender)} AS phase,
             {group_sql},
             dd.shot,
             COUNT(*) AS total_balls,

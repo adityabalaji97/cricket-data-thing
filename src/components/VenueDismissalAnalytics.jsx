@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Card, Typography, CircularProgress } from '@mui/material';
 import DismissalFieldDesigner from './DismissalFieldDesigner';
 import config from '../config';
+import { useFormat } from '../context/FormatContext';
 
 const VenueDismissalAnalytics = ({
   venue,
@@ -17,6 +18,8 @@ const VenueDismissalAnalytics = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const { pinnedFormatParams } = useFormat();
+
   useEffect(() => {
     if (!enabled || !venue || venue === 'All Venues') return;
 
@@ -31,6 +34,8 @@ const VenueDismissalAnalytics = ({
           leagues.forEach((league) => params.append('leagues', league));
         }
         params.set('include_international', includeInternational ? 'true' : 'false');
+        params.set('format', pinnedFormatParams.format);
+        params.set('gender', pinnedFormatParams.gender);
         if (includeInternational && topTeams) {
           params.set('top_teams', String(topTeams));
         }
@@ -56,7 +61,8 @@ const VenueDismissalAnalytics = ({
     };
 
     fetchDismissalData();
-  }, [enabled, venue, startDate, endDate, leagues, includeInternational, topTeams]);
+  }, [enabled, venue, startDate, endDate, leagues, includeInternational, topTeams,
+      pinnedFormatParams.format, pinnedFormatParams.gender]);
 
   if (loading) {
     return (

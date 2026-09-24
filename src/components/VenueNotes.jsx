@@ -975,6 +975,12 @@ const DEFAULT_SIMILAR_ZONE_FILTERS = {
     bowlStyle: null,
 };
 
+// "14 T20s", "1 ODI" -- the header count used to say "T20s" whatever the format.
+const matchNoun = (format, count) => {
+    const noun = format === 'ODI' ? 'ODI' : format === 'TEST' ? 'Test' : 'T20';
+    return count === 1 ? noun : `${noun}s`;
+};
+
 const VenueNotes = ({
     venue,
     startDate,
@@ -994,6 +1000,12 @@ const VenueNotes = ({
     onDayNightFilterChange = null,
     espnEventId = null,
   }) => {
+
+    // The preview is one format's record. Post-toss XI analysis (impact subs, T20 fantasy
+    // scoring) and Foresight (IPL-trained models) are men's-T20-only, so other formats hide them.
+    const { pinnedFormatParams } = useFormat();
+    const isT20Preview = pinnedFormatParams.format === 'T20' && pinnedFormatParams.gender === 'male';
+    const formatSlug = `${pinnedFormatParams.gender === 'male' ? 'mens' : 'womens'}-${pinnedFormatParams.format.toLowerCase()}`;
 
     const [activeSectionId, setActiveSectionId] = useState('summary');
     const [activatedSections, setActivatedSections] = useState(() => new Set(['summary', 'preview', 'teams']));
@@ -1131,6 +1143,7 @@ const VenueNotes = ({
                                 <CircularProgress size={24} />
                             </Box>
                         )}
+                        {isT20Preview ? (
                         <PostTossSetup
                             venue={venue}
                             team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
@@ -1140,6 +1153,11 @@ const VenueNotes = ({
                             onApplyResult={handlePostTossApply}
                             espnEventId={espnEventId}
                         />
+                        ) : (
+                            <Typography variant="body2" color="text.secondary" sx={{ px: 0.5 }}>
+                                Post-toss XI analysis and fantasy projections are available for men&apos;s T20 only.
+                            </Typography>
+                        )}
                         <Matchups
                             team1={selectedTeam1.full_name}
                             team2={selectedTeam2.full_name}
@@ -1250,6 +1268,7 @@ const VenueNotes = ({
                         leagues: [],
                         team1: selectedTeam1,
                         team2: selectedTeam2,
+                        fmt: formatSlug,
                     })}
                     title={`Explore ${venue.split(',')[0]} Data`}
                 />
@@ -1271,8 +1290,8 @@ const VenueNotes = ({
             ),
         });
 
-        // 9. ML FORESIGHT (last section, only when both teams selected)
-        if (selectedTeam1 && selectedTeam2) {
+        // 9. ML FORESIGHT (last section, only when both teams selected; models are T20-only)
+        if (selectedTeam1 && selectedTeam2 && isT20Preview) {
             groups.push({
                 id: 'foresight',
                 label: 'Foresight',
@@ -1295,6 +1314,8 @@ const VenueNotes = ({
         }
         return groups;
     }, [
+        isT20Preview,
+        formatSlug,
         noVenueMatches,
         onToggleFilters,
         venueStats,
@@ -1461,7 +1482,7 @@ return (
             </Box>
             <Box sx={{ mt: 0.25, px: 0.1 }}>
                 <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    {`${venueStats.total_matches} T20s • ${formattedDateRange}`}
+                    {`${venueStats.total_matches} ${matchNoun(pinnedFormatParams.format, venueStats.total_matches)} • ${formattedDateRange}`}
                 </Typography>
             </Box>
         </Box>

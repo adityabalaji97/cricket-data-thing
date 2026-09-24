@@ -642,7 +642,7 @@ const FantasyPlanner = ({ isMobile }) => {
             </Card>
 
             {/* Tabs for Squad / Recommendations / Transfer Plan */}
-            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+            <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 2 }}>
                 <Tab label="Squad Builder" sx={{ textTransform: 'none', fontWeight: 600 }} />
                 <Tab label="Player Rankings" sx={{ textTransform: 'none', fontWeight: 600 }} />
                 <Tab label="Transfer Plan" sx={{ textTransform: 'none', fontWeight: 600 }} />

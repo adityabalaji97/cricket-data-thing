@@ -21,6 +21,27 @@ logger = logging.getLogger(__name__)
 T20_MEN_PIN = ["dd.format = 'T20'", "dd.gender = 'male'"]
 
 
+def _format_scope(fmt: str, gender: str):
+    """
+    (format pin conditions, international competition label, {phase: (first_over, last_over)})
+    for delivery_details queries. Venue visualizations serve the match preview, which offers
+    ODIs as well as T20s, so none of these can be hard-coded to men's T20.
+    """
+    from format_config import get_format
+    from services.delivery_data_service import _international_bucket
+
+    spec = get_format(fmt, gender)
+    pin = [f"dd.format = '{spec.format}'", f"dd.gender = '{spec.gender}'"]
+    phases = {phase.key: (phase.start_over, phase.end_over) for phase in spec.phases}
+    return pin, _international_bucket(spec.format), phases
+
+
+def _phase_case(phases) -> str:
+    items = list(phases.items())
+    clauses = " ".join(f"WHEN dd.over BETWEEN {lo} AND {hi} THEN '{key}'" for key, (lo, hi) in items[:-1])
+    return f"CASE {clauses} ELSE '{items[-1][0]}' END"
+
+
 
 def get_player_name_for_delivery_details(db: Session, player_name: str) -> List[str]:
     """
@@ -765,6 +786,8 @@ def get_bowler_pitch_map_data(
 def get_venue_wagon_wheel_data(
     db: Session,
     venue: str,
+    fmt: str = "T20",
+    gender: str = "male",
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     leagues: List[str] = None,
@@ -785,7 +808,8 @@ def get_venue_wagon_wheel_data(
     try:
         logger.info(f"Fetching venue wagon wheel data for {venue}")
 
-        conditions = ["dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"] + T20_MEN_PIN
+        format_pin, intl_bucket, phase_overs = _format_scope(fmt, gender)
+        conditions = ["dd.wagon_x IS NOT NULL", "dd.wagon_y IS NOT NULL"] + format_pin
         params: Dict[str, Any] = {}
 
         if venue and venue != "All Venues":
@@ -807,30 +831,27 @@ def get_venue_wagon_wheel_data(
                 params["leagues"] = expanded_leagues
             else:
                 # Match venue-notes semantics: "All Leagues" includes non-T20I competitions
-                comp_conditions.append("dd.competition != 'T20I'")
+                comp_conditions.append(f"dd.competition != '{intl_bucket}'")
             if include_international:
                 if top_teams:
                     from models import INTERNATIONAL_TEAMS_RANKED
                     top_team_names = INTERNATIONAL_TEAMS_RANKED[:top_teams]
                     team_placeholders = ", ".join([f":team_{i}" for i in range(len(top_team_names))])
                     comp_conditions.append(f"""(
-                        dd.competition LIKE '%International%'
+                        dd.competition = '{intl_bucket}'
                         AND (dd.team_bat IN ({team_placeholders}) OR dd.team_bowl IN ({team_placeholders}))
                     )""")
                     for i, team in enumerate(top_team_names):
                         params[f"team_{i}"] = team
                 else:
-                    comp_conditions.append("dd.competition LIKE '%International%'")
+                    comp_conditions.append(f"dd.competition = '{intl_bucket}'")
             if comp_conditions:
                 conditions.append(f"({' OR '.join(comp_conditions)})")
 
         if phase and phase != "overall":
-            if phase == "powerplay":
-                conditions.append("dd.over BETWEEN 0 AND 5")
-            elif phase == "middle":
-                conditions.append("dd.over BETWEEN 6 AND 14")
-            elif phase == "death":
-                conditions.append("dd.over >= 15")
+            if phase in phase_overs:
+                first_over, last_over = phase_overs[phase]
+                conditions.append(f"dd.over BETWEEN {first_over} AND {last_over}")
 
         if bowl_kind:
             conditions.append("dd.bowl_kind = :bowl_kind")
@@ -881,11 +902,7 @@ def get_venue_wagon_wheel_data(
                 dd.dismissal,
                 CASE WHEN dd.out::boolean = true THEN true ELSE false END as is_wicket,
                 CASE WHEN LOWER(COALESCE(dd.dismissal, '')) = 'caught' THEN true ELSE false END as is_caught,
-                CASE
-                    WHEN dd.over BETWEEN 0 AND 5 THEN 'powerplay'
-                    WHEN dd.over BETWEEN 6 AND 14 THEN 'middle'
-                    ELSE 'death'
-                END as phase
+                {_phase_case(phase_overs)} as phase
             FROM delivery_details dd
             WHERE {where_clause}
             ORDER BY dd.match_date, dd.p_match, dd.over, dd.ball
@@ -928,6 +945,8 @@ def get_venue_wagon_wheel_data(
 def get_venue_pitch_map_data(
     db: Session,
     venue: str,
+    fmt: str = "T20",
+    gender: str = "male",
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     leagues: List[str] = None,
@@ -945,7 +964,8 @@ def get_venue_pitch_map_data(
     try:
         logger.info(f"Fetching venue pitch map data for {venue}")
 
-        conditions = ["dd.line IS NOT NULL", "dd.length IS NOT NULL"] + T20_MEN_PIN
+        format_pin, intl_bucket, phase_overs = _format_scope(fmt, gender)
+        conditions = ["dd.line IS NOT NULL", "dd.length IS NOT NULL"] + format_pin
         params: Dict[str, Any] = {}
 
         if venue and venue != "All Venues":
@@ -967,30 +987,27 @@ def get_venue_pitch_map_data(
                 params["leagues"] = expanded_leagues
             else:
                 # Match venue-notes semantics: "All Leagues" includes non-T20I competitions
-                comp_conditions.append("dd.competition != 'T20I'")
+                comp_conditions.append(f"dd.competition != '{intl_bucket}'")
             if include_international:
                 if top_teams:
                     from models import INTERNATIONAL_TEAMS_RANKED
                     top_team_names = INTERNATIONAL_TEAMS_RANKED[:top_teams]
                     team_placeholders = ", ".join([f":team_{i}" for i in range(len(top_team_names))])
                     comp_conditions.append(f"""(
-                        dd.competition LIKE '%International%'
+                        dd.competition = '{intl_bucket}'
                         AND (dd.team_bat IN ({team_placeholders}) OR dd.team_bowl IN ({team_placeholders}))
                     )""")
                     for i, team in enumerate(top_team_names):
                         params[f"team_{i}"] = team
                 else:
-                    comp_conditions.append("dd.competition LIKE '%International%'")
+                    comp_conditions.append(f"dd.competition = '{intl_bucket}'")
             if comp_conditions:
                 conditions.append(f"({' OR '.join(comp_conditions)})")
 
         if phase and phase != "overall":
-            if phase == "powerplay":
-                conditions.append("dd.over BETWEEN 0 AND 5")
-            elif phase == "middle":
-                conditions.append("dd.over BETWEEN 6 AND 14")
-            elif phase == "death":
-                conditions.append("dd.over >= 15")
+            if phase in phase_overs:
+                first_over, last_over = phase_overs[phase]
+                conditions.append(f"dd.over BETWEEN {first_over} AND {last_over}")
 
         if bowl_kind:
             conditions.append("dd.bowl_kind = :bowl_kind")

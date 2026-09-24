@@ -146,6 +146,47 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## Log entries (newest first)
 
+### 2026-09-24 — Match preview format leakage + query builder mobile layout — Claude
+
+User report (phone): an ODI preview (Kingsmead, AUS v SA) showed T20 numbers; top-teams input
+blanked itself; query builder cards overflowed and the column dropdown was unusable.
+
+**Findings:** "0 ODIs since 2021" and "~13 ODIs since 2008" were *correct* (Kingsmead's last
+ODI in the data is Feb 2020; 14 since 2008, one excluded by top-10). But most preview sections
+were format-blind or hard-coded to men's T20:
+* `/venues/{v}/stats` (Leaders): every query `format = 'T20'` literal, no format param.
+* `/venues/{v}/teams/{t1}/{t2}/history` (Recent/H2H/Form): no format filter at all — this also
+  leaked ODIs into **T20** previews.
+* `/venues/{v}/dismissals`: legacy `deliveries` only (T20, stops 2025-11) — no ODI, no 2026 T20.
+* `/visualizations/venue/{v}/wagon-wheel|pitch-map`: T20 pin + T20 phases, and the international
+  filter was `LIKE '%International%'`, which matches nothing (labels are T20I/ODI) — so
+  "include internationals" never added T20Is to the venue field map either.
+* `/boundary-analysis`: T20 phases, format not plumbed.
+* `/teams/{a}/{b}/matchups`: service supported fmt, route never passed it.
+
+**Done:**
+* All six endpoints take `format` (T20|ODI, default T20) + `gender`; per-format phases via
+  format_config / `phase_case_sql`; international label via `_international_bucket`. Dismissals
+  now split legacy (<2015, men's T20) + delivery_details (>=2015 and all other formats) with
+  names normalised (`leg before wicket`→`lbw`).
+* Frontend: Matchups, VenueDismissalAnalytics, DismissalFieldDesigner (venue), BoundaryAnalysis
+  send `pinnedFormatParams`; post-toss + fantasy top picks + Foresight hidden for non-men's-T20
+  (T20 scoring/models) with a note; Explore links carry `fmt=`; QueryBuilder applies `?fmt=` on
+  in-app navigation; venue header says "ODIs"/"T20s" by format.
+* CompetitionFilter top-teams: draft text state, commit only 1–20 (NaN was stored and echoed).
+* Query builder mobile: root grid had no column template, so its implicit column sized to the
+  widest child (~520px) → every card clipped at 390px and menus anchored off-screen. Now
+  `minmax(0, 1fr)`; filters header wraps; columns menu capped at viewport width. Fantasy tabs
+  scrollable.
+* `scripts/dev/ui_sweep.mjs`: overflow detection no longer treats `overflow: hidden` ancestors as
+  scrollers (body is overflow-x hidden, which masked all clipping); added `preview_odi` route.
+
+**Verified:** Kingsmead ODI via API — leaders Miller/Amla/de Villiers, ODI-only recent results,
+ODI dismissals + ODI-phase boundaries, ODI XI in matchups (Marsh/Carey/Green/Head). E2E phone run
+of the ODI preview: every request carries format=ODI. A/B goldens vs live (T20 defaults): 12/13
+identical, match_preview = known local-environment rankings diff. Phone sweep: no clipping
+except Home's intentional carousel.
+
 ### 2026-09-24 — Phase 1: Hindsight MCP connector (query builder for Claude/ChatGPT) — Claude
 
 **Done** (branch `phase1-mcp`; see `docs/mcp-connector.md`):
