@@ -668,11 +668,21 @@ def get_query_options(
     )
 
 
+PREVIEW_WINDOW_YEARS = {"ODI": 8, "T20": 4}
+
+
 def _default_window(fmt: str) -> tuple:
-    """ODIs are sparse, so look further back than for T20s by default."""
+    """
+    Rolling history window ending today: 8 years for ODIs (they are sparse) and 4 for T20s.
+    Rolling from today's date rather than 1 January, so "8 years" means 8 years.
+    """
     today = date.today()
-    years = 8 if fmt == "ODI" else 3
-    return date(today.year - years, 1, 1), today
+    years = PREVIEW_WINDOW_YEARS.get(fmt, 4)
+    try:
+        start = today.replace(year=today.year - years)
+    except ValueError:  # 29 February in a non-leap target year
+        start = today.replace(year=today.year - years, day=28)
+    return start, today
 
 
 def _matchup_edges(team_block: Dict[str, Any], min_balls: int) -> Dict[str, List[Dict[str, Any]]]:
@@ -715,7 +725,7 @@ def preview_match(
     team1: Annotated[str, Field(description="First team, exact name, e.g. 'Australia' or 'Mumbai Indians'.")],
     team2: Annotated[str, Field(description="Second team, exact name.")],
     format: Annotated[Literal["T20", "ODI"], Field(description="Format of the match being previewed.")] = "T20",
-    start_date: Annotated[Optional[date], Field(description="History window start (default: 3 years back for T20, 8 for ODI).")] = None,
+    start_date: Annotated[Optional[date], Field(description="History window start (default: 4 years back for T20, 8 for ODI, rolling from today).")] = None,
     end_date: Annotated[Optional[date], Field(description="History window end (default: today).")] = None,
     include_international: Annotated[bool, Field(description="Include internationals in the venue record.")] = True,
     top_teams: Annotated[int, Field(ge=1, le=20, description="Internationals only between the top N sides.")] = 20,
@@ -786,7 +796,7 @@ def preview_match(
         return f"{p['batter']} v {p['bowler']}: {p['runs']} off {p['balls']}, {p['wickets']} out (SR {p['strike_rate']})"
 
     noun = "ODIs" if format == "ODI" else "T20s"
-    lines = [f"**{team1} v {team2} at {venue}** ({format}, {start.year}–{end.year})", ""]
+    lines = [f"**{team1} v {team2} at {venue}** ({format}, {start.isoformat()} to {end.isoformat()})", ""]
     total = venue_record.get("total_matches") or 0
     if total:
         lines += [
