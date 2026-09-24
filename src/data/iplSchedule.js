@@ -15,6 +15,7 @@ export const fetchUpcomingMatches = async (count = 3) => {
       time: match.time,
       venue: match.venue,
       series: match.series,
+      format: match.format || 'T20',
       isLive: Boolean(match.is_live),
       status: match.status,
       statusText: match.status_text,

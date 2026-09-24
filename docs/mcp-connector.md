@@ -15,7 +15,8 @@ name `Hindsight`, URL above → Add. Then in a chat, enable it from the tools me
 URL above, authentication *No authentication*. Enable it in a chat from the + menu.
 
 Try: *"Kohli's strike rate against pace vs spin by year in T20s"*, *"top 10 IPL 2026 strike rates,
-min 100 balls"*, *"Bumrah's economy by phase"*.
+min 100 balls"*, *"Bumrah's economy by phase"*, *"preview South Africa v Australia at Kingsmead in
+ODIs"*. The URL and these steps are also on the Home page ("Use Hindsight in Claude or ChatGPT").
 
 ## Tools
 
@@ -23,9 +24,11 @@ min 100 balls"*, *"Bumrah's economy by phase"*.
 |---|---|
 | `find_entities` | Resolve "kohli" / "chinnaswamy" / "big bash" to exact names (players, teams, venues, competitions). |
 | `get_query_options` | Valid values for line, length, shot, bowl style/kind, bat hand, competitions, group-by columns. |
-| `query_cricket_data` | The query builder: filters + group_by + sort, returns rows, a text table for the model, an interactive view (`ui://hindsight/query-result`) and an "Open in Hindsight" deep link to `/query`. |
+| `query_cricket_data` | The query builder: filters + group_by (required) + sort, returns aggregated rows, a text table for the model, an interactive view (`ui://hindsight/query-result`) and an "Open in Hindsight" deep link to `/query`. |
+| `preview_match` | Fixture preview for two teams at a venue in T20 or ODI: venue record, leading run-scorers/wicket-takers there, head-to-head, recent form, standout batter-vs-bowler matchups, and a link to the site's preview. Format-specific throughout. |
 
-All three are read-only (`readOnlyHint`).
+All are read-only (`readOnlyHint`). Results are **aggregated only** — `group_by` is required, so
+raw ball-by-ball rows (line/length/shot from the licensed feed) are never redistributed.
 
 ## How it is built
 

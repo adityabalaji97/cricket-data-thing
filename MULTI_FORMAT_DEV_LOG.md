@@ -146,6 +146,30 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## Log entries (newest first)
 
+### 2026-09-24 — ODI fixtures, preview_match MCP tool, Home connector card — Claude
+
+* **Matchups are format-specific** (verified: Marsh v Maharaj 6 off 7 in T20, 53-54 off 80 in
+  ODIs, matching raw delivery_details).
+* **Today's AUS v SA ODI was missing from Home/preview because the fixture scraper only allowed
+  T20Is and top T20 leagues.** `services/fixture_scraper.py`: `_is_odi_event` (ESPN
+  internationalClassId 2 / card "ODI", both sides top-20) + fixtures carry `format`. Home cards
+  link with `fmt=mens-odi|mens-t20` and label ODIs. App-level `?fmt=` sync (App.js) replaces the
+  query-builder-only one; preview resets its fetch guard on format change so it refetches.
+* **Leaders bug (pre-existing, all formats):** `/venues/{v}/stats` with "all leagues" + include
+  internationals selected internationals ONLY (Wankhede leaders were Bethell/Hetmyer). Now league
+  matches + internationals, matching venue notes. Wankhede T20 leaders: SKY 1069, Rohit 792, ...
+* **MCP `preview_match`** (venue, team1, team2, format T20|ODI, window defaults 3y T20 / 8y ODI):
+  venue record, leaders, H2H, form, recent at venue, standout batter-v-bowler edges, deep link to
+  `/venue?...&fmt=`. Calls the preview's own endpoint functions (late `import main`).
+* **MCP aggregates-only:** `query_cricket_data` requires `group_by` — raw ball-by-ball rows
+  (licensed feed) are not redistributed.
+* **Home "05 / Connect" card** with the connector URL (copy button), Claude/ChatGPT steps and
+  example prompts; pipeline section renumbered 06.
+
+**Verified:** preview_match for Kingsmead ODI and Wankhede MI v CSK T20 (10-12s each); A/B goldens
+vs live: 12/13 identical (known local match_preview rankings diff); Home card at 390px, no page
+overflow.
+
 ### 2026-09-24 — Match preview format leakage + query builder mobile layout — Claude
 
 User report (phone): an ODI preview (Kingsmead, AUS v SA) showed T20 numbers; top-teams input

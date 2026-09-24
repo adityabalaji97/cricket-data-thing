@@ -19,6 +19,8 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import PersonIcon from '@mui/icons-material/Person';
 import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import StadiumIcon from '@mui/icons-material/Stadium';
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import GroupsIcon from '@mui/icons-material/Groups';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
@@ -98,6 +100,8 @@ const routePreview = (match) => (
   `&team1=${encodeURIComponent(match.team1Abbr || match.team1 || '')}` +
   `&team2=${encodeURIComponent(match.team2Abbr || match.team2 || '')}` +
   `&includeInternational=true&topTeams=20&autoload=true` +
+  // The preview is one format's record; ODI fixtures must open in ODI, not the global default.
+  `&fmt=${match.format === 'ODI' ? 'mens-odi' : 'mens-t20'}` +
   `${match.matchId ? `&matchId=${encodeURIComponent(match.matchId)}` : ''}`
 );
 
@@ -394,7 +398,7 @@ const TodaySection = ({ matches, loading, isMobile }) => {
         kicker={hasLive ? 'Live now' : '01 / Today'}
         kickerColor={hasLive ? C.red : C.lime}
         title="Today's Matches"
-        subtitle={todayMatches.length ? 'Live and scheduled T20 cricket' : 'No match today, showing the next fixtures'}
+        subtitle={todayMatches.length ? 'Live and scheduled T20 and ODI cricket' : 'No match today, showing the next fixtures'}
         action={<CarouselButtons trackRef={trackRef} hide={isMobile || loading || displayMatches.length < 2} />}
       />
       {loading ? (
@@ -431,7 +435,7 @@ const TodayMatchCard = ({ match }) => {
       }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.2, mb: 2 }}>
-        <Typography sx={chipSx}>{match.series || 'T20'}</Typography>
+        <Typography sx={chipSx}>{match.format === 'ODI' ? `ODI · ${match.series || ''}` : (match.series || 'T20')}</Typography>
         <Typography sx={{ ...monoSx, color: live ? C.red : C.soft }}>{status}</Typography>
       </Box>
       <TeamFixtureRow color={team1Color} abbr={match.team1Abbr || match.team1} name={match.team1} />
@@ -507,6 +511,68 @@ const limeButtonSx = {
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
   '&:hover': { bgcolor: C.limeHover },
+};
+
+
+// The Hindsight MCP connector (mcp_server/): lets Claude / ChatGPT query the data directly.
+const CONNECTOR_URL = 'https://cricket-data-thing-672dfbacf476.herokuapp.com/mcp';
+const CONNECTOR_PROMPTS = [
+  "Kohli's strike rate vs pace and spin by year in T20s",
+  'Top 10 IPL 2026 strike rates, min 100 balls',
+  'Preview South Africa v Australia at Kingsmead in ODIs',
+];
+
+const ConnectorSection = () => {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(CONNECTOR_URL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+  const step = (label, text) => (
+    <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 14, lineHeight: 1.5 }}>
+      <Box component="span" sx={{ color: C.hi, fontWeight: 700 }}>{label}</Box> {text}
+    </Typography>
+  );
+  return (
+    <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
+      <SectionHeader
+        kicker="05 / Connect"
+        title="Use Hindsight in Claude or ChatGPT"
+        subtitle="Ask questions in plain English and get tables, charts and a link back here."
+      />
+      <Box sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 3, bgcolor: C.surface, border: `1px solid ${C.hairline}`, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, p: 1, pl: 1.5, borderRadius: 2, bgcolor: C.inset, border: `1px solid ${C.hairlineStrong}` }}>
+          <Typography sx={{ ...monoSx, color: C.lime, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
+            {CONNECTOR_URL}
+          </Typography>
+          <Button
+            onClick={copy}
+            startIcon={copied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />}
+            sx={{ flexShrink: 0, minHeight: 40, px: 1.5, borderRadius: 2, bgcolor: C.lime, color: C.bg, fontFamily: fonts.mono, fontWeight: 700, fontSize: 11, '&:hover': { bgcolor: C.limeHover } }}
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
+        </Box>
+        {step('Claude:', 'Settings → Connectors → Add custom connector → paste the URL.')}
+        {step('ChatGPT:', 'Settings → Apps & Connectors → turn on Developer mode → Create → paste the URL, no authentication.')}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, pt: 0.5 }}>
+          {CONNECTOR_PROMPTS.map((prompt) => (
+            <Typography key={prompt} sx={{ ...chipSx, maxWidth: '100%', whiteSpace: 'normal', textTransform: 'none', letterSpacing: 0, fontSize: 12 }}>
+              “{prompt}”
+            </Typography>
+          ))}
+        </Box>
+        <Typography sx={{ color: C.low, fontFamily: fonts.body, fontSize: 12 }}>
+          Read-only and free to use; results are aggregated and rate-limited.
+        </Typography>
+      </Box>
+    </Box>
+  );
 };
 
 const RecentMatchesSection = ({
@@ -941,7 +1007,7 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
 
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
-      <Kicker>05 / Pipeline</Kicker>
+      <Kicker>06 / Pipeline</Kicker>
       <Typography sx={{ ...sectionTitleSx, fontSize: { xs: 17, md: 20 } }}>League Match Counts</Typography>
       <Typography sx={{ color: C.soft, mt: 0.6, mb: 1.8, fontFamily: fonts.body, fontSize: 13 }}>
         Ingested match totals per competition - data-pipeline health check
@@ -1280,6 +1346,7 @@ const LandingPage = ({ showLeagueCounts = true }) => {
         />
         <FeaturedInningsSection innings={innings} loading={inningsLoading} isMobile={isMobile} />
         <EloSection isMobile={isMobile} openDropdown={openDropdown} setOpenDropdown={setOpenDropdown} />
+        <ConnectorSection />
         <LeagueCountsSection stats={recentData?.competition_stats} showLeagueCounts={showLeagueCounts} />
         <CreditsSection />
       </Box>

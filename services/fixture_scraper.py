@@ -237,8 +237,42 @@ def _is_top_t20_league_event(series_name: str, event: Dict[str, Any], competitor
     return any(keyword in hay for keyword in TOP_T20_LEAGUE_KEYWORDS)
 
 
+def _is_odi_event(event: Dict[str, Any], competitors: List[Dict[str, Any]]) -> bool:
+    """
+    Men's ODIs between top-ranked national sides (same top-N rule as T20Is).
+
+    The app was T20-only when this filter was written, so ODIs were dropped outright; now that
+    match previews support ODIs, a fixture like South Africa v Australia belongs in the list.
+    ESPN marks men's ODIs as internationalClassId 2 / card "ODI" (women's ODIs are class 9).
+    """
+    event_class = event.get("class") or {}
+    is_odi = (
+        str(event_class.get("internationalClassId") or "") == "2"
+        or str(event_class.get("generalClassCard") or "").upper() == "ODI"
+    )
+    if not is_odi:
+        return False
+    team_names: List[str] = []
+    for c in competitors:
+        if not isinstance(c, dict):
+            continue
+        t = c.get("team") or c
+        raw_name = t.get("displayName") or t.get("shortDisplayName") or t.get("location")
+        if raw_name:
+            team_names.append(_normalize_team_name_for_ranking(t, raw_name))
+    return len(team_names) >= 2 and all(name in TOP_T20I_TEAMS for name in team_names[:2])
+
+
+def _event_format(event: Dict[str, Any]) -> str:
+    return "ODI" if str(event.get("eventType") or "").upper() == "ODI" else "T20"
+
+
 def _is_allowed_event(event: Dict[str, Any], competitors: List[Dict[str, Any]], series_name: str) -> bool:
-    return _is_t20i_event(event, competitors) or _is_top_t20_league_event(series_name, event, competitors)
+    return (
+        _is_t20i_event(event, competitors)
+        or _is_top_t20_league_event(series_name, event, competitors)
+        or _is_odi_event(event, competitors)
+    )
 
 
 def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -300,6 +334,8 @@ def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "team2_abbr": _team_abbreviation(t2, team2),
         "series": series_name,
         "event_type": event.get("eventType"),
+        # Lets the site open the preview in the right format (fmt=mens-odi / mens-t20).
+        "format": _event_format(event),
         "is_live": is_live,
         "status": state or "pre",
         "status_text": (status_obj.get("summary") or event.get("summary") or ("Live" if is_live else "Scheduled")),

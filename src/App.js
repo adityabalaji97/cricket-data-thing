@@ -127,7 +127,19 @@ const AppContent = () => {
   const isCompactNav = useMediaQuery(theme.breakpoints.down('md'));
   // Pinned, not the raw selection: a venue preview is one format's record at a ground,
   // and the venue endpoints reject 'ALL'.
-  const { supportsT20OnlyPages, pinnedFormatParams } = useFormat();
+  const { supportsT20OnlyPages, pinnedFormatParams, active: activeFormat, selectFormat } = useFormat();
+
+  // In-app links carry ?fmt= so the destination opens in the right format (a Home fixture card
+  // opens an ODI preview in ODI; a preview's Explore link opens the query builder in the same
+  // format). FormatProvider sits outside the router and only reads ?fmt= on first page load, so
+  // apply it here whenever navigation brings a different one.
+  const urlFormatSlug = new URLSearchParams(location.search).get('fmt');
+  useEffect(() => {
+    if (urlFormatSlug && activeFormat?.slug && urlFormatSlug !== activeFormat.slug) {
+      selectFormat(urlFormatSlug);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlFormatSlug]);
 
 
   
@@ -320,6 +332,13 @@ const AppContent = () => {
       }
     }
   };
+
+  // A format change (e.g. arriving from a Home ODI fixture via ?fmt=) must refetch even if the
+  // preview already loaded under the previous format; the duplicate-fetch guard would otherwise
+  // keep the old format's numbers. Declared before the fetch effect so it runs first.
+  useEffect(() => {
+    hasFetchedRef.current = false;
+  }, [pinnedFormatParams.format, pinnedFormatParams.gender]);
 
   useEffect(() => {
     const abortController = new AbortController();

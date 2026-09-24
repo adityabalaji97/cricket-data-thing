@@ -1000,6 +1000,12 @@ def get_venue_stats(
             # Expand league abbreviations to include full names
             params["leagues"] = expand_league_abbreviations(leagues)
             competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
+        elif include_international:
+            # "All leagues" plus internationals means league matches AND internationals -- the
+            # same rule venue notes use (analytics_common.build_matches_filter_sql). Without
+            # this, ticking "include internationals" silently dropped every league match, so an
+            # IPL ground's leaders were drawn from T20Is alone.
+            competition_conditions.append("(m.match_type = 'league')")
 
         if include_international:
             if top_teams:

@@ -149,19 +149,9 @@ const getActiveFilterCount = (filters, groupBy) => {
 };
 
 const QueryBuilder = ({ isMobile }) => {
-  const { formatParams, active, selectFormat } = useFormat();
+  const { formatParams, active } = useFormat();
   const { getFiltersFromUrl, getGroupByFromUrl, currentParams } = useUrlParams();
 
-  // Links from elsewhere in the app (e.g. a match preview's Explore queries) carry ?fmt= so the
-  // query runs in the same format. FormatProvider only reads it on first page load, so apply it
-  // here when the query builder is reached by in-app navigation.
-  const urlFormatSlug = new URLSearchParams(currentParams || '').get('fmt');
-  useEffect(() => {
-    if (urlFormatSlug && active?.slug && urlFormatSlug !== active.slug) {
-      selectFormat(urlFormatSlug);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlFormatSlug]);
   
   const [filters, setFilters] = useState(getDefaultFilters);
   

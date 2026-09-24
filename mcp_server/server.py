@@ -346,13 +346,16 @@ How to use the tools:
    exactly (e.g. "V Kohli", "M Chinnaswamy Stadium, Bengaluru").
 2. For enum-like filters (line, length, shot, bowl_style, bowl_kind, dismissal, competitions)
    call get_query_options once and use its values verbatim.
-3. query_cricket_data answers the question. Almost always pass group_by (aggregated rows); an
-   ungrouped query returns raw deliveries. For leaderboards, group by batter or bowler, set
+3. query_cricket_data answers the question. group_by is required (results are aggregated).
+   For leaderboards, group by batter or bowler, set
    min_balls (e.g. 120) to drop small samples, and sort_by the metric. Group by "phase" for
    powerplay/middle/death, "year" for trends, "format" when mixing T20 and ODI.
 Overs are 0-indexed (over_min=0, over_max=5 is the powerplay). Default format is ALL; pin
 format="T20" for T20-only questions. The result renders as an interactive table/chart and
 includes a link to open the same query on the Hindsight website — mention it to the user.
+4. preview_match gives a fixture preview (venue record, leaders, head-to-head, form, standout
+   batter-vs-bowler matchups) for two teams at a venue in T20 or ODI — use it for "preview X v Y
+   at Z" questions, then drill in with query_cricket_data.
 """
 
 apps = Apps()
@@ -372,7 +375,7 @@ apps = Apps()
 )
 def query_cricket_data(
     ctx: Context,
-    group_by: Annotated[List[GroupByColumn], Field(description="Columns to aggregate by, e.g. ['batter'], ['bowl_kind','year'], ['phase']. Empty returns raw deliveries.")] = [],
+    group_by: Annotated[List[GroupByColumn], Field(min_length=1, description="Columns to aggregate by (required), e.g. ['batter'], ['bowl_kind','year'], ['phase'].")],
     batters: Annotated[List[str], Field(description="Exact batter names from find_entities, e.g. ['V Kohli'].")] = [],
     bowlers: Annotated[List[str], Field(description="Exact bowler names from find_entities.")] = [],
     players: Annotated[List[str], Field(description="Players matched as batter OR bowler.")] = [],
@@ -429,6 +432,11 @@ def query_cricket_data(
         "top_teams": top_teams, "query_mode": query_mode,
     }
     group_by = list(dict.fromkeys(group_by))
+    if not group_by:
+        # Aggregates only: raw ball-by-ball rows (with line/length/shot from the licensed feed)
+        # are not redistributed through the public connector.
+        return _error("query_cricket_data returns aggregated results only. Pass group_by, e.g. "
+                      "['batter'], ['year'], ['phase'] or ['bowl_kind'].")
     if not _budget.try_acquire():
         _log_call("query_cricket_data", ctx, params, started, "busy")
         return _BUSY
@@ -658,6 +666,152 @@ def get_query_options(
         content=[TextContent(type="text", text=json.dumps(structured, default=str))],
         structured_content=structured,
     )
+
+
+def _default_window(fmt: str) -> tuple:
+    """ODIs are sparse, so look further back than for T20s by default."""
+    today = date.today()
+    years = 8 if fmt == "ODI" else 3
+    return date(today.year - years, 1, 1), today
+
+
+def _matchup_edges(team_block: Dict[str, Any], min_balls: int) -> Dict[str, List[Dict[str, Any]]]:
+    """Standout batter-vs-bowler pairs from a matchups block, both directions."""
+    pairs = []
+    for batter, cells in (team_block.get("batting_matchups") or {}).items():
+        for bowler, cell in (cells or {}).items():
+            if bowler == "Overall" or not isinstance(cell, dict):
+                continue
+            balls = cell.get("balls") or 0
+            if balls < min_balls:
+                continue
+            pairs.append({
+                "batter": batter, "bowler": bowler, "balls": balls, "runs": cell.get("runs"),
+                "wickets": cell.get("wickets"), "strike_rate": _normalise_value(cell.get("strike_rate")),
+            })
+    batter_edges = sorted(
+        (p for p in pairs if (p["wickets"] or 0) <= 1), key=lambda p: -(p["strike_rate"] or 0)
+    )[:4]
+    bowler_edges = sorted(
+        pairs, key=lambda p: (-(p["wickets"] or 0), p["strike_rate"] or 0)
+    )[:4]
+    return {"batter_edges": batter_edges, "bowler_edges": [p for p in bowler_edges if (p["wickets"] or 0) >= 1]}
+
+
+@mcp.tool(
+    name="preview_match",
+    title="Preview a match",
+    description=(
+        "Pre-match preview for two teams at a venue in T20 or ODI: the venue's record (bat-first "
+        "wins, average and winning scores), leading run-scorers and wicket-takers there, recent "
+        "head-to-head and form, and standout batter-vs-bowler matchups from recent XIs. All numbers "
+        "are for the chosen format only. Use find_entities for exact venue and team names."
+    ),
+    annotations=READ_ONLY,
+)
+def preview_match(
+    ctx: Context,
+    venue: Annotated[str, Field(description="Exact venue name from find_entities, e.g. 'Kingsmead, Durban'.")],
+    team1: Annotated[str, Field(description="First team, exact name, e.g. 'Australia' or 'Mumbai Indians'.")],
+    team2: Annotated[str, Field(description="Second team, exact name.")],
+    format: Annotated[Literal["T20", "ODI"], Field(description="Format of the match being previewed.")] = "T20",
+    start_date: Annotated[Optional[date], Field(description="History window start (default: 3 years back for T20, 8 for ODI).")] = None,
+    end_date: Annotated[Optional[date], Field(description="History window end (default: today).")] = None,
+    include_international: Annotated[bool, Field(description="Include internationals in the venue record.")] = True,
+    top_teams: Annotated[int, Field(ge=1, le=20, description="Internationals only between the top N sides.")] = 20,
+    leagues: Annotated[List[str], Field(description="Competitions for the venue record (empty = all leagues).")] = [],
+) -> CallToolResult:
+    import main as app  # late import: main.py imports this module at startup
+    from services.matchups import get_team_matchups_service
+
+    started = time.monotonic()
+    args = {"venue": venue, "team1": team1, "team2": team2, "format": format}
+    if not _budget.try_acquire():
+        return _BUSY
+    default_start, default_end = _default_window(format)
+    start, end = start_date or default_start, end_date or default_end
+    try:
+        with _read_only_session() as db:
+            notes = app.get_venue_notes(
+                venue=venue, start_date=start, end_date=end, leagues=leagues,
+                include_international=include_international, top_teams=top_teams,
+                day_or_night=None, format=format, gender="male", db=db,
+            )
+            stats = app.get_venue_stats(
+                venue=venue, start_date=start, end_date=end, leagues=leagues,
+                include_international=include_international, top_teams=top_teams,
+                day_or_night=None, format=format, gender="male", db=db,
+            )
+            history = app.get_match_history(
+                venue=venue, team1=team1, team2=team2, start_date=start, end_date=end,
+                day_or_night=None, format=format, gender="male", db=db,
+            )
+            matchups = get_team_matchups_service(
+                team1=team1, team2=team2, start_date=start, end_date=end, team1_players=[],
+                team2_players=[], db=db, use_current_roster=False, innings_position=None,
+                venue_filter=None, min_balls=6, day_or_night=None, fmt=format, gender="male",
+            )
+    except Exception as exc:
+        _log_call("preview_match", ctx, args, started, "error")
+        logger.warning("mcp preview failed: %r", exc)
+        return _error(_user_message(exc, "That preview could not be built."))
+
+    min_balls = 18 if format == "ODI" else 10
+    t1_edges = _matchup_edges((matchups or {}).get("team1") or {}, min_balls)
+    t2_edges = _matchup_edges((matchups or {}).get("team2") or {}, min_balls)
+    h2h = (history or {}).get("h2h_stats") or {}
+    link = f"{WEB_URL}/venue?" + urlencode([
+        ("venue", venue), ("team1", team1), ("team2", team2), ("includeInternational", "true"),
+        ("topTeams", str(top_teams)), ("autoload", "true"), ("fmt", _format_slug(format, "male")),
+    ])
+    venue_record = {k: _normalise_value(v) for k, v in (notes or {}).items() if not isinstance(v, (dict, list))}
+    structured = {
+        "venue": venue, "team1": team1, "team2": team2, "format": format,
+        "window": {"start_date": start.isoformat(), "end_date": end.isoformat()},
+        "venue_record": venue_record,
+        "top_batters": [{k: _normalise_value(v) for k, v in row.items()} for row in (stats or {}).get("batting_leaders", [])[:5]],
+        "top_bowlers": [{k: _normalise_value(v) for k, v in row.items()} for row in (stats or {}).get("bowling_leaders", [])[:5]],
+        "head_to_head": {"team1_wins": h2h.get("team1_wins"), "team2_wins": h2h.get("team2_wins"),
+                         "no_result": h2h.get("draws"), "recent": h2h.get("recent_matches", [])},
+        "recent_form": {"team1": (history or {}).get("team1_results", []), "team2": (history or {}).get("team2_results", [])},
+        "recent_at_venue": (history or {}).get("venue_results", []),
+        "matchups": {
+            f"{team1} batting": t1_edges,
+            f"{team2} batting": t2_edges,
+        },
+        "hindsight_url": link,
+    }
+
+    def _pair(p: Dict[str, Any]) -> str:
+        return f"{p['batter']} v {p['bowler']}: {p['runs']} off {p['balls']}, {p['wickets']} out (SR {p['strike_rate']})"
+
+    noun = "ODIs" if format == "ODI" else "T20s"
+    lines = [f"**{team1} v {team2} at {venue}** ({format}, {start.year}–{end.year})", ""]
+    total = venue_record.get("total_matches") or 0
+    if total:
+        lines += [
+            f"Venue: {total} {noun} — batting first won {venue_record.get('batting_first_wins')}, chasing won "
+            f"{venue_record.get('batting_second_wins')}. Avg 1st innings {venue_record.get('average_first_innings')}, "
+            f"avg winning score {venue_record.get('average_winning_score')}, highest chased {venue_record.get('highest_total_chased')}.",
+        ]
+    else:
+        lines.append(f"Venue: no {noun} at this ground in the window (try an earlier start_date).")
+    if structured["top_batters"]:
+        lines.append("Top run-scorers here: " + "; ".join(
+            f"{b.get('name')} {b.get('batRuns')} ({b.get('batInns')} inns, SR {b.get('batSR')})" for b in structured["top_batters"][:3]))
+    if structured["top_bowlers"]:
+        lines.append("Top wicket-takers here: " + "; ".join(
+            f"{b.get('name')} {b.get('bowlWickets')} ({b.get('bowlInns')} inns, econ {b.get('bowlER')})" for b in structured["top_bowlers"][:3]))
+    lines.append(f"Head-to-head (last {len(h2h.get('recent_matches') or [])}): {team1} {h2h.get('team1_wins')}, {team2} {h2h.get('team2_wins')}.")
+    for side, edges in structured["matchups"].items():
+        if edges["batter_edges"]:
+            lines.append(f"{side} — batter edges: " + "; ".join(_pair(p) for p in edges["batter_edges"][:3]))
+        if edges["bowler_edges"]:
+            lines.append(f"{side} — bowler edges: " + "; ".join(_pair(p) for p in edges["bowler_edges"][:3]))
+    lines += ["", f"Full preview on Hindsight: {link}"]
+
+    _log_call("preview_match", ctx, args, started, "ok")
+    return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
 
 
 # --------------------------------------------------------------------------------------------
