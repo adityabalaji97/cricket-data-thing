@@ -542,6 +542,8 @@ def get_venue_similar(
     bowl_kind: Optional[str] = Query(default=None),
     bowl_style: Optional[str] = Query(default=None),
     zone_metric: str = Query(default="boundary_pct", pattern="^(boundary_pct|run_pct)$"),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    gender: Literal["male", "female"] = Query(default="male"),
     db: Session = Depends(get_session),
 ):
     try:
@@ -559,6 +561,8 @@ def get_venue_similar(
             bowl_kind=bowl_kind,
             bowl_style=bowl_style,
             zone_metric=zone_metric,
+            fmt=format,
+            gender=gender,
         )
         if not result.get("found"):
             raise HTTPException(status_code=404, detail=result.get("error", "Venue not found"))
@@ -588,6 +592,8 @@ def get_venue_tactical_edges_endpoint(
     min_balls: int = Query(default=24, ge=1, le=5000),
     top_n_similar: int = Query(default=5, ge=1, le=20),
     similar_venues: Optional[str] = Query(default=None),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    gender: Literal["male", "female"] = Query(default="male"),
     db: Session = Depends(get_session),
 ):
     try:
@@ -615,6 +621,8 @@ def get_venue_tactical_edges_endpoint(
             min_balls=min_balls,
             top_n_similar=top_n_similar,
             similar_venues_override=similar_venues_list,
+            fmt=format,
+            gender=gender,
         )
         if not result.get("found", True):
             raise HTTPException(status_code=404, detail=result.get("error", "No tactical edge data found"))

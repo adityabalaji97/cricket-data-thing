@@ -673,16 +673,12 @@ PREVIEW_WINDOW_YEARS = {"ODI": 8, "T20": 4}
 
 def _default_window(fmt: str) -> tuple:
     """
-    Rolling history window ending today: 8 years for ODIs (they are sparse) and 4 for T20s.
-    Rolling from today's date rather than 1 January, so "8 years" means 8 years.
+    History window ending today, starting 1 January 8 years back for ODIs (they are sparse) and
+    4 years back for T20s -- sized for a meaningful number of matches, not an exact span. Same
+    rule as the website's preview (src/utils/dateDefaults.js getPreviewStartDate).
     """
     today = date.today()
-    years = PREVIEW_WINDOW_YEARS.get(fmt, 4)
-    try:
-        start = today.replace(year=today.year - years)
-    except ValueError:  # 29 February in a non-leap target year
-        start = today.replace(year=today.year - years, day=28)
-    return start, today
+    return date(today.year - PREVIEW_WINDOW_YEARS.get(fmt, 4), 1, 1), today
 
 
 def _matchup_edges(team_block: Dict[str, Any], min_balls: int) -> Dict[str, List[Dict[str, Any]]]:
@@ -725,7 +721,7 @@ def preview_match(
     team1: Annotated[str, Field(description="First team, exact name, e.g. 'Australia' or 'Mumbai Indians'.")],
     team2: Annotated[str, Field(description="Second team, exact name.")],
     format: Annotated[Literal["T20", "ODI"], Field(description="Format of the match being previewed.")] = "T20",
-    start_date: Annotated[Optional[date], Field(description="History window start (default: 4 years back for T20, 8 for ODI, rolling from today).")] = None,
+    start_date: Annotated[Optional[date], Field(description="History window start (default: 1 January, 4 years back for T20 and 8 for ODI).")] = None,
     end_date: Annotated[Optional[date], Field(description="History window end (default: today).")] = None,
     include_international: Annotated[bool, Field(description="Include internationals in the venue record.")] = True,
     top_teams: Annotated[int, Field(ge=1, le=20, description="Internationals only between the top N sides.")] = 20,

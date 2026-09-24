@@ -11,6 +11,9 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **Latest:** preview defaults to 1 Jan 8y (ODI) / 4y (T20) on site and connector; venue
+> similarity is format-pinned with a shared pool cache (see newest log entry).
+>
 > **U1 (five UI bugs) is deployed**: commit ab453ab on main; Heroku v411/v412, Vercel `hindsight`
 > Ready. **Phase 0 done**: Heroku Postgres is now **essential-1** ($9/mo, 10 GB, 20 connections;
 > 3.73 GB used after the copy dropped bloat). The plan change moved the database, so
@@ -145,6 +148,35 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-09-24 — Preview default windows; venue similarity format-pinned and cached — Claude
+
+**Preview window (site + connector):** the match preview's default start is now 1 January,
+8 years back for ODIs and 4 for T20s (`src/utils/dateDefaults.js` `getPreviewStartDate`,
+`mcp_server/server.py` `_default_window`). App.js follows the pinned format until the user
+touches the date, and the day/night toggle no longer widens the window on its own.
+
+**Venue similarity (`services/venue_similarity.py`) had no format at all.** With no competition
+filter it scanned every format; with one it pinned T20 regardless; phases were T20 over literals
+(so ODI grounds were profiled on overs 0-19); caches ignored format. Now:
+
+* `format`/`gender` on `/visualizations/venue/{v}/similar` and `/tactical-edges` (and passed
+  through the nested call); `_build_delivery_details_filters` always pins one format; phase
+  overs come from `format_config` via `_phase_overs`. `VenueSimilarity.jsx` sends both.
+* **Pool cache.** The seven pool-wide queries do not depend on the previewed venue, so they
+  moved into `_load_venue_pool`, cached by (format, gender, dates, competition filters) for 6h,
+  max 8 entries. Zone filters (bat hand / bowl kind / style) are *not* in that key — they run
+  one extra query. An end date of today or later is treated as none so keys survive the
+  browser/server date skew.
+* Phase query rewritten as per-innings then per-ground (the three `COUNT(DISTINCT
+  p_match||inns)` sorts were 8.4s); phase x pace/spin folded into it; the "output" zone query is
+  skipped when there are no zone filters (it was a duplicate).
+* Verified byte-identical responses before/after the refactor for 7 cases (T20/ODI similar,
+  All Venues, LHB zone filter, tactical edges T20/ODI-death). From a laptop against prod:
+  cold T20 4y pool ~22s (was 26-29s), every other venue ~1s, zone-filter change 21.5s → 4.6s.
+* Kingsmead ODI "not enough data" is correct: 4 ODIs since 2018, pool minimum is 5.
+
+**Open:** a cold T20 pool is still ~20s; if it H12s on Heroku, precompute venue features nightly.
 
 ### 2026-09-24 — ODI fixtures, preview_match MCP tool, Home connector card — Claude
 

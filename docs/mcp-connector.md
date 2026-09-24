@@ -25,7 +25,7 @@ ODIs"*. The URL and these steps are also on the Home page ("Use Hindsight in Cla
 | `find_entities` | Resolve "kohli" / "chinnaswamy" / "big bash" to exact names (players, teams, venues, competitions). |
 | `get_query_options` | Valid values for line, length, shot, bowl style/kind, bat hand, competitions, group-by columns. |
 | `query_cricket_data` | The query builder: filters + group_by (required) + sort, returns aggregated rows, a text table for the model, an interactive view (`ui://hindsight/query-result`) and an "Open in Hindsight" deep link to `/query`. |
-| `preview_match` | Fixture preview for two teams at a venue in T20 or ODI: venue record, leading run-scorers/wicket-takers there, head-to-head, recent form, standout batter-vs-bowler matchups, and a link to the site's preview. Format-specific throughout. History window defaults to the last 8 years for ODIs and 4 for T20s (rolling from today). |
+| `preview_match` | Fixture preview for two teams at a venue in T20 or ODI: venue record, leading run-scorers/wicket-takers there, head-to-head, recent form, standout batter-vs-bowler matchups, and a link to the site's preview. Format-specific throughout. History window defaults to 1 January 8 years back for ODIs and 4 years back for T20s (same as the website's preview). |
 
 All are read-only (`readOnlyHint`). Results are **aggregated only** — `group_by` is required, so
 raw ball-by-ball rows (line/length/shot from the licensed feed) are never redistributed.

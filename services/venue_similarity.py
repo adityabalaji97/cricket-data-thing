@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import math
 import time
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -233,12 +233,22 @@ def _canonicalize_venue(venue: Optional[str]) -> Optional[str]:
     return venue
 
 
+def _phase_overs(fmt: str, gender: str) -> Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]:
+    """(powerplay, middle, death) inclusive over ranges for a format."""
+    from format_config import get_format
+
+    phases = {phase.key: (phase.start_over, phase.end_over) for phase in get_format(fmt, gender).phases}
+    return phases["powerplay"], phases["middle"], phases["death"]
+
+
 def _build_delivery_details_filters(
     start_date: Optional[date],
     end_date: Optional[date],
     leagues: Optional[List[str]],
     include_international: Optional[bool],
     top_teams: Optional[int],
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Tuple[str, Dict[str, Any]]:
     params: Dict[str, Any] = {}
     clauses: List[str] = []
@@ -263,8 +273,16 @@ def _build_delivery_details_filters(
             include_international=include_international if include_international is not None else False,
             top_teams=top_teams,
             params=params,
+            fmt=fmt,
+            gender=gender,
         )
         where_sql += f" {competition_filter}"
+    else:
+        # No competition filter still means one format: unpinned, venue profiles blended T20 and
+        # ODI balls (and ODIs were cut with T20 phase overs).
+        from services.analytics_common import format_filter_sql
+
+        where_sql += f" AND {format_filter_sql('dd', fmt, gender)}"
 
     return where_sql, params
 
@@ -471,56 +489,27 @@ _similarity_cache: Dict[tuple, Dict[str, Any]] = {}
 _CACHE_TTL = 1800  # 30 minutes
 
 
-def get_similar_venues(
-    venue: str,
-    db: Session,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-    min_matches: int = 10,
-    top_n: int = 5,
-    leagues: Optional[List[str]] = None,
-    include_international: Optional[bool] = None,
-    top_teams: Optional[int] = None,
-    bat_hand: Optional[str] = None,
-    bowl_kind: Optional[str] = None,
-    bowl_style: Optional[str] = None,
-    zone_metric: str = "boundary_pct",
-) -> Dict[str, Any]:
-    """
-    Find most similar and dissimilar venues using normalized venue feature vectors.
-    """
-    cache_key = (
-        venue,
-        start_date,
-        end_date,
-        min_matches,
-        top_n,
-        tuple(sorted(leagues or [])),
-        include_international,
-        top_teams,
-        bat_hand,
-        bowl_kind,
-        bowl_style,
-        zone_metric,
-    )
-    if cache_key in _similarity_cache:
-        entry = _similarity_cache[cache_key]
-        if time.time() - entry["ts"] < _CACHE_TTL:
-            return entry["data"]
+# The venue pool (every venue's features for one format/window/filter set) does not depend on the
+# venue being previewed, and building it is several full passes over delivery_details. Cached
+# separately so the first preview pays for it and every other venue in that window reuses it.
+_pool_cache: "OrderedDict[tuple, Dict[str, Any]]" = OrderedDict()
+_POOL_CACHE_MAX = 8
+_POOL_CACHE_TTL = 6 * 3600  # the data changes once a day, with the nightly ingest
 
-    where_sql, params = _build_delivery_details_filters(
-        start_date=start_date,
-        end_date=end_date,
-        leagues=leagues,
-        include_international=include_international,
-        top_teams=top_teams,
-    )
-    zone_metric = "run_pct" if zone_metric == "run_pct" else "boundary_pct"
-    zone_output_filter_sql, zone_output_params = _build_zone_output_filter_sql(
-        bat_hand=bat_hand,
-        bowl_kind=bowl_kind,
-        bowl_style=bowl_style,
-    )
+
+def _load_venue_pool(
+    db: Session,
+    pool_key: tuple,
+    where_sql: str,
+    params: Dict[str, Any],
+    phase_overs: Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]],
+) -> Dict[str, Any]:
+    entry = _pool_cache.get(pool_key)
+    if entry and time.time() - entry["ts"] < _POOL_CACHE_TTL:
+        _pool_cache.move_to_end(pool_key)
+        return entry["pool"]
+
+    (_pp_lo, _pp_hi), (_mid_lo, _mid_hi), (_death_lo, _death_hi) = phase_overs
 
     match_rows = db.execute(
         text(
@@ -542,49 +531,102 @@ def get_similar_venues(
         params,
     ).fetchall()
 
+    # COUNT(DISTINCT match-innings) per phase used to cost three text-concatenation sorts over
+    # every ball; aggregating per innings first gives the same counts from one hash pass.
     phase_rows = db.execute(
         text(
             f"""
             SELECT
-                dd.ground AS venue,
-                COUNT(*) AS total_balls,
-                SUM(CASE WHEN dd.over BETWEEN 0 AND 5 THEN dd.score ELSE 0 END) AS pp_runs,
-                SUM(CASE WHEN dd.over BETWEEN 0 AND 5 THEN 1 ELSE 0 END) AS pp_balls,
-                SUM(CASE WHEN dd.over BETWEEN 0 AND 5 AND {WICKET_CONDITION} THEN 1 ELSE 0 END) AS pp_wickets,
-                SUM(CASE WHEN dd.over BETWEEN 0 AND 5 AND dd.score IN (4, 6) THEN 1 ELSE 0 END) AS pp_boundaries,
-                COUNT(DISTINCT CASE WHEN dd.over BETWEEN 0 AND 5 THEN dd.p_match::text || '-' || dd.inns::text END) AS pp_innings,
-
-                SUM(CASE WHEN dd.over BETWEEN 6 AND 14 THEN dd.score ELSE 0 END) AS middle_runs,
-                SUM(CASE WHEN dd.over BETWEEN 6 AND 14 THEN 1 ELSE 0 END) AS middle_balls,
-                SUM(CASE WHEN dd.over BETWEEN 6 AND 14 AND {WICKET_CONDITION} THEN 1 ELSE 0 END) AS middle_wickets,
-                SUM(CASE WHEN dd.over BETWEEN 6 AND 14 AND dd.score IN (4, 6) THEN 1 ELSE 0 END) AS middle_boundaries,
-                COUNT(DISTINCT CASE WHEN dd.over BETWEEN 6 AND 14 THEN dd.p_match::text || '-' || dd.inns::text END) AS middle_innings,
-
-                SUM(CASE WHEN dd.over BETWEEN 15 AND 19 THEN dd.score ELSE 0 END) AS death_runs,
-                SUM(CASE WHEN dd.over BETWEEN 15 AND 19 THEN 1 ELSE 0 END) AS death_balls,
-                SUM(CASE WHEN dd.over BETWEEN 15 AND 19 AND {WICKET_CONDITION} THEN 1 ELSE 0 END) AS death_wickets,
-                SUM(CASE WHEN dd.over BETWEEN 15 AND 19 AND dd.score IN (4, 6) THEN 1 ELSE 0 END) AS death_boundaries,
-                COUNT(DISTINCT CASE WHEN dd.over BETWEEN 15 AND 19 THEN dd.p_match::text || '-' || dd.inns::text END) AS death_innings,
-
-                SUM(CASE WHEN {PACE_KIND_CONDITION} THEN dd.score ELSE 0 END) AS pace_runs,
-                SUM(CASE WHEN {PACE_KIND_CONDITION} THEN 1 ELSE 0 END) AS pace_balls,
-                SUM(CASE WHEN {PACE_KIND_CONDITION} AND {WICKET_CONDITION} THEN 1 ELSE 0 END) AS pace_wickets,
-                SUM(CASE WHEN {PACE_KIND_CONDITION} AND dd.score = 0 THEN 1 ELSE 0 END) AS pace_dots,
-
-                SUM(CASE WHEN {SPIN_KIND_CONDITION} THEN dd.score ELSE 0 END) AS spin_runs,
-                SUM(CASE WHEN {SPIN_KIND_CONDITION} THEN 1 ELSE 0 END) AS spin_balls,
-                SUM(CASE WHEN {SPIN_KIND_CONDITION} AND {WICKET_CONDITION} THEN 1 ELSE 0 END) AS spin_wickets,
-                SUM(CASE WHEN {SPIN_KIND_CONDITION} AND dd.score = 0 THEN 1 ELSE 0 END) AS spin_dots,
-
-                SUM(CASE WHEN {SHORT_LENGTH_CONDITION} THEN 1 ELSE 0 END) AS short_balls,
-                SUM(CASE WHEN {SHORT_LENGTH_CONDITION} THEN dd.score ELSE 0 END) AS short_runs,
-                SUM(CASE WHEN {GOOD_LENGTH_CONDITION} THEN 1 ELSE 0 END) AS good_balls,
-                SUM(CASE WHEN {GOOD_LENGTH_CONDITION} THEN dd.score ELSE 0 END) AS good_runs,
-                SUM(CASE WHEN {FULL_LENGTH_CONDITION} THEN 1 ELSE 0 END) AS full_balls
-            FROM delivery_details dd
-            WHERE 1=1
-                {where_sql}
-            GROUP BY dd.ground
+                i.venue AS venue,
+                SUM(i.total_balls) AS total_balls,
+                SUM(i.pp_runs) AS pp_runs,
+                SUM(i.pp_balls) AS pp_balls,
+                SUM(i.pp_wickets) AS pp_wickets,
+                SUM(i.pp_boundaries) AS pp_boundaries,
+                COUNT(*) FILTER (WHERE i.pp_balls > 0) AS pp_innings,
+                SUM(i.middle_runs) AS middle_runs,
+                SUM(i.middle_balls) AS middle_balls,
+                SUM(i.middle_wickets) AS middle_wickets,
+                SUM(i.middle_boundaries) AS middle_boundaries,
+                COUNT(*) FILTER (WHERE i.middle_balls > 0) AS middle_innings,
+                SUM(i.death_runs) AS death_runs,
+                SUM(i.death_balls) AS death_balls,
+                SUM(i.death_wickets) AS death_wickets,
+                SUM(i.death_boundaries) AS death_boundaries,
+                COUNT(*) FILTER (WHERE i.death_balls > 0) AS death_innings,
+                SUM(i.pace_runs) AS pace_runs,
+                SUM(i.pace_balls) AS pace_balls,
+                SUM(i.pace_wickets) AS pace_wickets,
+                SUM(i.pace_dots) AS pace_dots,
+                SUM(i.spin_runs) AS spin_runs,
+                SUM(i.spin_balls) AS spin_balls,
+                SUM(i.spin_wickets) AS spin_wickets,
+                SUM(i.spin_dots) AS spin_dots,
+                SUM(i.short_balls) AS short_balls,
+                SUM(i.short_runs) AS short_runs,
+                SUM(i.good_balls) AS good_balls,
+                SUM(i.good_runs) AS good_runs,
+                SUM(i.full_balls) AS full_balls,
+                SUM(i.pp_pace_balls) AS pp_pace_balls,
+                SUM(i.pp_pace_runs) AS pp_pace_runs,
+                SUM(i.pp_spin_balls) AS pp_spin_balls,
+                SUM(i.pp_spin_runs) AS pp_spin_runs,
+                SUM(i.middle_pace_balls) AS middle_pace_balls,
+                SUM(i.middle_pace_runs) AS middle_pace_runs,
+                SUM(i.middle_spin_balls) AS middle_spin_balls,
+                SUM(i.middle_spin_runs) AS middle_spin_runs,
+                SUM(i.death_pace_balls) AS death_pace_balls,
+                SUM(i.death_pace_runs) AS death_pace_runs,
+                SUM(i.death_spin_balls) AS death_spin_balls,
+                SUM(i.death_spin_runs) AS death_spin_runs
+            FROM (
+                SELECT
+                    dd.ground AS venue,
+                    COUNT(*) AS total_balls,
+                    SUM(CASE WHEN dd.over BETWEEN {_pp_lo} AND {_pp_hi} THEN dd.score ELSE 0 END) AS pp_runs,
+                    SUM(CASE WHEN dd.over BETWEEN {_pp_lo} AND {_pp_hi} THEN 1 ELSE 0 END) AS pp_balls,
+                    SUM(CASE WHEN dd.over BETWEEN {_pp_lo} AND {_pp_hi} AND {WICKET_CONDITION} THEN 1 ELSE 0 END) AS pp_wickets,
+                    SUM(CASE WHEN dd.over BETWEEN {_pp_lo} AND {_pp_hi} AND dd.score IN (4, 6) THEN 1 ELSE 0 END) AS pp_boundaries,
+                    SUM(CASE WHEN dd.over BETWEEN {_mid_lo} AND {_mid_hi} THEN dd.score ELSE 0 END) AS middle_runs,
+                    SUM(CASE WHEN dd.over BETWEEN {_mid_lo} AND {_mid_hi} THEN 1 ELSE 0 END) AS middle_balls,
+                    SUM(CASE WHEN dd.over BETWEEN {_mid_lo} AND {_mid_hi} AND {WICKET_CONDITION} THEN 1 ELSE 0 END) AS middle_wickets,
+                    SUM(CASE WHEN dd.over BETWEEN {_mid_lo} AND {_mid_hi} AND dd.score IN (4, 6) THEN 1 ELSE 0 END) AS middle_boundaries,
+                    SUM(CASE WHEN dd.over BETWEEN {_death_lo} AND {_death_hi} THEN dd.score ELSE 0 END) AS death_runs,
+                    SUM(CASE WHEN dd.over BETWEEN {_death_lo} AND {_death_hi} THEN 1 ELSE 0 END) AS death_balls,
+                    SUM(CASE WHEN dd.over BETWEEN {_death_lo} AND {_death_hi} AND {WICKET_CONDITION} THEN 1 ELSE 0 END) AS death_wickets,
+                    SUM(CASE WHEN dd.over BETWEEN {_death_lo} AND {_death_hi} AND dd.score IN (4, 6) THEN 1 ELSE 0 END) AS death_boundaries,
+                    SUM(CASE WHEN {PACE_KIND_CONDITION} THEN dd.score ELSE 0 END) AS pace_runs,
+                    SUM(CASE WHEN {PACE_KIND_CONDITION} THEN 1 ELSE 0 END) AS pace_balls,
+                    SUM(CASE WHEN {PACE_KIND_CONDITION} AND {WICKET_CONDITION} THEN 1 ELSE 0 END) AS pace_wickets,
+                    SUM(CASE WHEN {PACE_KIND_CONDITION} AND dd.score = 0 THEN 1 ELSE 0 END) AS pace_dots,
+                    SUM(CASE WHEN {SPIN_KIND_CONDITION} THEN dd.score ELSE 0 END) AS spin_runs,
+                    SUM(CASE WHEN {SPIN_KIND_CONDITION} THEN 1 ELSE 0 END) AS spin_balls,
+                    SUM(CASE WHEN {SPIN_KIND_CONDITION} AND {WICKET_CONDITION} THEN 1 ELSE 0 END) AS spin_wickets,
+                    SUM(CASE WHEN {SPIN_KIND_CONDITION} AND dd.score = 0 THEN 1 ELSE 0 END) AS spin_dots,
+                    SUM(CASE WHEN {SHORT_LENGTH_CONDITION} THEN 1 ELSE 0 END) AS short_balls,
+                    SUM(CASE WHEN {SHORT_LENGTH_CONDITION} THEN dd.score ELSE 0 END) AS short_runs,
+                    SUM(CASE WHEN {GOOD_LENGTH_CONDITION} THEN 1 ELSE 0 END) AS good_balls,
+                    SUM(CASE WHEN {GOOD_LENGTH_CONDITION} THEN dd.score ELSE 0 END) AS good_runs,
+                    SUM(CASE WHEN {FULL_LENGTH_CONDITION} THEN 1 ELSE 0 END) AS full_balls,
+                    -- phase x pace/spin; death is "after the middle overs", as the old CASE had it
+                    SUM(CASE WHEN dd.over BETWEEN {_pp_lo} AND {_pp_hi} AND {PACE_KIND_CONDITION} THEN 1 ELSE 0 END) AS pp_pace_balls,
+                    SUM(CASE WHEN dd.over BETWEEN {_pp_lo} AND {_pp_hi} AND {PACE_KIND_CONDITION} THEN dd.score ELSE 0 END) AS pp_pace_runs,
+                    SUM(CASE WHEN dd.over BETWEEN {_pp_lo} AND {_pp_hi} AND ({PACE_KIND_CONDITION}) IS NOT TRUE AND {SPIN_KIND_CONDITION} THEN 1 ELSE 0 END) AS pp_spin_balls,
+                    SUM(CASE WHEN dd.over BETWEEN {_pp_lo} AND {_pp_hi} AND ({PACE_KIND_CONDITION}) IS NOT TRUE AND {SPIN_KIND_CONDITION} THEN dd.score ELSE 0 END) AS pp_spin_runs,
+                    SUM(CASE WHEN dd.over BETWEEN {_mid_lo} AND {_mid_hi} AND {PACE_KIND_CONDITION} THEN 1 ELSE 0 END) AS middle_pace_balls,
+                    SUM(CASE WHEN dd.over BETWEEN {_mid_lo} AND {_mid_hi} AND {PACE_KIND_CONDITION} THEN dd.score ELSE 0 END) AS middle_pace_runs,
+                    SUM(CASE WHEN dd.over BETWEEN {_mid_lo} AND {_mid_hi} AND ({PACE_KIND_CONDITION}) IS NOT TRUE AND {SPIN_KIND_CONDITION} THEN 1 ELSE 0 END) AS middle_spin_balls,
+                    SUM(CASE WHEN dd.over BETWEEN {_mid_lo} AND {_mid_hi} AND ({PACE_KIND_CONDITION}) IS NOT TRUE AND {SPIN_KIND_CONDITION} THEN dd.score ELSE 0 END) AS middle_spin_runs,
+                    SUM(CASE WHEN dd.over NOT BETWEEN {_pp_lo} AND {_mid_hi} AND {PACE_KIND_CONDITION} THEN 1 ELSE 0 END) AS death_pace_balls,
+                    SUM(CASE WHEN dd.over NOT BETWEEN {_pp_lo} AND {_mid_hi} AND {PACE_KIND_CONDITION} THEN dd.score ELSE 0 END) AS death_pace_runs,
+                    SUM(CASE WHEN dd.over NOT BETWEEN {_pp_lo} AND {_mid_hi} AND ({PACE_KIND_CONDITION}) IS NOT TRUE AND {SPIN_KIND_CONDITION} THEN 1 ELSE 0 END) AS death_spin_balls,
+                    SUM(CASE WHEN dd.over NOT BETWEEN {_pp_lo} AND {_mid_hi} AND ({PACE_KIND_CONDITION}) IS NOT TRUE AND {SPIN_KIND_CONDITION} THEN dd.score ELSE 0 END) AS death_spin_runs
+                FROM delivery_details dd
+                WHERE 1=1
+                    {where_sql}
+                GROUP BY dd.ground, dd.p_match, dd.inns
+            ) i
+            GROUP BY i.venue
             """
         ),
         params,
@@ -607,26 +649,6 @@ def get_similar_venues(
             """
         ),
         params,
-    ).fetchall()
-
-    zone_output_rows = db.execute(
-        text(
-            f"""
-            SELECT
-                dd.ground AS venue,
-                dd.wagon_zone AS wagon_zone,
-                COUNT(*) AS balls,
-                SUM(dd.score) AS runs,
-                SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) AS boundaries
-            FROM delivery_details dd
-            WHERE 1=1
-                {where_sql}
-                {zone_output_filter_sql}
-                AND dd.wagon_zone BETWEEN 1 AND 8
-            GROUP BY dd.ground, dd.wagon_zone
-            """
-        ),
-        {**params, **zone_output_params},
     ).fetchall()
 
     zone_filter_option_rows = db.execute(
@@ -666,39 +688,9 @@ def get_similar_venues(
         params,
     ).fetchall()
 
-    phase_kind_rows = db.execute(
-        text(
-            f"""
-            SELECT
-                dd.ground AS venue,
-                CASE
-                    WHEN dd.over BETWEEN 0 AND 5 THEN 'powerplay'
-                    WHEN dd.over BETWEEN 6 AND 14 THEN 'middle'
-                    ELSE 'death'
-                END AS phase,
-                CASE
-                    WHEN {PACE_KIND_CONDITION} THEN 'pace'
-                    WHEN {SPIN_KIND_CONDITION} THEN 'spin'
-                    ELSE NULL
-                END AS kind,
-                COUNT(*) AS balls,
-                SUM(dd.score) AS runs
-            FROM delivery_details dd
-            WHERE 1=1
-                {where_sql}
-                AND ({PACE_KIND_CONDITION} OR {SPIN_KIND_CONDITION})
-            GROUP BY dd.ground, phase, kind
-            """
-        ),
-        params,
-    ).fetchall()
-
     match_map: Dict[str, Dict[str, Any]] = defaultdict(_empty_match_agg)
     phase_raw_map: Dict[str, Dict[str, float]] = defaultdict(_empty_phase_agg)
     zone_map: Dict[str, Dict[int, Dict[str, float]]] = defaultdict(
-        lambda: defaultdict(lambda: {"balls": 0.0, "runs": 0.0, "boundaries": 0.0})
-    )
-    zone_output_map: Dict[str, Dict[int, Dict[str, float]]] = defaultdict(
         lambda: defaultdict(lambda: {"balls": 0.0, "runs": 0.0, "boundaries": 0.0})
     )
     style_map: Dict[str, Dict[str, Dict[str, float]]] = defaultdict(
@@ -738,7 +730,6 @@ def get_similar_venues(
             rec[key] += float(row._mapping.get(key) or 0.0)
 
     _add_zone_rows_to_map(zone_rows, zone_map)
-    _add_zone_rows_to_map(zone_output_rows, zone_output_map)
 
     for row in style_rows:
         raw_venue = row._mapping["venue"]
@@ -753,19 +744,15 @@ def get_similar_venues(
         style_rec["dots"] += float(row._mapping.get("dots") or 0.0)
         style_rec["matches"] += float(row._mapping.get("matches") or 0.0)
 
-    for row in phase_kind_rows:
-        raw_venue = row._mapping["venue"]
-        canonical_venue = _canonicalize_venue(raw_venue)
+    for row in phase_rows:
+        canonical_venue = _canonicalize_venue(row._mapping["venue"])
         if not canonical_venue:
             continue
-        phase = row._mapping.get("phase")
-        kind = row._mapping.get("kind")
-        if phase not in {"powerplay", "middle", "death"}:
-            continue
-        if kind not in {"pace", "spin"}:
-            continue
-        phase_kind_map[canonical_venue][phase][kind]["balls"] += float(row._mapping.get("balls") or 0.0)
-        phase_kind_map[canonical_venue][phase][kind]["runs"] += float(row._mapping.get("runs") or 0.0)
+        for phase, prefix in (("powerplay", "pp"), ("middle", "middle"), ("death", "death")):
+            for kind in ("pace", "spin"):
+                rec = phase_kind_map[canonical_venue][phase][kind]
+                rec["balls"] += float(row._mapping.get(f"{prefix}_{kind}_balls") or 0.0)
+                rec["runs"] += float(row._mapping.get(f"{prefix}_{kind}_runs") or 0.0)
 
     match_metrics: Dict[str, Dict[str, Optional[float]]] = {}
     for venue_name, raw in match_map.items():
@@ -790,11 +777,6 @@ def get_similar_venues(
         zone_profiles[venue_name] = profile
         zone_features_map[venue_name] = feature_values
 
-    zone_output_profiles: Dict[str, Dict[str, Dict[str, Optional[float]]]] = {}
-    for venue_name in set(list(match_map.keys()) + list(zone_output_map.keys())):
-        profile, _ = _build_zone_profile(zone_output_map.get(venue_name, {}))
-        zone_output_profiles[venue_name] = profile
-
     zone_filter_options = {
         "bat_hand": sorted(
             {row._mapping.get("bat_hand") for row in zone_filter_option_rows if row._mapping.get("bat_hand")},
@@ -809,6 +791,142 @@ def get_similar_venues(
             key=_safe_sort_value,
         ),
     }
+
+    pool = {
+        "match_metrics": match_metrics,
+        "phase_metrics": phase_metrics,
+        "zone_features_map": zone_features_map,
+        "zone_profiles": zone_profiles,
+        "zone_map": zone_map,
+        "phase_raw_map": phase_raw_map,
+        "style_map": style_map,
+        "phase_kind_map": phase_kind_map,
+        "zone_filter_options": zone_filter_options,
+    }
+    _pool_cache[pool_key] = {"pool": pool, "ts": time.time()}
+    while len(_pool_cache) > _POOL_CACHE_MAX:
+        _pool_cache.popitem(last=False)
+    return pool
+
+
+def get_similar_venues(
+    venue: str,
+    db: Session,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    min_matches: int = 10,
+    top_n: int = 5,
+    leagues: Optional[List[str]] = None,
+    include_international: Optional[bool] = None,
+    top_teams: Optional[int] = None,
+    bat_hand: Optional[str] = None,
+    bowl_kind: Optional[str] = None,
+    bowl_style: Optional[str] = None,
+    zone_metric: str = "boundary_pct",
+    fmt: str = "T20",
+    gender: str = "male",
+) -> Dict[str, Any]:
+    """
+    Find most similar and dissimilar venues using normalized venue feature vectors.
+    """
+    # "Up to today" is the default window, and the browser's today can be a day ahead of ours.
+    # Nothing is dated in the future, so any end date from today on is the same as none, and
+    # treating it so keeps the cache keys stable across days and timezones.
+    if end_date is not None and end_date >= date.today():
+        end_date = None
+
+    cache_key = (
+        venue,
+        fmt,
+        gender,
+        start_date,
+        end_date,
+        min_matches,
+        top_n,
+        tuple(sorted(leagues or [])),
+        include_international,
+        top_teams,
+        bat_hand,
+        bowl_kind,
+        bowl_style,
+        zone_metric,
+    )
+    if cache_key in _similarity_cache:
+        entry = _similarity_cache[cache_key]
+        if time.time() - entry["ts"] < _CACHE_TTL:
+            return entry["data"]
+
+    where_sql, params = _build_delivery_details_filters(
+        start_date=start_date,
+        end_date=end_date,
+        leagues=leagues,
+        include_international=include_international,
+        top_teams=top_teams,
+        fmt=fmt,
+        gender=gender,
+    )
+    zone_metric = "run_pct" if zone_metric == "run_pct" else "boundary_pct"
+    zone_output_filter_sql, zone_output_params = _build_zone_output_filter_sql(
+        bat_hand=bat_hand,
+        bowl_kind=bowl_kind,
+        bowl_style=bowl_style,
+    )
+
+    pool = _load_venue_pool(
+        db,
+        pool_key=(
+            fmt,
+            gender,
+            start_date,
+            end_date,
+            tuple(sorted(leagues or [])),
+            include_international,
+            top_teams,
+        ),
+        where_sql=where_sql,
+        params=params,
+        phase_overs=_phase_overs(fmt, gender),
+    )
+    match_metrics = pool["match_metrics"]
+    phase_metrics = pool["phase_metrics"]
+    zone_features_map = pool["zone_features_map"]
+    if zone_output_filter_sql:
+        # Zone filters (batter hand, bowler kind/style) only change the output zone profiles, so
+        # they run one query on top of the cached pool instead of rebuilding it.
+        zone_output_rows = db.execute(
+            text(
+                f"""
+                SELECT
+                    dd.ground AS venue,
+                    dd.wagon_zone AS wagon_zone,
+                    COUNT(*) AS balls,
+                    SUM(dd.score) AS runs,
+                    SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) AS boundaries
+                FROM delivery_details dd
+                WHERE 1=1
+                    {where_sql}
+                    {zone_output_filter_sql}
+                    AND dd.wagon_zone BETWEEN 1 AND 8
+                GROUP BY dd.ground, dd.wagon_zone
+                """
+            ),
+            {**params, **zone_output_params},
+        ).fetchall()
+        zone_output_map: Dict[str, Dict[int, Dict[str, float]]] = defaultdict(
+            lambda: defaultdict(lambda: {"balls": 0.0, "runs": 0.0, "boundaries": 0.0})
+        )
+        _add_zone_rows_to_map(zone_output_rows, zone_output_map)
+        zone_output_profiles = {
+            venue_name: _build_zone_profile(zone_output_map.get(venue_name, {}))[0]
+            for venue_name in set(match_metrics) | set(zone_output_map)
+        }
+    else:
+        zone_output_map = pool["zone_map"]
+        zone_output_profiles = pool["zone_profiles"]
+    phase_raw_map = pool["phase_raw_map"]
+    style_map = pool["style_map"]
+    phase_kind_map = pool["phase_kind_map"]
+    zone_filter_options = pool["zone_filter_options"]
 
     candidate_venues: List[str] = []
     venue_feature_vectors: Dict[str, Dict[str, Optional[float]]] = {}
@@ -1142,23 +1260,28 @@ def get_venue_tactical_edges(
     min_balls: int = 24,
     top_n_similar: int = 5,
     similar_venues_override: Optional[List[str]] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, Any]:
+    (_pp_lo, _pp_hi), (_mid_lo, _mid_hi), (_death_lo, _death_hi) = _phase_overs(fmt, gender)
     where_sql, params = _build_delivery_details_filters(
         start_date=start_date,
         end_date=end_date,
         leagues=leagues,
         include_international=include_international,
         top_teams=top_teams,
+        fmt=fmt,
+        gender=gender,
     )
 
     extra_clauses: List[str] = ["dd.line IS NOT NULL", "dd.length IS NOT NULL"]
     if phase and phase != "overall":
         if phase == "powerplay":
-            extra_clauses.append("dd.over BETWEEN 0 AND 5")
+            extra_clauses.append(f"dd.over BETWEEN {_pp_lo} AND {_pp_hi}")
         elif phase == "middle":
-            extra_clauses.append("dd.over BETWEEN 6 AND 14")
+            extra_clauses.append(f"dd.over BETWEEN {_mid_lo} AND {_mid_hi}")
         elif phase == "death":
-            extra_clauses.append("dd.over BETWEEN 15 AND 19")
+            extra_clauses.append(f"dd.over BETWEEN {_death_lo} AND {_death_hi}")
     if bat_hand:
         extra_clauses.append("dd.bat_hand = :edges_bat_hand")
         params["edges_bat_hand"] = bat_hand
@@ -1271,6 +1394,8 @@ def get_venue_tactical_edges(
                 leagues=leagues,
                 include_international=include_international,
                 top_teams=top_teams,
+                fmt=fmt,
+                gender=gender,
             )
             if similar_result.get("found"):
                 similar_venues = [

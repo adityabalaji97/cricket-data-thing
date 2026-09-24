@@ -25,6 +25,7 @@ import ReactECharts from 'echarts-for-react';
 import { ECHARTS_THEME } from '../theme/chartTheme';
 import config from '../config';
 import EmptyState from './ui/EmptyState';
+import { useFormat } from '../context/FormatContext';
 
 // The API answers 404 when a venue has too few matches to join the similarity pool. That is
 // "not enough data yet", not a failure, so it renders as an empty state rather than a red alert.
@@ -479,9 +480,15 @@ export const useVenueSimilarityData = ({
   const [error, setError] = useState(null);
 
   const effectiveLeagues = useMemo(() => (Array.isArray(leagues) ? leagues : []), [leagues]);
+  // Similarity is computed within one format: an ODI ground is compared on ODI balls and ODI
+  // phase overs, not blended with its T20 record.
+  const { pinnedFormatParams } = useFormat();
+  const { format, gender } = pinnedFormatParams;
 
   const buildCoreParams = () => {
     const params = new URLSearchParams();
+    params.append('format', format);
+    params.append('gender', gender);
     if (startDate) params.append('start_date', startDate);
     if (endDate) params.append('end_date', endDate);
     params.append('min_matches', '5');
@@ -499,7 +506,7 @@ export const useVenueSimilarityData = ({
   // Reset tactical edges when core params change (so it refetches with new similar data)
   useEffect(() => {
     setTacticalEdgesData(null);
-  }, [venue, startDate, endDate, includeInternational, topTeams, effectiveLeagues]);
+  }, [venue, format, gender, startDate, endDate, includeInternational, topTeams, effectiveLeagues]);
 
   // Effect 1: Fetch similar data (depends on core params + zone output filters)
   // Zone metric (boundary_pct vs run_pct) is display-only — both values are in the response
@@ -538,6 +545,8 @@ export const useVenueSimilarityData = ({
   }, [
     enabled,
     venue,
+    format,
+    gender,
     startDate,
     endDate,
     includeInternational,
@@ -583,7 +592,7 @@ export const useVenueSimilarityData = ({
 
     fetchEdges();
     return () => { cancelled = true; };
-  }, [enabled, venue, startDate, endDate, includeInternational, topTeams, effectiveLeagues, data?.most_similar, tacticalEdgesData]);
+  }, [enabled, venue, format, gender, startDate, endDate, includeInternational, topTeams, effectiveLeagues, data?.most_similar, tacticalEdgesData]);
 
   return { data, tacticalEdgesData, loading, error };
 };

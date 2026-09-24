@@ -40,7 +40,7 @@ import { colors as hsColors, fonts as hsFonts } from './theme/hindsightDark';
 import axios from 'axios';
 
 import config from './config';
-import { DEFAULT_START_DATE, TODAY } from './utils/dateDefaults';
+import { getPreviewStartDate, TODAY } from './utils/dateDefaults';
 import { NAV_ITEMS, getCurrentTabForPath, getPageTitleForPath } from './navItems';
 import { useFormat } from './context/FormatContext';
 
@@ -154,7 +154,8 @@ const AppContent = () => {
   const [selectedVenue, setSelectedVenue] = useState("All Venues");
   const [selectedTeam1, setSelectedTeam1] = useState(null);
   const [selectedTeam2, setSelectedTeam2] = useState(null);
-  const [startDate, setStartDate] = useState(DEFAULT_START_DATE);
+  // Preview window depends on format (8 years for ODIs, 4 for T20s, from 1 January).
+  const [startDate, setStartDate] = useState(() => getPreviewStartDate(pinnedFormatParams.format));
   const [endDate, setEndDate] = useState(TODAY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -250,10 +251,7 @@ const AppContent = () => {
 
           if (dayNightParam === 'day' || dayNightParam === 'night' || dayNightParam === 'all') {
             setDayNightFilter(dayNightParam);
-            if (dayNightParam === 'day' && !dateManuallyAdjustedRef.current) {
-              const dayDefaultStart = `${new Date().getFullYear() - 4}-01-01`;
-              setStartDate(dayDefaultStart);
-            }
+
           }
           
           // Set venue if it's in the URL parameters
@@ -324,21 +322,26 @@ const AppContent = () => {
     setDayNightFilter(nextValue);
     hasFetchedRef.current = false;
 
-    if (!dateManuallyAdjustedRef.current) {
-      if (nextValue === 'day') {
-        setStartDate(`${new Date().getFullYear() - 4}-01-01`);
-      } else {
-        setStartDate(DEFAULT_START_DATE);
-      }
-    }
+    // Day games used to widen the window to 4 years; that is now the T20 default for every
+    // filter, so the day/night toggle no longer changes the dates.
   };
+
+  // Follow the format's default window (e.g. arriving from a Home ODI fixture via ?fmt=) unless
+  // the user has picked dates themselves.
+  useEffect(() => {
+    if (!dateManuallyAdjustedRef.current) {
+      setStartDate(getPreviewStartDate(pinnedFormatParams.format));
+    }
+  }, [pinnedFormatParams.format]);
 
   // A format change (e.g. arriving from a Home ODI fixture via ?fmt=) must refetch even if the
   // preview already loaded under the previous format; the duplicate-fetch guard would otherwise
   // keep the old format's numbers. Declared before the fetch effect so it runs first.
+  // startDate too: a format change moves the default window one render later, and the fetch
+  // started in between is aborted by that change, so the guard must not block the refetch.
   useEffect(() => {
     hasFetchedRef.current = false;
-  }, [pinnedFormatParams.format, pinnedFormatParams.gender]);
+  }, [pinnedFormatParams.format, pinnedFormatParams.gender, startDate]);
 
   useEffect(() => {
     const abortController = new AbortController();
