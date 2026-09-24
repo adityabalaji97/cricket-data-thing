@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
+import { colors as hd, fieldSvg } from '../../theme/hindsightDark';
 import {
   getScoringZoneLabel,
   isLeftHandBat,
@@ -67,7 +68,7 @@ const CaughtDismissalScatterMap = ({
       const x = centerX + (xRaw - 150) * scale;
       const y = centerY + (yRaw - 150) * scale;
       const inSelectedZone = selectedZone === 'all' || selectedZone === delivery.__zone;
-      const pointColor = dotMode === 'caught' ? '#c62828' : '#1e88e5';
+      const pointColor = dotMode === 'caught' ? hd.red : hd.blue;
 
       return (
         <circle
@@ -108,8 +109,8 @@ const CaughtDismissalScatterMap = ({
       <path
         key={`zone-wedge-${zoneNum}`}
         d={`M ${centerX} ${centerY} L ${x1} ${y1} A ${maxRadius} ${maxRadius} 0 0 1 ${x2} ${y2} Z`}
-        fill={isActive ? 'rgba(198, 40, 40, 0.12)' : 'rgba(0, 0, 0, 0.01)'}
-        stroke={isActive ? '#c62828' : '#d5d5d5'}
+        fill={isActive ? 'rgba(229, 72, 77, 0.16)' : 'rgba(0, 0, 0, 0.01)'}
+        stroke={isActive ? hd.red : fieldSvg.zoneStroke}
         strokeWidth={isActive ? 2 : 1}
         style={{ cursor: 'pointer' }}
         onClick={() => {
@@ -148,7 +149,7 @@ const CaughtDismissalScatterMap = ({
         dominantBaseline="middle"
         fontSize={isMobile ? 10 : 11}
         fontWeight={600}
-        fill="#4b5563"
+        fill={fieldSvg.label}
         style={{ pointerEvents: 'none' }}
       >
         {layout.label}
@@ -174,12 +175,12 @@ const CaughtDismissalScatterMap = ({
       </Box>
       <Box sx={{ display: 'flex', justifyContent: 'center' }}>
         <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ maxWidth: '100%', height: 'auto' }}>
-          <circle cx={centerX} cy={centerY} r={maxRadius} fill="#fafafa" stroke="#d9d9d9" strokeWidth="2" />
+          <circle cx={centerX} cy={centerY} r={maxRadius} fill={fieldSvg.ground} stroke={fieldSvg.boundary} strokeWidth="2" />
           {zoneWedges}
-          <circle cx={centerX} cy={centerY} r={maxRadius * 0.5} fill="none" stroke="#e6e6e6" strokeWidth="1" strokeDasharray="4,4" />
+          <circle cx={centerX} cy={centerY} r={maxRadius * 0.5} fill="none" stroke={fieldSvg.ring} strokeWidth="1" strokeDasharray="4,4" />
           {points}
           {zoneLabels}
-          <circle cx={centerX} cy={centerY} r={6} fill="#1f1f1f" />
+          <circle cx={centerX} cy={centerY} r={6} fill={fieldSvg.batter} />
         </svg>
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>

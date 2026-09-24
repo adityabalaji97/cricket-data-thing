@@ -42,6 +42,20 @@ export const colors = {
   borderStrong: 'rgba(255,255,255,0.12)',
 };
 
+/**
+ * Field-shaped SVGs (wagon wheels, the caught-dismissal map, boundary shape). They each drew a
+ * light "ground" circle with light rings and slate labels, a white disc on a dark page.
+ */
+export const fieldSvg = {
+  ground: colors.surface2,
+  boundary: 'rgba(255,255,255,0.18)',
+  ring: 'rgba(255,255,255,0.12)',
+  spoke: 'rgba(255,255,255,0.06)',
+  zoneStroke: 'rgba(255,255,255,0.08)',
+  label: colors.textLo,
+  batter: colors.textHi,
+};
+
 export const fonts = {
   body: '"Barlow", sans-serif',
   display: '"Barlow Semi Condensed", sans-serif',

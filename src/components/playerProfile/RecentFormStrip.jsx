@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, Tooltip } from '@mui/material';
+import { textOn } from '../../utils/teamColors';
 
 const getBattingColor = (runs) => {
   if (runs >= 50) return '#2e7d32';
@@ -45,7 +46,7 @@ const RecentFormStrip = ({ innings, mode, isMobile }) => {
                   <Box
                     sx={{
                       bgcolor: getBowlingColor(wickets),
-                      color: '#fff',
+                      color: textOn(getBowlingColor(wickets)),
                       borderRadius: 1,
                       px: isMobile ? 0.75 : 1,
                       py: 0.5,
@@ -81,7 +82,7 @@ const RecentFormStrip = ({ innings, mode, isMobile }) => {
                 <Box
                   sx={{
                     bgcolor: getBattingColor(runs),
-                    color: '#fff',
+                    color: textOn(getBattingColor(runs)),
                     borderRadius: 1,
                     px: isMobile ? 0.75 : 1,
                     py: 0.5,

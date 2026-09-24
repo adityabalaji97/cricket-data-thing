@@ -31,7 +31,7 @@ import XIcon from '@mui/icons-material/X';
 import config from '../config';
 import { fetchUpcomingMatches } from '../data/iplSchedule';
 import MiniWagonWheel from './MiniWagonWheel';
-import { getTeamColor } from '../utils/teamColors';
+import { getTeamColor, textOn } from '../utils/teamColors';
 import SearchBar from './search/SearchBar';
 import { colors as dark, fonts } from '../theme/hindsightDark';
 import { useFormat } from '../context/FormatContext';
@@ -104,16 +104,6 @@ const routePreview = (match) => (
   `&fmt=${match.format === 'ODI' ? 'mens-odi' : 'mens-t20'}` +
   `${match.matchId ? `&matchId=${encodeURIComponent(match.matchId)}` : ''}`
 );
-
-const textOn = (hex) => {
-  const normalized = String(hex || '').replace('#', '');
-  if (normalized.length !== 6) return '#fff';
-  const r = parseInt(normalized.slice(0, 2), 16) / 255;
-  const g = parseInt(normalized.slice(2, 4), 16) / 255;
-  const b = parseInt(normalized.slice(4, 6), 16) / 255;
-  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return lum > 0.62 ? C.bg : '#fff';
-};
 
 const scrollTrack = (ref, direction) => {
   const node = ref.current;
@@ -439,7 +429,7 @@ const TodayMatchCard = ({ match }) => {
         <Typography sx={{ ...monoSx, color: live ? C.red : C.soft }}>{status}</Typography>
       </Box>
       <TeamFixtureRow color={team1Color} abbr={match.team1Abbr || match.team1} name={match.team1} />
-      <Typography sx={{ color: C.faint, fontFamily: fonts.mono, fontSize: 10, lineHeight: 1, textAlign: 'center', my: 0.7 }}>
+      <Typography sx={{ color: C.soft, fontFamily: fonts.mono, fontSize: 10, lineHeight: 1, textAlign: 'center', my: 0.7 }}>
         VS
       </Typography>
       <TeamFixtureRow color={team2Color} abbr={match.team2Abbr || match.team2} name={match.team2} />

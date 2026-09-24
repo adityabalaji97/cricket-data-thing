@@ -209,7 +209,9 @@ const CombinedLineLengthGrid = ({ data, metric, comparison, isMobile, mirrorLine
                       <Typography
                         variant="caption"
                         sx={{
-                          color: colors.neutral[500],
+                          // On a tinted heat cell; the faint grey dropped to ~2:1 there.
+                          color: colors.neutral[700],
+                          opacity: 0.85,
                           lineHeight: 1.1,
                           fontSize: isMobile ? '0.62rem' : '0.68rem',
                         }}

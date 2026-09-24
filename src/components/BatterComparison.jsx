@@ -567,14 +567,15 @@ const BatterComparison = () => {
                 sx={{ 
                   p: 2, 
                   mb: 1,
-                  border: '1px solid #eee',
+                  border: 1,
+                  borderColor: 'divider',
                   borderRadius: 1,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   flexWrap: 'wrap',
                   gap: 1,
-                  backgroundColor: batter.loading ? '#f5f5f5' : 'white',
+                  bgcolor: batter.loading ? 'action.hover' : 'background.paper',
                   position: 'relative'
                 }}
               >

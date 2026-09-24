@@ -216,3 +216,25 @@ export const readableOnDark = (color, minLuminance = 0.28) => {
   }
   return '#ffffff';
 };
+
+const DARK_TEXT = '#0a0c11';
+
+/**
+ * Text colour for a label sitting ON a filled colour: the app's near-black or white, whichever
+ * contrasts more. White-on-anything was the old default, and on bright fills (sky blue, light
+ * green, amber, teal) it fell to 1.5-2.5:1. Non-hex input gets white.
+ */
+export const textOn = (color) => {
+  if (typeof color !== 'string' || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color)) return '#ffffff';
+  let hex = color.slice(1);
+  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+  const channel = (v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const [r, g, b] = [0, 2, 4].map((i) => channel(parseInt(hex.slice(i, i + 2), 16)));
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const onWhite = 1.05 / (lum + 0.05);
+  const onDark = (lum + 0.05) / 0.0536;
+  return onDark > onWhite ? DARK_TEXT : '#ffffff';
+};

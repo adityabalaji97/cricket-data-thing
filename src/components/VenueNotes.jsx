@@ -39,10 +39,8 @@ import { ECHARTS_THEME } from '../theme/chartTheme';
 import MatchHistory from './MatchHistory';
 import Matchups from './Matchups';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
-import VenueSimilarity, { useVenueSimilarityData } from './VenueSimilarity';
 import MatchPreviewCard from './MatchPreviewCard';
 import PostTossSetup from './PostTossSetup';
-import VenueDismissalAnalytics from './VenueDismissalAnalytics';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 import VenueSectionTabs from './VenueSectionTabs';
 import VenueNotesDesktopNav from './VenueNotesDesktopNav';
@@ -573,7 +571,7 @@ const WinPercentagesPie = ({ data }) => {
             key: 'no-result',
             label: 'NR',
             value: noResults,
-            color: '#cbd5e1',
+            color: hsColors.textFaint,
         },
         {
             key: 'bowl-first',
@@ -691,7 +689,7 @@ const ScoresBarChart = ({ data }) => {
             axisTick: { show: false },
             axisLine: { show: false },
             axisLabel: {
-                color: '#475569',
+                color: hsColors.textLo,
                 width: isMobile ? 56 : 74,
                 overflow: 'truncate',
                 fontSize: isMobile ? 10 : 12,
@@ -874,8 +872,9 @@ const PhaseWiseStrategy = ({ data, isMobile }) => {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                backgroundColor: index % 2 === 0 ? '#5a8691' : '#55ae6a',
-                                color: 'white',
+                                // Deeper tones than the old #5a8691/#55ae6a, which left white text at ~2.6:1.
+                                backgroundColor: index % 2 === 0 ? '#35606a' : '#2f6e45',
+                                color: '#fff',
                                 fontSize: isMobile ? '0.7rem' : '0.875rem',
                                 borderRight: index < phaseData.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none'
                             }}
@@ -968,13 +967,6 @@ const formatVenueDateRange = (startDate, endDate) => {
     return `${startLabel} - ${endLabel}`;
 };
 
-const DEFAULT_SIMILAR_ZONE_FILTERS = {
-    zoneMetric: 'boundary_pct',
-    batHand: null,
-    bowlKind: null,
-    bowlStyle: null,
-};
-
 // "14 T20s", "1 ODI" -- the header count used to say "T20s" whatever the format.
 const matchNoun = (format, count) => {
     const noun = format === 'ODI' ? 'ODI' : format === 'TEST' ? 'Test' : 'T20';
@@ -1009,17 +1001,11 @@ const VenueNotes = ({
 
     const [activeSectionId, setActiveSectionId] = useState('summary');
     const [activatedSections, setActivatedSections] = useState(() => new Set(['summary', 'preview', 'teams']));
-    const [similarZoneFilters, setSimilarZoneFilters] = useState(DEFAULT_SIMILAR_ZONE_FILTERS);
     const [postTossSelection, setPostTossSelection] = useState(null);
     const sectionRefs = useRef({});
     const foresightEnabled = activeSectionId === 'foresight' || activatedSections.has('foresight');
     const previewEnabled = activeSectionId === 'preview' || activatedSections.has('preview');
     const teamsEnabled = activeSectionId === 'teams' || activatedSections.has('teams');
-    const similarEnabled = activeSectionId === 'similar'
-        || activeSectionId === 'venueTwins'
-        || activatedSections.has('similar')
-        || activatedSections.has('venueTwins');
-    const dismissalsEnabled = activeSectionId === 'dismissals' || activatedSections.has('dismissals');
     const boundariesEnabled = activeSectionId === 'boundaries' || activatedSections.has('boundaries');
 
     useEffect(() => {
@@ -1037,22 +1023,6 @@ const VenueNotes = ({
             raw: nextData || null,
         });
     }, []);
-
-    const {
-        data: similarData,
-        tacticalEdgesData: similarTacticalEdgesData,
-        loading: similarLoading,
-        error: similarError,
-    } = useVenueSimilarityData({
-        venue,
-        startDate,
-        endDate,
-        leagues,
-        includeInternational,
-        topTeams,
-        enabled: similarEnabled,
-        zoneFilters: similarZoneFilters,
-    });
 
     // A venue can have zero matches under the current filters (a new ground, a narrow date
     // window, or internationals restricted to the top N sides). Rendering the venue sections then
@@ -1179,42 +1149,6 @@ const VenueNotes = ({
             });
         }
 
-        // 4. SIMILAR
-        groups.push({
-            id: 'similar',
-            label: 'Similar',
-            content: (
-                <VenueSimilarity
-                    mode="insights"
-                    data={similarData}
-                    tacticalEdgesData={similarTacticalEdgesData}
-                    loading={similarLoading}
-                    error={similarError}
-                    isMobile={isMobile}
-                    zoneFilters={similarZoneFilters}
-                    onZoneFiltersChange={setSimilarZoneFilters}
-                />
-            ),
-        });
-
-        // 5. DISMISSALS
-        groups.push({
-            id: 'dismissals',
-            label: 'Dismissals',
-            content: (
-                <VenueDismissalAnalytics
-                    venue={venue}
-                    startDate={startDate}
-                    endDate={endDate}
-                    leagues={leagues}
-                    includeInternational={includeInternational}
-                    topTeams={topTeams}
-                    isMobile={isMobile}
-                    enabled={dismissalsEnabled}
-                />
-            ),
-        });
-
         // 5.5 BOUNDARIES
         groups.push({
             id: 'boundaries',
@@ -1275,21 +1209,6 @@ const VenueNotes = ({
             ),
         });
 
-        // 8. VENUE TWINS (cards only)
-        groups.push({
-            id: 'venueTwins',
-            label: 'Venue Twins',
-            content: (
-                <VenueSimilarity
-                    mode="cards"
-                    data={similarData}
-                    loading={similarLoading}
-                    error={similarError}
-                    isMobile={isMobile}
-                />
-            ),
-        });
-
         // 9. ML FORESIGHT (last section, only when both teams selected; models are T20-only)
         if (selectedTeam1 && selectedTeam2 && isT20Preview) {
             groups.push({
@@ -1333,13 +1252,7 @@ const VenueNotes = ({
         foresightEnabled,
         previewEnabled,
         teamsEnabled,
-        dismissalsEnabled,
         boundariesEnabled,
-        similarData,
-        similarTacticalEdgesData,
-        similarLoading,
-        similarError,
-        similarZoneFilters,
         postTossSelection,
         handlePostTossApply,
         dayNightFilter,
@@ -1373,7 +1286,6 @@ const VenueNotes = ({
     useEffect(() => {
         setActiveSectionId('summary');
         setActivatedSections(new Set(['summary', 'preview', 'teams']));
-        setSimilarZoneFilters(DEFAULT_SIMILAR_ZONE_FILTERS);
     }, [selectedTeam1, selectedTeam2, venue]);
 
     useEffect(() => {

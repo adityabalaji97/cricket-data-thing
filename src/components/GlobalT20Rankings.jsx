@@ -201,10 +201,10 @@ const RankingCard = ({
                     const primary = mode === 'batting' ? vals.sr : vals.econ_inv;
                     return (
                       <tr key={competition}>
-                        <td style={{ padding: '6px 8px', borderTop: '1px solid #eee' }}>{competition}</td>
-                        <td style={{ textAlign: 'right', padding: '6px 8px', borderTop: '1px solid #eee' }}>{Number(vals.weight || 1).toFixed(2)}</td>
-                        <td style={{ textAlign: 'right', padding: '6px 8px', borderTop: '1px solid #eee' }}>{vals.balls || 0}</td>
-                        <td style={{ textAlign: 'right', padding: '6px 8px', borderTop: '1px solid #eee' }}>{primary !== undefined && primary !== null ? Number(primary).toFixed(2) : 'N/A'}</td>
+                        <td style={{ padding: '6px 8px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>{competition}</td>
+                        <td style={{ textAlign: 'right', padding: '6px 8px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>{Number(vals.weight || 1).toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', padding: '6px 8px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>{vals.balls || 0}</td>
+                        <td style={{ textAlign: 'right', padding: '6px 8px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>{primary !== undefined && primary !== null ? Number(primary).toFixed(2) : 'N/A'}</td>
                       </tr>
                     );
                   })}

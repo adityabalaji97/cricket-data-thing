@@ -8,6 +8,7 @@ import {
   Typography,
 } from '@mui/material';
 import config from '../config';
+import { colors as hd, fieldSvg } from '../theme/hindsightDark';
 
 const fmt = (value, digits = 1) => {
   const n = Number(value);
@@ -163,7 +164,7 @@ const VenueBoundaryShape = ({
         cy={centerY}
         r={maxRadius * ratio}
         fill="none"
-        stroke="#e2e8f0"
+        stroke={fieldSvg.ring}
         strokeDasharray={idx === 3 ? 'none' : '4,4'}
       />
     ));
@@ -180,7 +181,7 @@ const VenueBoundaryShape = ({
           y1={centerY}
           x2={x2}
           y2={y2}
-          stroke="#f1f5f9"
+          stroke={fieldSvg.spoke}
         />
       );
     });
@@ -188,17 +189,17 @@ const VenueBoundaryShape = ({
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center' }}>
         <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ maxWidth: '100%', height: 'auto' }}>
-          <circle cx={centerX} cy={centerY} r={maxRadius} fill="#fafafa" stroke="#dbe3ea" strokeWidth="2" />
+          <circle cx={centerX} cy={centerY} r={maxRadius} fill={fieldSvg.ground} stroke={fieldSvg.boundary} strokeWidth="2" />
           {spokes}
           {rings}
           {bandPolygon ? (
-            <polygon points={bandPolygon} fill="rgba(59, 130, 246, 0.15)" stroke="none" />
+            <polygon points={bandPolygon} fill="rgba(91, 141, 239, 0.22)" stroke="none" />
           ) : null}
-          <polygon points={medianPolyline} fill="none" stroke="#1d4ed8" strokeWidth="2.3" />
+          <polygon points={medianPolyline} fill="none" stroke={hd.blue} strokeWidth="2.3" />
           {medianPoints.map((point, idx) => (
-            <circle key={`median-point-${idx}`} cx={point.x} cy={point.y} r={2.2} fill="#1d4ed8" />
+            <circle key={`median-point-${idx}`} cx={point.x} cy={point.y} r={2.2} fill={hd.blue} />
           ))}
-          <circle cx={centerX} cy={centerY} r={5} fill="#111827" />
+          <circle cx={centerX} cy={centerY} r={5} fill={fieldSvg.batter} />
         </svg>
       </Box>
     );

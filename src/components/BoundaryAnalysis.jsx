@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { textOn } from '../utils/teamColors';
 import {
   Box, Typography, ToggleButtonGroup, ToggleButton, CircularProgress, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -23,8 +24,8 @@ const formatShotName = (name) => {
 };
 
 const getBoundaryStyle = (ballsPerBoundary) => {
-  if (ballsPerBoundary <= 4) return { bgcolor: designColors.success[700], color: '#fff' };
-  if (ballsPerBoundary <= 6) return { bgcolor: designColors.success[500], color: '#fff' };
+  if (ballsPerBoundary <= 4) return { bgcolor: designColors.success[700], color: textOn(designColors.success[700]) };
+  if (ballsPerBoundary <= 6) return { bgcolor: designColors.success[500], color: textOn(designColors.success[500]) };
   if (ballsPerBoundary <= 10) return { bgcolor: designColors.success[50], color: designColors.neutral[900] };
   return { bgcolor: designColors.neutral[200], color: designColors.neutral[900] };
 };

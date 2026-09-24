@@ -187,15 +187,22 @@ const hindsightTheme = createTheme({
           color: colors.textMed,
           border: `1px solid ${colors.border}`,
         },
-        // Filled coloured chips keep their semantic colour; only the default grey chip is
-        // restyled above. MUI applies these after root, so they win.
-        colorPrimary: { backgroundColor: colors.accent, color: colors.bg, borderColor: 'transparent' },
-        colorSecondary: { backgroundColor: colors.blue, color: colors.bg, borderColor: 'transparent' },
-        colorSuccess: { backgroundColor: colors.accent, color: colors.bg, borderColor: 'transparent' },
-        colorError: { backgroundColor: colors.red, color: colors.textHi, borderColor: 'transparent' },
-        colorWarning: { backgroundColor: colors.gold, color: colors.bg, borderColor: 'transparent' },
-        colorInfo: { backgroundColor: colors.blue, color: colors.bg, borderColor: 'transparent' },
+        // Coloured chips keep their semantic colour; only the default grey chip is restyled
+        // above. Keyed per variant: as bare colorX keys the dark "on accent" text also landed on
+        // outlined chips, whose background is transparent -- near-black text on a dark page.
+        filledPrimary: { backgroundColor: colors.accent, color: colors.bg, borderColor: 'transparent' },
+        filledSecondary: { backgroundColor: colors.blue, color: colors.bg, borderColor: 'transparent' },
+        filledSuccess: { backgroundColor: colors.accent, color: colors.bg, borderColor: 'transparent' },
+        filledError: { backgroundColor: colors.red, color: colors.textHi, borderColor: 'transparent' },
+        filledWarning: { backgroundColor: colors.gold, color: colors.bg, borderColor: 'transparent' },
+        filledInfo: { backgroundColor: colors.blue, color: colors.bg, borderColor: 'transparent' },
         outlined: { backgroundColor: 'transparent', borderColor: inputBorder },
+        outlinedPrimary: { color: colors.accent, borderColor: 'rgba(182,242,74,0.45)' },
+        outlinedSecondary: { color: colors.blue, borderColor: 'rgba(91,141,239,0.5)' },
+        outlinedSuccess: { color: colors.accent, borderColor: 'rgba(182,242,74,0.45)' },
+        outlinedError: { color: colors.red, borderColor: 'rgba(229,72,77,0.5)' },
+        outlinedWarning: { color: colors.gold, borderColor: 'rgba(240,180,41,0.5)' },
+        outlinedInfo: { color: colors.blue, borderColor: 'rgba(91,141,239,0.5)' },
       },
     },
     MuiTabs: {

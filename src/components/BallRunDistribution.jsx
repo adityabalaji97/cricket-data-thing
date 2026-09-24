@@ -116,18 +116,23 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp, wrapInCard = tru
     return null;
   };
 
-  const CustomLabel = ({ x, y, width, height, value }) => (
-    <text 
-      x={x + (width/2)}
-      y={y + (height/2)}
-      fill="#fff"
-      fontSize={12}
-      textAnchor="middle"
-      dominantBaseline="middle"
-    >
-      {value}
-    </text>
-  );
+  // Inside the bar in dark text when it fits (the bars are bright green); otherwise just past
+  // the bar's end in light text, since a short bar leaves the label sitting on the dark card.
+  const CustomLabel = ({ x, y, width, height, value }) => {
+    const fits = width >= String(value).length * 6.5 + 12;
+    return (
+      <text
+        x={fits ? x + (width / 2) : x + width + 6}
+        y={y + (height / 2)}
+        fill={fits ? designColors.neutral[0] : designColors.neutral[900]}
+        fontSize={12}
+        textAnchor={fits ? 'middle' : 'start'}
+        dominantBaseline="middle"
+      >
+        {value}
+      </text>
+    );
+  };
 
   const chartHeight = isMobile ? 350 : 400;
 

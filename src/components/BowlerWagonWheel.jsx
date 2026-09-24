@@ -7,6 +7,8 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { textOn } from '../utils/teamColors';
+import { fieldSvg } from '../theme/hindsightDark';
 import {
   Box,
   Typography,
@@ -296,7 +298,7 @@ const BowlerWagonWheel = ({
         {deliveryLines}
 
         {/* Batter position (circle at center) */}
-        <circle cx={centerX} cy={centerY} r={batterRadius} fill="#333" stroke="#000" strokeWidth="1" />
+        <circle cx={centerX} cy={centerY} r={batterRadius} fill={fieldSvg.batter} stroke={fieldSvg.ground} strokeWidth="1" />
       </svg>
     );
   };
@@ -405,10 +407,10 @@ const BowlerWagonWheel = ({
       {/* Stats Summary */}
       <Box sx={{ display: 'flex', gap: isCompact ? 0.5 : 1, mb: isCompact ? 1.5 : 2, flexWrap: 'wrap', justifyContent: 'center' }}>
         <Chip label={`${stats.totalBalls} balls`} size="small" sx={{ fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
-        <Chip label={`${stats.totalRuns} runs`} size="small" sx={{ bgcolor: designColors.chart.blue, color: 'white', fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
+        <Chip label={`${stats.totalRuns} runs`} size="small" sx={{ bgcolor: designColors.chart.blue, color: textOn(designColors.chart.blue), fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
         <Chip label={`Econ: ${stats.economy}`} size="small" sx={{ fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
-        <Chip label={`${stats.fours} x 4s`} size="small" sx={{ bgcolor: designColors.chart.blue, color: 'white', fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
-        <Chip label={`${stats.sixes} x 6s`} size="small" sx={{ bgcolor: designColors.chart.pink, color: 'white', fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
+        <Chip label={`${stats.fours} x 4s`} size="small" sx={{ bgcolor: designColors.chart.blue, color: textOn(designColors.chart.blue), fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
+        <Chip label={`${stats.sixes} x 6s`} size="small" sx={{ bgcolor: designColors.chart.pink, color: textOn(designColors.chart.pink), fontSize: isCompact ? '0.7rem' : undefined, height: isCompact ? 24 : undefined }} />
       </Box>
 
       {/* Legend */}

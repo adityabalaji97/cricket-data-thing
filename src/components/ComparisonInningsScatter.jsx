@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { textOn } from '../utils/teamColors';
 import { 
   Card, 
   CardContent, 
@@ -263,11 +264,11 @@ const ComparisonInningsScatter = ({ batters }) => {
                   backgroundColor: visiblePlayers.includes(batter.id) 
                     ? playerColors[batter.id] 
                     : 'transparent',
-                  color: visiblePlayers.includes(batter.id) ? 'white' : playerColors[batter.id],
+                  color: visiblePlayers.includes(batter.id) ? textOn(playerColors[batter.id]) : playerColors[batter.id],
                   borderColor: playerColors[batter.id],
                   '&:hover': {
                     backgroundColor: playerColors[batter.id],
-                    color: 'white'
+                    color: textOn(playerColors[batter.id])
                   }
                 }}
               />

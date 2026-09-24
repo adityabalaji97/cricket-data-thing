@@ -747,10 +747,10 @@ const QueryBuilder = ({ isMobile }) => {
         </Box>
 
         <Box sx={{ mt: { xs: 3, md: 5 }, pt: 2, borderTop: `1px solid ${qbColors.border}`, display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'space-between' }}>
-          <Typography sx={{ color: qbColors.textGhost, fontFamily: qbFonts.mono, fontSize: 11 }}>
+          <Typography sx={{ color: qbColors.textFaint, fontFamily: qbFonts.mono, fontSize: 11 }}>
             Hindsight © 2026 · data via Cricsheet
           </Typography>
-          <Typography sx={{ color: qbColors.textGhost, fontFamily: qbFonts.mono, fontSize: 11 }}>
+          <Typography sx={{ color: qbColors.textFaint, fontFamily: qbFonts.mono, fontSize: 11 }}>
             Shareable query URL updates on execute
           </Typography>
         </Box>

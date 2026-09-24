@@ -11,7 +11,8 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
-> **Latest:** preview defaults to 1 Jan 8y (ODI) / 4y (T20) on site and connector; venue
+> **Latest:** U3 colour sweep done (see newest entry; `ui_sweep.mjs` now reports contrast).
+> Preview defaults to 1 Jan 8y (ODI) / 4y (T20) on site and connector; venue
 > similarity is format-pinned with a shared pool cache (see newest log entry).
 >
 > **U1 (five UI bugs) is deployed**: commit ab453ab on main; Heroku v411/v412, Vercel `hindsight`
@@ -148,6 +149,40 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-09-24 — Track U3: colour/contrast sweep; preview drops Similar, Dismissals, Venue Twins — Claude
+
+**Preview sections sunset** (user call, "unless we find a better use"): Similar, Venue Twins and
+Dismissals (the caught-dismissal field designer = the field-position callouts) are gone from
+`VenueNotes.jsx`. Components (`VenueSimilarity`, `VenueDismissalAnalytics`) and the backend
+endpoints are kept, unimported, for revival; the field designer still serves the player page.
+
+**Finding theme escapes by rendering, not grepping.** `scripts/dev/ui_sweep.mjs` now probes
+colour after the full-height resize: light *neutral* surfaces (HTML background or SVG fill; lime
+and team colours excluded) and leaf text under 3:1 against its composited background (disabled
+controls and text over gradients skipped). report.json gains `lightIslands`/`islands` and
+`lowContrast`/`low`. `LOAD_MS`/`SETTLE_MS` for the slow local API. Live baseline was 8 light
+islands + 180 low-contrast texts across 23 routes.
+
+Fixes, by root cause:
+* **Theme bug:** MuiChip `colorPrimary`/`colorSuccess`/… applied to *outlined* chips too, so
+  they got near-black "on accent" text on a transparent chip. Now `filledX` / `outlinedX` keys.
+* `utils/teamColors.textOn(color)` picks near-black or white by actual contrast (replaces
+  LandingPage's local gamma-space version). Used for ELO rank badges (home + EloLeaderboard),
+  player form pills, comparison player chips, wagon-wheel/pitch-map chips, boundary badges.
+* `hindsightDark.fieldSvg` tokens: CaughtDismissalScatterMap, VenueBoundaryShape and the wagon
+  wheels drew a #fafafa ground with slate labels.
+* White comparison cards (BatterComparison/TeamComparison selected items) → background.paper.
+* designSystem `neutral[400]` was textGhost (2.5:1) but ~20 sites use it for real captions →
+  #5f6672 (~3.2:1). QB footer → textFaint. Preview NR segment/axis labels, phase-strategy cells
+  (white on #55ae6a) deepened, GlobalT20Rankings table borders, BallRunDistribution labels sit
+  inside the bar only when they fit, LineLength heat-cell captions brighter.
+
+**Verified:** build OK; `check_theme_literals.sh main` clean; local sweep: 0 light islands and 0
+low-contrast texts on all routes except Wrapped's logo "H" (white on Spotify green, brand).
+
+**Left:** GuessInningsShareCard is a white exported PNG by design (restyle is a product call);
+comparison_full still overflows horizontally on phones (tables → U4 ScrollTable).
 
 ### 2026-09-24 — Preview default windows; venue similarity format-pinned and cached — Claude
 

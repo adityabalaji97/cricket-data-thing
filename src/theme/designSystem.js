@@ -82,7 +82,9 @@ export const colors = {
     100: hsColors.surface3,
     200: '#252a33',
     300: '#2f3540',
-    400: hsColors.textGhost,
+    // Faintest *readable* text (~3.2:1 on cards). textGhost sat at 2.5:1 and ~20 call sites use
+    // this step for real captions (ball counts, labels), not just decoration.
+    400: '#5f6672',
     500: hsColors.textFaint,
     600: hsColors.textLo,
     700: hsColors.textMed,

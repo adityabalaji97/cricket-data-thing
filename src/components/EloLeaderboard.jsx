@@ -28,7 +28,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import TrophyIcon from '@mui/icons-material/EmojiEvents';
 import { Link } from 'react-router-dom';
 import config from '../config';
-import { getTeamColor as getTeamColorFromUtils } from '../utils/teamColors';
+import { getTeamColor as getTeamColorFromUtils, textOn } from '../utils/teamColors';
 
 const EloLeaderboard = () => {
   const [rankings, setRankings] = useState([]);
@@ -321,7 +321,7 @@ const EloLeaderboard = () => {
                       height: 32,
                       borderRadius: '50%',
                       backgroundColor: getTeamColor(team.team_abbreviation),
-                      color: 'white',
+                      color: textOn(getTeamColor(team.team_abbreviation)),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
