@@ -20,8 +20,9 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 >
 > **U2 (global dark theme + mobile bottom nav) + first U3 pass is live** (2a3a18e on main,
 > Vercel `hindsight` production Ready; live phone sweep clean). User validating on device.
-> **Phase 1 (MCP connector)** built on branch `phase1-mcp` — see its entry and
-> `docs/mcp-connector.md`. Next: remaining U3 literals and U4, then Primer metrics.
+> **Phase 1 (MCP connector) is live** at `/mcp` (Heroku v413; see its entry and
+> `docs/mcp-connector.md`). Dyno now runs **one** uvicorn worker (`WEB_CONCURRENCY=1`,
+> pool 8+4, v414) after R14 memory errors. Next: remaining U3 literals and U4, then Primer metrics.
 >
 > Plan of record for the wider work lives in `~/.claude/plans/can-you-look-at-iterative-plum.md`:
 > U1+Phase 0 (done) → U2 global dark theme + mobile bottom nav → query-builder MCP → U3 →
@@ -178,8 +179,21 @@ environmental, not this change. Widget rendered in a test host at 390px and 720p
 prompt, so local MCP tests ran against prod with READ ONLY sessions. Rate limit is global, not
 per-IP (hosts call from shared IPs).
 
-**Next:** deploy + add the connector in Claude and ChatGPT; OAuth before wider sharing;
-Primer metrics become query-builder columns (and so connector columns).
+**Deployed:** a32a7b6 → Heroku v413; `/mcp` verified in production (all tools + UI resource).
+Build installed the pinned stack + mcp 2.2.0 on Python 3.10.21.
+
+**Memory (R14) — found and fixed on deploy day:** the 512MB Basic dyno had been logging R14
+"Memory quota exceeded" every ~20s since at least 08:51 UTC (before this deploy): two uvicorn
+workers idle at ~230MB each, so any heavy page (IPL predictions, doppelgangers, rankings) pushed
+it into swap. Now `WEB_CONCURRENCY=1` with `DB_POOL_SIZE=8 / DB_MAX_OVERFLOW=4` (v414) — same 12
+DB connections, one worker. Post-change sweep of the heaviest pages + MCP suite: 0 R14, 103×200.
+
+**Heroku warning:** Python 3.10 reaches end-of-life October 2026 and Heroku will drop it. Moving
+to 3.12 re-resolves the numerical stack (pandas 3 etc. need 3.11+), which shifts rankings and may
+break the joblib ML models — plan it as its own chunk with a golden A/B, not a drive-by.
+
+**Next:** add the connector in Claude and ChatGPT and try it; OAuth before wider sharing; Primer
+metrics become query-builder columns (and so connector columns).
 
 ### 2026-09-24 — Track U2 (+ first U3 pass): one dark theme, mobile bottom nav — Claude
 
