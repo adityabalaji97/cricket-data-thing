@@ -23,6 +23,7 @@ import ExploreSection from './playerProfile/sections/ExploreSection';
 import RecentFormStrip from './playerProfile/RecentFormStrip';
 import AdvancedBowlingAnalyticsSection from './playerProfile/AdvancedBowlingAnalyticsSection';
 import BoundaryAnalysis from './BoundaryAnalysis';
+import LazySection from './ui/LazySection';
 import usePlayerData from '../hooks/usePlayerData';
 import config from '../config';
 
@@ -654,7 +655,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
                 onSectionSelect={handleSectionSelect}
               />
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, px: 1, pb: 2 }}>
-                {sectionGroups.map((section) => (
+                {sectionGroups.map((section, index) => (
                   <Box
                     key={section.id}
                     ref={(el) => { sectionRefs.current[section.id] = el; }}
@@ -664,7 +665,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
                     <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, px: 0.5 }}>
                       {section.label}
                     </Typography>
-                    {section.content}
+                    <LazySection eager={index < 2}>{section.content}</LazySection>
                   </Box>
                 ))}
               </Box>
@@ -684,7 +685,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
                 onSectionSelect={handleSectionSelect}
               />
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {sectionGroups.map((section) => (
+                {sectionGroups.map((section, index) => (
                   <Box
                     key={section.id}
                     ref={(el) => { sectionRefs.current[section.id] = el; }}
@@ -703,7 +704,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
                       <Typography variant="h5" sx={{ mb: 2.5, fontWeight: 700 }}>
                         {section.label}
                       </Typography>
-                      {section.content}
+                      <LazySection eager={index < 2}>{section.content}</LazySection>
                     </Card>
                   </Box>
                 ))}

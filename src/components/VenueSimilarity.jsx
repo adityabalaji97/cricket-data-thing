@@ -23,6 +23,11 @@ import {
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ReactECharts from 'echarts-for-react';
 import config from '../config';
+import EmptyState from './ui/EmptyState';
+
+// The API answers 404 when a venue has too few matches to join the similarity pool. That is
+// "not enough data yet", not a failure, so it renders as an empty state rather than a red alert.
+export const NOT_ENOUGH_VENUE_DATA = 'NOT_ENOUGH_VENUE_DATA';
 
 const METRIC_META = {
   bat_first_win_pct: { label: 'Bat 1st Win%', digits: 1, suffix: '%' },
@@ -518,7 +523,9 @@ export const useVenueSimilarityData = ({
       } catch (err) {
         if (!cancelled) {
           setData(null);
-          setError(err?.response?.data?.detail || 'Failed to load similar venues');
+          setError(err?.response?.status === 404
+            ? NOT_ENOUGH_VENUE_DATA
+            : (err?.response?.data?.detail || 'Failed to load similar venues'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -784,6 +791,15 @@ const SimilarityInsightsView = ({
     );
   }
 
+  if (error === NOT_ENOUGH_VENUE_DATA && !loading) {
+    return (
+      <EmptyState
+        minHeight={140}
+        title="Not enough matches here yet"
+        description="Similar venues are only computed for grounds with at least 5 matches under the current filters. Try a wider date range or more competitions."
+      />
+    );
+  }
   if (error && !loading) {
     return <Alert severity="error">{error}</Alert>;
   }
@@ -1219,6 +1235,15 @@ const VenueTwinsCardsView = ({ data, loading, error }) => {
     );
   }
 
+  if (error === NOT_ENOUGH_VENUE_DATA && !loading) {
+    return (
+      <EmptyState
+        minHeight={140}
+        title="Not enough matches here yet"
+        description="Similar venues are only computed for grounds with at least 5 matches under the current filters. Try a wider date range or more competitions."
+      />
+    );
+  }
   if (error && !loading) {
     return <Alert severity="error">{error}</Alert>;
   }

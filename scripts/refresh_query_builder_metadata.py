@@ -147,15 +147,16 @@ def refresh_metadata(engine, fmt="T20", gender="male"):
         })
         print(f"{len(toss_values):,} values")
         
-        # Store total count
+        # Store total count. Scoped like every other key: written bare, each format's run
+        # overwrote the last, so the nightly ODI pass left the ODI count under the men's T20 key.
         conn.execute(text("""
             INSERT INTO query_builder_metadata (key, values, distinct_count, updated_at)
-            VALUES ('total_deliveries', :values, :count, NOW())
+            VALUES (:key, :values, :count, NOW())
             ON CONFLICT (key) DO UPDATE SET
                 values = :values,
                 distinct_count = :count,
                 updated_at = NOW()
-        """), {"values": json.dumps(total_count), "count": total_count})
+        """), {"key": scoped_key("total_deliveries"), "values": json.dumps(total_count), "count": total_count})
         
     elapsed = (datetime.now() - start_time).total_seconds()
     print(f"\n✓ Metadata refresh complete in {elapsed:.1f}s")

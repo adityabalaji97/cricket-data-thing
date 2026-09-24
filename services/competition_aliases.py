@@ -98,6 +98,21 @@ def variants_for(canonical: Optional[str]) -> List[str]:
     return list(_VARIANTS.get(target, [target]))
 
 
+def sql_in_list(canonical: str) -> str:
+    """
+    A SQL value list covering every raw spelling of a competition, e.g.
+    ``('IPL', 'Indian Premier League', 'Indian Premier League (IPL)')``.
+
+    For queries that filter one known competition by a literal. ``competition = 'Indian Premier
+    League'`` stopped matching the 2026 season, which the feed labels "IPL"; use
+    ``competition IN {sql_in_list("IPL")}`` so every variant registered here is included.
+    Values come only from this module's registry, never from user input.
+    """
+    variants = variants_for(canonical) or [canonical]
+    quoted = ", ".join("'" + value.replace("'", "''") + "'" for value in variants)
+    return f"({quoted})"
+
+
 def canonical_sql(column: str = "m.competition") -> str:
     """A SQL CASE mapping the raw competition column to its canonical name.
 

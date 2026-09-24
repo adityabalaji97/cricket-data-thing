@@ -14,6 +14,11 @@ import logging
 
 from services.teams import get_all_team_name_variations
 from services.player_aliases import get_player_names
+from services.competition_aliases import sql_in_list
+
+# Every spelling of the IPL in matches.competition. The 2026 season arrived as "IPL", so the old
+# literal 'Indian Premier League' filter silently dropped the current season.
+IPL_COMPETITIONS_SQL = sql_in_list("IPL")
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +37,11 @@ def _discover_roster_from_matches(
     cutoff = date.today() - timedelta(days=lookback_days)
 
     # Check if team has recent matches
-    check_query = text("""
+    check_query = text(f"""
         SELECT COUNT(*) FROM matches
         WHERE (team1 = ANY(:teams) OR team2 = ANY(:teams))
           AND date >= :cutoff
-          AND competition = 'Indian Premier League'
+          AND competition IN {IPL_COMPETITIONS_SQL}
           AND (:day_or_night IS NULL OR day_or_night = :day_or_night)
     """)
     count = db.execute(
@@ -48,12 +53,12 @@ def _discover_roster_from_matches(
         return None
 
     # Get unique players from batting and bowling stats in recent matches
-    players_query = text("""
+    players_query = text(f"""
         WITH recent_match_ids AS (
             SELECT id FROM matches
             WHERE (team1 = ANY(:teams) OR team2 = ANY(:teams))
               AND date >= :cutoff
-              AND competition = 'Indian Premier League'
+              AND competition IN {IPL_COMPETITIONS_SQL}
               AND (:day_or_night IS NULL OR day_or_night = :day_or_night)
         ),
         batters AS (

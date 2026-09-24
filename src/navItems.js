@@ -6,9 +6,10 @@
  * meant four edits and any missed one produced a wrong tab highlight or heading.
  *
  * `t20Only` marks the pages that are not being made multi-format. They stay reachable, but the
- * nav disables them when a non-T20 format is selected, because the endpoints behind them are
- * pinned to men's T20 and would otherwise render an empty page that looks broken rather than
- * out of scope.
+ * nav disables them when a single non-T20 format (e.g. men's ODI) is selected, because the
+ * endpoints behind them are pinned to men's T20 and would otherwise render an empty page that
+ * looks broken rather than out of scope. "All formats" does not disable them — see
+ * FormatContext `supportsT20OnlyPages`.
  */
 
 export const NAV_ITEMS = [

@@ -27,6 +27,11 @@ from services.bowler_types import BOWLER_CATEGORY_SQL
 from services.global_t20_rankings import get_batting_rankings_service, get_bowling_rankings_service
 from services.player_aliases import get_player_names
 from services.teams import get_all_team_name_variations
+from services.competition_aliases import sql_in_list
+
+# Every spelling of the IPL in matches.competition. The 2026 season arrived as "IPL", so the old
+# literal 'Indian Premier League' filter silently dropped the current season.
+IPL_COMPETITIONS_SQL = sql_in_list("IPL")
 
 
 CATEGORY_WEIGHTS = {
@@ -694,7 +699,7 @@ def _fetch_team_match_rows(
 
     rows = db.execute(
         text(
-            """
+            f"""
             WITH
             team_matches AS (
                 SELECT
@@ -709,7 +714,7 @@ def _fetch_team_match_rows(
                     m.team2_elo
                 FROM matches m
                 WHERE (m.team1 = ANY(:team_variations) OR m.team2 = ANY(:team_variations))
-                  AND m.competition = 'Indian Premier League'
+                  AND m.competition IN {IPL_COMPETITIONS_SQL}
                   AND m.date >= :start_date
                   AND m.date <= :end_date
             ),
@@ -1352,7 +1357,7 @@ def _fetch_precomputed_venue_batting_map(
                 FROM batting_stats bs
                 JOIN matches m ON bs.match_id = m.id
                 WHERE bs.striker = ANY(:players)
-                  AND m.competition = 'Indian Premier League'
+                  AND m.competition IN {IPL_COMPETITIONS_SQL}
                   AND m.venue IS NOT NULL
                   AND m.date >= :start_date
                   AND m.date <= :end_date
@@ -1410,7 +1415,7 @@ def _fetch_precomputed_venue_bowling_map(
                 FROM bowling_stats bw
                 JOIN matches m ON bw.match_id = m.id
                 WHERE bw.bowler = ANY(:players)
-                  AND m.competition = 'Indian Premier League'
+                  AND m.competition IN {IPL_COMPETITIONS_SQL}
                   AND m.venue IS NOT NULL
                   AND m.date >= :start_date
                   AND m.date <= :end_date
@@ -1809,10 +1814,10 @@ def _fetch_bowling_pace_spin_metrics(
 def _total_ipl_venues(db: Session) -> int:
     row = db.execute(
         text(
-            """
+            f"""
             SELECT COUNT(DISTINCT venue)
             FROM matches
-            WHERE competition = 'Indian Premier League'
+            WHERE competition IN {IPL_COMPETITIONS_SQL}
               AND venue IS NOT NULL
             """
         )
@@ -1846,7 +1851,7 @@ def _fetch_venue_experience_metrics(
                 FROM batting_stats bs
                 JOIN matches m ON bs.match_id = m.id
                 WHERE bs.striker = ANY(:players)
-                  AND m.competition = 'Indian Premier League'
+                  AND m.competition IN {IPL_COMPETITIONS_SQL}
                   AND m.venue IS NOT NULL
                   AND m.date >= :start_date
                   AND m.date <= :end_date
@@ -1875,7 +1880,7 @@ def _fetch_venue_experience_metrics(
                 FROM bowling_stats bw
                 JOIN matches m ON bw.match_id = m.id
                 WHERE bw.bowler = ANY(:players)
-                  AND m.competition = 'Indian Premier League'
+                  AND m.competition IN {IPL_COMPETITIONS_SQL}
                   AND m.venue IS NOT NULL
                   AND m.date >= :start_date
                   AND m.date <= :end_date
@@ -1909,7 +1914,7 @@ def _build_venue_archetypes(
     start, end = date_range
     rows = db.execute(
         text(
-            """
+            f"""
             SELECT
                 ground AS venue,
                 COALESCE(SUM(CASE WHEN LOWER(COALESCE(bowl_kind, '')) LIKE '%pace%' THEN score ELSE 0 END), 0) AS pace_runs,
@@ -1921,7 +1926,7 @@ def _build_venue_archetypes(
               AND date >= :start_date
               AND date <= :end_date
               AND bowl_kind IS NOT NULL
-              AND (competition = 'Indian Premier League' OR competition = 'IPL')
+              AND competition IN {IPL_COMPETITIONS_SQL}
             GROUP BY ground
             """
         ),
@@ -1943,7 +1948,7 @@ def _build_venue_archetypes(
                     WHERE m.venue IS NOT NULL
                       AND m.date >= :start_date
                       AND m.date <= :end_date
-                      AND m.competition = 'Indian Premier League'
+                      AND m.competition IN {IPL_COMPETITIONS_SQL}
                 )
                 SELECT
                     venue,

@@ -11,6 +11,11 @@ from sqlalchemy.sql import text
 
 from database import get_session
 from utils.league_utils import expand_league_abbreviations
+from services.competition_aliases import sql_in_list
+
+# Every spelling of the IPL in matches.competition. The 2026 season arrived as "IPL", so the old
+# literal 'Indian Premier League' filter silently dropped the current season.
+IPL_COMPETITIONS_SQL = sql_in_list("IPL")
 
 router = APIRouter(prefix="/games", tags=["games"])
 
@@ -258,7 +263,7 @@ def get_player_journey(
 
     # Combine batting and bowling appearances, use canonical names from player_aliases
     journey_query = text(
-        """
+        f"""
         WITH all_appearances AS (
             -- Batting appearances
             SELECT
@@ -270,7 +275,7 @@ def get_player_journey(
                 0 AS wickets
             FROM delivery_details dd
             JOIN matches m ON dd.p_match = m.id
-            WHERE m.competition = 'Indian Premier League'
+            WHERE mcompetition IN {IPL_COMPETITIONS_SQL}'
               AND dd.bat IS NOT NULL
               AND dd.team_bat IS NOT NULL
             GROUP BY dd.bat, dd.team_bat, EXTRACT(YEAR FROM m.date)
@@ -287,7 +292,7 @@ def get_player_journey(
                 SUM(CASE WHEN dd.out::boolean = true THEN 1 ELSE 0 END) AS wickets
             FROM delivery_details dd
             JOIN matches m ON dd.p_match = m.id
-            WHERE m.competition = 'Indian Premier League'
+            WHERE m.competition IN {IPL_COMPETITIONS_SQL}
               AND dd.bowl IS NOT NULL
               AND dd.team_bowl IS NOT NULL
             GROUP BY dd.bowl, dd.team_bowl, EXTRACT(YEAR FROM m.date)

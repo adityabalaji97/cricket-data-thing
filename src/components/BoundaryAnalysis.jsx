@@ -196,7 +196,7 @@ const buildGridRows = (data, drillDown, context) => {
 };
 
 /* ---------- Main component ---------- */
-const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeInternational, isMobile: isMobileProp, enabled = true }) => {
+const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeInternational, topTeams, isMobile: isMobileProp, enabled = true }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -217,6 +217,7 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
     if (endDate) params.end_date = endDate;
     if (leagues?.length) params.leagues = leagues;
     if (includeInternational) params.include_international = true;
+    if (includeInternational && topTeams) params.top_teams = topTeams;
 
     fetchAnalyticsJson('/boundary-analysis', params)
       .then((result) => {
@@ -227,7 +228,7 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
         setError(err.message);
         setLoading(false);
       });
-  }, [enabled, context, name, startDate, endDate, leagues, includeInternational]);
+  }, [enabled, context, name, startDate, endDate, leagues, includeInternational, topTeams]);
 
   if (loading) {
     return (

@@ -9,7 +9,17 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## CURRENT STATE
 
-> ### START HERE (2026-08-01)
+> ### START HERE (2026-09-24) — UI/UX track U1 on branch `u1-ui-bugfixes` (not yet deployed)
+>
+> A mobile-first UI/UX sweep found five live bugs; U1 fixes them on branch `u1-ui-bugfixes`
+> (uncommitted at time of writing — see the 2026-09-24 log entry). Plan of record for the wider
+> work (cost trim, query-builder MCP, T20 Primer metrics, dark-theme/mobile U2–U4) lives in
+> `~/.claude/plans/can-you-look-at-iterative-plum.md`; order is U1+Phase 0 → U2 → MCP → U3 →
+> Primer metrics → U4. **Not yet done:** Heroku Postgres essential-2 → essential-1 downgrade and
+> `DB_POOL_SIZE=4 / DB_MAX_OVERFLOW=2` config — the downgrade **changes DATABASE_URL**, so the
+> GitHub secret and local `.env` must be updated in the same step.
+>
+> ### Previous state (2026-08-01)
 >
 > **ODIs are live end to end** — API, nightly refresh and UI. **A1, A2, A6, A7 and A8 are
 > complete**, so all three hero features (query builder, scorecard, match preview) now work
@@ -121,6 +131,60 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-09-24 — Track U1 (UI bug fixes) — Claude
+
+**Done** (branch `u1-ui-bugfixes`):
+* **Nav disabled for every new visitor.** "All formats" is the default slug, and the nav keyed
+  `t20Only` pages off `isDefaultFormat`, so Player/Team/Comparison/Matchups/Rankings/games/Fantasy
+  were greyed out on first visit (11 of 15 items in the phone menu). New
+  `FormatContext.supportsT20OnlyPages` (T20 or ALL, men's); App.js uses it for tabs and menu;
+  disabled menu items now say "Men's T20 only". Those pages never read the format, so "all" was
+  always safe for them.
+* **Player page "Failed to fetch".** ~15 sections fetched on mount against a 6-connection pool
+  (2+1 per worker); router logs showed bursts of simultaneous 30s 503s. New
+  `src/components/ui/LazySection.jsx` mounts sections near the viewport (first two eager) in
+  `UnifiedPlayerProfile.jsx`. Match preview already had lazy activation. Pool resize pending (Phase 0).
+* **Doppelgangers broken for every post-2015 player.** batting_stats/bowling_stats use legacy
+  names before the 2015 split and current names after; the target was resolved to the legacy
+  name. `services/search.py`: `_merge_rows_by_canonical_name` folds rows under the current name
+  via `player_aliases`, target resolved to the current name, and both doppelganger queries are
+  pinned to men's T20 (`DOPPELGANGER_FORMAT_PIN`) — they were blending ODIs in.
+* **2026 IPL season invisible to IPL-specific queries.** The feed labels it `IPL`; 13 queries
+  filtered `competition = 'Indian Premier League'`, so IPL Predictions had no match rows (Win
+  Rate/Elo/Situational/Venue all 50 for every team) and team roster/H2H/games missed 2026.
+  New `competition_aliases.sql_in_list()`; `IPL_COMPETITIONS_SQL` used in
+  `services/ipl_prediction.py`, `services/team_roster.py`, `services/team_h2h.py`, `routers/games.py`.
+* **Match preview, venue with no matches:** Summary now renders `EmptyState` with reasons + Edit
+  filters, and venue-history sections are dropped (team sections kept). Boundary analysis ignored
+  `top_teams` (showed 327 balls beside "0 T20s"); now plumbed route → service → helper → prop.
+  Venue "similar" 404 ("not found in qualified pool") renders a not-enough-data empty state.
+  Invisible white header card (literal white gradient) and `grey.300` bar fixed.
+* **"Total deliveries" under All formats showed the ODI count.** refresh script wrote the count
+  to the bare key on every leg (ODI last); now `scoped_key()`. `/query/deliveries/columns` sums
+  per-format counts under ALL. Nightly workflow: T20 leg no longer `--skip-metadata` (metadata
+  is per-format; the T20 dropdown cache was never refreshed nightly).
+* `src/components/ui/EmptyState.jsx` extended (reasons/action/icon; palette colours) —
+  backward compatible with its 10 existing callers.
+
+**Verified:** local API against hindsight_local — doppelgangers found for V Kohli / Virat Kohli /
+JJ Bumrah; leaderboard OK; IPL predictions now differentiate (RCB 62.6 … MI 34.7, win-rate
+8.7–91.5). `npm run build` OK (only pre-existing warnings). CDP iPhone-emulation sweep of local
+dev server: empty-venue state, player lazy sections, all 15 menu items enabled.
+Golden check: 5 endpoints differ (qb_columns, qb_batter_vs_pace_by_length,
+qb_death_overs_venue, landing_featured_innings, qb_legacy_pre2015_window) — **identical set on
+a clean checkout (changes stashed)**, so pre-existing drift, not this work; goldens need a
+re-capture once someone confirms those drifts are intended.
+
+**Decisions / surprises:** headless `chrome --screenshot` cannot go below 500px wide — it faked
+right-edge clipping on every page at 390px; use CDP `Emulation.setDeviceMetricsOverride`
+(mobile sweep script to be promoted to `scripts/dev/ui_sweep.mjs`). Essential-tier plan changes
+move the DB and rewrite DATABASE_URL.
+
+**Next:** commit + deploy (Heroku API, Vercel frontend); Phase 0 downgrade + pool config +
+update GH secret `DATABASE_URL` and local `.env`; after the next nightly run confirm
+`total_deliveries` + `total_deliveries:ODI:male` keys exist. Then U2 (global dark theme + mobile
+bottom nav).
 
 ### 2026-08-01 — Chunks A6, A7, A8 — Claude — match preview redesign complete
 

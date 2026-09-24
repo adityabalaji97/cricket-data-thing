@@ -130,7 +130,7 @@ const AppContent = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   // Pinned, not the raw selection: a venue preview is one format's record at a ground,
   // and the venue endpoints reject 'ALL'.
-  const { isDefaultFormat, pinnedFormatParams } = useFormat();
+  const { supportsT20OnlyPages, pinnedFormatParams } = useFormat();
 
 
   
@@ -598,9 +598,14 @@ const AppContent = () => {
                 <MenuItem
                   key={item.path}
                   onClick={() => handleNavigate(item.path)}
-                  disabled={item.t20Only && !isDefaultFormat}
+                  disabled={item.t20Only && !supportsT20OnlyPages}
                 >
                   {item.label}
+                  {item.t20Only && !supportsT20OnlyPages && (
+                    <Typography component="span" variant="caption" sx={{ ml: 1 }}>
+                      Men's T20 only
+                    </Typography>
+                  )}
                 </MenuItem>
               ))}
             </Menu>
@@ -683,7 +688,7 @@ const AppContent = () => {
                   label={item.label}
                   component={Link}
                   to={item.path}
-                  disabled={item.t20Only && !isDefaultFormat}
+                  disabled={item.t20Only && !supportsT20OnlyPages}
                 />
               ))}
             </Tabs>

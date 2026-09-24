@@ -52,6 +52,7 @@ def get_boundary_analysis(
     end_date: Optional[date] = None,
     leagues: Optional[List[str]] = None,
     include_international: bool = False,
+    top_teams: Optional[int] = None,
 ) -> dict:
     """
     Unified boundary analysis for venue, batter, or bowler context.
@@ -104,8 +105,11 @@ def get_boundary_analysis(
     expanded_leagues = normalize_leagues(leagues)
     if expanded_leagues:
         params["leagues"] = expanded_leagues
+    # top_teams must match what the rest of the page uses: match preview restricts internationals
+    # to the top N sides, and passing None here made this section count games the summary above
+    # it excluded (e.g. a venue showing "0 T20s" beside 327 powerplay pace balls).
     comp_filter = build_competition_filter_delivery_details(
-        expanded_leagues, include_international, None, params
+        expanded_leagues, include_international, top_teams, params
     )
 
     where_clauses.append("(dd.wide IS NULL OR dd.wide = 0)")

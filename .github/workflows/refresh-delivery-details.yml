@@ -32,12 +32,17 @@ jobs:
           pip install -r requirements.txt
 
       # ------------------------------------------------------------------
-      # Per-format legs: load + backfill only.
+      # Per-format legs: load + backfill + metadata.
       #
-      # Steps 3-7 (columns, players, metadata, sync, ELO) are table-wide, not
+      # Steps 3, 4, 6, 7 (columns, players, sync, ELO) are table-wide, not
       # per-format -- running them once per leg would repeat the same work and
       # have two legs writing the same rows. So every leg but the last skips
       # them, and the last leg runs them once for everything loaded above.
+      #
+      # Step 5 (metadata) is the exception: it is per-format (it writes keys
+      # scoped to the leg's format/gender), so every leg runs it. Skipping it on
+      # the T20 leg meant the men's T20 dropdown values and delivery count were
+      # never refreshed by the nightly job.
       #
       # Sequential, not a matrix: matrix jobs run in parallel and these all
       # write delivery_details.
@@ -58,7 +63,7 @@ jobs:
             --format T20 \
             --gender male \
             --skip-validation \
-            --skip-columns --skip-players --skip-metadata --skip-sync --skip-elo
+            --skip-columns --skip-players --skip-sync --skip-elo
           rm -f t20_bbb.csv
 
       - name: "ODI (men): download"

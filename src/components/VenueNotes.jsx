@@ -47,6 +47,7 @@ import VenueSectionTabs from './VenueSectionTabs';
 import VenueNotesDesktopNav from './VenueNotesDesktopNav';
 import BoundaryAnalysis from './BoundaryAnalysis';
 import ForesightCard from './ForesightCard';
+import EmptyState from './ui/EmptyState';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -628,7 +629,7 @@ const WinPercentagesPie = ({ data }) => {
                             />
                         ) : null
                     )) : (
-                        <Box sx={{ height: '100%', flex: '1 1 auto', bgcolor: 'grey.300' }} />
+                        <Box sx={{ height: '100%', flex: '1 1 auto', bgcolor: hsColors.surface3 }} />
                     )}
                 </Box>
             </Box>
@@ -1038,13 +1039,40 @@ const VenueNotes = ({
         zoneFilters: similarZoneFilters,
     });
 
+    // A venue can have zero matches under the current filters (a new ground, a narrow date
+    // window, or internationals restricted to the top N sides). Rendering the venue sections then
+    // produced a page of 0s and 0-0 bars, so show one explanation instead and keep only the
+    // sections that are about the two teams rather than the ground.
+    const noVenueMatches = Boolean(venueStats)
+        && venue !== 'All Venues'
+        && (venueStats.total_matches || 0) === 0;
+
     const sectionGroups = useMemo(() => {
+        const emptyReasons = [
+            startDate ? 'The date range may be too narrow — matches before it are excluded.' : null,
+            leagues?.length ? 'Only the selected leagues are included.' : null,
+            includeInternational && topTeams
+                ? `Internationals are limited to the top ${topTeams} teams, so games between other sides are left out.`
+                : null,
+            !includeInternational ? 'International matches are excluded.' : null,
+        ].filter(Boolean);
+
         const groups = [
             // 1. SUMMARY — venue stats at a glance
             {
                 id: 'summary',
                 label: 'Summary',
-                content: (
+                content: noVenueMatches ? (
+                    <EmptyState
+                        title={`No matches at ${venue} for these filters`}
+                        description={selectedTeam1 && selectedTeam2
+                            ? 'There is no venue history to summarise yet. Team form and head-to-head below still apply.'
+                            : 'There is no venue history to summarise yet.'}
+                        reasons={emptyReasons}
+                        actionLabel={onToggleFilters ? 'Edit filters' : undefined}
+                        onAction={onToggleFilters}
+                    />
+                ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <WinPercentagesPie data={venueStats} />
                         <ScoresBarChart data={venueStats} />
@@ -1178,6 +1206,7 @@ const VenueNotes = ({
                     endDate={endDate}
                     leagues={leagues}
                     includeInternational={includeInternational}
+                    topTeams={topTeams}
                     isMobile={isMobile}
                     enabled={boundariesEnabled}
                 />
@@ -1256,8 +1285,15 @@ const VenueNotes = ({
             });
         }
 
+        if (noVenueMatches) {
+            // Sections built on the ground's own history have nothing to show.
+            const teamSections = new Set(['summary', 'preview', 'teams', 'foresight']);
+            return groups.filter((group) => teamSections.has(group.id));
+        }
         return groups;
     }, [
+        noVenueMatches,
+        onToggleFilters,
         venueStats,
         statsData,
         selectedTeam1,
@@ -1385,9 +1421,9 @@ return (
                 borderRadius: isMobile ? 0 : 3,
                 boxShadow: isMobile ? 'none' : 1,
                 bgcolor: isMobile ? 'transparent' : 'background.paper',
-                backgroundImage: isMobile
-                    ? 'none'
-                    : 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(250,250,250,1) 100%)',
+                // Was a literal white gradient, which bypassed the scoped dark theme and left the
+                // light venue title invisible on white.
+                backgroundImage: 'none',
             }}
         >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>

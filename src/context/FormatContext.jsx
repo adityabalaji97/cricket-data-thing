@@ -166,6 +166,12 @@ export const FormatProvider = ({ children }) => {
       },
       isAllFormats: (active?.format || 'T20') === 'ALL',
       isDefaultFormat: (active?.format || 'T20') === 'T20' && (active?.gender || 'male') === 'male',
+      // Whether the men's-T20-only pages (navItems `t20Only`) make sense right now. "All formats"
+      // counts: those pages ignore the format and always show men's T20, which is a subset of
+      // "all", not a contradiction of it. Keying the nav off isDefaultFormat alone disabled half
+      // the site for every first visit, because "all" is the default.
+      supportsT20OnlyPages:
+        ['T20', 'ALL'].includes(active?.format || 'T20') && (active?.gender || 'male') === 'male',
       phaseLabel: (key) => active?.phases?.find((p) => p.key === key)?.label || key,
       phaseOvers: (key) => active?.phases?.find((p) => p.key === key)?.display_overs || '',
     }),

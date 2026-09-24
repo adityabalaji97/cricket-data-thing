@@ -370,8 +370,19 @@ def get_available_columns(
         def get_coverage(key):
             return _entry(key).get("coverage")
         
-        # Get total deliveries
-        total_deliveries = get_values("total_deliveries")
+        # Get total deliveries. Under ALL it is the sum of every format's count -- _entry()
+        # takes the first scalar it meets, which reported one format's total as the whole.
+        # The bare key is men's T20 and the scoped keys are the other formats, so nothing is
+        # counted twice.
+        if format == "ALL":
+            total_deliveries = sum(
+                entry["values"]
+                for meta_key, entry in metadata.items()
+                if (meta_key == "total_deliveries" or meta_key.startswith("total_deliveries:"))
+                and isinstance(entry.get("values"), (int, float))
+            )
+        else:
+            total_deliveries = get_values("total_deliveries")
         if isinstance(total_deliveries, int):
             total_count = total_deliveries
         elif isinstance(total_deliveries, list) and len(total_deliveries) == 0:

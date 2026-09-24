@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import logging
 import random
 import math
+import numbers
 
 from services.player_aliases import (
     resolve_to_legacy_name,
@@ -243,6 +244,66 @@ def _build_matches_competition_filter(
         return ""
 
     return "\n        AND (" + "\n            OR ".join(conditions) + "\n        )"
+
+
+# Doppelganger pools are pinned to men's T20: the pages that use them are T20-only, and without the
+# pin batting_stats/bowling_stats silently blend in every ODI since the multi-format load.
+DOPPELGANGER_FORMAT_PIN = "\n        AND m.format = 'T20' AND m.gender = 'male'"
+
+
+class _MergedRow:
+    """Row stand-in supporting both `row.col` and `row._mapping`, like a SQLAlchemy Row."""
+
+    def __init__(self, mapping: Dict[str, Any]):
+        self._mapping = mapping
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return self._mapping[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
+
+
+def _load_alias_map(db: Session) -> Dict[str, str]:
+    """{legacy name: current name}, e.g. {"V Kohli": "Virat Kohli"}."""
+    try:
+        rows = db.execute(text("SELECT player_name, alias_name FROM player_aliases")).fetchall()
+    except Exception as exc:  # pragma: no cover - degrade to unmerged names
+        logger.warning(f"Could not load player aliases for doppelganger merge: {exc}")
+        return {}
+    return {row[0]: row[1] for row in rows if row[0] and row[1]}
+
+
+def _merge_rows_by_canonical_name(
+    rows: List[Any],
+    alias_map: Dict[str, str],
+    key_fields: tuple = ("player_name",),
+) -> List[_MergedRow]:
+    """
+    Fold rows for the same player under one name, summing every other (numeric) column.
+
+    batting_stats/bowling_stats carry legacy names ("V Kohli") before the 2015 table split and
+    current names ("Virat Kohli") after it, and the legacy `deliveries` table uses legacy names
+    throughout. Keyed on the raw name, one player became two half-sized players, and a lookup by
+    either name missed the rows under the other -- which is why every post-2015 player came
+    back "not found in player pool". Summing is safe because the two name forms never share a
+    match, so per-match counts do not double.
+    """
+    merged: Dict[tuple, Dict[str, Any]] = {}
+    for row in rows:
+        data = dict(row._mapping)
+        data["player_name"] = alias_map.get(data["player_name"], data["player_name"])
+        key = tuple(data[field] for field in key_fields)
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = data
+            continue
+        for column, value in data.items():
+            if column in key_fields or value is None:
+                continue
+            if isinstance(value, numbers.Number) and not isinstance(value, bool):
+                existing[column] = (existing.get(column) or 0) + value
+    return [_MergedRow(values) for values in merged.values()]
 
 
 def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
@@ -623,7 +684,10 @@ def get_player_doppelgangers(
     end = end_date or defaults["end_date"]
 
     names = get_player_names(player_name, db)
-    resolved_name = names["legacy_name"]
+    alias_map = _load_alias_map(db)
+    # Pool rows are keyed on the current (delivery_details) name after merging; see
+    # _merge_rows_by_canonical_name.
+    resolved_name = alias_map.get(names["legacy_name"], names["details_name"])
     requested_role = role.lower().strip() if role else None
     valid_roles = {"batter", "bowler", "all_rounder"}
     if requested_role and requested_role not in valid_roles:
@@ -642,7 +706,7 @@ def get_player_doppelgangers(
         include_international=(include_international if include_international is not None else False) if apply_competition_filter else False,
         top_teams=top_teams,
         match_alias="m",
-    )
+    ) + DOPPELGANGER_FORMAT_PIN
 
     batting_query = text(f"""
         SELECT
@@ -754,9 +818,13 @@ def get_player_doppelgangers(
         GROUP BY d.batter, d.bowler_type
     """)
 
-    batting_rows = db.execute(batting_query, params).fetchall()
-    bowling_rows = db.execute(bowling_query, params).fetchall()
-    batter_split_rows = db.execute(batter_split_query, params).fetchall()
+    batting_rows = _merge_rows_by_canonical_name(db.execute(batting_query, params).fetchall(), alias_map)
+    bowling_rows = _merge_rows_by_canonical_name(db.execute(bowling_query, params).fetchall(), alias_map)
+    batter_split_rows = _merge_rows_by_canonical_name(
+        db.execute(batter_split_query, params).fetchall(),
+        alias_map,
+        key_fields=("player_name", "split_type", "split_key"),
+    )
 
     player_map: Dict[str, Dict[str, Any]] = {}
 
@@ -1151,6 +1219,8 @@ def get_doppelganger_leaderboard(
 
     if not competition_filter:
         raise ValueError("At least one competition source must be selected (league and/or international)")
+    competition_filter += DOPPELGANGER_FORMAT_PIN
+    alias_map = _load_alias_map(db)
 
     batting_query = text(f"""
         SELECT
@@ -1264,9 +1334,13 @@ def get_doppelganger_leaderboard(
         GROUP BY d.batter, d.bowler_type
     """)
 
-    batting_rows = db.execute(batting_query, params).fetchall()
-    bowling_rows = db.execute(bowling_query, params).fetchall()
-    batter_split_rows = db.execute(batter_split_query, params).fetchall()
+    batting_rows = _merge_rows_by_canonical_name(db.execute(batting_query, params).fetchall(), alias_map)
+    bowling_rows = _merge_rows_by_canonical_name(db.execute(bowling_query, params).fetchall(), alias_map)
+    batter_split_rows = _merge_rows_by_canonical_name(
+        db.execute(batter_split_query, params).fetchall(),
+        alias_map,
+        key_fields=("player_name", "split_type", "split_key"),
+    )
 
     base_batting_metric_defs = [
         "batting_average",

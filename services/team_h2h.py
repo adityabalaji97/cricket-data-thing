@@ -13,6 +13,11 @@ from sqlalchemy.sql import text
 
 from ipl_rosters import get_all_ipl_teams, get_ipl_roster, get_team_abbrev_from_name
 from services.teams import get_all_team_name_variations
+from services.competition_aliases import sql_in_list
+
+# Every spelling of the IPL in matches.competition. The 2026 season arrived as "IPL", so the old
+# literal 'Indian Premier League' filter silently dropped the current season.
+IPL_COMPETITIONS_SQL = sql_in_list("IPL")
 
 
 def _expand_team_identifiers(team_identifier: str) -> List[str]:
@@ -29,14 +34,14 @@ def _get_h2h_rows(db: Session, team_names: List[str], opponent_names: List[str])
     Reuses the same pair-query pattern used by match preview H2H logic.
     """
     query = text(
-        """
+        f"""
         SELECT date, winner
         FROM matches
         WHERE (
           (team1 = ANY(:team_names) AND team2 = ANY(:opponent_names))
           OR (team1 = ANY(:opponent_names) AND team2 = ANY(:team_names))
         )
-          AND competition = 'Indian Premier League'
+          AND competition IN {IPL_COMPETITIONS_SQL}
         ORDER BY date DESC
         """
     )
