@@ -18,8 +18,9 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > new host (`c1rqglkbf2a14o…`). Pool is `DB_POOL_SIZE=4 / DB_MAX_OVERFLOW=2` (12 of 20
 > connections). Backup `b004` taken before the change. Row counts verified identical.
 >
-> **U2 (global dark theme + mobile bottom nav) + first U3 pass** is on branch
-> `u2-dark-theme-mobile-nav` — see its log entry; not yet merged/deployed.
+> **U2 (global dark theme + mobile bottom nav) + first U3 pass is live** (2a3a18e on main,
+> Vercel `hindsight` production Ready; live phone sweep clean). User validating on device.
+> Next: Phase 1 (query-builder MCP), then remaining U3 literals and U4.
 >
 > Plan of record for the wider work lives in `~/.claude/plans/can-you-look-at-iterative-plum.md`:
 > U1+Phase 0 (done) → U2 global dark theme + mobile bottom nav → query-builder MCP → U3 →
