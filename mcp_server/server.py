@@ -332,6 +332,9 @@ def _markdown_table(columns: List[str], rows: List[Dict[str, Any]], max_rows: in
     # The first ten columns, plus whatever the rows were ranked or charted by -- otherwise a
     # "ranked by wpa" table could hide the very numbers it was ranked on.
     extra = []
+    # The Primer metrics sit past the tenth column; show them whenever the rows carry them.
+    if any(r.get("impact") is not None for r in rows[:max_rows]):
+        must_show = list(must_show or []) + ["impact", "raa", "waa", "wpa"]
     for c in must_show or []:
         if c and c in columns and c not in columns[:10] and c not in extra:
             extra.append(c)
@@ -368,6 +371,13 @@ includes a link to open the same query on the Hindsight website — mention it t
 4. preview_match gives a fixture preview (venue record, leaders, head-to-head, form, standout
    batter-vs-bowler matchups) for two teams at a venue in T20 or ODI — use it for "preview X v Y
    at Z" questions, then drill in with query_cricket_data.
+5. Contextual metrics ARE available (men's T20 from 2015, not The Hundred), computed ball by ball
+   with Himanish Ganjoo's T20 Primer method and returned on every query_cricket_data row:
+   impact (runs added to the team's projected total; impact_per_100, impact_per_innings),
+   raa / waa (runs and wickets above average for the game state; *_per_100), wpa (win
+   probability added, 1.0 = one match won) and avg_leverage. They come from the batting side,
+   or the bowling side when grouped by bowler. For "most valuable / most impactful / match-
+   winning" questions, pin format="T20" and sort_by="impact" or "wpa" -- do not approximate them.
 """
 
 apps = Apps()
@@ -676,6 +686,19 @@ def get_query_options(
         "format": format,
         "gender": gender,
         "options": options,
+        # Metric columns query_cricket_data returns, so a model knows they exist before asking.
+        "metrics": {
+            "basic": ["balls", "runs", "wickets", "average", "strike_rate", "economy", "dot_percentage",
+                      "boundary_percentage", "control_percentage", "fours", "sixes", "percent_balls"],
+            "contextual_t20": {
+                "impact": "runs added to the team's projected total (DL-based), also impact_per_100 / impact_per_innings",
+                "raa": "runs above average for the game state, also raa_per_100",
+                "waa": "wickets above average for the game state, also waa_per_100",
+                "wpa": "win probability added; 1.0 = one match won",
+                "avg_leverage": "average stakes per ball (win-probability gap between a six and a wicket)",
+                "coverage": "men's T20 from 2015, not The Hundred; batting side, or bowling side when grouped by bowler",
+            },
+        },
         "coverage_percent": coverage,
         "notes": "line/length/shot/control exist from 2015 and cover a minority of balls; filtering on "
                  "them narrows results to balls that have the data.",

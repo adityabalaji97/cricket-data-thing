@@ -151,6 +151,16 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## Log entries (newest first)
 
+### 2026-09-25 — Connector didn't "see" the Primer metrics — Claude
+
+A Claude chat using the connector answered that Hindsight has no Impact/RAA/WPA and approximated
+them itself. The data was there, but (1) the text table the model reads stops at 10 columns and
+the metrics came after, so only a `sort_by="impact"` query showed them, (2) neither the server
+instructions nor get_query_options mentioned them. Fixed: instructions item 5 describes the
+metrics and says to sort by them rather than approximate; get_query_options returns a `metrics`
+block; the text table always appends impact/raa/waa/wpa when rows carry them. Chats opened before
+this deploy may hold the old tool list -- reconnect the connector (or start a new chat).
+
 ### 2026-09-25 — Phase 2: T20 Primer metrics (par, Impact, RAA/WAA, WP/WPA, leverage) — Claude
 
 Implements Himanish Ganjoo's *T20 Metrics: A Primer* (Aug 2026) for men's T20 (2015+, the
