@@ -1,4 +1,6 @@
 import React from 'react';
+import { useMediaQuery } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import { 
   Paper, 
   Typography, 
@@ -6,7 +8,6 @@ import {
   Table, 
   TableBody, 
   TableCell, 
-  TableContainer, 
   TableHead, 
   TableRow
 } from '@mui/material';
@@ -19,6 +20,8 @@ const COLORS = [
 ];
 
 const PhaseComparisonChart = ({ batters }) => {
+  // On a phone the metric labels around an 80% radar ran past the card edge and were clipped.
+  const isNarrow = useMediaQuery((theme) => theme.breakpoints.down('sm'));
   // Check if we have valid data
   if (!batters || batters.length === 0 || !batters.some(b => b.stats)) {
     return (
@@ -136,7 +139,7 @@ const PhaseComparisonChart = ({ batters }) => {
   // Prepare a detailed table of phase stats
   const renderStatsTable = () => {
     return (
-      <TableContainer component={Paper} sx={{ mt: 3 }}>
+      <ScrollTable paper sx={{ mt: 3 }}>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -825,7 +828,7 @@ const PhaseComparisonChart = ({ batters }) => {
             </TableRow>
           </TableBody>
         </Table>
-      </TableContainer>
+      </ScrollTable>
     );
   };
   
@@ -838,11 +841,11 @@ const PhaseComparisonChart = ({ batters }) => {
         Compare batting performance across different phases
       </Typography>
       
-      <Box sx={{ height: 400, width: '100%', mt: 2 }}>
+      <Box sx={{ height: isNarrow ? 320 : 400, width: '100%', mt: 2 }}>
         <ResponsiveContainer>
-          <RadarChart outerRadius="80%" data={radarData}>
+          <RadarChart outerRadius={isNarrow ? '58%' : '80%'} data={radarData}>
             <PolarGrid />
-            <PolarAngleAxis dataKey="metric" />
+            <PolarAngleAxis dataKey="metric" tick={{ fontSize: isNarrow ? 10 : 12 }} />
             <PolarRadiusAxis 
               domain={[0, 100]} 
               tick={false}

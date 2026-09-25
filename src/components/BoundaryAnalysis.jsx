@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { textOn } from '../utils/teamColors';
 import {
-  Box, Typography, ToggleButtonGroup, ToggleButton, CircularProgress, Alert,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  useMediaQuery, useTheme,
+  Box,
+  Typography,
+  ToggleButtonGroup,
+  ToggleButton,
+  CircularProgress,
+  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import Card from './ui/Card';
 import { fetchAnalyticsJson } from '../utils/analyticsApi';
 import { colors as designColors } from '../theme/designSystem';
@@ -325,7 +336,7 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
 
       {/* Detail Table */}
       {detailRows.length > 0 && (
-        <TableContainer>
+        <ScrollTable stickyFirstColumn>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -352,7 +363,7 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
               ))}
             </TableBody>
           </Table>
-        </TableContainer>
+        </ScrollTable>
       )}
     </Card>
   );

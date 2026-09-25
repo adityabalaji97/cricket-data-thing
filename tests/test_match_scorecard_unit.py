@@ -7,6 +7,9 @@ from services.match_scorecard import (
     _capabilities_for_source,
     _econ_color,
     _top_performers,
+    _build_summary,
+    _result_text,
+    _worm_ticks,
 )
 
 
@@ -83,3 +86,46 @@ def test_top_performers_include_scorecard_navigation_metadata():
     assert performers[0]["player_id"] == "shreyas-iyer"
     assert performers[1]["screen"] == "bowling"
     assert performers[1]["lens"] == "batter"
+
+
+def _inn(number, team, runs, wickets, target=None, worm=None):
+    return {
+        "innings": number,
+        "batting_team": team,
+        "score": {"team": team, "runs": runs, "wickets": wickets, "target": target},
+        "worm": worm or [],
+    }
+
+
+def test_result_text_uses_singular_margins():
+    match = {"winner": "A", "outcome": {"by": {"wickets": 1}}}
+    assert _result_text(match, []) == "A won by 1 wicket"
+    assert _result_text({"winner": "A", "outcome": {"by": {"runs": 1}}}, []) == "A won by 1 run"
+
+
+def test_result_text_derives_bat_first_margin_only_without_a_revised_target():
+    innings = [_inn(1, "AUS", 356, 6), _inn(2, "ZIM", 272, 10, target=357)]
+    assert _result_text({"winner": "AUS"}, innings) == "AUS won by 84 runs"
+    # DLS: the chase target was revised, so raw scores do not give the margin.
+    revised = [_inn(1, "AUS", 356, 6), _inn(2, "ZIM", 200, 10, target=250)]
+    assert _result_text({"winner": "AUS"}, revised) == "AUS won"
+
+
+def test_worm_ticks_follow_the_format_length():
+    assert _worm_ticks(20) == [5, 10, 15, 20]
+    assert _worm_ticks(50) == [10, 20, 30, 40, 50]
+
+
+def test_worm_innings_share_one_scale():
+    innings = [
+        _inn(1, "AUS", 200, 5, worm=[50, 100, 200]),
+        _inn(2, "ZIM", 100, 10, worm=[50, 100]),
+    ]
+    summary = _build_summary({"format": "T20"}, innings)
+    first, second = summary["worm"]
+    # Same runs at the same over land on the same point; the shorter, lower innings ends lower
+    # and earlier instead of being stretched to the top-right corner.
+    assert first["points"].split()[1] == second["points"].split()[1]
+    assert second["points"].split()[-1] != first["points"].split()[-1]
+    assert summary["worm_axis"] == [5, 10, 15, 20]
+

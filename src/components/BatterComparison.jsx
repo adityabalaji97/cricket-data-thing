@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Container, 
-  Box, 
-  Button, 
-  Typography, 
-  TextField, 
-  CircularProgress, 
-  Alert, 
+import {
+  Container,
+  Box,
+  Button,
+  Typography,
+  TextField,
+  CircularProgress,
+  Alert,
   Autocomplete,
   Paper,
   Divider,
@@ -15,13 +15,16 @@ import {
   Card,
   CardContent,
   Tooltip,
-  TableContainer,
   Table,
   TableHead,
   TableBody,
   TableRow,
-  TableCell
+  TableCell,
 } from '@mui/material';
+import TryExamples from './ui/TryExamples';
+import { useMediaQuery } from '@mui/material';
+import FilterSummary from './ui/FilterSummary';
+import ScrollTable from './ui/ScrollTable';
 import { useLocation, useNavigate } from 'react-router-dom';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -36,6 +39,7 @@ import config from '../config';
 import { DEFAULT_START_DATE, TODAY } from '../utils/dateDefaults';
 
 const BatterComparison = () => {
+  const isMobile = useMediaQuery((theme) => theme.breakpoints.down('md'));
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -337,7 +341,7 @@ const BatterComparison = () => {
     if (!compareData || compareData.length === 0) return null;
     
     return (
-      <TableContainer component={Paper} sx={{ mt: 4 }}>
+      <ScrollTable paper sx={{ mt: 4 }}>
         <Table>
           <TableHead>
             <TableRow>
@@ -434,7 +438,7 @@ const BatterComparison = () => {
             </TableRow>
           </TableBody>
         </Table>
-      </TableContainer>
+      </ScrollTable>
     );
   };
   
@@ -463,10 +467,27 @@ const BatterComparison = () => {
   return (
     <Container maxWidth="xl">
       <Box sx={{ py: 4 }}>
-        <Typography variant="h4" gutterBottom>Batter Comparison</Typography>
+        <Typography variant="h4" gutterBottom sx={{ display: { xs: 'none', md: 'block' } }}>Batter Comparison</Typography>
+        {!selectedBatters.length && !compareData?.length && (
+          <TryExamples
+            examples={[
+              { label: 'Kohli vs Babar', to: '/comparison?batters=V%20Kohli,Babar%20Azam' },
+              { label: 'Head vs Abhishek vs Salt', to: '/comparison?batters=TM%20Head,Abhishek%20Sharma,PD%20Salt' },
+              { label: 'SKY vs Buttler', to: '/comparison?batters=SA%20Yadav,JC%20Buttler' },
+            ]}
+          />
+        )}
         
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         
+        {/* Builder: one line on phones once results are up */}
+        <FilterSummary
+          collapsed={isMobile && Boolean(compareData?.length) && !loading}
+          title={selectedBatters.map((entry) => entry.name).join(' vs ')}
+          summary={`${selectedBatters.length} batters · add, remove or change dates`}
+          sheetTitle="Batters to compare"
+        >
+        <Box>
         {/* Add Batter Form */}
         <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
           <Typography variant="h6" gutterBottom>Add Batter to Compare</Typography>
@@ -525,7 +546,7 @@ const BatterComparison = () => {
             </Grid>
             
             <Grid item xs={12}>
-              <CompetitionFilter onFilterChange={setCompetitionFilters} />
+              <CompetitionFilter onFilterChange={setCompetitionFilters} value={competitionFilters} />
             </Grid>
             
             <Grid item xs={12}>
@@ -553,6 +574,7 @@ const BatterComparison = () => {
                 color="primary"
                 startIcon={<CompareArrowsIcon />}
                 onClick={handleCompare}
+                data-filter-submit
                 disabled={loading || selectedBatters.length === 0}
               >
                 Compare
@@ -641,6 +663,9 @@ const BatterComparison = () => {
           </Paper>
         )}
         
+        </Box>
+        </FilterSummary>
+
         {/* Loading indicator */}
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>

@@ -120,7 +120,7 @@ const MatchScorecardPage = () => {
 
   return (
     <div className="scorecard-page">
-      <div className="scorecard-shell">
+      <div className={`scorecard-shell${screen === 'summary' ? ' is-summary' : ''}`}>
         <ScorecardTopNav
           data={data}
           screen={screen}
@@ -233,7 +233,7 @@ const ScorecardSummaryScreen = ({ data, searchParams, setSearchParams }) => {
   };
 
   return (
-    <main>
+    <main className="scorecard-summary">
       <section className="result-card">
         <div className="scorecard-kicker">Result {data.match.venue ? `- ${data.match.venue}` : ''}</div>
         <h2>{hasWinnerMargin ? (
@@ -279,6 +279,26 @@ const ScorecardSummaryScreen = ({ data, searchParams, setSearchParams }) => {
   );
 };
 
+// Tick labels placed at their over, on the same scale as the worm (over / last tick).
+const WormAxis = ({ ticks }) => {
+  const last = ticks[ticks.length - 1] || 1;
+  return (
+    <div className="worm-axis is-positioned">
+      {ticks.map((over, index) => (
+        <span
+          key={over}
+          style={{
+            left: `${(over / last) * 100}%`,
+            transform: over === last ? 'translateX(-100%)' : 'translateX(-50%)',
+          }}
+        >
+          {index === 0 ? `Ov ${over}` : over}
+        </span>
+      ))}
+    </div>
+  );
+};
+
 const MomentumWorm = ({ data }) => (
   <section className="worm-card">
     <div className="card-heading-row">
@@ -306,7 +326,7 @@ const MomentumWorm = ({ data }) => (
         />
       ))}
     </svg>
-    <div className="worm-axis"><span>Ov 5</span><span>10</span><span>15</span><span>20</span></div>
+    <WormAxis ticks={data.summary.worm_axis || [5, 10, 15, 20]} />
   </section>
 );
 

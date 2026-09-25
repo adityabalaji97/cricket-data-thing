@@ -26,6 +26,8 @@ import {
     Checkbox,
     InputAdornment
 } from '@mui/material';
+import TryExamples from './ui/TryExamples';
+import FilterSummary, { joinSummary, summarizeDateRange } from './ui/FilterSummary';
 import { 
     Add as AddIcon, 
     Delete as DeleteIcon, 
@@ -658,9 +660,18 @@ const [team2Players, setTeam2Players] = useState([]);
 
     return (
         <Box sx={{ p: 2 }}>
-            <Typography variant="h4" gutterBottom>
+            <Typography variant="h4" gutterBottom sx={{ display: { xs: 'none', md: 'block' } }}>
                 Player Matchups Analysis
             </Typography>
+            {!showMatchups && (
+                <TryExamples
+                    examples={[
+                        { label: 'MI vs CSK', to: '/matchups?team1=MI&team2=CSK' },
+                        { label: 'RCB vs KKR', to: '/matchups?team1=RCB&team2=KKR' },
+                        { label: 'SRH vs RR', to: '/matchups?team1=SRH&team2=RR' },
+                    ]}
+                />
+            )}
             
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
@@ -668,6 +679,14 @@ const [team2Players, setTeam2Players] = useState([]);
                 </Alert>
             )}
             
+            <FilterSummary
+                collapsed={isMobile && showMatchups && !loading}
+                title={mode === 0 && selectedTeam1 && selectedTeam2
+                    ? `${selectedTeam1.abbreviated_name} vs ${selectedTeam2.abbreviated_name}`
+                    : 'Custom teams'}
+                summary={joinSummary(summarizeDateRange(startDate, endDate))}
+                sheetTitle="Matchup filters"
+            >
             <Paper sx={{ width: '100%', mb: 3 }}>
                 <Tabs 
                     value={mode} 
@@ -708,6 +727,7 @@ const [team2Players, setTeam2Players] = useState([]);
                         variant="contained"
                         color="primary"
                         onClick={handleGenerate}
+                        data-filter-submit
                         sx={{ mt: 2 }}
                         disabled={loading}
                     >
@@ -715,6 +735,7 @@ const [team2Players, setTeam2Players] = useState([]);
                     </Button>
                 </Box>
             </Paper>
+            </FilterSummary>
             
             {loading && <CircularProgress />}
             

@@ -8,7 +8,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   TablePagination,
@@ -41,6 +40,7 @@ import {
   ToggleButtonGroup,
   CircularProgress,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GetAppIcon from '@mui/icons-material/GetApp';
@@ -1148,7 +1148,7 @@ const QueryResults = ({
 
       {/* Data Table with Sorting */}
       <Paper sx={{ ...qbCardSx, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
-        <TableContainer sx={{ maxHeight: isMobile ? 400 : 600, bgcolor: qbColors.surface1, overflowX: 'auto' }}>
+        <ScrollTable sx={{ maxHeight: isMobile ? 400 : 600, bgcolor: qbColors.surface1, overflowX: 'auto' }}>
           <Table stickyHeader size={isMobile ? "small" : "medium"} sx={{ minWidth: Math.max(visibleColumns.length * (isMobile ? 96 : 124), isMobile ? 520 : 760) }}>
             <TableHead>
               <TableRow>
@@ -1263,7 +1263,7 @@ const QueryResults = ({
               ))}
             </TableBody>
           </Table>
-        </TableContainer>
+        </ScrollTable>
         
         <TablePagination
           rowsPerPageOptions={isMobile ? [5, 10, 25] : [5, 10, 25, 50]}

@@ -106,6 +106,7 @@ for (const [name, path] of ROUTES.filter(([n]) => !ONLY || ONLY.includes(n))) {
     for (const el of document.querySelectorAll('body *')) {
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.right <= vw + 1) continue;
+      if (getComputedStyle(el).visibility === 'hidden') continue; // closed off-canvas drawers
       // Skip elements inside an intentional horizontal scroller (auto/scroll). Not 'hidden':
       // that clips content, which is exactly the bug -- and body has overflow-x: hidden, so
       // counting it hid every clipped card on the page.
@@ -120,14 +121,21 @@ for (const [name, path] of ROUTES.filter(([n]) => !ONLY || ONLY.includes(n))) {
       const parentRect = el.parentElement && el.parentElement.getBoundingClientRect();
       if (parentRect && parentRect.right > vw + 1) continue;
       const cls = (el.className && typeof el.className === 'string') ? el.className.split(' ').filter(c => !c.startsWith('css-')).slice(0, 3).join('.') : '';
-      off.push({ tag: el.tagName.toLowerCase(), cls, right: Math.round(r.right), w: Math.round(r.width), text: (el.innerText || '').trim().slice(0, 40) });
+      const path = []; for (let a = el.parentElement, i = 0; a && a !== document.body && i < 6; a = a.parentElement, i++) {
+        const cs = getComputedStyle(a); path.push(a.tagName.toLowerCase() + (a.id ? '#' + a.id : '') + '[' + cs.overflowX + ',' + Math.round(a.getBoundingClientRect().width) + ']' + (a.getAttribute('aria-label') ? '{' + a.getAttribute('aria-label') + '}' : '')); }
+      off.push({ tag: el.tagName.toLowerCase(), cls, right: Math.round(r.right), w: Math.round(r.width), text: (el.innerText || '').trim().slice(0, 40), y: Math.round(r.top + scrollY), near: (el.closest('section, [data-section-id], .MuiCard-root, .MuiPaper-root')?.innerText || '').trim().slice(0, 60).replace(/\\s+/g, ' '), path: path.join(' < ') });
     }
     // Keep outermost offenders only.
     const small = [];
     const tiny = [...document.querySelectorAll('button, a, [role=button], input, [role=tab]')]
       .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (r.height < 32 || r.width < 32); }).length;
-    const smallText = [...document.querySelectorAll('body *')].filter(e => e.childElementCount === 0 && (e.innerText||'').trim() && parseFloat(getComputedStyle(e).fontSize) < 11).length;
-    return { vw, sw, docH: document.documentElement.scrollHeight, overflow: sw > vw + 1 || off.length > 0, offenders: off.slice(0, 8), tinyTapTargets: tiny, textUnder11px: smallText, bg: getComputedStyle(document.body).backgroundColor };
+    const smallEls = [...document.querySelectorAll('body *')].filter(e => e.childElementCount === 0 && (e.innerText||'').trim() && parseFloat(getComputedStyle(e).fontSize) < 11);
+    const smallText = smallEls.length;
+    const smallSamples = {}; smallEls.forEach(e => { const k = getComputedStyle(e).fontSize + ' ' + (e.innerText || '').trim().slice(0, 18); smallSamples[k] = (smallSamples[k] || 0) + 1; });
+    const tinyEls = [...document.querySelectorAll('button, a, [role=button], input, [role=tab]')]
+      .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (r.height < 32 || r.width < 32); })
+      .map(e => { const r = e.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height) + ' ' + e.tagName.toLowerCase() + ' ' + ((e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 20)); });
+    return { vw, sw, docH: document.documentElement.scrollHeight, overflow: sw > vw + 1 || off.length > 0, offenders: off.slice(0, 8), tinyTapTargets: tiny, tinySamples: tinyEls.slice(0, 40), textUnder11px: smallText, smallSamples: Object.entries(smallSamples).sort((a, b) => b[1] - a[1]).slice(0, 25), bg: getComputedStyle(document.body).backgroundColor };
   })()` });
   const info = probe.result?.result?.value || {};
   const h = Math.min(info.docH || H, MAX_H);

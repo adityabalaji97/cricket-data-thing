@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Card, CardContent, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TableSortLabel, Tooltip, TablePagination } from '@mui/material';
+import { Card, CardContent, Typography, Box, Table, TableBody, TableCell, TableHead, TableRow, Paper, TableSortLabel, Tooltip, TablePagination } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import {
   BarChart,
   Bar,
@@ -133,7 +134,7 @@ const OverCombinationsChart = ({ stats, isMobile = false, wrapInCard = true }) =
           </ResponsiveContainer>
         </Box>
         
-        <TableContainer component={Paper}>
+        <ScrollTable paper>
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
@@ -215,7 +216,7 @@ const OverCombinationsChart = ({ stats, isMobile = false, wrapInCard = true }) =
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
           />
-        </TableContainer>
+        </ScrollTable>
       </CardContent>
     </Card>
   );

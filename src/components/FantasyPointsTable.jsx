@@ -10,15 +10,15 @@ import {
   ButtonGroup,
   Typography,
   Box,
-  Paper,
-  TableContainer,
+  
   Pagination,
   Stack,
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 
 const FantasyPointsTable = ({
   players,
@@ -123,8 +123,7 @@ const FantasyPointsTable = ({
         </Box>
       ) : null}
       
-      <TableContainer
-        component={Paper}
+      <ScrollTable paper stickyFirstColumn
         sx={{
           maxHeight: tableMaxHeight,
           overflow: 'auto',
@@ -158,7 +157,7 @@ const FantasyPointsTable = ({
             ))}
           </TableBody>
         </Table>
-      </TableContainer>
+      </ScrollTable>
       
       {showPagination && !maxVisibleRows && sortedPlayers.length > rowsPerPage && (
         <Stack spacing={2} sx={{ mt: 2, alignItems: 'center' }}>

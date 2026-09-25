@@ -13,6 +13,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import FilterSummary, { joinSummary, summarizeDateRange } from './ui/FilterSummary';
 import { useNavigate } from 'react-router-dom';
 
 import CustomPlayerSelector from './CustomPlayerSelector';
@@ -606,12 +607,20 @@ const TeamProfile = ({ isMobile }) => {
   return (
     <Container maxWidth="xl">
       <Box sx={{ py: 4 }}>
-        <Typography variant="h4" gutterBottom>
+        {/* The app header already says "Team Profile" on phones. */}
+        <Typography variant="h4" gutterBottom sx={{ display: { xs: 'none', md: 'block' } }}>
           Team Profile
         </Typography>
 
         {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
 
+        <FilterSummary
+          collapsed={isMobile && (hasCustomResults || hasTeamResults)}
+          title={isCustomMode ? `${customPlayers.length} custom players` : (selectedTeam?.full_name || selectedTeam?.abbreviated_name)}
+          summary={joinSummary(summarizeDateRange(dateRange.start, dateRange.end), isCustomMode ? 'Custom player analysis' : null)}
+          sheetTitle="Team filters"
+        >
+        <Box>
         <Box sx={{ mb: 3 }}>
           <FormControlLabel
             control={<Switch checked={isCustomMode} onChange={handleModeToggle} name="customMode" />}
@@ -670,6 +679,7 @@ const TeamProfile = ({ isMobile }) => {
               onClick={handleFetch}
               disabled={!selectedTeam || loading}
               id="go-button"
+              data-filter-submit
               sx={{
                 height: '56px',
                 width: { xs: '100%', md: 'auto' },
@@ -714,6 +724,7 @@ const TeamProfile = ({ isMobile }) => {
                 onClick={handleFetch}
                 disabled={customPlayers.length === 0 || loading}
                 id="go-button"
+                data-filter-submit
                 sx={{
                   height: '56px',
                   width: { xs: '100%', md: 'auto' },
@@ -731,6 +742,8 @@ const TeamProfile = ({ isMobile }) => {
             />
           </Box>
         )}
+        </Box>
+        </FilterSummary>
 
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>

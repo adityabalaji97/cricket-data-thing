@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Collapse,
@@ -115,7 +116,7 @@ const RankingCard = ({
           borderColor: 'divider',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: { xs: 0.5, md: 1 } }}>
           <Box
             sx={{
               width: 28,
@@ -146,7 +147,16 @@ const RankingCard = ({
           />
         </Box>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 0.7 }}>
+        {/* Phones: one line per player (the bars made each card ~115px, x600 cards). The
+            strike/control numbers stay visible; the bars come back when the card is opened. */}
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: { xs: expanded ? 'none' : 'block', md: 'none' }, pl: 4.5, mt: -0.5 }}
+        >
+          Strike {Number(row.strike_factor || 0).toFixed(1)} · Control {Number(row.control_factor || 0).toFixed(1)}
+        </Typography>
+        <Box sx={{ display: { xs: expanded ? 'grid' : 'none', md: 'grid' }, gridTemplateColumns: '1fr', gap: 0.7 }}>
           {[
             { label: 'Quality', value: row.quality_score },
             { label: 'Strike Factor', value: row.strike_factor },
@@ -425,6 +435,31 @@ const GlobalT20Rankings = () => {
   const battingRows = useMemo(() => buildRows(battingPayload?.rankings || []), [battingPayload, buildRows]);
   const bowlingRows = useMemo(() => buildRows(bowlingPayload?.rankings || []), [bowlingPayload, buildRows]);
 
+  // 300 players per list rendered at once made this page ~42 phone screens. Show 25, then more
+  // on request; a new search, sort or filter starts again from the top.
+  const PAGE_SIZE = 25;
+  const [visibleCount, setVisibleCount] = useState({ batting: PAGE_SIZE, bowling: PAGE_SIZE });
+  useEffect(() => {
+    setVisibleCount({ batting: PAGE_SIZE, bowling: PAGE_SIZE });
+  }, [search, sortBy, battingPayload, bowlingPayload]);
+  const renderShowMore = (mode, total) => {
+    const shown = Math.min(visibleCount[mode], total);
+    if (shown >= total) return null;
+    return (
+      <Box sx={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, py: 1 }}>
+        <Typography variant="body2" color="text.secondary">{shown} of {total}</Typography>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => setVisibleCount((prev) => ({ ...prev, [mode]: prev[mode] + 50 }))}
+          sx={{ minHeight: 36 }}
+        >
+          Show more
+        </Button>
+      </Box>
+    );
+  };
+
   const renderSectionMeta = (payload) => {
     if (!payload) return null;
     return (
@@ -561,7 +596,7 @@ const GlobalT20Rankings = () => {
         {renderSectionMeta(battingPayload)}
 
         <Box sx={{ mt: 1.25, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.25 }}>
-          {battingRows.map((row) => {
+          {battingRows.slice(0, visibleCount.batting).map((row) => {
             const key = `batting:${row.player}`;
             const trajectory = trajectoryCache[key]?.data;
             const trajectoryLoading = trajectoryCache[key]?.loading;
@@ -582,6 +617,7 @@ const GlobalT20Rankings = () => {
               />
             );
           })}
+          {renderShowMore('batting', battingRows.length)}
           {!battingRows.length ? (
             <Typography variant="body2" color="text.secondary">No batting players match current filters.</Typography>
           ) : null}
@@ -597,7 +633,7 @@ const GlobalT20Rankings = () => {
         {renderSectionMeta(bowlingPayload)}
 
         <Box sx={{ mt: 1.25, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.25 }}>
-          {bowlingRows.map((row) => {
+          {bowlingRows.slice(0, visibleCount.bowling).map((row) => {
             const key = `bowling:${row.player}`;
             const trajectory = trajectoryCache[key]?.data;
             const trajectoryLoading = trajectoryCache[key]?.loading;
@@ -618,6 +654,7 @@ const GlobalT20Rankings = () => {
               />
             );
           })}
+          {renderShowMore('bowling', bowlingRows.length)}
           {!bowlingRows.length ? (
             <Typography variant="body2" color="text.secondary">No bowling players match current filters.</Typography>
           ) : null}

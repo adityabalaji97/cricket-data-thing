@@ -1,29 +1,29 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useFormat } from '../context/FormatContext';
 import { colors as hsColors } from '../theme/hindsightDark';
-import { 
-    Box, 
-    Card, 
-    Grid, 
-    Typography, 
-    CircularProgress, 
-    Alert,
-    Button,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Slider,
-    Stack,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    useMediaQuery,
-    useTheme
+import {
+  Box,
+  Card,
+  Grid,
+  Typography,
+  CircularProgress,
+  Alert,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Slider,
+  Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import {
     XAxis, 
     YAxis, 
@@ -444,7 +444,7 @@ const BattingLeaders = ({ data, isMobile }) => {
     if (!data || data.length === 0) return null;
 
     return (
-        <TableContainer sx={{ overflowX: 'hidden' }}>
+        <ScrollTable stickyFirstColumn sx={{ overflowX: 'hidden' }}>
             <Typography variant="h6" gutterBottom align="center">Most Runs</Typography>
             <Table size="small">
                 <TableHead>
@@ -491,7 +491,7 @@ const BattingLeaders = ({ data, isMobile }) => {
                     ))}
                 </TableBody>
             </Table>
-        </TableContainer>
+        </ScrollTable>
     );
 };
 
@@ -499,7 +499,7 @@ const BowlingLeaders = ({ data, isMobile }) => {
     if (!data || data.length === 0) return null;
 
     return (
-        <TableContainer sx={{ overflowX: 'hidden' }}>
+        <ScrollTable stickyFirstColumn sx={{ overflowX: 'hidden' }}>
             <Typography variant="h6" gutterBottom align="center">Most Wickets</Typography>
             <Table size="small">
                 <TableHead>
@@ -546,7 +546,7 @@ const BowlingLeaders = ({ data, isMobile }) => {
                     ))}
                 </TableBody>
             </Table>
-        </TableContainer>
+        </ScrollTable>
     );
 };
 
@@ -897,7 +897,7 @@ const PhaseWiseStrategy = ({ data, isMobile }) => {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontSize: isMobile ? '0.65rem' : '0.75rem',
+                                fontSize: isMobile ? '0.7rem' : '0.75rem',
                                 color: 'text.secondary',
                                 borderRight: index < phaseData.length - 1 ? `1px solid ${hsColors.border}` : 'none'
                             }}

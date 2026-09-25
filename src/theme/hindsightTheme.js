@@ -123,6 +123,9 @@ const hindsightTheme = createTheme({
     MuiAutocomplete: {
       styleOverrides: {
         paper: { backgroundColor: colors.surface2, border: `1px solid ${colors.borderStrong}` },
+        // Clear / open buttons were 31px on phones, and sit right beside the text you tap.
+        clearIndicator: { '@media (pointer: coarse)': { padding: 7 } },
+        popupIndicator: { '@media (pointer: coarse)': { padding: 7 } },
       },
     },
     MuiDrawer: {
@@ -186,6 +189,8 @@ const hindsightTheme = createTheme({
           backgroundColor: colors.surface3,
           color: colors.textMed,
           border: `1px solid ${colors.border}`,
+          // Small chips that do something (filters, suggestions) are tap targets on a phone.
+          '&.MuiChip-clickable.MuiChip-sizeSmall': { '@media (pointer: coarse)': { height: 32 } },
         },
         // Coloured chips keep their semantic colour; only the default grey chip is restyled
         // above. Keyed per variant: as bare colorX keys the dark "on accent" text also landed on

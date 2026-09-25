@@ -60,7 +60,7 @@ const RecentFormStrip = ({ innings, mode, isMobile }) => {
                   </Box>
                   <Typography
                     variant="caption"
-                    sx={{ fontSize: '0.6rem', color: 'text.secondary', display: 'block', mt: 0.25 }}
+                    sx={{ fontSize: '0.7rem', color: 'text.secondary', display: 'block', mt: 0.25 }}
                   >
                     vs {(inn.opponent || inn.opposition || inn.batting_team || '?').slice(0, 3).toUpperCase()}
                   </Typography>
@@ -96,7 +96,7 @@ const RecentFormStrip = ({ innings, mode, isMobile }) => {
                 </Box>
                 <Typography
                   variant="caption"
-                  sx={{ fontSize: '0.6rem', color: 'text.secondary', display: 'block', mt: 0.25 }}
+                  sx={{ fontSize: '0.7rem', color: 'text.secondary', display: 'block', mt: 0.25 }}
                 >
                   vs {(inn.opponent || inn.opposition || inn.bowling_team || '?').slice(0, 3).toUpperCase()}
                 </Typography>

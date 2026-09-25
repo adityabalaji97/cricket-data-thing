@@ -1,17 +1,17 @@
 import React from 'react';
-import { 
-  Card, 
+import {
+  Card,
   CardContent,
   Typography,
   Box,
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
-  Paper
+  
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import {
   RadarChart,
   PolarGrid,
@@ -196,7 +196,7 @@ const TeamBowlingPhasePerformanceRadar = ({ bowlingPhaseStats, teamName }) => {
           </Box>
           
           {/* Data Table */}
-          <TableContainer component={Paper} sx={{ maxHeight: 350 }}>
+          <ScrollTable paper sx={{ maxHeight: 350 }}>
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
@@ -284,7 +284,7 @@ const TeamBowlingPhasePerformanceRadar = ({ bowlingPhaseStats, teamName }) => {
                 ))}
               </TableBody>
             </Table>
-          </TableContainer>
+          </ScrollTable>
         </Box>
         
         {/* Summary Stats */}

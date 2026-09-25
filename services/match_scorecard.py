@@ -184,10 +184,17 @@ def _format_match(match: Dict[str, Any], innings: List[Dict[str, Any]]) -> Dict[
 
 
 def _build_summary(match: Dict[str, Any], innings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    axis_overs = _worm_axis_overs(match, innings)
+    max_score = max(
+        [1]
+        + [item["score"]["runs"] or 0 for item in innings]
+        + [value for item in innings for value in item.get("worm", [])]
+    )
     return {
         "innings_scores": [item["score"] for item in innings],
         "moment": _build_moment(innings),
-        "worm": [_worm_payload(item) for item in innings],
+        "worm": [_worm_payload(item, axis_overs, max_score) for item in innings],
+        "worm_axis": _worm_ticks(axis_overs),
         "top_performers": _top_performers(innings),
         "player_of_match": match.get("player_of_match"),
     }
@@ -1149,14 +1156,36 @@ def _build_moment(innings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _worm_payload(item: Dict[str, Any]) -> Dict[str, Any]:
+def _worm_axis_overs(match: Dict[str, Any], innings: List[Dict[str, Any]]) -> int:
+    """Overs on the worm's x axis: the format's full length, or the longest innings if longer
+    (Tests, or data without a format cap)."""
+    longest = max([len(item.get("worm", [])) for item in innings] + [1])
+    try:
+        from format_config import get_format
+
+        spec = get_format(match.get("format") or "T20", match.get("gender") or "male")
+        if spec.over_max is not None:
+            return max(spec.over_max + 1, longest)
+    except Exception:  # unknown format label: fall back to the data
+        pass
+    return longest
+
+
+def _worm_ticks(axis_overs: int) -> List[int]:
+    """Four or five evenly spaced over labels: 5/10/15/20 for a T20, 10/20/30/40/50 for an ODI."""
+    step = 5 if axis_overs <= 20 else 10 if axis_overs <= 50 else max(10, round(axis_overs / 50) * 10)
+    return list(range(step, axis_overs + 1, step))
+
+
+def _worm_payload(item: Dict[str, Any], axis_overs: int, max_score: int) -> Dict[str, Any]:
+    # Every innings shares one scale: x in overs of the full format, y in runs up to the match's
+    # highest total. Each line used to be stretched to its own length and its own top score, so
+    # 272 all out in 48 overs and 356/6 in 50 finished at the same point.
     values = item.get("worm", [])
-    max_score = max([score["runs"] for score in [item["score"]]] + values + [1])
-    points = []
-    denom = max(1, len(values) - 1)
+    points = ["0.00,60.00"] if values else []
     for index, value in enumerate(values):
-        x = index / denom * 100
-        y = 60 - (value / max_score * 56)
+        x = (index + 1) / max(1, axis_overs) * 100
+        y = 60 - (value / max(1, max_score) * 56)
         points.append(f"{x:.2f},{y:.2f}")
     return {
         "innings": item["innings"],
@@ -1184,17 +1213,30 @@ def _result_text(match: Dict[str, Any], innings: List[Dict[str, Any]]) -> str:
     by = outcome.get("by") if isinstance(outcome, dict) else None
     if isinstance(by, dict):
         if by.get("runs"):
-            return f"{winner} won by {by['runs']} runs"
+            return f"{winner} won by {_plural(by['runs'], 'run')}"
         if by.get("wickets"):
-            return f"{winner} won by {by['wickets']} wickets"
+            return f"{winner} won by {_plural(by['wickets'], 'wicket')}"
     # Fall back to deriving the margin from the chasing innings, which only holds for a
     # two-innings format -- a Test win can come by an innings, and a draw has no winner at all.
     chase_index = len(innings) - 1
     if len(innings) == 2 and innings[chase_index]["score"]["team"] == winner:
         wkts = 10 - innings[chase_index]["score"]["wickets"]
         if wkts > 0:
-            return f"{winner} won by {wkts} wickets"
+            return f"{winner} won by {_plural(wkts, 'wicket')}"
+    # Won batting first: the margin is the run difference -- unless the target was revised
+    # (DLS), in which case the raw scores do not give it and "won" is all we can honestly say.
+    if len(innings) == 2 and innings[0]["score"]["team"] == winner:
+        first, second = innings[0]["score"], innings[1]["score"]
+        target = second.get("target")
+        margin = (first["runs"] or 0) - (second["runs"] or 0)
+        if margin > 0 and (target is None or target == (first["runs"] or 0) + 1):
+            return f"{winner} won by {_plural(margin, 'run')}"
     return f"{winner} won"
+
+
+def _plural(count, noun: str) -> str:
+    """"1 wicket", "2 wickets" -- the result line used to say "won by 1 wickets"."""
+    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
 
 
 def _chase_note(

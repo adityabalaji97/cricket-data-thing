@@ -7,14 +7,14 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
-  Paper,
+  
   TableSortLabel,
   Button,
-  ButtonGroup
+  ButtonGroup,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import { spacing, colors, borderRadius } from '../theme/designSystem';
 import CondensedName from './common/CondensedName';
 
@@ -128,7 +128,7 @@ const BowlingInningsTable = ({ stats, isMobile = false, wrapInCard = true }) => 
           </ButtonGroup>
         </Box>
         
-        <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+        <ScrollTable paper sx={{ maxHeight: 400 }}>
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
@@ -227,7 +227,7 @@ const BowlingInningsTable = ({ stats, isMobile = false, wrapInCard = true }) => 
               ))}
             </TableBody>
           </Table>
-        </TableContainer>
+        </ScrollTable>
       </CardContent>
     </Card>
   );

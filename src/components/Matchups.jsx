@@ -1,29 +1,29 @@
 import React from 'react';
 import axios from 'axios';
 import config from '../config';
-import { 
-    Box, 
-    Button,
-    Card, 
-    Collapse,
-    CircularProgress,
-    Alert,
-    Autocomplete,
-    Chip,
-    IconButton,
-    Stack,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography, 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableContainer, 
-    TableHead, 
-    TableRow,
-    Tooltip,
+import {
+  Box,
+  Button,
+  Card,
+  Collapse,
+  CircularProgress,
+  Alert,
+  Autocomplete,
+  Chip,
+  IconButton,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Tooltip,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 
 import {
     Info as InfoIcon,
@@ -297,7 +297,7 @@ const FantasyAnalysisCard = ({
                     Fantasy Analysis - Top Picks
                 </Typography>
             </Box>
-            <TableContainer sx={{ maxHeight: 220, overflowY: 'auto' }}>
+            <ScrollTable stickyFirstColumn sx={{ maxHeight: 220, overflowY: 'auto' }}>
                 <Table size="small" stickyHeader>
                     <TableHead>
                         <TableRow>
@@ -371,7 +371,7 @@ const FantasyAnalysisCard = ({
                         })}
                     </TableBody>
                 </Table>
-            </TableContainer>
+            </ScrollTable>
         </Card>
     );
 };
@@ -436,7 +436,7 @@ const MatchupMatrix = ({
                     <InfoIcon size={16} />
                 </Tooltip>
             </Box>
-            <TableContainer>
+            <ScrollTable stickyFirstColumn>
                 <Table size={isMobile ? "small" : "medium"}>
                     <TableHead>
                         <TableRow>
@@ -601,7 +601,7 @@ const MatchupMatrix = ({
                         )}
                     </TableBody>
                 </Table>
-            </TableContainer>
+            </ScrollTable>
         </Card>
     );
 };

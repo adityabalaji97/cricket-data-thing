@@ -7,10 +7,9 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
-  Paper,
+  
   Tabs,
   Tab,
   useTheme,
@@ -24,8 +23,9 @@ import {
   Button,
   List,
   ListItem,
-  ListItemText
+  ListItemText,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import InfoIcon from '@mui/icons-material/Info';
 
 const TeamComparisonTable = ({ teams, showPercentiles }) => {
@@ -145,7 +145,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
     const phases = ['powerplay', 'middle_overs', 'death_overs'];
     
     return (
-      <TableContainer component={Paper} sx={{ mt: 2 }}>
+      <ScrollTable paper sx={{ mt: 2 }}>
         <Table>
           <TableHead>
             <TableRow>
@@ -194,7 +194,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
             )}
           </TableBody>
         </Table>
-      </TableContainer>
+      </ScrollTable>
     );
   };
 
@@ -248,7 +248,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
     const phases = ['powerplay', 'middle_overs', 'death_overs'];
     
     return (
-      <TableContainer component={Paper} sx={{ mt: 2 }}>
+      <ScrollTable paper sx={{ mt: 2 }}>
         <Table>
           <TableHead>
             <TableRow>
@@ -297,7 +297,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
             )}
           </TableBody>
         </Table>
-      </TableContainer>
+      </ScrollTable>
     );
   };
 
@@ -318,7 +318,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
     const sortedPositions = Array.from(allPositions).sort((a, b) => a - b);
     
     return (
-      <TableContainer component={Paper} sx={{ mt: 2 }}>
+      <ScrollTable paper sx={{ mt: 2 }}>
         <Table>
           <TableHead>
             <TableRow>
@@ -365,7 +365,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
             ))}
           </TableBody>
         </Table>
-      </TableContainer>
+      </ScrollTable>
     );
   };
 
@@ -403,7 +403,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
                 {phase.replace('_', ' ').toUpperCase()} Bowling
               </Typography>
               
-              <TableContainer component={Paper}>
+              <ScrollTable paper>
                 <Table>
                   <TableHead>
                     <TableRow>
@@ -454,7 +454,7 @@ const TeamComparisonTable = ({ teams, showPercentiles }) => {
                     ))}
                   </TableBody>
                 </Table>
-              </TableContainer>
+              </ScrollTable>
             </Box>
           );
         })}

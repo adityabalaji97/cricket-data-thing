@@ -982,7 +982,7 @@ const EloRow = ({ team }) => {
         <Typography sx={{ color: C.lime, fontFamily: fonts.display, fontWeight: 700, fontSize: 19, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
           {Math.round(Number(team.current_elo || 0))}
         </Typography>
-        <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: '0.1em' }}>
+        <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: '0.1em' }}>
           ELO
         </Typography>
       </Box>
@@ -990,10 +990,15 @@ const EloRow = ({ team }) => {
   );
 };
 
+const LEAGUE_COUNTS_PREVIEW = 10;
+
 const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
+  // A health check, not a headline: the biggest ten competitions, the other ~50 on request.
+  const [showAll, setShowAll] = useState(false);
   if (!showLeagueCounts) return null;
   const items = Object.values(stats || {}).sort((a, b) => (b.match_count || 0) - (a.match_count || 0));
   if (!items.length) return null;
+  const visible = showAll ? items : items.slice(0, LEAGUE_COUNTS_PREVIEW);
 
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
@@ -1007,7 +1012,7 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
         gridTemplateColumns: { xs: 'repeat(2, minmax(0,1fr))', md: 'repeat(4, minmax(0,1fr))', lg: 'repeat(5, minmax(0,1fr))' },
         gap: 1,
       }}>
-        {items.map((item) => (
+        {visible.map((item) => (
           <Box key={item.competition_key || item.competition} sx={{ p: 1.35, bgcolor: C.muted, border: `1px solid ${C.hairline}`, borderRadius: 2 }}>
             <Typography sx={{ color: C.mid, fontFamily: fonts.display, fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {item.competition_display || item.competition}
@@ -1021,6 +1026,16 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
           </Box>
         ))}
       </Box>
+      {items.length > LEAGUE_COUNTS_PREVIEW && (
+        <Box
+          component="button"
+          type="button"
+          onClick={() => setShowAll((prev) => !prev)}
+          sx={{ mt: 1.25, minHeight: 40, px: 1.5, bgcolor: 'transparent', color: C.lime, border: `1px solid ${C.hairlineStrong}`, borderRadius: 2, fontFamily: fonts.mono, fontSize: 12, cursor: 'pointer' }}
+        >
+          {showAll ? 'Show fewer' : `Show all ${items.length}`}
+        </Box>
+      )}
     </Box>
   );
 };

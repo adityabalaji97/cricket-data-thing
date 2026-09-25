@@ -16,11 +16,13 @@ import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import QueryFilters from './QueryFilters';
+import { MOBILE_NAV_HEIGHT } from './nav/MobileBottomNav';
 import QueryResults from './QueryResults';
 import NLQueryInput from './NLQueryInput';
 import NLInterpretation from './NLInterpretation';
 import { useUrlParams, filtersToUrlParams } from '../utils/urlParamParser';
 import axios from 'axios';
+import { Link as RouterLink } from 'react-router-dom';
 import config from '../config';
 import { qbButtonSx, qbCardSx, qbColors, qbFonts, qbGhostButtonSx } from './queryBuilderTheme';
 import { useFormat } from '../context/FormatContext';
@@ -171,7 +173,11 @@ const QueryBuilder = ({ isMobile }) => {
   const [nlRecommendedChart, setNlRecommendedChart] = useState(null);
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const [nlExpanded, setNlExpanded] = useState(true);
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  // Phones open with the filter card folded: the NL search is the quick path there, and the
+  // full field list is ~2.5 screens. (A shared link or NL run still expands/collapses it below.)
+  const [filtersCollapsed, setFiltersCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 899.95px)').matches,
+  );
   // ball_aggregation toggle: only meaningful when ball or ball_in_spell is in
   // the active group_by; otherwise the backend ignores it.
   const [ballAggregation, setBallAggregation] = useState('snapshot');
@@ -445,7 +451,9 @@ const QueryBuilder = ({ isMobile }) => {
         width: '100%',
         maxWidth: '100vw',
         boxSizing: 'border-box',
-        overflowX: 'hidden',
+        // clip, not hidden, here and on html/body below: hidden turns overflow-y into auto,
+        // making each a (non-scrolling) scroll container that position: sticky attaches to.
+        overflowX: 'clip',
         mx: { xs: 0, md: -3 },
         mt: -3,
         mb: -2,
@@ -489,7 +497,7 @@ const QueryBuilder = ({ isMobile }) => {
         styles={{
           'html, body, #root': {
             backgroundColor: qbColors.bg,
-            overflowX: 'hidden',
+            overflowX: 'clip',
           },
           '.MuiAutocomplete-popper .MuiPaper-root, .MuiPopover-paper, .MuiMenu-paper': {
             backgroundColor: qbColors.surface3,
@@ -595,7 +603,9 @@ const QueryBuilder = ({ isMobile }) => {
             </Alert>
           )}
 
-          <Paper elevation={0} sx={{ ...qbCardSx, overflow: 'hidden' }}>
+          {/* overflow: clip, not hidden: hidden makes the card a scroll container, which stops the
+              Execute bar below from sticking on phones. */}
+          <Paper elevation={0} sx={{ ...qbCardSx, overflow: 'clip' }}>
             <Box
               onClick={() => setFiltersCollapsed((prev) => !prev)}
               sx={{
@@ -653,6 +663,15 @@ const QueryBuilder = ({ isMobile }) => {
               sx={{
                 p: { xs: 2, md: 2.4 },
                 borderTop: `1px solid ${qbColors.border}`,
+                // Phones: with the filters open, Execute stays reachable above the bottom nav
+                // instead of ~2.5 screens down.
+                ...(isMobile && !filtersCollapsed && {
+                  position: 'sticky',
+                  bottom: `calc(${MOBILE_NAV_HEIGHT}px + env(safe-area-inset-bottom, 0px))`,
+                  zIndex: 2,
+                  bgcolor: qbColors.surface1,
+                  boxShadow: '0 -8px 16px rgba(0,0,0,0.35)',
+                }),
                 display: 'flex',
                 flexDirection: isMobile ? 'column' : 'row',
                 gap: 1.5,
@@ -748,7 +767,12 @@ const QueryBuilder = ({ isMobile }) => {
 
         <Box sx={{ mt: { xs: 3, md: 5 }, pt: 2, borderTop: `1px solid ${qbColors.border}`, display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'space-between' }}>
           <Typography sx={{ color: qbColors.textFaint, fontFamily: qbFonts.mono, fontSize: 11 }}>
-            Hindsight © 2026 · data via Cricsheet
+            {/* Cricsheet is one of several sources (the delivery detail comes from elsewhere), so
+                point at the full list rather than naming one. */}
+            Hindsight © {new Date().getFullYear()} ·{' '}
+            <Box component={RouterLink} to="/credits" sx={{ color: 'inherit', textDecorationColor: 'rgba(255,255,255,0.3)' }}>
+              data sources
+            </Box>
           </Typography>
           <Typography sx={{ color: qbColors.textFaint, fontFamily: qbFonts.mono, fontSize: 11 }}>
             Shareable query URL updates on execute

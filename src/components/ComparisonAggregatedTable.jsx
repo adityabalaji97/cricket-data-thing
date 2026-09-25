@@ -1,14 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { textOn } from '../utils/teamColors';
-import { 
-  Card, 
-  CardContent, 
-  Typography, 
-  Box, 
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   TableSortLabel,
@@ -17,10 +16,11 @@ import {
   Select,
   MenuItem,
   InputLabel,
-  Paper,
+  
   Tooltip,
-  IconButton
+  IconButton,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import {
   DndContext,
@@ -536,7 +536,7 @@ const ComparisonAggregatedTable = ({ batters }) => {
         </Box>
 
         {/* Table */}
-        <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+        <ScrollTable paper sx={{ maxHeight: 600 }}>
           <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
@@ -790,7 +790,7 @@ const ComparisonAggregatedTable = ({ batters }) => {
             </TableBody>
             </DndContext>
           </Table>
-        </TableContainer>
+        </ScrollTable>
 
         {/* Summary Info */}
         <Box sx={{ mt: 2, display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'space-between' }}>

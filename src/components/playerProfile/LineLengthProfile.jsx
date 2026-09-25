@@ -451,6 +451,9 @@ const LineLengthProfile = ({ playerName, mode, dateRange, selectedVenue, competi
           <Tabs
             value={selectedMetric}
             onChange={(_, v) => setSelectedMetric(v)}
+            // Four metric tabs are a few px wider than a phone card; scroll rather than clip DOT%.
+            variant="scrollable"
+            scrollButtons={false}
             sx={{ minHeight: 32, '& .MuiTab-root': { minHeight: 32, py: 0.5, px: 1.5, fontSize: '0.75rem' } }}
           >
             {METRIC_OPTIONS.map((m) => (

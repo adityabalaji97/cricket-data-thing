@@ -290,7 +290,8 @@ const FormTileDetails = ({ match, teamCode, result }) => (
 
 const TeamFormRow = ({ teamCode, matches, isMobile, onTileSelect }) => {
     const teamColor = getTeamColor(teamCode) || '#1d4ed8';
-    const tileSize = isMobile ? 24 : 26;
+    // 32px on phones: these are tap targets (they open the match detail), not just glyphs.
+    const tileSize = isMobile ? 32 : 26;
 
     const formTiles = useMemo(
         () => (matches || []).map((match) => ({

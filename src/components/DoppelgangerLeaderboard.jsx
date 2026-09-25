@@ -10,16 +10,18 @@ import {
   Container,
   Grid,
   MenuItem,
-  Paper,
+  
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   TextField,
   Typography,
 } from '@mui/material';
+import { useMediaQuery } from '@mui/material';
+import FilterSummary from './ui/FilterSummary';
+import ScrollTable from './ui/ScrollTable';
 import {
   Legend,
   PolarAngleAxis,
@@ -96,7 +98,7 @@ const PairRadar = ({ pair, radarMap }) => {
 const PairTable = ({ title, rows = [], role, selectedKey, onSelect }) => (
   <Box>
     <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
-    <TableContainer component={Paper} variant="outlined">
+    <ScrollTable paper variant="outlined">
       <Table size="small">
         <TableHead>
           <TableRow>
@@ -134,7 +136,7 @@ const PairTable = ({ title, rows = [], role, selectedKey, onSelect }) => (
           )}
         </TableBody>
       </Table>
-    </TableContainer>
+    </ScrollTable>
   </Box>
 );
 
@@ -188,6 +190,7 @@ const RoleSection = ({ title, board, batterMetricHelp }) => {
 };
 
 const DoppelgangerLeaderboard = () => {
+  const isMobile = useMediaQuery((theme) => theme.breakpoints.down('md'));
   const [startDate, setStartDate] = useState(DEFAULT_START);
   const [endDate, setEndDate] = useState(TODAY);
   const [minBattingInnings, setMinBattingInnings] = useState(25);
@@ -265,13 +268,24 @@ const DoppelgangerLeaderboard = () => {
       <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
         Global most similar and most dissimilar batter/bowler pairs for a selected timeframe.
       </Typography>
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Click a pair row to open a radar chart. Distance is computed as Euclidean distance on z-score normalized feature vectors, so lower values mean closer profiles.
-      </Alert>
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Batter metric level controls how granular batter doppelganger matching is. For each selected level, only batters with all required data for that level are included. Competition filters also reduce the qualified pool before distances are computed.
-      </Alert>
+      {/* The method notes used to be two banners filling a phone's first screen. */}
+      <Box component="details" sx={{ mb: 2, color: 'text.secondary', '& summary': { cursor: 'pointer', color: 'text.primary', fontWeight: 600, py: 0.5 } }}>
+        <summary>How it works</summary>
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          Click a pair row to open a radar chart. Distance is computed as Euclidean distance on z-score normalized feature vectors, so lower values mean closer profiles.
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          Batter metric level controls how granular batter doppelganger matching is. For each selected level, only batters with all required data for that level are included. Competition filters also reduce the qualified pool before distances are computed.
+        </Typography>
+      </Box>
 
+      <FilterSummary
+        collapsed={isMobile && Boolean(data) && !loading}
+        title="Doppelganger filters"
+        summary={filterSummary.join(' · ')}
+        sheetTitle="Doppelganger filters"
+      >
+      <Box>
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
         {filterSummary.map((label) => (
           <Chip key={label} label={label} size="small" variant="outlined" />
@@ -348,13 +362,15 @@ const DoppelgangerLeaderboard = () => {
               />
             </Grid>
             <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', alignItems: 'center' }}>
-              <Button variant="contained" onClick={fetchLeaderboard} fullWidth disabled={loading}>
+              <Button variant="contained" onClick={fetchLeaderboard} fullWidth disabled={loading} data-filter-submit>
                 {loading ? 'Loading...' : 'Run'}
               </Button>
             </Grid>
           </Grid>
         </CardContent>
       </Card>
+      </Box>
+      </FilterSummary>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

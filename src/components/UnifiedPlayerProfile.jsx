@@ -24,11 +24,13 @@ import RecentFormStrip from './playerProfile/RecentFormStrip';
 import AdvancedBowlingAnalyticsSection from './playerProfile/AdvancedBowlingAnalyticsSection';
 import BoundaryAnalysis from './BoundaryAnalysis';
 import LazySection from './ui/LazySection';
+import FilterSummary, { joinSummary, summarizeCompetitions, summarizeDateRange } from './ui/FilterSummary';
 import usePlayerData from '../hooks/usePlayerData';
 import config from '../config';
+import { PROFILE_START_DATE } from '../utils/dateDefaults';
 import { SECTION_SCROLL_MARGIN } from '../theme/layout';
 
-const DEFAULT_START_DATE = "2020-01-01";
+const DEFAULT_START_DATE = PROFILE_START_DATE;
 const TODAY = new Date().toISOString().split('T')[0];
 
 const GlobalRankTooltip = ({ active, payload, label }) => {
@@ -43,7 +45,7 @@ const GlobalRankTooltip = ({ active, payload, label }) => {
   );
 };
 
-const GlobalT20RankSection = ({ mode, rankPayload, loading }) => {
+const GlobalT20RankSection = ({ mode, rankPayload, loading, failed }) => {
   const modePayload = mode === 'bowling' ? rankPayload?.bowling : rankPayload?.batting;
   const ranking = modePayload?.ranking;
   const trajectory = (modePayload?.trajectory || []).slice(-6).map((point) => ({
@@ -61,10 +63,23 @@ const GlobalT20RankSection = ({ mode, rankPayload, loading }) => {
     );
   }
 
-  if (!ranking) {
+  if (failed) {
     return (
       <Typography variant="body2" color="text.secondary">
-        No global ranking found for this player in the selected window.
+        Couldn&apos;t load the global ranking. Long date windows can take too long to compute;
+        try a shorter range.
+      </Typography>
+    );
+  }
+
+  if (!ranking) {
+    // Used to say only "no ranking found", which read like missing data for players like Kohli.
+    return (
+      <Typography variant="body2" color="text.secondary">
+        Not ranked in this window. The global T20 ranking covers men&apos;s T20 players with at
+        least 50 balls {mode === 'bowling' ? 'bowled' : 'faced'} at each length (full, good, short
+        of good{mode === 'bowling' ? '' : ', short'}) in the selected dates; a longer window
+        usually qualifies more players.
       </Typography>
     );
   }
@@ -172,6 +187,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   const [fetchTrigger, setFetchTrigger] = useState(0);
   const [globalRankPayload, setGlobalRankPayload] = useState(null);
   const [globalRankLoading, setGlobalRankLoading] = useState(false);
+  const [globalRankFailed, setGlobalRankFailed] = useState(false);
 
   const sectionRefs = useRef({});
 
@@ -289,6 +305,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     const fetchGlobalRanking = async () => {
       try {
         setGlobalRankLoading(true);
+        setGlobalRankFailed(false);
         const params = new URLSearchParams();
         params.set('start_date', dateRange.start);
         params.set('end_date', dateRange.end);
@@ -303,7 +320,10 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         if (!cancelled) setGlobalRankPayload(data);
       } catch (err) {
         console.error('Failed to fetch global rank payload', err);
-        if (!cancelled) setGlobalRankPayload(null);
+        if (!cancelled) {
+          setGlobalRankPayload(null);
+          setGlobalRankFailed(true);
+        }
       } finally {
         if (!cancelled) setGlobalRankLoading(false);
       }
@@ -347,6 +367,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
             mode={activeTab}
             rankPayload={globalRankPayload}
             loading={globalRankLoading}
+            failed={globalRankFailed}
           />
         ),
       },
@@ -496,7 +517,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   }, [
     hasData, currentStats, currentDismissalStats, activeTab, battingStats,
     selectedPlayer, dateRange, selectedVenue, competitionFilters, isMobile, fetchTrigger,
-    globalRankPayload, globalRankLoading, activeSectionId,
+    globalRankPayload, globalRankLoading, globalRankFailed, activeSectionId,
   ]);
 
   // Scroll to section handler
@@ -553,8 +574,19 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     <Box sx={{ mx: { xs: 0, sm: 2 }, p: { xs: 0, sm: 2 }, maxWidth: 1400, margin: '0 auto' }}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* Filter Bar */}
+      {/* Filter Bar: one summary line on phones once a profile is showing */}
       <Box sx={{ px: { xs: 1.5, sm: 0 }, mb: 2 }}>
+        <FilterSummary
+          collapsed={isMobile && hasData}
+          title={selectedPlayer}
+          summary={joinSummary(
+            summarizeDateRange(dateRange.start, dateRange.end),
+            selectedVenue && selectedVenue !== 'All Venues' ? selectedVenue.split(',')[0] : null,
+            summarizeCompetitions(competitionFilters),
+          )}
+          sheetTitle="Player filters"
+        >
+        <Box>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
           <Autocomplete
             value={selectedPlayer}
@@ -588,12 +620,15 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
               onClick={handleFetch}
               disabled={!selectedPlayer || loading}
               id="go-button"
+              data-filter-submit
             >
               GO
             </Button>
           </Box>
         </Box>
-        <CompetitionFilter onFilterChange={setCompetitionFilters} isMobile={isMobile} />
+        <CompetitionFilter onFilterChange={setCompetitionFilters} isMobile={isMobile} value={competitionFilters} />
+        </Box>
+        </FilterSummary>
       </Box>
 
       {/* Loading state */}

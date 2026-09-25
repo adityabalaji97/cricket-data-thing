@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Grid,
@@ -50,6 +50,20 @@ const ORDINALS = ['1st', '2nd', '3rd', '4th'];
 const ordinalInnings = (n) => `${ORDINALS[n - 1] || `${n}th`} Innings`;
 
 const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColumns, isMobile }) => {
+  // On phones the two specialist groups fold away (about 1.5 screens of fields) unless one of
+  // their filters is already set -- e.g. from a shared link or an NL query.
+  const SECTION_KEYS = {
+    context: ['match_outcome', 'is_chase', 'chase_outcome', 'toss_decision', 'bat_hand', 'bowl_style', 'bowl_kind'],
+    delivery: ['line', 'length', 'shot', 'control', 'wagon_zone'],
+  };
+  const [openSections, setOpenSections] = useState({ context: false, delivery: false });
+  const sectionHasValues = (section) => SECTION_KEYS[section].some((key) => {
+    const value = filters[key];
+    return Array.isArray(value) ? value.length > 0 : value !== null && value !== undefined && value !== '';
+  });
+  const sectionOpen = (section) => !isMobile || openSections[section] || sectionHasValues(section);
+  const sectionStyle = (section) => (sectionOpen(section) ? undefined : { display: 'none' });
+  const toggleSection = (section) => setOpenSections((prev) => ({ ...prev, [section]: !sectionOpen(section) }));
   // All dropdown data now comes from availableColumns (fetched from delivery_details)
   const { active } = useFormat();
 
@@ -291,12 +305,16 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
 
         {/* Row 5: Advanced Match Context */}
         <Grid item xs={12}>
-          <Typography variant="subtitle2" sx={{ mb: 1, mt: 1, color: qbColors.textLo, fontFamily: qbFonts.mono, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-            Advanced Match Context
+          <Typography
+            variant="subtitle2"
+            component={isMobile ? 'button' : 'p'}
+            onClick={isMobile ? () => toggleSection('context') : undefined}
+            sx={{ background: 'none', border: 0, p: 0, cursor: isMobile ? 'pointer' : 'default', minHeight: isMobile ? 36 : undefined,  mb: 1, mt: 1, color: qbColors.textLo, fontFamily: qbFonts.mono, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            Advanced Match Context{isMobile ? (sectionOpen('context') ? ' ▴' : ' ▾') : ''}
           </Typography>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3} style={sectionStyle('context')}>
           <Autocomplete
             multiple
             value={filters.match_outcome || []}
@@ -313,7 +331,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           />
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3} style={sectionStyle('context')}>
           <FormControl size="small" fullWidth>
             <InputLabel>Is Chase</InputLabel>
             <Select
@@ -335,7 +353,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </FormControl>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3} style={sectionStyle('context')}>
           <Autocomplete
             multiple
             disabled={chaseOutcomeDisabled}
@@ -358,7 +376,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           />
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3} style={sectionStyle('context')}>
           <Autocomplete
             multiple
             value={filters.toss_decision || []}
@@ -376,7 +394,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         </Grid>
         
         {/* Row 6: Batter/Bowler Attributes */}
-        <Grid item xs={12} sm={4} md={3}>
+        <Grid item xs={12} sm={4} md={3} style={sectionStyle('context')}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <FormControl size="small" fullWidth>
               <InputLabel>Bat Hand</InputLabel>
@@ -394,7 +412,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        <Grid item xs={12} sm={4} md={3}>
+        <Grid item xs={12} sm={4} md={3} style={sectionStyle('context')}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Autocomplete
               multiple
@@ -415,7 +433,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        <Grid item xs={12} sm={4} md={3}>
+        <Grid item xs={12} sm={4} md={3} style={sectionStyle('context')}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Autocomplete
               multiple
@@ -438,12 +456,16 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
         
         {/* Row 7: Delivery Details - NEW */}
         <Grid item xs={12}>
-          <Typography variant="subtitle2" sx={{ mb: 1, mt: 1, color: qbColors.gold, fontFamily: qbFonts.mono, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-            Delivery Analysis Filters
+          <Typography
+            variant="subtitle2"
+            component={isMobile ? 'button' : 'p'}
+            onClick={isMobile ? () => toggleSection('delivery') : undefined}
+            sx={{ background: 'none', border: 0, p: 0, cursor: isMobile ? 'pointer' : 'default', minHeight: isMobile ? 36 : undefined,  mb: 1, mt: 1, color: qbColors.gold, fontFamily: qbFonts.mono, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            Delivery Analysis Filters{isMobile ? (sectionOpen('delivery') ? ' ▴' : ' ▾') : ''}
           </Typography>
         </Grid>
         
-        <Grid item xs={12} sm={4} md={3}>
+        <Grid item xs={12} sm={4} md={3} style={sectionStyle('delivery')}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Autocomplete
               multiple
@@ -464,7 +486,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        <Grid item xs={12} sm={4} md={3}>
+        <Grid item xs={12} sm={4} md={3} style={sectionStyle('delivery')}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Autocomplete
               multiple
@@ -485,7 +507,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        <Grid item xs={12} sm={4} md={3}>
+        <Grid item xs={12} sm={4} md={3} style={sectionStyle('delivery')}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Autocomplete
               multiple
@@ -506,7 +528,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        <Grid item xs={12} sm={4} md={3}>
+        <Grid item xs={12} sm={4} md={3} style={sectionStyle('delivery')}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <FormControl size="small" fullWidth>
               <InputLabel>Shot Control</InputLabel>
@@ -524,7 +546,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        <Grid item xs={12} sm={4} md={3}>
+        <Grid item xs={12} sm={4} md={3} style={sectionStyle('delivery')}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Autocomplete
               multiple

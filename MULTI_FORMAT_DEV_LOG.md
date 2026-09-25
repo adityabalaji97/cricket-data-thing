@@ -11,7 +11,8 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
-> **Latest:** U3 colour sweep done (see newest entry; `ui_sweep.mjs` now reports contrast).
+> **Latest:** API on Python 3.12 (v419); U4 phone UX done (see newest entries). Next: T20 Primer
+> metrics (Phase 2). U3 colour sweep done (see newest entry; `ui_sweep.mjs` now reports contrast).
 > Preview defaults to 1 Jan 8y (ODI) / 4y (T20) on site and connector; venue
 > similarity is format-pinned with a shared pool cache (see newest log entry).
 >
@@ -149,6 +150,43 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-09-25 — Track U4: phone UX (filter summaries, ScrollTable, sticky QB execute, rankings paging, desktop scorecard) — Claude
+
+New shared pieces in `src/components/ui/`:
+* **`ScrollTable`** — drop-in for TableContainer (`paper` replaces `component={Paper}`; margin
+  keys in `sx` go outside, the rest incl. maxHeight on the scroller). Edge fades show which side
+  has more to scroll; `stickyFirstColumn` pins the name column. Swapped into all ~20 live tables;
+  sticky first column on Matchups, Fantasy, preview leaders, Boundary Analysis.
+* **`FilterSummary`** (+ `summarizeDateRange` / `summarizeCompetitions` / `joinSummary`) — with
+  `collapsed` (phones, once results show) the page's unchanged form becomes one summary line +
+  Edit, opening it in a bottom sheet; `data-filter-submit` on the page's GO/Compare closes the
+  sheet. Used on Player, Team, Matchups, Doppelgangers, Batter/Team Comparison. The form remounts
+  when it moves, so CompetitionFilter now gets `value=` everywhere it is used this way.
+* **`TryExamples`** — one-tap presets (URL-param links) on Batter/Team Comparison and Matchups
+  start states.
+
+Page changes: QB filters folded by default on phones, "Advanced match context" / "Delivery
+analysis" collapse on phones unless set, **sticky Execute** above the bottom nav (needed
+`overflow-x: clip` instead of `hidden` on the QB root and its html/body GlobalStyles — `hidden`
+makes non-scrolling scroll containers that `position: sticky` attaches to). Rankings: one-line
+cards on phones, 25 per list + "Show more". Doppelganger method banners → "How it works"
+`<details>`. Home pipeline grid → top 10 + "Show all". Fantasy planner off-season message.
+Player: rolling `PROFILE_START_DATE` (6y, was frozen "2020-01-01"), Top Innings context no
+longer wraps (table-layout auto on desktop), Global rank distinguishes "failed to load" from
+"not ranked" and states the 50-balls-per-length rule. Theme: clickable small chips 32px and
+Autocomplete clear/open 38px on coarse pointers; MatchHistory W/L tiles 32px on phones; form
+strip / phase labels >= 11px. Radar on Batter Comparison fits phones.
+
+**Scorecard:** desktop (>= 1000px) summary is two columns (result across, story left, full
+scorecard always open right). Backend: result text pluralises ("won by 1 wicket"), derives the
+bat-first margin when the feed lacks `outcome.by` and the target was not revised (DLS); worm
+lines share one scale (format overs x match-high runs, was each innings stretched to its own
+length and top score) and `summary.worm_axis` ticks are format-aware (ODI 10-50). Goldens:
+scorecard_modern/legacy differ only in worm points + worm_axis (intended).
+
+Sweep: `ui_sweep.mjs` now also reports offender ancestry/position, small-text and tap-target
+samples, skips visibility:hidden (closed drawers), and takes `LOAD_MS`.
 
 ### 2026-09-25 — API on Python 3.12 (3.10 EOL Oct 2026); MCP lifespan restartable — Claude
 

@@ -273,6 +273,18 @@
   font-variant-numeric: tabular-nums;
 }
 
+.worm-axis.is-positioned {
+  position: relative;
+  display: block;
+  height: 14px;
+}
+
+.worm-axis.is-positioned span {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+
 .pom-card {
   display: flex;
   align-items: center;
@@ -871,3 +883,44 @@
     font-size: 9.5px;
   }
 }
+
+/* Desktop: the summary screen was a 430px phone column in the middle of a wide page. From
+   1000px it widens to two columns -- result across the top, the story (top performers, player
+   of the match, worm) on the left, the full scorecard always open on the right. The batting and
+   bowling breakdowns keep the single readable column. */
+@media (min-width: 1000px) {
+  .scorecard-shell.is-summary {
+    width: min(100% - 48px, 1080px);
+  }
+
+  .scorecard-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    grid-auto-flow: row dense;
+    column-gap: 8px;
+    align-items: start;
+  }
+
+  .scorecard-summary > .result-card {
+    grid-column: 1 / -1;
+  }
+
+  .scorecard-summary > :not(.result-card):not(.scorecard-collapse) {
+    grid-column: 1;
+  }
+
+  .scorecard-summary > .scorecard-collapse {
+    grid-column: 2;
+    grid-row: 2 / span 4;
+  }
+
+  .scorecard-summary > .scorecard-collapse > button {
+    display: none;
+  }
+
+  .scorecard-summary .full-scorecard {
+    max-height: none;
+    overflow: visible;
+  }
+}
+

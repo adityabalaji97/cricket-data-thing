@@ -1,24 +1,24 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-    Box,
-    Card,
-    Typography,
-    CircularProgress,
-    Alert,
-    Button,
-    Chip,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    TextField,
-    IconButton,
-    Tabs,
-    Tab,
-    Autocomplete,
+  Box,
+  Card,
+  Typography,
+  CircularProgress,
+  Alert,
+  Button,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  IconButton,
+  Tabs,
+  Tab,
+  Autocomplete,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
 import config from '../config';
@@ -290,7 +290,7 @@ const RecommendationsTable = ({ allPlayers, squad, onAddPlayer, isMobile }) => {
             <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>
                 Player Rankings
             </Typography>
-            <TableContainer sx={{ maxHeight: 500 }}>
+            <ScrollTable stickyFirstColumn sx={{ maxHeight: 500 }}>
                 <Table size="small" stickyHeader>
                     <TableHead>
                         <TableRow>
@@ -368,7 +368,7 @@ const RecommendationsTable = ({ allPlayers, squad, onAddPlayer, isMobile }) => {
                         })}
                     </TableBody>
                 </Table>
-            </TableContainer>
+            </ScrollTable>
         </Card>
     );
 };
@@ -616,7 +616,15 @@ const FantasyPlanner = ({ isMobile }) => {
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            {/* Fixture Calendar */}
+            {/* Off-season: the schedule has loaded and nothing in it is today or later. The card
+                used to sit empty under "Upcoming Fixtures" with no word on why. */}
+            {schedule?.fixtures && !upcomingFixtures.length ? (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                    The IPL 2026 season is over, so there are no fixtures to plan around. The planner
+                    picks up again when the next season&apos;s schedule is published; Player Rankings
+                    below still show the season&apos;s expected points.
+                </Alert>
+            ) : (
             <Card sx={{ p: 2, mb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
@@ -640,6 +648,7 @@ const FantasyPlanner = ({ isMobile }) => {
                     recommendationsLoading={recommendationsLoading}
                 />
             </Card>
+            )}
 
             {/* Tabs for Squad / Recommendations / Transfer Plan */}
             <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 2 }}>

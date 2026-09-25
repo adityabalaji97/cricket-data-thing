@@ -18,6 +18,9 @@ import {
   FormControlLabel,
   Switch
 } from '@mui/material';
+import TryExamples from './ui/TryExamples';
+import { useMediaQuery } from '@mui/material';
+import FilterSummary from './ui/FilterSummary';
 import { useLocation, useNavigate } from 'react-router-dom';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -28,6 +31,7 @@ import config from '../config';
 import { DEFAULT_START_DATE, TODAY } from '../utils/dateDefaults';
 
 const TeamComparison = () => {
+  const isMobile = useMediaQuery((theme) => theme.breakpoints.down('md'));
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -287,10 +291,27 @@ const TeamComparison = () => {
   return (
     <Container maxWidth="xl">
       <Box sx={{ py: 4 }}>
-        <Typography variant="h4" gutterBottom>Team Comparison</Typography>
+        <Typography variant="h4" gutterBottom sx={{ display: { xs: 'none', md: 'block' } }}>Team Comparison</Typography>
+        {!selectedTeams.length && !compareData?.length && (
+          <TryExamples
+            examples={[
+              { label: 'MI vs CSK', to: '/team-comparison?teams=MI,CSK' },
+              { label: 'RCB vs KKR vs SRH', to: '/team-comparison?teams=RCB,KKR,SRH' },
+              { label: 'India vs Australia', to: '/team-comparison?teams=India,Australia' },
+            ]}
+          />
+        )}
         
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         
+        {/* Builder: one line on phones once results are up */}
+        <FilterSummary
+          collapsed={isMobile && Boolean(compareData?.length) && !loading}
+          title={selectedTeams.map((entry) => (entry.team?.abbreviated_name || entry.label)).join(' vs ')}
+          summary={`${selectedTeams.length} teams · add, remove or change dates`}
+          sheetTitle="Teams to compare"
+        >
+        <Box>
         {/* Add Team Form */}
         <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
           <Typography variant="h6" gutterBottom>Add Team to Compare</Typography>
@@ -393,6 +414,7 @@ const TeamComparison = () => {
                   color="primary"
                   startIcon={<CompareArrowsIcon />}
                   onClick={handleCompare}
+                  data-filter-submit
                   disabled={loading || selectedTeams.length === 0}
                 >
                   Compare
@@ -464,6 +486,9 @@ const TeamComparison = () => {
           </Paper>
         )}
         
+        </Box>
+        </FilterSummary>
+
         {/* Loading indicator */}
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>

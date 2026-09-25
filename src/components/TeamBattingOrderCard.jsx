@@ -6,18 +6,18 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
-  Paper,
+  
   FormControl,
   Select,
   MenuItem,
   Box,
   Chip,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 
 const TeamBattingOrderCard = ({ battingOrderData, teamName }) => {
   const [selectedPhase, setSelectedPhase] = useState('overall');
@@ -165,7 +165,7 @@ const TeamBattingOrderCard = ({ battingOrderData, teamName }) => {
     const filteredPlayers = filterPlayersByPosition(battingOrderData.batting_order);
     
     return (
-      <TableContainer component={Paper} sx={{ maxHeight: '600px', overflowY: 'auto' }}>
+      <ScrollTable paper sx={{ maxHeight: '600px', overflowY: 'auto' }}>
         <Table stickyHeader>
           <TableHead>
             <TableRow>
@@ -253,7 +253,7 @@ const TeamBattingOrderCard = ({ battingOrderData, teamName }) => {
             )}
           </TableBody>
         </Table>
-      </TableContainer>
+      </ScrollTable>
     );
   };
 

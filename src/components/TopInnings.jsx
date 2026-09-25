@@ -3,12 +3,12 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Typography,
-  Box
+  Box,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
 import { EmptyState } from './ui';
@@ -107,12 +107,15 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
           minHeight={isMobile ? 240 : 280}
         />
       ) : (
-      <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
+      <ScrollTable sx={{ width: '100%', overflowX: 'auto' }}>
         <Table size={isMobile ? "small" : "medium"} sx={{
-          tableLayout: 'fixed',
+          // auto, not fixed: fixed gave every column an equal share, which squeezed the
+          // venue/competition context into five-line cells.
+          tableLayout: isMobile ? 'fixed' : 'auto',
           width: '100%',
           '& .MuiTableCell-root': {
-            borderBottom: '1px solid rgba(224, 224, 224, 1)',
+            borderBottom: 1,
+            borderColor: 'divider',
             py: isMobile ? `${spacing.xs}px` : `${spacing.md}px`,
             px: isMobile ? `${spacing.xs}px` : `${spacing.base}px`
           }
@@ -201,7 +204,13 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
                 )}
                 {!isMobile && (
                   <TableCell>
-                    <Typography variant="body2">{inning.venue}, {inning.competition}</Typography>
+                    <Typography
+                      variant="body2"
+                      title={`${inning.venue}, ${inning.competition}`}
+                      sx={{ maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                    >
+                      {inning.venue?.split(',')[0]} · {inning.competition}
+                    </Typography>
                   </TableCell>
                 )}
                 {!isMobile && (
@@ -219,7 +228,7 @@ const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }
             ))}
           </TableBody>
         </Table>
-      </TableContainer>
+      </ScrollTable>
       )}
     </Wrapper>
   );

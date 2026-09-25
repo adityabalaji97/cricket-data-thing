@@ -17,3 +17,11 @@ export const PREVIEW_WINDOW_YEARS = { ODI: 8, T20: 4 };
 export const getPreviewStartDate = (format = 'T20', referenceDate = new Date()) => (
   getSeasonStartDate(referenceDate, PREVIEW_WINDOW_YEARS[format] || PREVIEW_WINDOW_YEARS.T20)
 );
+
+/**
+ * Player profile window: 1 January, 6 years back (2020-01-01 in 2026). It was the fixed date
+ * "2020-01-01", which silently widened every year while the other pages' windows rolled.
+ */
+export const PROFILE_WINDOW_YEARS = 6;
+export const PROFILE_START_DATE = getSeasonStartDate(new Date(), PROFILE_WINDOW_YEARS);
+

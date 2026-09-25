@@ -5,10 +5,9 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
-  Paper,
+  
   Typography,
   Box,
   Select,
@@ -16,8 +15,9 @@ import {
   FormControl,
   InputLabel,
   Tooltip,
-  CircularProgress
+  CircularProgress,
 } from '@mui/material';
+import ScrollTable from './ui/ScrollTable';
 
 const TeamBowlingTypeMatchups = ({ 
   players, 
@@ -119,7 +119,7 @@ const TeamBowlingTypeMatchups = ({
   const otherFilteredData = filterEmptyRows(otherData);
 
   const renderPlayerTable = (playersData, title) => (
-    <TableContainer component={Paper} sx={{ mb: 4 }}>
+    <ScrollTable paper sx={{ mb: 4 }}>
       <Table size="small" sx={{ minWidth: 650 }}>
         <TableHead>
           <TableRow>
@@ -203,7 +203,7 @@ const TeamBowlingTypeMatchups = ({
           ))}
         </TableBody>
       </Table>
-    </TableContainer>
+    </ScrollTable>
   );
 
   return (
