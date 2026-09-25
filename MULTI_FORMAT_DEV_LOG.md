@@ -151,6 +151,18 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## Log entries (newest first)
 
+### 2026-09-25 — T20-only pages always reachable (MensT20Scope) — Claude
+
+Opening an ODI preview sets the site format to men's ODI (persisted), and the nav then disabled
+every `t20Only` page — most of the phone More sheet. Now `FormatContext.MensT20Scope` wraps those
+routes in App.js: it re-provides the context as men's T20 for the page's subtree and points the
+analytics API client at T20 while mounted (restoring the site format on unmount). Nav items are
+never disabled; the More sheet shows a "Men's T20" note when another format is selected.
+Verified with the site on mens-odi: all sheet items enabled, player page's boundary-analysis
+requests format=T20, and returning to /query still shows Men's ODI. Value building moved to
+`buildContextValue` so the provider and the scope share it; `supportsT20OnlyPages` is now unused
+by the nav (kept in the context).
+
 ### 2026-09-25 — Track U4: phone UX (filter summaries, ScrollTable, sticky QB execute, rankings paging, desktop scorecard) — Claude
 
 New shared pieces in `src/components/ui/`:

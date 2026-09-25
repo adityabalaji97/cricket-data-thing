@@ -42,7 +42,7 @@ import axios from 'axios';
 import config from './config';
 import { getPreviewStartDate, TODAY } from './utils/dateDefaults';
 import { NAV_ITEMS, getCurrentTabForPath, getPageTitleForPath } from './navItems';
-import { useFormat } from './context/FormatContext';
+import { MensT20Scope, useFormat } from './context/FormatContext';
 
 const TEAM_NAME_TO_ABBREVIATION = {
   'chennai super kings': 'CSK',
@@ -127,7 +127,7 @@ const AppContent = () => {
   const isCompactNav = useMediaQuery(theme.breakpoints.down('md'));
   // Pinned, not the raw selection: a venue preview is one format's record at a ground,
   // and the venue endpoints reject 'ALL'.
-  const { supportsT20OnlyPages, pinnedFormatParams, active: activeFormat, selectFormat } = useFormat();
+  const { pinnedFormatParams, active: activeFormat, selectFormat } = useFormat();
 
   // In-app links carry ?fmt= so the destination opens in the right format (a Home fixture card
   // opens an ODI preview in ODI; a preview's Explore link opens the query builder in the same
@@ -650,7 +650,6 @@ const AppContent = () => {
                   label={item.label}
                   component={Link}
                   to={item.path}
-                  disabled={item.t20Only && !supportsT20OnlyPages}
                 />
               ))}
             </Tabs>
@@ -671,22 +670,22 @@ const AppContent = () => {
 
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/player" element={<UnifiedPlayerProfile isMobile={isMobile} />} />
+        <Route path="/player" element={<MensT20Scope><UnifiedPlayerProfile isMobile={isMobile} /></MensT20Scope>} />
         <Route path="/bowler" element={<BowlerRedirect />} />
-        <Route path="/comparison" element={<BatterComparison />} />
-        <Route path="/matchups" element={<MatchupsTab isMobile={isMobile} />} />
+        <Route path="/comparison" element={<MensT20Scope><BatterComparison /></MensT20Scope>} />
+        <Route path="/matchups" element={<MensT20Scope><MatchupsTab isMobile={isMobile} /></MensT20Scope>} />
         <Route path="/query" element={<QueryBuilder isMobile={isMobile} />} />
-        <Route path="/team" element={<TeamProfile isMobile={isMobile} />} />
-        <Route path="/team-comparison" element={<TeamComparison />} />
-        <Route path="/doppelgangers" element={<DoppelgangerLeaderboard />} />
-        <Route path="/ipl-predictions" element={<IPLPredictions />} />
-        <Route path="/rankings" element={<GlobalT20Rankings />} />
-        <Route path="/games/guess-innings" element={<GuessInningsGame isMobile={isMobile} />} />
-        <Route path="/games/player-journeys" element={<PlayerJourneysGame isMobile={isMobile} />} />
+        <Route path="/team" element={<MensT20Scope><TeamProfile isMobile={isMobile} /></MensT20Scope>} />
+        <Route path="/team-comparison" element={<MensT20Scope><TeamComparison /></MensT20Scope>} />
+        <Route path="/doppelgangers" element={<MensT20Scope><DoppelgangerLeaderboard /></MensT20Scope>} />
+        <Route path="/ipl-predictions" element={<MensT20Scope><IPLPredictions /></MensT20Scope>} />
+        <Route path="/rankings" element={<MensT20Scope><GlobalT20Rankings /></MensT20Scope>} />
+        <Route path="/games/guess-innings" element={<MensT20Scope><GuessInningsGame isMobile={isMobile} /></MensT20Scope>} />
+        <Route path="/games/player-journeys" element={<MensT20Scope><PlayerJourneysGame isMobile={isMobile} /></MensT20Scope>} />
         <Route path="/wrapped/2025" element={<WrappedPage />} />
         <Route path="/search" element={<GoogleSearchLanding />} />
         <Route path="/credits" element={<CreditsPage />} />
-        <Route path="/fantasy-planner" element={<FantasyPlanner isMobile={isMobile} />} />
+        <Route path="/fantasy-planner" element={<MensT20Scope><FantasyPlanner isMobile={isMobile} /></MensT20Scope>} />
         <Route path="/scorecard/:matchId" element={<MatchScorecardPage />} />
         <Route path="/venue" element={
           <Box sx={{ my: { xs: 1.5, md: 3 }, bgcolor: 'background.default', color: 'text.primary' }}>

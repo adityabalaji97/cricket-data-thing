@@ -50,7 +50,7 @@ const MORE_VALUE = '__more__';
  */
 const MobileBottomNav = () => {
   const location = useLocation();
-  const { supportsT20OnlyPages } = useFormat();
+  const { isDefaultFormat } = useFormat();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const primaryItems = PRIMARY_NAV_PATHS
@@ -143,20 +143,21 @@ const MobileBottomNav = () => {
               </Typography>
               <List dense disablePadding>
                 {items.map((item) => {
-                  const disabled = Boolean(item.t20Only && !supportsT20OnlyPages);
+                  // Always tappable: T20-only pages run as men's T20 whatever the site format is
+                  // (MensT20Scope). The note just says so when another format is selected.
+                  const t20Note = Boolean(item.t20Only && !isDefaultFormat);
                   return (
                     <ListItemButton
                       key={item.path}
                       component={Link}
                       to={item.path}
-                      disabled={disabled}
                       selected={path === item.path}
                       onClick={() => setMoreOpen(false)}
                       sx={{ minHeight: 48, borderRadius: 2 }}
                     >
                       <ListItemText
                         primary={item.label}
-                        secondary={disabled ? "Men's T20 only" : null}
+                        secondary={t20Note ? "Men's T20" : null}
                         primaryTypographyProps={{ fontSize: 16, fontWeight: path === item.path ? 700 : 500 }}
                       />
                     </ListItemButton>

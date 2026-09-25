@@ -5,11 +5,11 @@
  * path-to-title map, the desktop <Tabs>, and the mobile <Menu> — so adding or renaming a page
  * meant four edits and any missed one produced a wrong tab highlight or heading.
  *
- * `t20Only` marks the pages that are not being made multi-format. They stay reachable, but the
- * nav disables them when a single non-T20 format (e.g. men's ODI) is selected, because the
- * endpoints behind them are pinned to men's T20 and would otherwise render an empty page that
- * looks broken rather than out of scope. "All formats" does not disable them — see
- * FormatContext `supportsT20OnlyPages`.
+ * `t20Only` marks the pages that are not being made multi-format. They are always reachable:
+ * App.js wraps their routes in FormatContext `MensT20Scope`, so they run as men's T20 whatever
+ * the site-wide format is (an ODI preview sets it to ODI, and it persists). The nav only adds a
+ * "Men's T20" note when another format is selected. (They used to be disabled then, which after
+ * one ODI preview greyed out most of the More sheet.)
  */
 
 export const NAV_ITEMS = [

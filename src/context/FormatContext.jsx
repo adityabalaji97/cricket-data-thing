@@ -15,6 +15,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import config from '../config';
@@ -91,6 +92,32 @@ const readInitialSlug = () => {
   }
 };
 
+const buildContextValue = ({ formats, loading, active, selectFormat }) => ({
+  formats,
+  loading,
+  active,
+  selectFormat,
+  // Ready to spread into a request: `{ ...formatParams }`. May be format: 'ALL'.
+  formatParams: { format: active?.format || 'T20', gender: active?.gender || 'male' },
+  // For endpoints that require a single real format. ELO, phase benchmarks and anything
+  // resolving a FormatSpec cannot accept 'ALL' -- get_format('ALL') raises -- so those
+  // callers use this and fall back to men's T20 rather than 500.
+  pinnedFormatParams: {
+    format: active?.format && active.format !== 'ALL' ? active.format : 'T20',
+    gender: active?.gender || 'male',
+  },
+  isAllFormats: (active?.format || 'T20') === 'ALL',
+  isDefaultFormat: (active?.format || 'T20') === 'T20' && (active?.gender || 'male') === 'male',
+  // Whether the men's-T20-only pages (navItems `t20Only`) make sense right now. "All formats"
+  // counts: those pages ignore the format and always show men's T20, which is a subset of
+  // "all", not a contradiction of it. Keying the nav off isDefaultFormat alone disabled half
+  // the site for every first visit, because "all" is the default.
+  supportsT20OnlyPages:
+    ['T20', 'ALL'].includes(active?.format || 'T20') && (active?.gender || 'male') === 'male',
+  phaseLabel: (key) => active?.phases?.find((p) => p.key === key)?.label || key,
+  phaseOvers: (key) => active?.phases?.find((p) => p.key === key)?.display_overs || '',
+});
+
 export const FormatProvider = ({ children }) => {
   const [formats, setFormats] = useState(FALLBACK_FORMATS);
   const [slug, setSlug] = useState(readInitialSlug);
@@ -150,33 +177,46 @@ export const FormatProvider = ({ children }) => {
   }, [active]);
 
   const value = useMemo(
-    () => ({
-      formats,
-      loading,
-      active,
-      selectFormat,
-      // Ready to spread into a request: `{ ...formatParams }`. May be format: 'ALL'.
-      formatParams: { format: active?.format || 'T20', gender: active?.gender || 'male' },
-      // For endpoints that require a single real format. ELO, phase benchmarks and anything
-      // resolving a FormatSpec cannot accept 'ALL' -- get_format('ALL') raises -- so those
-      // callers use this and fall back to men's T20 rather than 500.
-      pinnedFormatParams: {
-        format: active?.format && active.format !== 'ALL' ? active.format : 'T20',
-        gender: active?.gender || 'male',
-      },
-      isAllFormats: (active?.format || 'T20') === 'ALL',
-      isDefaultFormat: (active?.format || 'T20') === 'T20' && (active?.gender || 'male') === 'male',
-      // Whether the men's-T20-only pages (navItems `t20Only`) make sense right now. "All formats"
-      // counts: those pages ignore the format and always show men's T20, which is a subset of
-      // "all", not a contradiction of it. Keying the nav off isDefaultFormat alone disabled half
-      // the site for every first visit, because "all" is the default.
-      supportsT20OnlyPages:
-        ['T20', 'ALL'].includes(active?.format || 'T20') && (active?.gender || 'male') === 'male',
-      phaseLabel: (key) => active?.phases?.find((p) => p.key === key)?.label || key,
-      phaseOvers: (key) => active?.phases?.find((p) => p.key === key)?.display_overs || '',
-    }),
+    () => buildContextValue({ formats, loading, active, selectFormat }),
     [formats, loading, active, selectFormat],
   );
+
+  return <FormatContext.Provider value={value}>{children}</FormatContext.Provider>;
+};
+
+/**
+ * Runs a men's-T20-only page (navItems `t20Only`) as men's T20 whatever the site-wide format is.
+ *
+ * Opening an ODI preview sets the site to ODI (it persists), and the nav used to grey out every
+ * T20-only page until you switched back. Those pages always show men's T20 anyway, but a few
+ * shared children (boundary analysis, dismissal map, matchups) and the analytics API client read
+ * the format -- so under ODI they would have fetched ODI numbers into a T20 page. This scope
+ * re-provides the context as men's T20 for its subtree and points the API client at T20 while
+ * mounted, restoring the site's format on the way out. The user's choice is not changed.
+ */
+export const MensT20Scope = ({ children }) => {
+  const parent = useFormat();
+  const t20 = parent.formats.find((f) => f.slug === 'mens-t20') || FALLBACK_FORMATS[1];
+  const value = useMemo(
+    () => buildContextValue({
+      formats: parent.formats,
+      loading: parent.loading,
+      active: t20,
+      selectFormat: parent.selectFormat,
+    }),
+    [parent.formats, parent.loading, parent.selectFormat, t20],
+  );
+
+  const parentParams = useRef(parent.formatParams);
+  parentParams.current = parent.formatParams;
+  useEffect(() => {
+    setActiveFormatParams({ format: 'T20', gender: 'male' });
+    clearAnalyticsCache();
+    return () => {
+      setActiveFormatParams(parentParams.current);
+      clearAnalyticsCache();
+    };
+  }, []);
 
   return <FormatContext.Provider value={value}>{children}</FormatContext.Provider>;
 };
