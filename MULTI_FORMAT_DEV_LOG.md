@@ -150,6 +150,25 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## Log entries (newest first)
 
+### 2026-09-25 — API on Python 3.12 (3.10 EOL Oct 2026); MCP lifespan restartable — Claude
+
+* `.python-version` 3.10 → **3.12** (Heroku heroku-24), nightly workflow 3.11 → 3.12. Not 3.13:
+  numpy 1.26.4 has no 3.13 wheels and the ML pins stay put. Every pin has a cp312 wheel.
+* `sqlalchemy>=2.0.9,<2.1`: an unpinned rebuild would have jumped to 2.1.0 (behaviour-changing
+  minor; drops the implicit greenlet dep). Upgrade it on purpose later.
+* **MCP session manager is now restartable.** A `StreamableHTTPSessionManager` can run() once,
+  and every TestClient re-runs the lifespan, so since Phase 1 all 24 `tests/test_sanity.py`
+  tests errored. `mount_mcp` now returns a `run_mcp()` context factory that rebuilds the SDK
+  routes (fresh manager) and swaps their handlers into the registered /mcp routes. Prod unchanged.
+* Verified on a local 3.12 venv: app imports (61 routes, same as 3.11); pytest 109 passed,
+  2 failed — both stale tests that fail identically on 3.11 (`Indian Premier League (IPL)` alias
+  added since; partnership fallback SQL no longer uses `LEFT JOIN player_aliases pa_bat`).
+  Golden A/B vs live 3.10: only the known `match_preview` top_ranked_players diff. Latest joblib
+  models give identical predictions on 3.12 vs 3.11 (none are loaded by the API itself —
+  Foresight reads `match_predictions`). MCP initialize/tools/list/find_entities OK.
+* Local macOS note: xgboost needs `llvm-openmp` in the conda base to import at all.
+* `Tests.py` (root, old bokeh script) imports distutils (removed in 3.12); nothing uses it.
+
 ### 2026-09-24 — Track U3: colour/contrast sweep; preview drops Similar, Dismissals, Venue Twins — Claude
 
 **Preview sections sunset** (user call, "unless we find a better use"): Similar, Venue Twins and

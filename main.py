@@ -81,7 +81,7 @@ async def lifespan(_app):
     # lifespan is set, and the MCP connector needs one: its session manager must be running for
     # /mcp requests, and a mounted app's own lifespan never runs.
     initialize_database()
-    async with mcp_session_manager.run():
+    async with run_mcp():
         logging.info("Application startup complete")
         yield
 
@@ -113,7 +113,7 @@ app.include_router(ml_predictions_router)
 app.include_router(query_summarizer_router)
 
 # MCP connector for Claude / ChatGPT: POST /mcp (see mcp_server/server.py).
-mcp_session_manager = mount_mcp(app)
+run_mcp = mount_mcp(app)
 
 # Add CORS middleware
 app.add_middleware(

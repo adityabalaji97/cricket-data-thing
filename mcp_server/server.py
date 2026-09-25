@@ -24,11 +24,11 @@ import os
 import threading
 import time
 from collections import deque
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Annotated, Any, Dict, Iterator, List, Literal, Optional
+from typing import Annotated, Any, Callable, Dict, Iterator, List, Literal, Optional
 from urllib.parse import urlencode
 
 from pydantic import Field
@@ -824,14 +824,8 @@ def preview_match(
 # Mounting
 # --------------------------------------------------------------------------------------------
 
-def mount_mcp(app: Any) -> Any:
-    """
-    Add POST/GET /mcp to a FastAPI app and return the session manager, whose run() context must
-    wrap the app's lifespan (a mounted Starlette app's own lifespan never runs).
-
-    The SDK's routes are added to the parent router rather than app.mount()-ed, so the endpoint is
-    exactly /mcp (no /mcp/mcp, no slash redirect that some clients will not follow for POST).
-    """
+def _build_mcp_routes() -> list:
+    """The SDK's /mcp routes, backed by a new session manager (each can only run() once)."""
     starlette_app = mcp.streamable_http_app(
         streamable_http_path="/mcp",
         stateless_http=True,
@@ -841,6 +835,29 @@ def mount_mcp(app: Any) -> Any:
         # legitimate Host/Origin values (herokuapp.com, claude.ai, chatgpt.com, ...).
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )
-    for route in starlette_app.routes:
-        app.router.routes.append(route)
-    return mcp.session_manager
+    return list(starlette_app.routes)
+
+
+def mount_mcp(app: Any) -> Callable[[], Any]:
+    """
+    Add POST/GET /mcp to a FastAPI app and return a context-manager factory that must wrap the
+    app's lifespan (a mounted Starlette app's own lifespan never runs).
+
+    The SDK's routes are added to the parent router rather than app.mount()-ed, so the endpoint is
+    exactly /mcp (no /mcp/mcp, no slash redirect that some clients will not follow for POST).
+
+    A session manager can only run() once, but an app's lifespan can run many times (every
+    TestClient does). So each lifespan builds fresh routes and swaps their handlers into the
+    registered ones -- in production the lifespan runs once and this is the same as before.
+    """
+    routes = _build_mcp_routes()
+    app.router.routes.extend(routes)
+
+    @asynccontextmanager
+    async def run_mcp():
+        for registered, fresh in zip(routes, _build_mcp_routes()):
+            registered.app = fresh.app
+        async with mcp.session_manager.run():
+            yield
+
+    return run_mcp
