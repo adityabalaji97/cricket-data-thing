@@ -24,6 +24,7 @@ import RecentFormStrip from './playerProfile/RecentFormStrip';
 import AdvancedBowlingAnalyticsSection from './playerProfile/AdvancedBowlingAnalyticsSection';
 import BoundaryAnalysis from './BoundaryAnalysis';
 import LazySection from './ui/LazySection';
+import ImpactSection from './playerProfile/sections/ImpactSection';
 import FilterSummary, { joinSummary, summarizeCompetitions, summarizeDateRange } from './ui/FilterSummary';
 import usePlayerData from '../hooks/usePlayerData';
 import config from '../config';
@@ -358,6 +359,19 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         id: 'overview',
         label: 'Overview',
         content: <OverviewSection stats={currentStats} mode={activeTab} />,
+      },
+      {
+        id: 'impact',
+        label: 'Impact',
+        content: (
+          <ImpactSection
+            playerName={selectedPlayer}
+            mode={activeTab}
+            dateRange={dateRange}
+            selectedVenue={selectedVenue}
+            competitionFilters={competitionFilters}
+          />
+        ),
       },
       {
         id: 'global-rank',

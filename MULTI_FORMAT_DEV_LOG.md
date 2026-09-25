@@ -11,8 +11,8 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
-> **Latest:** API on Python 3.12 (v419); U4 phone UX done (see newest entries). Next: T20 Primer
-> metrics (Phase 2). U3 colour sweep done (see newest entry; `ui_sweep.mjs` now reports contrast).
+> **Latest:** Phase 2 T20 Primer metrics live (ball_metrics etc.; see newest entry). API on
+> Python 3.12; U4 done. U3 colour sweep done (see newest entry; `ui_sweep.mjs` now reports contrast).
 > Preview defaults to 1 Jan 8y (ODI) / 4y (T20) on site and connector; venue
 > similarity is format-pinned with a shared pool cache (see newest log entry).
 >
@@ -150,6 +150,50 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 ---
 
 ## Log entries (newest first)
+
+### 2026-09-25 — Phase 2: T20 Primer metrics (par, Impact, RAA/WAA, WP/WPA, leverage) — Claude
+
+Implements Himanish Ganjoo's *T20 Metrics: A Primer* (Aug 2026) for men's T20 (2015+, the
+Hundred excluded). Library: `services/metrics/` (pure numpy/pandas, unit-tested in
+`tests/test_primer_metrics.py`):
+* `dl_curve.py` — DL Standard fit (weighted LSQ on runs-to-come cell means from 9,794 complete
+  first innings; RMSE 0.73 runs; R_std(120,0) = 160.6 vs the Primer's ~170 on its narrower
+  5-competition dataset), DL Pro with n0 = 1.04, vectorised lambda solver. F cubic with F(0)=1,
+  beta cubic with free constant (8 params; the Primer says 7 without saying which).
+* `par_scores.py` — nested shrinkage (global→league→year→ground; T20I global→year→country), eq. 3-4.
+  Reproduces the Primer's fig. 1: Hyderabad IPL par 160.0 (2018) → 190.8 (2025), the same +31.
+* `ball_metrics.py` — pre-ball state is the PREVIOUS ball's recorded state (feed has ~0.3% rows
+  where score ≠ Δinns_runs, wickets without Δinns_wkts, mid-innings max_balls changes), so Impact
+  telescopes exactly (verified 0.0 diff) and rain cuts are not charged to a ball. Impact (eq. 9),
+  WP from the DL score ratio (eq. 11-12, n = 6 — also the best Brier on our data), WPA, leverage
+  (p6 − pw).
+* `raa_waa.py` — XGBoost regressor/classifier on (balls left, wickets down, par-or-target, innings),
+  wides excluded; runs = what the ball added to the team total (extras included), same as Impact.
+
+Validation (all against the Primer's own tables): IPL 2023-26 RAA leaders Abhishek 322.6 (Primer
+309.4), SKY, Sooryavanshi, Salt, Klaasen in near-identical order; IPL 2026 Impact Sooryavanshi 243
+(232), Bhuvneshwar 251 (243); WPA Sooryavanshi 1.75 (1.71), Kohli 1.02 (1.00), Kishan 0.75 (0.75);
+WP Brier 0.1808 (Primer 0.182), and 0.1823 vs the feed's own 0.1826 on the 873k balls where it has one.
+
+Storage (migration `003_primer_metrics.sql`, applied to prod after backup b005): `metric_models`
+(versioned params + validation), `match_par`, `ball_metrics` (2,395,328 rows, 283 MB; DB now 4.1 GB).
+Loaded by `scripts/compute_primer_metrics.py full --write`; models in `ml/models/primer/` (.ubj,
+11 MB). Nightly: workflow step `compute_primer_metrics.py incremental --write` (never refits;
+new matches only) + a DB-size warning over 8 GB.
+
+Surfaces: query builder grouped delivery mode adds impact / impact_per_100 / impact_per_innings /
+raa(_per_100) / waa(_per_100) / wpa / avg_leverage (+ metric_balls, metrics_perspective; bowling
+side when grouped by bowler without batter; `QB_PRIMER_METRICS=0` kill switch; cumulative mode
+returns nulls). Goldens: additions only. Results table shows Impact by default when present,
+hides all-null columns, explains the metrics. NL layer knows them ("most impactful IPL 2026
+batters" → impact/raa/wpa + bar). MCP: ordered, described, ranked column always in the text
+table. Scorecard: player Impact/WPA, `summary.primer` (Impact by over, WP path) → "Win probability ·
+Impact" card; desktop summary now a story column + full scorecard. Player page: Impact section
+(per season, via the QB API). Credits: glossary.
+
+**Open:** ODI / women's T20 metrics (need their own curves); leverage-weighted variants and
+adjusted Impact (Primer 5.3, 7.2); `/analytics/matches/{id}/resource-benchmark` still depends on
+the never-created `venue_resources` (unused by the UI) — repoint to dl_curve if it gets a consumer.
 
 ### 2026-09-25 — T20-only pages always reachable (MensT20Scope) — Claude
 

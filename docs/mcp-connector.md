@@ -24,7 +24,7 @@ ODIs"*. The URL and these steps are also on the Home page ("Use Hindsight in Cla
 |---|---|
 | `find_entities` | Resolve "kohli" / "chinnaswamy" / "big bash" to exact names (players, teams, venues, competitions). |
 | `get_query_options` | Valid values for line, length, shot, bowl style/kind, bat hand, competitions, group-by columns. |
-| `query_cricket_data` | The query builder: filters + group_by (required) + sort, returns aggregated rows, a text table for the model, an interactive view (`ui://hindsight/query-result`) and an "Open in Hindsight" deep link to `/query`. |
+| `query_cricket_data` | The query builder: filters + group_by (required) + sort, returns aggregated rows, a text table for the model, an interactive view (`ui://hindsight/query-result`) and an "Open in Hindsight" deep link to `/query`. Men's T20 rows also carry the T20 Primer metrics (impact, raa/waa, wpa, avg_leverage), from the bowling side when grouped by bowler; the text table always includes the column it was ranked by. |
 | `preview_match` | Fixture preview for two teams at a venue in T20 or ODI: venue record, leading run-scorers/wicket-takers there, head-to-head, recent form, standout batter-vs-bowler matchups, and a link to the site's preview. Format-specific throughout. History window defaults to 1 January 8 years back for ODIs and 4 years back for T20s (same as the website's preview). |
 
 All are read-only (`readOnlyHint`). Results are **aggregated only** — `group_by` is required, so
@@ -60,6 +60,5 @@ npx @modelcontextprotocol/inspector     # connect to http://localhost:8000/mcp (
 
 ## Not yet
 
-Auth (add OAuth before sharing widely), wagon-wheel / pitch-map widgets, and the T20 Primer
-metrics (RAA, Impact, WPA) — which will reach the connector for free once they are query-builder
-columns.
+Auth (add OAuth before sharing widely) and wagon-wheel / pitch-map widgets. (The T20 Primer
+metrics arrived with Phase 2 as query-builder columns, so the connector has them.)

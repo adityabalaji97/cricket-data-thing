@@ -137,6 +137,100 @@
   margin: 0 18px 20px;
 }
 
+/* Win probability & Impact card (T20 Primer metrics) */
+.impact-card .wp-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.impact-card line.mid {
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-dasharray: 2 2;
+}
+
+.impact-card line.break {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+.impact-card circle.wicket {
+  fill: #e5484d;
+}
+
+.impact-overs {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.impact-over-row {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.impact-over-row small {
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.impact-bars {
+  position: relative;
+  height: 44px;
+  display: flex;
+  gap: 2px;
+  border-top: 1px solid transparent;
+  background: linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(255, 255, 255, 0.12) 50%, transparent calc(50% + 0.5px));
+}
+
+.impact-bars span {
+  flex: 1;
+  align-self: flex-end;
+  border-radius: 2px;
+}
+
+.impact-bars span.up {
+  background: #b6f24a;
+  margin-bottom: 22px;
+}
+
+.impact-bars span.down {
+  background: #e5484d;
+  align-self: flex-start;
+  margin-top: 22px;
+}
+
+.impact-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.impact-pos {
+  color: #b6f24a !important;
+}
+
+.impact-neg {
+  color: #e5484d !important;
+}
+
+.mini-table.with-impact {
+  grid-template-columns: 1fr 30px 26px 22px 22px 40px;
+}
+
+.bowling-mini-row i {
+  font-style: normal;
+  width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .screen-header {
   padding: 2px 0 0;
 }
@@ -905,13 +999,14 @@
     grid-column: 1 / -1;
   }
 
-  .scorecard-summary > :not(.result-card):not(.scorecard-collapse) {
+  .scorecard-summary > .summary-story {
     grid-column: 1;
+    grid-row: 2;
   }
 
   .scorecard-summary > .scorecard-collapse {
     grid-column: 2;
-    grid-row: 2 / span 4;
+    grid-row: 2;
   }
 
   .scorecard-summary > .scorecard-collapse > button {

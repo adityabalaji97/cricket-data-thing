@@ -260,9 +260,14 @@ const ScorecardSummaryScreen = ({ data, searchParams, setSearchParams }) => {
         </div>
       </section>
 
-      <TopPerformers data={data} onSelect={openPerformer} />
-      {data.match.player_of_match && <PlayerOfMatchCard player={data.match.player_of_match} />}
-      <MomentumWorm data={data} />
+      {/* One column of story cards: on desktop the full scorecard sits beside it, and as separate
+          grid items these were stretched apart to match its height. */}
+      <div className="summary-story">
+        <TopPerformers data={data} onSelect={openPerformer} />
+        {data.match.player_of_match && <PlayerOfMatchCard player={data.match.player_of_match} />}
+        <MomentumWorm data={data} />
+        {data.summary.primer && <ImpactCard data={data} primer={data.summary.primer} />}
+      </div>
 
       <section className="scorecard-collapse">
         <button type="button" onClick={() => setFullOpen((value) => !value)}>
@@ -276,6 +281,74 @@ const ScorecardSummaryScreen = ({ data, searchParams, setSearchParams }) => {
         </div>
       </section>
     </main>
+  );
+};
+
+// "Kolkata Knight Riders" -> "KKR" for tight labels; short names pass through ("India").
+const shortTeam = (name) => {
+  if (!name) return '';
+  const words = name.split(/\s+/).filter(Boolean);
+  return name.length > 12 && words.length > 1 ? words.map((w) => w[0]).join('').toUpperCase() : name;
+};
+
+const signed = (value, digits = 1) => (value > 0 ? '+' : value < 0 ? '−' : '') + Math.abs(value).toFixed(digits);
+
+// Win probability and Impact (Ganjoo's T20 Primer; the layout follows its "Impact scorecard").
+// Win probability is drawn from the side batting first; Impact is runs added to the batting
+// side's projected total, summed by over.
+const ImpactCard = ({ data, primer }) => {
+  const wp = primer.win_probability;
+  const n = Math.max(1, wp.points.length - 1);
+  const toX = (i) => (i / n) * 100;
+  const toY = (p) => 58 - p * 56;
+  const line = wp.points.map((p, i) => `${toX(i).toFixed(2)},${toY(p).toFixed(2)}`).join(' ');
+  const firstTeam = wp.team;
+  const secondTeam = primer.innings.find((inn) => inn.team !== firstTeam)?.team;
+  const accent = getAccent(data, firstTeam);
+  const maxOver = Math.max(1, ...primer.innings.flatMap((inn) => inn.by_over.map((o) => Math.abs(o.impact))));
+
+  return (
+    <section className="worm-card impact-card">
+      <div className="card-heading-row">
+        <span>Win probability · Impact</span>
+        <div>
+          {primer.innings.map((inn) => (
+            <em key={inn.innings} style={{ color: getAccent(data, inn.team) }} title={inn.team}>
+              {shortTeam(inn.team)} {signed(inn.impact)}
+            </em>
+          ))}
+        </div>
+      </div>
+      <div className="wp-labels"><span>{shortTeam(firstTeam)} 100%</span><span>{shortTeam(secondTeam)} 100%</span></div>
+      <svg viewBox="0 0 100 60" preserveAspectRatio="none" width="100%" height="140" aria-label={`Win probability for ${firstTeam}`}>
+        <line x1="0" y1={toY(0.5)} x2="100" y2={toY(0.5)} className="mid" />
+        <line x1={toX(wp.innings_break)} y1="0" x2={toX(wp.innings_break)} y2="60" className="break" />
+        <polyline points={line} fill="none" stroke={accent} strokeWidth="2.2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        {wp.wickets.map((i) => (
+          <circle key={i} cx={toX(i)} cy={toY(wp.points[i])} r="1.1" className="wicket" />
+        ))}
+      </svg>
+      <div className="impact-overs">
+        {primer.innings.map((inn) => (
+          <div key={inn.innings} className="impact-over-row">
+            <small style={{ color: getAccent(data, inn.team) }} title={inn.team}>{shortTeam(inn.team)}</small>
+            <div className="impact-bars" aria-label={`${inn.team} Impact by over`}>
+              {inn.by_over.map((o) => (
+                <span
+                  key={o.over}
+                  title={`Over ${o.over}: ${signed(o.impact, 2)}`}
+                  className={o.impact >= 0 ? 'up' : 'down'}
+                  style={{ height: `${Math.max(4, (Math.abs(o.impact) / maxOver) * 50)}%` }}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="impact-note">
+        Impact: runs added to the batting side&apos;s projected total, per over. Dots mark wickets.
+      </p>
+    </section>
   );
 };
 
@@ -362,23 +435,30 @@ const TopPerformers = ({ data, onSelect }) => (
   </section>
 );
 
+const hasImpact = (innings) => innings.batting.some((row) => row.impact != null);
+const impactClass = (value) => (value == null ? '' : value >= 0 ? 'impact-pos' : 'impact-neg');
+
 const FullInnings = ({ data, innings }) => (
   <section className="full-innings">
     <div className="full-innings-title">
       <b>{innings.batting_team} <span style={{ color: getAccent(data, innings.batting_team) }}>{innings.score.runs}/{innings.score.wickets}</span></b>
       <span>RR {innings.score.run_rate}</span>
     </div>
-    <div className="mini-table header"><span>BATTER</span><span>R</span><span>B</span><span>4s</span><span>6s</span></div>
+    <div className={`mini-table header${hasImpact(innings) ? ' with-impact' : ''}`}>
+      <span>BATTER</span><span>R</span><span>B</span><span>4s</span><span>6s</span>{hasImpact(innings) && <span>IMP</span>}
+    </div>
     {innings.batting.map((row) => (
-      <div className="mini-table" key={row.id}>
+      <div className={`mini-table${hasImpact(innings) ? ' with-impact' : ''}`} key={row.id}>
         <span><b>{row.name}</b><small>{row.dismissal}</small></span>
         <span>{row.runs}</span><span>{row.balls}</span><span>{row.fours}</span><span>{row.sixes}</span>
+        {hasImpact(innings) && <span className={impactClass(row.impact)}>{row.impact != null ? signed(row.impact) : ''}</span>}
       </div>
     ))}
     <div className="section-label">{innings.bowling_team} bowling</div>
     {innings.bowling.map((row) => (
       <div className="bowling-mini-row" key={row.id}>
         <span>{row.name}</span><em>{row.figures}</em><b>{row.wickets}</b>
+        {row.impact != null && <i className={impactClass(row.impact)}>{signed(row.impact)}</i>}
       </div>
     ))}
   </section>

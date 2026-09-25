@@ -167,12 +167,27 @@ const isPlayerNameColumn = (key) => {
   return PLAYER_NAME_KEYS.has(normalized) || normalized.endsWith('_player');
 };
 
-const DEFAULT_SELECTED_METRIC_COLUMNS = ['balls', 'runs', 'strike_rate'];
+const DEFAULT_SELECTED_METRIC_COLUMNS = ['balls', 'runs', 'strike_rate', 'impact'];
 
-const buildInitialMetricColumns = ({ allColumns, groupBy, recommendedColumns }) => {
-  const metricColumns = allColumns.filter(col =>
-    !groupBy.includes(col) && !['is_summary', 'summary_level'].includes(col)
-  );
+const PRIMER_METRIC_COLUMNS = new Set([
+  'impact', 'impact_per_100', 'impact_per_innings', 'raa', 'raa_per_100', 'waa', 'waa_per_100', 'wpa', 'avg_leverage',
+]);
+
+// Bookkeeping fields that ride along with the T20 Primer metrics; never table columns.
+const INTERNAL_COLUMNS = new Set(['is_summary', 'summary_level', 'metric_balls', 'metrics_perspective']);
+
+// Columns worth offering: not a grouping key, not internal, and not empty in every row (the
+// Primer metrics are null outside men's T20, and an all-blank Impact column is just noise).
+const offerableColumns = (rows, groupBy) => {
+  if (!rows.length) return [];
+  return Object.keys(rows[0]).filter((col) => (
+    !groupBy.includes(col)
+    && !INTERNAL_COLUMNS.has(col)
+    && rows.some((row) => row[col] !== null && row[col] !== undefined)
+  ));
+};
+
+const buildInitialMetricColumns = ({ metricColumns, recommendedColumns }) => {
 
   if (metricColumns.length === 0) {
     return [];
@@ -403,9 +418,7 @@ const QueryResults = ({
   // Available metric columns for mobile column selector
   const availableMetricColumns = useMemo(() => {
     if (displayData.length === 0 || !isGrouped) return [];
-    return Object.keys(displayData[0]).filter(col =>
-      !groupBy.includes(col) && !['is_summary', 'summary_level'].includes(col)
-    );
+    return offerableColumns(displayData, groupBy);
   }, [displayData, isGrouped, groupBy]);
 
   useEffect(() => {
@@ -414,8 +427,7 @@ const QueryResults = ({
     }
 
     const initialColumns = buildInitialMetricColumns({
-      allColumns: Object.keys(displayData[0]),
-      groupBy,
+      metricColumns: offerableColumns(displayData, groupBy),
       recommendedColumns,
     });
     setSelectedMetricColumns(initialColumns);
@@ -818,7 +830,18 @@ const QueryResults = ({
       'balls_per_wicket': 'B/W',
       'overs': 'Overs',
       'innings_count': 'Innings',
-      'balls_faced': 'Balls'
+      'balls_faced': 'Balls',
+      // T20 Primer metrics (see Credits / the Primer): runs added, runs & wickets above average,
+      // win probability added, and how much was at stake on the average ball.
+      'impact': 'Impact',
+      'impact_per_100': 'Imp/100',
+      'impact_per_innings': 'Imp/Inns',
+      'raa': 'RAA',
+      'raa_per_100': 'RAA/100',
+      'waa': 'WAA',
+      'waa_per_100': 'WAA/100',
+      'wpa': 'WPA',
+      'avg_leverage': 'Leverage',
     };
     
     return displayNames[key] || key.split('_').map(word => 
@@ -1147,6 +1170,15 @@ const QueryResults = ({
       )}
 
       {/* Data Table with Sorting */}
+      {isGrouped && visibleColumns.some((col) => PRIMER_METRIC_COLUMNS.has(col)) && (
+        <Typography sx={{ color: qbColors.textLo, fontSize: 12, mb: 1, lineHeight: 1.5 }}>
+          <b style={{ color: qbColors.textMed }}>Impact</b> = runs added to the team&apos;s projected total ·{' '}
+          <b style={{ color: qbColors.textMed }}>RAA / WAA</b> = runs and wickets above average for the game state ·{' '}
+          <b style={{ color: qbColors.textMed }}>WPA</b> = win probability added. Men&apos;s T20 only,{' '}
+          {displayData[0]?.metrics_perspective === 'bowling' ? 'from the bowling side' : 'from the batting side'}; method from
+          Himanish Ganjoo&apos;s <i>T20 Metrics: A Primer</i>.
+        </Typography>
+      )}
       <Paper sx={{ ...qbCardSx, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
         <ScrollTable sx={{ maxHeight: isMobile ? 400 : 600, bgcolor: qbColors.surface1, overflowX: 'auto' }}>
           <Table stickyHeader size={isMobile ? "small" : "medium"} sx={{ minWidth: Math.max(visibleColumns.length * (isMobile ? 96 : 124), isMobile ? 520 : 760) }}>

@@ -7,6 +7,7 @@ with support for filtering, grouping, and aggregation.
 
 from sqlalchemy.sql import text
 from fastapi import HTTPException
+import os
 from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import date
 from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
@@ -3135,6 +3136,33 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
     }
 
 
+def _primer_metric_fields(values, innings_count, perspective: str) -> Dict:
+    """Totals and rates for the T20 Primer metrics on one grouped row (None where uncovered)."""
+    metric_balls, impact, raa, waa, wpa, avg_leverage = values
+    metric_balls = int(metric_balls or 0)
+    if not metric_balls:
+        return {"metric_balls": 0, "metrics_perspective": perspective, "impact": None, "impact_per_100": None,
+                "impact_per_innings": None, "raa": None, "raa_per_100": None, "waa": None, "waa_per_100": None,
+                "wpa": None, "avg_leverage": None}
+
+    def rate(total):
+        return round(float(total) * 100.0 / metric_balls, 2) if total is not None else None
+
+    return {
+        "metric_balls": metric_balls,
+        "metrics_perspective": perspective,
+        "impact": round(float(impact), 2) if impact is not None else None,
+        "impact_per_100": rate(impact),
+        "impact_per_innings": round(float(impact) / innings_count, 2) if impact is not None and innings_count else None,
+        "raa": round(float(raa), 2) if raa is not None else None,
+        "raa_per_100": rate(raa),
+        "waa": round(float(waa), 3) if waa is not None else None,
+        "waa_per_100": rate(waa),
+        "wpa": round(float(wpa), 3) if wpa is not None else None,
+        "avg_leverage": round(float(avg_leverage), 3) if avg_leverage is not None else None,
+    }
+
+
 def handle_grouped_query(
     where_clause, params, group_by, min_balls, max_balls,
     min_runs, max_runs, limit, offset, db, filters_applied=None,
@@ -3250,6 +3278,7 @@ def handle_grouped_query(
     # (`*_through_ball`), and the outer SUM() then aggregates those running
     # totals across innings/spells.
     if cumulative_source:
+        metrics_enabled = False
         src = cumulative_source  # "bs" (ball_seq) or "ss" (spell_seq)
         runs_column = "runs_through_ball" if use_runs_off_bat_only else "score_through_ball"
         runs_calculation = f"SUM({src}.{runs_column})"
@@ -3261,7 +3290,10 @@ def handle_grouped_query(
             f"{src}.fours_through_ball, "
             f"{src}.sixes_through_ball, "
             f"{src}.controlled_through_ball, "
-            f"{src}.control_balls_through_ball"
+            f"{src}.control_balls_through_ball, "
+            # Primer metrics are per-ball quantities; running totals of them are not defined here.
+            "NULL::real AS m_raa, NULL::real AS m_waa, NULL::real AS m_impact, NULL::real AS m_wpa, "
+            "NULL::real AS m_leverage, 1 AS wide"
         )
         dots_expr = "SUM(s.dots_through_ball)"
         boundaries_expr = "SUM(s.boundaries_through_ball)"
@@ -3270,10 +3302,15 @@ def handle_grouped_query(
         control_num_expr = "SUM(s.controlled_through_ball)"
         control_den_expr = "SUM(s.control_balls_through_ball)"
     else:
+        metrics_enabled = os.environ.get("QB_PRIMER_METRICS", "1") != "0"
         runs_calculation = "SUM(dd.batruns)" if use_runs_off_bat_only else "SUM(dd.score)"
         balls_expr = "COUNT(*)"
         wickets_expr = "SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END)"
-        stage2_extra_select = "dd.batruns, dd.wide, dd.noball, dd.control"
+        stage2_extra_select = "dd.batruns, dd.wide, dd.noball, dd.control, " + (
+            "bm.raa AS m_raa, bm.waa AS m_waa, bm.impact AS m_impact, bm.wpa AS m_wpa, bm.leverage AS m_leverage"
+            if metrics_enabled else
+            "NULL::real AS m_raa, NULL::real AS m_waa, NULL::real AS m_impact, NULL::real AS m_wpa, NULL::real AS m_leverage"
+        )
         dots_expr = "SUM(CASE WHEN s.batruns = 0 AND s.wide = 0 AND s.noball = 0 THEN 1 ELSE 0 END)"
         boundaries_expr = "SUM(CASE WHEN s.batruns IN (4, 6) THEN 1 ELSE 0 END)"
         fours_expr = "SUM(CASE WHEN s.batruns = 4 THEN 1 ELSE 0 END)"
@@ -3325,6 +3362,24 @@ def handle_grouped_query(
     final_select_groups = ", ".join(f"q.{col} as {col}" for col in group_by)
     final_group_by_carry = ", ".join(f"q.{col}" for col in group_by)
 
+    # T20 Primer metrics (services/metrics, table ball_metrics). Stored from the batting side;
+    # grouped by bowler (and not batter) they are shown from the bowling side, as the Primer's
+    # bowling tables are. Wides are left out, as in the Primer. metric_balls counts the balls
+    # that have metrics (men's T20 only for now), so per-100 rates stay honest when a group
+    # mixes covered and uncovered deliveries.
+    # QB_PRIMER_METRICS=0 drops the join (kill switch if it ever costs too much on a big scan).
+    metrics_join = "LEFT JOIN ball_metrics bm ON bm.delivery_id = dd.id" if metrics_enabled else ""
+    metric_sign = -1 if ("bowler" in group_by and "batter" not in group_by) else 1
+    metrics_perspective = "bowling" if metric_sign == -1 else "batting"
+    metric_ball = "s.wide = 0 AND s.m_impact IS NOT NULL"
+    metric_selects = f"""
+            SUM(CASE WHEN {metric_ball} THEN 1 ELSE 0 END) as metric_balls,
+            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_impact END) as impact,
+            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_raa END) as raa,
+            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_waa END) as waa,
+            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_wpa END) as wpa,
+            AVG(CASE WHEN {metric_ball} THEN s.m_leverage END) as avg_leverage"""
+
     combined_query = f"""
         WITH {bat_pos_cte}{computed_cte_prefix}all_groups AS (
             SELECT
@@ -3365,6 +3420,7 @@ def handle_grouped_query(
             {pa_join}
             {computed_join}
             {join_clause}
+            {metrics_join}
             {where_clause}
         )
         SELECT
@@ -3387,7 +3443,8 @@ def handle_grouped_query(
                 ELSE 0 END as boundary_percentage,
             CASE WHEN {control_den_expr} > 0
                 THEN (CAST({control_num_expr} AS DECIMAL) * 100.0) / {control_den_expr}
-                ELSE NULL END as control_percentage
+                ELSE NULL END as control_percentage,
+            {metric_selects}
         FROM qualifying q
         JOIN stage2_source s ON {stage2_join_conditions}
         GROUP BY {final_group_by_carry}, q.balls, q.innings_count, q.runs, q.wickets,
@@ -3424,6 +3481,7 @@ def handle_grouped_query(
         dot_percentage = row[n + 15]
         boundary_percentage = row[n + 16]
         control_percentage = row[n + 17]
+        metric_balls = row[n + 18] or 0
 
         if len(group_by) > 1 and parent_balls is not None and parent_balls > 0:
             percent_balls = round((balls / parent_balls) * 100, 2)
@@ -3448,6 +3506,7 @@ def handle_grouped_query(
             "boundary_percentage": float(boundary_percentage) if boundary_percentage is not None else 0,
             "control_percentage": float(control_percentage) if control_percentage is not None else None,
             "percent_balls": percent_balls,
+            **_primer_metric_fields(row[n + 18:n + 24], innings_count, metrics_perspective),
         })
         formatted_results.append(row_dict)
 

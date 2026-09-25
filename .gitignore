@@ -87,3 +87,6 @@ data_exports/
 # ML model artifacts (trained locally, not deployed)
 *.joblib
 ml/models/
+# Exception: ml/models/primer/ (T20 Primer RAA/WAA models + DL params, ~11 MB) is force-added
+# because the nightly workflow scores new matches with them. A parent-dir ignore cannot be undone
+# with '!', so it is tracked via `git add -f`; tracked files stay tracked.

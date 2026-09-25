@@ -82,6 +82,12 @@ jobs:
             --skip-validation
           rm -f odi_bbb.csv
 
+      # T20 Primer metrics (Impact, RAA/WAA, win probability, WPA, leverage) for any
+      # men's T20 match loaded above that has none yet. Uses the stored model version
+      # (ml/models/primer + metric_models) and never refits, so older numbers stay put.
+      - name: "T20 (men): Primer metrics for new matches"
+        run: python scripts/compute_primer_metrics.py incremental --write
+
       # Women's T20 and Test legs are deliberately absent: their data has not
       # been loaded yet (phases B and C). Adding a leg here is what loads a
       # format for the first time, so do not add one before its chunk is ready.
@@ -102,4 +108,8 @@ jobs:
                   "FROM matches GROUP BY 1,2 ORDER BY 1,2"
               )):
                   print(f"{row.format}/{row.gender}: {row.matches} matches, latest {row.latest}")
+              size = c.execute(text("SELECT pg_database_size(current_database())")).scalar()
+              print(f"Database size: {size / 1e9:.2f} GB of the 10 GB Essential-1 cap")
+              if size > 8e9:
+                  print("::warning::Database is over 8 GB -- plan the next storage step before the 10 GB cap")
           PY

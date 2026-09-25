@@ -58,6 +58,16 @@ ALLOWED_RECOMMENDED_COLUMNS = {
     "balls_per_wicket",
     "overs",
     "innings_count",
+    # T20 Primer metrics (men's T20 delivery-mode rows)
+    "impact",
+    "impact_per_100",
+    "impact_per_innings",
+    "raa",
+    "raa_per_100",
+    "waa",
+    "waa_per_100",
+    "wpa",
+    "avg_leverage",
 }
 VALID_RECOMMENDED_CHART_TYPES = {"bar", "scatter"}
 
@@ -154,6 +164,11 @@ Also return "recommended_columns": a list of 4-6 metric columns most relevant to
 Available metrics: balls, runs, strike_rate, average, wickets, dots, boundaries, fours, sixes,
 dot_percentage, boundary_percentage, economy, control_percentage, percent_balls, runs_conceded,
 balls_per_dismissal, balls_per_wicket, overs, innings_count, balls_faced.
+Contextual metrics (men's T20 only, delivery mode): impact (runs added to the team's projected
+total; impact_per_100, impact_per_innings), raa / raa_per_100 (runs above average for the game
+state), waa / waa_per_100 (wickets above average), wpa (win probability added), avg_leverage.
+Prefer these for questions about value, impact, "most valuable", "match-winning" or context
+("in pressure situations", "runs above average"); keep strike_rate/average for plain rate questions.
 Choose columns that best answer the user's question.
 
 ## Recommended chart

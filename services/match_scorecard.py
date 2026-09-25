@@ -111,9 +111,12 @@ def get_match_scorecard_service(match_id: str, min_balls: int, db: Session) -> D
     if data_source == "deliveries":
         warnings.append("Legacy deliveries data does not include wagon zone, line/length, shot, or control tracking.")
 
+    summary = _build_summary(match, innings)
+    summary["primer"] = _details_primer_series(match_id, innings, db) if use_details else None
+
     return {
         "match": _format_match(match, innings),
-        "summary": _build_summary(match, innings),
+        "summary": summary,
         "innings": innings,
         "meta": {
             "data_source": data_source,
@@ -369,9 +372,12 @@ def _details_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str
                 SUM(CASE WHEN b.batruns = 4 THEN 1 ELSE 0 END) AS fours,
                 SUM(CASE WHEN b.batruns = 6 THEN 1 ELSE 0 END) AS sixes,
                 SUM(CASE WHEN b.score = 0 AND COALESCE(b.wide, 0) = 0 AND COALESCE(b.noball, 0) = 0 THEN 1 ELSE 0 END) AS dots,
-                MAX(o.dismissal) AS dismissal
+                MAX(o.dismissal) AS dismissal,
+                SUM(CASE WHEN COALESCE(b.wide, 0) = 0 THEN bm.impact END) AS impact,
+                SUM(CASE WHEN COALESCE(b.wide, 0) = 0 THEN bm.wpa END) AS wpa
             FROM base b
             LEFT JOIN outs o ON o.inns = b.inns AND o.batter_name = b.batter_name
+            LEFT JOIN ball_metrics bm ON bm.delivery_id = b.id
             GROUP BY b.inns, b.batter_name
             ORDER BY b.inns, order_key
             """
@@ -442,9 +448,12 @@ def _details_bowling_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str
                 SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != ''
                           AND LOWER(dd.dismissal) NOT LIKE '%run out%' THEN 1 ELSE 0 END) AS wickets,
                 SUM(CASE WHEN dd.score = 0 AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) AS dots,
-                SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) AS legal_balls
+                SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) AS legal_balls,
+                -SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 THEN bm.impact END) AS impact,
+                -SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 THEN bm.wpa END) AS wpa
             FROM delivery_details dd
             LEFT JOIN alias_map pa ON LOWER(dd.bowl) = pa.name_key
+            LEFT JOIN ball_metrics bm ON bm.delivery_id = dd.id
             WHERE dd.p_match = :match_id AND dd.bowl IS NOT NULL
             GROUP BY dd.inns, COALESCE(pa.canonical_name, dd.bowl)
             ORDER BY dd.inns, MIN(dd.over * 100 + dd.ball)
@@ -975,6 +984,72 @@ def _score_payload(row: Dict[str, Any], batting_team: str, bowling_team: str) ->
     }
 
 
+def _primer_player_fields(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Impact and WPA for one player's innings (T20 Primer metrics); None where not computed."""
+    impact, wpa = row.get("impact"), row.get("wpa")
+    return {
+        "impact": round(float(impact), 1) if impact is not None else None,
+        "wpa": round(float(wpa), 3) if wpa is not None else None,
+    }
+
+
+def _details_primer_series(match_id: str, innings: List[Dict[str, Any]], db: Session) -> Optional[Dict[str, Any]]:
+    """
+    Match-level Primer views for the scorecard (the Primer's fig. 24 "Impact scorecard"):
+    Impact by over and in total for each innings, and the win-probability path from the side
+    batting first, one point per delivery. None when the match has no computed metrics.
+    """
+    rows = db.execute(
+        text(
+            """
+            SELECT dd.inns, dd.over, dd.ball, COALESCE(dd.out, '') AS out,
+                   bm.impact, bm.wp_before, bm.wp_after
+            FROM delivery_details dd
+            JOIN ball_metrics bm ON bm.delivery_id = dd.id
+            WHERE dd.p_match = :match_id AND dd.inns IN (1, 2)
+            ORDER BY dd.inns, dd.over, dd.ball
+            """
+        ),
+        {"match_id": match_id},
+    ).mappings().all()
+    if not rows:
+        return None
+
+    by_innings: Dict[int, Dict[int, float]] = {}
+    for row in rows:
+        overs = by_innings.setdefault(int(row["inns"]), {})
+        overs[int(row["over"])] = overs.get(int(row["over"]), 0.0) + float(row["impact"] or 0.0)
+
+    # Win probability of the side batting first: innings 1 is already theirs, innings 2 flips.
+    points = [round(float(rows[0]["wp_before"]), 4)]
+    wickets = []
+    for index, row in enumerate(rows, start=1):
+        p = float(row["wp_after"])
+        points.append(round(p if int(row["inns"]) == 1 else 1.0 - p, 4))
+        if str(row["out"]).lower() == "true":
+            wickets.append(index)
+    innings_break = sum(1 for row in rows if int(row["inns"]) == 1)
+
+    teams = {item["innings"]: item["batting_team"] for item in innings}
+    return {
+        "innings": [
+            {
+                "innings": inns,
+                "team": teams.get(inns),
+                "impact": round(sum(overs.values()), 1),
+                "by_over": [{"over": over + 1, "impact": round(value, 2)} for over, value in sorted(overs.items())],
+            }
+            for inns, overs in sorted(by_innings.items())
+        ],
+        "win_probability": {
+            "team": teams.get(1),
+            "points": points,
+            "wickets": wickets,
+            "innings_break": innings_break,
+        },
+    }
+
+
 def _group_player_rows(rows: Iterable[Dict[str, Any]], role: str) -> Dict[int, List[Dict[str, Any]]]:
     out: Dict[int, List[Dict[str, Any]]] = {}
     for row in rows:
@@ -994,6 +1069,7 @@ def _group_player_rows(rows: Iterable[Dict[str, Any]], role: str) -> Dict[int, L
             "sixes": int(row.get("sixes") or 0),
             "dots": int(row.get("dots") or 0),
             "strike_rate": _sr(runs, balls),
+            **_primer_player_fields(row),
         }
         out.setdefault(int(row["innings"]), []).append(item)
     return out
@@ -1020,6 +1096,7 @@ def _group_bowling_rows(rows: Iterable[Dict[str, Any]]) -> Dict[int, List[Dict[s
             "wickets": wickets,
             "economy": _econ(runs, legal_balls),
             "dots": int(row.get("dots") or 0),
+            **_primer_player_fields(row),
         }
         out.setdefault(int(row["innings"]), []).append(item)
     return out

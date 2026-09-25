@@ -46,6 +46,7 @@ const ROUTES = [
   ['credits', '/credits'],
   ['fantasy', '/fantasy-planner'],
   ['scorecard', '/scorecard/1530204'],
+  ['scorecard_t20', '/scorecard/1473438'],
   ['preview_odi', '/venue?venue=Kingsmead%2C%20Durban&team1=Australia&team2=South%20Africa&includeInternational=true&topTeams=10&autoload=true&fmt=mens-odi'],
 ];
 const W = Number(process.env.WIDTH || 390);

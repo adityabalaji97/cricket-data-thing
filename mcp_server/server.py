@@ -159,7 +159,12 @@ _METRIC_ORDER = [
     "average", "strike_rate", "economy", "bowling_strike_rate", "balls_per_dismissal",
     "dot_percentage", "boundary_percentage", "control_percentage", "fours", "sixes", "dots",
     "boundaries", "percent_balls",
+    # T20 Primer metrics (men's T20 only; null elsewhere).
+    "impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "waa", "waa_per_100",
+    "wpa", "avg_leverage",
 ]
+# Bookkeeping that rides along with the Primer metrics; reported once in metadata, not per row.
+_ROW_INTERNAL = {"metric_balls", "metrics_perspective"}
 _SEQUENTIAL_KEYS = {"year", "over", "ball", "ball_in_over", "ball_in_spell", "innings", "batting_position"}
 # The first of these present is charted by default, per query mode.
 _DEFAULT_CHART_METRIC = {
@@ -322,8 +327,15 @@ def _title(params: Dict[str, Any], group_by: List[str]) -> str:
     return subject
 
 
-def _markdown_table(columns: List[str], rows: List[Dict[str, Any]], max_rows: int = 25) -> str:
-    shown = columns[:10]
+def _markdown_table(columns: List[str], rows: List[Dict[str, Any]], max_rows: int = 25,
+                    must_show: Optional[List[str]] = None) -> str:
+    # The first ten columns, plus whatever the rows were ranked or charted by -- otherwise a
+    # "ranked by wpa" table could hide the very numbers it was ranked on.
+    extra = []
+    for c in must_show or []:
+        if c and c in columns and c not in columns[:10] and c not in extra:
+            extra.append(c)
+    shown = columns[:10] + extra
     lines = ["| " + " | ".join(shown) + " |", "|" + "---|" * len(shown)]
     for row in rows[:max_rows]:
         lines.append("| " + " | ".join("" if row.get(c) is None else str(row.get(c)) for c in shown) + " |")
@@ -369,7 +381,12 @@ apps = Apps()
         "Run a Hindsight query-builder query over ball-by-ball cricket data and return aggregated "
         "rows (runs, balls, strike rate, average, dot %, boundary %, wickets, economy...) plus an "
         "interactive chart/table and a link to open it on the website. Use find_entities for "
-        "exact names and get_query_options for filter values first."
+        "exact names and get_query_options for filter values first. Men's T20 rows also carry "
+        "contextual metrics from Ganjoo's T20 Primer: impact (runs added to the team's projected "
+        "total, DL-based; impact_per_100 per 100 balls), raa/waa (runs and wickets above average "
+        "for the game state), wpa (win probability added, in matches won) and avg_leverage (how "
+        "much was at stake per ball). They are from the batting side, or the bowling side when "
+        "grouped by bowler; use sort_by='impact' or 'wpa' for 'most valuable' questions."
     ),
     annotations=READ_ONLY,
 )
@@ -468,7 +485,8 @@ def query_cricket_data(
     raw_rows = result.get("data") or []
     # A bowling question: bowlers are filtered, or rows are split by bowler, and no batter is picked.
     bowler_centric = (bool(bowlers) or "bowler" in group_by) and not batters
-    rows = [{k: _normalise_value(v) for k, v in row.items()} for row in raw_rows]
+    metrics_perspective = next((r.get("metrics_perspective") for r in raw_rows if r.get("metric_balls")), None)
+    rows = [{k: _normalise_value(v) for k, v in row.items() if k not in _ROW_INTERNAL} for row in raw_rows]
     if bowler_centric:
         rows = [_with_economy(row, query_mode) for row in rows]
     meta = result.get("metadata") or {}
@@ -511,6 +529,7 @@ def query_cricket_data(
         "hindsight_url": url,
         "warnings": warnings,
         "note": " ".join(warnings) if warnings else None,
+        "metrics_perspective": metrics_perspective,
     }
 
     if not rows:
@@ -519,7 +538,7 @@ def query_cricket_data(
         summary = (
             f"{structured['title']} — {len(rows)} of {total_rows} rows"
             + (f", ranked by {sort_by}" if sort_by else "") + ".\n\n"
-            + _markdown_table(columns, rows)
+            + _markdown_table(columns, rows, must_show=[sort_by, chart_spec.get("metric")])
             + f"\n\nOpen this query on Hindsight: {url}"
         )
         if warnings:

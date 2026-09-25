@@ -24,6 +24,7 @@ import { qbButtonSx, qbCardSx, qbColors, qbFonts } from './queryBuilderTheme';
 
 const EXAMPLE_QUERIES = [
   "kohli vs spin since 2023",
+  "most impactful IPL 2026 batters",
   "csk powerplay batting over the years",
   "MS Dhoni in winning vs losing chases in IPL",
   "csk in chasing wins since 2018",
