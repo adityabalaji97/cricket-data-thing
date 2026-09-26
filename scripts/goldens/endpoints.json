@@ -145,5 +145,20 @@
       ],
       "limit": 100
     }
+  },
+  {
+    "name": "game_guess_innings",
+    "path": "/games/guess-innings",
+    "params": {},
+    "status_only": true
+  },
+  {
+    "name": "game_player_journey",
+    "path": "/games/player-journey",
+    "params": {
+      "include_answer": "true",
+      "min_seasons": "3"
+    },
+    "status_only": true
   }
 ]

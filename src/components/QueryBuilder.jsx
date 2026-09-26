@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { track } from '../utils/analytics';
 import {
   Box,
   Paper,
@@ -281,6 +282,7 @@ const QueryBuilder = ({ isMobile }) => {
   };
   
   const executeQuery = async () => {
+    track('query_run', { group_by: groupBy.join(',') || null });
     try {
       setLoading(true);
       setError(null);

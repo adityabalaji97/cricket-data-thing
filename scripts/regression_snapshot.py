@@ -329,6 +329,9 @@ def fetch(base_url: str, endpoint: dict[str, Any], timeout: int) -> dict[str, An
     try:
         with urllib.request.urlopen(url, timeout=timeout) as response:
             body = json.loads(response.read().decode("utf-8"))
+        if endpoint.get("status_only"):
+            # Random-by-design endpoints (the games): only "does it answer" is comparable.
+            return {"status": response.status}
         return {"status": response.status, "body": strip_volatile(body)}
     except urllib.error.HTTPError as exc:  # noqa: PERF203
         return {"status": exc.code, "error": exc.read().decode("utf-8")[:2000]}
@@ -403,6 +406,8 @@ def cmd_capture(args: argparse.Namespace) -> int:
         if status != 200:
             failures += 1
             print(f"  !! {endpoint['name']:32} status={status}")
+        elif "body" not in result:
+            print(f"  ok {endpoint['name']:32} status only")
         else:
             size = len(json.dumps(result["body"]))
             print(f"  ok {endpoint['name']:32} {size:>9,} bytes")

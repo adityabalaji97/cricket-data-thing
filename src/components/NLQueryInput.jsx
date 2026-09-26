@@ -1,4 +1,5 @@
 import React, { useImperativeHandle, useState } from 'react';
+import { track } from '../utils/analytics';
 import {
   Box,
   Paper,
@@ -55,6 +56,7 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
   const examplesVisible = showExamples && !externalCollapsed;
 
   const submitQuery = async (queryText) => {
+    track('nl_search', { example: Boolean(queryText) });
     const q = (queryText || query).trim();
     if (!q || loading) return null;
 

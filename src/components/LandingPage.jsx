@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { track } from '../utils/analytics';
 import {
   Box,
   Button,
@@ -517,6 +518,7 @@ const ConnectorSection = () => {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(CONNECTOR_URL);
+      track('connector_copy');
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {

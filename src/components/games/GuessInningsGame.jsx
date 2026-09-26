@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { track } from '../../utils/analytics';
 import {
   Box,
   Button,
@@ -268,6 +269,7 @@ const GuessInningsGame = ({ isMobile = false }) => {
     newStats.totalHints += hintsUsed;
     setStats(newStats);
     saveStats(newStats);
+    track('game_finish', { game: 'guess_innings', result, hints: hintsUsed });
   };
 
   const checkGuess = () => {
@@ -332,6 +334,7 @@ Play: ${getGameUrl()}`;
   };
 
   const handleShare = async () => {
+    track('share', { kind: 'game', game: 'guess_innings' });
     // Show share card temporarily for capture
     setShowShareCard(true);
 
@@ -375,6 +378,7 @@ Play: ${getGameUrl()}`;
   };
 
   const fetchGame = async () => {
+    track('game_start', { game: 'guess_innings' });
     setLoading(true);
     setError(null);
     setRevealAnswer(false);

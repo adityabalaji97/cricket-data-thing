@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { track } from '../../utils/analytics';
 import {
   Box,
   Button,
@@ -217,6 +218,7 @@ const PlayerJourneysGame = ({ isMobile = false }) => {
     newStats.totalHints += hintsUsed;
     setStats(newStats);
     saveStats(newStats);
+    track('game_finish', { game: 'player_journeys', result, hints: hintsUsed });
   };
 
   const handleKeyDown = (e) => {
@@ -276,6 +278,7 @@ Play: ${getGameUrl()}`;
   };
 
   const handleShare = async () => {
+    track('share', { kind: 'game', game: 'player_journeys' });
     try {
       const text = generateShareText();
       if (navigator.share) {
@@ -299,6 +302,7 @@ Play: ${getGameUrl()}`;
   };
 
   const fetchGame = async () => {
+    track('game_start', { game: 'player_journeys' });
     setLoading(true);
     setError(null);
     setRevealAnswer(false);

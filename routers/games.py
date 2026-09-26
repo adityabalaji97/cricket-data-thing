@@ -275,7 +275,7 @@ def get_player_journey(
                 0 AS wickets
             FROM delivery_details dd
             JOIN matches m ON dd.p_match = m.id
-            WHERE mcompetition IN {IPL_COMPETITIONS_SQL}'
+            WHERE m.competition IN {IPL_COMPETITIONS_SQL}
               AND dd.bat IS NOT NULL
               AND dd.team_bat IS NOT NULL
             GROUP BY dd.bat, dd.team_bat, EXTRACT(YEAR FROM m.date)

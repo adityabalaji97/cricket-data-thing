@@ -151,6 +151,26 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## Log entries (newest first)
 
+### 2026-09-26 — Growth G0: usage measurement, Player Journeys fix — Claude
+
+Growth plan (`~/.claude/plans/can-you-look-at-iterative-plum.md`): G0 foundations → G1 shareable
+links/OG → G2 daily games (Call It + Higher or Lower) → G3 AI "Hindsight Notes" → G4 MCP growth.
+* **Player Journeys 500 fixed** — my U1 edit left `routers/games.py:278` as
+  `WHERE mcompetition IN (...)'`. Both game endpoints are now status-only goldens
+  (`status_only` support in regression_snapshot.py; prod/local goldens hold `{"status": 200}`),
+  since the mocked-DB sanity tests can never catch SQL errors.
+* **Migration 004** (applied to prod): `mcp_call_log`, `app_events`. `services/usage_log.py`
+  writes them from one background thread (bounded queue, drop on failure, `USAGE_LOGGING=0` off).
+  MCP `_log_call` persists every call with a salted caller hash (USAGE_HASH_SALT).
+* **Web events**: `src/utils/analytics.js` (anon id in localStorage, 30-min session, DNT
+  honoured, batched `fetch keepalive` to `POST /events`); tracked: page_view (App route change),
+  query_run, nl_search, game_start/finish, share (games), connector_copy. The Vercel proxy now
+  forwards `x-vercel-ip-country` as `X-Client-Country` (no IP).
+* **Reports**: `GET /admin/usage` (X-Admin-Token = ADMIN_TOKEN config var; 404 if unset) and
+  `scripts/usage_report.py` share `services/usage_report.build_usage_report` (whole weeks).
+  Nightly workflow prunes raw rows older than 90 days.
+* tests/conftest.py sets USAGE_LOGGING=0 -- .env is prod, tests must not write usage rows.
+
 ### 2026-09-25 — Connector didn't "see" the Primer metrics — Claude
 
 A Claude chat using the connector answered that Hindsight has no Impact/RAA/WPA and approximated

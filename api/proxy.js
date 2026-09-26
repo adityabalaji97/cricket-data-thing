@@ -66,7 +66,8 @@ module.exports = (req, res) => {
     headers: {
       'Content-Type': 'application/json',
       'Origin': proxyOrigin,
-      // Copy other headers as needed
+      // Country from Vercel's edge (ISO code only), for usage stats; no IP is passed on.
+      'X-Client-Country': req.headers['x-vercel-ip-country'] || '',
     }
   };
 

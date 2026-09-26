@@ -117,14 +117,25 @@ def _log_call(tool: str, ctx: Optional[Context], args: Dict[str, Any], started: 
         headers = dict(ctx.headers or {}) if ctx is not None else {}
     except Exception:  # pragma: no cover - headers are best-effort
         pass
+    ms = int((time.monotonic() - started) * 1000)
+    client = headers.get("user-agent", "")[:80]
+    kept_args = {k: v for k, v in args.items() if v not in (None, [], "", False)}
     logger.info(json.dumps({
         "event": "mcp_call",
         "tool": tool,
         "outcome": outcome,
-        "ms": int((time.monotonic() - started) * 1000),
-        "client": headers.get("user-agent", "")[:80],
-        "args": {k: v for k, v in args.items() if v not in (None, [], "", False)},
+        "ms": ms,
+        "client": client,
+        "args": kept_args,
     }, default=str))
+    # Persisted too (mcp_call_log), from a background thread, so weekly usage survives Heroku's
+    # rolling log buffer. Never raises.
+    try:
+        from services.usage_log import log_mcp_call
+
+        log_mcp_call(tool, outcome, ms, client, headers.get("x-forwarded-for"), kept_args)
+    except Exception:  # pragma: no cover - logging must not affect the call
+        pass
 
 
 def _error(message: str) -> CallToolResult:

@@ -1,3 +1,9 @@
+import os
+
+# Usage logging writes from a background thread to whatever DATABASE_URL points at -- in this
+# repo .env is production. Tests must never add rows there.
+os.environ["USAGE_LOGGING"] = "0"
+
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock

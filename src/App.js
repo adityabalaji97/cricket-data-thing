@@ -43,6 +43,7 @@ import config from './config';
 import { getPreviewStartDate, TODAY } from './utils/dateDefaults';
 import { NAV_ITEMS, getCurrentTabForPath, getPageTitleForPath } from './navItems';
 import { MensT20Scope, useFormat } from './context/FormatContext';
+import { trackPageView } from './utils/analytics';
 
 const TEAM_NAME_TO_ABBREVIATION = {
   'chennai super kings': 'CSK',
@@ -128,6 +129,12 @@ const AppContent = () => {
   // Pinned, not the raw selection: a venue preview is one format's record at a ground,
   // and the venue endpoints reject 'ALL'.
   const { pinnedFormatParams, active: activeFormat, selectFormat } = useFormat();
+
+  // One page_view per route change (query-string changes on the same page count too: a
+  // new player or scorecard is a new view).
+  useEffect(() => {
+    trackPageView();
+  }, [location.pathname, location.search]);
 
   // In-app links carry ?fmt= so the destination opens in the right format (a Home fixture card
   // opens an ODI preview in ODI; a preview's Explore link opens the query builder in the same

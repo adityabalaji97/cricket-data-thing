@@ -88,6 +88,20 @@ jobs:
       - name: "T20 (men): Primer metrics for new matches"
         run: python scripts/compute_primer_metrics.py incremental --write
 
+      # Usage tables (migration 004) keep 90 days of raw rows; weekly reports need no more.
+      - name: Prune raw usage events
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          from sqlalchemy import create_engine, text
+          url = os.environ["DATABASE_URL"].replace("postgres://", "postgresql://", 1)
+          with create_engine(url).begin() as c:
+              for table in ("app_events", "mcp_call_log"):
+                  n = c.execute(text(f"DELETE FROM {table} WHERE ts < now() - interval '90 days'")).rowcount
+                  print(f"{table}: pruned {n}")
+          PY
+
       # Women's T20 and Test legs are deliberately absent: their data has not
       # been loaded yet (phases B and C). Adding a leg here is what loads a
       # format for the first time, so do not add one before its chunk is ready.
