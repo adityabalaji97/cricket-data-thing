@@ -97,6 +97,7 @@
             "dots": 2,
             "fours": 0,
             "id": "ben-dunk",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -105,7 +106,8 @@
             "runs": 0,
             "sixes": 0,
             "strike_rate": 0,
-            "team": "Hobart Hurricanes"
+            "team": "Hobart Hurricanes",
+            "wpa": null
           },
           {
             "balls": 14,
@@ -224,6 +226,7 @@
             "dots": 6,
             "fours": 1,
             "id": "tim-paine",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -232,7 +235,8 @@
             "runs": 12,
             "sixes": 0,
             "strike_rate": 86,
-            "team": "Hobart Hurricanes"
+            "team": "Hobart Hurricanes",
+            "wpa": null
           },
           {
             "balls": 24,
@@ -387,6 +391,7 @@
             "dots": 10,
             "fours": 1,
             "id": "alex-hales",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -395,7 +400,8 @@
             "runs": 29,
             "sixes": 1,
             "strike_rate": 121,
-            "team": "Hobart Hurricanes"
+            "team": "Hobart Hurricanes",
+            "wpa": null
           },
           {
             "balls": 14,
@@ -526,6 +532,7 @@
             "dots": 4,
             "fours": 0,
             "id": "george-bailey",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -534,7 +541,8 @@
             "runs": 12,
             "sixes": 0,
             "strike_rate": 86,
-            "team": "Hobart Hurricanes"
+            "team": "Hobart Hurricanes",
+            "wpa": null
           },
           {
             "balls": 3,
@@ -641,6 +649,7 @@
             "dots": 1,
             "fours": 0,
             "id": "evan-gulbis",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -649,7 +658,8 @@
             "runs": 2,
             "sixes": 0,
             "strike_rate": 67,
-            "team": "Hobart Hurricanes"
+            "team": "Hobart Hurricanes",
+            "wpa": null
           },
           {
             "balls": 37,
@@ -792,6 +802,7 @@
             "dots": 7,
             "fours": 5,
             "id": "jonathan-wells",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -800,7 +811,8 @@
             "runs": 58,
             "sixes": 2,
             "strike_rate": 157,
-            "team": "Hobart Hurricanes"
+            "team": "Hobart Hurricanes",
+            "wpa": null
           },
           {
             "balls": 4,
@@ -907,6 +919,7 @@
             "dots": 3,
             "fours": 0,
             "id": "daren-sammy",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -915,7 +928,8 @@
             "runs": 1,
             "sixes": 0,
             "strike_rate": 25,
-            "team": "Hobart Hurricanes"
+            "team": "Hobart Hurricanes",
+            "wpa": null
           },
           {
             "balls": 6,
@@ -1022,6 +1036,7 @@
             "dots": 3,
             "fours": 0,
             "id": "joe-mennie",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -1030,7 +1045,8 @@
             "runs": 3,
             "sixes": 0,
             "strike_rate": 50,
-            "team": "Hobart Hurricanes"
+            "team": "Hobart Hurricanes",
+            "wpa": null
           },
           {
             "balls": 9,
@@ -1149,6 +1165,7 @@
             "dots": 5,
             "fours": 0,
             "id": "ben-hilfenhaus",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -1157,7 +1174,8 @@
             "runs": 5,
             "sixes": 0,
             "strike_rate": 56,
-            "team": "Hobart Hurricanes"
+            "team": "Hobart Hurricanes",
+            "wpa": null
           },
           {
             "balls": 9,
@@ -1276,6 +1294,7 @@
             "dots": 2,
             "fours": 0,
             "id": "timm-van-der-gugten",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -1284,7 +1303,8 @@
             "runs": 9,
             "sixes": 0,
             "strike_rate": 100,
-            "team": "Hobart Hurricanes"
+            "team": "Hobart Hurricanes",
+            "wpa": null
           }
         ],
         "batting_team": "Hobart Hurricanes",
@@ -1416,6 +1436,7 @@
             "economy": 6.5,
             "figures": "2.0-0-13",
             "id": "kane-richardson",
+            "impact": null,
             "legal_balls": 12,
             "links": {
               "batting_card_id": null
@@ -1425,7 +1446,8 @@
             "runs": 13,
             "style": "RM",
             "team": "Adelaide Strikers",
-            "wickets": 1
+            "wickets": 1,
+            "wpa": null
           },
           {
             "balls": 24,
@@ -1582,6 +1604,7 @@
             "economy": 5.5,
             "figures": "4.0-0-22",
             "id": "craig-simmons",
+            "impact": null,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -1591,7 +1614,8 @@
             "runs": 22,
             "style": "NaN",
             "team": "Adelaide Strikers",
-            "wickets": 0
+            "wickets": 0,
+            "wpa": null
           },
           {
             "balls": 24,
@@ -1776,6 +1800,7 @@
             "economy": 5.8,
             "figures": "4.0-0-23",
             "id": "shaun-tait",
+            "impact": null,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -1785,7 +1810,8 @@
             "runs": 23,
             "style": "RF",
             "team": "Adelaide Strikers",
-            "wickets": 3
+            "wickets": 3,
+            "wpa": null
           },
           {
             "balls": 19,
@@ -1956,6 +1982,7 @@
             "economy": 8.7,
             "figures": "3.0-0-26",
             "id": "ben-laughlin",
+            "impact": null,
             "legal_balls": 18,
             "links": {
               "batting_card_id": null
@@ -1965,7 +1992,8 @@
             "runs": 26,
             "style": "RM",
             "team": "Adelaide Strikers",
-            "wickets": 2
+            "wickets": 2,
+            "wpa": null
           },
           {
             "balls": 25,
@@ -2122,6 +2150,7 @@
             "economy": 4.8,
             "figures": "4.0-0-19",
             "id": "adam-zampa",
+            "impact": null,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -2131,7 +2160,8 @@
             "runs": 19,
             "style": "RL",
             "team": "Adelaide Strikers",
-            "wickets": 1
+            "wickets": 1,
+            "wpa": null
           },
           {
             "balls": 18,
@@ -2288,6 +2318,7 @@
             "economy": 11.0,
             "figures": "3.0-0-33",
             "id": "johan-botha",
+            "impact": null,
             "legal_balls": 18,
             "links": {
               "batting_card_id": null
@@ -2297,7 +2328,8 @@
             "runs": 33,
             "style": "RO",
             "team": "Adelaide Strikers",
-            "wickets": 1
+            "wickets": 1,
+            "wpa": null
           }
         ],
         "bowling_team": "Adelaide Strikers",
@@ -2492,6 +2524,7 @@
             "dots": 13,
             "fours": 4,
             "id": "tim-ludeman",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -2500,7 +2533,8 @@
             "runs": 54,
             "sixes": 4,
             "strike_rate": 164,
-            "team": "Adelaide Strikers"
+            "team": "Adelaide Strikers",
+            "wpa": null
           },
           {
             "balls": 17,
@@ -2619,6 +2653,7 @@
             "dots": 10,
             "fours": 3,
             "id": "craig-simmons",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -2627,7 +2662,8 @@
             "runs": 22,
             "sixes": 1,
             "strike_rate": 129,
-            "team": "Adelaide Strikers"
+            "team": "Adelaide Strikers",
+            "wpa": null
           },
           {
             "balls": 36,
@@ -2770,6 +2806,7 @@
             "dots": 14,
             "fours": 1,
             "id": "jono-dean",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -2778,7 +2815,8 @@
             "runs": 54,
             "sixes": 6,
             "strike_rate": 150,
-            "team": "Adelaide Strikers"
+            "team": "Adelaide Strikers",
+            "wpa": null
           },
           {
             "balls": 2,
@@ -2873,6 +2911,7 @@
             "dots": 0,
             "fours": 0,
             "id": "kieron-pollard",
+            "impact": null,
             "links": {
               "bowling_card_id": null
             },
@@ -2881,7 +2920,8 @@
             "runs": 7,
             "sixes": 1,
             "strike_rate": 350,
-            "team": "Adelaide Strikers"
+            "team": "Adelaide Strikers",
+            "wpa": null
           }
         ],
         "batting_team": "Adelaide Strikers",
@@ -3013,6 +3053,7 @@
             "economy": 11.0,
             "figures": "3.0-0-33",
             "id": "timm-van-der-gugten",
+            "impact": null,
             "legal_balls": 18,
             "links": {
               "batting_card_id": null
@@ -3022,7 +3063,8 @@
             "runs": 33,
             "style": "RM",
             "team": "Hobart Hurricanes",
-            "wickets": 0
+            "wickets": 0,
+            "wpa": null
           },
           {
             "balls": 12,
@@ -3137,6 +3179,7 @@
             "economy": 9.0,
             "figures": "2.0-0-18",
             "id": "joe-mennie",
+            "impact": null,
             "legal_balls": 12,
             "links": {
               "batting_card_id": null
@@ -3146,7 +3189,8 @@
             "runs": 18,
             "style": "RM",
             "team": "Hobart Hurricanes",
-            "wickets": 0
+            "wickets": 0,
+            "wpa": null
           },
           {
             "balls": 18,
@@ -3275,6 +3319,7 @@
             "economy": 3.3,
             "figures": "3.0-0-10",
             "id": "daren-sammy",
+            "impact": null,
             "legal_balls": 18,
             "links": {
               "batting_card_id": null
@@ -3284,7 +3329,8 @@
             "runs": 10,
             "style": "RM",
             "team": "Hobart Hurricanes",
-            "wickets": 1
+            "wickets": 1,
+            "wpa": null
           },
           {
             "balls": 9,
@@ -3413,6 +3459,7 @@
             "economy": 21.3,
             "figures": "1.3-0-32",
             "id": "ben-hilfenhaus",
+            "impact": null,
             "legal_balls": 9,
             "links": {
               "batting_card_id": null
@@ -3422,7 +3469,8 @@
             "runs": 32,
             "style": "RM",
             "team": "Hobart Hurricanes",
-            "wickets": 0
+            "wickets": 0,
+            "wpa": null
           },
           {
             "balls": 24,
@@ -3537,6 +3585,7 @@
             "economy": 10.8,
             "figures": "4.0-0-43",
             "id": "cameron-boyce",
+            "impact": null,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -3546,7 +3595,8 @@
             "runs": 43,
             "style": "RL",
             "team": "Hobart Hurricanes",
-            "wickets": 1
+            "wickets": 1,
+            "wpa": null
           },
           {
             "balls": 7,
@@ -3661,6 +3711,7 @@
             "economy": 5.0,
             "figures": "1.0-0-5",
             "id": "evan-gulbis",
+            "impact": null,
             "legal_balls": 6,
             "links": {
               "batting_card_id": null
@@ -3670,7 +3721,8 @@
             "runs": 5,
             "style": "RM",
             "team": "Hobart Hurricanes",
-            "wickets": 0
+            "wickets": 0,
+            "wpa": null
           }
         ],
         "bowling_team": "Hobart Hurricanes",
@@ -3786,6 +3838,7 @@
       ],
       "moment": null,
       "player_of_match": "TP Ludeman",
+      "primer": null,
       "top_performers": [
         {
           "innings": 1,
@@ -3831,7 +3884,7 @@
       "worm": [
         {
           "innings": 1,
-          "points": "0.00,58.76 5.26,56.71 10.53,52.59 15.79,48.88 21.05,43.12 26.32,42.71 31.58,41.47 36.84,39.82 42.11,38.59 47.37,34.47 52.63,32.82 57.89,31.59 63.16,30.35 68.42,28.29 73.68,27.06 78.95,24.18 84.21,17.59 89.47,15.53 94.74,11.82 100.00,4.00",
+          "points": "0.00,60.00 5.00,58.81 10.00,56.82 15.00,52.85 20.00,49.28 25.00,43.72 30.00,43.32 35.00,42.13 40.00,40.54 45.00,39.35 50.00,35.38 55.00,33.79 60.00,32.60 65.00,31.40 70.00,29.42 75.00,28.23 80.00,25.45 85.00,19.09 90.00,17.11 95.00,13.53 100.00,5.99",
           "team": "Hobart Hurricanes",
           "values": [
             3,
@@ -3858,7 +3911,7 @@
         },
         {
           "innings": 2,
-          "points": "0.00,58.41 5.26,56.43 10.53,50.87 15.79,45.70 21.05,44.91 26.32,37.36 31.58,36.17 36.84,30.21 42.11,28.23 47.37,24.65 52.63,23.46 57.89,20.28 63.16,18.30 68.42,9.16 73.68,4.00 78.95,4.00 84.21,4.00 89.47,4.00 94.74,4.00 100.00,4.00",
+          "points": "0.00,60.00 5.00,58.41 10.00,56.43 15.00,50.87 20.00,45.70 25.00,44.91 30.00,37.36 35.00,36.17 40.00,30.21 45.00,28.23 50.00,24.65 55.00,23.46 60.00,20.28 65.00,18.30 70.00,9.16 75.00,4.00 80.00,4.00 85.00,4.00 90.00,4.00 95.00,4.00 100.00,4.00",
           "team": "Adelaide Strikers",
           "values": [
             4,
@@ -3883,6 +3936,12 @@
             141
           ]
         }
+      ],
+      "worm_axis": [
+        5,
+        10,
+        15,
+        20
       ]
     }
   }

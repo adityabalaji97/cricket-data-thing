@@ -44,8 +44,8 @@
       {
         "bullets": [
           "Winning-template pressure point is death overs (43 runs on average in successful chases).",
-          "Top picks \u2014 Rangpur Riders: Mahmudullah (67 exp pts, conf 0.90), Akif Javed (61 exp pts, conf 0.90); Sylhet Titans: Shohidul Islam (74 exp pts, conf 0.60), Azmatullah Omarzai (54 exp pts, conf 0.90).",
-          "Key edges: Khushdil Shah vs Nasum Ahmed (13b, SR 277); Nasum Ahmed threat (356b, 15 wkts, econ 6.96); Rony Talukdar vs Nahid Rana (11b, SR 218); Mustafizur Rahman threat (319b, 23 wkts, econ 6.94)."
+          "Top picks \u2014 Rangpur Riders: Mahmudullah (67 exp pts, conf 0.90), Mustafizur Rahman (57 exp pts, conf 0.60); Sylhet Titans: Shohidul Islam (74 exp pts, conf 0.60), Azmatullah Omarzai (54 exp pts, conf 0.90).",
+          "Key edges: Khushdil Shah vs Nasum Ahmed (13b, SR 277); Nasum Ahmed threat (360b, 16 wkts, econ 6.95); Rony Talukdar vs Nahid Rana (11b, SR 218); Mustafizur Rahman threat (319b, 23 wkts, econ 6.94)."
         ],
         "evidence_tags": [
           "phase_wise_strategy",
@@ -56,7 +56,7 @@
       },
       {
         "bullets": [
-          "Lean Sylhet Titans (-5) (ELO: Rangpur Riders 1615 vs Sylhet Titans 1533) \u2014 Recent H2H edge, Venue bias: chasing_edge, Last-5 wins Rangpur Riders 2-3 Sylhet Titans.",
+          "Lean Sylhet Titans (-5) (ELO: Rangpur Riders 1614 vs Sylhet Titans 1533) \u2014 Recent H2H edge, Venue bias: chasing_edge, Last-5 wins Rangpur Riders 2-3 Sylhet Titans.",
           "Toss/innings path: recent venue split is 2 bat-first wins vs 5 chases in the last 7."
         ],
         "evidence_tags": [
@@ -82,20 +82,20 @@
             {
               "form_flag": "cold",
               "player": "Towhid Hridoy",
-              "quality_score": 88.3,
+              "quality_score": 88.9,
               "rank": 6
             },
             {
               "form_flag": "neutral",
               "player": "Litton Das",
-              "quality_score": 58.6,
-              "rank": 34
+              "quality_score": 60.4,
+              "rank": 35
             },
             {
-              "form_flag": "neutral",
+              "form_flag": "cold",
               "player": "Iftikhar Ahmed",
-              "quality_score": 39.6,
-              "rank": 57
+              "quality_score": 43.3,
+              "rank": 59
             }
           ],
           "top_bowling": [
@@ -106,16 +106,16 @@
               "rank": 3
             },
             {
-              "form_flag": "hot",
+              "form_flag": "cold",
               "player": "Akif Javed",
-              "quality_score": 81.5,
-              "rank": 11
+              "quality_score": 78.4,
+              "rank": 16
             },
             {
               "form_flag": "cold",
               "player": "Mustafizur Rahman",
-              "quality_score": 61.5,
-              "rank": 37
+              "quality_score": 62.9,
+              "rank": 38
             }
           ],
           "top_overall": [
@@ -129,22 +129,22 @@
               "rank": 3
             },
             {
-              "batting_quality": 88.3,
+              "batting_quality": 88.9,
               "bowling_quality": null,
               "discipline": "batting",
               "form_flag": "cold",
               "player": "Towhid Hridoy",
-              "quality_score": 88.3,
+              "quality_score": 88.9,
               "rank": 6
             },
             {
               "batting_quality": null,
-              "bowling_quality": 81.5,
+              "bowling_quality": 78.4,
               "discipline": "bowling",
-              "form_flag": "hot",
+              "form_flag": "cold",
               "player": "Akif Javed",
-              "quality_score": 81.5,
-              "rank": 11
+              "quality_score": 78.4,
+              "rank": 16
             }
           ]
         },
@@ -154,57 +154,57 @@
             {
               "form_flag": "hot",
               "player": "Moeen Ali",
-              "quality_score": 20.6,
-              "rank": 84
+              "quality_score": 23.6,
+              "rank": 88
             },
             {
               "form_flag": "neutral",
               "player": "Mehidy Hasan Miraz",
-              "quality_score": 15.7,
-              "rank": 89
+              "quality_score": 12.2,
+              "rank": 94
             }
           ],
           "top_bowling": [
             {
               "form_flag": "neutral",
               "player": "Salman Irshad",
-              "quality_score": 57.7,
-              "rank": 43
+              "quality_score": 58.2,
+              "rank": 45
             },
             {
-              "form_flag": "hot",
+              "form_flag": "cold",
               "player": "Azmatullah Omarzai",
-              "quality_score": 54.7,
-              "rank": 49
+              "quality_score": 55.2,
+              "rank": 53
             }
           ],
           "top_overall": [
             {
               "batting_quality": null,
-              "bowling_quality": 57.7,
+              "bowling_quality": 58.2,
               "discipline": "bowling",
               "form_flag": "neutral",
               "player": "Salman Irshad",
-              "quality_score": 57.7,
-              "rank": 43
+              "quality_score": 58.2,
+              "rank": 45
             },
             {
               "batting_quality": null,
-              "bowling_quality": 54.7,
+              "bowling_quality": 55.2,
               "discipline": "bowling",
-              "form_flag": "hot",
+              "form_flag": "cold",
               "player": "Azmatullah Omarzai",
-              "quality_score": 54.7,
-              "rank": 49
+              "quality_score": 55.2,
+              "rank": 53
             },
             {
-              "batting_quality": 20.6,
+              "batting_quality": 23.6,
               "bowling_quality": null,
               "discipline": "batting",
               "form_flag": "hot",
               "player": "Moeen Ali",
-              "quality_score": 20.6,
-              "rank": 84
+              "quality_score": 23.6,
+              "rank": 88
             }
           ]
         }

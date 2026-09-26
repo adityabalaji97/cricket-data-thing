@@ -277,6 +277,7 @@
             "dots": 7,
             "fours": 2,
             "id": "sai-sudharsan",
+            "impact": -11.9,
             "links": {
               "bowling_card_id": null
             },
@@ -285,7 +286,8 @@
             "runs": 12,
             "sixes": 0,
             "strike_rate": 86,
-            "team": "Gujarat Titans"
+            "team": "Gujarat Titans",
+            "wpa": -0.099
           },
           {
             "balls": 9,
@@ -511,6 +513,7 @@
             "dots": 4,
             "fours": 2,
             "id": "shubman-gill",
+            "impact": -9.6,
             "links": {
               "bowling_card_id": null
             },
@@ -519,7 +522,8 @@
             "runs": 10,
             "sixes": 0,
             "strike_rate": 111,
-            "team": "Gujarat Titans"
+            "team": "Gujarat Titans",
+            "wpa": -0.076
           },
           {
             "balls": 18,
@@ -773,6 +777,7 @@
             "dots": 8,
             "fours": 3,
             "id": "nishant-sindhu",
+            "impact": -6.2,
             "links": {
               "bowling_card_id": null
             },
@@ -781,7 +786,8 @@
             "runs": 20,
             "sixes": 0,
             "strike_rate": 111,
-            "team": "Gujarat Titans"
+            "team": "Gujarat Titans",
+            "wpa": -0.05
           },
           {
             "balls": 23,
@@ -1066,6 +1072,7 @@
             "dots": 7,
             "fours": 1,
             "id": "jos-buttler",
+            "impact": -9.0,
             "links": {
               "bowling_card_id": null
             },
@@ -1074,7 +1081,8 @@
             "runs": 19,
             "sixes": 0,
             "strike_rate": 83,
-            "team": "Gujarat Titans"
+            "team": "Gujarat Titans",
+            "wpa": -0.064
           },
           {
             "balls": 38,
@@ -1387,6 +1395,7 @@
             "dots": 7,
             "fours": 5,
             "id": "washington-sundar",
+            "impact": 6.5,
             "links": {
               "bowling_card_id": null
             },
@@ -1395,7 +1404,8 @@
             "runs": 50,
             "sixes": 0,
             "strike_rate": 132,
-            "team": "Gujarat Titans"
+            "team": "Gujarat Titans",
+            "wpa": 0.047
           },
           {
             "balls": 6,
@@ -1607,6 +1617,7 @@
             "dots": 1,
             "fours": 0,
             "id": "arshad-khan",
+            "impact": 2.4,
             "links": {
               "bowling_card_id": null
             },
@@ -1615,7 +1626,8 @@
             "runs": 15,
             "sixes": 2,
             "strike_rate": 250,
-            "team": "Gujarat Titans"
+            "team": "Gujarat Titans",
+            "wpa": 0.016
           },
           {
             "balls": 5,
@@ -1827,6 +1839,7 @@
             "dots": 1,
             "fours": 1,
             "id": "rahul-tewatia",
+            "impact": -3.6,
             "links": {
               "bowling_card_id": null
             },
@@ -1835,7 +1848,8 @@
             "runs": 7,
             "sixes": 0,
             "strike_rate": 140,
-            "team": "Gujarat Titans"
+            "team": "Gujarat Titans",
+            "wpa": -0.027
           },
           {
             "balls": 5,
@@ -2061,6 +2075,7 @@
             "dots": 1,
             "fours": 1,
             "id": "jason-holder",
+            "impact": -1.9,
             "links": {
               "bowling_card_id": null
             },
@@ -2069,7 +2084,8 @@
             "runs": 7,
             "sixes": 0,
             "strike_rate": 140,
-            "team": "Gujarat Titans"
+            "team": "Gujarat Titans",
+            "wpa": -0.015
           },
           {
             "balls": 3,
@@ -2255,6 +2271,7 @@
             "dots": 1,
             "fours": 0,
             "id": "rashid-khan",
+            "impact": 0.7,
             "links": {
               "bowling_card_id": null
             },
@@ -2263,7 +2280,8 @@
             "runs": 7,
             "sixes": 1,
             "strike_rate": 233,
-            "team": "Gujarat Titans"
+            "team": "Gujarat Titans",
+            "wpa": 0.006
           },
           {
             "balls": 3,
@@ -2430,6 +2448,7 @@
             "dots": 1,
             "fours": 0,
             "id": "kagiso-rabada",
+            "impact": -1.8,
             "links": {
               "bowling_card_id": null
             },
@@ -2438,7 +2457,8 @@
             "runs": 3,
             "sixes": 0,
             "strike_rate": 100,
-            "team": "Gujarat Titans"
+            "team": "Gujarat Titans",
+            "wpa": -0.014
           }
         ],
         "batting_team": "Gujarat Titans",
@@ -2775,6 +2795,7 @@
             "economy": 9.8,
             "figures": "4.0-0-39",
             "id": "jacob-duffy",
+            "impact": -10.7,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -2784,7 +2805,8 @@
             "runs": 39,
             "style": "RFM",
             "team": "Royal Challengers Bengaluru",
-            "wickets": 0
+            "wickets": 0,
+            "wpa": -0.082
           },
           {
             "balls": 24,
@@ -3125,6 +3147,7 @@
             "economy": 7.2,
             "figures": "4.0-0-29",
             "id": "bhuvneshwar-kumar",
+            "impact": 13.7,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -3134,7 +3157,8 @@
             "runs": 29,
             "style": "RM",
             "team": "Royal Challengers Bengaluru",
-            "wickets": 2
+            "wickets": 2,
+            "wpa": 0.112
           },
           {
             "balls": 25,
@@ -3517,6 +3541,7 @@
             "economy": 9.2,
             "figures": "4.0-0-37",
             "id": "josh-hazlewood",
+            "impact": 6.8,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -3526,7 +3551,8 @@
             "runs": 37,
             "style": "RFM",
             "team": "Royal Challengers Bengaluru",
-            "wickets": 2
+            "wickets": 2,
+            "wpa": 0.055
           },
           {
             "balls": 24,
@@ -3860,6 +3886,7 @@
             "economy": 6.8,
             "figures": "4.0-0-27",
             "id": "rasikh-dar",
+            "impact": 17.2,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -3869,7 +3896,8 @@
             "runs": 27,
             "style": "RFM",
             "team": "Royal Challengers Bengaluru",
-            "wickets": 3
+            "wickets": 3,
+            "wpa": 0.136
           },
           {
             "balls": 24,
@@ -4154,6 +4182,7 @@
             "economy": 5.8,
             "figures": "4.0-0-23",
             "id": "krunal-pandya",
+            "impact": 7.3,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -4163,7 +4192,8 @@
             "runs": 23,
             "style": "SLA",
             "team": "Royal Challengers Bengaluru",
-            "wickets": 1
+            "wickets": 1,
+            "wpa": 0.056
           }
         ],
         "bowling_team": "Royal Challengers Bengaluru",
@@ -4459,6 +4489,7 @@
             "dots": 7,
             "fours": 4,
             "id": "venkatesh-iyer",
+            "impact": 6.1,
             "links": {
               "bowling_card_id": null
             },
@@ -4467,7 +4498,8 @@
             "runs": 32,
             "sixes": 2,
             "strike_rate": 200,
-            "team": "Royal Challengers Bengaluru"
+            "team": "Royal Challengers Bengaluru",
+            "wpa": 0.098
           },
           {
             "balls": 42,
@@ -4778,6 +4810,7 @@
             "dots": 9,
             "fours": 9,
             "id": "virat-kohli",
+            "impact": 31.1,
             "links": {
               "bowling_card_id": null
             },
@@ -4786,7 +4819,8 @@
             "runs": 75,
             "sixes": 3,
             "strike_rate": 179,
-            "team": "Royal Challengers Bengaluru"
+            "team": "Royal Challengers Bengaluru",
+            "wpa": 0.202
           },
           {
             "balls": 4,
@@ -4972,6 +5006,7 @@
             "dots": 3,
             "fours": 0,
             "id": "devdutt-padikkal",
+            "impact": -13.9,
             "links": {
               "bowling_card_id": null
             },
@@ -4980,7 +5015,8 @@
             "runs": 1,
             "sixes": 0,
             "strike_rate": 25,
-            "team": "Royal Challengers Bengaluru"
+            "team": "Royal Challengers Bengaluru",
+            "wpa": -0.043
           },
           {
             "balls": 14,
@@ -5225,6 +5261,7 @@
             "dots": 7,
             "fours": 1,
             "id": "rajat-patidar",
+            "impact": -6.8,
             "links": {
               "bowling_card_id": null
             },
@@ -5233,7 +5270,8 @@
             "runs": 15,
             "sixes": 1,
             "strike_rate": 107,
-            "team": "Royal Challengers Bengaluru"
+            "team": "Royal Challengers Bengaluru",
+            "wpa": 0.003
           },
           {
             "balls": 2,
@@ -5386,6 +5424,7 @@
             "dots": 1,
             "fours": 0,
             "id": "krunal-pandya",
+            "impact": -12.0,
             "links": {
               "bowling_card_id": null
             },
@@ -5394,7 +5433,8 @@
             "runs": 1,
             "sixes": 0,
             "strike_rate": 50,
-            "team": "Royal Challengers Bengaluru"
+            "team": "Royal Challengers Bengaluru",
+            "wpa": -0.056
           },
           {
             "balls": 17,
@@ -5634,6 +5674,7 @@
             "dots": 8,
             "fours": 3,
             "id": "tim-david",
+            "impact": 1.9,
             "links": {
               "bowling_card_id": null
             },
@@ -5642,7 +5683,8 @@
             "runs": 24,
             "sixes": 1,
             "strike_rate": 141,
-            "team": "Royal Challengers Bengaluru"
+            "team": "Royal Challengers Bengaluru",
+            "wpa": 0.05
           },
           {
             "balls": 14,
@@ -5889,6 +5931,7 @@
             "dots": 7,
             "fours": 1,
             "id": "jitesh-sharma",
+            "impact": -7.1,
             "links": {
               "bowling_card_id": null
             },
@@ -5897,7 +5940,8 @@
             "runs": 11,
             "sixes": 0,
             "strike_rate": 79,
-            "team": "Royal Challengers Bengaluru"
+            "team": "Royal Challengers Bengaluru",
+            "wpa": 0.004
           }
         ],
         "batting_team": "Royal Challengers Bengaluru",
@@ -6199,6 +6243,7 @@
             "economy": 9.2,
             "figures": "4.0-0-37",
             "id": "mohammed-siraj",
+            "impact": -2.4,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -6208,7 +6253,8 @@
             "runs": 37,
             "style": "RF",
             "team": "Gujarat Titans",
-            "wickets": 1
+            "wickets": 1,
+            "wpa": -0.071
           },
           {
             "balls": 18,
@@ -6500,6 +6546,7 @@
             "economy": 14.7,
             "figures": "3.0-0-44",
             "id": "kagiso-rabada",
+            "impact": -15.0,
             "legal_balls": 18,
             "links": {
               "batting_card_id": null
@@ -6509,7 +6556,8 @@
             "runs": 44,
             "style": "RF",
             "team": "Gujarat Titans",
-            "wickets": 1
+            "wickets": 1,
+            "wpa": -0.138
           },
           {
             "balls": 12,
@@ -6752,6 +6800,7 @@
             "economy": 8.0,
             "figures": "2.0-0-16",
             "id": "jason-holder",
+            "impact": -5.6,
             "legal_balls": 12,
             "links": {
               "batting_card_id": null
@@ -6761,7 +6810,8 @@
             "runs": 16,
             "style": "RMF",
             "team": "Gujarat Titans",
-            "wickets": 0
+            "wickets": 0,
+            "wpa": -0.062
           },
           {
             "balls": 24,
@@ -7053,6 +7103,7 @@
             "economy": 6.2,
             "figures": "4.0-0-25",
             "id": "rashid-khan",
+            "impact": 20.7,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -7062,7 +7113,8 @@
             "runs": 25,
             "style": "LBG",
             "team": "Gujarat Titans",
-            "wickets": 2
+            "wickets": 2,
+            "wpa": 0.034
           },
           {
             "balls": 24,
@@ -7347,6 +7399,7 @@
             "economy": 8.0,
             "figures": "4.0-0-32",
             "id": "arshad-khan",
+            "impact": 3.7,
             "legal_balls": 24,
             "links": {
               "batting_card_id": null
@@ -7356,7 +7409,8 @@
             "runs": 32,
             "style": "LFM",
             "team": "Gujarat Titans",
-            "wickets": 1
+            "wickets": 1,
+            "wpa": -0.017
           },
           {
             "balls": 6,
@@ -7578,6 +7632,7 @@
             "economy": 7.0,
             "figures": "1.0-0-7",
             "id": "prasidh-krishna",
+            "impact": -0.8,
             "legal_balls": 6,
             "links": {
               "batting_card_id": null
@@ -7587,7 +7642,8 @@
             "runs": 7,
             "style": "RFM",
             "team": "Gujarat Titans",
-            "wickets": 0
+            "wickets": 0,
+            "wpa": -0.004
           }
         ],
         "bowling_team": "Gujarat Titans",
@@ -7701,6 +7757,431 @@
       ],
       "moment": null,
       "player_of_match": null,
+      "primer": {
+        "innings": [
+          {
+            "by_over": [
+              {
+                "impact": 7.15,
+                "over": 1
+              },
+              {
+                "impact": -1.12,
+                "over": 2
+              },
+              {
+                "impact": -11.13,
+                "over": 3
+              },
+              {
+                "impact": -11.77,
+                "over": 4
+              },
+              {
+                "impact": 4.09,
+                "over": 5
+              },
+              {
+                "impact": 0.74,
+                "over": 6
+              },
+              {
+                "impact": -0.64,
+                "over": 7
+              },
+              {
+                "impact": -10.9,
+                "over": 8
+              },
+              {
+                "impact": -1.26,
+                "over": 9
+              },
+              {
+                "impact": -1.74,
+                "over": 10
+              },
+              {
+                "impact": -2.26,
+                "over": 11
+              },
+              {
+                "impact": -0.83,
+                "over": 12
+              },
+              {
+                "impact": -3.14,
+                "over": 13
+              },
+              {
+                "impact": 9.11,
+                "over": 14
+              },
+              {
+                "impact": -6.45,
+                "over": 15
+              },
+              {
+                "impact": 2.74,
+                "over": 16
+              },
+              {
+                "impact": -5.75,
+                "over": 17
+              },
+              {
+                "impact": 7.66,
+                "over": 18
+              },
+              {
+                "impact": -3.51,
+                "over": 19
+              },
+              {
+                "impact": -1.32,
+                "over": 20
+              }
+            ],
+            "impact": -30.3,
+            "innings": 1,
+            "team": "Gujarat Titans"
+          },
+          {
+            "by_over": [
+              {
+                "impact": -0.85,
+                "over": 1
+              },
+              {
+                "impact": 11.88,
+                "over": 2
+              },
+              {
+                "impact": 6.6,
+                "over": 3
+              },
+              {
+                "impact": 12.31,
+                "over": 4
+              },
+              {
+                "impact": -7.76,
+                "over": 5
+              },
+              {
+                "impact": -9.22,
+                "over": 6
+              },
+              {
+                "impact": 5.36,
+                "over": 7
+              },
+              {
+                "impact": 0.96,
+                "over": 8
+              },
+              {
+                "impact": -23.17,
+                "over": 9
+              },
+              {
+                "impact": 4.62,
+                "over": 10
+              },
+              {
+                "impact": 4.1,
+                "over": 11
+              },
+              {
+                "impact": 1.51,
+                "over": 12
+              },
+              {
+                "impact": 3.85,
+                "over": 13
+              },
+              {
+                "impact": -7.1,
+                "over": 14
+              },
+              {
+                "impact": 0.76,
+                "over": 15
+              },
+              {
+                "impact": -1.26,
+                "over": 16
+              },
+              {
+                "impact": -5.44,
+                "over": 17
+              },
+              {
+                "impact": 3.19,
+                "over": 18
+              }
+            ],
+            "impact": 0.3,
+            "innings": 2,
+            "team": "Royal Challengers Bengaluru"
+          }
+        ],
+        "win_probability": {
+          "innings_break": 124,
+          "points": [
+            0.5081,
+            0.5003,
+            0.4925,
+            0.517,
+            0.5409,
+            0.5486,
+            0.5564,
+            0.5565,
+            0.5642,
+            0.5642,
+            0.5565,
+            0.5487,
+            0.5716,
+            0.5638,
+            0.5636,
+            0.5556,
+            0.5781,
+            0.4799,
+            0.4808,
+            0.4734,
+            0.4741,
+            0.4665,
+            0.4753,
+            0.4677,
+            0.4598,
+            0.3489,
+            0.3426,
+            0.3689,
+            0.3624,
+            0.3888,
+            0.4153,
+            0.4167,
+            0.4098,
+            0.4028,
+            0.3957,
+            0.3886,
+            0.3896,
+            0.3906,
+            0.4164,
+            0.4089,
+            0.4097,
+            0.4103,
+            0.4108,
+            0.4113,
+            0.4117,
+            0.4036,
+            0.4038,
+            0.4039,
+            0.4039,
+            0.4121,
+            0.4036,
+            0.3145,
+            0.3078,
+            0.3089,
+            0.31,
+            0.3109,
+            0.3038,
+            0.3045,
+            0.2973,
+            0.2978,
+            0.2982,
+            0.2985,
+            0.2987,
+            0.291,
+            0.2832,
+            0.2754,
+            0.2752,
+            0.2672,
+            0.2667,
+            0.2737,
+            0.2729,
+            0.2721,
+            0.2711,
+            0.27,
+            0.2687,
+            0.2674,
+            0.2106,
+            0.2107,
+            0.2106,
+            0.2452,
+            0.2448,
+            0.2443,
+            0.2656,
+            0.2875,
+            0.2865,
+            0.3246,
+            0.3231,
+            0.3135,
+            0.2583,
+            0.2583,
+            0.2656,
+            0.2652,
+            0.2646,
+            0.2638,
+            0.2554,
+            0.2615,
+            0.2676,
+            0.2659,
+            0.2867,
+            0.2845,
+            0.24,
+            0.2394,
+            0.2386,
+            0.2376,
+            0.2434,
+            0.2417,
+            0.2616,
+            0.2593,
+            0.2566,
+            0.2759,
+            0.2836,
+            0.2801,
+            0.2993,
+            0.3185,
+            0.3136,
+            0.2841,
+            0.2807,
+            0.2692,
+            0.2723,
+            0.3058,
+            0.2812,
+            0.2701,
+            0.2659,
+            0.2608,
+            0.2624,
+            0.2609,
+            0.2595,
+            0.2657,
+            0.272,
+            0.263,
+            0.2618,
+            0.2379,
+            0.2441,
+            0.2066,
+            0.1849,
+            0.1903,
+            0.1694,
+            0.1497,
+            0.1544,
+            0.1357,
+            0.1344,
+            0.1171,
+            0.1211,
+            0.1047,
+            0.0898,
+            0.0688,
+            0.0576,
+            0.0566,
+            0.0589,
+            0.058,
+            0.0425,
+            0.0626,
+            0.0651,
+            0.0677,
+            0.0663,
+            0.1059,
+            0.1097,
+            0.1136,
+            0.1178,
+            0.1153,
+            0.0832,
+            0.0578,
+            0.0602,
+            0.0585,
+            0.0568,
+            0.0512,
+            0.0475,
+            0.0497,
+            0.0482,
+            0.0467,
+            0.049,
+            0.0475,
+            0.0499,
+            0.0378,
+            0.0366,
+            0.0631,
+            0.0607,
+            0.0584,
+            0.1163,
+            0.1211,
+            0.0897,
+            0.0937,
+            0.0895,
+            0.0937,
+            0.0671,
+            0.0705,
+            0.0605,
+            0.0574,
+            0.0606,
+            0.0515,
+            0.0546,
+            0.0363,
+            0.0387,
+            0.0246,
+            0.0229,
+            0.0213,
+            0.0229,
+            0.0213,
+            0.0199,
+            0.0215,
+            0.0087,
+            0.0079,
+            0.0071,
+            0.0064,
+            0.0058,
+            0.0063,
+            0.0057,
+            0.0025,
+            0.0028,
+            0.0059,
+            0.0051,
+            0.0057,
+            0.002,
+            0.0023,
+            0.0013,
+            0.0015,
+            0.0017,
+            0.0004,
+            0.0003,
+            0.0003,
+            0.0002,
+            0.0003,
+            0.0003,
+            0.0002,
+            0.0001,
+            0.0002,
+            0.0001,
+            0.0002,
+            0.0001,
+            0.0,
+            0.0001,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "team": "Gujarat Titans",
+          "wickets": [
+            17,
+            25,
+            51,
+            76,
+            88,
+            100,
+            115,
+            120,
+            151,
+            155,
+            175,
+            178,
+            209
+          ]
+        }
+      },
       "top_performers": [
         {
           "innings": 1,
@@ -7746,7 +8227,7 @@
       "worm": [
         {
           "innings": 1,
-          "points": "0.00,55.30 5.26,53.50 10.53,51.33 15.79,49.16 21.05,45.91 26.32,43.74 31.58,41.94 36.84,40.13 42.11,38.68 47.37,37.24 52.63,35.79 57.89,33.63 63.16,30.01 68.42,24.23 73.68,22.06 78.95,18.45 84.21,16.28 89.47,10.50 94.74,7.61 100.00,4.00",
+          "points": "0.00,60.00 5.00,55.48 10.00,53.74 15.00,51.65 20.00,49.57 25.00,46.43 30.00,44.35 35.00,42.61 40.00,40.87 45.00,39.48 50.00,38.09 55.00,36.70 60.00,34.61 65.00,31.13 70.00,25.57 75.00,23.48 80.00,20.00 85.00,17.91 90.00,12.35 95.00,9.57 100.00,6.09",
           "team": "Gujarat Titans",
           "values": [
             13,
@@ -7773,7 +8254,7 @@
         },
         {
           "innings": 2,
-          "points": "0.00,58.26 5.26,52.00 10.53,47.48 15.79,40.87 21.05,38.09 26.32,35.65 31.58,31.83 36.84,29.39 42.11,28.35 47.37,25.22 52.63,22.09 57.89,19.65 63.16,16.17 68.42,14.09 73.68,11.65 78.95,9.57 84.21,8.52 89.47,4.00 94.74,4.00 100.00,4.00",
+          "points": "0.00,60.00 5.00,58.26 10.00,52.00 15.00,47.48 20.00,40.87 25.00,38.09 30.00,35.65 35.00,31.83 40.00,29.39 45.00,28.35 50.00,25.22 55.00,22.09 60.00,19.65 65.00,16.17 70.00,14.09 75.00,11.65 80.00,9.57 85.00,8.52 90.00,4.00 95.00,4.00 100.00,4.00",
           "team": "Royal Challengers Bengaluru",
           "values": [
             5,
@@ -7798,6 +8279,12 @@
             161
           ]
         }
+      ],
+      "worm_axis": [
+        5,
+        10,
+        15,
+        20
       ]
     }
   }
