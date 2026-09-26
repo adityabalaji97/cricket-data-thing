@@ -1,6 +1,6 @@
 /**
  * Guess the Innings (daily). Name the batter from one innings: the score line and a wagon wheel of
- * every scoring shot. Hints (venue, season, opposition, team, initials) and wrong guesses each
+ * every scoring shot, with the season given. Hints (team, opposition, venue, initials) and wrong guesses each
  * cost a point; see NameGuessGame for the shared mechanics.
  */
 import React from 'react';
@@ -9,7 +9,6 @@ import { colors, fonts } from '../../theme/hindsightDark';
 import NameGuessGame from './daily/NameGuessGame';
 
 const HINTS = [
-  { key: 'season', icon: '📅', label: 'Season' },
   { key: 'team', icon: '👕', label: 'Team' },
   { key: 'opposition', icon: '⚔️', label: 'Opposition' },
   { key: 'venue', icon: '🏟️', label: 'Venue' },
@@ -58,6 +57,9 @@ const WagonWheel = ({ deliveries }) => {
 
 const InningsClue = ({ puzzle }) => (
   <Box sx={{ p: 2.25, borderRadius: 3, bgcolor: colors.surface1, border: `1px solid ${colors.border}` }}>
+    <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, color: colors.textLo, letterSpacing: '0.08em', textTransform: 'uppercase', mb: 1 }}>
+      {puzzle.season}
+    </Typography>
     <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
       <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 34, color: colors.textHi, lineHeight: 1 }}>
         {puzzle.runs}
@@ -89,7 +91,7 @@ const GuessInningsGame = () => (
     path="/games/guess-innings"
     puzzlePath="daily"
     hints={HINTS}
-    maxPoints={6}
+    maxPoints={5}
     shareUrl="/games/guess-innings"
     renderClue={(puzzle) => <InningsClue puzzle={puzzle} />}
   />

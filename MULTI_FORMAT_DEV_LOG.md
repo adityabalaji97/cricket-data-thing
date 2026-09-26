@@ -18,7 +18,8 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > `/player-journey/names` endpoint is gone); Guess the Innings is now a daily
 > (`/games/guess-innings/{daily,hint,check,reveal}`). Shared frontend: `games/daily/usePuzzle.js`,
 > `NameGuessGame.jsx`, `NameGuessInput.jsx`. Progress keys moved to `day.v3.<date>` so v2 saves
-> are ignored. `match_preview` prod golden drifts with rankings data; not a regression.
+> are ignored. Name entry is OTP-style letter boxes (initials hint pre-fills each word's first box);
+> Guess the Innings shows the season up front and has 4 hints like Journeys. `match_preview` prod golden drifts with rankings data; not a regression.
 >
 > **Latest:** Phase 2 T20 Primer metrics live (ball_metrics etc.; see newest entry). API on
 > Python 3.12; U4 done. U3 colour sweep done (see newest entry; `ui_sweep.mjs` now reports contrast).

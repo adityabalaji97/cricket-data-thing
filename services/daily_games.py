@@ -501,9 +501,9 @@ def name_matches(db: Session, guess: str, answer: str) -> bool:
 # ------------------------------------------------------------------------ Guess the Innings
 #
 # One 40+ innings a day (IPL, or T20Is between top-10 sides, since 2015): the wagon wheel and the
-# score are the clue; name the batter. Hints: venue, season, opposition, team, initials.
+# score (and the season) are the clue; name the batter. Hints: team, opposition, venue, initials.
 
-INNINGS_HINTS = ("venue", "season", "opposition", "team", "initials")
+INNINGS_HINTS = ("team", "opposition", "venue", "initials")  # the season is shown up front
 
 
 def _innings_pool(db: Session) -> List[Dict[str, Any]]:
@@ -549,6 +549,7 @@ def innings_question(pick: Dict[str, Any]) -> Dict[str, Any]:
         "sixes": runs.count(6),
         "bat_hand": {"RHB": "Right-hand bat", "LHB": "Left-hand bat"}.get(hand, hand),
         "name_shape": name_shape(pick["batter"]),
+        "season": innings_hint(pick, "season"),
         "hints": list(INNINGS_HINTS),
         "deliveries": [
             {"over": d["over"], "ball": d["ball"], "runs": int(d["runs"] or 0), "x": d["wagon_x"], "y": d["wagon_y"]}

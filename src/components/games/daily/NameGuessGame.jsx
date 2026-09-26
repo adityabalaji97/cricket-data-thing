@@ -113,7 +113,25 @@ const NameGuessGame = ({ game, title, rules, path, puzzlePath, hints, maxPoints,
     >
       {renderClue(puzzle)}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1, mt: 1.5 }}>
+      <Box sx={{ mt: 2 }}>
+        {finished ? null : (
+          <NameGuessInput
+            key={`${puzzle.puzzle}-${state.hints.initials ? 'i' : ''}`}
+            shape={puzzle.name_shape}
+            initials={state.hints.initials}
+            disabled={busy}
+            onGuess={guess}
+            onGiveUp={giveUp}
+            guessesLeft={MAX_GUESSES - misses}
+          />
+        )}
+        {misses > 0 && (
+          <Typography sx={{ color: colors.textLo, fontSize: 13, mt: 0.75 }}>Not {state.misses.join(', not ')}</Typography>
+        )}
+        {failure && <Typography sx={{ color: colors.red, fontSize: 13, mt: 0.75 }}>{failure}</Typography>}
+      </Box>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1, mt: 2.5 }}>
         {hints.map((h) => (
           <Box key={h.key} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${colors.border}`, bgcolor: state.hints[h.key] ? colors.surface2 : 'transparent', minHeight: 64 }}>
             <Typography sx={{ fontSize: 12, color: colors.textLo }}>{h.icon} {h.label}</Typography>
@@ -128,24 +146,6 @@ const NameGuessGame = ({ game, title, rules, path, puzzlePath, hints, maxPoints,
             )}
           </Box>
         ))}
-      </Box>
-
-      <Box sx={{ mt: 2.5 }}>
-        {finished ? null : (
-          <NameGuessInput
-            key={puzzle.puzzle}
-            shape={puzzle.name_shape}
-            initials={state.hints.initials}
-            disabled={busy}
-            onGuess={guess}
-            onGiveUp={giveUp}
-            guessesLeft={MAX_GUESSES - misses}
-          />
-        )}
-        {misses > 0 && (
-          <Typography sx={{ color: colors.textLo, fontSize: 13, mt: 0.75 }}>Not {state.misses.join(', not ')}</Typography>
-        )}
-        {failure && <Typography sx={{ color: colors.red, fontSize: 13, mt: 0.75 }}>{failure}</Typography>}
       </Box>
     </DailyGameShell>
   );

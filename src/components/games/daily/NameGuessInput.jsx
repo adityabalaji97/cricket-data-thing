@@ -1,35 +1,46 @@
-import React, { useState } from 'react';
-import { Box, Button, TextField, Typography } from '@mui/material';
+import React, { useRef, useState } from 'react';
+import { Box, Button, Typography } from '@mui/material';
 import { colors, fonts } from '../../../theme/hindsightDark';
 
 /**
- * Hangman-style name entry for the name-guessing games (Player Journeys, Guess the Innings).
+ * OTP-style name entry for the name-guessing games (Player Journeys, Guess the Innings).
  *
- * The dashes show the answer's shape from the start -- one group per word, one dash per letter --
- * and fill as you type. With the initials hint taken, each word's first letter is pre-shown.
- * Guesses are checked by the server, which forgives close spellings and known aliases, so a typed
- * name does not have to fit the dashes exactly.
+ * One box per letter, grouped by word, visible from the start, so the answer's shape is the first
+ * clue. Typing fills the boxes in order. With the initials hint taken, each word's first box is
+ * pre-filled and skipped. A single transparent input sits over the boxes: a tap anywhere focuses
+ * it and brings up the phone keyboard, and backspace/paste behave natively.
  */
 const NameGuessInput = ({ shape, initials, disabled, onGuess, onGiveUp, guessesLeft }) => {
   const [value, setValue] = useState('');
+  const [focused, setFocused] = useState(false);
   const [shake, setShake] = useState(false);
-  const typed = value.toUpperCase().replace(/[^A-Z]/g, '').split('');
-  const initialLetters = initials ? initials.replace(/[^A-Z ]/gi, '').split(/\s+/).filter(Boolean).map((w) => w[0].toUpperCase()) : [];
+  const inputRef = useRef(null);
 
-  // Keep the whole name on one line on a phone: longer names get narrower slots.
-  const total = shape.reduce((a, b) => a + b, 0);
-  const slot = total >= 15 ? 15 : total >= 12 ? 18 : 22;
+  const initialLetters = initials
+    ? initials.split(/\s+/).filter(Boolean).map((w) => w[0].toUpperCase())
+    : [];
+  const fixed = (word, i) => (i === 0 && initialLetters[word]) || null;
+  const freeSlots = shape.reduce((n, len, word) => n + len - (fixed(word, 0) ? 1 : 0), 0);
+  const typed = value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, freeSlots).split('');
 
   let cursor = 0;
-  const groups = shape.map((length, word) => Array.from({ length }, (_, i) => {
+  let activeSet = false;
+  const words = shape.map((length, word) => Array.from({ length }, (_, i) => {
+    const pinned = fixed(word, i);
+    if (pinned) return { letter: pinned, pinned: true };
     const letter = typed[cursor];
     cursor += 1;
-    return { letter, hint: i === 0 ? initialLetters[word] : null };
+    const active = !letter && !activeSet;
+    if (active) activeSet = true;
+    return { letter, active };
   }));
 
+  const complete = typed.length === freeSlots;
+  const guessText = words.map((slots) => slots.map((s) => s.letter || '').join('')).join(' ');
+
   const submit = async () => {
-    if (typed.length < 3 || disabled) return;
-    const correct = await onGuess(value);
+    if (!complete || disabled) return;
+    const correct = await onGuess(guessText);
     if (!correct) {
       setShake(true);
       setTimeout(() => { setShake(false); setValue(''); }, 450);
@@ -39,8 +50,10 @@ const NameGuessInput = ({ shape, initials, disabled, onGuess, onGiveUp, guessesL
   return (
     <Box>
       <Box
+        onClick={() => inputRef.current?.focus()}
         sx={{
-          display: 'flex', flexWrap: 'wrap', columnGap: 1.5, rowGap: 1, justifyContent: 'center', mb: 1.5,
+          position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center',
+          gap: '4px', py: 0.5, cursor: 'text',
           animation: shake ? 'nameShake 0.4s' : 'none',
           '@keyframes nameShake': {
             '0%, 100%': { transform: 'translateX(0)' },
@@ -48,42 +61,57 @@ const NameGuessInput = ({ shape, initials, disabled, onGuess, onGiveUp, guessesL
             '75%': { transform: 'translateX(6px)' },
           },
         }}
-        aria-label={`Name has ${shape.length} word${shape.length === 1 ? '' : 's'}: ${shape.join(', ')} letters`}
       >
-        {groups.map((slots, g) => (
-          <Box key={g} sx={{ display: 'flex', gap: slot < 20 ? 0.375 : 0.5 }}>
+        {words.map((slots, w) => (
+          <React.Fragment key={w}>
+            {w > 0 && <Box sx={{ flex: '0 0 14px' }} />}
             {slots.map((slot, i) => (
               <Box
                 key={i}
                 sx={{
-                  width: slot, height: 30, borderBottom: `2px solid ${slot.letter ? colors.accent : colors.borderStrong}`,
+                  flex: '0 1 38px', minWidth: 14, height: 46, borderRadius: 1.25,
                   display: 'grid', placeItems: 'center',
-                  fontFamily: fonts.mono, fontWeight: 700, fontSize: slot < 20 ? 14 : 17,
-                  color: slot.letter ? colors.textHi : colors.textFaint,
+                  fontFamily: fonts.mono, fontWeight: 700, fontSize: { xs: 17, sm: 20 },
+                  bgcolor: slot.pinned ? colors.accentSoft : colors.surface1,
+                  color: slot.pinned ? colors.accent : colors.textHi,
+                  border: `2px solid ${
+                    focused && slot.active ? colors.accent
+                      : slot.letter ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.22)'
+                  }`,
+                  transition: 'border-color 100ms',
                 }}
               >
-                {slot.letter || slot.hint || ''}
+                {slot.letter || ''}
               </Box>
             ))}
-          </Box>
+          </React.Fragment>
         ))}
+        <input
+          ref={inputRef}
+          value={value}
+          disabled={disabled}
+          onChange={(e) => setValue(e.target.value.replace(/[^A-Za-z]/g, '').slice(0, freeSlots))}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          autoCapitalize="characters"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          aria-label={`Player's name: ${shape.length} word${shape.length === 1 ? '' : 's'} of ${shape.join(' and ')} letters`}
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0,
+            border: 0, padding: 0, fontSize: 16, color: 'transparent', background: 'transparent', caretColor: 'transparent',
+          }}
+        />
       </Box>
-      <TextField
-        fullWidth
-        value={value}
-        disabled={disabled}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
-        placeholder="Type the player's name"
-        inputProps={{ autoCapitalize: 'words', autoCorrect: 'off', spellCheck: false, 'aria-label': "Player's name" }}
-      />
-      <Box sx={{ display: 'flex', gap: 1, mt: 1.25 }}>
-        <Button fullWidth variant="contained" disabled={disabled || typed.length < 3} onClick={submit} sx={{ minHeight: 44 }}>Guess</Button>
+      <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+        <Button fullWidth variant="contained" disabled={disabled || !complete} onClick={submit} sx={{ minHeight: 44 }}>Guess</Button>
         <Button variant="outlined" disabled={disabled} onClick={onGiveUp} sx={{ minHeight: 44, flexShrink: 0 }}>Give up</Button>
       </Box>
       {guessesLeft !== undefined && (
         <Typography sx={{ color: colors.textLo, fontSize: 13, mt: 1 }}>
-          {guessesLeft} guess{guessesLeft === 1 ? '' : 'es'} left · close spellings count
+          {guessesLeft} guess{guessesLeft === 1 ? '' : 'es'} left · tap the boxes to type
         </Typography>
       )}
     </Box>
