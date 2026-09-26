@@ -25,6 +25,8 @@ export const NAV_ITEMS = [
   { path: '/doppelgangers', label: 'Doppelgangers', title: 'Doppelgangers', t20Only: true, group: 'compare' },
   { path: '/ipl-predictions', label: 'IPL Predictions', title: 'IPL Predictions', t20Only: true, group: 'play' },
   { path: '/rankings', label: 'Global Rankings', title: 'Global Rankings', t20Only: true, group: 'explore' },
+  { path: '/games/call-it', label: '📈 Call It (daily)', title: 'Call It', t20Only: true, group: 'play' },
+  { path: '/games/higher-lower', label: '⬆️ Higher or Lower (daily)', title: 'Higher or Lower', t20Only: true, group: 'play' },
   {
     path: '/games/guess-innings',
     label: '🎯 Guess the Innings',

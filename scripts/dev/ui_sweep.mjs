@@ -42,6 +42,8 @@ const ROUTES = [
   ['rankings', '/rankings'],
   ['guess', '/games/guess-innings'],
   ['journeys', '/games/player-journeys'],
+  ['call_it', '/games/call-it'],
+  ['higher_lower', '/games/higher-lower'],
   ['wrapped', '/wrapped/2025'],
   ['credits', '/credits'],
   ['fantasy', '/fantasy-planner'],

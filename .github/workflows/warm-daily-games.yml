@@ -1,0 +1,22 @@
+name: Warm daily games
+
+# The daily games build each day's puzzle on first request (~10s for Call It) and then cache it.
+# Requesting both right after midnight IST (18:30 UTC) means no player waits, and doubles as a
+# daily check that the games are up.
+on:
+  schedule:
+    - cron: "35 18 * * *"
+  workflow_dispatch:
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build today's puzzles
+        run: |
+          API=https://cricket-data-thing-672dfbacf476.herokuapp.com
+          for path in /games/call-it/daily /games/higher-lower/daily; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$API$path")
+            echo "$path -> $code"
+            [ "$code" = "200" ] || exit 1
+          done

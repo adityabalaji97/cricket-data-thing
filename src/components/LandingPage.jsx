@@ -1231,6 +1231,51 @@ const EmptyCard = ({ label, actionLabel, onAction }) => (
   </Box>
 );
 
+// Daily games (growth plan G2): the day's puzzles, with this browser's played state.
+const DAILY_LAUNCH = Date.UTC(2026, 8, 26);
+const istToday = () => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+const dailyNumber = () => Math.floor((Date.parse(`${istToday()}T00:00:00Z`) - DAILY_LAUNCH) / 86400000) + 1;
+const playedToday = (game) => {
+  try {
+    return JSON.parse(localStorage.getItem(`hindsight.daily.${game}.stats`) || '{}').lastPlayed === istToday();
+  } catch {
+    return false;
+  }
+};
+
+const TodaysGamesSection = () => {
+  const number = dailyNumber();
+  const games = [
+    { key: 'call_it', to: '/games/call-it', title: 'Call It', blurb: 'Five real chases, frozen mid-game. Call the win chance; beat the model.' },
+    { key: 'higher_lower', to: '/games/higher-lower', title: 'Higher or Lower', blurb: 'Whose season added more runs to their team? One miss ends the run.' },
+  ];
+  return (
+    <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
+      <Kicker>Daily · #{number}</Kicker>
+      <Typography sx={{ ...sectionTitleSx, fontSize: { xs: 20, md: 24 }, mb: 1.5 }}>Today&apos;s games</Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.25 }}>
+        {games.map((game) => {
+          const done = playedToday(game.key);
+          return (
+            <Box
+              key={game.key}
+              component={Link}
+              to={game.to}
+              sx={{ p: 2, borderRadius: 2.5, bgcolor: C.surface, border: `1px solid ${done ? C.hairline : 'rgba(182,242,74,0.35)'}`, textDecoration: 'none', display: 'block', '&:hover': { bgcolor: C.raised } }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>{game.title}</Typography>
+                <Typography sx={{ color: done ? C.soft : C.lime, fontFamily: fonts.mono, fontSize: 12 }}>{done ? 'Played ✓' : 'Play →'}</Typography>
+              </Box>
+              <Typography sx={{ color: C.soft, fontSize: 13.5, mt: 0.5 }}>{game.blurb}</Typography>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+};
+
 const LandingPage = ({ showLeagueCounts = true }) => {
   // Match the app-wide breakpoint from App.js rather than a page-specific pixel value;
   // three different mobile thresholds across the hero pages made behaviour inconsistent.
@@ -1338,6 +1383,7 @@ const LandingPage = ({ showLeagueCounts = true }) => {
       <Box sx={{ maxWidth: 1220, mx: 'auto' }}>
         <TopBar navOpen={navOpen} setNavOpen={setNavOpen} isMobile={isMobile} hideExplore={isCompactNav} />
         <TodaySection matches={fixtures} loading={fixturesLoading} isMobile={isMobile} />
+        <TodaysGamesSection />
         <RecentMatchesSection
           data={recentData}
           loading={recentLoading}

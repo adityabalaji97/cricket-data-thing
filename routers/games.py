@@ -400,3 +400,54 @@ def get_player_journey(
         }
 
     return payload
+
+
+# ------------------------------------------------------------------------------------------
+# Daily games (growth plan G2). Same puzzle for everyone each day (IST); answers are only served
+# by the reveal endpoints, one item at a time, after the player has committed a guess.
+# ------------------------------------------------------------------------------------------
+
+from services import daily_games as dg  # noqa: E402
+
+
+def _daily_meta(day):
+    return {"date": day.isoformat(), "number": dg.puzzle_number(day), "today": dg.today_ist().isoformat()}
+
+
+@router.get("/call-it/daily")
+def call_it_daily(day: Optional[date] = Query(default=None, alias="date"), db: Session = Depends(get_session)):
+    day = dg.resolve_day(day)
+    moments = dg.call_it_puzzle(db, day)
+    if not moments:
+        raise HTTPException(status_code=503, detail="Today's Call It is not ready yet.")
+    return {**_daily_meta(day), "moments": [dg.call_it_question(m, i) for i, m in enumerate(moments)]}
+
+
+@router.get("/call-it/reveal")
+def call_it_reveal(index: int = Query(ge=0, lt=dg.CALL_IT_MOMENTS), day: Optional[date] = Query(default=None, alias="date"),
+                   db: Session = Depends(get_session)):
+    day = dg.resolve_day(day)
+    moments = dg.call_it_puzzle(db, day)
+    if index >= len(moments):
+        raise HTTPException(status_code=404, detail="No such moment.")
+    return dg.call_it_answer(moments[index], index)
+
+
+@router.get("/higher-lower/daily")
+def higher_lower_daily(day: Optional[date] = Query(default=None, alias="date"), db: Session = Depends(get_session)):
+    day = dg.resolve_day(day)
+    chain = dg.higher_lower_puzzle(db, day)
+    if len(chain) < 2:
+        raise HTTPException(status_code=503, detail="Today's Higher or Lower is not ready yet.")
+    # The first card's Impact is the starting point, so it is shown; the rest are hidden.
+    return {**_daily_meta(day), "cards": [dg.higher_lower_card(item, i, reveal=(i == 0)) for i, item in enumerate(chain)]}
+
+
+@router.get("/higher-lower/reveal")
+def higher_lower_reveal(index: int = Query(ge=1, lt=dg.HIGHER_LOWER_LENGTH), day: Optional[date] = Query(default=None, alias="date"),
+                        db: Session = Depends(get_session)):
+    day = dg.resolve_day(day)
+    chain = dg.higher_lower_puzzle(db, day)
+    if index >= len(chain):
+        raise HTTPException(status_code=404, detail="No such card.")
+    return dg.higher_lower_card(chain[index], index, reveal=True)

@@ -160,5 +160,17 @@
       "min_seasons": "3"
     },
     "status_only": true
+  },
+  {
+    "name": "game_call_it_daily",
+    "path": "/games/call-it/daily",
+    "params": {},
+    "status_only": true
+  },
+  {
+    "name": "game_higher_lower_daily",
+    "path": "/games/higher-lower/daily",
+    "params": {},
+    "status_only": true
   }
 ]

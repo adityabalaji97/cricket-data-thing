@@ -151,6 +151,23 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## Log entries (newest first)
 
+### 2026-09-26 — Growth G2: daily games "Call It" and "Higher or Lower" — Claude
+
+* `services/daily_games.py`: deterministic puzzles per (game, IST date) via sha256 seed; #1 =
+  2026-09-26; future dates clamp to today, pre-launch to launch. Pools cached 6h per process.
+  - **Call It**: 5 decided chases from the last 3 years (slots weighted IPL 40% / top-10 T20I
+    25% / other majors 35%); per match the max-leverage inns-2 ball with wp_before 0.15-0.85 and
+    12-48 balls left. `/games/call-it/daily` (no answers) + `/games/call-it/reveal?index=`.
+  - **Higher or Lower**: batter-seasons per competition (>= 150 balls, last 4 seasons, majors +
+    top-10 T20I) of players with >= 600 balls in the window; 11-card chain alternating close
+    (< 15) / clear (> 30) Impact gaps. `/games/higher-lower/daily` + `/reveal?index=`.
+* Frontend: `games/daily/{dailyStorage.js, DailyGameShell.jsx}` (progress per day, streaks that
+  survive only if yesterday was played, share, countdown to midnight IST), `CallItGame.jsx`
+  (slider; score 100x(1-sq err); 🟩 right+beat model / 🟨 right / 🟥 wrong or 50%),
+  `HigherLowerGame.jsx`. Routes in MensT20Scope, nav "Play" group, Home "Today's games" card.
+* `.github/workflows/warm-daily-games.yml` requests both at 18:35 UTC (Call It builds in ~10s
+  cold) and fails if either is down. Both daily endpoints are status-only goldens.
+
 ### 2026-09-26 — Growth G1: every shared link unfurls with its own title and image — Claude
 
 * The site-wide og:image was an SVG, which WhatsApp/X/Facebook do not render: shared links had
