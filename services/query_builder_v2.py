@@ -3366,7 +3366,8 @@ def handle_grouped_query(
     # grouped by bowler (and not batter) they are shown from the bowling side, as the Primer's
     # bowling tables are. Wides are left out, as in the Primer. metric_balls counts the balls
     # that have metrics (men's T20 only for now), so per-100 rates stay honest when a group
-    # mixes covered and uncovered deliveries.
+    # mixes covered and uncovered deliveries. Sums run in double precision: float4 totals over
+    # tens of thousands of balls wobble in the last shown digit with parallel aggregation order.
     # QB_PRIMER_METRICS=0 drops the join (kill switch if it ever costs too much on a big scan).
     metrics_join = "LEFT JOIN ball_metrics bm ON bm.delivery_id = dd.id" if metrics_enabled else ""
     metric_sign = -1 if ("bowler" in group_by and "batter" not in group_by) else 1
@@ -3374,11 +3375,11 @@ def handle_grouped_query(
     metric_ball = "s.wide = 0 AND s.m_impact IS NOT NULL"
     metric_selects = f"""
             SUM(CASE WHEN {metric_ball} THEN 1 ELSE 0 END) as metric_balls,
-            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_impact END) as impact,
-            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_raa END) as raa,
-            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_waa END) as waa,
-            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_wpa END) as wpa,
-            AVG(CASE WHEN {metric_ball} THEN s.m_leverage END) as avg_leverage"""
+            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_impact::double precision END) as impact,
+            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_raa::double precision END) as raa,
+            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_waa::double precision END) as waa,
+            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_wpa::double precision END) as wpa,
+            AVG(CASE WHEN {metric_ball} THEN s.m_leverage::double precision END) as avg_leverage"""
 
     combined_query = f"""
         WITH {bat_pos_cte}{computed_cte_prefix}all_groups AS (
