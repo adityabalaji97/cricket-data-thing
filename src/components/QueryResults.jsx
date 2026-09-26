@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import ShareButton from './ui/ShareButton';
 import CondensedName from './common/CondensedName';
 import NLInterpretation from './NLInterpretation';
 import axios from 'axios';
@@ -1107,6 +1108,7 @@ const QueryResults = ({
                       </Box>
                     </Button>
                   )}
+                  <ShareButton kind="query" sx={{ ...qbGhostButtonSx }} />
                   <Button
                     variant="outlined"
                     startIcon={<GetAppIcon />}

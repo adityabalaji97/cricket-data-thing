@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import ShareButton from './ui/ShareButton';
 import { useFormat } from '../context/FormatContext';
 import { colors as hsColors } from '../theme/hindsightDark';
 import {
@@ -1391,6 +1392,7 @@ return (
                         {filtersExpanded ? 'Hide filters' : 'Edit filters'}
                     </Button>
                 ) : null}
+                <ShareButton variant="icon" kind="preview" title={`${venue} preview on Hindsight`} sx={{ flexShrink: 0 }} />
             </Box>
             <Box sx={{ mt: 0.25, px: 0.1 }}>
                 <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>

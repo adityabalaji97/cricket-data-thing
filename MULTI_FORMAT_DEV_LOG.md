@@ -151,6 +151,22 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## Log entries (newest first)
 
+### 2026-09-26 — Growth G1: every shared link unfurls with its own title and image — Claude
+
+* The site-wide og:image was an SVG, which WhatsApp/X/Facebook do not render: shared links had
+  no image at all. Now `api/og.mjs` (@vercel/og, Node) draws 1200x630 PNGs at `/_og?path=...`:
+  scorecards (result, scores, WP sparkline, Impact margin), players (latest-season Impact /
+  per-100 / WPA tiles + Impact by season), everything else a branded text card.
+* `api/meta.mjs` serves index.html with a page-specific head (title, description, OG/Twitter,
+  canonical). `vercel.json` routes ONLY bot/unfurler user-agents there (explicit UA list, no
+  `(?i)`), so people get the static app with no extra hop. Summaries live in `api/_lib/share.mjs`.
+* `/sitemap.xml` (`api/sitemap.mjs` + API `GET /seo/sitemap-entries`, cached 1 day): last
+  year's scorecards, top-500 men's T20 batters (3y), top-200 venues; robots.txt points at it.
+* `src/components/ui/ShareButton.jsx` (native share sheet, else copy link; `share` event) on
+  scorecard, player, match preview and query results.
+* `SITE_URL` / `HINDSIGHT_API_BASE` env vars on Vercel override the defaults when the custom
+  domain lands.
+
 ### 2026-09-26 — Growth G0: usage measurement, Player Journeys fix — Claude
 
 Growth plan (`~/.claude/plans/can-you-look-at-iterative-plum.md`): G0 foundations → G1 shareable

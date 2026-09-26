@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import ShareButton from '../ui/ShareButton';
 import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import config from '../../config';
@@ -175,6 +176,12 @@ const ScorecardTopNav = ({ data, screen, setScreen }) => (
       <h1>{data.match.team1} vs {data.match.team2}</h1>
       <p>{data.match.venue}{data.match.city ? `, ${data.match.city}` : ''}</p>
     </div>
+    <ShareButton
+      kind="scorecard"
+      title={`${data.match.team1} v ${data.match.team2}`}
+      text={data.match.result_text}
+      sx={{ alignSelf: 'flex-start' }}
+    />
     <div className="scorecard-screen-tabs" role="tablist">
       {SCREEN_OPTIONS.map((option) => (
         <button

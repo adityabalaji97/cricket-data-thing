@@ -3,7 +3,43 @@
   "version": 2,
   "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/proxy.js" },
-    { "src": "/(.*)", "dest": "/$1" }
+    {
+      "src": "/_og",
+      "dest": "/api/og.mjs"
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "/api/sitemap.mjs"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/proxy.js"
+    },
+    {
+      "src": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|Crawler|spider|Spider|facebookexternalhit|WhatsApp|Embedly|Preview|vkShare|Google|bing).*"
+        }
+      ],
+      "dest": "/api/meta.mjs?__path=/"
+    },
+    {
+      "src": "/(scorecard/[^/]+|player|venue|query|rankings|games/[^/]+)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|Crawler|spider|Spider|facebookexternalhit|WhatsApp|Embedly|Preview|vkShare|Google|bing).*"
+        }
+      ],
+      "dest": "/api/meta.mjs?__path=/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
   ]
 }

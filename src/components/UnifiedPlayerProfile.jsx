@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import ShareButton from './ui/ShareButton';
 import {
   Box, Button, Typography, TextField, CircularProgress,
   Alert, Autocomplete, ToggleButtonGroup, ToggleButton, Card, Chip, LinearProgress,
@@ -679,6 +680,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
                 </Typography>
               </Typography>
 
+              <ShareButton variant="icon" kind="player" title={`${selectedPlayer} on Hindsight`} />
               {showBattingTab && showBowlingTab && (
                 <ToggleButtonGroup
                   value={activeTab}
