@@ -102,6 +102,20 @@ jobs:
                   print(f"{table}: pruned {n}")
           PY
 
+      # Weekly adoption check-in (growth plan): on Mondays the usage report lands on this run's
+      # summary page in the Actions tab.
+      - name: Weekly usage report (Mondays)
+        if: always()
+        run: |
+          if [ "$(date -u +%u)" = "1" ]; then
+            {
+              echo '## Hindsight weekly usage'
+              echo '```'
+              python scripts/usage_report.py --weeks 8
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       # Women's T20 and Test legs are deliberately absent: their data has not
       # been loaded yet (phases B and C). Adding a leg here is what loads a
       # format for the first time, so do not add one before its chunk is ready.
