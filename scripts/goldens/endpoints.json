@@ -178,5 +178,11 @@
     "path": "/games/player-journey/puzzle",
     "params": {},
     "status_only": true
+  },
+  {
+    "name": "game_guess_innings_daily",
+    "path": "/games/guess-innings/daily",
+    "params": {},
+    "status_only": true
   }
 ]

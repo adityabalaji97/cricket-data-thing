@@ -1,124 +1,166 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Button, CircularProgress, Typography } from '@mui/material';
+/**
+ * Higher or Lower: Impact (daily). Ten independent pairs of player-seasons; tap the one with the
+ * higher Impact. Both values are revealed after each tap, and every pair is played.
+ */
+import React, { useState } from 'react';
+import { Box, Button, ButtonBase, CircularProgress, Typography } from '@mui/material';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { track } from '../../utils/analytics';
 import DailyGameShell from './daily/DailyGameShell';
-import { loadProgress, loadStats, recordFinish, saveProgress } from './daily/dailyStorage';
+import usePuzzle from './daily/usePuzzle';
+import { recordFinish, saveProgress } from './daily/dailyStorage';
 
 const GAME = 'higher_lower';
 const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}`;
+const emptyProgress = () => ({ picks: [] }); // { choice, cards (with impact), right } per round
 
-const PlayerCard = ({ card, hidden, label }) => (
-  <Box sx={{ p: 2, borderRadius: 3, bgcolor: colors.surface1, border: `1px solid ${colors.border}`, flex: 1, minWidth: 0 }}>
-    <Typography sx={{ fontFamily: fonts.mono, fontSize: 11, color: colors.textLo, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</Typography>
-    <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 22, color: colors.textHi, mt: 0.5, lineHeight: 1.15 }}>{card.player}</Typography>
-    <Typography sx={{ color: colors.textMed, fontSize: 14 }}>
-      {card.competition} {card.season} · {card.runs} off {card.balls} (SR {card.strike_rate})
-    </Typography>
-    <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 34, mt: 1, color: hidden ? colors.textFaint : (card.impact >= 0 ? colors.accent : colors.red) }}>
-      {hidden ? 'Impact ?' : `Impact ${signed(card.impact)}`}
-    </Typography>
-    {!hidden && card.raa !== undefined && (
-      <Typography sx={{ color: colors.textLo, fontSize: 13 }}>RAA {signed(card.raa)} · WPA {card.wpa > 0 ? '+' : ''}{card.wpa}</Typography>
-    )}
-  </Box>
-);
+const PlayerCard = ({ card, revealed, chosen, winner, disabled, onTap }) => {
+  let border = colors.border;
+  if (revealed && winner) border = colors.accent;
+  else if (revealed && chosen) border = colors.red;
+  return (
+    <ButtonBase
+      onClick={onTap}
+      disabled={disabled}
+      focusRipple
+      sx={{
+        flex: 1, minWidth: 0, display: 'block', textAlign: 'left', p: 2, borderRadius: 3,
+        bgcolor: colors.surface1, border: `2px solid ${border}`,
+        transition: 'border-color 120ms, transform 120ms',
+        '&:not(:disabled):hover': { borderColor: colors.borderStrong, transform: 'translateY(-1px)' },
+      }}
+      aria-label={`${card.player}, ${card.competition} ${card.season}`}
+    >
+      <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20, color: colors.textHi, lineHeight: 1.15 }}>{card.player}</Typography>
+      <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, color: colors.textLo, mt: 0.5, letterSpacing: '0.04em' }}>
+        {card.competition} {card.season}
+      </Typography>
+      <Typography sx={{ color: colors.textMed, fontSize: 14, mt: 0.5 }}>
+        {card.runs} off {card.balls} · SR {card.strike_rate}
+      </Typography>
+      <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 28, mt: 1, color: revealed ? (card.impact >= 0 ? colors.accent : colors.red) : colors.textFaint }}>
+        {revealed ? signed(card.impact) : '?'}
+      </Typography>
+      <Typography sx={{ color: colors.textLo, fontSize: 12 }}>
+        {revealed ? `Impact · RAA ${signed(card.raa)} · WPA ${card.wpa > 0 ? '+' : ''}${card.wpa}` : 'Impact'}
+      </Typography>
+      {revealed && chosen && (
+        <Typography sx={{ fontSize: 12, fontWeight: 700, mt: 0.5, color: winner ? colors.accent : colors.red }}>Your pick</Typography>
+      )}
+    </ButtonBase>
+  );
+};
 
 const HigherLowerGame = () => {
-  const [puzzle, setPuzzle] = useState(null);
-  const [revealed, setRevealed] = useState([]); // cards with impact, index 0.. current
-  const [calls, setCalls] = useState([]); // 'up' | 'down' per guess
-  const [over, setOver] = useState(false);
+  const {
+    puzzle, progress, setProgress, stats, setStats, error, practice, daily,
+  } = usePuzzle(GAME, '/games/higher-lower/daily', emptyProgress);
+  const [showing, setShowing] = useState(null); // round whose answer is on screen
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const [stats, setStats] = useState(null);
-
-  useEffect(() => {
-    fetch(`${config.API_URL}/games/higher-lower/daily`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((data) => {
-        setPuzzle(data);
-        const saved = loadProgress(GAME, data.date);
-        setRevealed(saved?.revealed || [data.cards[0]]);
-        setCalls(saved?.calls || []);
-        setOver(Boolean(saved?.over));
-        setStats(loadStats(GAME, data.date));
-        if (!saved) track('game_start', { game: GAME, number: data.number });
-      })
-      .catch(() => setError("Couldn't load today's Higher or Lower. Try again in a minute."));
-  }, []);
+  const [failure, setFailure] = useState(null);
 
   if (error) return <Typography sx={{ p: 3, color: colors.textMed, textAlign: 'center' }}>{error}</Typography>;
-  if (!puzzle || !stats) return <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress /></Box>;
+  if (!puzzle || !progress || !stats) return <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress /></Box>;
 
-  const total = puzzle.cards.length - 1;
-  const correct = calls.filter((c) => c.right).length;
-  const current = revealed[revealed.length - 1];
-  const nextIndex = revealed.length;
-  const next = puzzle.cards[nextIndex];
+  const total = puzzle.rounds.length;
+  const { picks } = progress;
+  const finished = picks.length >= total;
+  const correct = picks.filter((p) => p.right).length;
+  const roundIndex = showing ?? (finished ? total - 1 : picks.length);
+  const pick = picks[roundIndex];
+  const round = puzzle.rounds[roundIndex];
 
-  const guess = async (direction) => {
+  const tap = async (choice) => {
+    if (pick || busy) return;
     setBusy(true);
+    setFailure(null);
     try {
-      const r = await fetch(`${config.API_URL}/games/higher-lower/reveal?index=${nextIndex}&date=${puzzle.date}`);
-      const card = await r.json();
-      const right = direction === 'up' ? card.impact >= current.impact : card.impact <= current.impact;
-      const nextCalls = [...calls, { direction, right }];
-      const nextRevealed = [...revealed, card];
-      const finished = nextIndex >= total;  // every card is played; misses just score 0
-      setCalls(nextCalls);
-      setRevealed(nextRevealed);
-      setOver(finished);
-      saveProgress(GAME, puzzle.date, { revealed: nextRevealed, calls: nextCalls, over: finished });
-      if (finished) {
-        const score = nextCalls.filter((c) => c.right).length;
-        setStats(recordFinish(GAME, puzzle.date, score));
-        track('game_finish', { game: GAME, number: puzzle.number, score });
+      const r = await fetch(`${config.API_URL}/games/higher-lower/reveal?index=${roundIndex}&puzzle=${encodeURIComponent(puzzle.puzzle)}`);
+      if (!r.ok) throw new Error(r.status);
+      const { cards } = await r.json();
+      const right = cards[choice].impact >= cards[1 - choice].impact;
+      const next = { picks: [...picks, { choice, cards, right }] };
+      setProgress(next);
+      setShowing(roundIndex);
+      if (puzzle.daily) saveProgress(GAME, puzzle.puzzle, next);
+      if (next.picks.length >= total) {
+        const score = next.picks.filter((p) => p.right).length;
+        if (puzzle.daily) setStats(recordFinish(GAME, puzzle.puzzle, score));
+        track('game_finish', { game: GAME, number: puzzle.number, score, practice: !puzzle.daily });
       }
     } catch {
-      setError('Something went wrong. Try again.');
+      setFailure('Something went wrong. Try again.');
     } finally {
       setBusy(false);
     }
   };
 
-  const trail = calls.map((c) => (c.right ? '🟩' : '🟥')).join('');
+  const trail = picks.map((p) => (p.right ? '🟩' : '🟥')).join('');
   const shareText = `Higher or Lower #${puzzle.number} · ${correct}/${total}${correct >= 8 ? ' 🔥' : ''}\n${trail}\n${window.location.origin}/games/higher-lower`;
-  const lastCall = calls[calls.length - 1];
+  const cards = pick ? pick.cards : round.cards;
+  const winnerIndex = pick ? (cards[0].impact >= cards[1].impact ? 0 : 1) : null;
 
   return (
     <DailyGameShell
       game={GAME}
       title="Higher or Lower"
-      number={puzzle.number}
-      rules="Impact is the runs a batter added to their team's projected total, given the game situation. Is the next player-season's Impact higher or lower than the one before? Ten calls a day."
+      number={puzzle.daily ? puzzle.number : null}
+      rules="Impact is the runs a batter added to their team's projected total, given the game situation. Tap the player-season with the higher Impact. Ten pairs a day."
       stats={stats}
-      finished={over}
+      finished={finished}
       resultLine={`${correct} / ${total}`}
       shareText={shareText}
+      practice={!puzzle.daily}
+      onPractice={() => { setShowing(null); practice(); }}
+      onBackToDaily={() => { setShowing(null); daily(); }}
     >
-      <Typography sx={{ fontFamily: fonts.mono, color: colors.textLo, fontSize: 13, mb: 1.5 }}>
-        {correct} / {calls.length} right {trail ? `· ${trail}` : ''}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+        <Typography sx={{ fontFamily: fonts.mono, color: colors.textLo, fontSize: 13 }}>
+          Pair {roundIndex + 1} of {total}
+        </Typography>
+        <Typography sx={{ fontFamily: fonts.mono, color: colors.textLo, fontSize: 13 }}>
+          {correct} right {trail}
+        </Typography>
+      </Box>
+
+      <Typography sx={{ color: colors.textHi, fontWeight: 700, mb: 1 }}>
+        {pick ? (pick.right ? 'Right.' : 'Not this time.') : 'Who had the higher Impact?'}
       </Typography>
-      {over ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {revealed.length > 1 && <PlayerCard card={revealed[revealed.length - 2]} label="Previous" />}
-          <PlayerCard card={current} label="Last card" />
-        </Box>
-      ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <PlayerCard card={current} label="Known" />
-          <PlayerCard card={next} hidden label="Next: higher or lower?" />
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <Button fullWidth variant="contained" disabled={busy} onClick={() => guess('up')} sx={{ minHeight: 48 }}>⬆️ Higher</Button>
-            <Button fullWidth variant="outlined" disabled={busy} onClick={() => guess('down')} sx={{ minHeight: 48 }}>⬇️ Lower</Button>
-          </Box>
-          {lastCall && (
-            <Typography sx={{ color: lastCall.right ? colors.accent : colors.red, fontSize: 14 }}>
-              {lastCall.right ? 'Right' : 'Wrong'}: {revealed[revealed.length - 2]?.player}&apos;s Impact was {signed(revealed[revealed.length - 2]?.impact ?? 0)}, {current.player}&apos;s {signed(current.impact)}.
-            </Typography>
-          )}
+      <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'stretch' }}>
+        {cards.map((card, i) => (
+          <PlayerCard
+            key={`${roundIndex}-${card.player}`}
+            card={card}
+            revealed={Boolean(pick)}
+            chosen={pick?.choice === i}
+            winner={winnerIndex === i}
+            disabled={Boolean(pick) || busy}
+            onTap={() => tap(i)}
+          />
+        ))}
+      </Box>
+      {failure && <Typography sx={{ color: colors.red, fontSize: 13, mt: 1 }}>{failure}</Typography>}
+
+      {pick && !finished && (
+        <Button fullWidth variant="contained" onClick={() => setShowing(null)} sx={{ mt: 2, minHeight: 48 }}>
+          Next pair
+        </Button>
+      )}
+      {finished && (
+        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 2 }}>
+          {picks.map((p, i) => (
+            <Button
+              key={i}
+              size="small"
+              variant={i === roundIndex ? 'contained' : 'outlined'}
+              onClick={() => setShowing(i)}
+              sx={{ minWidth: 40, minHeight: 36, px: 0 }}
+              aria-label={`Pair ${i + 1}, ${p.right ? 'right' : 'wrong'}`}
+            >
+              {p.right ? '🟩' : '🟥'}
+            </Button>
+          ))}
         </Box>
       )}
     </DailyGameShell>

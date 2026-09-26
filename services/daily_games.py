@@ -30,10 +30,9 @@ TOP_T20I_TEAMS = (
 MAJOR_LEAGUES = ("IPL", "BBL", "PSL", "SA20", "CPL", "ILT20", "MLC")
 
 CALL_IT_MOMENTS = 5
-HIGHER_LOWER_LENGTH = 11  # 10 guesses
 ESTABLISHED_BALLS = 600
 
-_pool_cache: Dict[Tuple[str, date], Tuple[float, Any]] = {}
+_pool_cache: Dict[Tuple[Any, ...], Tuple[float, Any]] = {}
 _POOL_TTL = 6 * 3600
 
 
@@ -58,12 +57,46 @@ def resolve_day(day: Optional[date]) -> date:
     return max(day, LAUNCH_DATE)
 
 
-def _cached(key: Tuple[str, date], build):
+class Puzzle:
+    """A daily (date) or practice (token) puzzle: its cache key, its day and its seeded RNG."""
+
+    def __init__(self, game: str, puzzle_id: Optional[str]):
+        self.game = game
+        self.day: Optional[date] = None
+        token = (puzzle_id or "").strip()
+        try:
+            self.day = resolve_day(date.fromisoformat(token)) if token else today_ist()
+        except ValueError:
+            if len(token) > 40 or not all(c.isalnum() or c in "-_" for c in token):
+                raise ValueError("bad puzzle id")
+        self.id = self.day.isoformat() if self.day else token
+        self.daily = self.day is not None
+        # Practice puzzles draw from the same pools as today's daily.
+        self.window_day = self.day or today_ist()
+        seed_text = f"hindsight:{game}:{self.id}" if self.daily else f"practice:{game}:{self.id}"
+        self.rng = random.Random(int(hashlib.sha256(seed_text.encode()).hexdigest()[:16], 16))
+        if self.daily:
+            self.rng = rng_for(game, self.day)
+
+    @property
+    def number(self) -> Optional[int]:
+        return puzzle_number(self.day) if self.day else None
+
+    def meta(self) -> Dict[str, Any]:
+        return {"puzzle": self.id, "daily": self.daily, "number": self.number, "today": today_ist().isoformat()}
+
+
+_CACHE_MAX = 400  # daily pools + recent practice puzzles; oldest evicted first
+
+
+def _cached(key: Tuple[Any, ...], build):
     hit = _pool_cache.get(key)
     if hit and time.time() - hit[0] < _POOL_TTL:
         return hit[1]
     value = build()
     _pool_cache[key] = (time.time(), value)
+    while len(_pool_cache) > _CACHE_MAX:
+        _pool_cache.pop(next(iter(_pool_cache)))
     return value
 
 
@@ -104,6 +137,18 @@ def _moment_for(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
                (dd.inns_wkts - CASE WHEN LOWER(COALESCE(dd.out, '')) = 'true' THEN 1 ELSE 0 END) AS wkts_before,
                dd.inns_balls_rem + CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END AS balls_left,
                NULLIF(dd.target, '')::numeric::int AS target,
+               dd.bat AS striker,
+               dd.cur_bat_runs - COALESCE(dd.batruns, 0) AS striker_runs,
+               dd.cur_bat_bf - CASE WHEN COALESCE(dd.wide, 0) = 0 THEN 1 ELSE 0 END AS striker_balls,
+               dd.non_striker,
+               (SELECT d2.cur_bat_runs FROM delivery_details d2
+                 WHERE d2.p_match = dd.p_match AND d2.inns = dd.inns AND d2.bat = dd.non_striker
+                   AND (d2.over * 100 + d2.ball) < (dd.over * 100 + dd.ball)
+                 ORDER BY d2.over DESC, d2.ball DESC LIMIT 1) AS non_striker_runs,
+               (SELECT d2.cur_bat_bf FROM delivery_details d2
+                 WHERE d2.p_match = dd.p_match AND d2.inns = dd.inns AND d2.bat = dd.non_striker
+                   AND (d2.over * 100 + d2.ball) < (dd.over * 100 + dd.ball)
+                 ORDER BY d2.over DESC, d2.ball DESC LIMIT 1) AS non_striker_balls,
                m.winner, m.date
         FROM delivery_details dd
         JOIN ball_metrics bm ON bm.delivery_id = dd.id
@@ -119,10 +164,10 @@ def _moment_for(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
     return dict(row)
 
 
-def call_it_puzzle(db: Session, day: date) -> Dict[str, Any]:
+def call_it_puzzle(db: Session, puzzle: Puzzle) -> List[Dict[str, Any]]:
     def build():
-        groups = _eligible_chases(db, day)
-        rng = rng_for("call-it", day)
+        groups = {k: list(v) for k, v in _cached(("chases", puzzle.window_day), lambda: _eligible_chases(db, puzzle.window_day)).items()}
+        rng = puzzle.rng
         for matches in groups.values():
             rng.shuffle(matches)
         names = [name for name, _ in CALL_IT_GROUP_WEIGHTS]
@@ -143,7 +188,13 @@ def call_it_puzzle(db: Session, day: date) -> Dict[str, Any]:
                 moments.append({**moment, "match_id": match_id})
         return moments
 
-    return _cached(("call-it", day), build)
+    return _cached(("call-it", puzzle.id), build)
+
+
+def _batter(name, runs, balls) -> Optional[Dict[str, Any]]:
+    if not name:
+        return None
+    return {"name": name, "runs": int(runs or 0), "balls": int(balls or 0)}
 
 
 def call_it_question(moment: Dict[str, Any], index: int) -> Dict[str, Any]:
@@ -160,6 +211,12 @@ def call_it_question(moment: Dict[str, Any], index: int) -> Dict[str, Any]:
         "runs_needed": needed,
         "balls_left": int(moment["balls_left"]),
         "wickets_left": 10 - int(moment["wkts_before"]),
+        # The model's number is part of the question now: "did they win?" is the call.
+        "model_win_probability": round(float(moment["wp_before"]), 3),
+        "batters": [b for b in (
+            _batter(moment.get("striker"), moment.get("striker_runs"), moment.get("striker_balls")),
+            _batter(moment.get("non_striker"), moment.get("non_striker_runs"), moment.get("non_striker_balls")),
+        ) if b],
     }
 
 
@@ -199,51 +256,39 @@ def _player_seasons(db: Session, day: date) -> List[Dict[str, Any]]:
     return [dict(r) for r in rows if totals[r["player"]] >= ESTABLISHED_BALLS]
 
 
-def higher_lower_puzzle(db: Session, day: date) -> List[Dict[str, Any]]:
-    """A chain alternating close (< 15 runs apart) and clear (> 30) Impact gaps, no repeats."""
+HIGHER_LOWER_ROUNDS = 10
+
+
+def higher_lower_puzzle(db: Session, puzzle: Puzzle) -> List[Tuple[Dict[str, Any], Dict[str, Any]]]:
+    """Ten independent pairs; tap the one with the higher Impact. Rounds alternate a close gap
+    (3-15 runs) and a clear one (> 30); no player appears twice in a day."""
     def build():
-        pool = _player_seasons(db, day)
-        rng = rng_for("higher-lower", day)
+        pool = list(_cached(("seasons", puzzle.window_day), lambda: _player_seasons(db, puzzle.window_day)))
+        rng = puzzle.rng
         rng.shuffle(pool)
-        if not pool:
-            return []
-        chain = [pool[0]]
-        used = {pool[0]["player"]}
-        for step in range(1, HIGHER_LOWER_LENGTH):
-            last = float(chain[-1]["impact"])
-            close = step % 2 == 1
-            def fits(item):
-                gap = abs(float(item["impact"]) - last)
-                return item["player"] not in used and gap >= 2 and (gap < 15 if close else gap > 30)
-            nxt = next((item for item in pool if fits(item)), None) or next(
-                (item for item in pool if item["player"] not in used and abs(float(item["impact"]) - last) >= 2), None)
-            if nxt is None:
+        pairs, used = [], set()
+        for round_ in range(HIGHER_LOWER_ROUNDS):
+            close = round_ % 2 == 0
+            pair = None
+            for a in pool:
+                if a["player"] in used:
+                    continue
+                for b in pool:
+                    if b["player"] in used or b["player"] == a["player"]:
+                        continue
+                    gap = abs(float(a["impact"]) - float(b["impact"]))
+                    if (3 <= gap <= 15) if close else gap > 30:
+                        pair = (a, b)
+                        break
+                if pair:
+                    break
+            if not pair:
                 break
-            chain.append(nxt)
-            used.add(nxt["player"])
-        return chain
+            used.update({pair[0]["player"], pair[1]["player"]})
+            pairs.append(pair if rng.random() < 0.5 else (pair[1], pair[0]))
+        return pairs
 
-    return _cached(("higher-lower", day), build)
-
-
-def higher_lower_card(item: Dict[str, Any], index: int, reveal: bool) -> Dict[str, Any]:
-    balls = int(item["balls"])
-    card = {
-        "index": index,
-        "player": item["player"],
-        "competition": item["competition"],
-        "season": item["year"],
-        "balls": balls,
-        "runs": int(item["runs"] or 0),
-        "strike_rate": round(float(item["runs"] or 0) * 100.0 / balls, 1) if balls else None,
-    }
-    if reveal:
-        card.update({
-            "impact": round(float(item["impact"]), 1),
-            "raa": round(float(item["raa"]), 1),
-            "wpa": round(float(item["wpa"]), 2),
-        })
-    return card
+    return _cached(("higher-lower", puzzle.id), build)
 
 
 # ---------------------------------------------------------------------------- Player Journeys
@@ -352,17 +397,10 @@ def journey_pool(db: Session) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
     return _cached(("journey-pool", today), lambda: (lambda pool: (pool, _eligible_journeys(pool)))(_journey_pool(db)))
 
 
-def journey_player(db: Session, puzzle_id: str) -> Tuple[str, Dict[str, Any], Optional[date]]:
-    """The player for a puzzle id: an ISO date (the daily) or a practice token."""
+def journey_player(db: Session, puzzle: Puzzle) -> Tuple[str, Dict[str, Any]]:
     pool, eligible = journey_pool(db)
-    try:
-        day = resolve_day(date.fromisoformat(puzzle_id))
-        rng = rng_for("player-journey", day)
-    except ValueError:
-        day = None
-        rng = random.Random(int(hashlib.sha256(f"practice:{puzzle_id}".encode()).hexdigest()[:16], 16))
-    name = rng.choice(eligible)
-    return name, pool[name], day
+    name = puzzle.rng.choice(eligible)
+    return name, pool[name]
 
 
 def collapse_journey(team_years) -> List[Dict[str, Any]]:
@@ -422,9 +460,7 @@ def journey_hint(db: Session, name: str, rec: Dict[str, Any], key: str) -> str:
               WHERE dd.bowl IN (:name, (SELECT player_name FROM player_aliases WHERE alias_name = :name LIMIT 1))
                 AND dd.bowl_style IS NOT NULL AND dd.bowl_style NOT IN ('', '-') LIMIT 1) AS bowl_style
     """), {"name": name}).mappings().first() or {}
-    # style: role from IPL numbers + handedness + bowling style
-    runs, wickets = rec["runs"], rec["wickets"]
-    role = "All-rounder" if runs >= 800 and wickets >= 30 else "Bowler" if wickets >= 30 else "Batter"
+    # style: batting hand and bowling style only (no batter/bowler label -- that gives too much away)
     raw_hand = (clean(profile.get("batting_hand")) or clean(feed.get("bat_hand")) or "").upper()
     hand = {"RHB": "right-hand bat", "LHB": "left-hand bat"}.get(raw_hand)
     raw_bowl = clean(feed.get("bowl_style")) or clean(profile.get("bowling_type")) or clean(profile.get("bowler_type"))
@@ -432,7 +468,103 @@ def journey_hint(db: Session, name: str, rec: Dict[str, Any], key: str) -> str:
     if raw_bowl:
         codes = [BOWL_STYLE_LABELS.get(code.strip().upper(), code.strip()) for code in str(raw_bowl).split("/")]
         bowl = " / ".join(codes)
-    # Only mention bowling for players who actually bowled in the IPL.
-    if rec["wickets"] < 5:
+    # Bowling style only for players who bowled: the feed only records a style for bowlers.
+    if not clean(feed.get("bowl_style")) and rec["wickets"] < 1:
         bowl = None
-    return " · ".join(part for part in (role, hand, bowl) if part)
+    return " · ".join(part for part in ((hand or "").capitalize() or None, bowl) if part) or "Not recorded"
+
+
+# ------------------------------------------------------------------------------ name guessing
+#
+# Player Journeys and Guess the Innings take typed guesses against hangman dashes. The check is
+# forgiving about spelling -- the game tests cricket knowledge, not "Chakaravarthy" vs
+# "Chakravarthy" -- so a guess counts if it matches the canonical name, any known alias, or is a
+# close spelling of the canonical name.
+
+def name_matches(db: Session, guess: str, answer: str) -> bool:
+    from difflib import SequenceMatcher
+
+    g, a = letters(guess), letters(answer)
+    if len(g) < 3:
+        return False
+    if g == a:
+        return True
+    aliases = db.execute(text("""
+        SELECT player_name FROM player_aliases WHERE alias_name = :a
+        UNION SELECT alias_name FROM player_aliases WHERE player_name = :a
+    """), {"a": answer}).scalars().all()
+    if any(letters(alias) == g for alias in aliases if alias):
+        return True
+    return abs(len(g) - len(a)) <= 2 and SequenceMatcher(None, g, a).ratio() >= 0.85
+
+
+# ------------------------------------------------------------------------ Guess the Innings
+#
+# One 40+ innings a day (IPL, or T20Is between top-10 sides, since 2015): the wagon wheel and the
+# score are the clue; name the batter. Hints: venue, season, opposition, team, initials.
+
+INNINGS_HINTS = ("venue", "season", "opposition", "team", "initials")
+
+
+def _innings_pool(db: Session) -> List[Dict[str, Any]]:
+    rows = db.execute(text("""
+        SELECT match_id, innings, batter, venue, competition, match_date, balls, runs, strike_rate,
+               batting_team, bowling_team
+        FROM guess_innings_pool
+        WHERE runs >= 40 AND match_date::date >= DATE '2015-01-01'
+          AND (competition IN ('IPL', 'Indian Premier League')
+               OR (competition IN ('T20I', 'International Twenty20')
+                   AND batting_team = ANY(:teams) AND bowling_team = ANY(:teams)))
+        ORDER BY match_id, innings, batter
+    """), {"teams": list(TOP_T20I_TEAMS)}).mappings().all()
+    return [dict(r) for r in rows]
+
+
+def innings_puzzle(db: Session, puzzle: Puzzle) -> Dict[str, Any]:
+    def build():
+        pool = _cached(("innings-pool", puzzle.window_day), lambda: _innings_pool(db))
+        pick = dict(puzzle.rng.choice(pool))
+        deliveries = db.execute(text("""
+            SELECT dd.over, dd.ball, dd.batruns AS runs, dd.wagon_x, dd.wagon_y, dd.bat_hand
+            FROM delivery_details dd
+            WHERE dd.p_match = :match_id AND dd.inns = :innings AND dd.bat = :batter
+              AND COALESCE(dd.wide, 0) = 0
+            ORDER BY dd.over, dd.ball
+        """), {"match_id": pick["match_id"], "innings": pick["innings"], "batter": pick["batter"]}).mappings().all()
+        pick["deliveries"] = [dict(d) for d in deliveries]
+        return pick
+
+    return _cached(("innings", puzzle.id), build)
+
+
+def innings_question(pick: Dict[str, Any]) -> Dict[str, Any]:
+    deliveries = pick["deliveries"]
+    runs = [int(d["runs"] or 0) for d in deliveries]
+    hand = next((d["bat_hand"] for d in deliveries if d.get("bat_hand") not in (None, "", "-")), None)
+    return {
+        "runs": int(pick["runs"]),
+        "balls": int(pick["balls"]),
+        "strike_rate": round(float(pick["strike_rate"] or 0), 1),
+        "fours": runs.count(4),
+        "sixes": runs.count(6),
+        "bat_hand": {"RHB": "Right-hand bat", "LHB": "Left-hand bat"}.get(hand, hand),
+        "name_shape": name_shape(pick["batter"]),
+        "hints": list(INNINGS_HINTS),
+        "deliveries": [
+            {"over": d["over"], "ball": d["ball"], "runs": int(d["runs"] or 0), "x": d["wagon_x"], "y": d["wagon_y"]}
+            for d in deliveries
+        ],
+    }
+
+
+def innings_hint(pick: Dict[str, Any], key: str) -> str:
+    if key == "venue":
+        return pick["venue"] or "Not recorded"
+    if key == "season":
+        comp = "IPL" if pick["competition"] in ("IPL", "Indian Premier League") else "T20I"
+        return f"{comp} {str(pick['match_date'])[:4]}"
+    if key == "opposition":
+        return f"vs {pick['bowling_team']}"
+    if key == "team":
+        return f"for {pick['batting_team']}"
+    return " ".join(word[0].upper() for word in pick["batter"].split() if word)

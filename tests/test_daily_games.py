@@ -50,3 +50,39 @@ def test_journey_collapses_consecutive_seasons_and_splits_on_gaps():
         {"team": "RPS", "years": "2016"},
         {"team": "CSK", "years": "2018-2019"},
     ]
+
+
+class _NoAliases:
+    """Stands in for the DB session: no aliases, so only spelling rules decide."""
+
+    def execute(self, *_args, **_kwargs):
+        return self
+
+    def scalars(self):
+        return self
+
+    def all(self):
+        return []
+
+
+def test_name_matches_forgives_close_spellings_but_not_other_players():
+    db = _NoAliases()
+    assert dg.name_matches(db, "umesh yadv", "Umesh Yadav")
+    assert dg.name_matches(db, "Umesh Yadhav", "Umesh Yadav")
+    assert dg.name_matches(db, "UMESH-YADAV", "Umesh Yadav")
+    assert not dg.name_matches(db, "Yadav", "Umesh Yadav")
+    assert not dg.name_matches(db, "Umesh", "Umesh Yadav")
+    assert not dg.name_matches(db, "Jaydev Unadkat", "Umesh Yadav")
+    assert not dg.name_matches(db, "UY", "Umesh Yadav")
+
+
+def test_puzzle_ids_split_daily_from_practice():
+    import pytest
+
+    today = dg.Puzzle("call-it", "")
+    assert today.daily and today.id == today.day.isoformat()
+    practice = dg.Puzzle("call-it", "pabc123")
+    assert not practice.daily and practice.id == "pabc123"
+    assert dg.Puzzle("call-it", "pabc123").rng.random() == practice.rng.random()
+    with pytest.raises(ValueError):
+        dg.Puzzle("call-it", "bad token!")

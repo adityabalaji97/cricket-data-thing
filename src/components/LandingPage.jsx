@@ -1246,15 +1246,16 @@ const playedToday = (game) => {
 const TodaysGamesSection = () => {
   const number = dailyNumber();
   const games = [
-    { key: 'call_it', to: '/games/call-it', title: 'Call It', blurb: 'Five real chases, frozen mid-game. Call the win chance; beat the model.' },
-    { key: 'higher_lower', to: '/games/higher-lower', title: 'Higher or Lower', blurb: 'Whose season added more runs to their team? Ten calls a day.' },
+    { key: 'call_it', to: '/games/call-it', title: 'Call It', blurb: 'Five real chases, frozen mid-game. Did they win it?' },
+    { key: 'higher_lower', to: '/games/higher-lower', title: 'Higher or Lower', blurb: 'Tap the player-season with the higher Impact. Ten pairs a day.' },
     { key: 'player_journeys', to: '/games/player-journeys', title: 'Player Journeys', blurb: 'Name the IPL player from their franchise path.' },
+    { key: 'guess_innings', to: '/games/guess-innings', title: 'Guess the Innings', blurb: 'Whose innings was it? A score line and a wagon wheel.' },
   ];
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
       <Kicker>Daily · #{number}</Kicker>
       <Typography sx={{ ...sectionTitleSx, fontSize: { xs: 20, md: 24 }, mb: 1.5 }}>Today&apos;s games</Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.25 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.25 }}>
         {games.map((game) => {
           const done = playedToday(game.key);
           return (

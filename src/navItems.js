@@ -29,7 +29,7 @@ export const NAV_ITEMS = [
   { path: '/games/higher-lower', label: '⬆️ Higher or Lower (daily)', title: 'Higher or Lower', t20Only: true, group: 'play' },
   {
     path: '/games/guess-innings',
-    label: '🎯 Guess the Innings',
+    label: '🎯 Guess the Innings (daily)',
     title: 'Guess the Innings',
     t20Only: true,
     group: 'play',

@@ -405,77 +405,84 @@ def get_player_journey(
 
 
 # ------------------------------------------------------------------------------------------
-# Daily games (growth plan G2). Same puzzle for everyone each day (IST); answers are only served
-# by the reveal endpoints, one item at a time, after the player has committed a guess.
+# Daily games (growth plan G2). Every game takes `puzzle`: an ISO date (default today, IST) is the
+# shared daily; any other short token is a practice puzzle. Answers only come back from the
+# reveal / check endpoints, after the player commits.
 # ------------------------------------------------------------------------------------------
 
 from services import daily_games as dg  # noqa: E402
 
 
-def _daily_meta(day):
-    return {"date": day.isoformat(), "number": dg.puzzle_number(day), "today": dg.today_ist().isoformat()}
+def _puzzle(game: str, puzzle: Optional[str]) -> "dg.Puzzle":
+    try:
+        return dg.Puzzle(game, puzzle)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Bad puzzle id.")
 
+
+# ---- Call It: five chase moments; did the chasing side win? ----
 
 @router.get("/call-it/daily")
-def call_it_daily(day: Optional[date] = Query(default=None, alias="date"), db: Session = Depends(get_session)):
-    day = dg.resolve_day(day)
-    moments = dg.call_it_puzzle(db, day)
+def call_it_daily(puzzle: Optional[str] = Query(default=None), db: Session = Depends(get_session)):
+    p = _puzzle("call-it", puzzle)
+    moments = dg.call_it_puzzle(db, p)
     if not moments:
-        raise HTTPException(status_code=503, detail="Today's Call It is not ready yet.")
-    return {**_daily_meta(day), "moments": [dg.call_it_question(m, i) for i, m in enumerate(moments)]}
+        raise HTTPException(status_code=503, detail="Call It is not ready yet.")
+    return {**p.meta(), "moments": [dg.call_it_question(m, i) for i, m in enumerate(moments)]}
 
 
 @router.get("/call-it/reveal")
-def call_it_reveal(index: int = Query(ge=0, lt=dg.CALL_IT_MOMENTS), day: Optional[date] = Query(default=None, alias="date"),
+def call_it_reveal(index: int = Query(ge=0, lt=dg.CALL_IT_MOMENTS), puzzle: Optional[str] = Query(default=None),
                    db: Session = Depends(get_session)):
-    day = dg.resolve_day(day)
-    moments = dg.call_it_puzzle(db, day)
+    moments = dg.call_it_puzzle(db, _puzzle("call-it", puzzle))
     if index >= len(moments):
         raise HTTPException(status_code=404, detail="No such moment.")
     return dg.call_it_answer(moments[index], index)
 
 
+# ---- Higher or Lower: ten pairs; tap the higher Impact ----
+
+def _season_card(item) -> dict:
+    balls = int(item["balls"])
+    return {
+        "player": item["player"], "competition": item["competition"], "season": item["year"],
+        "balls": balls, "runs": int(item["runs"] or 0),
+        "strike_rate": round(float(item["runs"] or 0) * 100.0 / balls, 1) if balls else None,
+    }
+
+
 @router.get("/higher-lower/daily")
-def higher_lower_daily(day: Optional[date] = Query(default=None, alias="date"), db: Session = Depends(get_session)):
-    day = dg.resolve_day(day)
-    chain = dg.higher_lower_puzzle(db, day)
-    if len(chain) < 2:
-        raise HTTPException(status_code=503, detail="Today's Higher or Lower is not ready yet.")
-    # The first card's Impact is the starting point, so it is shown; the rest are hidden.
-    return {**_daily_meta(day), "cards": [dg.higher_lower_card(item, i, reveal=(i == 0)) for i, item in enumerate(chain)]}
+def higher_lower_daily(puzzle: Optional[str] = Query(default=None), db: Session = Depends(get_session)):
+    p = _puzzle("higher-lower", puzzle)
+    pairs = dg.higher_lower_puzzle(db, p)
+    if not pairs:
+        raise HTTPException(status_code=503, detail="Higher or Lower is not ready yet.")
+    return {**p.meta(), "rounds": [{"index": i, "cards": [_season_card(a), _season_card(b)]} for i, (a, b) in enumerate(pairs)]}
 
 
 @router.get("/higher-lower/reveal")
-def higher_lower_reveal(index: int = Query(ge=1, lt=dg.HIGHER_LOWER_LENGTH), day: Optional[date] = Query(default=None, alias="date"),
+def higher_lower_reveal(index: int = Query(ge=0, lt=dg.HIGHER_LOWER_ROUNDS), puzzle: Optional[str] = Query(default=None),
                         db: Session = Depends(get_session)):
-    day = dg.resolve_day(day)
-    chain = dg.higher_lower_puzzle(db, day)
-    if index >= len(chain):
-        raise HTTPException(status_code=404, detail="No such card.")
-    return dg.higher_lower_card(chain[index], index, reveal=True)
+    pairs = dg.higher_lower_puzzle(db, _puzzle("higher-lower", puzzle))
+    if index >= len(pairs):
+        raise HTTPException(status_code=404, detail="No such round.")
+    return {"index": index, "cards": [
+        {**_season_card(item), "impact": round(float(item["impact"]), 1), "raa": round(float(item["raa"]), 1),
+         "wpa": round(float(item["wpa"]), 2)}
+        for item in pairs[index]
+    ]}
 
 
-# Player Journeys v2: daily (puzzle=<ISO date>, default today) or practice (puzzle=<token>).
-# Years are shown up front; hints and guesses are resolved here so the answer stays server-side.
-
-def _journey(db, puzzle: Optional[str]):
-    puzzle_id = puzzle or dg.today_ist().isoformat()
-    if len(puzzle_id) > 40 or not all(c.isalnum() or c in "-_" for c in puzzle_id):
-        raise HTTPException(status_code=400, detail="Bad puzzle id.")
-    name, rec, day = dg.journey_player(db, puzzle_id)
-    return puzzle_id, name, rec, day
-
+# ---- Player Journeys: name the IPL player from their franchise path ----
 
 @router.get("/player-journey/puzzle")
 def player_journey_puzzle(puzzle: Optional[str] = Query(default=None), db: Session = Depends(get_session)):
-    puzzle_id, name, rec, day = _journey(db, puzzle)
-    seasons = {year for _, year in rec["team_years"]}
+    p = _puzzle("player-journey", puzzle)
+    name, rec = dg.journey_player(db, p)
     return {
-        "puzzle": day.isoformat() if day else puzzle_id,
-        "daily": day is not None,
-        "number": dg.puzzle_number(day) if day else None,
+        **p.meta(),
         "journey": dg.collapse_journey(rec["team_years"]),
-        "seasons": len(seasons),
+        "seasons": len({year for _, year in rec["team_years"]}),
         "name_shape": dg.name_shape(name),
         "hints": list(dg.JOURNEY_HINTS),
     }
@@ -484,26 +491,47 @@ def player_journey_puzzle(puzzle: Optional[str] = Query(default=None), db: Sessi
 @router.get("/player-journey/hint")
 def player_journey_hint(key: str = Query(pattern="^(style|country|numbers|initials)$"), puzzle: Optional[str] = Query(default=None),
                         db: Session = Depends(get_session)):
-    _, name, rec, _ = _journey(db, puzzle)
+    name, rec = dg.journey_player(db, _puzzle("player-journey", puzzle))
     return {"key": key, "value": dg.journey_hint(db, name, rec, key)}
 
 
 @router.get("/player-journey/check")
 def player_journey_check(guess: str = Query(min_length=1, max_length=80), puzzle: Optional[str] = Query(default=None),
                          db: Session = Depends(get_session)):
-    _, name, _, _ = _journey(db, puzzle)
-    correct = dg.letters(guess) == dg.letters(name)
+    name, _ = dg.journey_player(db, _puzzle("player-journey", puzzle))
+    correct = dg.name_matches(db, guess, name)
     return {"correct": correct, "answer": name if correct else None}
 
 
 @router.get("/player-journey/reveal")
 def player_journey_reveal(puzzle: Optional[str] = Query(default=None), db: Session = Depends(get_session)):
-    _, name, rec, _ = _journey(db, puzzle)
+    name, rec = dg.journey_player(db, _puzzle("player-journey", puzzle))
     return {"answer": name, "hints": {key: dg.journey_hint(db, name, rec, key) for key in dg.JOURNEY_HINTS}}
 
 
-@router.get("/player-journey/names")
-def player_journey_names(db: Session = Depends(get_session)):
-    """Every name a Player Journeys answer can be, for the guess box (no spelling test)."""
-    _, eligible = dg.journey_pool(db)
-    return {"names": eligible}
+# ---- Guess the Innings: name the batter from the wagon wheel ----
+
+@router.get("/guess-innings/daily")
+def guess_innings_daily(puzzle: Optional[str] = Query(default=None), db: Session = Depends(get_session)):
+    p = _puzzle("guess-innings", puzzle)
+    return {**p.meta(), **dg.innings_question(dg.innings_puzzle(db, p))}
+
+
+@router.get("/guess-innings/hint")
+def guess_innings_hint(key: str = Query(pattern="^(venue|season|opposition|team|initials)$"), puzzle: Optional[str] = Query(default=None),
+                       db: Session = Depends(get_session)):
+    return {"key": key, "value": dg.innings_hint(dg.innings_puzzle(db, _puzzle("guess-innings", puzzle)), key)}
+
+
+@router.get("/guess-innings/check")
+def guess_innings_check(guess: str = Query(min_length=1, max_length=80), puzzle: Optional[str] = Query(default=None),
+                        db: Session = Depends(get_session)):
+    pick = dg.innings_puzzle(db, _puzzle("guess-innings", puzzle))
+    correct = dg.name_matches(db, guess, pick["batter"])
+    return {"correct": correct, "answer": pick["batter"] if correct else None}
+
+
+@router.get("/guess-innings/reveal")
+def guess_innings_reveal(puzzle: Optional[str] = Query(default=None), db: Session = Depends(get_session)):
+    pick = dg.innings_puzzle(db, _puzzle("guess-innings", puzzle))
+    return {"answer": pick["batter"], "hints": {key: dg.innings_hint(pick, key) for key in dg.INNINGS_HINTS}}

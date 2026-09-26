@@ -1,180 +1,176 @@
-import React, { useEffect, useMemo, useState } from 'react';
+/**
+ * Call It (daily). Five real chase moments with the batters at the crease and the model's win
+ * probability; call whether the chasing side won. A point for each right call, and a ⭐ when the
+ * right call went against the model (an upset).
+ */
+import React, { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { Box, Button, CircularProgress, Slider, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
+import { getTeamColor, readableOnDark } from '../../utils/teamColors';
 import { track } from '../../utils/analytics';
 import DailyGameShell from './daily/DailyGameShell';
-import { loadProgress, loadStats, recordFinish, saveProgress } from './daily/dailyStorage';
+import usePuzzle from './daily/usePuzzle';
+import { recordFinish, saveProgress } from './daily/dailyStorage';
 
 const GAME = 'call_it';
+const emptyProgress = () => ({ calls: [] }); // { call, answer, right, upset } per moment
 
-// Per moment: how close the call was (100 x (1 - squared error)), whether the winner was picked,
-// and whether it beat the model's own number on the same ball.
-const grade = (guess, answer) => {
-  const outcome = answer.chasing_side_won ? 1 : 0;
-  const p = guess / 100;
-  const userErr = (p - outcome) ** 2;
-  const modelErr = (answer.model_win_probability - outcome) ** 2;
-  const pickedWinner = guess !== 50 && (guess > 50) === answer.chasing_side_won;
-  return {
-    points: Math.round(100 * (1 - userErr)),
-    pickedWinner,
-    beatModel: userErr < modelErr,
-    tile: pickedWinner ? (userErr < modelErr ? '🟩' : '🟨') : '🟥',
-  };
-};
+const tileOf = (c) => (c.right ? (c.upset ? '⭐' : '🟩') : '🟥');
 
-const MomentCard = ({ moment, guess, onGuess, onLock, answer, locking }) => {
-  const chaser = moment.batting_team;
-  const result = answer ? grade(guess, answer) : null;
+const WinBar = ({ team, probability }) => {
+  const pct = Math.round(probability * 100);
+  const color = readableOnDark(getTeamColor(team) || colors.accent);
   return (
-    <Box sx={{ p: 2.25, borderRadius: 3, bgcolor: colors.surface1, border: `1px solid ${colors.border}` }}>
-      <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, color: colors.textLo, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-        {moment.competition} {moment.season} · {moment.venue?.split(',')[0]}
-      </Typography>
-      <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 22, color: colors.textHi, mt: 0.75, lineHeight: 1.2 }}>
-        {chaser} need {moment.runs_needed} off {moment.balls_left}
-      </Typography>
-      <Typography sx={{ color: colors.textMed, fontSize: 14, mt: 0.5 }}>
-        {moment.score} chasing {moment.target} against {moment.bowling_team} · {moment.wickets_left} wicket{moment.wickets_left === 1 ? '' : 's'} left
-      </Typography>
-
-      <Box sx={{ mt: 2.5, px: 1 }}>
-        <Typography sx={{ color: colors.textHi, fontWeight: 700, mb: 0.5 }}>
-          {chaser} win chance: <span style={{ color: colors.accent }}>{guess}%</span>
-        </Typography>
-        <Slider
-          value={guess}
-          onChange={(_, value) => onGuess(value)}
-          min={0}
-          max={100}
-          step={5}
-          disabled={Boolean(answer)}
-          aria-label={`${chaser} win chance`}
-        />
+    <Box sx={{ mt: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+        <Typography sx={{ fontSize: 13, color: colors.textLo }}>Model win probability</Typography>
+        <Typography sx={{ fontFamily: fonts.mono, fontSize: 14, fontWeight: 700, color: colors.textHi }}>{pct}%</Typography>
       </Box>
-
-      {!answer ? (
-        <Button fullWidth variant="contained" onClick={onLock} disabled={locking} sx={{ mt: 1, minHeight: 44 }}>
-          {locking ? 'Checking…' : 'Lock it in'}
-        </Button>
-      ) : (
-        <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: colors.surface2 }}>
-          <Typography sx={{ fontWeight: 700, color: result.pickedWinner ? colors.accent : colors.red }}>
-            {result.tile} {answer.winner} won · +{result.points}
-          </Typography>
-          <Typography sx={{ color: colors.textMed, fontSize: 14, mt: 0.5 }}>
-            You said {guess}% · Hindsight&apos;s model said {Math.round(answer.model_win_probability * 100)}%
-            {result.beatModel ? ' · you beat the model' : ''}
-          </Typography>
-          <Box component={RouterLink} to={`/scorecard/${answer.match_id}`} sx={{ color: colors.accent, fontSize: 13, display: 'inline-block', mt: 0.75 }}>
-            See how it played out →
-          </Box>
-        </Box>
-      )}
+      <Box sx={{ height: 10, borderRadius: 5, bgcolor: colors.surface2, overflow: 'hidden' }}>
+        <Box sx={{ width: `${pct}%`, height: '100%', bgcolor: color }} />
+      </Box>
     </Box>
   );
 };
 
+const MomentCard = ({ moment }) => (
+  <Box sx={{ p: 2.25, borderRadius: 3, bgcolor: colors.surface1, border: `1px solid ${colors.border}` }}>
+    <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, color: colors.textLo, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+      {moment.competition} {moment.season} · {moment.venue?.split(',')[0]}
+    </Typography>
+    <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 22, color: colors.textHi, mt: 0.75, lineHeight: 1.2 }}>
+      {moment.batting_team} need {moment.runs_needed} off {moment.balls_left}
+    </Typography>
+    <Typography sx={{ color: colors.textMed, fontSize: 14, mt: 0.5 }}>
+      {moment.score} chasing {moment.target} against {moment.bowling_team} · {moment.wickets_left} wicket{moment.wickets_left === 1 ? '' : 's'} left
+    </Typography>
+    {moment.batters?.length > 0 && (
+      <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+        {moment.batters.map((b) => (
+          <Box key={b.name} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+            <Typography sx={{ color: colors.textHi, fontSize: 15 }}>🏏 {b.name}</Typography>
+            <Typography sx={{ fontFamily: fonts.mono, color: colors.textMed, fontSize: 15 }}>{b.runs}* ({b.balls})</Typography>
+          </Box>
+        ))}
+      </Box>
+    )}
+    <WinBar team={moment.batting_team} probability={moment.model_win_probability} />
+  </Box>
+);
+
 const CallItGame = () => {
-  const [puzzle, setPuzzle] = useState(null);
-  const [error, setError] = useState(null);
-  const [guesses, setGuesses] = useState([]);
-  const [answers, setAnswers] = useState([]);
-  const [current, setCurrent] = useState(0);
-  const [locking, setLocking] = useState(false);
-  const [stats, setStats] = useState(null);
+  const {
+    puzzle, progress, setProgress, stats, setStats, error, practice, daily,
+  } = usePuzzle(GAME, '/games/call-it/daily', emptyProgress);
+  const [showing, setShowing] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
 
-  useEffect(() => {
-    fetch(`${config.API_URL}/games/call-it/daily`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((data) => {
-        setPuzzle(data);
-        const saved = loadProgress(GAME, data.date);
-        const n = data.moments.length;
-        setGuesses(saved?.guesses || Array(n).fill(50));
-        setAnswers(saved?.answers || Array(n).fill(null));
-        setCurrent(saved?.current || 0);
-        setStats(loadStats(GAME, data.date));
-        if (!saved) track('game_start', { game: GAME, number: data.number });
-      })
-      .catch(() => setError("Couldn't load today's Call It. Try again in a minute."));
-  }, []);
+  if (error) return <Typography sx={{ p: 3, color: colors.textMed, textAlign: 'center' }}>{error}</Typography>;
+  if (!puzzle || !progress || !stats) return <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress /></Box>;
 
-  const finished = puzzle && answers.length > 0 && answers.every(Boolean);
-  const graded = useMemo(
-    () => (finished ? answers.map((a, i) => grade(guesses[i], a)) : []),
-    [finished, answers, guesses],
-  );
-  const total = graded.reduce((sum, g) => sum + g.points, 0);
-  const beat = graded.filter((g) => g.beatModel).length;
+  const total = puzzle.moments.length;
+  const { calls } = progress;
+  const finished = calls.length >= total;
+  const index = showing ?? (finished ? total - 1 : calls.length);
+  const moment = puzzle.moments[index];
+  const current = calls[index];
+  const correct = calls.filter((c) => c.right).length;
+  const upsets = calls.filter((c) => c.right && c.upset).length;
 
-  const lock = async (index) => {
-    setLocking(true);
+  const makeCall = async (call) => {
+    if (current || busy) return;
+    setBusy(true);
+    setFailure(null);
     try {
-      const r = await fetch(`${config.API_URL}/games/call-it/reveal?index=${index}&date=${puzzle.date}`);
+      const r = await fetch(`${config.API_URL}/games/call-it/reveal?index=${index}&puzzle=${encodeURIComponent(puzzle.puzzle)}`);
+      if (!r.ok) throw new Error(r.status);
       const answer = await r.json();
-      const nextAnswers = answers.map((a, i) => (i === index ? answer : a));
-      setAnswers(nextAnswers);
-      // Stay on this moment so the reveal is seen; "Next moment" moves on.
-      saveProgress(GAME, puzzle.date, { guesses, answers: nextAnswers, current: index });
-      if (nextAnswers.every(Boolean)) {
-        const score = nextAnswers.reduce((sum, a, i) => sum + grade(guesses[i], a).points, 0);
-        setStats(recordFinish(GAME, puzzle.date, score));
-        track('game_finish', { game: GAME, number: puzzle.number, score });
+      const right = call === answer.chasing_side_won;
+      const modelFavoured = answer.model_win_probability >= 0.5;
+      const upset = answer.chasing_side_won !== modelFavoured;
+      const next = { calls: [...calls, { call, answer, right, upset }] };
+      setProgress(next);
+      setShowing(index);
+      if (puzzle.daily) saveProgress(GAME, puzzle.puzzle, next);
+      if (next.calls.length >= total) {
+        const score = next.calls.filter((c) => c.right).length;
+        if (puzzle.daily) setStats(recordFinish(GAME, puzzle.puzzle, score));
+        track('game_finish', { game: GAME, number: puzzle.number, score, practice: !puzzle.daily });
       }
     } catch {
-      setError('Something went wrong revealing that one. Try again.');
+      setFailure('Something went wrong. Try again.');
     } finally {
-      setLocking(false);
+      setBusy(false);
     }
   };
 
-  if (error) return <Typography sx={{ p: 3, color: colors.textMed, textAlign: 'center' }}>{error}</Typography>;
-  if (!puzzle || !stats) return <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress /></Box>;
-
-  const shareText = `Call It #${puzzle.number} ${graded.map((g) => g.tile).join('')}\n${total}/${puzzle.moments.length * 100} · beat the model ${beat}/${puzzle.moments.length}\n${window.location.origin}/games/call-it`;
+  const tiles = calls.map(tileOf).join('');
+  const shareText = `Call It #${puzzle.number} ${tiles}\n${correct}/${total}${upsets ? ` · called ${upsets} upset${upsets === 1 ? '' : 's'}` : ''}\n${window.location.origin}/games/call-it`;
 
   return (
     <DailyGameShell
       game={GAME}
       title="Call It"
-      number={puzzle.number}
-      rules="Five real run chases, frozen mid-game. How likely was the chasing side to win? Closer to what happened scores more; beat Hindsight's win-probability model if you can."
+      number={puzzle.daily ? puzzle.number : null}
+      rules="Five real run chases, frozen mid-chase. The model gives its win probability; did the chasing side actually win? ⭐ for calling an upset."
       stats={stats}
       finished={finished}
-      resultLine={`${total} / ${puzzle.moments.length * 100}`}
+      resultLine={`${correct} / ${total}${upsets ? ` · ${upsets} ⭐` : ''}`}
       shareText={shareText}
+      practice={!puzzle.daily}
+      onPractice={() => { setShowing(null); practice(); }}
+      onBackToDaily={() => { setShowing(null); daily(); }}
     >
-      <Box sx={{ display: 'flex', gap: 0.75, mb: 2 }}>
-        {puzzle.moments.map((m, i) => (
-          <Box
-            key={m.index}
-            component="button"
-            type="button"
-            onClick={() => (answers[i] || i <= current ? setCurrent(i) : null)}
-            aria-label={`Moment ${i + 1}`}
-            sx={{
-              flex: 1, height: 8, borderRadius: 4, border: 0, p: 0, cursor: 'pointer',
-              bgcolor: answers[i] ? (grade(guesses[i], answers[i]).pickedWinner ? colors.accent : colors.red) : i === current ? colors.textMed : colors.borderStrong,
-            }}
-          />
-        ))}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+        <Typography sx={{ fontFamily: fonts.mono, color: colors.textLo, fontSize: 13 }}>Moment {index + 1} of {total}</Typography>
+        <Typography sx={{ fontFamily: fonts.mono, color: colors.textLo, fontSize: 13 }}>{correct} right {tiles}</Typography>
       </Box>
-      <MomentCard
-        key={current}
-        moment={puzzle.moments[current]}
-        guess={guesses[current]}
-        onGuess={(value) => setGuesses((prev) => prev.map((g, i) => (i === current ? value : g)))}
-        onLock={() => lock(current)}
-        answer={answers[current]}
-        locking={locking}
-      />
-      {answers[current] && !finished && (
-        <Button fullWidth variant="outlined" sx={{ mt: 1.5, minHeight: 44 }} onClick={() => setCurrent(answers.findIndex((a) => !a))}>
-          Next moment
-        </Button>
+
+      <MomentCard key={index} moment={moment} />
+
+      {!current ? (
+        <Box sx={{ mt: 2 }}>
+          <Typography sx={{ color: colors.textHi, fontWeight: 700, mb: 1, textAlign: 'center' }}>
+            Did {moment.batting_team} win it?
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1.25 }}>
+            <Button fullWidth variant="contained" disabled={busy} onClick={() => makeCall(true)} sx={{ minHeight: 52, fontSize: 16 }}>Yes, they won</Button>
+            <Button fullWidth variant="outlined" disabled={busy} onClick={() => makeCall(false)} sx={{ minHeight: 52, fontSize: 16 }}>No, they lost</Button>
+          </Box>
+          {failure && <Typography sx={{ color: colors.red, fontSize: 13, mt: 1 }}>{failure}</Typography>}
+        </Box>
+      ) : (
+        <Box sx={{ mt: 2, p: 2, borderRadius: 3, border: `1px solid ${current.right ? colors.accent : colors.red}` }}>
+          <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20, color: current.right ? colors.accent : colors.red }}>
+            {current.right ? (current.upset ? '⭐ Upset called!' : 'Right call') : 'Wrong call'}
+          </Typography>
+          <Typography sx={{ color: colors.textMed, fontSize: 14, mt: 0.5 }}>
+            {current.answer.winner} won
+            {current.upset ? `, against the model's ${Math.round((current.answer.chasing_side_won ? current.answer.model_win_probability : 1 - current.answer.model_win_probability) * 100)}% for them` : ''}.
+            {' '}{current.answer.date}
+          </Typography>
+          <Box component={RouterLink} to={`/scorecard/${current.answer.match_id}`} sx={{ color: colors.accent, fontSize: 13, display: 'inline-block', mt: 0.75 }}>
+            See the scorecard →
+          </Box>
+          {!finished && (
+            <Button fullWidth variant="contained" onClick={() => setShowing(null)} sx={{ mt: 1.5, minHeight: 48 }}>
+              Next moment
+            </Button>
+          )}
+        </Box>
+      )}
+
+      {finished && (
+        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 2 }}>
+          {calls.map((c, i) => (
+            <Button key={i} size="small" variant={i === index ? 'contained' : 'outlined'} onClick={() => setShowing(i)} sx={{ minWidth: 40, minHeight: 36, px: 0 }}>
+              {tileOf(c)}
+            </Button>
+          ))}
+        </Box>
       )}
     </DailyGameShell>
   );

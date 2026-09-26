@@ -11,6 +11,15 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **Games v3 (2026-09-26):** four dailies, each with a practice mode (`?puzzle=<token>`, no streak):
+> Higher or Lower = 10 independent pairs, tap the higher-Impact card; Call It = yes/no "did they win
+> it?" with batters at the crease and the model %, ⭐ for a right upset call; Player Journeys = team
+> colours + typed guesses (hangman dashes; `name_matches` forgives close spellings/aliases, the
+> `/player-journey/names` endpoint is gone); Guess the Innings is now a daily
+> (`/games/guess-innings/{daily,hint,check,reveal}`). Shared frontend: `games/daily/usePuzzle.js`,
+> `NameGuessGame.jsx`, `NameGuessInput.jsx`. Progress keys moved to `day.v3.<date>` so v2 saves
+> are ignored. `match_preview` prod golden drifts with rankings data; not a regression.
+>
 > **Latest:** Phase 2 T20 Primer metrics live (ball_metrics etc.; see newest entry). API on
 > Python 3.12; U4 done. U3 colour sweep done (see newest entry; `ui_sweep.mjs` now reports contrast).
 > Preview defaults to 1 Jan 8y (ODI) / 4y (T20) on site and connector; venue

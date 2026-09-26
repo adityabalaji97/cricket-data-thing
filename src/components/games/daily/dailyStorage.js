@@ -20,8 +20,8 @@ const write = (k, value) => {
   }
 };
 
-export const loadProgress = (game, date) => read(key(game, `day.${date}`), null);
-export const saveProgress = (game, date, progress) => write(key(game, `day.${date}`), progress);
+export const loadProgress = (game, date) => read(key(game, `day.v3.${date}`), null);
+export const saveProgress = (game, date, progress) => write(key(game, `day.v3.${date}`), progress);
 
 const EMPTY_STATS = { played: 0, currentStreak: 0, maxStreak: 0, lastPlayed: null, best: 0 };
 
