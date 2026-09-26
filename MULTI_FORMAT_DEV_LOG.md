@@ -151,6 +151,26 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 ## Log entries (newest first)
 
+### 2026-09-26 — Games v2: Higher or Lower plays all 10; Player Journeys daily across both tables — Claude
+
+* **Higher or Lower**: a wrong call no longer ends the run -- all 10 are played, score N/10,
+  share grid 🟩/🟥 per call.
+* **Player Journeys v2** (daily like the others; answer never sent to the browser):
+  - Careers from legacy `deliveries` (IPL < 2015) + `delivery_details` (IPL >= 2015) on
+    canonical names (player_aliases). Pool: >= 4 seasons, >= 2 franchises, >= 500 runs or >= 25
+    wickets, no lone-initial legacy names (216 players).
+  - Team names shown as they were that season: delivery_details writes CURRENT names back to 2015,
+    so `historical_team()` restores Delhi Daredevils (<=2018), Kings XI Punjab (<=2020), Royal
+    Challengers Bangalore (<=2023). The old endpoint's map also no longer merges Deccan Chargers
+    into SRH (different franchises).
+  - Years shown up front; hints 🏏 style (role + hand + bowling style, labels not codes, feed
+    fallback) / 🌍 country / 📊 IPL numbers / 🔤 initials, each -1; guesses from a name list
+    (no spelling test), wrong guess -1, 6 guesses; score 5 - hints - misses (min 1 if solved).
+  - Endpoints `/games/player-journey/{puzzle,hint,check,reveal,names}`; `puzzle=<ISO date>` is the
+    daily, any other token is practice ("play a random one", no streak). Old `/player-journey`
+    kept for compatibility.
+* Home "Today's games" lists all three; warm-daily-games also builds the journey pool.
+
 ### 2026-09-26 — Growth G2: daily games "Call It" and "Higher or Lower" — Claude
 
 * `services/daily_games.py`: deterministic puzzles per (game, IST date) via sha256 seed; #1 =

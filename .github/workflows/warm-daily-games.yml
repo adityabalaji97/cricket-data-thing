@@ -15,7 +15,7 @@ jobs:
       - name: Build today's puzzles
         run: |
           API=https://cricket-data-thing-672dfbacf476.herokuapp.com
-          for path in /games/call-it/daily /games/higher-lower/daily; do
+          for path in /games/call-it/daily /games/higher-lower/daily /games/player-journey/puzzle; do
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$API$path")
             echo "$path -> $code"
             [ "$code" = "200" ] || exit 1

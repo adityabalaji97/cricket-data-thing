@@ -201,11 +201,13 @@ def get_guess_innings(
 
 
 # IPL team name normalization for franchise renames
+# Renames of the SAME franchise only. Deccan Chargers (2008-12) and Sunrisers Hyderabad are
+# different franchises, so they are not merged.
 IPL_TEAM_NAMES = {
     'Delhi Daredevils': 'Delhi Capitals',
-    'Deccan Chargers': 'Sunrisers Hyderabad',
     'Rising Pune Supergiants': 'Rising Pune Supergiant',
     'Kings XI Punjab': 'Punjab Kings',
+    'Royal Challengers Bangalore': 'Royal Challengers Bengaluru',
 }
 
 
@@ -451,3 +453,57 @@ def higher_lower_reveal(index: int = Query(ge=1, lt=dg.HIGHER_LOWER_LENGTH), day
     if index >= len(chain):
         raise HTTPException(status_code=404, detail="No such card.")
     return dg.higher_lower_card(chain[index], index, reveal=True)
+
+
+# Player Journeys v2: daily (puzzle=<ISO date>, default today) or practice (puzzle=<token>).
+# Years are shown up front; hints and guesses are resolved here so the answer stays server-side.
+
+def _journey(db, puzzle: Optional[str]):
+    puzzle_id = puzzle or dg.today_ist().isoformat()
+    if len(puzzle_id) > 40 or not all(c.isalnum() or c in "-_" for c in puzzle_id):
+        raise HTTPException(status_code=400, detail="Bad puzzle id.")
+    name, rec, day = dg.journey_player(db, puzzle_id)
+    return puzzle_id, name, rec, day
+
+
+@router.get("/player-journey/puzzle")
+def player_journey_puzzle(puzzle: Optional[str] = Query(default=None), db: Session = Depends(get_session)):
+    puzzle_id, name, rec, day = _journey(db, puzzle)
+    seasons = {year for _, year in rec["team_years"]}
+    return {
+        "puzzle": day.isoformat() if day else puzzle_id,
+        "daily": day is not None,
+        "number": dg.puzzle_number(day) if day else None,
+        "journey": dg.collapse_journey(rec["team_years"]),
+        "seasons": len(seasons),
+        "name_shape": dg.name_shape(name),
+        "hints": list(dg.JOURNEY_HINTS),
+    }
+
+
+@router.get("/player-journey/hint")
+def player_journey_hint(key: str = Query(pattern="^(style|country|numbers|initials)$"), puzzle: Optional[str] = Query(default=None),
+                        db: Session = Depends(get_session)):
+    _, name, rec, _ = _journey(db, puzzle)
+    return {"key": key, "value": dg.journey_hint(db, name, rec, key)}
+
+
+@router.get("/player-journey/check")
+def player_journey_check(guess: str = Query(min_length=1, max_length=80), puzzle: Optional[str] = Query(default=None),
+                         db: Session = Depends(get_session)):
+    _, name, _, _ = _journey(db, puzzle)
+    correct = dg.letters(guess) == dg.letters(name)
+    return {"correct": correct, "answer": name if correct else None}
+
+
+@router.get("/player-journey/reveal")
+def player_journey_reveal(puzzle: Optional[str] = Query(default=None), db: Session = Depends(get_session)):
+    _, name, rec, _ = _journey(db, puzzle)
+    return {"answer": name, "hints": {key: dg.journey_hint(db, name, rec, key) for key in dg.JOURNEY_HINTS}}
+
+
+@router.get("/player-journey/names")
+def player_journey_names(db: Session = Depends(get_session)):
+    """Every name a Player Journeys answer can be, for the guess box (no spelling test)."""
+    _, eligible = dg.journey_pool(db)
+    return {"names": eligible}

@@ -36,7 +36,7 @@ export const NAV_ITEMS = [
   },
   {
     path: '/games/player-journeys',
-    label: '🛤️ Player Journeys',
+    label: '🛤️ Player Journeys (daily)',
     title: 'Player Journeys',
     t20Only: true,
     group: 'play',

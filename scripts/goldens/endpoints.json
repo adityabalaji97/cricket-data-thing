@@ -172,5 +172,11 @@
     "path": "/games/higher-lower/daily",
     "params": {},
     "status_only": true
+  },
+  {
+    "name": "game_player_journey_daily",
+    "path": "/games/player-journey/puzzle",
+    "params": {},
+    "status_only": true
   }
 ]

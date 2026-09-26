@@ -66,7 +66,7 @@ const HigherLowerGame = () => {
       const right = direction === 'up' ? card.impact >= current.impact : card.impact <= current.impact;
       const nextCalls = [...calls, { direction, right }];
       const nextRevealed = [...revealed, card];
-      const finished = !right || nextIndex >= total;
+      const finished = nextIndex >= total;  // every card is played; misses just score 0
       setCalls(nextCalls);
       setRevealed(nextRevealed);
       setOver(finished);
@@ -83,8 +83,8 @@ const HigherLowerGame = () => {
     }
   };
 
-  const trail = calls.map((c) => (c.right ? (c.direction === 'up' ? '⬆️' : '⬇️') : '❌')).join('');
-  const shareText = `Higher or Lower #${puzzle.number} · ${correct}/${total}${correct >= 5 ? ' 🔥' : ''}\n${trail}\n${window.location.origin}/games/higher-lower`;
+  const trail = calls.map((c) => (c.right ? '🟩' : '🟥')).join('');
+  const shareText = `Higher or Lower #${puzzle.number} · ${correct}/${total}${correct >= 8 ? ' 🔥' : ''}\n${trail}\n${window.location.origin}/games/higher-lower`;
   const lastCall = calls[calls.length - 1];
 
   return (
@@ -92,19 +92,19 @@ const HigherLowerGame = () => {
       game={GAME}
       title="Higher or Lower"
       number={puzzle.number}
-      rules="Impact is the runs a batter added to their team's projected total, given the game situation. Is the next player-season's Impact higher or lower? One wrong call ends the run."
+      rules="Impact is the runs a batter added to their team's projected total, given the game situation. Is the next player-season's Impact higher or lower than the one before? Ten calls a day."
       stats={stats}
       finished={over}
       resultLine={`${correct} / ${total}`}
       shareText={shareText}
     >
       <Typography sx={{ fontFamily: fonts.mono, color: colors.textLo, fontSize: 13, mb: 1.5 }}>
-        {correct} in a row {trail ? `· ${trail}` : ''}
+        {correct} / {calls.length} right {trail ? `· ${trail}` : ''}
       </Typography>
       {over ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {revealed.length > 1 && <PlayerCard card={revealed[revealed.length - 2]} label="Previous" />}
-          <PlayerCard card={current} label={lastCall?.right ? 'Last one' : 'The one that got you'} />
+          <PlayerCard card={current} label="Last card" />
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -115,8 +115,8 @@ const HigherLowerGame = () => {
             <Button fullWidth variant="outlined" disabled={busy} onClick={() => guess('down')} sx={{ minHeight: 48 }}>⬇️ Lower</Button>
           </Box>
           {lastCall && (
-            <Typography sx={{ color: colors.accent, fontSize: 14 }}>
-              Right: {revealed[revealed.length - 2]?.player}&apos;s Impact was {signed(revealed[revealed.length - 2]?.impact ?? 0)}, {current.player}&apos;s {signed(current.impact)}.
+            <Typography sx={{ color: lastCall.right ? colors.accent : colors.red, fontSize: 14 }}>
+              {lastCall.right ? 'Right' : 'Wrong'}: {revealed[revealed.length - 2]?.player}&apos;s Impact was {signed(revealed[revealed.length - 2]?.impact ?? 0)}, {current.player}&apos;s {signed(current.impact)}.
             </Typography>
           )}
         </Box>

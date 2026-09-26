@@ -690,7 +690,7 @@ const AppContent = () => {
         <Route path="/ipl-predictions" element={<MensT20Scope><IPLPredictions /></MensT20Scope>} />
         <Route path="/rankings" element={<MensT20Scope><GlobalT20Rankings /></MensT20Scope>} />
         <Route path="/games/guess-innings" element={<MensT20Scope><GuessInningsGame isMobile={isMobile} /></MensT20Scope>} />
-        <Route path="/games/player-journeys" element={<MensT20Scope><PlayerJourneysGame isMobile={isMobile} /></MensT20Scope>} />
+        <Route path="/games/player-journeys" element={<MensT20Scope><PlayerJourneysGame /></MensT20Scope>} />
         <Route path="/games/call-it" element={<MensT20Scope><CallItGame /></MensT20Scope>} />
         <Route path="/games/higher-lower" element={<MensT20Scope><HigherLowerGame /></MensT20Scope>} />
         <Route path="/wrapped/2025" element={<WrappedPage />} />

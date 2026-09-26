@@ -32,3 +32,21 @@ def test_resolve_day_never_serves_the_future_or_pre_launch():
     assert dg.resolve_day(None) == today
     assert dg.resolve_day(date(2099, 1, 1)) == today
     assert dg.resolve_day(date(2000, 1, 1)) == dg.LAUNCH_DATE
+
+
+def test_ipl_team_names_are_restored_to_what_they_were_that_season():
+    assert dg.historical_team("Punjab Kings", 2019) == "Kings XI Punjab"
+    assert dg.historical_team("Punjab Kings", 2021) == "Punjab Kings"
+    assert dg.historical_team("Delhi Capitals", 2016) == "Delhi Daredevils"
+    assert dg.historical_team("Royal Challengers Bengaluru", 2023) == "Royal Challengers Bangalore"
+    assert dg.historical_team("Rising Pune Supergiants", 2016) == "Rising Pune Supergiant"
+    assert dg.historical_team("Deccan Chargers", 2010) == "Deccan Chargers"
+
+
+def test_journey_collapses_consecutive_seasons_and_splits_on_gaps():
+    stints = dg.collapse_journey({("CSK", 2008), ("CSK", 2009), ("RPS", 2016), ("CSK", 2018), ("CSK", 2019)})
+    assert stints == [
+        {"team": "CSK", "years": "2008-2009"},
+        {"team": "RPS", "years": "2016"},
+        {"team": "CSK", "years": "2018-2019"},
+    ]

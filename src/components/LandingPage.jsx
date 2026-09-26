@@ -1247,13 +1247,14 @@ const TodaysGamesSection = () => {
   const number = dailyNumber();
   const games = [
     { key: 'call_it', to: '/games/call-it', title: 'Call It', blurb: 'Five real chases, frozen mid-game. Call the win chance; beat the model.' },
-    { key: 'higher_lower', to: '/games/higher-lower', title: 'Higher or Lower', blurb: 'Whose season added more runs to their team? One miss ends the run.' },
+    { key: 'higher_lower', to: '/games/higher-lower', title: 'Higher or Lower', blurb: 'Whose season added more runs to their team? Ten calls a day.' },
+    { key: 'player_journeys', to: '/games/player-journeys', title: 'Player Journeys', blurb: 'Name the IPL player from their franchise path.' },
   ];
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
       <Kicker>Daily · #{number}</Kicker>
       <Typography sx={{ ...sectionTitleSx, fontSize: { xs: 20, md: 24 }, mb: 1.5 }}>Today&apos;s games</Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.25 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.25 }}>
         {games.map((game) => {
           const done = playedToday(game.key);
           return (
