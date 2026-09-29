@@ -33,11 +33,11 @@ def score_facts(facts: List[Dict[str, Any]], state: Dict[str, Any], question: st
     return scored
 
 
-def top(facts: List[Dict[str, Any]], n: int, threshold: float = 0.0) -> List[Dict[str, Any]]:
-    """Best n by score (unscored last), always at least one, then only those at/above threshold."""
+def top(facts: List[Dict[str, Any]], n: int, threshold: float = 0.0, minimum: int = 3) -> List[Dict[str, Any]]:
+    """Best n by score (unscored last): always the best `minimum`, then only those at/above threshold."""
     ranked = sorted(facts, key=lambda f: (f.get("score") is not None, f.get("score") or 0), reverse=True)
-    chosen = ranked[:1]
-    for f in ranked[1:]:
+    chosen = ranked[:minimum]
+    for f in ranked[minimum:]:
         if len(chosen) >= n or (f.get("score") or 0) < threshold:
             break
         chosen.append(f)
