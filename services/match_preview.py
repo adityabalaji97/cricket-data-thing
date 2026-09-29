@@ -1635,6 +1635,7 @@ def gather_preview_context(
     fmt: str = "T20",
     gender: str = "male",
     elo_as_of: Optional[date] = None,  # backtests only: Elo as it stood before this date
+    include_top_ranked: bool = False,
 ) -> Dict[str, Any]:
     team1 = resolve_team_identifier(team1_identifier)
     team2 = resolve_team_identifier(team2_identifier)
@@ -1698,13 +1699,20 @@ def gather_preview_context(
         gender=gender,
     )
     lineup_sources = (matchup_fantasy or {}).get("lineup_sources") or {}
-    top_ranked_players = _summarize_top_ranked_lineup_players(
-        db=db,
-        lineup_players=(matchup_fantasy or {}).get("lineup_players") or {},
-        start_date=start_date,
-        end_date=end_date,
-        top_n=3,
-    )
+    # Global T20 rankings cost ~30s cold (two full ranking builds per preview window), which pushed
+    # previews past Heroku's 30s router limit, and nothing displays them (the card renders
+    # `sections`; they only fed the unused GPT context). Off unless a caller asks, and T20 only:
+    # they are T20 rankings.
+    if include_top_ranked and fmt == "T20":
+        top_ranked_players = _summarize_top_ranked_lineup_players(
+            db=db,
+            lineup_players=(matchup_fantasy or {}).get("lineup_players") or {},
+            start_date=start_date,
+            end_date=end_date,
+            top_n=3,
+        )
+    else:
+        top_ranked_players = {"available": False, "teams": {}}
     serialized_phase_stats = _serialize_phase_stats(phase_stats)
 
     h2h_team1_wins = sum(1 for m in h2h if m["winner"] == team1)
