@@ -11,6 +11,19 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **Jev everywhere user-facing (2026-09-29), all fall back cleanly without TYPESAFE_API_KEY:**
+> shared helper `services/fact_curation.py` (code writes facts, Jev scores). (1) Scorecard recaps
+> `services/match_recap.py`, `GET /matches/{id}/recap`, 'How it was won' card, share-card story,
+> MCP `match_recap`. (2) Player standouts `services/player_standouts.py`,
+> `GET /player-summary/{batter|bowler}/{name}/standouts` (Impact/RAA/WPA by season + rank), top of
+> the Player DNA card, MCP `player_profile`. (3) Search routing `services/search_routing.py`,
+> `GET /search/route`: non-exact searches that are really one player/team/venue go to that page;
+> questions still go to the NL query builder. (4) Player DNA fact-check `services/summary_check.py`:
+> numbers must match patterns; Jev Noul per line; failing lines swapped for deterministic ones.
+> MCP `preview_match` also returns the typed preview ('Hindsight's take'). Also fixed: player
+> bowling stats mixed ball sources (phase economies inflated, innings after 2025-11 missing);
+> matchup lineups took one shared LIMIT 10 (busier team took every slot).
+>
 > **Jev typed preview (2026-09-29), dark until `TYPESAFE_API_KEY` is set on Heroku:**
 > `services/typed_preview.py` writes short single-claim facts from the preview context and asks
 > Jev (`services/jev_client.py`, TypeSafe System One) to score how much each matters; the best per

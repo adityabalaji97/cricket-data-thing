@@ -159,8 +159,21 @@ const SearchBar = ({
 
       if (exactMatch) {
         handleSelect(exactMatch);
+        return;
+      }
+      // Not an exact name: ask the API whether this is really one player/team/venue page
+      // ("abhishek sharma batting", "wankhede") before handing it to the query builder.
+      let routed = null;
+      try {
+        const { data } = await axios.get(`${API_BASE_URL}/search/route`, { params: { q }, timeout: 4000 });
+        routed = data?.route === 'entity' ? data.item : null;
+      } catch {
+        routed = null;
+      }
+      setShowSuggestions(false);
+      if (routed) {
+        handleSelect(routed);
       } else {
-        setShowSuggestions(false);
         routeToQueryBuilder(q);
       }
     } catch (error) {

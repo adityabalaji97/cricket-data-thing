@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 from database import get_session
+from services.search_routing import route_search
 from services.search import (
     search_entities,
     get_random_entity,
@@ -34,6 +35,15 @@ def get_search_suggestions(
         return {"suggestions": results, "query": q}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@router.get("/route")
+def route(q: str = Query(..., min_length=1), db: Session = Depends(get_session)):
+    """Where a non-exact search should go: one entity's page, or the query builder (Jev-routed)."""
+    try:
+        return route_search(q, db)
+    except Exception:
+        return {"route": "query"}
 
 
 @router.get("/random")

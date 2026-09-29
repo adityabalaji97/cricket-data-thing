@@ -89,8 +89,8 @@ def _impact_facts(facts, name: str, role: str, years: List[Dict[str, Any]], rank
           f"In {latest['year']}, {_poss(name)} {role} cost {abs(latest['impact']):.1f} runs against expected (Impact) "
           f"in {latest['innings']} innings.")
     if rank:
-        _fact(facts, "rank", f"That {role} Impact ranks {_ordinal(rank['rank'])} of {rank['of']} men's T20 "
-              f"{'batters' if role == 'batting' else 'bowlers'} with {MIN_RANK_BALLS[role]}+ balls in {latest['year']}.")
+        _fact(facts, "rank", f"{_poss(name)} {role} Impact in {latest['year']} ranks {_ordinal(rank['rank'])} of {rank['of']} men's T20 "
+              f"{'batters' if role == 'batting' else 'bowlers'} with {MIN_RANK_BALLS[role]}+ balls.")
     if len(years) > 1 and (years[1]["balls"] or 0) >= 60:
         prev = years[1]
         prev_per = prev["impact"] / max(1, prev["innings"])
