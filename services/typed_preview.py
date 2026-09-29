@@ -28,8 +28,9 @@ SECTIONS: List[Tuple[str, str]] = [
     ("preview_take", "Preview Take"),
 ]
 MAX_PER_SECTION = 3
-# Key Players holds one batter and one bowler per side.
+# Key Players holds one batter and one bowler per side, and always shows both sides.
 SECTION_LIMITS = {"key_players": 4}
+BALANCED_SECTIONS = {"key_players"}
 # Score levels (0..4); a fact below "relevant" is dropped unless its section would be empty.
 RELEVANCE_CRITERIA = [
     "Trivia: true, but tells a fan nothing about how this match might go",
@@ -44,8 +45,9 @@ MIN_VENUE_MATCHES = 5
 MIN_EDGE_BALLS = {"T20": 12, "ODI": 18}
 
 
-def _fact(facts: List[Dict[str, Any]], section: str, kind: str, text: str, fixed: bool = False) -> None:
-    facts.append({"id": f"f{len(facts)}", "section": section, "kind": kind, "text": text, "fixed": fixed})
+def _fact(facts: List[Dict[str, Any]], section: str, kind: str, text: str, fixed: bool = False,
+          team: Optional[str] = None) -> None:
+    facts.append({"id": f"f{len(facts)}", "section": section, "kind": kind, "text": text, "fixed": fixed, "team": team})
 
 
 def _possessive(name: str) -> str:
@@ -152,11 +154,11 @@ def build_candidate_facts(context: Dict[str, Any]) -> List[Dict[str, Any]]:
               + (f"saved {bowl:.1f} runs a match" if bowl >= 0 else f"leaked {abs(bowl):.1f} runs a match more than expected")
               + " (Impact).")
         for p in tm.get("top_batters", [])[:1]:
-            _fact(facts, "key_players", "bat_leader",
+            _fact(facts, "key_players", "bat_leader", team=team, text=
                   f"{p['player']} leads {_possessive(team)} batting Impact over the last year: {_signed(p['impact'])} runs "
                   f"in {p['innings']} innings (RAA {_signed(p['raa'])}, WPA {p['wpa']:+.2f}).")
         for p in tm.get("top_bowlers", [])[:1]:
-            _fact(facts, "key_players", "bowl_leader",
+            _fact(facts, "key_players", "bowl_leader", team=team, text=
                   f"{p['player']} leads {_possessive(team)} bowling Impact over the last year: {p['impact']:.1f} runs saved "
                   f"in {_plural(p['innings'], 'match')} (WPA {p['wpa']:+.2f}).")
 
@@ -262,6 +264,12 @@ def assemble(facts: List[Dict[str, Any]]) -> Dict[str, Any]:
             key=lambda f: f["score"], reverse=True,
         )
         chosen, kinds = [], set()
+        if section_id in BALANCED_SECTIONS:
+            # Each side's best-scored fact first, whatever Jev thought of it; then fill by score.
+            for team in dict.fromkeys(f["team"] for f in pool if f.get("team")):
+                chosen.append(next(f for f in pool if f.get("team") == team))
+            pool = [f for f in pool if f not in chosen]
+            chosen.sort(key=lambda f: f["score"], reverse=True)
         for f in pool:
             if len(chosen) >= SECTION_LIMITS.get(section_id, MAX_PER_SECTION) or (chosen and f["score"] < KEEP_THRESHOLD):
                 break

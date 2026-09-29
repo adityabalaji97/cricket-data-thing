@@ -91,3 +91,14 @@ def test_primer_metrics_become_team_and_player_facts():
     assert "Over the last year, Mumbai Indians' batters have cost 15.8 runs a match against expected totals (Impact, 14 matches)." in texts
     assert "Ryan Rickelton leads Mumbai Indians' batting Impact over the last year: +20.6 runs in 12 innings (RAA +54.7, WPA +0.22)." in texts
     assert "Jasprit Bumrah leads Mumbai Indians' bowling Impact over the last year: 48.8 runs saved in 13 matches (WPA +0.53)." in texts
+
+
+def test_key_players_always_shows_both_sides():
+    facts = [
+        {"id": "a", "section": "key_players", "kind": "bat_leader", "text": "A bat", "fixed": False, "team": "India", "score": 3.5},
+        {"id": "b", "section": "key_players", "kind": "bowl_leader", "text": "A bowl", "fixed": False, "team": "India", "score": 3.2},
+        {"id": "c", "section": "key_players", "kind": "bat_leader", "text": "B bat", "fixed": False, "team": "West Indies", "score": 0.9},
+        {"id": "d", "section": "key_players", "kind": "bowl_leader", "text": "B bowl", "fixed": False, "team": "West Indies", "score": 0.4},
+    ]
+    section = next(s for s in typed_preview.assemble(facts)["sections"] if s["id"] == "key_players")
+    assert section["bullets"] == ["A bat", "B bat", "A bowl"]
