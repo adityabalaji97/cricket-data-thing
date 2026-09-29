@@ -23,6 +23,7 @@ import logging
 from database import get_session
 from services.player_patterns import detect_batter_patterns, detect_bowler_patterns
 from services.player_aliases import resolve_to_legacy_name
+from services.summary_check import verify_lines
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +167,18 @@ def generate_summary_with_llm(patterns: dict, player_type: str) -> str:
             temperature=TEMPERATURE,
         )
         
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content.strip()
+        # Fact-check each line against the patterns it was written from (numbers in code, claims
+        # by Jev); a failing line is swapped for the deterministic line on the same topic.
+        fallback = generate_bowler_fallback_summary(patterns) if player_type == "bowler" else generate_fallback_summary(patterns)
+        # Values the prompt asks GPT to derive are part of the data it may cite.
+        data = dict(patterns)
+        if patterns.get("matches") and patterns.get("total_wickets") is not None:
+            data["wickets_per_match"] = patterns["total_wickets"] / patterns["matches"]
+        checked, report = verify_lines(content, data, fallback_text=fallback, subject=patterns.get("player_name") or "this player")
+        if report.get("replaced") or report.get("dropped"):
+            logger.info("player summary fact-check: %s", json.dumps(report, default=str)[:1500])
+        return checked
     
     except Exception as e:
         logger.error(f"Error calling OpenAI API: {str(e)}")
@@ -568,6 +580,69 @@ async def get_bowler_summary(
             player_type="bowler",
             error=str(e)
         )
+
+
+standouts_cache = {}
+
+
+def load_patterns(player_type: str, player_name: str, db: Session, **filters) -> tuple:
+    """(resolved legacy name, patterns or None) using the same stats the DNA summary reads."""
+    resolved_name = resolve_to_legacy_name(player_name, db)
+    if player_type == "batter":
+        from main import get_player_stats
+        stats = get_player_stats(player_name=resolved_name, db=db, **filters)
+    else:
+        from main import get_player_bowling_stats
+        stats = get_player_bowling_stats(player_name=resolved_name, db=db, **filters)
+    if not stats or not stats.get("overall") or stats.get("overall", {}).get("matches", 0) == 0:
+        return resolved_name, None
+    stats["player_name"] = resolved_name
+    detect = detect_batter_patterns if player_type == "batter" else detect_bowler_patterns
+    return resolved_name, detect(stats)
+
+
+def player_standouts(player_type: str, player_name: str, db: Session, **filters) -> dict:
+    from services.player_aliases import get_player_names
+    from services.player_standouts import standouts
+
+    key = get_cache_key(player_name, f"standouts-{player_type}", {k: str(v) for k, v in filters.items()})
+    if key in standouts_cache:
+        return standouts_cache[key]
+    resolved_name, patterns = load_patterns(player_type, player_name, db, **filters)
+    if not patterns:
+        return {"available": False}
+    names = get_player_names(resolved_name, db)
+    name_set = list({n for n in (names.get("legacy_name"), names.get("details_name"), player_name) if n})
+    display = names.get("details_name") or player_name
+    result = standouts(db, "batting" if player_type == "batter" else "bowling", display, name_set, patterns)
+    if result.get("available") and (result.get("source") == "typed" or not os.getenv("TYPESAFE_API_KEY")):
+        standouts_cache[key] = result  # a Jev hiccup is not cached
+    return result
+
+
+@router.get("/{player_type}/{player_name}/standouts")
+def get_player_standouts(
+    player_type: str,
+    player_name: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    leagues: List[str] = Query(default=[]),
+    include_international: bool = Query(default=False),
+    top_teams: Optional[int] = Query(default=None),
+    venue: Optional[str] = None,
+    db: Session = Depends(get_session),
+):
+    """What stands out about a player: code-written facts (incl. Impact/RAA/WPA by season), ranked by Jev."""
+    if player_type not in ("batter", "bowler"):
+        raise HTTPException(status_code=400, detail="player_type must be batter or bowler")
+    try:
+        return player_standouts(
+            player_type, player_name, db, start_date=start_date, end_date=end_date, leagues=leagues,
+            include_international=include_international, top_teams=top_teams, venue=venue,
+        )
+    except Exception as e:
+        logger.error(f"Standouts failed for {player_name}: {e}", exc_info=True)
+        return {"available": False}
 
 
 @router.delete("/cache")

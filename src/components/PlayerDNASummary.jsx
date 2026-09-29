@@ -18,6 +18,7 @@ const PlayerDNASummary = ({
   fetchTrigger // Only fetch when this changes
 }) => {
   const [summary, setSummary] = useState(null);
+  const [standouts, setStandouts] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -42,6 +43,11 @@ const PlayerDNASummary = ({
         }
         
         const endpoint = playerType === 'bowler' ? 'bowler' : 'batter';
+        // "What stands out" (Impact/RAA/WPA and style facts ranked by Jev) loads alongside.
+        setStandouts(null);
+        axios.get(`${config.API_URL}/player-summary/${endpoint}/${encodeURIComponent(playerName)}/standouts?${params.toString()}`)
+          .then((res) => setStandouts(res.data?.available ? res.data : null))
+          .catch(() => {});
         const response = await axios.get(
           `${config.API_URL}/player-summary/${endpoint}/${encodeURIComponent(playerName)}?${params.toString()}`
         );
@@ -91,6 +97,16 @@ const PlayerDNASummary = ({
               </Typography>
             )}
           </Box>
+
+          {standouts && (
+            <Box sx={{ mb: `${spacing.md}px`, pb: `${spacing.md}px`, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.6 }}>What stands out</Typography>
+              <Typography variant="body1" fontWeight="bold" sx={{ mb: `${spacing.xs}px` }}>{standouts.headline}</Typography>
+              {standouts.bullets.map((bullet) => (
+                <Typography key={bullet} variant="body2" color="text.secondary" sx={{ mb: '2px' }}>• {bullet}</Typography>
+              ))}
+            </Box>
+          )}
 
           {/* Loading State */}
           {loading && (

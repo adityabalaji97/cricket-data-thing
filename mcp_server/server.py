@@ -394,6 +394,9 @@ includes a link to open the same query on the Hindsight website — mention it t
 7. match_recap explains how a finished men's T20 was won (biggest Impact and WPA performances,
    the biggest win-probability swing, first innings vs par). Use it for "how did X beat Y" or
    "who won the game for X" questions.
+8. player_profile gives what stands out about a player (Impact/RAA/WPA by season with rank,
+   style, matchups) and Hindsight's fact-checked Player DNA. Use it for "tell me about X" or
+   "how good has X been" questions before drilling in with query_cricket_data.
 """
 
 apps = Apps()
@@ -957,6 +960,59 @@ def match_recap(
         lines.append("No ball-by-ball Impact/WPA for this match, so no recap; the scorecard is linked below.")
     lines += ["", f"Scorecard on Hindsight: {link}"]
     _log_call("match_recap", ctx, args, started, "ok")
+    return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
+
+
+@mcp.tool(
+    name="player_profile",
+    title="What stands out about a player",
+    description=(
+        "A player's standout facts for men's T20: their Impact, RAA and WPA by season with rank "
+        "among peers, style (strike rate / economy, phase), pace-v-spin and best/worst matchups, "
+        "ranked by how distinctive they are, plus Hindsight's fact-checked 'Player DNA' summary. "
+        "role is 'batter' or 'bowler'. Use find_entities for the exact player name."
+    ),
+    annotations=READ_ONLY,
+)
+def player_profile(
+    ctx: Context,
+    player: Annotated[str, Field(description="Exact player name from find_entities, e.g. 'V Kohli'.")],
+    role: Annotated[Literal["batter", "bowler"], Field(description="Batting or bowling profile.")] = "batter",
+    start_date: Annotated[Optional[date], Field(description="Window start for the style facts (default: 1 January, two years back).")] = None,
+    end_date: Annotated[Optional[date], Field(description="Window end (default: today).")] = None,
+) -> CallToolResult:
+    import asyncio
+    from routers.player_summary import get_batter_summary, get_bowler_summary, player_standouts
+
+    started = time.monotonic()
+    args = {"player": player, "role": role}
+    if not _budget.try_acquire():
+        return _BUSY
+    start = start_date or date(date.today().year - 2, 1, 1)
+    filters = dict(start_date=start, end_date=end_date, leagues=[], include_international=True, top_teams=None, venue=None)
+    try:
+        with _read_only_session() as db:
+            stand = player_standouts(role, player, db, **filters)
+            summary_fn = get_batter_summary if role == "batter" else get_bowler_summary
+            dna = asyncio.run(summary_fn(player_name=player, include_patterns=False, db=db, **filters))
+    except Exception as exc:
+        _log_call("player_profile", ctx, args, started, "error")
+        logger.warning("mcp player profile failed: %r", exc)
+        return _error(_user_message(exc, "That player profile could not be built."))
+
+    tab = "batting" if role == "batter" else "bowling"
+    link = f"{WEB_URL}/player?" + urlencode([("name", player), ("tab", tab), ("autoload", "true")])
+    structured = {"player": player, "role": role, "window": {"start_date": start.isoformat(), "end_date": str(end_date) if end_date else None},
+                  "standouts": stand, "player_dna": getattr(dna, "summary", None), "hindsight_url": link}
+    lines = [f"**{player}** ({tab}, men's T20)", ""]
+    if stand.get("available"):
+        lines += ["What stands out:", f"- {stand['headline']}"] + [f"- {b}" for b in stand["bullets"]]
+    if structured["player_dna"]:
+        lines += ["", f"Player DNA (since {start.isoformat()}, fact-checked):", structured["player_dna"]]
+    if len(lines) == 2:
+        lines.append("No T20 data for this player in the window.")
+    lines += ["", f"Profile on Hindsight: {link}"]
+    _log_call("player_profile", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
 
 
