@@ -37,6 +37,7 @@ RELEVANCE_CRITERIA = [
     "Likely decisive: the single factor most likely to swing this match",
 ]
 KEEP_THRESHOLD = 2.0
+MIN_VENUE_MATCHES = 5
 
 
 def _fact(facts: List[Dict[str, Any]], section: str, kind: str, text: str, fixed: bool = False) -> None:
@@ -48,7 +49,8 @@ def _possessive(name: str) -> str:
 
 
 def _plural(n: int, word: str) -> str:
-    return f"{n} {word}{'' if n == 1 else 's'}"
+    suffix = "es" if word.endswith(("ch", "s")) else "s"
+    return f"{n} {word}{'' if n == 1 else suffix}"
 
 
 def build_candidate_facts(context: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -65,7 +67,7 @@ def build_candidate_facts(context: Dict[str, Any]) -> List[Dict[str, Any]]:
     # --- Venue Profile ---
     total = int(toss.get("total_matches") or 0)
     bf, ch = int(toss.get("batting_first_wins") or 0), int(toss.get("chasing_wins") or 0)
-    if total >= 5:
+    if total >= MIN_VENUE_MATCHES:
         bias = _classify_toss_bias(bf, total).get("label")
         if bias == "chasing_edge":
             _fact(facts, "venue_profile", "venue_split", f"Chasing sides have won {ch} of {total} matches at {venue}.")
@@ -77,17 +79,24 @@ def build_candidate_facts(context: Dict[str, Any]) -> List[Dict[str, Any]]:
     if rv_n >= 4:
         rv_bf, rv_ch = int(recent_venue.get("batting_first_wins") or 0), int(recent_venue.get("chasing_wins") or 0)
         _fact(facts, "venue_profile", "recent_venue", f"The last {rv_n} matches here went {rv_bf} bat-first wins to {rv_ch} chases.")
+    # Scoring benchmarks mean nothing from a couple of matches (Barsapara ODIs gave "highest
+    # chased 322, lowest defended 373"), so they need the same sample as the split above.
+    venue_sample = total >= MIN_VENUE_MATCHES
     avg_win, avg_chase = innings.get("avg_winning_score_rounded"), innings.get("avg_chasing_score_rounded")
+    if not venue_sample:
+        avg_win = avg_chase = None
+        _fact(facts, "venue_profile", "thin_venue",
+              f"Only {_plural(total, 'match')} at {venue} in this window, too few for a reliable venue pattern.", fixed=True)
     if avg_win:
         _fact(facts, "venue_profile", "par", f"Winning first-innings totals here average {avg_win}.")
     if avg_chase:
         _fact(facts, "venue_profile", "chase_par", f"Chasing totals here average {avg_chase}.")
     hi_chased, lo_defended = innings.get("highest_total_chased"), innings.get("lowest_total_defended")
-    if hi_chased and lo_defended:
+    if venue_sample and hi_chased and lo_defended:
         _fact(facts, "venue_profile", "extremes", f"The highest total chased here is {hi_chased}; the lowest defended is {lo_defended}.")
     dominant = phase.get("dominant_phase")
     runs = _phase_runs(phase.get("batting_first_wins_template") or {}, dominant or "powerplay")
-    if dominant and runs:
+    if venue_sample and dominant and runs:
         _fact(facts, "venue_profile", "phase", f"Winning sides here are built in the {_phase_label(dominant)}, averaging {runs} runs in that phase.")
 
     # --- Form Guide ---

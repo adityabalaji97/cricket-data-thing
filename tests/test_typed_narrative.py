@@ -64,3 +64,12 @@ def test_failed_jev_call_falls_back(monkeypatch):
     monkeypatch.setenv("TYPESAFE_API_KEY", "test")
     monkeypatch.setattr(jev_client, "ask", lambda *a, **k: None)
     assert typed_preview.curate(_context()) is None
+
+
+def test_thin_venue_samples_give_no_venue_benchmarks():
+    ctx = _context()
+    ctx["screen_story"]["match_results_distribution"]["venue_toss_signal"] = {"batting_first_wins": 1, "chasing_wins": 1, "total_matches": 2}
+    ctx["screen_story"]["innings_scores_analysis"] = {"avg_winning_score_rounded": 373, "avg_chasing_score_rounded": 322,
+                                                      "highest_total_chased": 322, "lowest_total_defended": 373}
+    kinds = {f["kind"] for f in typed_preview.build_candidate_facts(ctx) if f["section"] == "venue_profile"}
+    assert kinds == {"thin_venue"}
