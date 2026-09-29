@@ -21,6 +21,7 @@ RECAP_CRITERIA = [
     "Major: one of the two or three biggest reasons for the result",
     "Decisive: the single moment or performance that most decided the result",
 ]
+BIG_PICTURE_KINDS = {"par", "phase_swing", "comeback"}
 _CACHE: Dict[str, Dict[str, Any]] = {}
 _CACHE_MAX = 500
 
@@ -97,7 +98,8 @@ def build_recap_facts(scorecard: Dict[str, Any], db: Session) -> List[Dict[str, 
         first = scores[0]
         diff = first["runs"] - par
         side = "above" if diff >= 0 else "below"
-        _fact(facts, "par", f"{_poss(first['batting_team'])} {first['runs']}/{first['wickets']} was {abs(diff):.0f} {side} par ({par:.0f}).", diff)
+        # Only a real gap is big-picture; "3 above par" is a detail.
+        _fact(facts, "par" if abs(diff) >= 10 else "par_close", f"{_poss(first['batting_team'])} {first['runs']}/{first['wickets']} was {abs(diff):.0f} {side} par ({par:.0f}).", diff)
 
     tp = _turning_point(db, match_id)
     if tp and abs(float(tp["wpa"])) >= 0.08:
@@ -116,6 +118,21 @@ def build_recap_facts(scorecard: Dict[str, Any], db: Session) -> List[Dict[str, 
         low = min(winner_path)
         if low <= 0.3:
             _fact(facts, "comeback", f"{winner} won from as low as {_pct(low)} win probability.", (0.5 - low) * 100)
+
+    # Which phase decided it: the biggest gap in batting Impact between the two innings.
+    innings_primer = primer.get("innings") or []
+    if len(innings_primer) == 2:
+        phases = (("powerplay", 1, 6), ("middle overs", 7, 15), ("death overs", 16, 20))
+        gaps = []
+        for label, lo, hi in phases:
+            vals = [sum(o["impact"] for o in inn.get("by_over") or [] if lo <= o["over"] <= hi) for inn in innings_primer]
+            gaps.append((vals[0] - vals[1], label, vals))
+        gap, label, vals = max(gaps, key=lambda g: abs(g[0]))
+        if abs(gap) >= 10:
+            better, worse = (innings_primer[0], innings_primer[1]) if gap > 0 else (innings_primer[1], innings_primer[0])
+            b_val, w_val = (vals[0], vals[1]) if gap > 0 else (vals[1], vals[0])
+            _fact(facts, "phase_swing", f"The {label} decided it: {better['team']} batted {abs(gap):.0f} runs better than "
+                  f"{worse['team']} there by Impact ({b_val:+.0f} v {w_val:+.0f}).", gap)
 
     result = match.get("result_text")
     if result:
@@ -143,7 +160,11 @@ def build_recap(scorecard: Dict[str, Any], db: Session) -> Dict[str, Any]:
     if not jev:
         for f in ranked:
             f["score"] = f["weight"]
-    chosen = top(ranked, 4, threshold=2.0 if jev else 0.0)
+    # Big-picture facts (par, the deciding phase, a comeback) lead; Jev orders within each group.
+    big = sorted((f for f in ranked if f["kind"] in BIG_PICTURE_KINDS), key=lambda f: f["score"] or 0, reverse=True)
+    detail = [f for f in ranked if f["kind"] not in BIG_PICTURE_KINDS]
+    chosen = big[:2] + top(detail, max(2, 4 - len(big[:2])), threshold=2.0 if jev else 0.0, minimum=2)
+    chosen = chosen[:4]
     recap = {
         "available": True,
         "source": "typed" if jev else "deterministic",

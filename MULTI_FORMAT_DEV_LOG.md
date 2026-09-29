@@ -11,6 +11,15 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **Player name spellings (2026-09-29):** a feed spelling change split Vaibhav Sooryavanshi
+> ("Vaibhav Suryavanshi" / "Vaibhav Sooryavanshi" in delivery_details, "V Suryavanshi" legacy).
+> Migration 005 (applied to prod) makes the current spelling canonical. Code: 
+> `player_aliases.expand_name_group` expands any name to its whole alias group (was one hop);
+> `get_player_names` returns `all_names`; query-builder batter/bowler grouping on delivery_details
+> maps to canonical names; search dedupes by display name. `scripts/find_name_variants.py`
+> reports more candidates (37 pairs; ~28 look like the same player) -- not applied, awaiting review.
+> Recaps: par (10+ runs off), the deciding phase and comebacks now lead.
+>
 > **Jev everywhere user-facing (2026-09-29), all fall back cleanly without TYPESAFE_API_KEY:**
 > shared helper `services/fact_curation.py` (code writes facts, Jev scores). (1) Scorecard recaps
 > `services/match_recap.py`, `GET /matches/{id}/recap`, 'How it was won' card, share-card story,

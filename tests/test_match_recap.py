@@ -48,11 +48,24 @@ def test_recap_without_jev_orders_by_effect_size(monkeypatch):
     assert recap["bullets"][-1].startswith("Chennai Super Kings won by 8 wickets")
 
 
-def test_recap_uses_jev_ranking_when_available(monkeypatch):
+def test_recap_uses_jev_ranking_when_there_is_no_big_picture_fact(monkeypatch):
     monkeypatch.setenv("TYPESAFE_API_KEY", "test")
     match_recap._CACHE.clear()
     monkeypatch.setattr(jev_client, "ask", lambda state, questions, timeout=3.0: {
         qid: {"score": 3.9 if "Noor Ahmad" in q["instructions"] else 1.0} for qid, q in questions.items()})
-    recap = match_recap.build_recap(_scorecard(), _NoRows())
+    scorecard = _scorecard()
+    scorecard["summary"]["primer"]["win_probability"]["points"] = [0.5, 0.45, 0.4, 0.35]  # no comeback
+    recap = match_recap.build_recap(scorecard, _NoRows())
     assert recap["source"] == "typed"
     assert recap["headline"].startswith("Noor Ahmad")
+
+
+def test_big_picture_facts_lead_whatever_jev_prefers(monkeypatch):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test")
+    match_recap._CACHE.clear()
+    # Jev prefers a bowling spell, but the comeback (big picture) must still lead.
+    monkeypatch.setattr(jev_client, "ask", lambda state, questions, timeout=3.0: {
+        qid: {"score": 3.9 if "Noor Ahmad" in q["instructions"] else 1.0} for qid, q in questions.items()})
+    recap = match_recap.build_recap(_scorecard(), _NoRows())
+    assert recap["headline"] == "Chennai Super Kings won from as low as 20% win probability."
+    assert recap["bullets"][0].startswith("Noor Ahmad")

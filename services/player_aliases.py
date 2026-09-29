@@ -12,7 +12,7 @@ Usage:
 
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Session
-from typing import Optional, List, Dict
+from typing import Any, Optional, List, Dict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -96,52 +96,70 @@ def resolve_to_details_name(name: str, db: Session) -> str:
         return name
 
 
-def get_player_names(name: str, db: Session) -> Dict[str, str]:
+def expand_name_group(names: List[str], db: Session) -> List[str]:
     """
-    Get both legacy and details names for a player.
-    
-    Args:
-        name: Any known name for the player
-        db: Database session
-        
+    Every stored spelling of the given players: the inputs, their canonical names, and every
+    name aliased to those canonical names.
+
+    One hop was not enough once a feed changed spelling: "V Suryavanshi" (legacy),
+    "Vaibhav Suryavanshi" and "Vaibhav Sooryavanshi" (both delivery_details) all alias to one
+    canonical name, and from any one of them the others are two hops away. We only step
+    input -> canonical -> members, never member -> other canonical, so an ambiguous legacy
+    name ("A Shukla" -> Arpit and Ayush) is not chained into unrelated players.
+    """
+    names = [n for n in (names or []) if n]
+    if not names:
+        return []
+    try:
+        rows = db.execute(text("""
+            WITH canon AS (
+                SELECT alias_name AS c FROM player_aliases
+                WHERE LOWER(alias_name) = ANY(:lowered) OR LOWER(player_name) = ANY(:lowered)
+            )
+            SELECT c FROM canon
+            UNION
+            SELECT player_name FROM player_aliases WHERE alias_name IN (SELECT c FROM canon)
+        """), {"lowered": [n.lower() for n in names]}).scalars().all()
+        return list(dict.fromkeys([*names, *[r for r in rows if r]]))
+    except Exception as e:
+        logger.warning(f"Error expanding name group for {names}: {e}")
+        return names
+
+
+def get_player_names(name: str, db: Session) -> Dict[str, Any]:
+    """
+    Legacy and details names for a player, plus every stored spelling.
+
     Returns:
-        {"legacy_name": "V Kohli", "details_name": "Virat Kohli"}
-        If no alias exists, both will be the same as input.
+        {"legacy_name": "V Kohli", "details_name": "Virat Kohli", "all_names": [...]}
+        legacy_name is the Cricsheet-style form ("V Kohli") where one exists; details_name is the
+        canonical full name. If no alias exists, all are the input.
     """
     if not name:
-        return {"legacy_name": name, "details_name": name}
-    
+        return {"legacy_name": name, "details_name": name, "all_names": [name] if name else []}
+
     try:
-        # First try: input is a NEW name (alias_name)
-        query1 = text("""
-            SELECT player_name, alias_name 
-            FROM player_aliases 
-            WHERE LOWER(alias_name) = LOWER(:name)
+        canonical = db.execute(text("""
+            SELECT alias_name FROM player_aliases
+            WHERE LOWER(alias_name) = LOWER(:name) OR LOWER(player_name) = LOWER(:name)
+            ORDER BY (LOWER(alias_name) = LOWER(:name)) DESC, alias_name
             LIMIT 1
-        """)
-        result = db.execute(query1, {"name": name}).fetchone()
-        
-        if result:
-            return {"legacy_name": result[0], "details_name": result[1]}
-        
-        # Second try: input is an OLD name (player_name)
-        query2 = text("""
-            SELECT player_name, alias_name 
-            FROM player_aliases 
-            WHERE LOWER(player_name) = LOWER(:name)
-            LIMIT 1
-        """)
-        result = db.execute(query2, {"name": name}).fetchone()
-        
-        if result:
-            return {"legacy_name": result[0], "details_name": result[1]}
-        
-        # No alias found - player uses same name everywhere
-        return {"legacy_name": name, "details_name": name}
-        
+        """), {"name": name}).scalar()
+        if not canonical:
+            return {"legacy_name": name, "details_name": name, "all_names": [name]}
+        members = db.execute(text("""
+            SELECT player_name FROM player_aliases WHERE alias_name = :canonical
+            -- Prefer the initials form ("V Kohli") as the legacy name: that is how the legacy
+            -- tables spell it; a spelling-variant alias ("Vaibhav Suryavanshi") is not legacy.
+            ORDER BY (player_name ~ '^[A-Z]+ ') DESC, player_name
+        """), {"canonical": canonical}).scalars().all()
+        legacy = name if (name != canonical and name in members) else (members[0] if members else name)
+        return {"legacy_name": legacy, "details_name": canonical,
+                "all_names": list(dict.fromkeys([name, canonical, *members]))}
+
     except Exception as e:
         logger.warning(f"Error getting player names for '{name}': {e}")
-        return {"legacy_name": name, "details_name": name}
+        return {"legacy_name": name, "details_name": name, "all_names": [name]}
 
 
 def search_players_with_aliases(
@@ -309,51 +327,8 @@ def search_players_with_aliases(
 
 
 def get_all_name_variants(names: List[str], db: Session) -> List[str]:
-    """
-    Get all variants (old and new) of player names for querying.
-    Useful when querying tables that might have either format.
-    
-    Args:
-        names: List of player names (can be old or new format)
-        db: Database session
-        
-    Returns:
-        List of all name variants (original + aliases)
-    """
-    if not names:
-        return []
-    
-    all_variants = set(names)  # Start with originals
-    
-    try:
-        # Get old names for any new names provided
-        new_to_old_query = text("""
-            SELECT alias_name, player_name 
-            FROM player_aliases 
-            WHERE alias_name = ANY(:names)
-        """)
-        new_to_old = db.execute(new_to_old_query, {"names": names}).fetchall()
-        
-        for row in new_to_old:
-            all_variants.add(row[0])  # alias_name (new)
-            all_variants.add(row[1])  # player_name (old)
-        
-        # Get new names for any old names provided
-        old_to_new_query = text("""
-            SELECT player_name, alias_name 
-            FROM player_aliases 
-            WHERE player_name = ANY(:names)
-        """)
-        old_to_new = db.execute(old_to_new_query, {"names": names}).fetchall()
-        
-        for row in old_to_new:
-            all_variants.add(row[0])  # player_name (old)
-            all_variants.add(row[1])  # alias_name (new)
-        
-    except Exception as e:
-        logger.warning(f"Error getting name variants: {e}")
-    
-    return list(all_variants)
+    """All stored spellings of these players (see expand_name_group)."""
+    return expand_name_group(names, db)
 
 
 def load_aliases_map(db: Session) -> Dict[str, str]:

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Optional, Any
 from datetime import date, timedelta
 import logging
+import re
 import random
 import math
 import numbers
@@ -324,6 +325,15 @@ def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
     try:
         # Search players with alias support (returns deduplicated with both names)
         players = search_players_with_aliases(query, db, limit)
+        # A feed spelling change leaves two stored names for one player (both aliased to the same
+        # display name); keep one entry, preferring the initials form the profile pages route on.
+        by_display: Dict[str, Dict] = {}
+        for p in players:
+            key = (p.get("display_name") or p["name"]).lower()
+            current = by_display.get(key)
+            if current is None or (re.match(r"^[A-Z]+ ", p["name"]) and not re.match(r"^[A-Z]+ ", current["name"])):
+                by_display[key] = p
+        players = list(by_display.values())
         
         # Search teams - use subquery
         team_query = text("""

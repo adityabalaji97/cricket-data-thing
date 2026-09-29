@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from services.matchups import get_all_team_name_variations
+from services.player_aliases import UNAMBIGUOUS_ALIASES as aliases
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,10 @@ MIN_PAR_MATCHES = 5
 def _team_rows(db: Session, team: str, start: date, end: date) -> Dict[str, Any]:
     names = get_all_team_name_variations(team)
     params = {"teams": names, "start": start.isoformat(), "end": end.isoformat()}
-    batting = db.execute(text("""
-        SELECT dd.bat AS player,
+    # Players are grouped under their canonical name: a feed spelling change must not split one
+    # player into two leaders.
+    batting = db.execute(text(f"""
+        SELECT COALESCE(pa.alias_name, dd.bat) AS player,
                COUNT(*) AS balls,
                COUNT(DISTINCT dd.p_match) AS innings,
                SUM(bm.impact::double precision) AS impact,
@@ -36,13 +39,14 @@ def _team_rows(db: Session, team: str, start: date, end: date) -> Dict[str, Any]
         FROM delivery_details dd
         JOIN ball_metrics bm ON bm.delivery_id = dd.id
         JOIN matches m ON m.id = dd.p_match
+        LEFT JOIN {aliases} pa ON pa.player_name = dd.bat
         WHERE dd.team_bat = ANY(:teams) AND COALESCE(dd.wide, 0) = 0
           AND m.format = 'T20' AND m.gender = 'male'
           AND dd.match_date BETWEEN :start AND :end
-        GROUP BY dd.bat
+        GROUP BY 1
     """), params).mappings().all()
-    bowling = db.execute(text("""
-        SELECT dd.bowl AS player,
+    bowling = db.execute(text(f"""
+        SELECT COALESCE(pa.alias_name, dd.bowl) AS player,
                COUNT(*) AS balls,
                COUNT(DISTINCT dd.p_match) AS innings,
                -SUM(bm.impact::double precision) AS impact,
@@ -51,10 +55,11 @@ def _team_rows(db: Session, team: str, start: date, end: date) -> Dict[str, Any]
         FROM delivery_details dd
         JOIN ball_metrics bm ON bm.delivery_id = dd.id
         JOIN matches m ON m.id = dd.p_match
+        LEFT JOIN {aliases} pa ON pa.player_name = dd.bowl
         WHERE dd.team_bowl = ANY(:teams) AND COALESCE(dd.wide, 0) = 0
           AND m.format = 'T20' AND m.gender = 'male'
           AND dd.match_date BETWEEN :start AND :end
-        GROUP BY dd.bowl
+        GROUP BY 1
     """), params).mappings().all()
     matches = db.execute(text("""
         SELECT COUNT(DISTINCT dd.p_match)

@@ -612,7 +612,7 @@ def player_standouts(player_type: str, player_name: str, db: Session, **filters)
     if not patterns:
         return {"available": False}
     names = get_player_names(resolved_name, db)
-    name_set = list({n for n in (names.get("legacy_name"), names.get("details_name"), player_name) if n})
+    name_set = list(dict.fromkeys(n for n in (player_name, *names.get("all_names", []), names.get("legacy_name"), names.get("details_name")) if n))
     display = names.get("details_name") or player_name
     result = standouts(db, "batting" if player_type == "batter" else "bowling", display, name_set, patterns)
     if result.get("available") and (result.get("source") == "typed" or not os.getenv("TYPESAFE_API_KEY")):

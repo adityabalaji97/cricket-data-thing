@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
+from services.player_aliases import UNAMBIGUOUS_ALIASES
 
 IST = timezone(timedelta(hours=5, minutes=30))
 LAUNCH_DATE = date(2026, 9, 26)  # puzzle #1
@@ -234,20 +235,30 @@ def call_it_answer(moment: Dict[str, Any], index: int) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------- Higher or Lower
 
 
+# From this puzzle day, player-seasons group under the canonical name, so a feed spelling change
+# ("Vaibhav Suryavanshi" / "Sooryavanshi") is one player. Earlier days keep the raw grouping so a
+# puzzle never changes under someone who is mid-game.
+CANONICAL_NAMES_FROM = date(2026, 9, 30)
+
+
 def _player_seasons(db: Session, day: date) -> List[Dict[str, Any]]:
     """Batter-seasons (per competition) with >= 150 balls in the last four seasons before `day`."""
-    rows = db.execute(text("""
-        SELECT dd.bat AS player, dd.competition, dd.year,
+    canonical = day >= CANONICAL_NAMES_FROM
+    player = "COALESCE(pa.alias_name, dd.bat)" if canonical else "dd.bat"
+    alias_join = f"LEFT JOIN {UNAMBIGUOUS_ALIASES} pa ON pa.player_name = dd.bat" if canonical else ""
+    rows = db.execute(text(f"""
+        SELECT {player} AS player, dd.competition, dd.year,
                COUNT(*) AS balls, SUM(dd.batruns) AS runs,
                SUM(bm.impact) AS impact, SUM(bm.raa) AS raa, SUM(bm.wpa) AS wpa
         FROM delivery_details dd
         JOIN ball_metrics bm ON bm.delivery_id = dd.id
+        {alias_join}
         WHERE dd.format = 'T20' AND dd.gender = 'male' AND COALESCE(dd.wide, 0) = 0
           AND dd.year BETWEEN :first AND :last
           AND (dd.competition = ANY(:leagues) OR (dd.competition = 'T20I' AND dd.team_bat = ANY(:teams)))
-        GROUP BY dd.bat, dd.competition, dd.year
+        GROUP BY 1, dd.competition, dd.year
         HAVING COUNT(*) >= 150
-        ORDER BY dd.bat, dd.competition, dd.year
+        ORDER BY 1, dd.competition, dd.year
     """), {"first": day.year - 4, "last": day.year, "leagues": list(MAJOR_LEAGUES), "teams": list(TOP_T20I_TEAMS)}).mappings().all()
     # Recognisable names only: players with >= 600 balls across these seasons, not one-season wonders.
     totals: Dict[str, int] = {}

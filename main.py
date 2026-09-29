@@ -2231,7 +2231,8 @@ def get_player_stats(
 
         # Resolve player name aliases
         names = get_player_names(player_name, db)
-        player_names = list(set(filter(None, [names.get('legacy_name'), names.get('details_name'), player_name])))
+        # Every stored spelling (legacy initials, full names, feed spelling changes).
+        player_names = list(dict.fromkeys(filter(None, [player_name, *names.get('all_names', []), names.get('legacy_name'), names.get('details_name')])))
 
         params = {
             "player_names": player_names,
@@ -3637,7 +3638,8 @@ def get_player_bowling_stats(
 
         # Resolve player name aliases
         names = get_player_names(player_name, db)
-        player_names = list(set(filter(None, [names.get('legacy_name'), names.get('details_name'), player_name])))
+        # Every stored spelling (legacy initials, full names, feed spelling changes).
+        player_names = list(dict.fromkeys(filter(None, [player_name, *names.get('all_names', []), names.get('legacy_name'), names.get('details_name')])))
 
         params = {
             "player_names": player_names,

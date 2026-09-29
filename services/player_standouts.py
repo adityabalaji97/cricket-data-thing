@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from services.fact_curation import score_facts, top
+from services.player_aliases import UNAMBIGUOUS_ALIASES
 
 STANDOUT_CRITERIA = [
     "Generic: true of most players in this role; says nothing distinctive",
@@ -60,10 +61,11 @@ def impact_rank(db: Session, name_set: List[str], role: str, year: str) -> Optio
     if key not in _RANK_CACHE:
         col, sign = ("dd.bat", 1) if role == "batting" else ("dd.bowl", -1)
         rows = db.execute(text(f"""
-            SELECT {col} AS player, {sign} * SUM(bm.impact::double precision) AS impact
+            SELECT COALESCE(pa.alias_name, {col}) AS player, {sign} * SUM(bm.impact::double precision) AS impact
             FROM delivery_details dd
             JOIN ball_metrics bm ON bm.delivery_id = dd.id
             JOIN matches m ON m.id = dd.p_match
+            LEFT JOIN {UNAMBIGUOUS_ALIASES} pa ON pa.player_name = {col}
             WHERE dd.match_date LIKE :year AND COALESCE(dd.wide, 0) = 0 AND m.format = 'T20' AND m.gender = 'male'
             GROUP BY 1 HAVING COUNT(*) >= :min_balls
             ORDER BY 2 DESC

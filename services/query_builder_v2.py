@@ -17,6 +17,7 @@ from services.player_aliases import (
     UNAMBIGUOUS_ALIASES,
     alias_map_join_sql,
     canonical_name_sql,
+    expand_name_group,
 )
 from services.bowler_types import PACE_TYPES as ALL_KNOWN_PACE_TYPES, SPIN_TYPES as ALL_KNOWN_SPIN_TYPES
 import logging
@@ -416,43 +417,20 @@ def get_player_name_variants(player_names: List[str], db, direction: str = 'new_
 
 
 def get_all_player_variants(player_names: List[str], db) -> List[str]:
-    """
-    Get all variants of player names for querying legacy table.
-    Returns flat list of all names (original + aliases).
-    """
+    """Every stored spelling of these players, legacy and delivery_details alike."""
     if not player_names:
         return []
-
-    variants = get_player_name_variants(player_names, db, direction='new_to_old')
-    all_names = set()
-    for name, name_variants in variants.items():
-        all_names.update(name_variants)
-
-    return list(all_names)
+    return expand_name_group(player_names, db)
 
 
 def _expand_player_names(player_names: List[str], db) -> List[str]:
     """
-    Expand player names to include both legacy and delivery_details variants.
-    Checks both directions so either name format works as input.
+    Expand player names to every stored spelling (legacy initials, delivery_details full names,
+    and feed spelling changes that alias to the same canonical name), from any input form.
     """
     if not player_names or not db:
         return player_names
-
-    all_names = set(player_names)
-    try:
-        # old_to_new: "YS Samra" -> "Yuvraj Samra"
-        old_to_new = get_player_name_variants(player_names, db, direction='old_to_new')
-        for variants in old_to_new.values():
-            all_names.update(variants)
-        # new_to_old: "Yuvraj Samra" -> "YS Samra"
-        new_to_old = get_player_name_variants(player_names, db, direction='new_to_old')
-        for variants in new_to_old.values():
-            all_names.update(variants)
-    except Exception as e:
-        logger.warning(f"Error expanding player names: {e}")
-
-    return list(all_names)
+    return expand_name_group(player_names, db)
 
 
 # =============================================================================
@@ -3071,9 +3049,11 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
         "batting_team": "dd.team_bat",
         "bowling_team": "dd.team_bowl",
         
-        # Players
-        "batter": "dd.bat",
-        "bowler": "dd.bowl",
+        # Players. Canonical names too: a feed can change how it spells a player ("Vaibhav
+        # Suryavanshi" -> "Vaibhav Sooryavanshi"), and player_aliases links the spellings.
+        # pa_bat / pa_bowl joins are added by handle_grouped_query.
+        "batter": "COALESCE(pa_bat.alias_name, dd.bat)",
+        "bowler": "COALESCE(pa_bowl.alias_name, dd.bowl)",
         # delivery_details.non_striker is mostly stored in legacy short-form
         # ("V Kohli") while dd.bat is canonical. Use player_aliases to project
         # to canonical, so non_striker / partnership groupings collapse the
@@ -3243,11 +3223,12 @@ def handle_grouped_query(
     # form), so name variants for the same player collapse to one row.
     needs_partner_canon = ("partnership" in group_by) or ("non_striker" in group_by)
     pa_join = ""
+    if needs_partner_canon or "batter" in group_by:
+        pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = dd.bat "
     if needs_partner_canon:
-        pa_join = (
-            "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = dd.bat "
-            "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = dd.non_striker"
-        )
+        pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = dd.non_striker "
+    if "bowler" in group_by:
+        pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bowl ON pa_bowl.player_name = dd.bowl "
 
     # Delivery-position grouping: ROW_NUMBER over delivery_details to produce
     # ball_in_over / ball_in_innings / ball_in_spell. Each requested column
@@ -3623,11 +3604,12 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
 
             summary_needs_partner_canon = ("partnership" in summary_group_by) or ("non_striker" in summary_group_by)
             summary_pa_join = ""
+            if summary_needs_partner_canon or "batter" in summary_group_by:
+                summary_pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = dd.bat "
             if summary_needs_partner_canon:
-                summary_pa_join = (
-                    "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = dd.bat "
-                    "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = dd.non_striker"
-                )
+                summary_pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = dd.non_striker "
+            if "bowler" in summary_group_by:
+                summary_pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bowl ON pa_bowl.player_name = dd.bowl "
 
             # Same conditional CTE/join splicing as handle_grouped_query for
             # ball_in_over / ball / ball_in_spell. The bat_pos block uses a
