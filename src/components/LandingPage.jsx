@@ -376,10 +376,27 @@ const topIconSx = {
   '&:hover': { bgcolor: C.raised },
 };
 
+// Fixture start in the viewer's own time zone. The API's `date`/`time` are UTC, so without
+// `startUtc` (an older cached response) the time is labelled UTC rather than guessed.
+const localStart = (match) => {
+  if (!match.startUtc) {
+    return { date: match.date, label: match.time ? `${match.time} UTC` : null };
+  }
+  const start = new Date(match.startUtc);
+  const date = start.toLocaleDateString('en-CA');
+  let time = start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+  // en-US browsers in India name the zone "GMT+5:30"; most of our readers know it as IST.
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (zone === 'Asia/Kolkata' || zone === 'Asia/Calcutta') time = time.replace(/GMT\+5:30$/, 'IST');
+  const today = new Date().toLocaleDateString('en-CA');
+  const weekday = date === today ? '' : `${start.toLocaleDateString(undefined, { weekday: 'short' })} `;
+  return { date, label: `${weekday}${time}` };
+};
+
 const TodaySection = ({ matches, loading, isMobile }) => {
   const trackRef = useRef(null);
   const today = new Date().toLocaleDateString('en-CA');
-  const todayMatches = matches.filter((match) => match.isLive || match.date === today);
+  const todayMatches = matches.filter((match) => match.isLive || localStart(match).date === today);
   const displayMatches = todayMatches.length ? todayMatches : matches.slice(0, 6);
   const hasLive = displayMatches.some((match) => match.isLive);
 
@@ -408,7 +425,8 @@ const TodaySection = ({ matches, loading, isMobile }) => {
 
 const TodayMatchCard = ({ match }) => {
   const live = Boolean(match.isLive);
-  const status = live ? (match.statusText || 'Live') : (match.time ? `Starts ${match.time} IST` : 'Scheduled');
+  const startLabel = localStart(match).label;
+  const status = live ? (match.statusText || 'Live') : (startLabel ? `Starts ${startLabel}` : 'Scheduled');
   const team1Color = getTeamColor(match.team1Abbr || match.team1) || C.low;
   const team2Color = getTeamColor(match.team2Abbr || match.team2) || C.low;
   return (

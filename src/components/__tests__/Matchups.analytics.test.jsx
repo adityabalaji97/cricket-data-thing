@@ -4,6 +4,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import Matchups from '../Matchups';
 import { postAnalyticsJson } from '../../utils/analyticsApi';
 
+// Matchups reads the pinned site format; the real provider fetches /formats, so pin T20 here.
+jest.mock('../../context/FormatContext', () => ({
+  useFormat: () => ({ pinnedFormatParams: { format: 'T20', gender: 'male' } }),
+}));
+
 jest.mock('axios', () => ({
   __esModule: true,
   default: {

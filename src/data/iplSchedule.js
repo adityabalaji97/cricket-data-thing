@@ -13,6 +13,7 @@ export const fetchUpcomingMatches = async (count = 3) => {
       matchId: match.match_id || null,
       date: match.date,
       time: match.time,
+      startUtc: match.start_utc || null,
       venue: match.venue,
       series: match.series,
       format: match.format || 'T20',

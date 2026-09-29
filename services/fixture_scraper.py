@@ -325,8 +325,10 @@ def _extract_fixture(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
 
     return {
-        "date": date_str,
-        "time": time_str,
+        "date": date_str,  # UTC date; kept for older callers
+        "time": time_str,  # UTC HH:MM; kept for older callers
+        # The exact start instant, so clients can show it in the viewer's own time zone.
+        "start_utc": event_dt.astimezone(timezone.utc).isoformat() if event_dt else None,
         "venue": _normalize_venue(venue_name),
         "team1": team1,
         "team2": team2,

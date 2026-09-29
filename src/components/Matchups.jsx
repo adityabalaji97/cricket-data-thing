@@ -142,15 +142,24 @@ const resolvePostTossPlayerLinks = (
 };
 
 
+// A bowler's full quota, which the consolidated bowling row is scaled to: 4 overs in a T20,
+// 10 in an ODI. Economy bands shift with the format too.
+const BOWLING_SPELL = {
+    T20: { balls: 24, good: 6, bad: 9 },
+    ODI: { balls: 60, good: 4.5, bad: 6 },
+};
+
 const MetricCell = ({ data, isMobile, bowler, isBowlingConsolidated = false }) => {
+    const { pinnedFormatParams } = useFormat();
+    const spell = BOWLING_SPELL[pinnedFormatParams.format] || BOWLING_SPELL.T20;
     if (!data) return <TableCell align="center">-</TableCell>;
 
     const getColor = (sr, balls) => {
         if (balls < 6) return 'text.secondary';
         if (isBowlingConsolidated) {
             // For bowling consolidated, lower economy is better
-            if (data.economy < 6) return 'success.main';
-            if (data.economy > 9) return 'error.main';
+            if (data.economy < spell.good) return 'success.main';
+            if (data.economy > spell.bad) return 'error.main';
             return 'warning.main';
         } else {
             // For batting, higher strike rate is better
@@ -164,20 +173,21 @@ const MetricCell = ({ data, isMobile, bowler, isBowlingConsolidated = false }) =
     let tooltipContent;
 
     if (isBowlingConsolidated) {
-        // Normalize bowling performance to 24 balls (4 overs max)
-        const normalizedRuns = (data.runs || 0) * (24 / Math.max(data.balls || 1, 1));
-        const normalizedWickets = (data.wickets || 0) * (24 / Math.max(data.balls || 1, 1));
-        const normalizedEconomy = normalizedRuns / 4; // 4 overs
-        
-        // Display format: runs-wickets (balls) @ economy (normalized to 24 balls)
+        // Scale to a full spell (24 balls in a T20, 60 in an ODI)
+        const scale = spell.balls / Math.max(data.balls || 1, 1);
+        const normalizedRuns = (data.runs || 0) * scale;
+        const normalizedWickets = (data.wickets || 0) * scale;
+        const normalizedEconomy = normalizedRuns / (spell.balls / 6);
+
+        // Display format: runs-wickets (spell balls) @ economy
         displayValue = isMobile
-            ? `${Math.round(normalizedRuns)}-${normalizedWickets.toFixed(1)} (24)`
-            : `${Math.round(normalizedRuns)}-${normalizedWickets.toFixed(1)} (24) @ ${normalizedEconomy.toFixed(1)}`;
-            
+            ? `${Math.round(normalizedRuns)}-${normalizedWickets.toFixed(1)} (${spell.balls})`
+            : `${Math.round(normalizedRuns)}-${normalizedWickets.toFixed(1)} (${spell.balls}) @ ${normalizedEconomy.toFixed(1)}`;
+
         tooltipContent = (
             <Box>
                 <Typography variant="body2">
-                    <strong>Normalized to 24 balls:</strong><br />
+                    <strong>Normalized to {spell.balls} balls ({spell.balls / 6} overs):</strong><br />
                     Runs: {Math.round(normalizedRuns)}<br />
                     Wickets: {normalizedWickets.toFixed(1)}<br />
                     Economy: {normalizedEconomy.toFixed(2)}<br />
