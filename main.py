@@ -3671,19 +3671,46 @@ def get_player_bowling_stats(
 
         # SIMPLIFIED: Overall bowling stats using pre-calculated data + legal deliveries count
         overall_query = text(f"""
-            WITH legal_balls_summary AS (
-                SELECT
-                    SUM(1) as total_legal_balls,
-                    SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
-                FROM (SELECT * FROM delivery_details WHERE format = 'T20' AND gender = 'male') dd
-                JOIN matches m ON dd.p_match = m.id
-                WHERE dd.bowl = ANY(:player_names)
-                AND dd.wide = 0 AND dd.noball = 0  -- Only legal deliveries
+            WITH bowler_innings_balls AS (
+                -- Legal balls per innings: delivery_details where the match has ball data there
+                -- (2015 on, and current), else the legacy deliveries table (which ends in late
+                -- 2025). Reading these only from the legacy table undercounted recent seasons:
+                -- phase economies inflated (Bumrah 2025+ powerplay "23.67") and recent innings
+                -- dropped from the innings list.
+                SELECT dd.p_match AS match_id, dd.inns AS innings,
+                       COUNT(*) AS legal_balls,
+                       COUNT(CASE WHEN dd.batruns IN (4, 6) THEN 1 END) AS boundaries,
+                       COUNT(CASE WHEN dd.over < 6 THEN 1 END) AS pp_legal_balls,
+                       COUNT(CASE WHEN dd.over >= 6 AND dd.over < 15 THEN 1 END) AS middle_legal_balls,
+                       COUNT(CASE WHEN dd.over >= 15 THEN 1 END) AS death_legal_balls
+                FROM delivery_details dd
+                WHERE dd.bowl = ANY(:player_names) AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0
+                GROUP BY dd.p_match, dd.inns
+                UNION ALL
+                SELECT d.match_id, d.innings,
+                       COUNT(*),
+                       COUNT(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 END),
+                       COUNT(CASE WHEN d.over < 6 THEN 1 END),
+                       COUNT(CASE WHEN d.over >= 6 AND d.over < 15 THEN 1 END),
+                       COUNT(CASE WHEN d.over >= 15 THEN 1 END)
+                FROM deliveries d
+                WHERE d.bowler = ANY(:player_names) AND d.wides = 0 AND d.noballs = 0
+                  AND NOT EXISTS (SELECT 1 FROM delivery_details x WHERE x.p_match = d.match_id)
+                GROUP BY d.match_id, d.innings
+            ),
+            bowler_innings AS (
+                SELECT bs.*
+                FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bs
+                JOIN matches m ON bs.match_id = m.id
+                WHERE bs.bowler = ANY(:player_names)
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 AND (:venue IS NULL OR m.venue = :venue)
                 {match_filter}
             )
+            -- Runs/wickets/dots from bowling_stats and legal balls from the same innings, so every
+            -- rate shares one denominator. (Balls used to come from delivery_details alone, which
+            -- starts in 2015, so career economies before then were inflated.)
             SELECT
                 COUNT(DISTINCT bs.match_id) as matches,
                 SUM(bs.runs_conceded) as runs_conceded,
@@ -3691,22 +3718,14 @@ def get_player_bowling_stats(
                 SUM(bs.dots) as dots,
                 COUNT(CASE WHEN bs.wickets >= 3 AND bs.wickets < 5 THEN 1 END) as three_wicket_hauls,
                 COUNT(CASE WHEN bs.wickets >= 5 THEN 1 END) as five_wicket_hauls,
-                lbs.total_legal_balls as legal_balls,
-                lbs.boundaries,
-                -- Pre-calculated metrics
+                SUM(b.legal_balls)::int as legal_balls,
+                SUM(b.boundaries)::int as boundaries,
                 CAST(SUM(bs.runs_conceded) AS FLOAT) / NULLIF(SUM(bs.wickets), 0) as bowling_average,
-                CAST(lbs.total_legal_balls AS FLOAT) / NULLIF(SUM(bs.wickets), 0) as bowling_strike_rate,
-                CAST(SUM(bs.runs_conceded) * 6.0 AS FLOAT) / NULLIF(lbs.total_legal_balls, 0) as economy_rate,
-                CAST(SUM(bs.dots) * 100.0 AS FLOAT) / NULLIF(lbs.total_legal_balls, 0) as dot_percentage
-            FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bs
-            JOIN matches m ON bs.match_id = m.id
-            CROSS JOIN legal_balls_summary lbs
-            WHERE bs.bowler = ANY(:player_names)
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY lbs.total_legal_balls, lbs.boundaries
+                CAST(SUM(b.legal_balls) AS FLOAT) / NULLIF(SUM(bs.wickets), 0) as bowling_strike_rate,
+                CAST(SUM(bs.runs_conceded) * 6.0 AS FLOAT) / NULLIF(SUM(b.legal_balls), 0) as economy_rate,
+                CAST(SUM(bs.dots) * 100.0 AS FLOAT) / NULLIF(SUM(b.legal_balls), 0) as dot_percentage
+            FROM bowler_innings bs
+            JOIN bowler_innings_balls b ON b.match_id = bs.match_id AND b.innings = bs.innings
         """)
 
         # SIMPLIFIED: Maidens calculation - more efficient approach
@@ -3731,50 +3750,66 @@ def get_player_bowling_stats(
 
         # SIMPLIFIED: Phase stats using pre-calculated columns + legal ball counts
         phase_query = text(f"""
-            WITH phase_legal_balls AS (
-                SELECT 
-                    SUM(CASE WHEN d.over < 6 THEN 1 ELSE 0 END) as pp_legal_balls,
-                    SUM(CASE WHEN d.over >= 6 AND d.over < 15 THEN 1 ELSE 0 END) as middle_legal_balls,
-                    SUM(CASE WHEN d.over >= 15 THEN 1 ELSE 0 END) as death_legal_balls
+            WITH bowler_innings_balls AS (
+                -- Legal balls per innings: delivery_details where the match has ball data there
+                -- (2015 on, and current), else the legacy deliveries table (which ends in late
+                -- 2025). Reading these only from the legacy table undercounted recent seasons:
+                -- phase economies inflated (Bumrah 2025+ powerplay "23.67") and recent innings
+                -- dropped from the innings list.
+                SELECT dd.p_match AS match_id, dd.inns AS innings,
+                       COUNT(*) AS legal_balls,
+                       COUNT(CASE WHEN dd.batruns IN (4, 6) THEN 1 END) AS boundaries,
+                       COUNT(CASE WHEN dd.over < 6 THEN 1 END) AS pp_legal_balls,
+                       COUNT(CASE WHEN dd.over >= 6 AND dd.over < 15 THEN 1 END) AS middle_legal_balls,
+                       COUNT(CASE WHEN dd.over >= 15 THEN 1 END) AS death_legal_balls
+                FROM delivery_details dd
+                WHERE dd.bowl = ANY(:player_names) AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0
+                GROUP BY dd.p_match, dd.inns
+                UNION ALL
+                SELECT d.match_id, d.innings,
+                       COUNT(*),
+                       COUNT(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 END),
+                       COUNT(CASE WHEN d.over < 6 THEN 1 END),
+                       COUNT(CASE WHEN d.over >= 6 AND d.over < 15 THEN 1 END),
+                       COUNT(CASE WHEN d.over >= 15 THEN 1 END)
                 FROM deliveries d
-                JOIN matches m ON d.match_id = m.id
-                WHERE d.bowler = ANY(:player_names)
-                AND d.wides = 0 AND d.noballs = 0  -- Only legal deliveries
+                WHERE d.bowler = ANY(:player_names) AND d.wides = 0 AND d.noballs = 0
+                  AND NOT EXISTS (SELECT 1 FROM delivery_details x WHERE x.p_match = d.match_id)
+                GROUP BY d.match_id, d.innings
+            ),
+            bowler_innings AS (
+                SELECT bs.*
+                FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bs
+                JOIN matches m ON bs.match_id = m.id
+                WHERE bs.bowler = ANY(:player_names)
                 AND (:start_date IS NULL OR m.date >= :start_date)
                 AND (:end_date IS NULL OR m.date <= :end_date)
                 AND (:venue IS NULL OR m.venue = :venue)
                 {match_filter}
             )
             SELECT
-                -- Use pre-calculated phase stats from bowling_stats
+                -- Runs, wickets, dots, boundaries by phase: pre-calculated in bowling_stats
                 SUM(bs.pp_runs) as pp_runs,
                 SUM(bs.pp_wickets) as pp_wickets,
                 SUM(bs.pp_dots) as pp_dots,
                 SUM(bs.pp_boundaries) as pp_boundaries,
-                
+
                 SUM(bs.middle_runs) as middle_runs,
                 SUM(bs.middle_wickets) as middle_wickets,
                 SUM(bs.middle_dots) as middle_dots,
                 SUM(bs.middle_boundaries) as middle_boundaries,
-                
+
                 SUM(bs.death_runs) as death_runs,
                 SUM(bs.death_wickets) as death_wickets,
                 SUM(bs.death_dots) as death_dots,
                 SUM(bs.death_boundaries) as death_boundaries,
-                
-                -- Legal ball counts from CTE
-                plb.pp_legal_balls,
-                plb.middle_legal_balls,
-                plb.death_legal_balls
-            FROM (SELECT * FROM bowling_stats WHERE format = 'T20' AND gender = 'male') bs
-            JOIN matches m ON bs.match_id = m.id
-            CROSS JOIN phase_legal_balls plb
-            WHERE bs.bowler = ANY(:player_names)
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY plb.pp_legal_balls, plb.middle_legal_balls, plb.death_legal_balls
+
+                -- Legal balls for the same innings, so the rates share one denominator
+                SUM(b.pp_legal_balls)::int as pp_legal_balls,
+                SUM(b.middle_legal_balls)::int as middle_legal_balls,
+                SUM(b.death_legal_balls)::int as death_legal_balls
+            FROM bowler_innings bs
+            JOIN bowler_innings_balls b ON b.match_id = bs.match_id AND b.innings = bs.innings
         """)
 
         # SIMPLIFIED: Over distribution - already efficient, minor cleanup
@@ -3846,17 +3881,30 @@ def get_player_bowling_stats(
         # SIMPLIFIED: Innings query using bowling_stats + legal ball counts
         innings_query = text(f"""
             WITH innings_legal_balls AS (
-                SELECT 
-                    d.match_id,
-                    d.innings,
-                    COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
-                    COUNT(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 END) as boundaries,
-                    -- Phase-wise legal balls
-                    COUNT(CASE WHEN d.over < 6 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as pp_legal_balls,
-                    COUNT(CASE WHEN d.over >= 6 AND d.over < 15 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as middle_legal_balls,
-                    COUNT(CASE WHEN d.over >= 15 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as death_legal_balls
+                -- Legal balls per innings: delivery_details where the match has ball data there
+                -- (2015 on, and current), else the legacy deliveries table (which ends in late
+                -- 2025). Reading these only from the legacy table undercounted recent seasons:
+                -- phase economies inflated (Bumrah 2025+ powerplay "23.67") and recent innings
+                -- dropped from the innings list.
+                SELECT dd.p_match AS match_id, dd.inns AS innings,
+                       COUNT(*) AS legal_balls,
+                       COUNT(CASE WHEN dd.batruns IN (4, 6) THEN 1 END) AS boundaries,
+                       COUNT(CASE WHEN dd.over < 6 THEN 1 END) AS pp_legal_balls,
+                       COUNT(CASE WHEN dd.over >= 6 AND dd.over < 15 THEN 1 END) AS middle_legal_balls,
+                       COUNT(CASE WHEN dd.over >= 15 THEN 1 END) AS death_legal_balls
+                FROM delivery_details dd
+                WHERE dd.bowl = ANY(:player_names) AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0
+                GROUP BY dd.p_match, dd.inns
+                UNION ALL
+                SELECT d.match_id, d.innings,
+                       COUNT(*),
+                       COUNT(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 END),
+                       COUNT(CASE WHEN d.over < 6 THEN 1 END),
+                       COUNT(CASE WHEN d.over >= 6 AND d.over < 15 THEN 1 END),
+                       COUNT(CASE WHEN d.over >= 15 THEN 1 END)
                 FROM deliveries d
-                WHERE d.bowler = ANY(:player_names)
+                WHERE d.bowler = ANY(:player_names) AND d.wides = 0 AND d.noballs = 0
+                  AND NOT EXISTS (SELECT 1 FROM delivery_details x WHERE x.p_match = d.match_id)
                 GROUP BY d.match_id, d.innings
             )
             SELECT 
