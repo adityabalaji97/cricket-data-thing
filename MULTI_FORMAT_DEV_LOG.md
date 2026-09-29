@@ -17,7 +17,10 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > `player_aliases.expand_name_group` expands any name to its whole alias group (was one hop);
 > `get_player_names` returns `all_names`; query-builder batter/bowler grouping on delivery_details
 > maps to canonical names; search dedupes by display name. `scripts/find_name_variants.py`
-> reports more candidates (37 pairs; ~28 look like the same player) -- not applied, awaiting review.
+> reports candidates. Migration 006 (applied to prod) links 26 more reviewed spelling pairs
+> (main name = full-name spelling, most recent first); the 10 left in the report are deliberate
+> skips: 8 different people matched on an initial, 2 uncertain (Shehan Madusanka/Madushanka,
+> M Mohammed/Mohammed Mohammed).
 > Recaps: par (10+ runs off), the deciding phase and comebacks now lead.
 >
 > **Jev everywhere user-facing (2026-09-29), all fall back cleanly without TYPESAFE_API_KEY:**
