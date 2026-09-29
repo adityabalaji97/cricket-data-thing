@@ -1,6 +1,8 @@
 {
   "status": 200,
   "body": {
+    "headline": null,
+    "narrative_source": "deterministic",
     "preview_mode": "hybrid",
     "preview_version": "v3-narrative",
     "sections": [
@@ -74,142 +76,8 @@
     "team1": "Rangpur Riders",
     "team2": "Sylhet Titans",
     "top_ranked_players": {
-      "available": true,
-      "teams": {
-        "Rangpur Riders": {
-          "lineup_size": 17,
-          "top_batting": [
-            {
-              "form_flag": "cold",
-              "player": "Towhid Hridoy",
-              "quality_score": 88.9,
-              "rank": 6
-            },
-            {
-              "form_flag": "neutral",
-              "player": "Litton Das",
-              "quality_score": 60.4,
-              "rank": 35
-            },
-            {
-              "form_flag": "cold",
-              "player": "Iftikhar Ahmed",
-              "quality_score": 43.3,
-              "rank": 59
-            }
-          ],
-          "top_bowling": [
-            {
-              "form_flag": "hot",
-              "player": "Nahid Rana",
-              "quality_score": 97.4,
-              "rank": 3
-            },
-            {
-              "form_flag": "cold",
-              "player": "Akif Javed",
-              "quality_score": 78.4,
-              "rank": 16
-            },
-            {
-              "form_flag": "cold",
-              "player": "Mustafizur Rahman",
-              "quality_score": 62.9,
-              "rank": 38
-            }
-          ],
-          "top_overall": [
-            {
-              "batting_quality": null,
-              "bowling_quality": 97.4,
-              "discipline": "bowling",
-              "form_flag": "hot",
-              "player": "Nahid Rana",
-              "quality_score": 97.4,
-              "rank": 3
-            },
-            {
-              "batting_quality": 88.9,
-              "bowling_quality": null,
-              "discipline": "batting",
-              "form_flag": "cold",
-              "player": "Towhid Hridoy",
-              "quality_score": 88.9,
-              "rank": 6
-            },
-            {
-              "batting_quality": null,
-              "bowling_quality": 78.4,
-              "discipline": "bowling",
-              "form_flag": "cold",
-              "player": "Akif Javed",
-              "quality_score": 78.4,
-              "rank": 16
-            }
-          ]
-        },
-        "Sylhet Titans": {
-          "lineup_size": 18,
-          "top_batting": [
-            {
-              "form_flag": "hot",
-              "player": "Moeen Ali",
-              "quality_score": 23.6,
-              "rank": 88
-            },
-            {
-              "form_flag": "neutral",
-              "player": "Mehidy Hasan Miraz",
-              "quality_score": 12.2,
-              "rank": 94
-            }
-          ],
-          "top_bowling": [
-            {
-              "form_flag": "neutral",
-              "player": "Salman Irshad",
-              "quality_score": 58.2,
-              "rank": 45
-            },
-            {
-              "form_flag": "cold",
-              "player": "Azmatullah Omarzai",
-              "quality_score": 55.2,
-              "rank": 53
-            }
-          ],
-          "top_overall": [
-            {
-              "batting_quality": null,
-              "bowling_quality": 58.2,
-              "discipline": "bowling",
-              "form_flag": "neutral",
-              "player": "Salman Irshad",
-              "quality_score": 58.2,
-              "rank": 45
-            },
-            {
-              "batting_quality": null,
-              "bowling_quality": 55.2,
-              "discipline": "bowling",
-              "form_flag": "cold",
-              "player": "Azmatullah Omarzai",
-              "quality_score": 55.2,
-              "rank": 53
-            },
-            {
-              "batting_quality": 23.6,
-              "bowling_quality": null,
-              "discipline": "batting",
-              "form_flag": "hot",
-              "player": "Moeen Ali",
-              "quality_score": 23.6,
-              "rank": 88
-            }
-          ]
-        }
-      },
-      "top_n": 3
+      "available": false,
+      "teams": {}
     },
     "venue": "Sylhet International Cricket Stadium"
   }
