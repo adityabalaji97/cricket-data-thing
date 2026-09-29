@@ -46,8 +46,8 @@
       {
         "bullets": [
           "Winning-template pressure point is death overs (43 runs on average in successful chases).",
-          "Top picks \u2014 Rangpur Riders: Mahmudullah (67 exp pts, conf 0.90), Mustafizur Rahman (57 exp pts, conf 0.60); Sylhet Titans: Shohidul Islam (74 exp pts, conf 0.60), Azmatullah Omarzai (54 exp pts, conf 0.90).",
-          "Key edges: Khushdil Shah vs Nasum Ahmed (13b, SR 277); Nasum Ahmed threat (360b, 16 wkts, econ 6.95); Rony Talukdar vs Nahid Rana (11b, SR 218); Mustafizur Rahman threat (319b, 23 wkts, econ 6.94)."
+          "Top picks \u2014 Rangpur Riders: Mahmudullah (59 exp pts, conf 0.90), Mustafizur Rahman (53 exp pts, conf 0.60); Sylhet Titans: Shohidul Islam (74 exp pts, conf 0.60), Saim Ayub (71 exp pts, conf 0.90).",
+          "Key edges: Khushdil Shah vs Nasum Ahmed (13b, SR 277); Nasum Ahmed threat (360b, 16 wkts, econ 6.95); Mohammad Amir vs Khushdil Shah (6b, SR 300); Mustafizur Rahman threat (335b, 23 wkts, econ 7.06)."
         ],
         "evidence_tags": [
           "phase_wise_strategy",
@@ -58,7 +58,7 @@
       },
       {
         "bullets": [
-          "Lean Sylhet Titans (-5) (ELO: Rangpur Riders 1614 vs Sylhet Titans 1533) \u2014 Recent H2H edge, Venue bias: chasing_edge, Last-5 wins Rangpur Riders 2-3 Sylhet Titans.",
+          "Lean Sylhet Titans (-6) (ELO: Rangpur Riders 1614 vs Sylhet Titans 1533) \u2014 Recent H2H edge, Venue bias: chasing_edge, Fantasy/matchup edge.",
           "Toss/innings path: recent venue split is 2 bat-first wins vs 5 chases in the last 7."
         ],
         "evidence_tags": [

@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from services import jev_client
 from services.match_preview import (
     _best_bowling_threat,
-    _best_edge,
     _classify_toss_bias,
     _phase_label,
     _phase_runs,
@@ -24,10 +23,13 @@ SECTIONS: List[Tuple[str, str]] = [
     ("venue_profile", "Venue Profile"),
     ("form_guide", "Form Guide"),
     ("head_to_head", "Head-to-Head"),
+    ("key_players", "Key Players"),
     ("key_matchup_factor", "Key Matchup Factor"),
     ("preview_take", "Preview Take"),
 ]
-MAX_PER_SECTION = 2
+MAX_PER_SECTION = 3
+# Key Players holds one batter and one bowler per side.
+SECTION_LIMITS = {"key_players": 4}
 # Score levels (0..4); a fact below "relevant" is dropped unless its section would be empty.
 RELEVANCE_CRITERIA = [
     "Trivia: true, but tells a fan nothing about how this match might go",
@@ -38,6 +40,8 @@ RELEVANCE_CRITERIA = [
 ]
 KEEP_THRESHOLD = 2.0
 MIN_VENUE_MATCHES = 5
+# Batter-v-bowler edges below this many balls are noise (a 9-ball 311 strike rate).
+MIN_EDGE_BALLS = {"T20": 12, "ODI": 18}
 
 
 def _fact(facts: List[Dict[str, Any]], section: str, kind: str, text: str, fixed: bool = False) -> None:
@@ -46,6 +50,10 @@ def _fact(facts: List[Dict[str, Any]], section: str, kind: str, text: str, fixed
 
 def _possessive(name: str) -> str:
     return f"{name}'" if name.endswith("s") else f"{name}'s"
+
+
+def _signed(x: float) -> str:
+    return f"+{x:.1f}" if x >= 0 else f"{x:.1f}"
 
 
 def _plural(n: int, word: str) -> str:
@@ -98,6 +106,16 @@ def build_candidate_facts(context: Dict[str, Any]) -> List[Dict[str, Any]]:
     runs = _phase_runs(phase.get("batting_first_wins_template") or {}, dominant or "powerplay")
     if venue_sample and dominant and runs:
         _fact(facts, "venue_profile", "phase", f"Winning sides here are built in the {_phase_label(dominant)}, averaging {runs} runs in that phase.")
+    bf_template = phase.get("batting_first_wins_template") or {}
+    pp_runs, death_runs = _phase_runs(bf_template, "powerplay"), _phase_runs(bf_template, "death")
+    if venue_sample and pp_runs and death_runs:
+        _fact(facts, "venue_profile", "phase_split",
+              f"Sides that won batting first here scored {pp_runs} in the powerplay and {death_runs} at the death on average.")
+    primer = context.get("primer_metrics") or {}
+    par = primer.get("venue_par")
+    if par:
+        _fact(facts, "venue_profile", "par_model",
+              f"Par for a first innings here is {par['par']}, from {_plural(par['matches'], 'match')} in the window.")
 
     # --- Form Guide ---
     for team, key in ((team1, "team1_recent"), (team2, "team2_recent")):
@@ -118,6 +136,29 @@ def build_candidate_facts(context: Dict[str, Any]) -> List[Dict[str, Any]]:
         restriction = recent.get("avg_restriction_when_bowling_first")
         if restriction:
             _fact(facts, "form_guide", "restriction", f"Bowling first, {team} have conceded {int(restriction)} on average recently.")
+
+    # --- T20 Primer metrics: team Impact (Form Guide) and Impact leaders (Key Players) ---
+    for team in (team1, team2):
+        tm = (primer.get("teams") or {}).get(team)
+        if not tm:
+            continue
+        bat, bowl = tm["batting_impact_per_match"], tm["bowling_impact_per_match"]
+        _fact(facts, "form_guide", "team_bat_impact",
+              f"Over the last year, {_possessive(team)} batters have "
+              + (f"added {bat:.1f} runs a match to their expected totals" if bat >= 0 else f"cost {abs(bat):.1f} runs a match against expected totals")
+              + f" (Impact, {_plural(tm['matches'], 'match')}).")
+        _fact(facts, "form_guide", "team_bowl_impact",
+              f"Over the last year, {_possessive(team)} bowlers have "
+              + (f"saved {bowl:.1f} runs a match" if bowl >= 0 else f"leaked {abs(bowl):.1f} runs a match more than expected")
+              + " (Impact).")
+        for p in tm.get("top_batters", [])[:1]:
+            _fact(facts, "key_players", "bat_leader",
+                  f"{p['player']} leads {_possessive(team)} batting Impact over the last year: {_signed(p['impact'])} runs "
+                  f"in {p['innings']} innings (RAA {_signed(p['raa'])}, WPA {p['wpa']:+.2f}).")
+        for p in tm.get("top_bowlers", [])[:1]:
+            _fact(facts, "key_players", "bowl_leader",
+                  f"{p['player']} leads {_possessive(team)} bowling Impact over the last year: {p['impact']:.1f} runs saved "
+                  f"in {_plural(p['innings'], 'match')} (WPA {p['wpa']:+.2f}).")
 
     # --- Head-to-Head ---
     h2h = story.get("head_to_head_stats") or {}
@@ -145,8 +186,10 @@ def build_candidate_facts(context: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     # --- Key Matchup Factor ---
     for team, other in ((team1, team2), (team2, team1)):
-        edge = _best_edge(story, team)
-        if edge and edge.get("balls"):
+        min_balls = MIN_EDGE_BALLS.get(context.get("format") or "T20", 12)
+        edges = ((story.get("expected_fantasy_points") or {}).get("batting_edges") or {}).get(team) or []
+        edge = next((e for e in edges if (e.get("balls") or 0) >= min_balls), None)
+        if edge:
             _fact(facts, "key_matchup_factor", "edge",
                   f"{edge['batter']} has scored {edge.get('runs')} off {edge['balls']} balls against {edge['bowler']} "
                   f"(strike rate {round(float(edge.get('strike_rate') or 0))}).")
@@ -220,9 +263,12 @@ def assemble(facts: List[Dict[str, Any]]) -> Dict[str, Any]:
         )
         chosen, kinds = [], set()
         for f in pool:
-            if len(chosen) >= MAX_PER_SECTION or (chosen and f["score"] < KEEP_THRESHOLD):
+            if len(chosen) >= SECTION_LIMITS.get(section_id, MAX_PER_SECTION) or (chosen and f["score"] < KEEP_THRESHOLD):
                 break
-            if f["kind"] in kinds and f["kind"] not in ("record", "edge", "threat", "fantasy", "chasing", "bf_par", "restriction"):
+            if f["kind"] in kinds and f["kind"] not in (
+                "record", "edge", "threat", "fantasy", "chasing", "bf_par", "restriction",
+                "team_bat_impact", "team_bowl_impact", "bat_leader", "bowl_leader",
+            ):
                 continue
             chosen.append(f)
             kinds.add(f["kind"])

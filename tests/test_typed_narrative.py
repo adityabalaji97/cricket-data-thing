@@ -56,7 +56,8 @@ def test_curation_keeps_the_best_per_section_and_picks_a_headline(monkeypatch):
     by_id = {s["id"]: s for s in result["sections"]}
     for section in by_id.values():
         curated = [b for b in section["bullets"] if not b.startswith(("Too close", "Lean"))]
-        assert 1 <= len(curated) <= typed_preview.MAX_PER_SECTION or section["id"] == "preview_take"
+        limit = typed_preview.SECTION_LIMITS.get(section["id"], typed_preview.MAX_PER_SECTION)
+        assert 1 <= len(curated) <= limit or section["id"] == "preview_take"
     assert by_id["preview_take"]["bullets"][0].startswith("Too close to call")
 
 
@@ -73,3 +74,20 @@ def test_thin_venue_samples_give_no_venue_benchmarks():
                                                       "highest_total_chased": 322, "lowest_total_defended": 373}
     kinds = {f["kind"] for f in typed_preview.build_candidate_facts(ctx) if f["section"] == "venue_profile"}
     assert kinds == {"thin_venue"}
+
+
+def test_primer_metrics_become_team_and_player_facts():
+    ctx = _context()
+    ctx["primer_metrics"] = {
+        "venue_par": {"par": 179, "matches": 31},
+        "teams": {"Mumbai Indians": {
+            "matches": 14, "batting_impact_per_match": -15.8, "bowling_impact_per_match": 5.6,
+            "top_batters": [{"player": "Ryan Rickelton", "innings": 12, "impact": 20.6, "raa": 54.7, "wpa": 0.22}],
+            "top_bowlers": [{"player": "Jasprit Bumrah", "innings": 13, "impact": 48.8, "raa": 81.3, "wpa": 0.53}],
+        }},
+    }
+    texts = [f["text"] for f in typed_preview.build_candidate_facts(ctx)]
+    assert "Par for a first innings here is 179, from 31 matches in the window." in texts
+    assert "Over the last year, Mumbai Indians' batters have cost 15.8 runs a match against expected totals (Impact, 14 matches)." in texts
+    assert "Ryan Rickelton leads Mumbai Indians' batting Impact over the last year: +20.6 runs in 12 innings (RAA +54.7, WPA +0.22)." in texts
+    assert "Jasprit Bumrah leads Mumbai Indians' bowling Impact over the last year: 48.8 runs saved in 13 matches (WPA +0.53)." in texts

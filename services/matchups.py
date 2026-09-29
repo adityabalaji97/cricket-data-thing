@@ -675,14 +675,16 @@ def get_team_matchups_service(
             team1_names = get_all_team_name_variations(team1)
             team2_names = get_all_team_name_variations(team2)
             recent_matches_query = text("""
-                WITH recent_matches AS (
+                -- Last 10 matches PER TEAM. One shared LIMIT 10 over "either team" let the busier
+                -- side take every slot (India v West Indies T20: 22 India players, 0 West Indies),
+                -- which emptied the other side's matchups.
+                -- Format/gender are pinned here rather than on each delivery join below: every
+                -- player CTE hangs off recent_matches, so one predicate covers all six. Without it
+                -- "last 10 matches" mixes formats and a T20 XI is inferred from ODIs.
+                WITH team1_recent AS (
                     SELECT id
                     FROM matches
-                    WHERE ((team1 = ANY(:team1_names) OR team2 = ANY(:team1_names))
-                           OR (team1 = ANY(:team2_names) OR team2 = ANY(:team2_names)))
-                    -- Pinned here rather than on each delivery join below: every player CTE
-                    -- hangs off recent_matches, so one predicate covers all six. Without it
-                    -- "last 10 matches" mixes formats and a T20 XI is inferred from ODIs.
+                    WHERE (team1 = ANY(:team1_names) OR team2 = ANY(:team1_names))
                     AND format = :fmt AND gender = :gender
                     AND (:start_date IS NULL OR date >= :start_date)
                     AND (:end_date IS NULL OR date <= :end_date)
@@ -690,6 +692,23 @@ def get_team_matchups_service(
                     AND (:venue_filter IS NULL OR venue = :venue_filter)
                     ORDER BY date DESC
                     LIMIT 10
+                ),
+                team2_recent AS (
+                    SELECT id
+                    FROM matches
+                    WHERE (team1 = ANY(:team2_names) OR team2 = ANY(:team2_names))
+                    AND format = :fmt AND gender = :gender
+                    AND (:start_date IS NULL OR date >= :start_date)
+                    AND (:end_date IS NULL OR date <= :end_date)
+                    AND (:day_or_night IS NULL OR day_or_night = :day_or_night)
+                    AND (:venue_filter IS NULL OR venue = :venue_filter)
+                    ORDER BY date DESC
+                    LIMIT 10
+                ),
+                recent_matches AS (
+                    SELECT id FROM team1_recent
+                    UNION
+                    SELECT id FROM team2_recent
                 ),
                 alias_map AS (
                     SELECT DISTINCT ON (name_key)

@@ -9,11 +9,12 @@ import { track } from '../../utils/analytics';
  * Every Hindsight link now unfurls with a page-specific title and preview image (api/meta.mjs,
  * api/og.mjs), so a shared link is the cheapest ad the site has. `kind` labels the share event.
  */
-const ShareButton = ({ title, text, kind = 'page', variant = 'button', sx }) => {
+const ShareButton = ({ title, text, kind = 'page', variant = 'button', url: shareUrl, sx }) => {
   const [copied, setCopied] = useState(false);
 
   const share = async () => {
-    const url = window.location.href;
+    // Pages whose selections live in state, not the address bar, pass the link to share.
+    const url = shareUrl || window.location.href;
     track('share', { kind });
     try {
       if (navigator.share) {

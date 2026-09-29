@@ -12,6 +12,7 @@ from models import teams_mapping
 from services.delivery_data_service import get_match_scores, get_venue_match_stats, get_venue_phase_stats
 from services.global_t20_rankings import get_batting_rankings_service, get_bowling_rankings_service
 from services.matchups import get_all_team_name_variations, get_team_matchups_service
+from services.preview_metrics import preview_metrics
 
 
 INTERNATIONAL_ABBR_TO_NAME = {
@@ -1771,6 +1772,13 @@ def gather_preview_context(
             "team2_source": lineup_sources.get(team2),
         },
         "top_ranked_players": top_ranked_players,
+        "format": fmt,
+        "gender": gender,
+        # T20 Primer metrics (Impact/RAA/WPA, venue par) exist for men's T20 only.
+        "primer_metrics": (
+            preview_metrics(db, venue, team1, team2, start_date, end_date)
+            if fmt == "T20" and gender == "male" else {}
+        ),
         "screen_story": {
             "match_results_distribution": {
                 "venue_toss_signal": {

@@ -996,7 +996,19 @@ const VenueNotes = ({
 
     // The preview is one format's record. Post-toss XI analysis (impact subs, T20 fantasy
     // scoring) and Foresight (IPL-trained models) are men's-T20-only, so other formats hide them.
-    const { pinnedFormatParams } = useFormat();
+    const { pinnedFormatParams, active: activeFormat } = useFormat();
+    // The venue page keeps its selections in state, so the address bar can be just /venue?fmt=...
+    // Share a link that reopens this exact preview instead.
+    const shareUrl = useMemo(() => {
+        const params = new URLSearchParams();
+        if (venue) params.set('venue', venue);
+        if (selectedTeam1?.full_name) params.set('team1', selectedTeam1.full_name);
+        if (selectedTeam2?.full_name) params.set('team2', selectedTeam2.full_name);
+        if (dayNightFilter && dayNightFilter !== 'all') params.set('dayNight', dayNightFilter);
+        params.set('autoload', 'true');
+        if (activeFormat?.slug && activeFormat.slug !== 'all') params.set('fmt', activeFormat.slug);
+        return `${window.location.origin}/venue?${params.toString()}`;
+    }, [venue, selectedTeam1?.full_name, selectedTeam2?.full_name, dayNightFilter, activeFormat?.slug]);
     const isT20Preview = pinnedFormatParams.format === 'T20' && pinnedFormatParams.gender === 'male';
     const formatSlug = `${pinnedFormatParams.gender === 'male' ? 'mens' : 'womens'}-${pinnedFormatParams.format.toLowerCase()}`;
 
@@ -1392,7 +1404,7 @@ return (
                         {filtersExpanded ? 'Hide filters' : 'Edit filters'}
                     </Button>
                 ) : null}
-                <ShareButton variant="icon" kind="preview" title={`${venue} preview on Hindsight`} sx={{ flexShrink: 0 }} />
+                <ShareButton variant="icon" kind="preview" title={`${venue} preview on Hindsight`} url={shareUrl} sx={{ flexShrink: 0 }} />
             </Box>
             <Box sx={{ mt: 0.25, px: 0.1 }}>
                 <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
