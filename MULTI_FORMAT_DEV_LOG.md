@@ -20,7 +20,10 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > never displayed (the card renders `sections`; MCP builds its own); the typed path skips it.
 > `scripts/backtest_jev_winner.py` compares Jev's anonymised winner pick with the lean and Elo
 > (`gather_preview_context(elo_as_of=)` keeps Elo pre-match); show Jev's read only if it wins on
-> Brier. Also: fixtures carry `start_utc` and Home shows the viewer's local time; ODI matchup
+> Brier. **Backtest result (2026-09-29, 200 IPL/top-T20I matches 2023-26):** Elo acc 54.5% Brier
+> 0.256; lean 53.8% / 0.246; Jev 50.0% / 0.421 (log loss 3.04; >95% sure on 124 of 200). Jev's
+> read is NOT shown. Pre-match T20 winner calls are near coin-flip for every predictor.
+> Also: fixtures carry `start_utc` and Home shows the viewer's local time; ODI matchup
 > consolidated bowling scales to 60 balls.
 >
 > **Games v3 (2026-09-26):** four dailies, each with a practice mode (`?puzzle=<token>`, no streak):
