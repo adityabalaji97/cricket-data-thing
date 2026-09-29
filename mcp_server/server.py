@@ -389,6 +389,11 @@ includes a link to open the same query on the Hindsight website — mention it t
    probability added, 1.0 = one match won) and avg_leverage. They come from the batting side,
    or the bowling side when grouped by bowler. For "most valuable / most impactful / match-
    winning" questions, pin format="T20" and sort_by="impact" or "wpa" -- do not approximate them.
+6. preview_match also returns "Hindsight's take": the site's own preview facts (incl. par and
+   each side's Impact leaders for T20), ranked by importance. Quote these rather than rederiving.
+7. match_recap explains how a finished men's T20 was won (biggest Impact and WPA performances,
+   the biggest win-probability swing, first innings vs par). Use it for "how did X beat Y" or
+   "who won the game for X" questions.
 """
 
 apps = Apps()
@@ -810,6 +815,17 @@ def preview_match(
                 team2_players=[], db=db, use_current_roster=False, innings_position=None,
                 venue_filter=None, min_balls=6, day_or_night=None, fmt=format, gender="male",
             )
+            # The site's preview narrative (code-written facts ranked by Jev), best-effort.
+            try:
+                from routers.match_preview import get_match_preview
+                site_preview = get_match_preview(
+                    venue=venue, team1_id=team1, team2_id=team2, start_date=start, end_date=end,
+                    include_international=include_international, top_teams=top_teams, day_or_night=None,
+                    format=format, gender="male", debug=False, db=db,
+                )
+            except Exception as preview_exc:
+                logger.warning("mcp preview narrative failed: %r", preview_exc)
+                site_preview = {}
     except Exception as exc:
         _log_call("preview_match", ctx, args, started, "error")
         logger.warning("mcp preview failed: %r", exc)
@@ -837,6 +853,10 @@ def preview_match(
         "matchups": {
             f"{team1} batting": t1_edges,
             f"{team2} batting": t2_edges,
+        },
+        "hindsight_take": {
+            "headline": (site_preview or {}).get("headline"),
+            "sections": [{"title": sec.get("title"), "bullets": sec.get("bullets")} for sec in (site_preview or {}).get("sections") or []],
         },
         "hindsight_url": link,
     }
@@ -867,9 +887,76 @@ def preview_match(
             lines.append(f"{side} — batter edges: " + "; ".join(_pair(p) for p in edges["batter_edges"][:3]))
         if edges["bowler_edges"]:
             lines.append(f"{side} — bowler edges: " + "; ".join(_pair(p) for p in edges["bowler_edges"][:3]))
+    take = structured["hindsight_take"]
+    if take["sections"]:
+        lines += ["", "**Hindsight's take** (facts from Hindsight's numbers, including T20 Impact/RAA/WPA; ranked by importance):"]
+        if take["headline"]:
+            lines.append(f"Headline: {take['headline']}")
+        for sec in take["sections"]:
+            lines.append(f"{sec['title']}: " + " ".join(sec["bullets"] or []))
     lines += ["", f"Full preview on Hindsight: {link}"]
 
     _log_call("preview_match", ctx, args, started, "ok")
+    return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
+
+
+@mcp.tool(
+    name="match_recap",
+    title="Recap a finished match",
+    description=(
+        "How a finished men's T20 was won, from Hindsight's T20 Primer metrics: the performances that "
+        "added or saved the most runs (Impact) and win probability (WPA), the biggest win-probability "
+        "swing, the first innings against par, and comebacks. Give the two teams (exact names from "
+        "find_entities) and optionally the date; without a date, their most recent meeting."
+    ),
+    annotations=READ_ONLY,
+)
+def match_recap(
+    ctx: Context,
+    team1: Annotated[str, Field(description="One team, exact name, e.g. 'India' or 'Mumbai Indians'.")],
+    team2: Annotated[str, Field(description="The other team, exact name.")],
+    match_date: Annotated[Optional[date], Field(description="Match date (YYYY-MM-DD); default: their latest T20 meeting.")] = None,
+) -> CallToolResult:
+    from sqlalchemy import text as sql_text
+    from services.match_recap import build_recap
+    from services.match_scorecard import get_match_scorecard_service
+    from services.matchups import get_all_team_name_variations
+
+    started = time.monotonic()
+    args = {"team1": team1, "team2": team2, "match_date": str(match_date) if match_date else None}
+    if not _budget.try_acquire():
+        return _BUSY
+    try:
+        with _read_only_session() as db:
+            row = db.execute(sql_text("""
+                SELECT id, date FROM matches
+                WHERE format = 'T20' AND gender = 'male'
+                  AND ((team1 = ANY(:a) AND team2 = ANY(:b)) OR (team1 = ANY(:b) AND team2 = ANY(:a)))
+                  AND (CAST(:d AS date) IS NULL OR date = :d)
+                ORDER BY date DESC LIMIT 1
+            """), {"a": get_all_team_name_variations(team1), "b": get_all_team_name_variations(team2), "d": match_date}).first()
+            if not row:
+                _log_call("match_recap", ctx, args, started, "not_found")
+                return _error(f"No men's T20 between {team1} and {team2}" + (f" on {match_date}" if match_date else "") + " in Hindsight.")
+            scorecard = get_match_scorecard_service(match_id=str(row[0]), min_balls=6, db=db)
+            recap = build_recap(scorecard, db) if (scorecard.get("summary") or {}).get("primer") else {"available": False}
+    except Exception as exc:
+        _log_call("match_recap", ctx, args, started, "error")
+        logger.warning("mcp recap failed: %r", exc)
+        return _error(_user_message(exc, "That recap could not be built."))
+
+    match = scorecard.get("match") or {}
+    link = f"{WEB_URL}/scorecard/{match.get('id')}"
+    structured = {"match_id": match.get("id"), "date": str(match.get("date")), "result": match.get("result_text"),
+                  "recap": recap, "hindsight_url": link}
+    lines = [f"**{match.get('team1')} v {match.get('team2')}**, {match.get('competition')} {match.get('date')}: {match.get('result_text')}", ""]
+    if recap.get("available"):
+        lines.append(recap["headline"])
+        lines += [f"- {b}" for b in recap["bullets"]]
+    else:
+        lines.append("No ball-by-ball Impact/WPA for this match, so no recap; the scorecard is linked below.")
+    lines += ["", f"Scorecard on Hindsight: {link}"]
+    _log_call("match_recap", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
 
 

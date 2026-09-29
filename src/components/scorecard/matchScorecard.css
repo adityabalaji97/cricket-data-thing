@@ -1019,3 +1019,20 @@
   }
 }
 
+
+/* Recap: headline and bullets explaining the result (API /matches/:id/recap). */
+.recap-card .recap-headline {
+  margin: 10px 0 8px;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.35;
+  color: var(--hs-text-hi, #f5f7fa);
+}
+.recap-card .recap-bullets {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--hs-text-med, #c4cad4);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.recap-card .recap-bullets li + li { margin-top: 6px; }

@@ -55,7 +55,10 @@ function scorecardCard(card) {
       h('div', { gap: 22, fontSize: 30, fontWeight: 700 },
         card.impact.map((i) => h('div', { color: i.value >= 0 ? C.lime : C.red }, `${i.team} ${signed(i.value)}`))))
     : null;
-  return frame(card.kicker, card.headline, h('div', { alignItems: 'flex-end' }, scores, impact));
+  const story = card.story
+    ? h('div', { color: C.mid, fontSize: 26, marginTop: 16, lineHeight: 1.3 }, card.story.length > 120 ? `${card.story.slice(0, 117)}...` : card.story)
+    : null;
+  return frame(card.kicker, card.headline, h('div', { flexDirection: 'column' }, story, h('div', { alignItems: 'flex-end' }, scores, impact)));
 }
 
 function playerCard(card) {

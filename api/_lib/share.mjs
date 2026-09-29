@@ -36,14 +36,18 @@ export const shortTeam = (name) => {
 };
 
 async function scorecardSummary(id) {
-  const data = await getJSON(`/matches/${encodeURIComponent(id)}/scorecard`);
+  const [data, recap] = await Promise.all([
+    getJSON(`/matches/${encodeURIComponent(id)}/scorecard`),
+    getJSON(`/matches/${encodeURIComponent(id)}/recap`).catch(() => null),
+  ]);
   if (!data?.match) return null;
+  const story = recap?.available ? recap.headline : null;
   const { match, summary } = data;
   const scores = (summary?.innings_scores || []).map((s) => `${shortTeam(s.team)} ${s.runs}/${s.wickets} (${s.overs})`);
   const primer = summary?.primer;
   const impact = primer?.innings?.map((inn) => `${shortTeam(inn.team)} ${signed(inn.impact)}`).join(' · ');
   const top = (summary?.top_performers || []).slice(0, 2).map((p) => `${p.player} ${p.label || ''}`.trim());
-  const description = [match.result_text, scores.join(' v '), impact ? `Impact ${impact}` : null, top.length ? `Top: ${top.join(', ')}` : null]
+  const description = [story, match.result_text, scores.join(' v '), impact ? `Impact ${impact}` : null, top.length ? `Top: ${top.join(', ')}` : null]
     .filter(Boolean).join(' · ');
   return {
     kind: 'scorecard',
@@ -55,6 +59,7 @@ async function scorecardSummary(id) {
       lines: (summary?.innings_scores || []).map((s) => ({ team: shortTeam(s.team), score: `${s.runs}/${s.wickets}`, overs: s.overs })),
       impact: primer?.innings?.map((inn) => ({ team: shortTeam(inn.team), value: inn.impact })) || null,
       wp: primer?.win_probability || null,
+      story,
     },
   };
 }

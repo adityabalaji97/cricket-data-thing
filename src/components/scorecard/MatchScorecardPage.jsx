@@ -270,6 +270,7 @@ const ScorecardSummaryScreen = ({ data, searchParams, setSearchParams }) => {
       {/* One column of story cards: on desktop the full scorecard sits beside it, and as separate
           grid items these were stretched apart to match its height. */}
       <div className="summary-story">
+        {data.summary.primer && <RecapCard matchId={data.match.id} />}
         <TopPerformers data={data} onSelect={openPerformer} />
         {data.match.player_of_match && <PlayerOfMatchCard player={data.match.player_of_match} />}
         <MomentumWorm data={data} />
@@ -288,6 +289,29 @@ const ScorecardSummaryScreen = ({ data, searchParams, setSearchParams }) => {
         </div>
       </section>
     </main>
+  );
+};
+
+// How the match was won: Impact/WPA facts written by the API, ranked by Jev (T20 Primer matches).
+// Loaded separately so the scorecard itself never waits on it.
+const RecapCard = ({ matchId }) => {
+  const [recap, setRecap] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    axios.get(`${config.API_URL}/matches/${encodeURIComponent(matchId)}/recap`)
+      .then((response) => { if (!cancelled) setRecap(response.data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [matchId]);
+  if (!recap?.available) return null;
+  return (
+    <section className="worm-card recap-card">
+      <div className="card-heading-row"><span>How it was won</span></div>
+      <p className="recap-headline">{recap.headline}</p>
+      <ul className="recap-bullets">
+        {recap.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}
+      </ul>
+    </section>
   );
 };
 
