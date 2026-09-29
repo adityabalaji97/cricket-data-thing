@@ -11,6 +11,18 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **Jev typed preview (2026-09-29), dark until `TYPESAFE_API_KEY` is set on Heroku:**
+> `services/typed_preview.py` writes short single-claim facts from the preview context and asks
+> Jev (`services/jev_client.py`, TypeSafe System One) to score how much each matters; the best per
+> section replace the deterministic `sections`, and the top fact is `headline` (shown on the
+> preview card). With no key or a failed call, output is today's deterministic sections
+> (`narrative_source` says which). Note: the GPT narrative (`preview` field) is generated but
+> never displayed (the card renders `sections`; MCP builds its own); the typed path skips it.
+> `scripts/backtest_jev_winner.py` compares Jev's anonymised winner pick with the lean and Elo
+> (`gather_preview_context(elo_as_of=)` keeps Elo pre-match); show Jev's read only if it wins on
+> Brier. Also: fixtures carry `start_utc` and Home shows the viewer's local time; ODI matchup
+> consolidated bowling scales to 60 balls.
+>
 > **Games v3 (2026-09-26):** four dailies, each with a practice mode (`?puzzle=<token>`, no streak):
 > Higher or Lower = 10 independent pairs, tap the higher-Impact card; Call It = yes/no "did they win
 > it?" with batters at the crease and the model %, ⭐ for a right upset call; Player Journeys = team

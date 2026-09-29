@@ -180,7 +180,8 @@ def _get_recent_form(
     }
 
 
-def _get_latest_elo(db: Session, team: str) -> Optional[int]:
+def _get_latest_elo(db: Session, team: str, before: Optional[date] = None) -> Optional[int]:
+    """Latest recorded Elo; with `before`, the latest from matches strictly before that date."""
     variations = get_all_team_name_variations(team)
     placeholders = ", ".join(f":t{i}" for i in range(len(variations)))
     query = text(f"""
@@ -188,10 +189,12 @@ def _get_latest_elo(db: Session, team: str) -> Optional[int]:
         FROM matches
         WHERE (team1 IN ({placeholders}) OR team2 IN ({placeholders}))
           AND (team1_elo IS NOT NULL OR team2_elo IS NOT NULL)
+          AND (CAST(:before AS date) IS NULL OR date < :before)
         ORDER BY date DESC
         LIMIT 20
     """)
     params = {f"t{i}": v for i, v in enumerate(variations)}
+    params["before"] = before
     rows = db.execute(query, params).fetchall()
     for r in rows:
         if r.team1 in variations and r.team1_elo is not None:
@@ -1631,6 +1634,7 @@ def gather_preview_context(
     day_or_night: Optional[str] = None,
     fmt: str = "T20",
     gender: str = "male",
+    elo_as_of: Optional[date] = None,  # backtests only: Elo as it stood before this date
 ) -> Dict[str, Any]:
     team1 = resolve_team_identifier(team1_identifier)
     team2 = resolve_team_identifier(team2_identifier)
@@ -1666,8 +1670,8 @@ def gather_preview_context(
     )
     form1 = _get_recent_form(db, team1, 5, end_date=end_date)
     form2 = _get_recent_form(db, team2, 5, end_date=end_date)
-    elo1 = _get_latest_elo(db, team1)
-    elo2 = _get_latest_elo(db, team2)
+    elo1 = _get_latest_elo(db, team1, before=elo_as_of)
+    elo2 = _get_latest_elo(db, team2, before=elo_as_of)
     match_history_bundle = _get_match_history_bundle(
         db, venue, team1, team2, start_date, end_date, fmt=fmt, gender=gender
     )

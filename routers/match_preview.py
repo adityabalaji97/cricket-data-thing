@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from database import get_session
 from services.cricinfo_scraper import scrape_match_setup
+from services import jev_client, typed_preview
 from services.match_preview import (
     build_deterministic_preview_sections,
     build_narrative_data_context,
@@ -264,6 +265,7 @@ def _cache_key(
             "preview_version": PREVIEW_ENGINE_VERSION,
             "openai_model": OPENAI_MODEL,
             "preview_mode": preview_mode,
+            "typed_narrative": jev_client.enabled(),
         },
         sort_keys=True,
     )
@@ -387,11 +389,24 @@ def get_match_preview(
         except Exception as enrich_exc:
             logger.warning("Failed to enrich match preview with form flags: %s", enrich_exc)
         sections = build_deterministic_preview_sections(context)
+        headline = None
+        narrative_source = "deterministic"
+        # Typed narrative: code-written facts, ranked by Jev. Replaces the GPT narrative when Jev
+        # is configured; otherwise (or if the call fails) the deterministic sections stand.
+        typed = None
+        try:
+            typed = typed_preview.curate(context)
+        except Exception as typed_exc:
+            logger.warning("Typed preview failed; keeping deterministic sections: %r", typed_exc)
+        if typed and typed.get("sections"):
+            sections = typed["sections"]
+            headline = typed.get("headline")
+            narrative_source = "typed"
         canonical_markdown = serialize_sections_to_markdown(sections)
         llm_used = False
         preview_text = canonical_markdown
 
-        if preview_mode == "hybrid":
+        if preview_mode == "hybrid" and narrative_source != "typed":
             # Build data context for LLM narrative generation
             data_context = build_narrative_data_context(context)
             # Try LLM narrative generation first
@@ -419,6 +434,8 @@ def get_match_preview(
             "llm_model": OPENAI_MODEL,
             "llm_strategy": "responses" if _is_gpt5_model() else "chat.completions",
             "llm_used": llm_used,
+            "narrative_source": narrative_source,
+            "headline": headline,
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "cached": False,
         }
@@ -427,6 +444,7 @@ def get_match_preview(
                 "decision_scores": decision_scores,
                 "phase_template_consistency_check": phase_check,
                 "lineup_selection": lineup_selection,
+                "typed_scores": (typed or {}).get("scores"),
             }
         preview_cache[key] = result
         return result

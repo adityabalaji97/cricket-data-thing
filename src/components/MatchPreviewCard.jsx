@@ -183,6 +183,11 @@ const MatchPreviewCard = ({
           <ToggleButton value="night">Night</ToggleButton>
         </ToggleButtonGroup>
       </Box>
+      {data.headline && (
+        <Typography sx={{ fontWeight: 700, fontSize: { xs: 15, sm: 16 }, lineHeight: 1.35, mb: 1.2 }}>
+          {data.headline}
+        </Typography>
+      )}
       <Box>
         {(parsedPreview.length ? parsedPreview : [{ title: 'Preview', bullets: [], paragraphs: [String(data.preview)] }]).map((section) => (
           <Box key={section.title} sx={{ mb: 1.2 }}>
