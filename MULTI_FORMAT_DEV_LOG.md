@@ -30,6 +30,10 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > format) feeds packs. services/content_ideas.py: /admin Idea box -> nl2query -> ranking image with the
 > subject's true rank; per-match ideas ("first ODI v WI") group by match_id and park until a match v that
 > opponent in the last 30 days loads; nightly retry for 14 days. Scans/ideas run as BackgroundTasks.
+> Ideas also handle "N centuries/50s/wicket hauls in an innings|match" (count_within: query step one,
+> count per innings in Python, list layout image/embed, latest first); other count-within asks fail with a
+> reason. tests/js/snapshot_fixtures.json is force-added (.gitignore has *.json).
+> Parked: site-wide mobile share images for every chart/table (see Notes plan file).
 > Next: 6c Cricsheet fallback, then Notes 3-5.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
