@@ -74,6 +74,8 @@ module.exports = (req, res) => {
       'Origin': proxyOrigin,
       // Country from Vercel's edge (ISO code only), for usage stats; no IP is passed on.
       'X-Client-Country': req.headers['x-vercel-ip-country'] || '',
+      // The admin queue (/admin) authenticates with this header; nothing else is forwarded.
+      ...(req.headers['x-admin-token'] ? { 'X-Admin-Token': req.headers['x-admin-token'] } : {}),
     }
   };
 
