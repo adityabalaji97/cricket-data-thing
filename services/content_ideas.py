@@ -177,10 +177,23 @@ def _find(rows: List[Dict[str, Any]], label_key: str, names: List[str]) -> Optio
     return None
 
 
+# Counts read "with 147 sixes"; rates read "at 87.3%" / "at 207.3".
+COUNT_METRICS = {"runs", "balls", "wickets", "sixes", "fours", "dots", "boundaries", "innings_count", "matches",
+                 "fifties", "hundreds", "catches", "dismissals"}
+
+
 def _value_text(metric: str, value: float) -> str:
     if metric.endswith("percentage"):
         return f"{value:.1f}%"
-    return f"{value:,.0f}" if metric in ("runs", "balls", "wickets") else f"{value:.2f}"
+    if metric in COUNT_METRICS or float(value).is_integer():
+        return f"{int(round(value)):,}"
+    return f"{value:.1f}" if metric == "strike_rate" or abs(value) >= 100 else f"{value:.2f}"
+
+
+def _value_phrase(metric: str, value: float) -> str:
+    if metric in COUNT_METRICS:
+        return f"with {_value_text(metric, value)} {metric_label(metric)}"
+    return f"at {_value_text(metric, value)}"
 
 
 def _latest_loaded(db: Session, fmt: str) -> Optional[date]:
@@ -442,8 +455,8 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
     value = float(row[metric])
     parts = title_parts(params)
     name = _row_name(row, label_key).replace(" & ", " and ")
-    title = (f"{name} rank {ordinal(idx + 1)} of {total:,} {parts['scope']}{parts['minimum']}{parts['venue']}{parts['overs']} "
-             f"for {metric_label(metric)}{parts['window'].replace(',', '')}, at {_value_text(metric, value)}")
+    title = (f"{name} rank {ordinal(idx + 1)} of {total:,} {parts['scope']}{parts['filters']}{parts['minimum']}{parts['venue']}"
+             f"{parts['overs']} for {metric_label(metric)}{parts['window'].replace(',', '')}, {_value_phrase(metric, value)}")
 
     # The image: the top rows, with the subject swapped in at its true rank when it is lower.
     shown = list(range(min(8, len(rows)))) if idx < 8 else list(range(7)) + [idx]

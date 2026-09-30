@@ -16,7 +16,7 @@ import json
 import secrets
 import string
 from datetime import date
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -127,6 +127,30 @@ def metric_label(metric: Optional[str]) -> str:
     return _METRIC_LABELS.get(metric, metric.replace("_percentage", " %").replace("_", " "))
 
 
+def _and(values: List[str]) -> str:
+    values = [v.replace("_", " ").lower() for v in values]
+    return values[0] if len(values) == 1 else ", ".join(values[:-1]) + " and " + values[-1]
+
+
+def _filter_phrase(params: Dict[str, Any]) -> str:
+    """The filters that change what a chart means: " off pull and hook shots", " against spin"."""
+    out = ""
+    if params.get("shot"):
+        out += f" off {_and(params['shot'])} shots"
+    if params.get("bowl_kind"):
+        kinds = [k.split()[0] for k in params["bowl_kind"]]  # "pace bowler" -> "pace"
+        out += f" against {_and(kinds)}"
+    if params.get("bowl_style"):
+        out += f" against {', '.join(params['bowl_style'])}"
+    if params.get("length"):
+        out += f" to {_and(params['length'])} balls"
+    if params.get("line"):
+        out += f" on the {_and(params['line'])} line"
+    if params.get("dismissal"):
+        out += f" ({_and(params['dismissal'])})"
+    return out
+
+
 def title_parts(params: Dict[str, Any]) -> Dict[str, str]:
     """Pieces of a chart headline: who, scope ("ODI partnerships"), venue, window, minimum."""
     who = (params.get("batters") or params.get("bowlers") or params.get("players") or params.get("teams")
@@ -153,6 +177,7 @@ def title_parts(params: Dict[str, Any]) -> Dict[str, str]:
     return {
         "who": ", ".join(who[:2]),
         "overs": overs,
+        "filters": _filter_phrase(params),
         "scope": scope,
         "venue": f" at {params['venue']}" if params.get("venue") else "",
         "window": window,
@@ -169,7 +194,7 @@ def default_title(params: Dict[str, Any], metric: Optional[str]) -> str:
     p = title_parts(params)
     scope = p["scope"]
     title = f"{p['who']}: {scope}" if p["who"] else scope[:1].upper() + scope[1:]
-    title += p["venue"] + p["overs"]
+    title += p["filters"] + p["venue"] + p["overs"]
     if metric:
         title += f" by {metric_label(metric)}"
     return title + p["window"] + p["minimum"]
