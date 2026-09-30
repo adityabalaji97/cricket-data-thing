@@ -3788,7 +3788,7 @@ def validate_format_bounds(
         )
 
 
-def run_deliveries_query(
+def _run_deliveries_query_uncached(
     db,
     *,
     venue: Optional[str] = None,
@@ -3885,3 +3885,14 @@ def run_deliveries_query(
         fmt=fmt,
         gender=gender,
     )
+
+
+def run_deliveries_query(db, **kwargs):
+    """Run a query-builder query through the persistent result cache (services/query_cache.py).
+
+    The website, the connector and embeds all come through here, so a heavy query (all-time ODI
+    partnerships, ~17s) is computed once per data load instead of once per viewer.
+    """
+    from services.query_cache import cached_run
+
+    return cached_run(db, kwargs, lambda: _run_deliveries_query_uncached(db, **kwargs))

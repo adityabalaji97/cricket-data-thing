@@ -51,6 +51,7 @@ from routers.ml_predictions import router as ml_predictions_router
 from routers.query_summarizer import router as query_summarizer_router
 from routers.usage import router as usage_router
 from routers.seo import router as seo_router
+from routers.snapshots import router as snapshots_router
 from services.delivery_data_service import (
     get_venue_match_stats,
     get_match_scores,
@@ -92,6 +93,7 @@ app = FastAPI(title="Cricket Stats API", lifespan=lifespan)
 app.include_router(matchups_router)
 app.include_router(usage_router)
 app.include_router(seo_router)
+app.include_router(snapshots_router)
 #app.include_router(query_builder_router)
 app.include_router(query_builder_router_v2)
 app.include_router(players_router)

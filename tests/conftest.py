@@ -3,6 +3,8 @@ import os
 # Usage logging writes from a background thread to whatever DATABASE_URL points at -- in this
 # repo .env is production. Tests must never add rows there.
 os.environ["USAGE_LOGGING"] = "0"
+# Tests must never read or write the production query cache.
+os.environ["QUERY_CACHE"] = "0"
 
 import pytest
 from fastapi.testclient import TestClient

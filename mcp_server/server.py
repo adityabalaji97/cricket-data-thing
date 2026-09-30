@@ -404,6 +404,71 @@ includes a link to open the same query on the Hindsight website — mention it t
 apps = Apps()
 
 
+def structure_query_result(
+    result: Dict[str, Any], params: Dict[str, Any], group_by: List[str], *, query_mode: str = "delivery",
+    format: str = "ALL", gender: str = "male", batters: Optional[List[str]] = None,
+    bowlers: Optional[List[str]] = None, sort_by: Optional[str] = None, sort_descending: bool = True,
+    limit: int = 25, chart: str = "auto", chart_metric: Optional[str] = None,
+    scatter_x: Optional[str] = None, scatter_y: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Shape a query-builder result for display: ordered columns, chart spec, title, link.
+
+    Shared by the connector (query_cricket_data) and chart snapshots/embeds, so the widget renders
+    both the same way.
+    """
+    raw_rows = result.get("data") or []
+    # A bowling question: bowlers are filtered, or rows are split by bowler, and no batter is picked.
+    bowler_centric = (bool(bowlers) or "bowler" in group_by) and not batters
+    metrics_perspective = next((r.get("metrics_perspective") for r in raw_rows if r.get("metric_balls")), None)
+    rows = [{k: _normalise_value(v) for k, v in row.items() if k not in _ROW_INTERNAL} for row in raw_rows]
+    if bowler_centric:
+        rows = [_with_economy(row, query_mode) for row in rows]
+    meta = result.get("metadata") or {}
+
+    def _num(value: Any) -> Optional[float]:
+        return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+    if sort_by and rows and any(_num(r.get(sort_by)) is not None for r in rows):
+        # Missing values sort last whichever direction is asked for.
+        rows.sort(key=lambda r: (
+            _num(r.get(sort_by)) is None,
+            -(_num(r.get(sort_by)) or 0.0) if sort_descending else (_num(r.get(sort_by)) or 0.0),
+        ))
+    elif group_by and (group_by[0] in _SEQUENTIAL_KEYS or group_by[0] == "phase"):
+        rows.sort(key=lambda r: _sequence_key(group_by[0], r.get(group_by[0])))
+    total_rows = meta.get("total_groups") or meta.get("total_rows") or len(rows)
+    rows = rows[:limit]
+
+    columns = _order_columns(rows, group_by)
+    metric_columns = [
+        c for c in columns
+        if c not in group_by and any(isinstance(r.get(c), (int, float)) and not isinstance(r.get(c), bool) for r in rows)
+    ]
+    default_metric = chart_metric or sort_by or ("economy" if bowler_centric and "economy" in metric_columns else None)
+    chart_spec = _choose_chart(chart, group_by, rows, metric_columns, query_mode, default_metric, scatter_x, scatter_y)
+    url = _hindsight_url(params, group_by, format, gender)
+    warnings = [w for w in (meta.get("warnings") or []) if w]
+
+    structured = {
+        "title": _title(params, group_by),
+        "subtitle": f"{len(rows)} of {total_rows} rows" + (f" · ranked by {sort_by}" if sort_by else ""),
+        "filter_chips": _filter_chips(params, format),
+        "group_by": group_by,
+        "query_mode": query_mode,
+        "columns": columns,
+        "metric_columns": metric_columns,
+        "rows": rows,
+        "total_rows": total_rows,
+        "chart": chart_spec,
+        "hindsight_url": url,
+        "warnings": warnings,
+        "note": " ".join(warnings) if warnings else None,
+        "metrics_perspective": metrics_perspective,
+    }
+
+    return structured
+
+
 @apps.tool(
     resource_uri=UI_URI,
     name="query_cricket_data",
@@ -517,55 +582,13 @@ def query_cricket_data(
         logger.warning("mcp query failed: %r", exc)
         return _error(_user_message(exc, "That query could not be run."))
 
-    raw_rows = result.get("data") or []
-    # A bowling question: bowlers are filtered, or rows are split by bowler, and no batter is picked.
-    bowler_centric = (bool(bowlers) or "bowler" in group_by) and not batters
-    metrics_perspective = next((r.get("metrics_perspective") for r in raw_rows if r.get("metric_balls")), None)
-    rows = [{k: _normalise_value(v) for k, v in row.items() if k not in _ROW_INTERNAL} for row in raw_rows]
-    if bowler_centric:
-        rows = [_with_economy(row, query_mode) for row in rows]
-    meta = result.get("metadata") or {}
-
-    def _num(value: Any) -> Optional[float]:
-        return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
-
-    if sort_by and rows and any(_num(r.get(sort_by)) is not None for r in rows):
-        # Missing values sort last whichever direction is asked for.
-        rows.sort(key=lambda r: (
-            _num(r.get(sort_by)) is None,
-            -(_num(r.get(sort_by)) or 0.0) if sort_descending else (_num(r.get(sort_by)) or 0.0),
-        ))
-    elif group_by and (group_by[0] in _SEQUENTIAL_KEYS or group_by[0] == "phase"):
-        rows.sort(key=lambda r: _sequence_key(group_by[0], r.get(group_by[0])))
-    total_rows = meta.get("total_groups") or meta.get("total_rows") or len(rows)
-    rows = rows[:limit]
-
-    columns = _order_columns(rows, group_by)
-    metric_columns = [
-        c for c in columns
-        if c not in group_by and any(isinstance(r.get(c), (int, float)) and not isinstance(r.get(c), bool) for r in rows)
-    ]
-    default_metric = chart_metric or sort_by or ("economy" if bowler_centric and "economy" in metric_columns else None)
-    chart_spec = _choose_chart(chart, group_by, rows, metric_columns, query_mode, default_metric, scatter_x, scatter_y)
-    url = _hindsight_url(params, group_by, format, gender)
-    warnings = [w for w in (meta.get("warnings") or []) if w]
-
-    structured = {
-        "title": _title(params, group_by),
-        "subtitle": f"{len(rows)} of {total_rows} rows" + (f" · ranked by {sort_by}" if sort_by else ""),
-        "filter_chips": _filter_chips(params, format),
-        "group_by": group_by,
-        "query_mode": query_mode,
-        "columns": columns,
-        "metric_columns": metric_columns,
-        "rows": rows,
-        "total_rows": total_rows,
-        "chart": chart_spec,
-        "hindsight_url": url,
-        "warnings": warnings,
-        "note": " ".join(warnings) if warnings else None,
-        "metrics_perspective": metrics_perspective,
-    }
+    structured = structure_query_result(
+        result, params, group_by, query_mode=query_mode, format=format, gender=gender, batters=batters,
+        bowlers=bowlers, sort_by=sort_by, sort_descending=sort_descending, limit=limit, chart=chart,
+        chart_metric=chart_metric, scatter_x=scatter_x, scatter_y=scatter_y,
+    )
+    rows, columns, url, warnings = structured["rows"], structured["columns"], structured["hindsight_url"], structured["warnings"]
+    total_rows, chart_spec = structured["total_rows"], structured["chart"]
 
     if not rows:
         summary = "No rows match these filters. Check exact names with find_entities, or loosen filters (dates, min_balls, competitions)."

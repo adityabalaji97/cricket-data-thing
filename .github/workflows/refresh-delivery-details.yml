@@ -88,6 +88,17 @@ jobs:
       - name: "T20 (men): Primer metrics for new matches"
         run: python scripts/compute_primer_metrics.py incremental --write
 
+      # New data: bump the data version so every cached query result (query_cache, migration
+      # 009) is stale from now on, and drop results cached against older versions.
+      - name: Invalidate the query cache
+        run: |
+          python - <<'PY'
+          from database import get_session
+          from services.query_cache import bump_data_version, prune
+          db = next(get_session())
+          print("data_version:", bump_data_version(db), "| pruned:", prune(db))
+          PY
+
       # Usage tables (migration 004) keep 90 days of raw rows; weekly reports need no more.
       - name: Prune raw usage events
         if: always()
