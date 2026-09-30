@@ -125,5 +125,8 @@ def test_team_filter_matches_full_name_and_abbreviation_candidates():
 def test_ipl_competition_aliases_share_one_canonical_key():
     assert _canonical_competition_key("Indian Premier League") == "IPL"
     assert _canonical_competition_key("IPL") == "IPL"
-    assert _competition_values_for_key("IPL") == ["IPL", "Indian Premier League"]
-    assert _competition_values_for_key("Indian Premier League") == ["IPL", "Indian Premier League"]
+    # Every stored spelling (services.competition_aliases), including the feed's
+    # "Indian Premier League (IPL)" variant.
+    ipl = ["IPL", "Indian Premier League", "Indian Premier League (IPL)"]
+    assert _competition_values_for_key("IPL") == ipl
+    assert _competition_values_for_key("Indian Premier League") == ipl

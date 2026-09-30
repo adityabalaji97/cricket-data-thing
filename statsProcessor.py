@@ -8,6 +8,16 @@ from tqdm import tqdm
 from database import get_database_connection
 from fantasy_points_v2 import FantasyPointsCalculator
 
+
+def _bowler_runs(d) -> int:
+    """Runs charged to the bowler: off the bat plus wides and no-balls, never byes or leg-byes.
+
+    `extras` also holds byes, leg-byes and penalties, so `runs_off_bat + extras` overstated
+    every bowler's runs conceded and economy.
+    """
+    return (d.runs_off_bat or 0) + (d.wides or 0) + (d.noballs or 0)
+
+
 class StatsProcessor:
     def __init__(self, session: Session):
         self.session = session
@@ -359,7 +369,7 @@ class StatsProcessor:
         
         # Calculate basic stats
         stats.overs = len(bowler_deliveries) / 6
-        stats.runs_conceded = sum(d.runs_off_bat + d.extras for d in bowler_deliveries)
+        stats.runs_conceded = sum(_bowler_runs(d) for d inbowler_deliveries)
         stats.wickets = sum(1 for d in bowler_deliveries if d.wicket_type in [
             'bowled', 'caught', 'lbw', 'caught and bowled', 'stumped', 'hit wicket'
         ])
@@ -378,7 +388,7 @@ class StatsProcessor:
         
         # Powerplay stats
         stats.pp_overs = len(pp_deliveries) / 6
-        stats.pp_runs = sum(d.runs_off_bat + d.extras for d in pp_deliveries)
+        stats.pp_runs = sum(_bowler_runs(d) for d inpp_deliveries)
         stats.pp_wickets = sum(1 for d in pp_deliveries if d.wicket_type in [
             'bowled', 'caught', 'lbw', 'caught and bowled', 'stumped', 'hit wicket'
         ])
@@ -389,7 +399,7 @@ class StatsProcessor:
         
         # Middle overs stats
         stats.middle_overs = len(middle_deliveries) / 6
-        stats.middle_runs = sum(d.runs_off_bat + d.extras for d in middle_deliveries)
+        stats.middle_runs = sum(_bowler_runs(d) for d inmiddle_deliveries)
         stats.middle_wickets = sum(1 for d in middle_deliveries if d.wicket_type in [
             'bowled', 'caught', 'lbw', 'caught and bowled', 'stumped', 'hit wicket'
         ])
@@ -400,7 +410,7 @@ class StatsProcessor:
         
         # Death overs stats
         stats.death_overs = len(death_deliveries) / 6
-        stats.death_runs = sum(d.runs_off_bat + d.extras for d in death_deliveries)
+        stats.death_runs = sum(_bowler_runs(d) for d indeath_deliveries)
         stats.death_wickets = sum(1 for d in death_deliveries if d.wicket_type in [
             'bowled', 'caught', 'lbw', 'caught and bowled', 'stumped', 'hit wicket'
         ])
@@ -411,7 +421,7 @@ class StatsProcessor:
         
         # Calculate comparative team stats
         other_bowlers_deliveries = [d for d in innings_deliveries if d.bowler != bowler]
-        stats.team_runs_excl_bowler = sum(d.runs_off_bat + d.extras for d in other_bowlers_deliveries)
+        stats.team_runs_excl_bowler = sum(_bowler_runs(d) for d inother_bowlers_deliveries)
         stats.team_overs_excl_bowler = len(other_bowlers_deliveries) / 6
         
         if stats.team_overs_excl_bowler > 0:

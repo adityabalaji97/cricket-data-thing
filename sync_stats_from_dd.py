@@ -245,6 +245,20 @@ class StatsFromDeliveryDetails:
         ruleset = get_format(fmt, gender).fantasy_ruleset
         return ruleset in cls.IMPLEMENTED_FANTASY_RULESETS
 
+    @staticmethod
+    def _bowler_runs(d: Dict) -> int:
+        """Runs charged to the bowler on one ball: the ball's total less byes and leg-byes.
+
+        `score` already includes wide and no-ball runs, so adding `wide`/`noball` again (as this
+        used to) counted them twice; byes and leg-byes are never the bowler's.
+        """
+        return (d['score'] or 0) - (d.get('byes') or 0) - (d.get('legbyes') or 0)
+
+    @staticmethod
+    def _bowler_dot(d: Dict) -> bool:
+        """A dot for the bowler: nothing off the bat on a legal ball (byes/leg-byes still count)."""
+        return (d['batruns'] or 0) == 0 and not d['wide'] and not d['noball']
+
     def calculate_bowling_stats(self, match_id: str, innings: int, bowler: str, deliveries: List[Dict]) -> BowlingStats:
         bowler_dels = [d for d in deliveries if d['innings'] == innings and d['bowler'] == bowler]
         if not bowler_dels:
@@ -257,12 +271,12 @@ class StatsFromDeliveryDetails:
         
         legal_balls = len([d for d in bowler_dels if not d['wide'] and not d['noball']])
         stats.overs = legal_balls / 6
-        stats.runs_conceded = sum((d['score'] or 0) + (d['wide'] or 0) + (d['noball'] or 0) for d in bowler_dels)
-        stats.wickets = sum(1 for d in bowler_dels if self._is_out(d) and d['dismissal'] and 
+        stats.runs_conceded = sum(self._bowler_runs(d) for d in bowler_dels)
+        stats.wickets = sum(1 for d in bowler_dels if self._is_out(d) and d['dismissal'] and
                           d['dismissal'].lower() in [w.lower() for w in self.BOWLER_WICKETS])
-        stats.dots = sum(1 for d in bowler_dels if (d['score'] or 0) == 0 and not d['wide'] and not d['noball'])
-        stats.fours_conceded = sum(1 for d in bowler_dels if (d['score'] or 0) == 4)
-        stats.sixes_conceded = sum(1 for d in bowler_dels if (d['score'] or 0) == 6)
+        stats.dots = sum(1 for d in bowler_dels if self._bowler_dot(d))
+        stats.fours_conceded = sum(1 for d in bowler_dels if (d['batruns'] or 0) == 4)
+        stats.sixes_conceded = sum(1 for d in bowler_dels if (d['batruns'] or 0) == 6)
         stats.extras = sum((d['wide'] or 0) + (d['noball'] or 0) for d in bowler_dels)
         
         if stats.overs > 0:
@@ -283,18 +297,18 @@ class StatsFromDeliveryDetails:
             phase_dels = [d for d in bowler_dels if start <= d['over'] < end]
             legal = len([d for d in phase_dels if not d['wide'] and not d['noball']])
             setattr(stats, f'{phase}_overs', legal / 6)
-            runs = sum((d['score'] or 0) + (d['wide'] or 0) + (d['noball'] or 0) for d in phase_dels)
+            runs = sum(self._bowler_runs(d) for d in phase_dels)
             setattr(stats, f'{phase}_runs', runs)
-            setattr(stats, f'{phase}_wickets', sum(1 for d in phase_dels if self._is_out(d) and d['dismissal'] and 
+            setattr(stats, f'{phase}_wickets', sum(1 for d in phase_dels if self._is_out(d) and d['dismissal'] and
                           d['dismissal'].lower() in [w.lower() for w in self.BOWLER_WICKETS]))
-            setattr(stats, f'{phase}_dots', sum(1 for d in phase_dels if (d['score'] or 0) == 0 and not d['wide'] and not d['noball']))
-            setattr(stats, f'{phase}_boundaries', sum(1 for d in phase_dels if (d['score'] or 0) in [4, 6]))
+            setattr(stats, f'{phase}_dots', sum(1 for d in phase_dels if self._bowler_dot(d)))
+            setattr(stats, f'{phase}_boundaries', sum(1 for d in phase_dels if (d['batruns'] or 0) in [4, 6]))
             if legal > 0:
                 setattr(stats, f'{phase}_economy', runs / (legal / 6))
         
         # Team comparison
         other_dels = [d for d in innings_dels if d['bowler'] != bowler]
-        stats.team_runs_excl_bowler = sum((d['score'] or 0) + (d['wide'] or 0) + (d['noball'] or 0) for d in other_dels)
+        stats.team_runs_excl_bowler = sum(self._bowler_runs(d) for d in other_dels)
         other_legal = len([d for d in other_dels if not d['wide'] and not d['noball']])
         stats.team_overs_excl_bowler = other_legal / 6
         if stats.team_overs_excl_bowler > 0:

@@ -12,6 +12,7 @@ from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import date
 from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
 from services.delivery_data_service import get_venue_aliases
+from services.competition_aliases import canonical_sql as competition_canonical_sql
 from services.player_aliases import (
     ALIAS_MAP_CTE,
     UNAMBIGUOUS_ALIASES,
@@ -456,7 +457,7 @@ def get_legacy_grouping_columns_map():
         
         # Match identifiers
         "match_id": "d.match_id",
-        "competition": "m.competition",
+        "competition": competition_canonical_sql("m.competition"),
         "year": "EXTRACT(YEAR FROM m.date)",
         
         # Teams
@@ -1233,6 +1234,8 @@ def query_batting_stats_service(
     chase_outcome: List[str],
     toss_decision: List[str],
     db,
+    fmt: str = "ALL",
+    gender: str = "male",
 ):
     if bowlers:
         raise HTTPException(status_code=400, detail="bowlers filter is unsupported for query_mode=batting_stats")
@@ -1270,6 +1273,14 @@ def query_batting_stats_service(
 
     conditions = ["1=1"]
     params = {"limit": min(limit, 10000), "offset": offset}
+    # Scope to the requested format: these modes never received it, so a T20 query grouped by
+    # competition also returned ODI and Champions Trophy rows.
+    if fmt and fmt != "ALL":
+        conditions.append("bs.format = :fmt")
+        params["fmt"] = fmt
+    if gender:
+        conditions.append("bs.gender = :gender")
+        params["gender"] = gender
 
     if venue:
         params["venue_aliases"] = get_venue_aliases(venue)
@@ -1436,7 +1447,7 @@ def query_batting_stats_service(
     grouping_columns = {
         "format": "bs.format",
         "venue": "m.venue",
-        "competition": "m.competition",
+        "competition": competition_canonical_sql("m.competition"),
         "year": "EXTRACT(YEAR FROM m.date)",
         "batting_team": "bs.batting_team",
         "bowling_team": bowling_team_expr,
@@ -1598,6 +1609,8 @@ def query_bowling_stats_service(
     chase_outcome: List[str],
     toss_decision: List[str],
     db,
+    fmt: str = "ALL",
+    gender: str = "male",
 ):
     if batters:
         raise HTTPException(status_code=400, detail="batters filter is unsupported for query_mode=bowling_stats")
@@ -1635,6 +1648,14 @@ def query_bowling_stats_service(
 
     conditions = ["1=1"]
     params = {"limit": min(limit, 10000), "offset": offset}
+    # Scope to the requested format: these modes never received it, so a T20 query grouped by
+    # competition also returned ODI and Champions Trophy rows.
+    if fmt and fmt != "ALL":
+        conditions.append("bs.format = :fmt")
+        params["fmt"] = fmt
+    if gender:
+        conditions.append("bs.gender = :gender")
+        params["gender"] = gender
 
     if venue:
         params["venue_aliases"] = get_venue_aliases(venue)
@@ -1810,7 +1831,7 @@ def query_bowling_stats_service(
     grouping_columns = {
         "format": "bs.format",
         "venue": "m.venue",
-        "competition": "m.competition",
+        "competition": competition_canonical_sql("m.competition"),
         "year": "EXTRACT(YEAR FROM m.date)",
         "batting_team": batting_team_expr,
         "bowling_team": "bs.bowling_team",
@@ -2083,6 +2104,8 @@ def query_deliveries_service(
                 chase_outcome=chase_outcome,
                 toss_decision=toss_decision,
                 db=db,
+                fmt=fmt,
+                gender=gender,
             )
         if query_mode == "bowling_stats":
             return query_bowling_stats_service(
@@ -2113,6 +2136,8 @@ def query_deliveries_service(
                 chase_outcome=chase_outcome,
                 toss_decision=toss_decision,
                 db=db,
+                fmt=fmt,
+                gender=gender,
             )
         
         # Prepare filters dict for routing analysis
@@ -3042,7 +3067,7 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
         
         # Match identifiers
         "match_id": "dd.p_match",
-        "competition": "dd.competition",
+        "competition": competition_canonical_sql("dd.competition"),
         "year": "dd.year",
         
         # Teams

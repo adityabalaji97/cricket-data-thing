@@ -101,6 +101,12 @@ def expand_league_abbreviations(abbrevs: List[str]) -> List[str]:
         variations = get_league_variations(abbrev)
         expanded.extend(variations)
 
+        # Every raw spelling registered for this competition ("IPL" also selects "Indian
+        # Premier League" rows, and the reverse), so a league filter never returns a partial
+        # season when the feed switches naming.
+        from services.competition_aliases import variants_for
+        expanded.extend(variants_for(abbrev))
+
     # Remove duplicates while preserving order
     result = []
     for item in expanded:

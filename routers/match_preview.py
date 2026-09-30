@@ -406,14 +406,9 @@ def get_match_preview(
         llm_used = False
         preview_text = canonical_markdown
 
-        if preview_mode == "hybrid" and narrative_source != "typed":
-            # Build data context for LLM narrative generation
-            data_context = build_narrative_data_context(context)
-            # Try LLM narrative generation first
-            llm_preview, llm_used = _generate_narrative_with_llm(data_context, sections)
-            if llm_used and llm_preview:
-                preview_text = llm_preview
-            # else: keep deterministic canonical_markdown as preview_text
+        # No GPT narrative: nothing displayed it (the preview card renders `sections`, the
+        # connector reads `sections`/`headline`), yet every uncached preview paid an OpenAI call
+        # and its latency. `preview` is now the markdown of the sections actually shown.
 
         if not preview_text:
             preview_text = generate_match_preview_fallback(context)
