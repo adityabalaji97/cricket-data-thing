@@ -56,7 +56,7 @@ if [[ -z "${changed_files}" ]]; then
   exit 0
 fi
 
-frontend_paths='^(src/|public/|api/|package\.json$|package-lock\.json$|vercel\.json$|\.vercelignore$)'
+frontend_paths='^(src/|public/|api/|mcp_server/widget\.html$|package\.json$|package-lock\.json$|vercel\.json$|\.vercelignore$)'
 
 if echo "${changed_files}" | grep -E -q "${frontend_paths}"; then
   echo "Frontend-relevant changes detected; proceeding with build."

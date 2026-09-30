@@ -38,6 +38,14 @@
       "dest": "/api/sitemap.mjs"
     },
     {
+      "src": "/img/([A-Za-z0-9]{6,16})\\.png",
+      "dest": "/api/img.mjs?id=$1"
+    },
+    {
+      "src": "/embed/(q|wp|recap)/([A-Za-z0-9]{6,16})",
+      "dest": "/api/embed.mjs?kind=$1&id=$2"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/proxy.js"
     },
@@ -67,5 +75,13 @@
       "src": "/(.*)",
       "dest": "/$1"
     }
-  ]
+  ],
+  "functions": {
+    "api/img.mjs": {
+      "includeFiles": "api/_lib/fonts/**"
+    },
+    "api/embed.mjs": {
+      "includeFiles": "mcp_server/widget.html"
+    }
+  }
 }

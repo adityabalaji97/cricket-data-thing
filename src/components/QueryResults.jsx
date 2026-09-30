@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ShareButton from './ui/ShareButton';
+import ChartExportButton from './ui/ChartExportButton';
 import CondensedName from './common/CondensedName';
 import NLInterpretation from './NLInterpretation';
 import axios from 'axios';
@@ -265,6 +266,7 @@ const QueryResults = ({
   interpretationDisabled = false,
   isMobile,
   ballAggregation = 'snapshot',
+  apiQueryString = '',
   onBallAggregationChange,
 }) => {
   const ballAggregationApplicable = Array.isArray(groupBy) && (
@@ -1121,6 +1123,18 @@ const QueryResults = ({
                     </Button>
                   )}
                   <ShareButton kind="query" sx={{ ...qbGhostButtonSx }} />
+                  {apiQueryString && groupBy?.length > 0 && (
+                    <ChartExportButton
+                      sx={{ ...qbGhostButtonSx }}
+                      request={() => ({
+                        kind: 'query',
+                        query_string: apiQueryString,
+                        params: sortConfig.key
+                          ? { sort_by: sortConfig.key, sort_descending: sortConfig.direction === 'desc' }
+                          : {},
+                      })}
+                    />
+                  )}
                   <Button
                     variant="outlined"
                     startIcon={<GetAppIcon />}

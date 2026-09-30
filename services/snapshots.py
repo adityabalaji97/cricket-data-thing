@@ -69,6 +69,87 @@ def _clean_query_params(raw: Dict[str, Any]) -> Dict[str, Any]:
     return params
 
 
+_INT_PARAMS = {"control", "innings", "over_min", "over_max", "min_balls", "max_balls", "min_runs", "max_runs",
+               "min_wickets", "max_wickets", "top_teams"}
+_BOOL_PARAMS = {"is_chase", "include_international"}
+
+
+def params_from_query_string(query_string: str) -> Dict[str, Any]:
+    """Snapshot params from the exact query string the site sent to GET /query/deliveries.
+
+    The Embed and Download image buttons pass it through unchanged, so a snapshot runs the query
+    the viewer is looking at. Parsed like the route: repeated keys and comma lists both become
+    lists; paging and display-only keys are dropped; unknown keys are rejected by the cleaner.
+    """
+    from urllib.parse import parse_qsl
+
+    from routers.query_builder_v2 import preprocess_int_list_param, preprocess_list_param
+
+    raw: Dict[str, list] = {}
+    for key, value in parse_qsl(query_string.lstrip("?"), keep_blank_values=False):
+        raw.setdefault(key, []).append(value)
+    for key in ("limit", "offset", "show_summary_rows", "striker_batter_type", "non_striker_batter_type"):
+        raw.pop(key, None)
+    params: Dict[str, Any] = {}
+    for key, values in raw.items():
+        if key == "wagon_zone":
+            params[key] = preprocess_int_list_param(values)
+        elif key in LIST_PARAMS:
+            params[key] = preprocess_list_param(values)
+        elif key in _INT_PARAMS:
+            try:
+                params[key] = int(values[-1])
+            except ValueError:
+                raise SnapshotError(f"{key} must be a whole number")
+        elif key in _BOOL_PARAMS:
+            params[key] = values[-1].lower() in ("true", "1", "yes")
+        else:
+            params[key] = values[-1]
+    return params
+
+
+_METRIC_LABELS = {
+    "control_percentage": "control %", "dot_percentage": "dot %", "boundary_percentage": "boundary %",
+    "strike_rate": "strike rate", "average": "average", "economy": "economy", "impact": "Impact", "wpa": "WPA",
+    "raa": "runs above average", "runs": "runs", "balls": "balls", "wickets": "wickets",
+}
+_FORMAT_LABELS = {"T20": "T20", "ODI": "ODI", "TEST": "Test"}
+
+
+def _plural(word: str) -> str:
+    word = word.replace("_", " ")
+    return word if word.endswith("s") else word + "s"
+
+
+def default_title(params: Dict[str, Any], metric: Optional[str]) -> str:
+    """A self-contained headline for a share image: what, ranked by what, over which window.
+
+    "ODI partnerships by control %, since 2019 (1,000+ balls)". Statement, not a question, and
+    it carries its own numbers (the content rules for Reddit-style stat posts).
+    """
+    who = (params.get("batters") or params.get("bowlers") or params.get("players") or params.get("teams")
+           or params.get("batting_teams") or params.get("bowling_teams") or [])
+    scope = " ".join(filter(None, [
+        ", ".join(params.get("leagues") or []) or _FORMAT_LABELS.get(str(params.get("fmt") or "").upper()),
+        " & ".join(_plural(g) for g in params.get("group_by") or []),
+    ]))
+    title = f"{', '.join(who[:2])}: {scope}" if who else scope[:1].upper() + scope[1:]
+    if params.get("venue"):
+        title += f" at {params['venue']}"
+    if metric:
+        title += f" by {_METRIC_LABELS.get(metric, metric.replace('_percentage', ' %').replace('_', ' '))}"
+    start, end = params.get("start_date"), params.get("end_date")
+    if start and end:
+        title += f", {start.year}–{end.year}" if start.year != end.year else f", {start.year}"
+    elif start:
+        title += f", since {start.year}"
+    elif end:
+        title += f", up to {end.year}"
+    if params.get("min_balls"):
+        title += f" ({params['min_balls']:,}+ balls)"
+    return title
+
+
 def _query_data(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
     from mcp_server.server import structure_query_result
     from services.query_builder_v2 import run_deliveries_query
@@ -87,8 +168,8 @@ def _query_data(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
         sort_descending=view.get("sort_descending", True), limit=limit, chart=view.get("chart") or "auto",
         chart_metric=view.get("chart_metric"), scatter_x=view.get("scatter_x"), scatter_y=view.get("scatter_y"),
     )
-    if view.get("title"):
-        structured["title"] = view["title"]
+    metric = view.get("sort_by") or view.get("chart_metric") or (structured.get("chart") or {}).get("metric")
+    structured["title"] = view.get("title") or default_title(query, metric)
     structured["highlight"] = view.get("highlight")
     return structured
 

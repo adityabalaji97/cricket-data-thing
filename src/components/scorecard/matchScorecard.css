@@ -1036,3 +1036,9 @@
   line-height: 1.4;
 }
 .recap-card .recap-bullets li + li { margin-top: 6px; }
+
+.card-export {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}

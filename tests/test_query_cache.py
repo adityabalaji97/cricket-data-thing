@@ -32,3 +32,40 @@ def test_snapshot_params_are_whitelisted_and_normalised():
         snapshots._clean_query_params({"group_by": ["batter"], "drop_table": "x"})
     with pytest.raises(snapshots.SnapshotError):
         snapshots._clean_query_params({"format": "T20"})
+
+
+def test_snapshot_params_from_site_query_string():
+    from services.snapshots import params_from_query_string
+
+    params = params_from_query_string(
+        "format=ODI&gender=male&start_date=2019-01-01&group_by=partnership&min_balls=1000"
+        "&leagues=IPL,BBL&wagon_zone=1,2&include_international=true&limit=1000&offset=0"
+    )
+    assert params["format"] == "ODI"
+    assert params["group_by"] == ["partnership"]
+    assert params["min_balls"] == 1000
+    assert params["leagues"] == ["IPL", "BBL"]
+    assert params["wagon_zone"] == [1, 2]
+    assert params["include_international"] is True
+    assert "limit" not in params and "offset" not in params
+
+
+def test_snapshot_rejects_unknown_query_keys():
+    import pytest
+
+    from services.snapshots import SnapshotError, _clean_query_params, params_from_query_string
+
+    with pytest.raises(SnapshotError):
+        _clean_query_params(params_from_query_string("group_by=batter&drop_table=1"))
+
+
+def test_snapshot_default_title_is_a_self_contained_statement():
+    from datetime import date
+
+    from services.snapshots import default_title
+
+    title = default_title({"fmt": "ODI", "group_by": ["partnership"], "start_date": date(2019, 1, 1),
+                           "min_balls": 1000}, "control_percentage")
+    assert title == "ODI partnerships by control %, since 2019 (1,000+ balls)"
+    assert default_title({"batters": ["V Kohli"], "leagues": ["IPL"], "group_by": ["phase"]}, "strike_rate") \
+        == "V Kohli: IPL phases by strike rate"

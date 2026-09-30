@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ShareButton from '../ui/ShareButton';
+import ChartExportButton from '../ui/ChartExportButton';
 import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import config from '../../config';
@@ -294,6 +295,16 @@ const ScorecardSummaryScreen = ({ data, searchParams, setSearchParams }) => {
 
 // How the match was won: Impact/WPA facts written by the API, ranked by Jev (T20 Primer matches).
 // Loaded separately so the scorecard itself never waits on it.
+// Share image and embed for a scorecard card (recap / win probability), as a quiet footer action.
+const CardExport = ({ kind, matchId }) => (
+  <div className="card-export">
+    <ChartExportButton
+      request={{ kind, params: { match_id: String(matchId) } }}
+      sx={{ color: '#c3c8d0', borderColor: 'rgba(255,255,255,.14)', fontSize: 12, textTransform: 'none' }}
+    />
+  </div>
+);
+
 const RecapCard = ({ matchId }) => {
   const [recap, setRecap] = useState(null);
   useEffect(() => {
@@ -311,6 +322,7 @@ const RecapCard = ({ matchId }) => {
       <ul className="recap-bullets">
         {recap.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}
       </ul>
+      <CardExport kind="recap" matchId={matchId} />
     </section>
   );
 };
@@ -379,6 +391,7 @@ const ImpactCard = ({ data, primer }) => {
       <p className="impact-note">
         Impact: runs added to the batting side&apos;s projected total, per over. Dots mark wickets.
       </p>
+      <CardExport kind="win_prob" matchId={data.match.id} />
     </section>
   );
 };

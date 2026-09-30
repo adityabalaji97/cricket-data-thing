@@ -66,8 +66,18 @@
   var pending = {};
   var nextId = 1;
   var state = { result: null, view: null, metric: null };
+  // Static mode: /embed/q/:id (api/embed.mjs) inlines a chart snapshot here instead of speaking
+  // the MCP Apps protocol; the frame's height goes to the embedding page as hindsight:resize.
+  var SNAPSHOT = window.__HINDSIGHT_SNAPSHOT__ || null;
 
-  function send(msg) { window.parent.postMessage(msg, "*"); }
+  function send(msg) {
+    if (SNAPSHOT) {
+      if (msg.method === "ui/notifications/size-changed") window.parent.postMessage({ type: "hindsight:resize", height: msg.params.height }, "*");
+      else if (msg.method === "ui/open-link") window.open(msg.params.url, "_blank", "noopener");
+      return;
+    }
+    window.parent.postMessage(msg, "*");
+  }
   function request(method, params) {
     var id = nextId++;
     send({ jsonrpc: "2.0", id: id, method: method, params: params || {} });
@@ -146,21 +156,35 @@
   // axis text stays 11px on a phone instead of shrinking to ~7px.
   function chartWidth() {
     var el = document.getElementById("app");
-    return Math.max(300, Math.min(900, (el ? el.clientWidth : 640) - 20));
+    return Math.max(260, Math.min(900, (el ? el.clientWidth : 640) - 34));
   }
 
   function barChart(rows, labelKey, metric) {
-    var w = chartWidth(), rowH = 24, padL = Math.min(150, Math.round(w * 0.36)), padR = 52;
-    var h = rows.length * rowH + 10;
+    var w = chartWidth();
     var max = Math.max.apply(null, rows.map(function (r) { return Math.abs(+r[metric] || 0); })) || 1;
     var accent = seriesColors()[0];
-    var bars = rows.map(function (r, i) {
+    var svg = function (h, body) {
+      return '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-width:' + w + 'px;height:auto" role="img" aria-label="' +
+        esc(metric) + ' by ' + esc(labelKey) + '">' + body + '</svg>';
+    };
+    // Narrow frames (phones, embeds in a column): the label sits above its bar and the value is
+    // right-aligned on the label line, so neither is truncated to fit beside the bar.
+    if (w < 480) {
+      var rowS = 38;
+      return svg(rows.length * rowS + 4, rows.map(function (r, i) {
+        var v = +r[metric] || 0, y = 4 + i * rowS, bw = Math.max(2, w * Math.abs(v) / max);
+        return '<text x="0" y="' + (y + 13) + '">' + esc(String(r[labelKey]).slice(0, 40)) + '</text>' +
+          '<text x="' + w + '" y="' + (y + 13) + '" text-anchor="end" font-weight="600">' + esc(fmt(v)) + '</text>' +
+          '<rect x="0" y="' + (y + 19) + '" width="' + bw + '" height="10" rx="3" fill="' + accent + '"></rect>';
+      }).join(""));
+    }
+    var rowH = 24, padL = Math.min(150, Math.round(w * 0.36)), padR = 52;
+    return svg(rows.length * rowH + 10, rows.map(function (r, i) {
       var v = +r[metric] || 0, bw = Math.max(1, (w - padL - padR) * Math.abs(v) / max), y = 5 + i * rowH;
       return '<text x="' + (padL - 8) + '" y="' + (y + 14) + '" text-anchor="end">' + esc(String(r[labelKey]).slice(0, 22)) + '</text>' +
         '<rect x="' + padL + '" y="' + (y + 3) + '" width="' + bw + '" height="' + (rowH - 8) + '" rx="3" fill="' + accent + '"></rect>' +
         '<text x="' + (padL + bw + 6) + '" y="' + (y + 14) + '">' + esc(fmt(v)) + '</text>';
-    }).join("");
-    return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" role="img" aria-label="' + esc(metric) + ' by ' + esc(labelKey) + '">' + bars + '</svg>';
+    }).join(""));
   }
 
   function lineChart(rows, labelKey, metric) {
@@ -264,6 +288,7 @@
     if (sel) sel.onchange = function () { state.metric = sel.value; render(); };
   }
 
+  if (SNAPSHOT) { onResult({ structuredContent: SNAPSHOT }); return; }
   request("ui/initialize", {
     protocolVersion: "2026-01-26",
     clientInfo: { name: "hindsight-query-result", version: "1.0.0" },

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_session
-from services.snapshots import SnapshotError, create_snapshot, get_snapshot
+from services.snapshots import SnapshotError, create_snapshot, get_snapshot, params_from_query_string
 
 router = APIRouter(prefix="/snapshots", tags=["snapshots"])
 
@@ -38,7 +38,10 @@ def _allow(client: str) -> bool:
 
 class SnapshotRequest(BaseModel):
     kind: str
-    params: Dict[str, Any]
+    params: Dict[str, Any] = {}
+    # kind=query only: the site's own /query/deliveries query string, merged under params
+    # (which then carry just the presentation options: title, sort_by, chart_metric...).
+    query_string: Optional[str] = None
 
 
 @router.post("")
@@ -46,7 +49,10 @@ def create(body: SnapshotRequest, request: Request, db: Session = Depends(get_se
     if not _allow(_client(request)):
         raise HTTPException(status_code=429, detail="Too many charts created; try again in a few minutes.")
     try:
-        snap = create_snapshot(db, body.kind, body.params, created_by="web")
+        params = dict(body.params)
+        if body.query_string and body.kind == "query":
+            params = {**params_from_query_string(body.query_string[:4000]), **params}
+        snap = create_snapshot(db, body.kind, params, created_by="web")
     except SnapshotError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return {"id": snap["id"], "kind": snap["kind"], "title": snap["title"]}

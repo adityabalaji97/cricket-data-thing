@@ -187,6 +187,8 @@ const QueryBuilder = ({ isMobile }) => {
   // the active group_by; otherwise the backend ignores it.
   const [ballAggregation, setBallAggregation] = useState('snapshot');
   const executeQueryRef = useRef(null);
+  // The exact query string of the last run: the Image & embed button snapshots this query.
+  const [lastQueryString, setLastQueryString] = useState('');
   const nlInputRef = useRef(null);
 
   // Load filters from URL on mount
@@ -289,6 +291,7 @@ const QueryBuilder = ({ isMobile }) => {
 
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
+      setLastQueryString(params.toString());
       setQueryTab(1);
       setNlExpanded(false);
       setFiltersCollapsed(true);
@@ -317,6 +320,7 @@ const QueryBuilder = ({ isMobile }) => {
 
       const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
       setResults(response.data);
+      setLastQueryString(params.toString());
       setQueryTab(1);
       setNlExpanded(false);
       setFiltersCollapsed(true);
@@ -744,6 +748,7 @@ const QueryBuilder = ({ isMobile }) => {
                 interpretationDisabled={loading || isApplyingSuggestion}
                 isMobile={isMobile}
                 ballAggregation={ballAggregation}
+                apiQueryString={lastQueryString}
                 onBallAggregationChange={(mode) => {
                   setBallAggregation(mode);
                   setTimeout(() => executeQueryRef.current && executeQueryRef.current(), 0);
