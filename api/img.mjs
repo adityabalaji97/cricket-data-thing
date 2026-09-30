@@ -91,7 +91,10 @@ function barsBody(size, data) {
       // Ranking snapshots (content packs) flag their row and carry the true rank and a display
       // value ("142 (118)", "5/21"); query snapshots match a highlight string.
       const isHi = r.highlight === true || (highlight && label.toLowerCase().includes(highlight));
-      const pct = Math.max(0.04, (Math.abs(r[metric]) - floor) / (max - floor));
+      // "Fastest to 100": fewest balls is best, so the best row gets the longest bar.
+      const pct = data.lower_is_better
+        ? Math.max(0.04, min / r[metric])
+        : Math.max(0.04, (Math.abs(r[metric]) - floor) / (max - floor));
       return h('div', { flexDirection: 'column', gap: 6 },
         h('div', { justifyContent: 'space-between', alignItems: 'baseline', fontSize: size.label, color: isHi ? C.lime : C.text, fontWeight: isHi ? 600 : 400 },
           h('div', { maxWidth: '74%' }, `${r.rank ?? i + 1}. ${label}`),
@@ -137,27 +140,40 @@ function winProbBody(size, data) {
     h('div', { flexDirection: 'column', gap: 8, marginTop: 10 }, scores));
 }
 
-// "Every ODI innings with 3+ centuries": a header per innings (teams, date) and its individual
-// performances beneath. Fits as many groups as the height allows, then "+ N more".
-function listBody(size, data) {
+// "Every ODI innings with 3+ centuries": a header per innings (teams, date) with its individual
+// performances comma-separated beneath. Tries normal sizes, then a compact set (still at the
+// legibility minimums) so the whole list fits; only then does it cut to "+ N more".
+function listLayout(size, data, compact) {
+  const head = compact ? Math.max(MIN_FONT.label - 2, 32) : size.label;
+  const detail = compact ? MIN_FONT.footer : size.small;
+  const gap = compact ? 12 : 20;
   const headlineLines = Math.ceil(((data.title || '').length * size.headline * 0.36) / (size.width - 120));
   let budget = size.height - 120 - 60 - headlineLines * size.headline * 1.1 - 34 - size.small * 1.6 - 60;
-  const lineH = size.small * 1.35, headH = size.label * 1.3, gap = 22;
+  const perLine = (size.width - 120 - 18) / (detail * 0.5);
   const shown = [];
   for (const row of data.rows || []) {
-    const cost = headH + (row.details || []).length * lineH + gap;
-    if (cost > budget && shown.length) break;
+    const text = (row.details || []).join(', ');
+    const cost = head * 1.3 + Math.ceil(text.length / perLine) * detail * 1.35 + gap;
+    if (cost > budget) break;
     budget -= cost;
-    shown.push(row);
+    shown.push({ ...row, text });
   }
+  return { head, detail, gap, shown };
+}
+
+function listBody(size, data) {
+  let layout = listLayout(size, data, false);
+  if (layout.shown.length < (data.rows || []).length) layout = listLayout(size, data, true);
+  const { head, detail, gap } = layout;
+  const shown = layout.shown.length ? layout.shown : [{ ...(data.rows || [])[0], text: ((data.rows || [])[0]?.details || []).join(', ') }];
   const more = (data.rows || []).length - shown.length;
-  return h('div', { flexDirection: 'column', marginTop: 34, gap },
+  return h('div', { flexDirection: 'column', marginTop: 30, gap },
     h('div', { color: C.mid, fontSize: size.small }, [data.subtitle, ...chipsFor(data).slice(1)].filter(Boolean).join(' · ')),
-    shown.map((row, i) => h('div', { flexDirection: 'column', gap: 4 },
-      h('div', { justifyContent: 'space-between', alignItems: 'baseline', fontSize: size.label, color: i === 0 ? C.lime : C.text, fontWeight: 600 },
-        h('div', { maxWidth: '70%' }, row.label), h('div', { fontSize: size.small, color: C.low, fontWeight: 400 }, row.sub || '')),
-      (row.details || []).map((d) => h('div', { fontSize: size.small, color: C.mid, paddingLeft: 18 }, d)))),
-    more > 0 ? h('div', { fontSize: size.small, color: C.low }, `+ ${more} more`) : null);
+    shown.map((row, i) => h('div', { flexDirection: 'column', gap: 2 },
+      h('div', { justifyContent: 'space-between', alignItems: 'baseline', fontSize: head, color: i === 0 ? C.lime : C.text, fontWeight: 600 },
+        h('div', { maxWidth: '70%' }, row.label), h('div', { fontSize: detail, color: C.low, fontWeight: 400 }, row.sub || '')),
+      h('div', { fontSize: detail, color: C.mid, lineHeight: 1.3 }, row.text))),
+    more > 0 ? h('div', { fontSize: detail, color: C.low }, `+ ${more} more at hindsightcricket.com`) : null);
 }
 
 function recapBody(size, data) {

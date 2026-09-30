@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from services import content_rules
+from services import content_rules, idea_stats
 from services.records import ordinal
 from services.snapshots import QUERY_PARAMS, SnapshotError, metric_label, title_parts
 
@@ -35,34 +35,10 @@ ENTITY_GROUPS = {"batter": "batters", "bowler": "bowlers", "partnership": "batte
 # "the first ODI v WI", "last night's game against India": the idea is about one match.
 SPECIFIC_MATCH = re.compile(r"\b(first|second|third|fourth|fifth|last|latest|this|1st|2nd|3rd|4th|5th)\b.{0,20}"
                             r"\b(odi|t20i?|match|game)\b", re.I)
-# "3 batter centuries in an ODI innings": count qualifying players within one innings or match.
-# The query builder has no such second step, so ideas run it here (see _attempt_rollup).
-WITHIN = re.compile(r"\bin\s+(?:a|an|one|the same|a single|single)\s+(?:[\w-]+\s+){0,2}?(innings|match|game)\b", re.I)
-NUMBER_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8}
-MILESTONES = [  # (pattern, member dimension, threshold filter, plural noun)
-    (r"centur|hundreds|\b100s\b|tons\b", "batter", {"min_runs": 100}, "centuries"),
-    (r"half[- ]centur|fift|\b50s\b", "batter", {"min_runs": 50}, "50+ scores"),
-    (r"five[- ]?(?:wicket|fers?)|5[- ]?(?:wicket|fers?|wkt)", "bowler", {"min_wickets": 5}, "five-wicket hauls"),
-    (r"four[- ]?(?:wicket|fers?)|4[- ]?(?:wicket|fers?|wkt)", "bowler", {"min_wickets": 4}, "four-wicket hauls"),
-    (r"three[- ]?(?:wicket|fers?)|3[- ]?(?:wicket|fers?|wkt)", "bowler", {"min_wickets": 3}, "three-wicket hauls"),
-]
-
-
-def count_within(idea: str) -> Optional[Dict[str, Any]]:
-    """{n, unit, member, threshold, noun} for "N <milestones> in an innings/match" ideas, else None."""
-    m = WITHIN.search(idea)
-    if not m:
-        return None
-    before = idea[:m.start()]
-    counts = [int(t) if t.isdigit() else NUMBER_WORDS[t.lower()]
-              for t in re.findall(r"\b(\d{1,2}|" + "|".join(NUMBER_WORDS) + r")\b(?![- ]?(?:wicket|fer|wkt))", before, re.I)]
-    counts = [c for c in counts if 2 <= c <= 11]
-    milestone = next(((dim, thr, noun) for pat, dim, thr, noun in MILESTONES if re.search(pat, idea, re.I)), None)
-    if not counts or not milestone:
-        return None
-    return {"n": counts[0], "unit": "innings" if m.group(1).lower() == "innings" else "match",
-            "member": milestone[0], "threshold": milestone[1], "noun": milestone[2]}
-
+# Count-within and race ideas are parsed in code (services/idea_stats.py), not by the model.
+WITHIN = idea_stats.WITHIN
+NUMBER_WORDS = idea_stats.NUMBER_WORDS
+WATCH_DAYS = 30  # resolved list/race ideas are re-run nightly this long, so new entries update the pack
 
 METRIC_WORDS = [
     (r"control", "control_percentage"), (r"strike[- ]?rate|\bsr\b", "strike_rate"), (r"econ", "economy"),
@@ -90,7 +66,13 @@ def _metric_for(idea: str, parsed: Dict[str, Any]) -> Optional[str]:
 
 
 def plan(idea: str, fmt_choice: Optional[str], db: Session) -> Dict[str, Any]:
-    """Parse the idea into snapshot params: {params, metric, highlight, explanation}."""
+    """Parse the idea: {spec, scope} for count-within / race ideas, else query-builder params."""
+    spec = idea_stats.parse_race(idea) or idea_stats.parse_count_within(idea)
+    if spec:
+        return {"spec": spec, "scope": idea_stats.parse_scope(idea, db, fmt_choice)}
+    if WITHIN.search(idea) and re.search(r"\b(\d{1,2}|" + "|".join(NUMBER_WORDS) + r")\b", idea, re.I):
+        raise SnapshotError("Counting players within one innings or match only works for centuries, fifties and "
+                            "wicket hauls so far; the query builder can't express this one yet.")
     from services.nl2query import log_nl_query_event_background, parse_nl_query
 
     parsed = parse_nl_query(idea, db=db)
@@ -119,22 +101,8 @@ def plan(idea: str, fmt_choice: Optional[str], db: Session) -> Dict[str, Any]:
             for key in ("teams", "batting_teams", "bowling_teams"):
                 filters.pop(key, None)
     metric = _metric_for(idea, parsed)
-    rollup = count_within(idea)
-    if rollup:
-        # Step one is every qualifying player-innings (e.g. every ODI hundred); the count per
-        # innings happens in _attempt_rollup. The milestone comes from the words, not the parser.
-        for key in ("min_runs", "max_runs", "min_wickets", "max_wickets", "min_balls"):
-            filters.pop(key, None)
-        filters.update(rollup["threshold"])
-        group_by = ["match_id", "innings", rollup["member"]]
-        metric = "runs" if rollup["member"] == "batter" else "wickets"
-        highlight = None
-    elif WITHIN.search(idea) and re.search(r"\b(\d{1,2}|" + "|".join(NUMBER_WORDS) + r")\b", idea, re.I):
-        raise SnapshotError("Counting players within one innings or match only works for centuries, fifties and "
-                            "wicket hauls so far; the query builder can't express this one yet.")
     params = {**filters, "group_by": group_by, "fmt": fmt, "gender": "male", "query_mode": filters.get("query_mode") or "delivery"}
-    return {"params": params, "metric": metric, "highlight": highlight, "rollup": rollup,
-            "explanation": parsed.get("explanation")}
+    return {"params": params, "metric": metric, "highlight": highlight, "explanation": parsed.get("explanation")}
 
 
 def _row_name(row: Dict[str, Any], label_key: str) -> str:
@@ -228,90 +196,99 @@ def _ascending(metric: str, group_by: List[str]) -> bool:
     return metric in LOWER_IS_BETTER or (bowling and metric in ("average", "strike_rate"))
 
 
-def _innings_info(db: Session, match_ids: List[str]) -> Dict[tuple, Dict[str, Any]]:
-    """(match_id, innings) -> {team, opp, date}, from the deliveries themselves."""
-    rows = db.execute(text("""
-        SELECT dd.p_match, dd.inns, MAX(dd.team_bat) AS team, MAX(dd.team_bowl) AS opp, MAX(m.date) AS date
-        FROM delivery_details dd JOIN matches m ON m.id = dd.p_match
-        WHERE dd.p_match = ANY(:ids) GROUP BY 1, 2
-    """), {"ids": match_ids}).mappings()
-    return {(str(r["p_match"]), int(r["inns"])): dict(r) for r in rows}
-
-
-def _first_year(db: Session, fmt: str) -> Optional[int]:
-    where = "" if fmt == "ALL" else "WHERE format = :fmt"
-    first = db.execute(text(f"SELECT MIN(match_date) FROM delivery_details {where}"), {"fmt": fmt}).scalar()
-    return int(str(first)[:4]) if first else None
-
-
 def _attempt_rollup(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, Any]:
-    """"3 centuries in an ODI innings": every qualifying player-innings, counted per innings/match.
+    """"3 centuries (vs India) in an ODI innings": every such innings, latest first, as a list."""
+    from services.snapshots import create_static_snapshot
 
-    Result: every innings (or match) with N+ of them, latest first, each with its individual
-    performances -- shown as a list image, not bars (the counts are all ~N).
-    """
-    from services.snapshots import _clean_query_params, _query_data, create_static_snapshot
-
-    rollup, params = planned["rollup"], dict(planned["params"])
-    member, n, noun = rollup["member"], int(rollup["n"]), rollup["noun"]
-    full = _query_data(db, _clean_query_params({**params, "limit": 20000, "sort_by": planned["metric"]}))
-    rows = full.get("rows") or []
-    info = _innings_info(db, sorted({str(r["match_id"]) for r in rows}))
-    groups: Dict[tuple, List[Dict[str, Any]]] = {}
-    for r in rows:
-        inn = info.get((str(r["match_id"]), int(r["innings"])))
-        if not inn:
-            continue
-        key = (str(r["match_id"]), int(r["innings"])) if rollup["unit"] == "innings" else (str(r["match_id"]),)
-        if member == "bowler":  # a bowler's side is the one fielding
-            inn = {**inn, "team": inn["opp"], "opp": inn["team"]}
-        groups.setdefault(key, []).append({**r, **inn})
-    hits = sorted((g for g in groups.values() if len(g) >= n), key=lambda g: g[0]["date"], reverse=True)
-    fmt = params.get("fmt") or "ALL"
-    fmt_label = {"ODI": "ODI", "T20": "T20", "ALL": ""}.get(fmt, fmt)
-    first_year = _first_year(db, fmt)
-    unit_noun = f"{fmt_label} {rollup['unit']}".strip()
-    units_noun = f"{fmt_label} {'innings' if rollup['unit'] == 'innings' else 'matches'}".strip()
-    if not hits:
-        return {"status": "failed", "note": f"No {units_noun} with {n}+ {noun} in Hindsight's data since {first_year}."}
-
-    def perf(r: Dict[str, Any]) -> str:
-        if member == "batter":
-            return f"{r['batter']} {int(r['runs'])} ({int(r['balls'])})"
-        return f"{r['bowler']} {int(r['wickets'])}/{int(r['runs'])}"
-
-    list_rows = []
-    for g in hits:
-        lead = g[0]
-        label = f"{lead['team']} v {lead['opp']}"
-        members = sorted(g, key=lambda r: r["runs" if member == "batter" else "wickets"], reverse=True)
-        list_rows.append({"label": label, "date": lead["date"].isoformat(), "sub": f"{lead['date']:%d %b %Y}",
-                          "count": len(g), "display": f"{len(g)} {noun}", "details": [perf(r) for r in members]})
-
-    latest = hits[0][0]
-    count = len(hits)
+    spec, scope = planned["spec"], planned["scope"]
+    n, noun = int(spec["n"]), spec["noun"]
+    groups = idea_stats.count_within(db, spec, scope)
+    first_year, window = idea_stats.window_text(db, scope)
+    fmt = idea_stats.scope_label(scope)
+    unit = "innings" if spec["unit"] == "innings" else "matches"
+    units_noun = " ".join(filter(None, [scope.get("team"), fmt, unit])) + (f" against {scope['opponent']}" if scope.get("opponent") else "")
+    if not groups:
+        return {"status": "failed", "note": f"No {units_noun} with {n}+ {noun} in Hindsight's data{window}."}
+    latest, count = groups[0], len(groups)
     only = "the only" if count == 1 else f"one of {count}"
-    if rollup["unit"] == "innings":
-        title = (f"{_poss_team(latest['team'])} {len(hits[0])} {noun} v {latest['opp']} ({latest['date']:%b %Y}) make it "
-                 f"{only} {units_noun} with {n}+ {noun} since {first_year}")
+    if spec["unit"] == "innings":
+        title = (f"{_poss_team(latest['team'])} {len(latest['members'])} {noun} v {latest['opp']} ({latest['date']:%b %Y}) "
+                 f"make it {only} {units_noun} with {n}+ {noun}{window}")
     else:  # a match's milestones come from both sides
-        title = (f"{latest['team']} v {latest['opp']} ({latest['date']:%b %Y}) had {len(hits[0])} {noun}, "
-                 f"{only} {units_noun} with {n}+ since {first_year}")
+        title = (f"{latest['team']} v {latest['opp']} ({latest['date']:%b %Y}) had {len(latest['members'])} {noun}, "
+                 f"{only} {units_noun} with {n}+{window}")
+    rows = [{"label": f"{g['team']} v {g['opp']}", "date": g["date"].isoformat(), "sub": f"{g['date']:%d %b %Y}",
+             "count": len(g["members"]), "display": f"{len(g['members'])} {noun}", "details": g["details"]} for g in groups]
     data = {
-        "layout": "list", "title": title, "kicker": f"{fmt_label} · {'innings' if rollup['unit'] == 'innings' else 'matches'}".strip(" ·"),
-        "subtitle": f"Every {unit_noun} with {n}+ {noun}, latest first", "filter_chips": [fmt_label, f"since {first_year}"],
-        "group_by": [rollup["unit"]], "query_mode": "ranking", "rows": list_rows, "columns": ["label", "sub", "display", "details"],
-        "metric_columns": ["count"], "chart": {"type": "list", "label_key": "label", "metric": "count"},
-        "hindsight_url": full.get("hindsight_url"), "total_rows": count, "source": "ball-by-ball",
+        "layout": "list", "title": title, "kicker": f"{fmt} · {unit}",
+        "subtitle": f"Every {units_noun.replace(' matches', ' match')} with {n}+ {noun}, latest first",
+        "filter_chips": [fmt, window.strip()], "group_by": [unit], "query_mode": "ranking", "rows": rows,
+        "columns": ["label", "sub", "display", "details"], "metric_columns": ["count"],
+        "chart": {"type": "list", "label_key": "label", "metric": "count"},
+        "hindsight_url": f"{content_rules.SITE_URL}/query", "total_rows": count, "source": "scorecards",
     }
-    snap = create_static_snapshot(db, "ranking", data, title, {"idea": idea_text, "rollup": rollup, "params": params,
-                                                               "title": title}, created_by="idea")
+    snap = create_static_snapshot(db, "ranking", data, title, {"idea": idea_text, "spec": spec, "scope": scope, "title": title,
+                                                               "entries": [r["date"] for r in rows]}, created_by="idea")
     fact = {
         "kind": "idea", "subject": latest["team"], "title": title,
-        "numbers": {"count": len(hits[0]), "n": n, "total": count, "rank": 1, "years": [first_year, latest["date"].year],
-                    "details": [r["details"] for r in list_rows]},
-        "method": f"All {count} {units_noun} in Hindsight's ball-by-ball data since {first_year} with {n}+ {noun}, latest first: "
-                  + "; ".join(f"{r['label']} {r['sub']} ({', '.join(r['details'])})" for r in list_rows[:6]) + ".",
+        "numbers": {"count": len(latest["members"]), "n": n, "total": count, "rank": 1,
+                    "years": [first_year, latest["date"].year], "details": [r["details"] for r in rows]},
+        "method": f"All {count} {units_noun} in Hindsight's data{window} with {n}+ {noun}, latest first: "
+                  + "; ".join(f"{r['label']} {r['sub']} ({', '.join(r['details'])})" for r in rows[:8]) + ".",
+    }
+    return {"status": "resolved", "fact": fact, "snapshot": snap}
+
+
+def _attempt_race(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, Any]:
+    """"Fastest to 100 in ODIs": every innings/player that got there, ranked, subject highlighted."""
+    from services.snapshots import create_static_snapshot
+
+    spec, scope = planned["spec"], planned["scope"]
+    rows, caveat = idea_stats.race(db, spec, scope)
+    words = idea_stats.race_words(spec, scope)
+    first_year, window = idea_stats.window_text(db, scope)
+    if spec["unit"] == "innings":
+        window = f" (debuts since {first_year + 1})"
+    opp_part = f" against {scope['opponent']}" if scope.get("opponent") else ""
+    if not rows:
+        return {"status": "failed", "note": f"Nobody reached {words['what']}{opp_part} in Hindsight's data{window}."}
+    for r in rows:
+        r["label"] = r["name"] if spec["unit"] == "innings" else f"{r['name']} v {r['opp']}, {r['date'].year}"
+    mentions = _mentions(idea_text)
+    idx = _find_mentioned(rows, "name", mentions) if mentions else 0
+    if idx is None:
+        return {"status": "parked", "note": f"{' '.join(mentions)} not among those who reached {words['what']} yet."}
+    hit, n = rows[idx], len(rows)
+    rank = 1 + sum(1 for r in rows if (r["value"] < hit["value"] if spec["direction"] == "fastest" else r["value"] > hit["value"]))
+    tied = sum(1 for r in rows if r["value"] == hit["value"]) > 1
+    sup = idea_stats.sup_word(rank, spec["direction"], tied)
+    unit = "balls" if spec["unit"] == "balls" else "innings"
+    verb = f"took {spec['target']} wickets" if spec["measure"] == "wickets" and spec["unit"] == "balls" else f"reached {words['what']}"
+    against = f" v {hit['opp']} ({hit['date']:%b %Y})" if spec["unit"] == "balls" else ""
+    title = f"{hit['name']} {verb} in {hit['value']} {unit}{against}, {sup} of {n:,} {words['noun']}{opp_part}{window}"
+    shown = list(range(min(8, n))) if idx < 8 else list(range(7)) + [idx]
+    ranks = [1 + sum(1 for r in rows if (r["value"] < rows[i]["value"] if spec["direction"] == "fastest" else r["value"] > rows[i]["value"]))
+             for i in shown]
+    fmt = idea_stats.scope_label(scope)
+    data = {
+        "title": title, "kicker": f"{fmt} · {spec['direction']} to {spec['target']:,}",
+        "metric_label": f"{unit} to {words['what']}", "filter_chips": [fmt, window.strip(" ()")],
+        "group_by": ["innings" if spec["unit"] == "balls" else "players"], "query_mode": "ranking",
+        "columns": ["rank", "label", "value", "display"], "metric_columns": ["value"],
+        "rows": [{"rank": rk, "label": rows[i]["label"], "value": rows[i]["value"], "display": f"{rows[i]['value']} {unit}",
+                  "highlight": i == idx and bool(mentions)} for i, rk in zip(shown, ranks)],
+        "chart": {"type": "bar", "label_key": "label", "metric": "value"}, "lower_is_better": spec["direction"] == "fastest",
+        "hindsight_url": f"{content_rules.SITE_URL}/query", "total_rows": n, "source": "ball-by-ball" if unit == "balls" else "scorecards",
+        "note": caveat,
+    }
+    snap = create_static_snapshot(db, "ranking", data, title, {"idea": idea_text, "spec": spec, "scope": scope, "title": title,
+                                                               "top": [r["label"] for r in rows[:8]]}, created_by="idea")
+    fact = {
+        "kind": "idea", "subject": hit["name"], "title": title,
+        "numbers": {"value": hit["value"], "target": spec["target"], "rank": rank, "total": n, "years": [first_year, first_year + 1,
+                    hit["date"].year]},
+        "method": (f"{spec['direction'].capitalize()} to {words['what']}: {'balls faced' if unit == 'balls' else 'innings'} "
+                   f"when the running total first reached it, across {n:,} {words['noun']}{opp_part}{window}. " + (caveat or "")).strip(),
     }
     return {"status": "resolved", "fact": fact, "snapshot": snap}
 
@@ -324,8 +301,8 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
     """Run a planned idea. Returns {status: 'resolved', fact, snapshot} or {status: 'parked', note}."""
     from services.snapshots import create_static_snapshot
 
-    if planned.get("rollup"):
-        return _attempt_rollup(db, idea_text, planned)
+    if planned.get("spec"):
+        return (_attempt_race if planned["spec"]["type"] == "race" else _attempt_rollup)(db, idea_text, planned)
 
     params = dict(planned["params"])
     for key in ("start_date", "end_date"):
@@ -420,6 +397,10 @@ def _pack_from_fact(db: Session, idea_id: int, result: Dict[str, Any]) -> Option
     rank, total = fact["numbers"]["rank"], fact["numbers"]["total"]
     if rank > max(10, total * 0.1):
         warnings.append(f"Ranks {ordinal(rank)} of {total:,}: not a standout, probably not worth posting.")
+    previous = db.execute(text("SELECT snapshot_id FROM content_packs WHERE angle_key = :k"),
+                          {"k": f"idea:{idea_id}"}).scalar()
+    if previous and previous != snap["id"]:
+        warnings.insert(0, "Updated with new data since the first version.")
     live = snap["data"].get("hindsight_url") or f"{content_rules.SITE_URL}/query"
     sep = "&" if "?" in live else "?"
     link = f"{live}{sep}utm_source=reddit&utm_campaign=pack-{snap['id']}"
@@ -430,7 +411,14 @@ def _pack_from_fact(db: Session, idea_id: int, result: Dict[str, Any]) -> Option
             INSERT INTO content_packs (match_id, snapshot_id, angle_key, title, first_comment, subreddit, flair,
                                        facts, rule_warnings, status, post_by, source)
             VALUES (NULL, :s, :k, :t, :c, 'r/Cricket', 'Stats', CAST(:f AS jsonb), CAST(:w AS jsonb), 'ready', :pb, 'idea')
-            ON CONFLICT (angle_key) WHERE angle_key IS NOT NULL DO UPDATE SET title = EXCLUDED.title
+            ON CONFLICT (angle_key) WHERE angle_key IS NOT NULL DO UPDATE SET
+                title = EXCLUDED.title, first_comment = EXCLUDED.first_comment, facts = EXCLUDED.facts,
+                rule_warnings = EXCLUDED.rule_warnings,
+                status = CASE WHEN content_packs.snapshot_id IS DISTINCT FROM EXCLUDED.snapshot_id THEN 'ready'
+                              ELSE content_packs.status END,
+                post_by = CASE WHEN content_packs.snapshot_id IS DISTINCT FROM EXCLUDED.snapshot_id THEN EXCLUDED.post_by
+                               ELSE content_packs.post_by END,
+                snapshot_id = EXCLUDED.snapshot_id
             RETURNING id
         """), {"s": snap["id"], "k": f"idea:{idea_id}", "t": fact["title"],
                "c": f"{fact['method']}\n\nRun it yourself: {link}\n\nData: Hindsight (hindsightcricket.com), a free cricket stats site.",
@@ -474,12 +462,17 @@ def process_idea(db: Session, idea_id: int, fmt_choice: Optional[str] = None) ->
 
 
 def retry_parked(db: Session) -> Dict[str, int]:
-    """Nightly: re-run parked ideas against the new data; give up after PARK_DAYS."""
+    """Nightly: re-run parked ideas (give up after PARK_DAYS) and watched list/race ideas (a new
+    entry -- e.g. today's third century -- refreshes the pack and puts it back in the queue)."""
     counts = {"resolved": 0, "parked": 0, "failed": 0}
-    parked = db.execute(text("SELECT id, text, params, created_at FROM content_ideas WHERE status = 'parked'")).mappings().all()
+    parked = db.execute(text("""
+        SELECT id, text, params, created_at, status FROM content_ideas
+        WHERE status = 'parked'
+           OR (status = 'resolved' AND params ? 'spec' AND created_at >= now() - make_interval(days => :watch))
+    """), {"watch": WATCH_DAYS}).mappings().all()
     for idea in parked:
         try:
-            if idea["created_at"] < datetime.now(timezone.utc) - timedelta(days=PARK_DAYS):
+            if idea["status"] == "parked" and idea["created_at"] < datetime.now(timezone.utc) - timedelta(days=PARK_DAYS):
                 result = {"status": "failed", "note": f"Still no data after {PARK_DAYS} days."}
             elif idea["params"]:
                 result = attempt(db, idea["text"], idea["params"])

@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 class StatsFromDeliveryDetails:
     POWERPLAY_END = 6
     MIDDLE_END = 15
-    BOWLER_WICKETS = ['bowled', 'caught', 'lbw', 'caught and bowled', 'stumped', 'hit wicket']
+    # The ball-by-ball feed spells LBW out ("leg before wicket"); Cricsheet writes "lbw". Missing
+    # the long form dropped every LBW from bowling_stats (scripts/backfill_bowler_wickets.py).
+    BOWLER_WICKETS = ['bowled', 'caught', 'lbw', 'leg before wicket', 'caught and bowled', 'stumped', 'hit wicket']
     
     def __init__(self):
         self.engine, self.SessionLocal = get_database_connection()

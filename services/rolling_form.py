@@ -27,6 +27,7 @@ BOWLER_WICKET_TYPES = (
     "bowled",
     "caught",
     "lbw",
+    "leg before wicket",  # the ball-by-ball feed's spelling
     "caught and bowled",
     "stumped",
     "hit wicket",

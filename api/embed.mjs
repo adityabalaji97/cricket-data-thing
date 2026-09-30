@@ -122,11 +122,11 @@ function recapHtml(snap) {
 function listHtml(snap) {
   const d = snap.data || {};
   const items = (d.rows || []).map((r) => `<div class="grp"><div class="gh"><b>${esc(r.label)}</b><span>${esc(r.sub || '')}</span></div>`
-    + `<ul>${(r.details || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>`).join('');
+    + `<div class="det">${esc((r.details || []).join(', '))}</div></div>`).join('');
   const body = `<div class="kicker">${esc(d.kicker || 'Hindsight')}</div><h1>${esc(d.title || snap.title)}</h1>
 <div class="sub">${esc(d.subtitle || '')}</div>
 <style>.grp{margin-top:12px}.gh{display:flex;justify-content:space-between;gap:10px}.gh span{color:var(--lo);font-size:12px;white-space:nowrap}
-.grp ul{margin:4px 0 0}.grp li{margin-bottom:2px}</style>${items}`;
+.det{color:var(--med);margin-top:2px}</style>${items}`;
   return page(snap, 'q', d.title || snap.title, body, d.hindsight_url || '/query');
 }
 

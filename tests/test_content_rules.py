@@ -112,15 +112,41 @@ def test_title_parts_include_over_range():
 
 
 def test_count_within_ideas_are_detected():
-    from services.content_ideas import count_within
+    from services.idea_stats import parse_count_within
 
-    assert count_within("3 batter centuries in an ODI innings") == {
-        "n": 3, "unit": "innings", "member": "batter", "threshold": {"min_runs": 100}, "noun": "centuries"}
-    two_fers = count_within("two five-wicket hauls in one ODI match")
-    assert (two_fers["n"], two_fers["unit"], two_fers["threshold"]) == (2, "match", {"min_wickets": 5})
-    assert count_within("three fifties in the same T20 innings")["threshold"] == {"min_runs": 50}
-    assert count_within("Gill and Kohli control % in the first ODI v West Indies") is None
-    assert count_within("highest ODI score since 2015") is None
+    assert parse_count_within("3 batter centuries in an ODI innings") == {
+        "type": "rollup", "n": 3, "unit": "innings", "member": "batter", "threshold": 100, "noun": "centuries"}
+    two_fers = parse_count_within("two five-wicket hauls in one ODI match")
+    assert (two_fers["n"], two_fers["unit"], two_fers["member"], two_fers["threshold"]) == (2, "match", "bowler", 5)
+    assert parse_count_within("three fifties in the same T20 innings")["threshold"] == 50
+    assert parse_count_within("Gill and Kohli control % in the first ODI v West Indies") is None
+    assert parse_count_within("highest ODI score since 2015") is None
+
+
+def test_race_ideas_are_detected():
+    from services.idea_stats import parse_race
+
+    def core(t):
+        r = parse_race(t)
+        return r and (r["direction"], r["target"], r["measure"], r["unit"], r["subject"])
+
+    assert core("fastest to 100 in ODIs") == ("fastest", 100, "runs", "balls", "batter")
+    assert core("slowest ODI century") == ("slowest", 100, "runs", "balls", "batter")
+    assert core("fastest to 10000 ODI runs by innings") == ("fastest", 10000, "runs", "innings", "batter")
+    assert core("fastest to 10k runs in T20s") == ("fastest", 10000, "runs", "innings", "batter")
+    assert core("fastest to 100 ODI wickets") == ("fastest", 100, "wickets", "innings", "bowler")
+    assert core("fastest to 5 wickets in an ODI innings") == ("fastest", 5, "wickets", "balls", "bowler")
+    assert core("fastest team to 300 in an ODI") == ("fastest", 300, "runs", "balls", "team")
+    assert core("fastest IPL fifty since 2020") == ("fastest", 50, "runs", "balls", "batter")
+    assert parse_race("highest ODI score") is None
+
+
+def test_joint_superlatives():
+    from services.idea_stats import sup_word
+
+    assert sup_word(1, "fastest") == "the fastest"
+    assert sup_word(1, "fastest", tied=True) == "the joint-fastest"
+    assert sup_word(3, "slowest", tied=True) == "the joint 3rd-slowest"
 
 
 def test_unsupported_count_within_idea_is_refused(monkeypatch):
