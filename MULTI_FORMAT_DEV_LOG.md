@@ -34,7 +34,7 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > count per innings in Python, list layout image/embed, latest first); other count-within asks fail with a
 > reason. tests/js/snapshot_fixtures.json is force-added (.gitignore has *.json).
 > Parked: site-wide mobile share images for every chart/table (see Notes plan file).
-> **Step 6c built, not yet deployed (2026-09-30):** scripts/load_cricsheet.py, nightly after the ODI leg
+> **Step 6c built (2026-09-30):** scripts/load_cricsheet.py, nightly after the ODI leg
 > (continue-on-error). Cricsheet recently-added (7 days) -> men's T20I/ODI + main leagues (LEAGUE_BUCKETS),
 > 2015+ only, skipping ids in matches/delivery_details and logging same-date/same-teams under another id
 > ("REVIEW ..."). Writes matches (data_source='cricsheet'), deliveries (the scorecard reads those for
@@ -48,9 +48,16 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > loads 0 (the feed is ahead of Cricsheet right now). Findings, not fixed: Cricsheet has NO Afghanistan
 > matches (Rashid's 5 missing ODI wkts are in partial dd matches 1079250/1133018/1150146 -- parked);
 > backfill_bowler_runs.py only rewrote rows whose own runs changed, so team_*_excl_bowler/economy_diff and
-> bowling fantasy_points are stale on many prod rows; run_full_dd_sync step 6 (fix_league_names) has never
+> bowling fantasy_points were stale -- FIXED by scripts/backfill_bowling_derived.py (below); run_full_dd_sync step 6 (fix_league_names) has never
 > imported -- harmless, it is interactive; dd for 1549965 is missing ~31 balls of innings 2.
 > Local goldens are stale vs HEAD (no ball_metrics locally); diff against a HEAD server instead.
+> **Bowling derived columns repaired in prod (2026-09-30):** scripts/backfill_bowling_derived.py rewrote
+> team_runs_excl_bowler/team_economy_excl_bowler/economy_diff (~71k rows, dd + legacy) and bowling
+> fantasy_points (~58k rows) by the writers' current rules; recompute checked equal to
+> StatsFromDeliveryDetails on sample matches. Backup of the four columns (all rows, by id):
+> bowling_stats_backup_derived_20260930 -- drop once nothing looks off. Re-run is a no-op.
+> 6c commit 051c1f1 is on origin/main; **Heroku not yet deployed** (scorecard routing for cricsheet matches
+> needs it -- `git push heroku main`).
 > Next: Notes 3-5.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
