@@ -875,6 +875,18 @@ const QueryResults = ({
   
   const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const visibleColumns = getVisibleColumns();
+  // The first grouping column stays pinned while the rest scroll. On a phone a long label
+  // ("Rohit Sharma & Shubman Gill") made it ~270 of 360px, leaving no room to scroll the
+  // numbers into view: cap it and let the label wrap. The shadow marks the pinned edge.
+  const pinnedColumnSx = isMobile ? {
+    width: '38vw',
+    maxWidth: '38vw',
+    minWidth: 96,
+    whiteSpace: 'normal',
+    overflowWrap: 'anywhere',
+    lineHeight: 1.25,
+    boxShadow: `inset -1px 0 0 ${qbColors.borderStrong}, 6px 0 8px -6px rgba(0,0,0,0.6)`,
+  } : {};
   const hiddenMetricCount = Math.max(availableMetricColumns.length - selectedMetricColumns.length, 0);
   const columnsMenuOpen = Boolean(columnsAnchorEl);
 
@@ -1183,7 +1195,7 @@ const QueryResults = ({
       )}
       <Paper sx={{ ...qbCardSx, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
         <ScrollTable sx={{ maxHeight: isMobile ? 400 : 600, bgcolor: qbColors.surface1, overflowX: 'auto' }}>
-          <Table stickyHeader size={isMobile ? "small" : "medium"} sx={{ minWidth: Math.max(visibleColumns.length * (isMobile ? 96 : 124), isMobile ? 520 : 760) }}>
+          <Table stickyHeader size={isMobile ? "small" : "medium"} sx={{ minWidth: isMobile ? visibleColumns.length * 84 : Math.max(visibleColumns.length * 124, 760) }}>
             <TableHead>
               <TableRow>
                 {visibleColumns.map((column, colIndex) => {
@@ -1207,7 +1219,8 @@ const QueryResults = ({
                       left: groupByIndex === 0 ? 0 : 'auto',
                       backgroundColor: `${qbColors.surface2} !important`,
                       zIndex: groupByIndex === 0 ? 3 : 1,
-                    })
+                    }),
+                    ...(groupByIndex === 0 && pinnedColumnSx),
                   }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                       <TableSortLabel
@@ -1284,11 +1297,17 @@ const QueryResults = ({
                         color: qbColors.textHi,
                         fontWeight: 700,
                         zIndex: groupByIndex === 0 ? 1 : 0,
-                      })
+                      }),
+                      ...(groupByIndex === 0 && pinnedColumnSx),
                     }}>
                       {row.is_summary && column !== groupBy[0] && groupBy.includes(column) ?
                         '— Total —' :
-                        formatValue(row[column], column)
+                        column === 'partnership' && isMobile && typeof row[column] === 'string'
+                          // "Rohit Sharma &" / "Shubman Gill": wrap at the pair, not mid-name.
+                          ? row[column].split(' & ').map((name, i, all) => (
+                            <React.Fragment key={name}>{name}{i < all.length - 1 ? '\u00a0&' : ''}{i < all.length - 1 && <br />}</React.Fragment>
+                          ))
+                          : formatValue(row[column], column)
                       }
                     </TableCell>
                     );
