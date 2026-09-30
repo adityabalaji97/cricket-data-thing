@@ -67,6 +67,11 @@ def _recap_fact(db: Session, match: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def candidate_facts(db: Session, match: Dict[str, Any]) -> List[Dict[str, Any]]:
     facts = match_records(db, match)
+    # Ball-by-ball angles (control %, partnerships, phases) need delivery_details for the match.
+    if match.get("data_source") in (None, "bbb"):
+        from services.standout_scanner import scan_match
+
+        facts += scan_match(db, match)
     recap = _recap_fact(db, match)
     if recap:
         facts.append(recap)
@@ -106,6 +111,7 @@ def _ranking_data(fact: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]
         "query_mode": "ranking",
         "columns": ["rank", "label", metric, "display"],
         "metric_columns": [metric],
+        "metric_label": chart.get("metric_label"),
         "rows": chart["rows"],
         "chart": {"type": "bar", "label_key": "label", "metric": metric},
         "hindsight_url": f"{content_rules.SITE_URL}/scorecard/{match['id']}",

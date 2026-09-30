@@ -71,3 +71,41 @@ def test_choose_keeps_series_posts_and_ranks_the_rest_without_jev(monkeypatch):
         {"id": "e", "text": "e", "title": "e", "weight": 4.5},
     ]
     assert [f["id"] for f in choose(facts, match, per_match=2)] == ["a", "b", "d"]
+
+
+def test_scanner_rank_handles_direction_and_ties():
+    from services.standout_scanner import _rank
+
+    pop = [{"value": v} for v in (95.0, 90.0, 90.0, 80.0, 70.0)]          # sorted best-first (desc)
+    assert _rank(pop, 92.0, True) == (2, False)
+    assert _rank(pop, 90.0, True) == (2, True)
+    low_is_good = [{"value": v} for v in (50.0, 55.0, 60.0)]              # ascending, e.g. batters' control v a bowler
+    assert _rank(low_is_good, 52.0, False) == (2, False)
+
+
+def test_idea_name_mentions_skip_formats_and_sentence_words():
+    from services.content_ideas import _find_mentioned, _mentions
+
+    assert _mentions("Gill and Kohli control % in the first ODI v WI compared to other ODI partnerships") == ["Gill", "Kohli"]
+    assert _mentions("Highest strike rate for batters in IPL death overs since 2023") == []
+    rows = [{"partnership": "Milind Kumar & Saiteja Mukkamalla"}, {"partnership": "Shubman Gill & Virat Kohli"},
+            {"partnership": "KL Rahul & Virat Kohli"}]
+    assert _find_mentioned(rows, "partnership", ["Gill", "Kohli"]) == 1
+    assert _find_mentioned(rows, "partnership", ["Babar", "Rizwan"]) is None
+
+
+def test_bowling_metrics_rank_ascending():
+    from services.content_ideas import _ascending
+
+    assert _ascending("economy", ["bowler"]) and _ascending("average", ["bowler"])
+    assert not _ascending("average", ["batter"]) and not _ascending("control_percentage", ["partnership"])
+
+
+def test_title_parts_include_over_range():
+    from datetime import date
+
+    from services.snapshots import default_title
+
+    assert default_title({"leagues": ["IPL"], "group_by": ["batter"], "over_min": 15, "over_max": 19,
+                          "start_date": date(2023, 1, 1), "min_balls": 150}, "strike_rate") \
+        == "IPL batters in overs 16-20 by strike rate, since 2023 (150+ balls)"

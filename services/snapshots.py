@@ -121,33 +121,57 @@ def _plural(word: str) -> str:
     return word if word.endswith("s") else word + "s"
 
 
-def default_title(params: Dict[str, Any], metric: Optional[str]) -> str:
-    """A self-contained headline for a share image: what, ranked by what, over which window.
+def metric_label(metric: Optional[str]) -> str:
+    if not metric:
+        return ""
+    return _METRIC_LABELS.get(metric, metric.replace("_percentage", " %").replace("_", " "))
 
-    "ODI partnerships by control %, since 2019 (1,000+ balls)". Statement, not a question, and
-    it carries its own numbers (the content rules for Reddit-style stat posts).
-    """
+
+def title_parts(params: Dict[str, Any]) -> Dict[str, str]:
+    """Pieces of a chart headline: who, scope ("ODI partnerships"), venue, window, minimum."""
     who = (params.get("batters") or params.get("bowlers") or params.get("players") or params.get("teams")
            or params.get("batting_teams") or params.get("bowling_teams") or [])
     scope = " ".join(filter(None, [
         ", ".join(params.get("leagues") or []) or _FORMAT_LABELS.get(str(params.get("fmt") or "").upper()),
         " & ".join(_plural(g) for g in params.get("group_by") or []),
     ]))
-    title = f"{', '.join(who[:2])}: {scope}" if who else scope[:1].upper() + scope[1:]
-    if params.get("venue"):
-        title += f" at {params['venue']}"
-    if metric:
-        title += f" by {_METRIC_LABELS.get(metric, metric.replace('_percentage', ' %').replace('_', ' '))}"
     start, end = params.get("start_date"), params.get("end_date")
     if start and end:
-        title += f", {start.year}–{end.year}" if start.year != end.year else f", {start.year}"
+        window = f", {start.year}–{end.year}" if start.year != end.year else f", {start.year}"
     elif start:
-        title += f", since {start.year}"
+        window = f", since {start.year}"
     elif end:
-        title += f", up to {end.year}"
-    if params.get("min_balls"):
-        title += f" ({params['min_balls']:,}+ balls)"
-    return title
+        window = f", up to {end.year}"
+    else:
+        window = ""
+    overs = ""
+    if params.get("over_min") is not None or params.get("over_max") is not None:
+        lo, hi = params.get("over_min"), params.get("over_max")
+        overs = (f" in overs {lo + 1}-{hi + 1}" if lo is not None and hi is not None
+                 else f" from over {lo + 1}" if lo is not None else f" up to over {hi + 1}")
+    return {
+        "who": ", ".join(who[:2]),
+        "overs": overs,
+        "scope": scope,
+        "venue": f" at {params['venue']}" if params.get("venue") else "",
+        "window": window,
+        "minimum": f" ({params['min_balls']:,}+ balls)" if params.get("min_balls") else "",
+    }
+
+
+def default_title(params: Dict[str, Any], metric: Optional[str]) -> str:
+    """A self-contained headline for a share image: what, ranked by what, over which window.
+
+    "ODI partnerships by control %, since 2019 (1,000+ balls)". Statement, not a question, and
+    it carries its own numbers (the content rules for Reddit-style stat posts).
+    """
+    p = title_parts(params)
+    scope = p["scope"]
+    title = f"{p['who']}: {scope}" if p["who"] else scope[:1].upper() + scope[1:]
+    title += p["venue"] + p["overs"]
+    if metric:
+        title += f" by {metric_label(metric)}"
+    return title + p["window"] + p["minimum"]
 
 
 def _query_data(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:

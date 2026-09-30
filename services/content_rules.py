@@ -69,6 +69,7 @@ def check_title(title: str, facts: List[Dict[str, Any]], subject: Optional[str] 
         warnings.append(f"Short title ({len(t)} chars); self-contained titles of {TITLE_MIN}+ do better.")
     if len(t) > TITLE_MAX:
         warnings.append(f"Long title ({len(t)} chars); keep it under {TITLE_MAX}.")
+    subject = (subject or "").replace(" & ", " and ")
     if subject and not t.lower().startswith(subject.lower()[:max(4, len(subject) // 2)]):
         warnings.append(f"Title does not lead with {subject}.")
     if CLICKBAIT.search(t) or "!!" in t:

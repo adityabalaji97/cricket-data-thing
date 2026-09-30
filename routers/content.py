@@ -2,7 +2,7 @@
 import json
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -75,15 +75,58 @@ class GenerateRequest(BaseModel):
     days: int = Field(default=3, ge=1, le=30)
 
 
-@router.post("/generate")
-def generate_packs(body: GenerateRequest, db: Session = Depends(get_session)):
-    """Scan recent (or the given) matches now instead of waiting for the nightly run."""
+def _generate_in_background(match_ids: List[str], days: int) -> None:
     from services.content_packs import generate
 
-    summary = generate(db, days=body.days, match_ids=body.match_ids or None)
-    return {
-        "matches": summary["matches"],
-        "created": [p["title"] for p in summary["packs"] if not p.get("duplicate")],
-        "refused": [{"title": p["title"], "why": p["refused"]} for p in summary["refused"]],
-        "expired": summary["expired"],
-    }
+    db = next(get_session())
+    try:
+        generate(db, days=days, match_ids=match_ids or None)
+    finally:
+        db.close()
+
+
+@router.post("/generate", status_code=202)
+def generate_packs(body: GenerateRequest, background: BackgroundTasks):
+    """Scan recent (or the given) matches now instead of waiting for the nightly run.
+
+    Runs after the response: building the ball-by-ball comparison sets takes ~30 s per format on
+    a cold process, past Heroku's 30 s request limit. New packs appear in the queue when done.
+    """
+    background.add_task(_generate_in_background, body.match_ids, body.days)
+    return {"started": True}
+
+
+class IdeaRequest(BaseModel):
+    text: str = Field(min_length=8, max_length=500)
+    format: Optional[str] = None  # T20 | ODI | ALL; guessed from the text when omitted
+
+
+def _process_idea_in_background(idea_id: int, fmt: Optional[str]) -> None:
+    from services.content_ideas import process_idea
+
+    db = next(get_session())
+    try:
+        process_idea(db, idea_id, fmt)
+    finally:
+        db.close()
+
+
+@router.post("/ideas", status_code=202)
+def submit_idea(body: IdeaRequest, background: BackgroundTasks):
+    """Idea -> pack (services/content_ideas.py). Parsing and a cold query can pass Heroku's 30 s
+    limit, so it runs after the response; poll GET /ideas for the outcome."""
+    from services.content_ideas import create_idea
+
+    idea_id = create_idea(body.text)
+    background.add_task(_process_idea_in_background, idea_id, body.format)
+    return {"id": idea_id, "status": "pending"}
+
+
+@router.get("/ideas")
+def list_ideas(limit: int = 15, db: Session = Depends(get_session)):
+    rows = db.execute(text("""
+        SELECT i.id, i.text, i.status, i.note, i.pack_id, i.created_at, i.resolved_at, p.title AS pack_title
+        FROM content_ideas i LEFT JOIN content_packs p ON p.id = i.pack_id
+        ORDER BY i.created_at DESC LIMIT :limit
+    """), {"limit": min(limit, 100)}).mappings()
+    return {"ideas": [dict(r) for r in rows]}

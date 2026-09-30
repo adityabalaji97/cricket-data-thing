@@ -6,7 +6,8 @@ Generate content packs for newly loaded matches (services/content_packs.py).
     python scripts/generate_content_packs.py --match 1525655 --match 1496589
 
 Runs nightly after the load (refresh-delivery-details.yml). Packs land as 'ready' in the admin
-"Social" tab; ready packs past their post-by deadline are marked expired.
+"Social" tab; ready packs past their post-by deadline are marked expired; parked ideas
+(services/content_ideas.py) are retried against the new data.
 """
 import argparse
 import os
@@ -37,6 +38,12 @@ def main() -> None:
             print(f"      warning: {w}")
     for p in summary["refused"]:
         print(f"  - refused: {p['title']} -- {'; '.join(p['refused'])}")
+
+    if not args.dry_run and not args.matches:
+        from services.content_ideas import retry_parked
+
+        counts = retry_parked(db)
+        print(f"parked ideas: {counts['resolved']} resolved, {counts['parked']} still parked, {counts['failed']} given up")
 
 
 if __name__ == "__main__":

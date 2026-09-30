@@ -85,7 +85,7 @@ function barsBody(size, data) {
   const floor = min > 0 && (max - min) / max < 0.25 ? min * 0.9 : 0;
   const highlight = (data.highlight || '').toLowerCase();
   return h('div', { flexDirection: 'column', marginTop: 34, gap: size.rows > 6 ? 18 : 22 },
-    h('div', { color: C.mid, fontSize: size.small }, [metricLabel(metric), ...chipsFor(data)].join(' · ')),
+    h('div', { color: C.mid, fontSize: size.small }, [data.metric_label ? data.metric_label[0].toUpperCase() + data.metric_label.slice(1) : metricLabel(metric), ...chipsFor(data)].join(' · ')),
     rows.map((r, i) => {
       const label = String(r[labelKey] ?? '');
       // Ranking snapshots (content packs) flag their row and carry the true rank and a display

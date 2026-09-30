@@ -62,7 +62,7 @@ const PackCard = ({ pack, client, onChanged, toast }) => {
   return (
     <Box sx={{ bgcolor: C.card, border: `1px solid ${C.line}`, borderRadius: 3, p: 2, mb: 2 }}>
       <Typography sx={{ fontSize: 12, color: C.lo, mb: 1 }}>
-        {pack.team1} v {pack.team2} · {pack.competition} · {pack.match_date}
+        {pack.team1 ? `${pack.team1} v ${pack.team2} · ${pack.competition} · ${pack.match_date}` : `From an idea · ${String(pack.created_at).slice(0, 10)}`}
       </Typography>
       <Box component="img" src={imageUrl} alt={pack.title} loading="lazy"
         sx={{ display: 'block', width: '100%', maxWidth: 420, aspectRatio: '4 / 5', borderRadius: 2, bgcolor: '#14171e', border: `1px solid ${C.line}` }} />
@@ -114,6 +114,77 @@ const PackCard = ({ pack, client, onChanged, toast }) => {
   );
 };
 
+const IDEA_STATUS_COLOR = { pending: C.lo, parked: C.amber, resolved: C.lime, failed: C.red };
+
+// "Idea -> pack": a hunch in plain English becomes a query, a highlighted chart and a pack. Ideas
+// about matches not loaded yet are parked and retried after each nightly load.
+const IdeaBox = ({ client, toast, onPackCreated }) => {
+  const [textValue, setTextValue] = useState('');
+  const [format, setFormat] = useState('');
+  const [ideas, setIdeas] = useState([]);
+  const [sending, setSending] = useState(false);
+
+  const loadIdeas = useCallback(async () => {
+    try {
+      const { data } = await client.get('/admin/content/ideas', { params: { limit: 6 } });
+      setIdeas(data.ideas);
+      return data.ideas;
+    } catch { return []; }
+  }, [client]);
+
+  useEffect(() => { loadIdeas(); }, [loadIdeas]);
+
+  // Poll while an idea is being worked on (parsing + a cold query can take a minute).
+  useEffect(() => {
+    if (!ideas.some((i) => i.status === 'pending')) return undefined;
+    const timer = setTimeout(async () => {
+      const next = await loadIdeas();
+      if (next.some((i) => i.status === 'resolved' && ideas.find((o) => o.id === i.id)?.status === 'pending')) onPackCreated();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [ideas, loadIdeas, onPackCreated]);
+
+  const submit = async () => {
+    if (textValue.trim().length < 8) return;
+    setSending(true);
+    try {
+      await client.post('/admin/content/ideas', { text: textValue.trim(), format: format || null });
+      setTextValue('');
+      toast('Working on it…');
+      loadIdeas();
+    } catch (err) { toast(err.response?.data?.detail?.[0]?.msg || 'Could not submit the idea'); }
+    setSending(false);
+  };
+
+  return (
+    <Box sx={{ bgcolor: C.card, border: `1px solid ${C.line}`, borderRadius: 3, p: 2, mb: 2 }}>
+      <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 1 }}>Idea → pack</Typography>
+      <TextField multiline minRows={2} fullWidth value={textValue} onChange={(e) => setTextValue(e.target.value)}
+        placeholder="e.g. Gill and Kohli control % compared to other ODI partnerships since 2019, 1000+ balls"
+        sx={{ '& .MuiInputBase-root': { color: C.hi, bgcolor: '#14171e', fontSize: 14 } }} />
+      <Box sx={{ display: 'flex', gap: 0.75, mt: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+        {[['', 'Auto'], ['T20', 'T20'], ['ODI', 'ODI']].map(([value, label]) => (
+          <Chip key={label} size="small" label={label} onClick={() => setFormat(value)}
+            sx={{ bgcolor: format === value ? C.lime : '#1d212b', color: format === value ? C.bg : C.mid, fontWeight: 600 }} />
+        ))}
+        <Button variant="contained" onClick={submit} disabled={sending || textValue.trim().length < 8}
+          sx={{ ml: 'auto', bgcolor: C.lime, color: C.bg, fontWeight: 700, '&:hover': { bgcolor: '#a3dc3f' } }}>
+          Make pack
+        </Button>
+      </Box>
+      {ideas.map((i) => (
+        <Box key={i.id} sx={{ mt: 1.5, pt: 1.5, borderTop: `1px solid ${C.line}` }}>
+          <Typography sx={{ fontSize: 13, color: C.mid }}>{i.text}</Typography>
+          <Typography sx={{ fontSize: 12, color: IDEA_STATUS_COLOR[i.status] || C.lo, mt: 0.5 }}>
+            {i.status === 'pending' ? 'Working…' : i.status}
+            {i.status === 'resolved' && i.pack_title ? ` · pack below: ${i.pack_title}` : i.note && i.status !== 'resolved' ? ` · ${i.note}` : ''}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
 const SocialTab = ({ client, toast, onAuthFail }) => {
   const [status, setStatus] = useState('ready');
   const [packs, setPacks] = useState(null);
@@ -136,9 +207,9 @@ const SocialTab = ({ client, toast, onAuthFail }) => {
   const scan = async () => {
     setScanning(true);
     try {
-      const { data } = await client.post('/admin/content/generate', { days: 3 });
-      toast(`Scanned ${data.matches} matches · ${data.created.length} new packs`);
-      load();
+      await client.post('/admin/content/generate', { days: 3 });
+      toast('Scanning recent matches… new packs appear here in about a minute');
+      setTimeout(load, 60000);
     } catch { toast('Scan failed'); }
     setScanning(false);
   };
@@ -154,6 +225,7 @@ const SocialTab = ({ client, toast, onAuthFail }) => {
           {scanning ? 'Scanning…' : 'Scan new matches'}
         </Button>
       </Box>
+      {status === 'ready' && <IdeaBox client={client} toast={toast} onPackCreated={load} />}
       {packs === null && <CircularProgress size={22} sx={{ color: C.lime }} />}
       {packs && packs.length === 0 && (
         <Typography sx={{ color: C.lo, py: 4 }}>
