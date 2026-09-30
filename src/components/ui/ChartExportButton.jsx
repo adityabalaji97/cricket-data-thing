@@ -21,7 +21,30 @@ import { track } from '../../utils/analytics';
  */
 const SITE = 'https://hindsightcricket.com';
 // Local dev has no /img or /embed functions; point at production there.
-const origin = () => (/^(localhost|127\.)/.test(window.location.hostname) ? SITE : window.location.origin);
+export const siteOrigin = () => (/^(localhost|127\.)/.test(window.location.hostname) ? SITE : window.location.origin);
+
+// Phones: hand the PNG itself to the share sheet (WhatsApp, Reddit app, Photos), with the title
+// as text where the target takes it. Elsewhere: download it. Returns false if the user cancelled.
+export const shareImage = async (imageUrl, fileName, title, text) => {
+  try {
+    const blob = await (await fetch(imageUrl)).blob();
+    const file = new File([blob], fileName, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: title || 'Hindsight', ...(text ? { text } : {}) });
+      return true;
+    }
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = file.name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+    return true;
+  } catch (err) {
+    if (err?.name === 'AbortError') return false;
+    window.open(`${imageUrl}${imageUrl.includes('?') ? '&' : '?'}download=1`, '_blank', 'noopener');
+    return true;
+  }
+};
 
 const EMBED_PATH = { query: 'q', win_prob: 'wp', recap: 'recap' };
 const EMBED_HEIGHT = { query: 520, win_prob: 400, recap: 420 };
@@ -62,7 +85,7 @@ const ChartExportButton = ({ request, label = 'Image & embed', sx, disabled }) =
     }
   };
 
-  const imageUrl = snap ? `${origin()}/img/${snap.id}.png?size=${size}` : null;
+  const imageUrl = snap ? `${siteOrigin()}/img/${snap.id}.png?size=${size}` : null;
 
   const copy = async (text, what) => {
     try {
@@ -74,26 +97,9 @@ const ChartExportButton = ({ request, label = 'Image & embed', sx, disabled }) =
     }
   };
 
-  // Phones: hand the PNG itself to the share sheet (WhatsApp, Reddit app, Photos). Elsewhere:
-  // download it.
   const saveImage = async () => {
     track('image_download', { kind: snap.kind, size });
-    try {
-      const blob = await (await fetch(imageUrl)).blob();
-      const file = new File([blob], `hindsight-${snap.id}.png`, { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: snap.title || 'Hindsight' });
-        return;
-      }
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = file.name;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(link.href), 5000);
-    } catch (err) {
-      if (err?.name === 'AbortError') return;
-      window.open(`${imageUrl}&download=1`, '_blank', 'noopener');
-    }
+    await shareImage(imageUrl, `hindsight-${snap.id}.png`, snap.title);
   };
 
   return (

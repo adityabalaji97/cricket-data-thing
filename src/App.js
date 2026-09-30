@@ -46,6 +46,9 @@ import ExploreMenu, { ExploreButton } from './components/nav/ExploreMenu';
 import { MensT20Scope, useFormat } from './context/FormatContext';
 import { trackPageView } from './utils/analytics';
 
+// Admin queue: loaded only when visited, so it adds nothing to the public bundle.
+const AdminPage = React.lazy(() => import('./components/admin/AdminPage'));
+
 const TEAM_NAME_TO_ABBREVIATION = {
   'chennai super kings': 'CSK',
   'mumbai indians': 'MI',
@@ -705,6 +708,7 @@ const AppContent = () => {
         <Route path="/credits" element={<CreditsPage />} />
         <Route path="/fantasy-planner" element={<MensT20Scope><FantasyPlanner isMobile={isMobile} /></MensT20Scope>} />
         <Route path="/scorecard/:matchId" element={<MatchScorecardPage />} />
+        <Route path="/admin" element={<React.Suspense fallback={null}><AdminPage /></React.Suspense>} />
         <Route path="/venue" element={
           <Box sx={{ my: { xs: 1.5, md: 3 }, bgcolor: 'background.default', color: 'text.primary' }}>
             <PreviewFilters

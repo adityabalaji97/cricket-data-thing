@@ -99,6 +99,16 @@ jobs:
           print("data_version:", bump_data_version(db), "| pruned:", prune(db))
           PY
 
+      # Reddit/X-ready content packs for newly loaded matches (services/content_packs.py): record
+      # and career-best stats plus the win-probability series, queued in /admin for a human to
+      # post. Jev ranks share-worthiness when the TYPESAFE_API_KEY secret is set; without it the
+      # packs are ranked by the size of the record. Never blocks the rest of the run.
+      - name: Content packs for new matches
+        continue-on-error: true
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: python scripts/generate_content_packs.py --days 10
+
       # Usage tables (migration 004) keep 90 days of raw rows; weekly reports need no more.
       - name: Prune raw usage events
         if: always()

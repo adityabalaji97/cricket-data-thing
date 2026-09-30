@@ -137,7 +137,8 @@ export default async function handler(req, res) {
   const kind = url.searchParams.get('kind');
   const id = url.searchParams.get('id') || '';
   const snap = RENDER[kind] && ID.test(id) ? await getJSON(`/snapshots/${id}`, 15000) : null;
-  if (!snap || snap.kind !== KIND_FOR[kind]) {
+  // q also renders ranking snapshots (content packs), which are shaped like query results.
+  if (!snap || !(snap.kind === KIND_FOR[kind] || (kind === 'q' && snap.kind === 'ranking'))) {
     res.statusCode = 404;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.end('<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;color:#9aa1ac">Chart not found.</p>');

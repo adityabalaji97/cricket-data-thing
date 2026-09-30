@@ -259,6 +259,35 @@ def create_snapshot(db: Session, kind: str, params: Dict[str, Any], created_by: 
     return dict(row)
 
 
+STATIC_KINDS = ("ranking",)
+
+
+def create_static_snapshot(db: Session, kind: str, data: Dict[str, Any], title: str, key: Dict[str, Any],
+                           created_by: str) -> Dict[str, Any]:
+    """Store precomputed chart data (e.g. a records ranking for a content pack).
+
+    Internal only: the public POST /snapshots never accepts data, only parameters. `key`
+    identifies the chart for de-duplication; it is not versioned, because the data is frozen
+    at the moment the fact was found.
+    """
+    if kind not in STATIC_KINDS:
+        raise SnapshotError(f"kind must be one of {STATIC_KINDS}")
+    params_hash = hashlib.sha256(json.dumps({"static": key}, sort_keys=True, default=str).encode()).hexdigest()
+    from database import engine
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO chart_snapshots (id, kind, params, params_hash, data, title, created_by)
+            VALUES (:id, :kind, CAST(:params AS jsonb), :hash, CAST(:data AS json), :title, :by)
+            ON CONFLICT (kind, params_hash) DO NOTHING
+        """), {"id": _new_id(), "kind": kind, "params": json.dumps(key, default=str), "hash": params_hash,
+               "data": json.dumps(data, default=str), "title": title, "by": created_by})
+        row = conn.execute(text(
+            "SELECT id, kind, title, data FROM chart_snapshots WHERE kind = :k AND params_hash = :h"
+        ), {"k": kind, "h": params_hash}).mappings().first()
+    return dict(row)
+
+
 def get_snapshot(db: Session, snapshot_id: str) -> Optional[Dict[str, Any]]:
     row = db.execute(text(
         "SELECT id, kind, title, params, data, created_at FROM chart_snapshots WHERE id = :id"

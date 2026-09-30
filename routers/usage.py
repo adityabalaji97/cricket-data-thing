@@ -12,13 +12,13 @@ path by services/usage_log.py.
 from __future__ import annotations
 
 import json
-import os
+
 import re
 import time
 from collections import defaultdict, deque
 from typing import Any, Deque, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -79,12 +79,7 @@ def post_events(batch: EventBatch, request: Request) -> Response:
     return Response(status_code=204)
 
 
-def _require_admin(token: Optional[str]) -> None:
-    expected = os.environ.get("ADMIN_TOKEN")
-    if not expected:
-        raise HTTPException(status_code=404, detail="Not Found")
-    if token != expected:
-        raise HTTPException(status_code=403, detail="Forbidden")
+from routers._auth import require_admin_token as _require_admin  # noqa: E402  (shared with other admin routes)
 
 
 @router.get("/admin/usage")

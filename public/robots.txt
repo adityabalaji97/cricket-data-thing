@@ -1,5 +1,5 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Disallow: /admin
 
 Sitemap: https://hindsightcricket.com/sitemap.xml

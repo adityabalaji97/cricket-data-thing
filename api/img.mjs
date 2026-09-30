@@ -64,7 +64,7 @@ function frame(size, kicker, headline, body, source) {
     h('div', { justifyContent: 'space-between', alignItems: 'center' },
       h('div', { color: C.lime, fontSize: size.small + 2, letterSpacing: 5, fontWeight: 600 }, 'HINDSIGHT'),
       h('div', { color: C.low, fontSize: size.small }, kicker || '')),
-    h('div', { fontFamily: DISPLAY, fontSize: long ? Math.max(size.headline - 8, MIN_FONT.headline * (size.width / 1080)) : size.headline, fontWeight: 700, marginTop: 30, lineHeight: 1.08 }, headline || ''),
+    h('div', { fontFamily: DISPLAY, flexShrink: 0, fontSize: long ? Math.max(size.headline - 8, MIN_FONT.headline * (size.width / 1080)) : size.headline, fontWeight: 700, marginTop: 30, lineHeight: 1.08 }, headline || ''),
     body,
     h('div', { marginTop: 'auto', paddingTop: 24, justifyContent: 'space-between', alignItems: 'flex-end', gap: 20 },
       h('div', { color: C.low, fontSize: size.small, maxWidth: '62%' }, source || 'Hindsight · ball-by-ball cricket data'),
@@ -75,7 +75,9 @@ function barsBody(size, data) {
   const chart = data.chart || {};
   const labelKey = chart.label_key || (data.group_by || [])[0];
   const metric = chart.metric || (data.metric_columns || [])[0];
-  const rows = (data.rows || []).filter((r) => typeof r[metric] === 'number').slice(0, size.rows);
+  // A three-line headline leaves room for one bar fewer.
+  const maxRows = size.rows - ((data.title || '').length > 70 ? 1 : 0);
+  const rows = (data.rows || []).filter((r) => typeof r[metric] === 'number').slice(0, maxRows);
   const values = rows.map((r) => r[metric]);
   const max = Math.max(...values.map(Math.abs), 1e-9);
   const min = Math.min(...values);
@@ -86,12 +88,14 @@ function barsBody(size, data) {
     h('div', { color: C.mid, fontSize: size.small }, [metricLabel(metric), ...chipsFor(data)].join(' · ')),
     rows.map((r, i) => {
       const label = String(r[labelKey] ?? '');
-      const isHi = highlight && label.toLowerCase().includes(highlight);
+      // Ranking snapshots (content packs) flag their row and carry the true rank and a display
+      // value ("142 (118)", "5/21"); query snapshots match a highlight string.
+      const isHi = r.highlight === true || (highlight && label.toLowerCase().includes(highlight));
       const pct = Math.max(0.04, (Math.abs(r[metric]) - floor) / (max - floor));
       return h('div', { flexDirection: 'column', gap: 6 },
         h('div', { justifyContent: 'space-between', alignItems: 'baseline', fontSize: size.label, color: isHi ? C.lime : C.text, fontWeight: isHi ? 600 : 400 },
-          h('div', { maxWidth: '78%' }, `${i + 1}. ${label}`),
-          h('div', { fontSize: size.value, fontWeight: 600 }, formatValue(metric, r[metric]))),
+          h('div', { maxWidth: '74%' }, `${r.rank ?? i + 1}. ${label}`),
+          h('div', { fontSize: size.value, fontWeight: 600 }, r.display ?? formatValue(metric, r[metric]))),
         h('div', { height: 14, width: '100%', background: C.track, borderRadius: 7 },
           h('div', { height: 14, width: `${(pct * 100).toFixed(1)}%`, background: isHi ? C.lime : C.bar, borderRadius: 7 })));
     }));
@@ -168,9 +172,9 @@ export function renderSnapshot(snap, sizeName = 'portrait') {
   }
   // "ODI · partnerships": the format chip, then what each bar is.
   const fmt = (data.filter_chips || []).find((c) => /^(T20I?|ODI|Test|T20s?)$/i.test(c));
-  const kicker = [fmt, ...(data.group_by || []).map((g) => g.replace(/_/g, ' ') + (g.endsWith('s') ? '' : 's'))]
+  const kicker = data.kicker || [fmt, ...(data.group_by || []).map((g) => g.replace(/_/g, ' ') + (g.endsWith('s') ? '' : 's'))]
     .filter(Boolean).join(' · ');
-  return frame(size, kicker, data.title || snap.title, barsBody(size, data), `Data as of ${asOf(snap)} · ball-by-ball`);
+  return frame(size, kicker, data.title || snap.title, barsBody(size, data), `Data as of ${asOf(snap)} · ${data.source || 'ball-by-ball'}`);
 }
 
 export default async function handler(req, res) {
