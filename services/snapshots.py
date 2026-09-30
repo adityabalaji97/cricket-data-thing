@@ -133,7 +133,8 @@ def title_parts(params: Dict[str, Any]) -> Dict[str, str]:
            or params.get("batting_teams") or params.get("bowling_teams") or [])
     scope = " ".join(filter(None, [
         ", ".join(params.get("leagues") or []) or _FORMAT_LABELS.get(str(params.get("fmt") or "").upper()),
-        " & ".join(_plural(g) for g in params.get("group_by") or []),
+        # match_id makes rows per-match; it is not what the chart is "of".
+        " & ".join(_plural(g) for g in params.get("group_by") or [] if g != "match_id"),
     ]))
     start, end = params.get("start_date"), params.get("end_date")
     if start and end:

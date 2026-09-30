@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from services import content_rules
 from services.records import ordinal
-from services.snapshots import QUERY_PARAMS, SnapshotError, create_snapshot, metric_label, title_parts
+from services.snapshots import QUERY_PARAMS, SnapshotError, metric_label, title_parts
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,9 @@ PARK_DAYS = 14
 COMPARE = re.compile(r"\b(compar\w*|vs\.? others?|other|rank\w*|among|against (all|every|other)|best|highest|lowest|record)\b", re.I)
 ENTITY_GROUPS = {"batter": "batters", "bowler": "bowlers", "partnership": "batters", "batting_team": "batting_teams",
                  "bowling_team": "bowling_teams"}
+# "the first ODI v WI", "last night's game against India": the idea is about one match.
+SPECIFIC_MATCH = re.compile(r"\b(first|second|third|fourth|fifth|last|latest|this|1st|2nd|3rd|4th|5th)\b.{0,20}"
+                            r"\b(odi|t20i?|match|game)\b", re.I)
 METRIC_WORDS = [
     (r"control", "control_percentage"), (r"strike[- ]?rate|\bsr\b", "strike_rate"), (r"econ", "economy"),
     (r"dot", "dot_percentage"), (r"boundar", "boundary_percentage"), (r"average|\bavg\b", "average"),
@@ -77,6 +80,15 @@ def plan(idea: str, fmt_choice: Optional[str], db: Session) -> Dict[str, Any]:
     if entity_key and filters.get(entity_key) and COMPARE.search(idea):
         names = filters.pop(entity_key)
         highlight = names if isinstance(names, list) else [names]
+    # One match against a named opponent, compared with others: rank per match (group by
+    # match_id) against every partnership/innings, not just those against that opponent -- the
+    # team filters only identified the match. attempt() then takes the subject from that match.
+    if SPECIFIC_MATCH.search(idea) and _opponent_in(idea, db):
+        if "match_id" not in group_by:
+            group_by.append("match_id")
+        if COMPARE.search(idea):
+            for key in ("teams", "batting_teams", "bowling_teams"):
+                filters.pop(key, None)
     metric = _metric_for(idea, parsed)
     params = {**filters, "group_by": group_by, "fmt": fmt, "gender": "male", "query_mode": filters.get("query_mode") or "delivery"}
     return {"params": params, "metric": metric, "highlight": highlight, "explanation": parsed.get("explanation")}
@@ -113,6 +125,35 @@ def _find_mentioned(rows: List[Dict[str, Any]], label_key: str, mentions: List[s
             best, best_hits = i, hits
     need = 2 if " & " in _row_name(rows[0], label_key) and len(wanted) >= 2 else 1
     return best if best_hits >= need else None
+
+
+TEAM_SHORT = {"wi": "West Indies", "sa": "South Africa", "nz": "New Zealand", "aus": "Australia", "eng": "England",
+              "ind": "India", "pak": "Pakistan", "sl": "Sri Lanka", "ban": "Bangladesh", "afg": "Afghanistan",
+              "ire": "Ireland", "zim": "Zimbabwe"}
+MATCH_WINDOW_DAYS = 30
+
+
+def _opponent_in(idea: str, db: Session) -> Optional[str]:
+    """A team the idea is played against ("v WI", "against West Indies"), if it names one."""
+    m = re.search(r"\b(?:v|vs\.?|versus|against)\s+([A-Za-z][A-Za-z .'-]{1,40})", idea, re.I)
+    if not m:
+        return None
+    phrase = m.group(1).strip().lower()
+    first = phrase.split()[0]
+    if first in TEAM_SHORT:
+        return TEAM_SHORT[first]
+    teams = [r[0] for r in db.execute(text(
+        "SELECT DISTINCT team1 FROM matches WHERE date >= now() - interval '3 years' "
+        "UNION SELECT DISTINCT team2 FROM matches WHERE date >= now() - interval '3 years'"))]
+    hits = [t for t in teams if t and phrase.startswith(t.lower())]
+    return max(hits, key=len) if hits else None
+
+
+def _recent_matches_against(db: Session, team: str, fmt: str) -> List[str]:
+    where = "" if fmt == "ALL" else "AND format = :fmt"
+    return [r[0] for r in db.execute(text(f"""
+        SELECT id FROM matches WHERE :team IN (team1, team2) AND date >= CURRENT_DATE - :days {where}
+    """), {"team": team, "days": MATCH_WINDOW_DAYS, "fmt": fmt})]
 
 
 def _find(rows: List[Dict[str, Any]], label_key: str, names: List[str]) -> Optional[int]:
@@ -153,10 +194,14 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
         if isinstance(params.get(key), str):
             params[key] = date.fromisoformat(params[key])
     metric, highlight = planned.get("metric"), planned.get("highlight")
-    query_params = {**planned["params"], "limit": 500}
+    query_params = {**planned["params"], "limit": 20000}
     if metric:
         query_params.update(sort_by=metric, sort_descending=not _ascending(metric, params["group_by"]))
-    full = create_snapshot(db, "query", query_params, created_by="idea")["data"]
+    # The full ordering (through the query cache), to find the subject's true rank; only the
+    # ranking image built below is stored as a snapshot.
+    from services.snapshots import _clean_query_params, _query_data
+
+    full = _query_data(db, _clean_query_params(query_params))
     rows = full.get("rows") or []
     label_key = (full.get("chart") or {}).get("label_key") or params["group_by"][0]
     if not metric or not rows or metric not in rows[0]:
@@ -164,10 +209,25 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
     if not rows or not metric:
         return {"status": "parked", "note": "The query returned nothing to chart yet."}
 
+    # "…in the first ODI v WI": a per-match question about a named opponent. The subject must come
+    # from a recent match against that team, not from any match in history.
+    candidates = rows
+    if "match_id" in params["group_by"]:
+        opponent = _opponent_in(idea_text, db)
+        if opponent:
+            recent = set(_recent_matches_against(db, opponent, params.get("fmt") or "ALL"))
+            candidates = [r for r in rows if str(r.get("match_id")) in recent]
+            if not candidates:
+                latest = _latest_loaded(db, params.get("fmt") or "ALL")
+                when = f" Latest match loaded: {latest:%d %b %Y}." if latest else ""
+                return {"status": "parked",
+                        "note": f"No match v {opponent} in the last {MATCH_WINDOW_DAYS} days is loaded yet.{when}"}
+
     idx = 0
     mentions = [] if highlight else _mentions(idea_text)
     if highlight or mentions:
-        idx = _find(rows, label_key, highlight) if highlight else _find_mentioned(rows, label_key, mentions)
+        found = _find(candidates, label_key, highlight) if highlight else _find_mentioned(candidates, label_key, mentions)
+        idx = rows.index(candidates[found]) if found is not None else None  # rank in the full ordering
         highlight = highlight or mentions
         if idx is None:
             latest = _latest_loaded(db, params.get("fmt") or "ALL")
@@ -211,6 +271,9 @@ def _pack_from_fact(db: Session, idea_id: int, result: Dict[str, Any]) -> Option
     errors, warnings = content_rules.check_title(fact["title"], known, fact["subject"])
     if errors:
         warnings = errors + warnings  # an idea's pack is reviewed by hand anyway: show, don't drop
+    rank, total = fact["numbers"]["rank"], fact["numbers"]["total"]
+    if rank > max(10, total * 0.1):
+        warnings.append(f"Ranks {ordinal(rank)} of {total:,}: not a standout, probably not worth posting.")
     live = snap["data"].get("hindsight_url") or f"{content_rules.SITE_URL}/query"
     sep = "&" if "?" in live else "?"
     link = f"{live}{sep}utm_source=reddit&utm_campaign=pack-{snap['id']}"
