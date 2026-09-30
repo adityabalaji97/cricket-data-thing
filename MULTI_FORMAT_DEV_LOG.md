@@ -24,8 +24,13 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > services/records.py (rank vs all comparable innings/spells since 2015 + career-bests; stats tables, so
 > every format), services/content_packs.py + scripts/generate_content_packs.py (nightly step, Jev ranks;
 > win-prob series always kept for IPL/BBL/PSL/SA20/Hundred/T20I). /admin Social queue (token in
-> localStorage; api/proxy.js forwards X-Admin-Token only). Next: 6b standout scanner (control %,
-> partnerships from delivery_details) + Idea -> pack, then 6c Cricsheet fallback.
+> localStorage; api/proxy.js forwards X-Admin-Token only).
+> **Step 6b live:** services/standout_scanner.py (delivery_details angles: partnership control %/runs,
+> innings control %, spells, powerplay/death; populations cached per scope+data version, ~30 s cold per
+> format) feeds packs. services/content_ideas.py: /admin Idea box -> nl2query -> ranking image with the
+> subject's true rank; per-match ideas ("first ODI v WI") group by match_id and park until a match v that
+> opponent in the last 30 days loads; nightly retry for 14 days. Scans/ideas run as BackgroundTasks.
+> Next: 6c Cricsheet fallback, then Notes 3-5.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
 > (sync_stats_from_dd double-counted wides/no-balls and charged byes; statsProcessor charged
