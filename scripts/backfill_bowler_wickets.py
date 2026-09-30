@@ -62,11 +62,24 @@ WHERE bs.wickets IS DISTINCT FROM f.wickets
    OR bs.middle_wickets IS DISTINCT FROM f.middle_wickets
    OR bs.death_wickets IS DISTINCT FROM f.death_wickets
 """
-UPDATE = """
-UPDATE bowling_stats SET wickets = :w, pp_wickets = :pp, middle_wickets = :mid, death_wickets = :death,
-       fantasy_points = :fp
-WHERE id = :id
-"""
+BATCH = 500
+
+
+def _write(conn, updates):
+    """One UPDATE ... FROM (VALUES ...) per BATCH rows: a round trip per row took ~45 min for the table."""
+    for i in range(0, len(updates), BATCH):
+        chunk = updates[i:i + BATCH]
+        values, params = [], {}
+        for j, u in enumerate(chunk):
+            values.append(f"(:id{j}, :w{j}, :pp{j}, :mid{j}, :death{j}, CAST(:fp{j} AS double precision))")
+            params.update({f"id{j}": u["id"], f"w{j}": u["w"], f"pp{j}": u["pp"], f"mid{j}": u["mid"],
+                           f"death{j}": u["death"], f"fp{j}": u["fp"]})
+        conn.execute(text(f"""
+            UPDATE bowling_stats bs SET wickets = v.w, pp_wickets = v.pp, middle_wickets = v.mid,
+                   death_wickets = v.death, fantasy_points = v.fp
+            FROM (VALUES {", ".join(values)}) AS v(id, w, pp, mid, death, fp)
+            WHERE bs.id = v.id
+        """), params)
 
 
 def _new_fantasy(row, calculators):
@@ -100,10 +113,8 @@ def main():
             rows = conn.execute(text(CHANGED), {"year": year, "types": list(WICKET_TYPES)}).mappings().all()
             added = sum((r["new_wickets"] or 0) - (r["wickets"] or 0) for r in rows)
             if args.confirm:
-                for r in rows:
-                    conn.execute(text(UPDATE), {"id": r["id"], "w": r["new_wickets"], "pp": r["new_pp"],
-                                                "mid": r["new_middle"], "death": r["new_death"],
-                                                "fp": _new_fantasy(r, calculators)})
+                _write(conn, [{"id": r["id"], "w": r["new_wickets"], "pp": r["new_pp"], "mid": r["new_middle"],
+                               "death": r["new_death"], "fp": _new_fantasy(r, calculators)} for r in rows])
         totals["rows"] += len(rows)
         totals["wickets_added"] += added
         sample += [(r["bowler"], r["format"], r["match_id"], r["wickets"], r["new_wickets"]) for r in rows[:2]]
