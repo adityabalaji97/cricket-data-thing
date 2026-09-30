@@ -90,7 +90,7 @@ const WrappedPage = () => {
     
     updateMetaTag('og:title', '2025 In Hindsight - T20 Cricket Wrapped');
     updateMetaTag('og:description', 'Your year in T20 cricket data. Explore the stats, stories, and standout performances of 2025.');
-    updateMetaTag('og:url', 'https://hindsight2020.vercel.app/wrapped/2025');
+    updateMetaTag('og:url', 'https://hindsightcricket.com/wrapped/2025');
     updateMetaTag('twitter:title', '2025 In Hindsight - T20 Cricket Wrapped');
     updateMetaTag('twitter:description', 'Your year in T20 cricket data. Explore the stats, stories, and standout performances of 2025.');
     

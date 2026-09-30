@@ -585,7 +585,7 @@ const EloRacerChart = () => {
     ctx.font = `${Math.round(14 * scale)}px Arial`;
     ctx.textAlign = 'right';
     ctx.fillText(
-      'Created using hindsight2020.vercel.app', 
+      'Created using hindsightcricket.com', 
       canvasWidth - Math.round(20 * scale), 
       canvasHeight - Math.round(20 * scale)
     );

@@ -22,7 +22,7 @@ if (!OUT) {
   console.error('usage: node scripts/dev/ui_sweep.mjs <out_dir>');
   process.exit(1);
 }
-const B = process.env.BASE || 'https://hindsight2020.vercel.app';
+const B = process.env.BASE || 'https://hindsightcricket.com';
 const ROUTES = [
   ['home', '/'],
   ['search', '/search'],

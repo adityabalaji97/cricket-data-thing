@@ -2,4 +2,4 @@
 User-agent: *
 Disallow:
 
-Sitemap: https://hindsight2020.vercel.app/sitemap.xml
+Sitemap: https://hindsightcricket.com/sitemap.xml

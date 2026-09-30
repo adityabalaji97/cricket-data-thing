@@ -6,7 +6,7 @@
 // back to the site-wide card rather than failing the unfurl.
 
 export const API_BASE = process.env.HINDSIGHT_API_BASE || 'https://cricket-data-thing-672dfbacf476.herokuapp.com';
-export const SITE_URL = (process.env.SITE_URL || 'https://hindsight2020.vercel.app').replace(/\/$/, '');
+export const SITE_URL = (process.env.SITE_URL || 'https://hindsightcricket.com').replace(/\/$/, '');
 export const SITE_NAME = 'Hindsight';
 export const DEFAULT_TITLE = 'Hindsight - T20 cricket analytics';
 export const DEFAULT_DESCRIPTION =

@@ -5,6 +5,8 @@ const ALLOWED_ORIGINS = new Set([
   'http://localhost:3000',
   'https://cricket-data-thing.vercel.app',
   'https://hindsight2020.vercel.app',
+  'https://hindsightcricket.com',
+  'https://www.hindsightcricket.com',
 ]);
 
 const getAllowedOrigin = (requestOrigin) => (
@@ -17,6 +19,10 @@ const getProxyOrigin = (host, requestOrigin) => {
     return allowedOrigin;
   }
 
+  if (host && host.includes('hindsightcricket.com')) {
+    return 'https://hindsightcricket.com';
+  }
+
   if (host && host.includes('hindsight2020.vercel.app')) {
     return 'https://hindsight2020.vercel.app';
   }
@@ -25,7 +31,7 @@ const getProxyOrigin = (host, requestOrigin) => {
     return 'https://cricket-data-thing.vercel.app';
   }
 
-  return 'https://hindsight2020.vercel.app';
+  return 'https://hindsightcricket.com';
 };
 
 const applyCorsHeaders = (req, res) => {

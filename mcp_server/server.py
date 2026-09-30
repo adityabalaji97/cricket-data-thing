@@ -45,7 +45,7 @@ from services.query_builder_v2 import GROUP_BY_COLUMNS, QueryValidationError, ru
 
 logger = logging.getLogger("hindsight.mcp")
 
-WEB_URL = os.getenv("HINDSIGHT_WEB_URL", "https://hindsight2020.vercel.app").rstrip("/")
+WEB_URL = os.getenv("HINDSIGHT_WEB_URL", "https://hindsightcricket.com").rstrip("/")
 UI_URI = "ui://hindsight/query-result"
 STATEMENT_TIMEOUT_MS = int(os.getenv("MCP_STATEMENT_TIMEOUT_MS", "15000"))
 DEFAULT_ROWS = 50
@@ -595,7 +595,7 @@ apps.add_html_resource(
 mcp = MCPServer(
     name="hindsight",
     title="Hindsight cricket data",
-    description="Query ball-by-ball cricket data from Hindsight (hindsight2020.vercel.app).",
+    description="Query ball-by-ball cricket data from Hindsight (hindsightcricket.com).",
     instructions=INSTRUCTIONS,
     website_url=WEB_URL,
     version="1.0.0",
