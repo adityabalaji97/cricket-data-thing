@@ -3283,7 +3283,12 @@ def handle_grouped_query(
         control_num_expr = "SUM(s.controlled_through_ball)"
         control_den_expr = "SUM(s.control_balls_through_ball)"
     else:
-        metrics_enabled = os.environ.get("QB_PRIMER_METRICS", "1") != "0"
+        # ball_metrics covers men's T20 only: skip the join elsewhere (an ODI query joined 1.4M
+        # metric rows for nothing).
+        metrics_enabled = (
+            os.environ.get("QB_PRIMER_METRICS", "1") != "0"
+            and fmt not in ("ODI", "TEST") and gender != "female"
+        )
         runs_calculation = "SUM(dd.batruns)" if use_runs_off_bat_only else "SUM(dd.score)"
         balls_expr = "COUNT(*)"
         wickets_expr = "SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END)"
@@ -3334,9 +3339,11 @@ def handle_grouped_query(
 
     # Stage 2 join: compute grouping expressions once in stage2_source (with
     # the same joins/filters as Stage 1), then match against qualifying groups.
-    # Use IS NOT DISTINCT FROM so NULL-group keys still join correctly.
+    # NULL group keys must still match, but IS NOT DISTINCT FROM cannot be hashed: Postgres fell
+    # back to a nested loop over every ball x every group (ODI partnerships: 73M comparisons,
+    # 30s+ timeouts). An equality on a NULL-safe text key hashes and keeps NULL = NULL.
     stage2_join_conditions = " AND ".join(
-        f"s.{col} IS NOT DISTINCT FROM q.{col}"
+        f"COALESCE(s.{col}::text, '~~null~~') = COALESCE(q.{col}::text, '~~null~~')"
         for col in group_by
     )
 

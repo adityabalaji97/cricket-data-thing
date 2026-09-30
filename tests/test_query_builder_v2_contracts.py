@@ -113,8 +113,10 @@ class TestQueryBuilderV2Contracts:
 
         assert "stage2_source AS (" in combined_sql
         assert "JOIN stage2_source s ON" in combined_sql
-        assert "s.batter IS NOT DISTINCT FROM q.batter" in combined_sql
-        assert "s.batting_position IS NOT DISTINCT FROM q.batting_position" in combined_sql
+        # NULL-safe but hashable (IS NOT DISTINCT FROM forced a nested loop over every ball).
+        assert "COALESCE(s.batter::text, '~~null~~') = COALESCE(q.batter::text, '~~null~~')" in combined_sql
+        assert "COALESCE(s.batting_position::text, '~~null~~') = COALESCE(q.batting_position::text, '~~null~~')" in combined_sql
+        assert "IS NOT DISTINCT FROM" not in combined_sql
         assert "LEFT JOIN bat_pos bp" in fallback_sql
 
     def test_partnership_stage2_join_uses_stage2_source_aliases(self):
@@ -144,6 +146,7 @@ class TestQueryBuilderV2Contracts:
         fallback_sql = db.statements[1]
 
         assert "stage2_source AS (" in combined_sql
-        assert "JOIN stage2_source s ON s.partnership IS NOT DISTINCT FROM q.partnership" in combined_sql
-        assert "LEFT JOIN player_aliases pa_bat" in fallback_sql
-        assert "LEFT JOIN player_aliases pa_ns" in fallback_sql
+        assert "JOIN stage2_source s ON COALESCE(s.partnership::text, '~~null~~') = COALESCE(q.partnership::text, '~~null~~')" in combined_sql
+        # Aliases join through the de-duplicated (unambiguous) source, never the raw table.
+        assert "pa_bat ON pa_bat.player_name = dd.bat" in fallback_sql
+        assert "pa_ns ON pa_ns.player_name = dd.non_striker" in fallback_sql
