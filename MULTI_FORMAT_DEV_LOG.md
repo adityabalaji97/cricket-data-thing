@@ -11,6 +11,16 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **Notes plan, steps 1-2 live (2026-09-30):** plan in ~/.claude/plans/can-you-look-at-iterative-plum.md
+> (order 1 → 2 → 6 → 6b → 6c → 3-5 → 7 → 8). Migration 009 (app_meta, query_cache, chart_snapshots,
+> notes, note_authors, content_packs, content_ideas, matches.data_source). run_deliveries_query goes
+> through services/query_cache.py (key = params + app_meta.data_version; nightly workflow bumps and
+> prunes). services/snapshots.py + POST/GET /snapshots (POST takes the site's query string).
+> Vercel: /img/:id.png (api/img.mjs, Barlow fonts in api/_lib/fonts, test tests/js/share_images.test.mjs
+> via `node --test <file>`) and /embed/{q,wp,recap}/:id (api/embed.mjs; q = mcp_server/widget.html
+> static mode). "Image & embed" dialog (src/components/ui/ChartExportButton.jsx) on query results and
+> scorecard recap / win-probability cards. Next: step 6 content rules + packs.
+>
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
 > (sync_stats_from_dd double-counted wides/no-balls and charged byes; statsProcessor charged
 > byes). Writers fixed; scripts/backfill_bowler_runs.py rewrote ~94.6k bowling_stats rows
