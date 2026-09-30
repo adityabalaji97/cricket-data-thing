@@ -137,6 +137,29 @@ function winProbBody(size, data) {
     h('div', { flexDirection: 'column', gap: 8, marginTop: 10 }, scores));
 }
 
+// "Every ODI innings with 3+ centuries": a header per innings (teams, date) and its individual
+// performances beneath. Fits as many groups as the height allows, then "+ N more".
+function listBody(size, data) {
+  const headlineLines = Math.ceil(((data.title || '').length * size.headline * 0.36) / (size.width - 120));
+  let budget = size.height - 120 - 60 - headlineLines * size.headline * 1.1 - 34 - size.small * 1.6 - 60;
+  const lineH = size.small * 1.35, headH = size.label * 1.3, gap = 22;
+  const shown = [];
+  for (const row of data.rows || []) {
+    const cost = headH + (row.details || []).length * lineH + gap;
+    if (cost > budget && shown.length) break;
+    budget -= cost;
+    shown.push(row);
+  }
+  const more = (data.rows || []).length - shown.length;
+  return h('div', { flexDirection: 'column', marginTop: 34, gap },
+    h('div', { color: C.mid, fontSize: size.small }, [data.subtitle, ...chipsFor(data).slice(1)].filter(Boolean).join(' · ')),
+    shown.map((row, i) => h('div', { flexDirection: 'column', gap: 4 },
+      h('div', { justifyContent: 'space-between', alignItems: 'baseline', fontSize: size.label, color: i === 0 ? C.lime : C.text, fontWeight: 600 },
+        h('div', { maxWidth: '70%' }, row.label), h('div', { fontSize: size.small, color: C.low, fontWeight: 400 }, row.sub || '')),
+      (row.details || []).map((d) => h('div', { fontSize: size.small, color: C.mid, paddingLeft: 18 }, d)))),
+    more > 0 ? h('div', { fontSize: size.small, color: C.low }, `+ ${more} more`) : null);
+}
+
 function recapBody(size, data) {
   const bullets = (data.recap?.bullets || []).slice(0, size.rows > 6 ? 4 : 3);
   return h('div', { flexDirection: 'column', marginTop: 34, gap: 22 },
@@ -169,6 +192,9 @@ export function renderSnapshot(snap, sizeName = 'portrait') {
   if (snap.kind === 'recap') {
     const kicker = [data.competition, data.date].filter(Boolean).join(' · ');
     return frame(size, kicker, data.recap?.headline || snap.title, recapBody(size, data), `${data.result || ''} · Impact & WPA by Hindsight`);
+  }
+  if (data.layout === 'list') {
+    return frame(size, data.kicker || '', data.title || snap.title, listBody(size, data), `Data as of ${asOf(snap)} · ${data.source || 'ball-by-ball'}`);
   }
   // "ODI · partnerships": the format chip, then what each bar is.
   const fmt = (data.filter_chips || []).find((c) => /^(T20I?|ODI|Test|T20s?)$/i.test(c));

@@ -118,7 +118,20 @@ function recapHtml(snap) {
   return page(snap, 'recap', recap.headline || snap.title, body, `/scorecard/${encodeURIComponent(d.match_id || '')}`);
 }
 
+// List snapshots ("every ODI innings with 3+ centuries"): a group per innings with its performances.
+function listHtml(snap) {
+  const d = snap.data || {};
+  const items = (d.rows || []).map((r) => `<div class="grp"><div class="gh"><b>${esc(r.label)}</b><span>${esc(r.sub || '')}</span></div>`
+    + `<ul>${(r.details || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>`).join('');
+  const body = `<div class="kicker">${esc(d.kicker || 'Hindsight')}</div><h1>${esc(d.title || snap.title)}</h1>
+<div class="sub">${esc(d.subtitle || '')}</div>
+<style>.grp{margin-top:12px}.gh{display:flex;justify-content:space-between;gap:10px}.gh span{color:var(--lo);font-size:12px;white-space:nowrap}
+.grp ul{margin:4px 0 0}.grp li{margin-bottom:2px}</style>${items}`;
+  return page(snap, 'q', d.title || snap.title, body, d.hindsight_url || '/query');
+}
+
 function queryHtml(snap) {
+  if (snap.data?.layout === 'list') return listHtml(snap);
   const data = { ...(snap.data || {}) };
   if (data.hindsight_url) data.hindsight_url = withUtm(data.hindsight_url);
   data.filter_chips = (data.filter_chips || []).map((c) => c.replace('→ today', `→ ${asOf(snap)}`));

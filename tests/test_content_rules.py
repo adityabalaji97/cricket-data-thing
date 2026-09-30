@@ -109,3 +109,28 @@ def test_title_parts_include_over_range():
     assert default_title({"leagues": ["IPL"], "group_by": ["batter"], "over_min": 15, "over_max": 19,
                           "start_date": date(2023, 1, 1), "min_balls": 150}, "strike_rate") \
         == "IPL batters in overs 16-20 by strike rate, since 2023 (150+ balls)"
+
+
+def test_count_within_ideas_are_detected():
+    from services.content_ideas import count_within
+
+    assert count_within("3 batter centuries in an ODI innings") == {
+        "n": 3, "unit": "innings", "member": "batter", "threshold": {"min_runs": 100}, "noun": "centuries"}
+    two_fers = count_within("two five-wicket hauls in one ODI match")
+    assert (two_fers["n"], two_fers["unit"], two_fers["threshold"]) == (2, "match", {"min_wickets": 5})
+    assert count_within("three fifties in the same T20 innings")["threshold"] == {"min_runs": 50}
+    assert count_within("Gill and Kohli control % in the first ODI v West Indies") is None
+    assert count_within("highest ODI score since 2015") is None
+
+
+def test_unsupported_count_within_idea_is_refused(monkeypatch):
+    import pytest
+
+    from services import content_ideas
+    from services.snapshots import SnapshotError
+
+    monkeypatch.setattr("services.nl2query.parse_nl_query",
+                        lambda idea, db=None: {"success": True, "filters": {}, "group_by": ["batter"]})
+    monkeypatch.setattr("services.nl2query.log_nl_query_event_background", lambda **kw: None)
+    with pytest.raises(SnapshotError):
+        content_ideas.plan("3 batters hitting 5 sixes in an innings", None, None)
