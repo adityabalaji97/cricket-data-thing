@@ -67,7 +67,7 @@ def _metric_for(idea: str, parsed: Dict[str, Any]) -> Optional[str]:
 
 def plan(idea: str, fmt_choice: Optional[str], db: Session) -> Dict[str, Any]:
     """Parse the idea: {spec, scope} for count-within / race ideas, else query-builder params."""
-    spec = idea_stats.parse_race(idea) or idea_stats.parse_count_within(idea)
+    spec = idea_stats.parse_race(idea) or idea_stats.parse_debut(idea) or idea_stats.parse_count_within(idea)
     if spec:
         return {"spec": spec, "scope": idea_stats.parse_scope(idea, db, fmt_choice)}
     if WITHIN.search(idea) and re.search(r"\b(\d{1,2}|" + "|".join(NUMBER_WORDS) + r")\b", idea, re.I):
@@ -247,14 +247,15 @@ def _attempt_race(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[
     rows, caveat = idea_stats.race(db, spec, scope)
     words = idea_stats.race_words(spec, scope)
     first_year, window = idea_stats.window_text(db, scope)
-    if spec["unit"] == "innings":
-        window = f" (debuts since {first_year + 1})"
+    career = idea_stats.span_of(spec) == "career"
+    if career:
+        window = idea_stats.debut_floor(db, scope, ball_by_ball=spec["unit"] == "balls")[1]
     opp_part = f" against {scope['opponent']}" if scope.get("opponent") else ""
     if not rows:
         return {"status": "failed", "note": f"Nobody reached {words['what']}{opp_part} in Hindsight's data{window}."}
     for r in rows:
-        r["label"] = r["name"] if spec["unit"] == "innings" else f"{r['name']} v {r['opp']}, {r['date'].year}"
-    mentions = _mentions(idea_text)
+        r["label"] = r["name"] if career else f"{r['name']} v {r['opp']}, {r['date'].year}"
+    mentions = _scoped_mentions(idea_text, scope)
     idx = _find_mentioned(rows, "name", mentions) if mentions else 0
     if idx is None:
         return {"status": "parked", "note": f"{' '.join(mentions)} not among those who reached {words['what']} yet."}
@@ -263,9 +264,9 @@ def _attempt_race(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[
     tied = sum(1 for r in rows if r["value"] == hit["value"]) > 1
     sup = idea_stats.sup_word(rank, spec["direction"], tied)
     unit = "balls" if spec["unit"] == "balls" else "innings"
-    verb = f"took {spec['target']} wickets" if spec["measure"] == "wickets" and spec["unit"] == "balls" else f"reached {words['what']}"
-    against = f" v {hit['opp']} ({hit['date']:%b %Y})" if spec["unit"] == "balls" else ""
-    title = f"{hit['name']} {verb} in {hit['value']} {unit}{against}, {sup} of {n:,} {words['noun']}{opp_part}{window}"
+    verb = f"took {spec['target']} wickets" if spec["measure"] == "wickets" and not career else f"reached {words['what']}"
+    against = "" if career else f" v {hit['opp']} ({hit['date']:%b %Y})"
+    title = f"{hit['name']} {verb} in {hit['value']:,} {unit}{against}, {sup} of {n:,} {words['noun']}{opp_part}{window}"
     shown = list(range(min(8, n))) if idx < 8 else list(range(7)) + [idx]
     ranks = [1 + sum(1 for r in rows if (r["value"] < rows[i]["value"] if spec["direction"] == "fastest" else r["value"] > rows[i]["value"]))
              for i in shown]
@@ -273,24 +274,104 @@ def _attempt_race(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[
     data = {
         "title": title, "kicker": f"{fmt} · {spec['direction']} to {spec['target']:,}",
         "metric_label": f"{unit} to {words['what']}", "filter_chips": [fmt, window.strip(" ()")],
-        "group_by": ["innings" if spec["unit"] == "balls" else "players"], "query_mode": "ranking",
+        "group_by": ["players" if career else "innings"], "query_mode": "ranking",
         "columns": ["rank", "label", "value", "display"], "metric_columns": ["value"],
-        "rows": [{"rank": rk, "label": rows[i]["label"], "value": rows[i]["value"], "display": f"{rows[i]['value']} {unit}",
+        "rows": [{"rank": rk, "label": rows[i]["label"], "value": rows[i]["value"], "display": f"{rows[i]['value']:,} {unit}",
                   "highlight": i == idx and bool(mentions)} for i, rk in zip(shown, ranks)],
         "chart": {"type": "bar", "label_key": "label", "metric": "value"}, "lower_is_better": spec["direction"] == "fastest",
         "hindsight_url": f"{content_rules.SITE_URL}/query", "total_rows": n, "source": "ball-by-ball" if unit == "balls" else "scorecards",
-        "note": caveat,
+        "note": caveat if career else None,
     }
     snap = create_static_snapshot(db, "ranking", data, title, {"idea": idea_text, "spec": spec, "scope": scope, "title": title,
                                                                "top": [r["label"] for r in rows[:8]]}, created_by="idea")
     fact = {
         "kind": "idea", "subject": hit["name"], "title": title,
-        "numbers": {"value": hit["value"], "target": spec["target"], "rank": rank, "total": n, "years": [first_year, first_year + 1,
-                    hit["date"].year]},
-        "method": (f"{spec['direction'].capitalize()} to {words['what']}: {'balls faced' if unit == 'balls' else 'innings'} "
-                   f"when the running total first reached it, across {n:,} {words['noun']}{opp_part}{window}. " + (caveat or "")).strip(),
+        "numbers": {"value": hit["value"], "target": spec["target"], "rank": rank, "total": n,
+                    "years": [first_year, first_year + 1, hit["date"].year,
+                              idea_stats.debut_floor(db, scope, ball_by_ball=spec["unit"] == "balls")[0].year]},
+        "method": (f"{spec['direction'].capitalize()} to {words['what']}: {unit} "
+                   f"when the running total first reached it, across {n:,} {words['noun']}{opp_part}{window}. "
+                   + (caveat if career else "")).strip(),
     }
     return {"status": "resolved", "fact": fact, "snapshot": snap}
+
+
+DEBUT_WORDS = {  # (metric, best is high) -> superlative, noun
+    ("runs", True): ("highest", "debut scores"), ("runs", False): ("lowest", "debut scores"),
+    ("runs_conceded", True): ("most expensive", "debut spells"), ("runs_conceded", False): ("cheapest", "debut spells"),
+    ("figures", True): ("best", "debut figures"), ("figures", False): ("worst", "debut figures"),
+    ("economy", False): ("most economical", "debut spells"), ("economy", True): ("least economical", "debut spells"),
+}
+
+
+def _attempt_debut(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, Any]:
+    """"Most runs conceded on ODI debut": every player's first innings or spell, ranked."""
+    from services.snapshots import create_static_snapshot
+
+    spec, scope = planned["spec"], planned["scope"]
+    rows, window = idea_stats.debut(db, spec, scope)
+    fmt = idea_stats.scope_label(scope)
+    word, noun = DEBUT_WORDS[(spec["metric"], spec["desc"])]
+    who = f"{scope['team']} " if scope.get("team") else ""
+    opp_part = f" against {scope['opponent']}" if scope.get("opponent") else ""
+    if not rows:
+        return {"status": "failed", "note": f"No {who}{fmt} {noun}{opp_part} in Hindsight's data{window}."}
+    batting = spec["table"] == "batting"
+    for r in rows:
+        r["label"] = f"{r['name']} v {r['opp']}, {r['date'].year}"
+        overs = idea_stats.overs_text(r.get("overs")) if not batting else None
+        r["display"] = (f"{r['runs']} ({r['balls']})" if batting else
+                        f"{r['wickets']}/{r['runs']} ({overs})" if spec["metric"] == "figures" else
+                        f"{r['economy']:.2f} ({overs} ov)" if spec["metric"] == "economy" else f"{r['runs']} ({overs} ov)")
+        r["value"] = (r["runs"] if spec["metric"] in ("runs", "runs_conceded") else
+                      r["wickets"] if spec["metric"] == "figures" else round(r["economy"] or 0, 2))
+    mentions = _scoped_mentions(idea_text, scope)
+    idx = _find_mentioned(rows, "name", mentions) if mentions else 0
+    if idx is None:
+        return {"status": "parked", "note": f"{' '.join(mentions)} has no {fmt} debut in Hindsight's data yet."}
+    hit, n = rows[idx], len(rows)
+    same = [i for i, r in enumerate(rows) if r["value"] == hit["value"] and (spec["metric"] != "figures" or r["runs"] == hit["runs"])]
+    rank, tied = same[0] + 1, len(same) > 1
+    sup = idea_stats.sup_word(rank, word, tied)
+    when = f"on {fmt} debut v {hit['opp']} ({hit['date']:%b %Y})"
+    if batting:
+        lead = f"{hit['name']} made {hit['runs']} off {hit['balls']} {when}"
+    elif spec["metric"] == "figures":
+        lead = f"{hit['name']} took {hit['wickets']}/{hit['runs']} {when}"
+    elif spec["metric"] == "economy":
+        lead = f"{hit['name']} conceded {hit['runs']} in {idea_stats.overs_text(hit['overs'])} overs (economy {hit['economy']:.2f}) {when}"
+    else:
+        lead = f"{hit['name']} conceded {hit['runs']} in {idea_stats.overs_text(hit['overs'])} overs {when}"
+    title = f"{lead}, {sup} of {n:,} {who}{fmt} {noun}{opp_part}{window}"
+    shown = list(range(min(8, n))) if idx < 8 else list(range(7)) + [idx]
+    data = {
+        "title": title, "kicker": f"{fmt} · debuts", "metric_label": noun.replace("debut ", "").capitalize(),
+        "filter_chips": [fmt, window.strip(" ()")], "group_by": ["debuts"], "query_mode": "ranking",
+        "columns": ["rank", "label", "value", "display"], "metric_columns": ["value"],
+        "rows": [{"rank": i + 1, "label": rows[i]["label"], "value": float(rows[i]["value"]), "display": rows[i]["display"],
+                  "highlight": i == idx and bool(mentions)} for i in shown],
+        "chart": {"type": "bar", "label_key": "label", "metric": "value"},
+        "lower_is_better": spec["metric"] == "economy" and not spec["desc"],
+        "hindsight_url": f"{content_rules.SITE_URL}/query", "total_rows": n, "source": "scorecards",
+    }
+    snap = create_static_snapshot(db, "ranking", data, title, {"idea": idea_text, "spec": spec, "scope": scope, "title": title},
+                                  created_by="idea")
+    fact = {
+        "kind": "idea", "subject": hit["name"], "title": title,
+        "numbers": {"runs": hit["runs"], "balls": hit.get("balls"), "wickets": hit.get("wickets"),
+                    "overs": idea_stats.overs_text(hit.get("overs")) if not batting else None,
+                    "economy": round(hit["economy"], 2) if hit.get("economy") else None, "rank": rank, "total": n,
+                    "years": [hit["date"].year, idea_stats.debut_floor(db, scope)[0].year]},
+        "method": f"Each player's first {'innings' if batting else 'spell'} in {fmt} cricket in Hindsight's data{window}, "
+                  f"ranked across {n:,} {noun}.",
+    }
+    return {"status": "resolved", "fact": fact, "snapshot": snap}
+
+
+def _scoped_mentions(idea: str, scope: Dict[str, Any]) -> List[str]:
+    """Name-like words in the idea, minus the team/opponent it is scoped to ("for India")."""
+    scoped = {w.lower() for t in (scope.get("team"), scope.get("opponent")) if t for w in t.split()}
+    return [m for m in _mentions(idea) if m.lower() not in scoped]
 
 
 def _poss_team(name: str) -> str:
@@ -302,7 +383,8 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
     from services.snapshots import create_static_snapshot
 
     if planned.get("spec"):
-        return (_attempt_race if planned["spec"]["type"] == "race" else _attempt_rollup)(db, idea_text, planned)
+        kind = planned["spec"]["type"]
+        return {"race": _attempt_race, "debut": _attempt_debut}.get(kind, _attempt_rollup)(db, idea_text, planned)
 
     params = dict(planned["params"])
     for key in ("start_date", "end_date"):

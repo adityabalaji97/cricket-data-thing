@@ -121,13 +121,40 @@ def parse_race(idea: str) -> Optional[Dict[str, Any]]:
         return None
     unit_m = re.search(r"\b(?:in|by)\s+(?:terms of\s+)?(balls|deliveries|innings|matches|games)\b", idea, re.I)
     subject = "team" if re.search(r"\bteams?\b|\btotal\b", idea, re.I) else ("bowler" if measure == "wickets" else "batter")
+    # span: reached within one innings ("fastest 100") or over a career ("fastest to 1000 IPL runs");
+    # unit: counted in balls or in innings. A career can be counted either way.
+    career = subject != "team" and ((measure == "runs" and target >= 500) or (measure == "wickets" and target >= 20))
     if unit_m:
         unit = "balls" if unit_m.group(1).lower() in ("balls", "deliveries") else "innings"
-    else:  # a career milestone is counted in innings; an innings milestone in balls
-        unit = "innings" if (measure == "runs" and target >= 500) or (measure == "wickets" and target >= 20) else "balls"
-    if subject == "team":
+    else:
+        unit = "innings" if career else "balls"
+    if not career:
         unit = "balls"
-    return {"type": "race", "direction": direction, "target": target, "measure": measure, "unit": unit, "subject": subject}
+    return {"type": "race", "direction": direction, "target": target, "measure": measure, "unit": unit,
+            "subject": subject, "span": "career" if career else "innings"}
+
+
+def span_of(spec: Dict[str, Any]) -> str:
+    """Specs stored before 'span' existed: an innings count meant a career."""
+    return spec.get("span") or ("career" if spec.get("unit") == "innings" else "innings")
+
+
+DEBUT_MEASURES = [  # (pattern, table, metric)
+    (r"conced|expensive|leak", "bowling", "runs_conceded"),
+    (r"econom", "bowling", "economy"),
+    (r"wicket|figures|haul", "bowling", "figures"),
+    (r"runs|score|scored|innings|centur|hundred|fift", "batting", "runs"),
+]
+
+
+def parse_debut(idea: str) -> Optional[Dict[str, Any]]:
+    """"Most runs conceded on ODI debut", "highest IPL debut score", "best figures on debut"."""
+    if not re.search(r"\bdebut", idea, re.I):
+        return None
+    table, metric = next(((t, m) for pat, t, m in DEBUT_MEASURES if re.search(pat, idea, re.I)), ("batting", "runs"))
+    low = bool(re.search(r"\b(least|fewest|lowest|worst|slowest)\b", idea, re.I))
+    best_is_high = metric in ("runs", "runs_conceded", "figures")
+    return {"type": "debut", "table": table, "metric": metric, "desc": best_is_high != low, "low": low}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -161,13 +188,42 @@ def scope_label(scope: Dict[str, Any]) -> str:
     return scope.get("league") or scope["fmt"]
 
 
+# First season of each league. When Hindsight's data for a league starts there, every career in
+# it is complete; otherwise (ODIs from 2000, T20Is from 2005) only debuts inside the data count.
+LEAGUE_START = {"IPL": 2008, "BBL": 2011, "PSL": 2016, "CPL": 2013, "SA20": 2023, "Men's Hundred": 2021, "MLC": 2023,
+                "ILT20": 2023, "BPL": 2012, "LPL": 2020, "T20 Blast": 2003}
+
+
+def scope_first_date(db: Session, scope: Dict[str, Any]) -> date:
+    where, params = _where({**scope, "team": None, "opponent": None, "start": None, "end": None}, "m.team1", "m.team2")
+    first = db.execute(text(f"SELECT MIN(m.date) FROM matches m WHERE {where}"), params).scalar()
+    return first or date(2000, 1, 1)
+
+
+def debut_floor(db: Session, scope: Dict[str, Any], ball_by_ball: bool = False) -> Tuple[date, str]:
+    """(earliest debut that is a real debut, how to say it).
+
+    ball_by_ball: the stat is built from delivery_details, whose coverage can start later than
+    the scorecards (IPL deliveries from 2015), so its own first date decides.
+    """
+    first = scope_first_date(db, scope)
+    if ball_by_ball:
+        where, params = _where({**scope, "team": None, "opponent": None, "start": None, "end": None}, "m.team1", "m.team2")
+        first = db.execute(text(f"SELECT MIN(m.date) FROM matches m WHERE {where} AND m.data_source = 'bbb'"),
+                           params).scalar() or first
+    league = scope.get("league")
+    if league in LEAGUE_START and first.year <= LEAGUE_START[league]:
+        return first, f" (every {league} career)"
+    floor = first + timedelta(days=365)
+    return floor, f" (debuts since {floor.year})"
+
+
 def window_text(db: Session, scope: Dict[str, Any]) -> Tuple[int, str]:
     """(first year, " since 2000") for the comparison window actually covered by the data."""
     if scope.get("start") and scope.get("end") and scope["start"][:4] == scope["end"][:4]:
         return int(scope["start"][:4]), f" in {scope['start'][:4]}"
-    first = db.execute(text("SELECT MIN(date) FROM matches WHERE format = :fmt AND gender = 'male'"),
-                       {"fmt": scope["fmt"]}).scalar()
-    year = max(first.year if first else 2000, int(scope["start"][:4]) if scope.get("start") else 0)
+    first = scope_first_date(db, scope)
+    year = max(first.year, int(scope["start"][:4]) if scope.get("start") else 0)
     return year, f" since {year}"
 
 
@@ -221,7 +277,7 @@ def race(db: Session, spec: Dict[str, Any], scope: Dict[str, Any]) -> Tuple[List
     target, asc = spec["target"], spec["direction"] == "fastest"
     order = "ASC" if asc else "DESC"
     caveat = None
-    if spec["unit"] == "balls":
+    if span_of(spec) == "innings":
         if spec["subject"] == "team":
             where, params = _where(scope, "dd.team_bat", "dd.team_bowl")
             sql = f"""
@@ -260,37 +316,109 @@ def race(db: Session, spec: Dict[str, Any], scope: Dict[str, Any]) -> Tuple[List
             r["value"] = int(r["value"])
         return _dedupe(rows, lambda r: (r["match_id"], r["inns"], r["name"])), caveat
 
-    # Career: the innings number at which a running total first reached the target. Only players
-    # whose first innings in the data is a year after it starts, so a career that began before
-    # our data is never counted from the middle.
+    # Career: the innings number (or ball) at which a running total first reached the target. Only
+    # careers that start inside the data (debut_floor), so none is counted from the middle.
     batter = spec["subject"] == "batter"
-    team_col = "s.batting_team" if batter else "s.bowling_team"
+    floor, floor_label = debut_floor(db, scope, ball_by_ball=spec["unit"] == "balls")
+    caveat = floor_label.strip(" ()").capitalize() + "."
+    if spec["unit"] == "balls":
+        team_col = "dd.team_bat" if batter else "dd.team_bowl"
+        where, params = _where({**scope, "start": None, "end": None}, team_col, "dd.team_bowl" if batter else "dd.team_bat")
+        name = "COALESCE(am.canonical_name, dd.bat)" if batter else "COALESCE(am.canonical_name, dd.bowl)"
+        join = "LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key" if batter else "LEFT JOIN alias_map am ON LOWER(dd.bowl) = am.name_key"
+        amount = ("COALESCE(dd.batruns, 0)" if batter else
+                  "CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' AND LOWER(COALESCE(dd.dismissal, '')) = ANY(:wk) THEN 1 ELSE 0 END")
+        ball = ("COALESCE(dd.ballfaced, CASE WHEN COALESCE(dd.wide, 0) = 0 THEN 1 ELSE 0 END)" if batter else
+                "CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END")
+        rows = [dict(r) for r in db.execute(text(f"""
+            WITH {ALIAS_MAP_CTE},
+            b AS (
+                SELECT {name} AS name, {team_col} AS team, m.date, dd.p_match, dd.inns, dd.over, dd.ball,
+                       {amount} AS amount, {ball} AS faced
+                FROM delivery_details dd JOIN matches m ON m.id = dd.p_match {join}
+                WHERE {where}
+            ),
+            running AS (
+                SELECT *, SUM(amount) OVER w AS total, SUM(faced) OVER w AS balls, MIN(date) OVER (PARTITION BY name) AS debut
+                FROM b WINDOW w AS (PARTITION BY name ORDER BY date, p_match, inns, over, ball ROWS UNBOUNDED PRECEDING)
+            )
+            SELECT DISTINCT ON (name) name, team, date, balls AS value, total AS final, debut
+            FROM running WHERE total >= :target AND debut >= :floor
+            ORDER BY name, date, p_match, inns, over, ball
+        """), {**params, "target": target, "floor": floor, "wk": list(BOWLER_WICKETS)}).mappings()]
+    else:
+        team_col = "s.batting_team" if batter else "s.bowling_team"
+        where, params = _where({**scope, "start": None, "end": None}, team_col, _opp(team_col))
+        table, name_col, measure = ("batting_stats", "striker", "s.runs") if batter else ("bowling_stats", "bowler", "s.wickets")
+        rows = [dict(r) for r in db.execute(text(f"""
+            WITH {ALIAS_MAP_CTE},
+            inns AS (
+                SELECT DISTINCT ON (COALESCE(am.canonical_name, s.{name_col}), s.match_id, s.innings)
+                       COALESCE(am.canonical_name, s.{name_col}) AS name, {team_col} AS team, m.date, s.match_id, s.innings,
+                       {measure} AS amount
+                FROM {table} s JOIN matches m ON m.id = s.match_id
+                LEFT JOIN alias_map am ON LOWER(s.{name_col}) = am.name_key
+                WHERE {where}
+                ORDER BY COALESCE(am.canonical_name, s.{name_col}), s.match_id, s.innings
+            ),
+            running AS (
+                SELECT *, SUM(amount) OVER w AS total, ROW_NUMBER() OVER w AS inn_no, MIN(date) OVER (PARTITION BY name) AS debut
+                FROM inns WINDOW w AS (PARTITION BY name ORDER BY date, match_id, innings)
+            )
+            SELECT DISTINCT ON (name) name, team, date, inn_no AS value, total AS final, debut
+            FROM running WHERE total >= :target AND debut >= :floor
+            ORDER BY name, inn_no
+        """), {**params, "target": target, "floor": floor}).mappings()]
+    for r in rows:
+        r["value"] = int(r["value"])
+    rows.sort(key=lambda r: (r["value"] if asc else -r["value"], r["date"]))
+    return rows, caveat
+
+
+BOWLER_WICKETS = ("bowled", "caught", "lbw", "leg before wicket", "caught and bowled", "stumped", "hit wicket")
+
+
+def debut(db: Session, spec: Dict[str, Any], scope: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], str]:
+    """Every player's first innings (batting) or spell (bowling) in scope, best first."""
+    batting = spec["table"] == "batting"
+    team_col = "s.batting_team" if batting else "s.bowling_team"
     where, params = _where({**scope, "start": None, "end": None}, team_col, _opp(team_col))
-    table, name_col, measure = ("batting_stats", "striker", "s.runs") if batter else ("bowling_stats", "bowler", "s.wickets")
-    first = db.execute(text("SELECT MIN(date) FROM matches WHERE format = :fmt AND gender = 'male'"), {"fmt": scope["fmt"]}).scalar()
-    debut_floor = (first or date(2000, 1, 1)) + timedelta(days=365)
+    floor, floor_label = debut_floor(db, scope)
+    table, name_col, cols = (("batting_stats", "striker", "s.runs, s.balls_faced AS balls") if batting else
+                             ("bowling_stats", "bowler", "s.runs_conceded AS runs, s.wickets, s.overs, s.economy"))
     rows = [dict(r) for r in db.execute(text(f"""
         WITH {ALIAS_MAP_CTE},
-        inns AS (
-            SELECT DISTINCT ON (COALESCE(am.canonical_name, s.{name_col}), s.match_id, s.innings)
-                   COALESCE(am.canonical_name, s.{name_col}) AS name, {team_col} AS team, m.date, s.match_id, s.innings,
-                   {measure} AS amount
+        firsts AS (
+            SELECT DISTINCT ON (COALESCE(am.canonical_name, s.{name_col}))
+                   COALESCE(am.canonical_name, s.{name_col}) AS name, {team_col} AS team, {_opp(team_col)} AS opp,
+                   m.date, s.match_id, {cols}
             FROM {table} s JOIN matches m ON m.id = s.match_id
             LEFT JOIN alias_map am ON LOWER(s.{name_col}) = am.name_key
             WHERE {where}
-            ORDER BY COALESCE(am.canonical_name, s.{name_col}), s.match_id, s.innings
-        ),
-        running AS (
-            SELECT *, SUM(amount) OVER w AS total, ROW_NUMBER() OVER w AS inn_no, MIN(date) OVER (PARTITION BY name) AS debut
-            FROM inns WINDOW w AS (PARTITION BY name ORDER BY date, match_id, innings)
+            ORDER BY COALESCE(am.canonical_name, s.{name_col}), m.date, s.match_id, s.innings
         )
-        SELECT DISTINCT ON (name) name, team, date, inn_no AS value, total AS final, debut
-        FROM running WHERE total >= :target AND debut >= :floor
-        ORDER BY name, inn_no
-    """), {**params, "target": target, "floor": debut_floor}).mappings()]
-    rows.sort(key=lambda r: (r["value"] if asc else -r["value"], r["date"]))
-    caveat = f"Players who debuted from {debut_floor.year} (Hindsight's {scope['fmt']} data starts in {(first or date(2000,1,1)).year})."
-    return rows, caveat
+        SELECT * FROM firsts WHERE date >= :floor
+    """), {**params, "floor": floor}).mappings()]
+    # A player's debut is their first appearance in the scope as a whole, but filters (vs X, since
+    # a year) narrow which debuts are shown.
+    if scope.get("start"):
+        rows = [r for r in rows if r["date"] >= date.fromisoformat(scope["start"])]
+    if spec["metric"] == "economy":
+        rows = [r for r in rows if (r["overs"] or 0) >= (5 if scope["fmt"] == "ODI" else 2)]
+    key = {"runs": lambda r: r["runs"], "runs_conceded": lambda r: r["runs"], "economy": lambda r: r["economy"] or 0,
+           "figures": lambda r: (r["wickets"], -r["runs"])}[spec["metric"]]
+    rows.sort(key=key, reverse=spec["desc"])
+    return rows, floor_label
+
+def overs_text(overs: Any) -> Optional[str]:
+    """Stored overs are decimal (9.333 = 9.2 overs); cricket notation."""
+    if overs is None:
+        return None
+    o = float(overs)
+    whole, balls = int(o), round((o - int(o)) * 6)
+    if balls == 6:
+        whole, balls = whole + 1, 0
+    return f"{whole}" if balls == 0 else f"{whole}.{balls}"
 
 
 def _dedupe(rows: List[Dict[str, Any]], key: Callable) -> List[Dict[str, Any]]:
@@ -307,16 +435,18 @@ def race_words(spec: Dict[str, Any], scope: Dict[str, Any]) -> Dict[str, str]:
     """Nouns for titles: {what: "100", unit: "balls", plural: "ODI hundreds" ...}."""
     fmt = scope_label(scope)
     t = spec["target"]
+    career = span_of(spec) == "career"
+    who = f"{scope['team']} " if scope.get("team") else ""
     if spec["measure"] == "wickets":
-        what = f"{t} wickets" if spec["unit"] == "innings" else f"{t} wickets in an innings"
-    elif spec["unit"] == "innings":
+        what = f"{t} {fmt} wickets" if career else f"{t} wickets in an innings"
+    elif career:
         what = f"{t:,} {fmt} runs"
     else:
         what = str(t)
     if spec["subject"] == "team":
         noun = f"{fmt} innings to reach {t}"
-    elif spec["unit"] == "innings":
-        noun = f"{'batters' if spec['subject'] == 'batter' else 'bowlers'} to reach {what}"
+    elif career:
+        noun = f"{who}{'batters' if spec['subject'] == 'batter' else 'bowlers'} to reach {what}"
     elif spec["measure"] == "runs" and t == 100:
         noun = f"{fmt} hundreds"
     elif spec["measure"] == "runs" and t == 50:

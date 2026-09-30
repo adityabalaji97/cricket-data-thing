@@ -138,6 +138,9 @@ def test_race_ideas_are_detected():
     assert core("fastest to 5 wickets in an ODI innings") == ("fastest", 5, "wickets", "balls", "bowler")
     assert core("fastest team to 300 in an ODI") == ("fastest", 300, "runs", "balls", "team")
     assert core("fastest IPL fifty since 2020") == ("fastest", 50, "runs", "balls", "batter")
+    assert parse_race("Fastest to 1000 IPL runs in balls")["span"] == "career"
+    assert parse_race("Fastest to 1000 IPL runs in balls")["unit"] == "balls"
+    assert parse_race("fastest to 100 in ODIs")["span"] == "innings"
     assert parse_race("highest ODI score") is None
 
 
@@ -160,3 +163,18 @@ def test_unsupported_count_within_idea_is_refused(monkeypatch):
     monkeypatch.setattr("services.nl2query.log_nl_query_event_background", lambda **kw: None)
     with pytest.raises(SnapshotError):
         content_ideas.plan("3 batters hitting 5 sixes in an innings", None, None)
+
+
+def test_debut_ideas_are_detected():
+    from services.idea_stats import parse_debut
+
+    def core(t):
+        r = parse_debut(t)
+        return r and (r["table"], r["metric"], r["desc"])
+
+    assert core("Most runs conceded in debut ODI game") == ("bowling", "runs_conceded", True)
+    assert core("highest score on ODI debut") == ("batting", "runs", True)
+    assert core("best figures on IPL debut") == ("bowling", "figures", True)
+    assert core("most economical ODI debut spell") == ("bowling", "economy", False)
+    assert core("lowest score on debut") == ("batting", "runs", False)
+    assert parse_debut("fastest to 100 in ODIs") is None
