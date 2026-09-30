@@ -19,7 +19,13 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > Vercel: /img/:id.png (api/img.mjs, Barlow fonts in api/_lib/fonts, test tests/js/share_images.test.mjs
 > via `node --test <file>`) and /embed/{q,wp,recap}/:id (api/embed.mjs; q = mcp_server/widget.html
 > static mode). "Image & embed" dialog (src/components/ui/ChartExportButton.jsx) on query results and
-> scorecard recap / win-probability cards. Next: step 6 content rules + packs.
+> scorecard recap / win-probability cards.
+> **Step 6 live:** docs/content_guidelines.md + services/content_rules.py (title checks, routing, post-by),
+> services/records.py (rank vs all comparable innings/spells since 2015 + career-bests; stats tables, so
+> every format), services/content_packs.py + scripts/generate_content_packs.py (nightly step, Jev ranks;
+> win-prob series always kept for IPL/BBL/PSL/SA20/Hundred/T20I). /admin Social queue (token in
+> localStorage; api/proxy.js forwards X-Admin-Token only). Next: 6b standout scanner (control %,
+> partnerships from delivery_details) + Idea -> pack, then 6c Cricsheet fallback.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
 > (sync_stats_from_dd double-counted wides/no-balls and charged byes; statsProcessor charged
