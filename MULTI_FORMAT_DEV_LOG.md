@@ -11,6 +11,17 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **Query builder is format-aware (2026-09-30):** shared links waited on nothing and auto-ran
+> before ?fmt= resolved, so an ODI link ran as ALL (+ an unasked top_teams=10) and mixed in T20
+> numbers; now the auto-run waits for the format list and reads it at run time. For ODI the
+> 'Include T20I' switch and top-teams slider are hidden and never sent; 'Leagues' reads
+> 'Competitions'. A URL with only ?fmt= no longer auto-runs an unfiltered query. Connector:
+> descriptions tell Claude to pin format and leave T20 switches off for ODIs; format='ODI' drops
+> include_international/top_teams. Nightly loader: feed aliases pointing at a reviewed spelling
+> variant now map to the main name (it re-split Sooryavanshi on 30 Sep); migration 007 removed
+> the 7 rows it had re-added. Local py3.12 env now lives at ~/cdt/.py312 (scratchpad was wiped);
+> scripts/dev/interact.mjs is the CDP step runner.
+>
 > **Player name spellings (2026-09-29):** a feed spelling change split Vaibhav Sooryavanshi
 > ("Vaibhav Suryavanshi" / "Vaibhav Sooryavanshi" in delivery_details, "V Suryavanshi" legacy).
 > Migration 005 (applied to prod) makes the current spelling canonical. Code: 

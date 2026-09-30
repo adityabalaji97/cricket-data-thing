@@ -376,8 +376,10 @@ How to use the tools:
    For leaderboards, group by batter or bowler, set
    min_balls (e.g. 120) to drop small samples, and sort_by the metric. Group by "phase" for
    powerplay/middle/death, "year" for trends, "format" when mixing T20 and ODI.
-Overs are 0-indexed (over_min=0, over_max=5 is the powerplay). Default format is ALL; pin
-format="T20" for T20-only questions. The result renders as an interactive table/chart and
+Overs are 0-indexed (over_min=0, over_max=5 is the powerplay). Default format is ALL, which
+mixes T20 and ODI: ALWAYS pin format="ODI" for ODI questions and format="T20" for T20 ones.
+ODIs are all internationals -- for format="ODI" leave include_international, top_teams and
+leagues unset (a T20 league filter on an ODI query returns nothing). The result renders as an interactive table/chart and
 includes a link to open the same query on the Hindsight website — mention it to the user.
 4. preview_match gives a fixture preview (venue record, leaders, head-to-head, form, standout
    batter-vs-bowler matchups) for two teams at a venue in T20 or ODI — use it for "preview X v Y
@@ -429,12 +431,12 @@ def query_cricket_data(
     bowling_teams: Annotated[List[str], Field(description="Team bowling, exact names.")] = [],
     teams: Annotated[List[str], Field(description="Team either batting or bowling.")] = [],
     venue: Annotated[Optional[str], Field(description="Exact venue name from find_entities.")] = None,
-    leagues: Annotated[List[str], Field(description="Competitions, e.g. ['IPL','BBL'] (abbreviations work).")] = [],
-    include_international: Annotated[bool, Field(description="Include T20Is/ODIs between national sides.")] = False,
-    top_teams: Annotated[Optional[int], Field(ge=1, le=30, description="With include_international, only matches between the top N national teams.")] = None,
+    leagues: Annotated[List[str], Field(description="T20 leagues, e.g. ['IPL','BBL'] (abbreviations work). Leave empty for ODIs, which are all internationals.")] = [],
+    include_international: Annotated[bool, Field(description="T20 only: add T20Is (national sides) to league data. Not needed for ODIs -- every ODI is included automatically.")] = False,
+    top_teams: Annotated[Optional[int], Field(ge=1, le=30, description="With include_international (T20), only T20Is between the top N national teams.")] = None,
     start_date: Annotated[Optional[date], Field(description="YYYY-MM-DD inclusive.")] = None,
     end_date: Annotated[Optional[date], Field(description="YYYY-MM-DD inclusive.")] = None,
-    format: Annotated[Literal["T20", "ODI", "ALL"], Field(description="Cricket format. ALL mixes formats; add 'format' to group_by to keep rows comparable.")] = "ALL",
+    format: Annotated[Literal["T20", "ODI", "ALL"], Field(description="Cricket format. Set format='ODI' for any ODI question and format='T20' for T20 ones; ALL mixes T20 and ODI rows (add 'format' to group_by if you really want both).")] = "ALL",
     gender: Annotated[Literal["male", "female"], Field(description="Men's or women's cricket.")] = "male",
     query_mode: Annotated[Literal["delivery", "batting_stats", "bowling_stats"], Field(description="delivery = ball-by-ball aggregates (supports line/length/shot filters); batting_stats / bowling_stats = per-innings scorecard aggregates (faster for career totals, 50s/100s-style questions).")] = "delivery",
     innings: Annotated[Optional[int], Field(ge=1, le=4, description="1 = batting first, 2 = chasing.")] = None,
@@ -465,6 +467,10 @@ def query_cricket_data(
     scatter_y: Annotated[Optional[str], Field(description="Scatter y metric, e.g. 'average'.")] = None,
 ) -> CallToolResult:
     started = time.monotonic()
+    if format == "ODI":
+        # Every ODI is between national sides: the T20 "add internationals" switch and its
+        # top-teams cut do not apply, and the website ignores them for ODIs too.
+        include_international, top_teams = False, None
     params: Dict[str, Any] = {
         "venue": venue, "start_date": start_date.isoformat() if start_date else None,
         "end_date": end_date.isoformat() if end_date else None, "leagues": leagues, "teams": teams,

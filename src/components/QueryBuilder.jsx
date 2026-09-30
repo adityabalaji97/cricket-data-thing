@@ -152,7 +152,11 @@ const getActiveFilterCount = (filters, groupBy) => {
 };
 
 const QueryBuilder = ({ isMobile }) => {
-  const { formatParams, active } = useFormat();
+  const { formatParams, active, loading: formatsLoading } = useFormat();
+  // The auto-run from a shared link is scheduled; read the format at run time, not from the
+  // render that scheduled it.
+  const formatParamsRef = useRef(formatParams);
+  formatParamsRef.current = formatParams;
   const { getFiltersFromUrl, getGroupByFromUrl, currentParams } = useUrlParams();
 
   
@@ -203,7 +207,16 @@ const QueryBuilder = ({ isMobile }) => {
     const urlFilters = getFiltersFromUrl();
     const urlGroupBy = getGroupByFromUrl();
     
-    if (currentParams && currentParams.length > 1 && !hasLoadedFromUrl) {
+    // Wait for the format list: until it loads, ?fmt=mens-odi is not yet resolvable and the
+    // page sits on its fallback ("All formats"), so a shared ODI link ran as ALL and mixed in
+    // T20 numbers.
+    if (formatsLoading) return;
+
+    // Only a link with something to run auto-runs. The site stamps ?fmt= on every URL, and a
+    // format alone used to fire an unfiltered, ungrouped query over the whole table.
+    const runnable = new URLSearchParams(currentParams || '');
+    runnable.delete('fmt');
+    if (currentParams && [...runnable.keys()].length > 0 && !hasLoadedFromUrl) {
       setFilters(prevFilters => ({
         ...prevFilters,
         ...urlFilters
@@ -218,7 +231,7 @@ const QueryBuilder = ({ isMobile }) => {
         executeQueryFromUrl(urlFilters, urlGroupBy);
       }, 500);
     }
-  }, [currentParams, hasLoadedFromUrl]);
+  }, [currentParams, hasLoadedFromUrl, formatsLoading]);
   
   // Fetch available columns
   useEffect(() => {
@@ -240,27 +253,35 @@ const QueryBuilder = ({ isMobile }) => {
     // an ODI query must not be offered the T20 competition list.
   }, [formatParams.format, formatParams.gender]);
   
+  // Query params for a run, scoped to the selected format. ODIs are all between national sides,
+  // so the T20 league/international switch and top-teams cut do not apply to them; a T20-only
+  // switch left on from an earlier T20 query must not narrow an ODI one.
+  const buildQueryParams = (source) => {
+    const fp = formatParamsRef.current;
+    const params = new URLSearchParams(fp);
+    const internationalOnly = fp.format === 'ODI' || fp.format === 'TEST';
+    Object.entries(source).forEach(([key, value]) => {
+      if (key === 'query_mode' && value === 'delivery') return;
+      if (internationalOnly && (key === 'include_international' || key === 'top_teams')) return;
+      if (key === 'top_teams' && !source.include_international) return;
+      if (value !== null && value !== undefined && value !== '') {
+        if (Array.isArray(value)) {
+          value.forEach((item) => params.append(key, item));
+        } else {
+          params.append(key, value);
+        }
+      }
+    });
+    return params;
+  };
+
   const executeQueryFromUrl = async (urlFilters, urlGroupBy) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Scope the query to the selected format; the backend defaults to men's T20.
-      const params = new URLSearchParams(formatParams);
-      
-      Object.entries(urlFilters).forEach(([key, value]) => {
-        if (key === 'query_mode' && value === 'delivery') {
-          return;
-        }
-        if (value !== null && value !== undefined && value !== '') {
-          if (Array.isArray(value)) {
-            value.forEach(item => params.append(key, item));
-          } else {
-            params.append(key, value);
-          }
-        }
-      });
-      
+      const params = buildQueryParams(urlFilters);
+
       urlGroupBy.forEach(col => params.append('group_by', col));
       if (ballAggregation && ballAggregation !== 'snapshot') {
         params.append('ball_aggregation', ballAggregation);
@@ -287,22 +308,8 @@ const QueryBuilder = ({ isMobile }) => {
       setLoading(true);
       setError(null);
       
-      // Scope the query to the selected format; the backend defaults to men's T20.
-      const params = new URLSearchParams(formatParams);
-      
-      Object.entries(filters).forEach(([key, value]) => {
-        if (key === 'query_mode' && value === 'delivery') {
-          return;
-        }
-        if (value !== null && value !== undefined && value !== '') {
-          if (Array.isArray(value)) {
-            value.forEach(item => params.append(key, item));
-          } else {
-            params.append(key, value);
-          }
-        }
-      });
-      
+      const params = buildQueryParams(filters);
+
       groupBy.forEach(col => params.append('group_by', col));
       if (ballAggregation && ballAggregation !== 'snapshot') {
         params.append('ball_aggregation', ballAggregation);

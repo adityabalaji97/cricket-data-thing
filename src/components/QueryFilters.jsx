@@ -66,6 +66,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
   const toggleSection = (section) => setOpenSections((prev) => ({ ...prev, [section]: !sectionOpen(section) }));
   // All dropdown data now comes from availableColumns (fetched from delivery_details)
   const { active } = useFormat();
+  const internationalOnly = active?.format === 'ODI' || active?.format === 'TEST';
 
   // Limits come from the selected format, not from T20 constants: an over 40 filter is normal
   // for an ODI and meaningless for a T20, and Tests have four innings rather than two.
@@ -166,7 +167,7 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               ))
             }
             renderInput={(params) => (
-              <TextField {...params} label="Leagues" size="small" />
+              <TextField {...params} label={internationalOnly ? 'Competitions' : 'Leagues'} size="small" />
             )}
           />
         </Grid>
@@ -214,18 +215,21 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        <Grid item xs={12} sm={4} md={3}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={filters.include_international}
-                onChange={(e) => handleFilterChange('include_international', e.target.checked)}
-                size="small"
-              />
-            }
-            label="Include T20I"
-          />
-        </Grid>
+        {/* ODIs are all between national sides: nothing to include, and no top-teams cut. */}
+        {!internationalOnly && (
+          <Grid item xs={12} sm={4} md={3}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={filters.include_international}
+                  onChange={(e) => handleFilterChange('include_international', e.target.checked)}
+                  size="small"
+                />
+              }
+              label={active?.format === 'T20' ? 'Include T20I' : 'Include internationals'}
+            />
+          </Grid>
+        )}
         
         {/* Row 3: Players */}
         <Grid item xs={12} sm={6}>
@@ -765,12 +769,12 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           </Box>
         </Grid>
         
-        {filters.include_international && (
+        {filters.include_international && !internationalOnly && (
           <Grid item xs={12} sm={6}>
             <Box>
-            <Typography variant="body2" gutterBottom sx={{ color: qbColors.textMed }}>Top Teams: {filters.top_teams}</Typography>
+            <Typography variant="body2" gutterBottom sx={{ color: qbColors.textMed }}>Top Teams: {filters.top_teams ?? 'All'}</Typography>
               <Slider
-                value={filters.top_teams}
+                value={filters.top_teams ?? 20}
                 onChange={(e, value) => handleFilterChange('top_teams', value)}
                 min={5}
                 max={20}

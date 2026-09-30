@@ -97,7 +97,8 @@ export const parseUrlParams = (search) => {
   
   // International matches
   filters.include_international = getBoolParam('include_international', false);
-  filters.top_teams = getIntParam('top_teams', 10);
+  // No default: a link that includes internationals without top_teams means all of them.
+  filters.top_teams = getIntParam('top_teams', null);
   
   // Summary rows
   filters.show_summary_rows = getBoolParam('show_summary_rows', false);

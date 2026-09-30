@@ -303,6 +303,20 @@ def update_players(engine, batters, bowlers, dry_run=False, gender="male"):
             print(f"    ✓ Updated {result.rowcount:,} bowler types")
             conn.execute(text("DROP TABLE tmp_bowler_updates"))
 
+        # A spelling the feed has used for a player may since have been reviewed and linked to
+        # that player's main name (player_aliases.source = 'spelling_variant', e.g. "Vaibhav
+        # Suryavanshi" -> "Vaibhav Sooryavanshi"). Point new aliases at the main name, or the
+        # legacy name gains a second alias, turns ambiguous, and the player splits again.
+        variant_to_main = dict(conn.execute(text(
+            "SELECT player_name, alias_name FROM player_aliases WHERE source = 'spelling_variant'"
+        )).fetchall())
+        if variant_to_main and alias_inserts:
+            alias_inserts = [
+                {**a, "alias_name": variant_to_main.get(a["alias_name"], a["alias_name"])}
+                for a in alias_inserts
+                if a["player_name"] not in variant_to_main  # a variant never becomes a legacy name
+            ]
+
         # Batch insert aliases
         if alias_inserts:
             print(f"  Inserting {len(alias_inserts):,} aliases...")
