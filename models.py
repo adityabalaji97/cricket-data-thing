@@ -131,6 +131,11 @@ class Match(Base):
     # Day vs night classification (IPL-only currently). 'day', 'night', or NULL.
     day_or_night = Column(String, nullable=True)
 
+    # Where the row came from (migration 009): 'bbb' (delivery_details), 'cricsheet' (the
+    # scripts/load_cricsheet.py fallback, upgraded to 'bbb' by the sync once the ball-by-ball
+    # CSV has the match) or 'legacy' (the original Cricsheet load).
+    data_source = Column(String, nullable=True)
+
     def to_dict(self) -> dict:
         """Convert match to dictionary with formatted scores"""
         return {

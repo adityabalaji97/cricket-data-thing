@@ -82,6 +82,15 @@ jobs:
             --skip-validation
           rm -f odi_bbb.csv
 
+      # Cricsheet fallback (scripts/load_cricsheet.py): men's T20Is, ODIs and main-league T20s
+      # from Cricsheet's last-7-days archive that the CSVs above have not delivered yet --
+      # result, scorecard and basic stats, marked data_source='cricsheet'. Runs after the legs so
+      # anything the CSVs had tonight is skipped; the sync upgrades the rest when the CSV catches
+      # up. Never blocks the rest of the run.
+      - name: Cricsheet fallback for matches the CSVs lack
+        continue-on-error: true
+        run: python scripts/load_cricsheet.py --days 7
+
       # T20 Primer metrics (Impact, RAA/WAA, win probability, WPA, leverage) for any
       # men's T20 match loaded above that has none yet. Uses the stored model version
       # (ml/models/primer + metric_models) and never refits, so older numbers stay put.

@@ -88,11 +88,17 @@ def get_match_scorecard_service(match_id: str, min_balls: int, db: Session) -> D
         raise HTTPException(status_code=404, detail=f"Match not found: {match_id}")
 
     match_date = match.get("date")
-    data_source = data_source_for_match_date(
-        match_date,
-        match.get("format") or "T20",
-        match.get("gender") or "male",
-    )
+    basic_data = match.get("data_source") == "cricsheet"
+    if basic_data:
+        # Loaded by scripts/load_cricsheet.py before the ball-by-ball CSV had it: its balls are in
+        # the legacy deliveries table whatever the date. The sync moves it to 'bbb' later.
+        data_source = "deliveries"
+    else:
+        data_source = data_source_for_match_date(
+            match_date,
+            match.get("format") or "T20",
+            match.get("gender") or "male",
+        )
     use_details = data_source == "delivery_details"
 
     fmt = match.get("format") or "T20"
@@ -108,7 +114,9 @@ def get_match_scorecard_service(match_id: str, min_balls: int, db: Session) -> D
 
     capabilities = _capabilities_for_source(data_source, innings)
     warnings = []
-    if data_source == "deliveries":
+    if basic_data:
+        warnings.append("Basic data from Cricsheet; ball-by-ball details (line/length, shot, control, win probability) pending.")
+    elif data_source == "deliveries":
         warnings.append("Legacy deliveries data does not include wagon zone, line/length, shot, or control tracking.")
 
     summary = _build_summary(match, innings)
@@ -133,7 +141,7 @@ def _fetch_match(match_id: str, db: Session) -> Optional[Dict[str, Any]]:
             """
             SELECT id, date, venue, city, event_name, event_match_number, team1, team2,
                    toss_winner, toss_decision, winner, outcome, player_of_match,
-                   overs, balls_per_over, match_type, competition, format, gender
+                   overs, balls_per_over, match_type, competition, format, gender, data_source
             FROM matches
             WHERE id = :match_id
             """
@@ -406,7 +414,7 @@ def _legacy_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str,
                 MIN(d.batting_team) AS team,
                 MIN(d.over * 100 + d.ball) AS order_key,
                 SUM(COALESCE(d.runs_off_bat, 0)) AS runs,
-                COUNT(*) AS balls,
+                SUM(CASE WHEN COALESCE(d.wides, 0) = 0 THEN 1 ELSE 0 END) AS balls,
                 SUM(CASE WHEN d.runs_off_bat = 4 THEN 1 ELSE 0 END) AS fours,
                 SUM(CASE WHEN d.runs_off_bat = 6 THEN 1 ELSE 0 END) AS sixes,
                 SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) = 0 AND COALESCE(d.extras, 0) = 0 THEN 1 ELSE 0 END) AS dots,
@@ -473,7 +481,9 @@ def _legacy_bowling_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str,
                 COALESCE(pa.alias_name, d.bowler) AS name,
                 MIN(d.bowling_team) AS team,
                 MIN(COALESCE(d.bowler_type, p.bowler_type, p.bowling_type, p.bowl_type)) AS style,
-                SUM(COALESCE(d.runs_off_bat, 0) + COALESCE(d.extras, 0)) AS runs,
+                -- Byes and leg-byes are never the bowler's (same rule as bowling_stats).
+                SUM(COALESCE(d.runs_off_bat, 0) + COALESCE(d.extras, 0)
+                    - COALESCE(d.byes, 0) - COALESCE(d.legbyes, 0)) AS runs,
                 COUNT(*) AS balls,
                 SUM(CASE WHEN d.wicket_type IS NOT NULL AND d.wicket_type != ''
                           AND LOWER(d.wicket_type) NOT LIKE '%run out%'

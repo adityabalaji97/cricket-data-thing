@@ -325,9 +325,15 @@ class StatsFromDeliveryDetails:
 
     def process_match_stats(self, session: Session, match_id: str) -> Dict:
         deliveries = self.get_match_deliveries(session, match_id)
+        return self.write_stats_for_deliveries(session, match_id, deliveries)
+
+    def write_stats_for_deliveries(self, session: Session, match_id: str, deliveries: List[Dict]) -> Dict:
+        """Add batting/bowling_stats rows for one match built from delivery dicts in this module's
+        shape (see get_match_deliveries). Shared with scripts/load_cricsheet.py, which converts
+        Cricsheet balls into the same shape so both sources use one set of stat definitions."""
         if not deliveries:
             return {'batting': 0, 'bowling': 0}
-        
+
         batting_count, bowling_count = 0, 0
         
         for innings in [1, 2]:

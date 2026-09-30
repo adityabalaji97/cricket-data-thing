@@ -62,7 +62,14 @@ def run_sync_pipeline(confirm=False, limit=None, skip_elo=False, dry_run=False):
         print(f"  ✅ Created: {result['created']}, Errors: {result['errors']}")
     else:
         print("  ⏭️  No missing matches")
-    
+
+    # Cricsheet-loaded matches the ball-by-ball data now covers: refresh the row and drop the
+    # Cricsheet stats, so step 3 rebuilds them from delivery_details.
+    upgrade_result = syncer.upgrade_cricsheet_matches()
+    results['cricsheet_upgrades'] = upgrade_result
+    if upgrade_result['upgraded'] or upgrade_result['errors']:
+        print(f"  ⬆️  Cricsheet matches upgraded: {upgrade_result['upgraded']}, errors: {upgrade_result['errors']}")
+
     # Step 3: Create stats
     print(f"\n[3/{total_steps}] Creating batting/bowling stats...")
     from sync_stats_from_dd import create_stats_from_delivery_details

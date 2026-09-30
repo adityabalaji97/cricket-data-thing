@@ -34,7 +34,24 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > count per innings in Python, list layout image/embed, latest first); other count-within asks fail with a
 > reason. tests/js/snapshot_fixtures.json is force-added (.gitignore has *.json).
 > Parked: site-wide mobile share images for every chart/table (see Notes plan file).
-> Next: 6c Cricsheet fallback, then Notes 3-5.
+> **Step 6c built, not yet deployed (2026-09-30):** scripts/load_cricsheet.py, nightly after the ODI leg
+> (continue-on-error). Cricsheet recently-added (7 days) -> men's T20I/ODI + main leagues (LEAGUE_BUCKETS),
+> 2015+ only, skipping ids in matches/delivery_details and logging same-date/same-teams under another id
+> ("REVIEW ..."). Writes matches (data_source='cricsheet'), deliveries (the scorecard reads those for
+> cricsheet matches) and stats via StatsFromDeliveryDetails.write_stats_for_deliveries (balls converted to
+> dd shape). Names: Cricsheet id -> people.csv cricinfo id -> dd name (435/436 on the Sep sample), then
+> player_aliases, spelling_variant -> main name. Sync upgrade: DeliveryDetailsSync.upgrade_cricsheet_matches
+> (in run_full_dd_sync step 2) refreshes the row, sets 'bbb', drops cricsheet stats + deliveries; step 3
+> rebuilds. Sync now sets data_source='bbb' on new rows (was NULL). Legacy scorecard: batter balls exclude
+> wides, bowler runs exclude byes/leg-byes (scorecard_legacy_pre2015 golden changes by that only).
+> Verified on hindsight_local (74 Sep matches loaded, parity vs prod stats, upgrade, guards); prod dry run
+> loads 0 (the feed is ahead of Cricsheet right now). Findings, not fixed: Cricsheet has NO Afghanistan
+> matches (Rashid's 5 missing ODI wkts are in partial dd matches 1079250/1133018/1150146 -- parked);
+> backfill_bowler_runs.py only rewrote rows whose own runs changed, so team_*_excl_bowler/economy_diff and
+> bowling fantasy_points are stale on many prod rows; run_full_dd_sync step 6 (fix_league_names) has never
+> imported -- harmless, it is interactive; dd for 1549965 is missing ~31 balls of innings 2.
+> Local goldens are stale vs HEAD (no ball_metrics locally); diff against a HEAD server instead.
+> Next: Notes 3-5.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
 > (sync_stats_from_dd double-counted wides/no-balls and charged byes; statsProcessor charged

@@ -215,6 +215,7 @@ class DeliveryDetailsSync:
             'format': fmt,
             'gender': gender,
             'day_or_night': self._map_day_or_night(getattr(first_row, 'daynight', None)),
+            'data_source': 'bbb',
         }
         
         if toss_winner and toss_decision:
@@ -318,6 +319,56 @@ class DeliveryDetailsSync:
             session.commit()
             return stats
         except Exception as e:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+
+    def get_cricsheet_match_ids_to_upgrade(self, session: Session) -> List[str]:
+        """Cricsheet-loaded matches (scripts/load_cricsheet.py) that delivery_details now has in
+        full. get_missing_match_ids never returns them -- they are already in matches -- and the
+        stats step skips any match with stats, so without this they would stay on basic data."""
+        rows = session.execute(text("""
+            SELECT m.id
+            FROM matches m
+            WHERE m.data_source = 'cricsheet'
+              AND EXISTS (
+                  SELECT 1 FROM delivery_details dd
+                  WHERE dd.p_match = m.id AND dd.inns = 1
+                  GROUP BY dd.p_match
+                  HAVING MIN(dd.over) = 0
+              )
+            ORDER BY m.id
+        """)).fetchall()
+        return [r[0] for r in rows]
+
+    def upgrade_cricsheet_matches(self) -> Dict:
+        """Move Cricsheet-loaded matches onto the ball-by-ball data.
+
+        Keeps the single matches row (so ELO, notes and packs that point at it survive), refreshes
+        its fields from delivery_details and marks it 'bbb'; deletes the Cricsheet-derived stats so
+        the stats step that follows rebuilds them, and the Cricsheet `deliveries` rows, which only
+        existed to give the scorecard something to read.
+        """
+        session = self.SessionLocal()
+        stats = {'upgraded': 0, 'errors': 0}
+        try:
+            for match_id in self.get_cricsheet_match_ids_to_upgrade(session):
+                match_data = self.extract_match_data_from_dd(session, match_id)
+                if not match_data:
+                    stats['errors'] += 1
+                    continue
+                fields = {k: v for k, v in match_data.items() if k != 'id'}
+                assignments = ', '.join(f"{k} = :{k}" for k in fields)
+                session.execute(text(f"UPDATE matches SET {assignments} WHERE id = :id"), match_data)
+                for table in ('batting_stats', 'bowling_stats', 'deliveries'):
+                    session.execute(text(f"DELETE FROM {table} WHERE match_id = :id"), {'id': match_id})
+                stats['upgraded'] += 1
+                logger.info(f"Upgraded Cricsheet match {match_id} to ball-by-ball data")
+            session.commit()
+            return stats
+        except Exception:
             session.rollback()
             raise
         finally:
