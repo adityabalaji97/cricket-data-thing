@@ -6,8 +6,6 @@ import {
   Container,
   Box,
   Typography,
-  Tabs,
-  Tab,
   IconButton,
   useMediaQuery,
   useTheme,
@@ -43,7 +41,8 @@ import axios from 'axios';
 
 import config from './config';
 import { getPreviewStartDate, TODAY } from './utils/dateDefaults';
-import { NAV_ITEMS, getCurrentTabForPath, getPageTitleForPath } from './navItems';
+import { getPageTitleForPath } from './navItems';
+import ExploreMenu, { ExploreButton } from './components/nav/ExploreMenu';
 import { MensT20Scope, useFormat } from './context/FormatContext';
 import { trackPageView } from './utils/analytics';
 
@@ -178,8 +177,8 @@ const AppContent = () => {
     topTeams: 10
   });
   const [statsData, setStatsData] = useState(null);
-  const [currentTab, setCurrentTab] = useState(0);
   const [searchExpanded, setSearchExpanded] = useState(false);
+  const [exploreOpen, setExploreOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [dayNightFilter, setDayNightFilter] = useState('all');
 
@@ -201,10 +200,6 @@ const AppContent = () => {
     }
   };
 
-
-  useEffect(() => {
-    setCurrentTab(getCurrentTabForPath(location.pathname));
-  }, [location]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -519,10 +514,6 @@ const AppContent = () => {
     setCompetitions(filters);
   };
 
-  const handleTabChange = (event, newValue) => {
-    setCurrentTab(newValue);
-  };
-
   // Create page title based on current tab
   const getPageTitle = () => {
     return getPageTitleForPath(location.pathname);
@@ -645,37 +636,53 @@ const AppContent = () => {
           </>
         ) : (
           <>
-            <Tabs
-              value={currentTab}
-              onChange={handleTabChange}
-              variant="scrollable"
-              scrollButtons="auto"
-              allowScrollButtonsMobile
-              sx={{ flexGrow: 1, minHeight: 60 }}
+            {/* Desktop: logo, page title, search and the Explore menu (every page, grouped).
+                The old tab strip had outgrown the width and scrolled sideways. */}
+            <Box
+              component={Link}
+              to="/"
+              aria-label="Hindsight home"
+              sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', py: 1.5 }}
             >
-              {NAV_ITEMS.map((item) => (
-                <Tab
-                  key={item.path}
-                  label={item.label}
-                  component={Link}
-                  to={item.path}
-                />
-              ))}
-            </Tabs>
-            <Box sx={{ ml: 1, display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+              <Box component="img" src="/cricket-icon.svg" alt="" sx={{ width: 30, height: 30 }} />
+              <Typography sx={{ fontFamily: hsFonts.display, fontWeight: 700, fontSize: 20, color: hsColors.textHi }}>
+                Hindsight
+              </Typography>
+            </Box>
+            <Typography
+              component="h1"
+              sx={{
+                ml: 2,
+                pl: 2,
+                borderLeft: `1px solid ${hsColors.borderStrong}`,
+                flexGrow: 1,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                fontFamily: hsFonts.display,
+                fontWeight: 600,
+                fontSize: 18,
+                color: hsColors.textMed,
+              }}
+            >
+              {getPageTitle()}
+            </Typography>
+            <Box sx={{ ml: 1, display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
               <IconButton
                 onClick={() => setSearchExpanded(true)}
-                size="small"
-                sx={{ color: 'text.secondary' }}
+                sx={{ color: 'text.secondary', width: 42, height: 42 }}
                 aria-label="search"
               >
                 <SearchIcon />
               </IconButton>
+              <ExploreButton onClick={() => setExploreOpen(true)} />
             </Box>
           </>
         )}
       </Box>
       )}
+
+      {!isCompactNav && <ExploreMenu open={exploreOpen} onClose={() => setExploreOpen(false)} />}
 
       <Routes>
         <Route path="/" element={<LandingPage />} />

@@ -12,25 +12,17 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import SearchIcon from '@mui/icons-material/Search';
 import MenuIcon from '@mui/icons-material/Menu';
-import CloseIcon from '@mui/icons-material/Close';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import PersonIcon from '@mui/icons-material/Person';
-import SportsCricketIcon from '@mui/icons-material/SportsCricket';
-import StadiumIcon from '@mui/icons-material/Stadium';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
-import GroupsIcon from '@mui/icons-material/Groups';
-import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
-import QueryStatsIcon from '@mui/icons-material/QueryStats';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import XIcon from '@mui/icons-material/X';
 import config from '../config';
 import { fetchUpcomingMatches } from '../data/iplSchedule';
+import ExploreMenu from './nav/ExploreMenu';
 import MiniWagonWheel from './MiniWagonWheel';
 import { getTeamColor, textOn } from '../utils/teamColors';
 import SearchBar from './search/SearchBar';
@@ -74,16 +66,6 @@ const ELO_RANGE_OPTIONS = [
   { value: 'ytd', label: '2026 only' },
 ];
 
-const EXPLORE_ITEMS = [
-  { label: 'Batter Profiles', description: 'Batting form, scoring maps and matchups', route: '/player', icon: PersonIcon, color: '#c70d3a' },
-  { label: 'Bowler Profiles', description: 'Wickets, phases, line and length patterns', route: '/bowler', icon: SportsCricketIcon, color: '#ff6f00' },
-  { label: 'Batter Comparison', description: 'Compare players across roles and contexts', route: '/comparison', icon: CompareArrowsIcon, color: '#9c27b0' },
-  { label: 'Query Builder', description: 'Ask custom questions of the ball-by-ball data', route: '/query', icon: QueryStatsIcon, color: '#5b8def' },
-  { label: 'Venue Analysis', description: 'Preview venues, par scores and matchups', route: '/venue', icon: StadiumIcon, color: '#0057b7' },
-  { label: 'Team Matchups', description: 'Head-to-head and tactical matchup history', route: '/matchups', icon: GroupsIcon, color: '#1cba2e' },
-  { label: 'ELO Rankings', description: 'Current team strength ratings', route: '/rankings', icon: EmojiEventsIcon, color: '#f0b429' },
-  { label: 'Credits', description: 'Sources, inspiration and project links', route: '/credits', icon: InfoOutlinedIcon, color: '#6b7280' },
-];
 
 const toDateLabel = (value) => {
   if (!value) return '';
@@ -1140,93 +1122,6 @@ const CreditChip = ({ href, icon, children }) => (
   </Box>
 );
 
-const ExploreDrawer = ({ open, onClose }) => (
-  <>
-    <Box
-      onClick={onClose}
-      sx={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 60,
-        bgcolor: 'rgba(0,0,0,0.45)',
-        opacity: open ? 1 : 0,
-        pointerEvents: open ? 'auto' : 'none',
-        transition: 'opacity 0.28s cubic-bezier(0.22,1,0.36,1)',
-      }}
-    />
-    <Box
-      aria-hidden={!open}
-      sx={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: { xs: '86%', sm: 380 },
-        zIndex: 61,
-        bgcolor: C.muted,
-        borderLeft: `1px solid ${C.hairlineStrong}`,
-        p: 2,
-        transform: open ? 'translateX(0)' : 'translateX(102%)',
-        visibility: open ? 'visible' : 'hidden',
-        pointerEvents: open ? 'auto' : 'none',
-        transition: open
-          ? 'transform 0.28s cubic-bezier(0.22,1,0.36,1)'
-          : 'transform 0.28s cubic-bezier(0.22,1,0.36,1), visibility 0s linear 0.28s',
-        boxShadow: '0 0 60px rgba(0,0,0,0.5)',
-      }}
-    >
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box>
-          <Kicker>Explore</Kicker>
-          <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 22 }}>
-            Hindsight tools
-          </Typography>
-        </Box>
-        <IconButton aria-label="Close explore menu" onClick={onClose} sx={{ color: C.hi }}>
-          <CloseIcon />
-        </IconButton>
-      </Box>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {EXPLORE_ITEMS.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Box
-              key={item.label}
-              component={Link}
-              to={item.route}
-              onClick={onClose}
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: '42px minmax(0,1fr) 18px',
-                alignItems: 'center',
-                gap: 1,
-                p: 1,
-                color: C.hi,
-                textDecoration: 'none',
-                borderRadius: 2,
-                border: `1px solid ${C.hairline}`,
-                bgcolor: C.surface,
-                '&:hover': { bgcolor: C.raised, borderColor: 'rgba(255,255,255,0.14)' },
-              }}
-            >
-              <Box sx={{ width: 38, height: 38, display: 'grid', placeItems: 'center', borderRadius: 1.6, bgcolor: `${item.color}22`, color: item.color }}>
-                <Icon sx={{ fontSize: 20 }} />
-              </Box>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 16 }}>{item.label}</Typography>
-                <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.description}
-                </Typography>
-              </Box>
-              <ChevronRightIcon sx={{ color: C.low, fontSize: 18 }} />
-            </Box>
-          );
-        })}
-      </Box>
-    </Box>
-  </>
-);
-
 const LoadingCard = ({ label }) => (
   <Box sx={{ minHeight: 130, display: 'grid', placeItems: 'center', bgcolor: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 2.5 }}>
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, color: C.soft }}>
@@ -1423,7 +1318,7 @@ const LandingPage = ({ showLeagueCounts = true }) => {
         <LeagueCountsSection stats={recentData?.competition_stats} showLeagueCounts={showLeagueCounts} />
         <CreditsSection />
       </Box>
-      <ExploreDrawer open={navOpen} onClose={() => setNavOpen(false)} />
+      <ExploreMenu open={navOpen} onClose={() => setNavOpen(false)} />
     </Box>
   );
 };
