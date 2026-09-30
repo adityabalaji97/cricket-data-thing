@@ -11,6 +11,14 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
+> (sync_stats_from_dd double-counted wides/no-balls and charged byes; statsProcessor charged
+> byes). Writers fixed; scripts/backfill_bowler_runs.py rewrote ~94.6k bowling_stats rows
+> (-213k runs; backup b006 first); a re-run is a no-op. Query-builder batting/bowling_stats modes
+> now filter by format/gender and group competitions via competition_aliases (IPL 2026 was a
+> separate 'IPL' group). Unused GPT preview narrative removed. Migration 008 resolved the last
+> spelling pairs (Shabbir main name). Test suite fully green (157).
+>
 > **Query builder is format-aware (2026-09-30):** shared links waited on nothing and auto-ran
 > before ?fmt= resolved, so an ODI link ran as ALL (+ an unasked top_teams=10) and mixed in T20
 > numbers; now the auto-run waits for the format list and reads it at run time. For ODI the
