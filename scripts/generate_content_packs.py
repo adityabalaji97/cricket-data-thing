@@ -5,8 +5,8 @@ Generate content packs for newly loaded matches (services/content_packs.py).
     python scripts/generate_content_packs.py --days 3 --dry-run
     python scripts/generate_content_packs.py --match 1525655 --match 1496589
 
-Runs nightly after the load (refresh-delivery-details.yml). Packs land as 'ready' in the admin
-"Social" tab; ready packs past their post-by deadline are marked expired; parked ideas
+Runs nightly after the load (refresh-delivery-details.yml). Also makes the season tallies for
+leagues in progress (playoff race, Impact leaders). Packs land as 'ready' in the admin "Social" tab; ready packs past their post-by deadline are marked expired; parked ideas
 (services/content_ideas.py) are retried against the new data.
 """
 import argparse
@@ -38,6 +38,25 @@ def main() -> None:
             print(f"      warning: {w}")
     for p in summary["refused"]:
         print(f"  - refused: {p['title']} -- {'; '.join(p['refused'])}")
+
+    if not args.matches:
+        # Season tallies (services/season_tallies.py): playoff race and Impact leaders for leagues in
+        # progress. Needs ESPN; a failure here must not lose the packs above.
+        try:
+            from services.season_tallies import generate as generate_tallies
+
+            tallies = generate_tallies(db, dry_run=args.dry_run)
+            print(f"season tallies: leagues {tallies['leagues'] or '-'} | packs: {len(tallies['packs'])} | "
+                  f"refused: {len(tallies['refused'])}")
+            for p in tallies["packs"]:
+                print(f"  + {p['title']}{' (already queued)' if p.get('duplicate') else ''}")
+            for p in tallies["refused"]:
+                print(f"  - refused: {p['title']} -- {'; '.join(p['refused'])}")
+            for reason in tallies["skipped"]:
+                print(f"  . {reason}")
+        except Exception as exc:  # noqa: BLE001 -- reported, never fatal
+            db.rollback()
+            print(f"season tallies failed: {exc!r}")
 
     if not args.dry_run and not args.matches:
         from services.content_ideas import retry_parked

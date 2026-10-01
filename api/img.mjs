@@ -76,8 +76,11 @@ function barsBody(size, data) {
   const chart = data.chart || {};
   const labelKey = chart.label_key || (data.group_by || [])[0];
   const metric = chart.metric || (data.metric_columns || [])[0];
-  // A three-line headline leaves room for one bar fewer.
-  const maxRows = size.rows - ((data.title || '').length > 70 ? 1 : 0);
+  // A three-line headline leaves room for one bar fewer. A full league table (data.row_limit, e.g. 10
+  // teams in a playoff race) must show every team, so on the tall sizes it gets up to two extra rows,
+  // drawn tighter, whatever the headline length.
+  const extra = data.row_limit && size.height >= size.width ? Math.min(2, Math.max(0, data.row_limit - size.rows)) : 0;
+  const maxRows = extra ? size.rows + extra : size.rows - ((data.title || '').length > 70 ? 1 : 0);
   const rows = (data.rows || []).filter((r) => typeof r[metric] === 'number').slice(0, maxRows);
   const values = rows.map((r) => r[metric]);
   const max = Math.max(...values.map(Math.abs), 1e-9);
@@ -85,7 +88,7 @@ function barsBody(size, data) {
   // Compress the axis when all values are close (e.g. control % 80-90) so differences show.
   const floor = min > 0 && (max - min) / max < 0.25 ? min * 0.9 : 0;
   const highlight = (data.highlight || '').toLowerCase();
-  return h('div', { flexDirection: 'column', marginTop: size.height < size.width ? 24 : 34, gap: size.gap },
+  return h('div', { flexDirection: 'column', marginTop: size.height < size.width ? 24 : 34, gap: extra ? Math.round(size.gap * 0.5) : size.gap },
     h('div', { color: C.mid, fontSize: size.small }, [data.metric_label ? data.metric_label[0].toUpperCase() + data.metric_label.slice(1) : metricLabel(metric), ...chipsFor(data)].join(' · ')),
     rows.map((r, i) => {
       const label = String(r[labelKey] ?? '');

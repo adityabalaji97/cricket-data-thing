@@ -131,6 +131,20 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > 2015). Charts carry lower_is_better (content_packs._ranking_data passes it to /img). content_rules: a
 > title that opens with its subject is not a question ("Will Jacks ..."). Replay on 1,031 local 2025-26
 > matches: 18 s, no errors, 0 rule failures. tests/test_record_framings.py.
+> **Season tallies (2026-10-01, local):** services/season_tallies.py, run by generate_content_packs.py after
+> the per-match packs (failures reported, never fatal). For each main league with a match in the last 10
+> days: schedule from ESPN's league scoreboard (calendar of match days, fetched in parallel with retries;
+> a missing day skips the league rather than post odds from a partial fixture list); league id from the
+> live header feed by name, kept in app_meta "espn_league:<label>" (IPL 8048 known). ESPN ids = matches.id.
+> Points table from matches.winner, else ESPN's winner flag / "Match tied (X won the Super Over)"; NRR from
+> delivery_details. 20,000 Elo simulations -> chance of top 4 (Hundred top 3) and top 2. Packs (source
+> 'tally', static ranking snapshot, all teams on the portrait image via data.row_limit): playoff race
+> every 7 league matches; batting and bowling Impact leaders (query snapshots) every 10. Replay IPL 2026 as
+> of 1 May: final table = ESPN's for all 10 teams; Sooryavanshi +244 / Bhuvneshwar 250 Impact (validated
+> numbers). content_rules.tracked_url now appends with & when the path has a query. tests/test_season_tallies.py.
+> **Data gap found, not fixed:** a tie settled by a Super Over loads with matches.winner NULL and no outcome
+> (1529281 LSG v KKR, 26 Apr 2026: KKR won the Super Over; dd has no innings 3/4), so Elo, streaks and
+> head-to-heads treat it as no result. The tally reads the winner from ESPN; the sync should set it.
 > **Notes 3-8 DEPLOYED (2026-10-01):** migration 010 applied to prod (author 'aditya' id 34, pack_id,
 > idx_notes_bot_match); Heroku v460; Vercel from origin/main 9a68aad. Smoke: /notes 200 (empty), admin 403
 > without token, Googlebot /notes gets the server-rendered list, sitemap lists /notes. Prod goldens: 4 diffs,

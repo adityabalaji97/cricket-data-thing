@@ -103,7 +103,8 @@ def post_by(match_date: date, now: Optional[datetime] = None) -> datetime:
 
 
 def tracked_url(path: str, campaign: str, source: str = "reddit") -> str:
-    return f"{SITE_URL}{path}?{urlencode({'utm_source': source, 'utm_campaign': campaign})}"
+    joiner = "&" if "?" in path else "?"
+    return f"{SITE_URL}{path}{joiner}{urlencode({'utm_source': source, 'utm_campaign': campaign})}"
 
 
 def first_comment(fact: Dict[str, Any], link: str) -> str:
