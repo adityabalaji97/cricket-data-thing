@@ -104,10 +104,15 @@ def resolve(db: Session, days: Optional[int] = None, match_ids: Optional[List[st
             dry_run: bool = False) -> Dict[str, Any]:
     """Look up each unresolved match on ESPN and record ties, Super Over winners and no-results."""
     summary: Dict[str, Any] = {"checked": 0, "tie_eliminator": [], "tie": [], "no_result": [], "unclear": [], "won": []}
+    from concurrent.futures import ThreadPoolExecutor
+
     updates = []
-    for m in unresolved(db, days, match_ids):
+    todo = unresolved(db, days, match_ids)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        pages = list(pool.map(lambda m: _fetch(str(m["id"])), todo))
+    for m, page in zip(todo, pages):
         summary["checked"] += 1
-        parsed = parse_result(_fetch(str(m["id"])), m["team1"], m["team2"])
+        parsed = parse_result(page, m["team1"], m["team2"])
         label = f"{m['id']} {m['date']} {m['team1']} v {m['team2']}"
         if not parsed:
             summary["unclear"].append(label)
