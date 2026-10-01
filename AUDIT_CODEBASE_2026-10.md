@@ -13,7 +13,17 @@ Nothing in prod was touched.
 Branch for fixes: `audit-fixes` (not merged or deployed). **Fixed:** F0 `62a272d`, C4 `68c4023`, A7 `f26f058`, A9 `d6f9a5d`,
 A4 (wicket casing only) `3200f45`, B1 `2ba20f5`, A16a `2355562`, C9 `2e19fcc`. All goldens identical after each.
 Batch 2: cache LOGIC_VERSION `bba7529`, A1 `718d74e`, A2 `5b8e6b9`, A3 via shared `services/metrics/sql_defs.py` `49e561c`,
-A6 + legacy-scorecard part of A18 `d00c0fa`. **Batch 2 changes 8 goldens — refresh awaiting sign-off.**
+A6 + legacy-scorecard part of A18 `d00c0fa`; 8 goldens re-baselined with sign-off `40d9fc5`.
+Batch 3: A14 rolling form/bowling context `0d76ce9`, venue leaders `fd5421b`, player stats vs types `d0591ba`,
+player bowling breakdowns `33df9bd`, pitch maps `57d9284`; A11 matchups + innings filter `114eabc`;
+A15 rankings `bb33be3`; A8 dismissal stats `08c1d6d`. **match_preview golden refresh awaiting sign-off.**
+
+**New findings from fixing:** A19 — `/player/{name}/stats` bowling-type matrix reads only the legacy
+table, which after 2025 holds only cricsheet-loaded matches (72 locally since mid-2025), so the profile
+matrix misses most recent cricket. A20 — local `bowling_stats` was written by older sync rules (wide runs
+double-counted, 'leg before wicket' not a wicket, `score = 0` dots): 26k/3.2k/12k innings differ from
+current rules; check prod (read-only) before regenerating. A21 — `matchups.py` filtered innings on
+`dd.innings` (never populated), so any innings-position filter dropped all post-2015 data (fixed).
 
 ---
 

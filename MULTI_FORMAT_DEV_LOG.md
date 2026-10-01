@@ -24,9 +24,15 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > dates (match_date), A2 merge/legacy-only thresholds + pagination applied once after merging,
 > services/metrics/sql_defs.py = shared batter/bowler/team ball, run, wicket, dot SQL (mirrors
 > sync_stats_from_dd); query-builder grouped mode + scorecard (rows, breakdowns, legacy innings
-> wickets) use it. GOLDENS NOT REFRESHED YET: 8 endpoints differ (6 qb_*, 2 scorecard_*) pending user
-> sign-off. Still on old defs: cumulative (through-ball) QB mode and the A14 list (rolling_form,
-> bowling_context, matchups, main.py player breakdowns, wrapped cards, pitch-map runs, rankings).
+> wickets) use it. 8 local goldens re-baselined with user sign-off (40d9fc5; capture --only NAME...).
+> Batch 3 (A14/A15/A8/A11) on sql_defs too: rolling_form + bowling_context, venue fallback leaders,
+> /player/{name}/stats pace-spin + bowling-type columns, player bowling breakdowns, pitch maps,
+> matchups (+ innings_position used dead dd.innings -> dd.inns), rankings (prefers bat/bowl/match_date;
+> `date` was all NULL so windows widened to whole years), dismissal stats (new
+> services/dismissal_stats.py behind /players/... and /player/... routes; filters + all name
+> spellings + dd-or-legacy). PENDING SIGN-OFF: match_preview golden (2 prose bullets from matchups).
+> Not done: Wrapped cards (20 files, seasonal recap -- product call), cumulative QB mode, /player stats
+> bowling-type breakdowns still legacy-table only (post-2025 cricsheet-only coverage).
 > Local bowling_stats is stale vs current sync rules (wide double-count, 'leg before wicket' missed,
 > old score=0 dots) -- check prod before regenerating.
 >
