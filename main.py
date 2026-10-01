@@ -69,6 +69,32 @@ import math
 _VENUE_BAT = sql_defs.delivery_details_defs(sql_defs.BATTER, "dd")
 _VENUE_BOWL = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
 
+
+def _batter_vs_type_columns() -> str:
+    """Overall + T20-phase columns for a batter against a bowler grouping (legacy table).
+
+    Runs off the bat, balls excluding wides, and the batter's *own* dismissals. The old columns
+    counted extras as his runs, wides as balls faced, and any non-run-out wicket on a ball he
+    faced -- while dropping his own run outs.
+    """
+    bat = sql_defs.legacy_defs(sql_defs.BATTER, "d")
+    phases = [("", None), ("pp_", "d.over < 6"), ("middle_", "d.over >= 6 AND d.over < 15"), ("death_", "d.over >= 15")]
+    cols = []
+    for prefix, cond in phases:
+        when = (lambda expr: f"{cond} AND {expr}") if cond else (lambda expr: expr)
+        runs = f"SUM(CASE WHEN {cond} THEN {bat.runs} ELSE 0 END)" if cond else bat.runs_sum
+        cols += [
+            f"{runs} as {prefix}runs",
+            f"SUM(CASE WHEN {when(bat.legal_ball)} THEN 1 ELSE 0 END) as {prefix}balls",
+            f"SUM(CASE WHEN {when(bat.dot)} THEN 1 ELSE 0 END) as {prefix}dots",
+            f"SUM(CASE WHEN {when('d.runs_off_bat >= 4')} THEN 1 ELSE 0 END) as {prefix}boundaries",
+            f"SUM(CASE WHEN {when(bat.wicket)} THEN 1 ELSE 0 END) as {prefix}wickets",
+        ]
+    return ",\n                ".join(cols)
+
+
+_BATTER_VS_TYPE_COLUMNS = _batter_vs_type_columns()
+
 from dotenv import load_dotenv
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
@@ -2361,37 +2387,7 @@ def get_player_stats(
             )
             SELECT 
                 bt.bowling_category as category,
-                SUM(d.runs_off_bat + d.extras) as runs,
-                COUNT(*) as balls,
-                SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
-                SUM(CASE WHEN d.runs_off_bat >= 4 THEN 1 ELSE 0 END) as boundaries,
-                SUM(CASE WHEN d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out') 
-                THEN 1 ELSE 0 END) as wickets,
-                
-                SUM(CASE WHEN d.over < 6 THEN d.runs_off_bat + d.extras ELSE 0 END) as pp_runs,
-                SUM(CASE WHEN d.over < 6 THEN 1 ELSE 0 END) as pp_balls,
-                SUM(CASE WHEN d.over < 6 AND d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as pp_dots,
-                SUM(CASE WHEN d.over < 6 AND d.runs_off_bat >= 4 THEN 1 ELSE 0 END) as pp_boundaries,
-                SUM(CASE WHEN d.over < 6 AND d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out')
-                THEN 1 ELSE 0 END) as pp_wickets,
-                
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 THEN d.runs_off_bat + d.extras ELSE 0 END) as middle_runs,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 THEN 1 ELSE 0 END) as middle_balls,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 AND d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as middle_dots,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 AND d.runs_off_bat >= 4 THEN 1 ELSE 0 END) as middle_boundaries,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 AND d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out')
-                THEN 1 ELSE 0 END) as middle_wickets,
-                
-                SUM(CASE WHEN d.over >= 15 THEN d.runs_off_bat + d.extras ELSE 0 END) as death_runs,
-                SUM(CASE WHEN d.over >= 15 THEN 1 ELSE 0 END) as death_balls,
-                SUM(CASE WHEN d.over >= 15 AND d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as death_dots,
-                SUM(CASE WHEN d.over >= 15 AND d.runs_off_bat >= 4 THEN 1 ELSE 0 END) as death_boundaries,
-                SUM(CASE WHEN d.over >= 15 AND d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out')
-                THEN 1 ELSE 0 END) as death_wickets
+                {_BATTER_VS_TYPE_COLUMNS}
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
             JOIN players p ON d.bowler = p.name
@@ -2408,37 +2404,7 @@ def get_player_stats(
         bowling_types_query = text(f"""
             SELECT 
                 p.bowler_type,
-                SUM(d.runs_off_bat + d.extras) as runs,
-                COUNT(*) as balls,
-                SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
-                SUM(CASE WHEN d.runs_off_bat >= 4 THEN 1 ELSE 0 END) as boundaries,
-                SUM(CASE WHEN d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out') 
-                THEN 1 ELSE 0 END) as wickets,
-                
-                SUM(CASE WHEN d.over < 6 THEN d.runs_off_bat + d.extras ELSE 0 END) as pp_runs,
-                SUM(CASE WHEN d.over < 6 THEN 1 ELSE 0 END) as pp_balls,
-                SUM(CASE WHEN d.over < 6 AND d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as pp_dots,
-                SUM(CASE WHEN d.over < 6 AND d.runs_off_bat >= 4 THEN 1 ELSE 0 END) as pp_boundaries,
-                SUM(CASE WHEN d.over < 6 AND d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out')
-                THEN 1 ELSE 0 END) as pp_wickets,
-                
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 THEN d.runs_off_bat + d.extras ELSE 0 END) as middle_runs,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 THEN 1 ELSE 0 END) as middle_balls,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 AND d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as middle_dots,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 AND d.runs_off_bat >= 4 THEN 1 ELSE 0 END) as middle_boundaries,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 AND d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out')
-                THEN 1 ELSE 0 END) as middle_wickets,
-                
-                SUM(CASE WHEN d.over >= 15 THEN d.runs_off_bat + d.extras ELSE 0 END) as death_runs,
-                SUM(CASE WHEN d.over >= 15 THEN 1 ELSE 0 END) as death_balls,
-                SUM(CASE WHEN d.over >= 15 AND d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as death_dots,
-                SUM(CASE WHEN d.over >= 15 AND d.runs_off_bat >= 4 THEN 1 ELSE 0 END) as death_boundaries,
-                SUM(CASE WHEN d.over >= 15 AND d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out')
-                THEN 1 ELSE 0 END) as death_wickets
+                {_BATTER_VS_TYPE_COLUMNS}
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
             JOIN players p ON d.bowler = p.name
