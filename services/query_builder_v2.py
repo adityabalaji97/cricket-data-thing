@@ -2930,13 +2930,23 @@ BALL_IN_OVER_SEQ_JOIN = "JOIN ball_in_over_seq bio ON bio.id = dd.id"
 # AND running-window cumulative metric totals (used in cumulative mode). The
 # windows partition by (p_match, inns), which caps at ~120 rows per innings,
 # so the per-row cost is negligible even when only ball_in_innings is used.
-BALL_SEQ_CTE = """ball_seq AS (
+# Wickets follow services/metrics/sql_defs.py: wickets_through_ball are the innings' real dismissals
+# (a non-empty `dismissal` counted retired hurt and the feed's stray "not out" rows), and
+# batter_wickets_through_ball the striker's own, for batter-filtered queries. Runs, wickets and
+# dots here cover legal balls only, like "ball N" itself: runs off wides and no-balls fall outside
+# the window (a known limitation of the cumulative view, not of the snapshot one).
+_SEQ_TEAM = sql_defs.delivery_details_defs(sql_defs.TEAM, "delivery_details")
+_SEQ_BATTER = sql_defs.delivery_details_defs(sql_defs.BATTER, "delivery_details")
+_SEQ_BOWLER = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
+
+BALL_SEQ_CTE = f"""ball_seq AS (
     SELECT id,
            ROW_NUMBER() OVER w AS ball_in_innings,
            SUM(batruns) OVER w AS runs_through_ball,
            SUM(score) OVER w AS score_through_ball,
            COUNT(*) OVER w AS balls_through_ball,
-           SUM(CASE WHEN dismissal IS NOT NULL AND dismissal != '' THEN 1 ELSE 0 END) OVER w AS wickets_through_ball,
+           SUM(CASE WHEN {_SEQ_TEAM.wicket} THEN 1 ELSE 0 END) OVER w AS wickets_through_ball,
+           SUM(CASE WHEN {_SEQ_BATTER.wicket} THEN 1 ELSE 0 END) OVER w AS batter_wickets_through_ball,
            SUM(CASE WHEN batruns = 0 AND wide = 0 AND noball = 0 THEN 1 ELSE 0 END) OVER w AS dots_through_ball,
            SUM(CASE WHEN batruns IN (4, 6) THEN 1 ELSE 0 END) OVER w AS boundaries_through_ball,
            SUM(CASE WHEN batruns = 4 THEN 1 ELSE 0 END) OVER w AS fours_through_ball,
@@ -2990,13 +3000,16 @@ SPELL_SEQ_CTES = [
     # totals partitioned by spell. Used in cumulative mode the same way
     # ball_seq.runs_through_ball is — the outer SUMs aggregate per-row
     # cumulative values across all spells that reached this position.
-    """spell_seq AS (
+    # A spell is the bowler's: his runs (no byes / leg-byes) and the wickets credited to him (run
+    # outs counted before). See the note above BALL_SEQ_CTE on legal balls only.
+    f"""spell_seq AS (
         SELECT dd.id,
                ROW_NUMBER() OVER w AS ball_in_spell,
                SUM(dd.batruns) OVER w AS runs_through_ball,
                SUM(dd.score) OVER w AS score_through_ball,
+               SUM({_SEQ_BOWLER.runs}) OVER w AS bowler_runs_through_ball,
                COUNT(*) OVER w AS balls_through_ball,
-               SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) OVER w AS wickets_through_ball,
+               SUM(CASE WHEN {_SEQ_BOWLER.wicket} THEN 1 ELSE 0 END) OVER w AS wickets_through_ball,
                SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) OVER w AS dots_through_ball,
                SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) OVER w AS boundaries_through_ball,
                SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) OVER w AS fours_through_ball,
@@ -3349,10 +3362,18 @@ def handle_grouped_query(
     if cumulative_source:
         metrics_enabled = False
         src = cumulative_source  # "bs" (ball_seq) or "ss" (spell_seq)
-        runs_column = "runs_through_ball" if use_runs_off_bat_only else "score_through_ball"
+        if use_runs_off_bat_only:
+            runs_column = "runs_through_ball"
+        elif src == "ss":
+            runs_column = "bowler_runs_through_ball"  # a spell is the bowler's
+        else:
+            runs_column = "score_through_ball"  # an innings: every run
         runs_calculation = f"SUM({src}.{runs_column})"
         balls_expr = f"SUM({src}.balls_through_ball)"
-        wickets_expr = f"SUM({src}.wickets_through_ball)"
+        wickets_column = (
+            "batter_wickets_through_ball" if (src == "bs" and use_runs_off_bat_only) else "wickets_through_ball"
+        )
+        wickets_expr = f"SUM({src}.{wickets_column})"
         stage2_extra_select = (
             f"{src}.dots_through_ball, "
             f"{src}.boundaries_through_ball, "
