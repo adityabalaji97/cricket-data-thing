@@ -130,3 +130,15 @@ def list_ideas(limit: int = 15, db: Session = Depends(get_session)):
         ORDER BY i.created_at DESC LIMIT :limit
     """), {"limit": min(limit, 100)}).mappings()
     return {"ideas": [dict(r) for r in rows]}
+
+
+@router.post("/packs/{pack_id}/note", status_code=201)
+def pack_to_note(pack_id: int, db: Session = Depends(get_session)):
+    """One tap from the Social queue: the pack becomes a draft note (or the one it already became)."""
+    from services.note_drafts import note_from_pack
+    from services.notes import NoteError
+
+    try:
+        return note_from_pack(db, pack_id)
+    except NoteError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

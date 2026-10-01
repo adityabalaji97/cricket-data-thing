@@ -1043,7 +1043,9 @@ def score_preview_lean(context: Dict[str, Any]) -> Dict[str, Any]:
     else:
         c["toss_fit_vs_venue_bias"] = 0
     if c["toss_fit_vs_venue_bias"]:
-        reasons.append({"component": "toss_fit_vs_venue_bias", "score": c["toss_fit_vs_venue_bias"], "detail": f"Venue bias: {bias_label}"})
+        # Reasons are shown to readers ("Lean X: ..."), so the label is spelled out, not the code.
+        bias_text = "chasing sides win more here" if bias_label == "chasing_edge" else "sides batting first win more here"
+        reasons.append({"component": "toss_fit_vs_venue_bias", "score": c["toss_fit_vs_venue_bias"], "detail": f"Venue: {bias_text}"})
 
     # Threshold fit
     t1_thresh = (t1_recent.get("reached_avg_winning_score_batting_first", 0) or 0) + (t1_recent.get("chased_avg_chasing_score", 0) or 0)

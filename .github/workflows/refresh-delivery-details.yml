@@ -118,6 +118,16 @@ jobs:
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
         run: python scripts/generate_content_packs.py --days 10
 
+      # Hindsight Bot drafts Notes (services/note_drafts.py): recaps of newly loaded matches, which
+      # reuse the packs' facts and charts (so this runs after them), then previews of fixtures in
+      # the next 36 hours. Drafts only -- nothing publishes until the admin does it in /admin/notes.
+      # Jev picks the preview headline when TYPESAFE_API_KEY is set. Never blocks the rest of the run.
+      - name: Draft notes (recaps, then previews)
+        continue-on-error: true
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: python scripts/draft_notes.py --days 10
+
       # Usage tables (migration 004) keep 90 days of raw rows; weekly reports need no more.
       - name: Prune raw usage events
         if: always()

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { Box, Button, Chip, CircularProgress, MenuItem, Snackbar, TextField, Typography } from '@mui/material';
 import axios from 'axios';
 import config from '../../config';
@@ -400,7 +400,13 @@ const AdminNotes = () => {
     return author ? { mode: 'author', token: author } : null;
   });
   const [me, setMe] = useState(null);
-  const [open, setOpen] = useState(null);       // note id, 'new', or null
+  const [params, setParams] = useSearchParams();
+  // ?open=<id>: arrive straight in a note's editor (the Social queue's "Make note").
+  const [open, setOpenState] = useState(() => Number(params.get('open')) || null);   // note id, 'new', or null
+  const setOpen = useCallback((value) => {
+    setOpenState(value);
+    if (params.has('open')) setParams({}, { replace: true });
+  }, [params, setParams]);
   const [message, setMessage] = useState(null);
   const toast = useCallback((m) => setMessage(m), []);
   const api = useMemo(() => (session ? makeApi(session.mode, session.token) : null), [session]);
@@ -414,9 +420,9 @@ const AdminNotes = () => {
     store.set(session?.mode === 'admin' ? ADMIN_KEY : AUTHOR_KEY, '');
     setSession(null);
     setOpen(null);
-  }, [session]);
+  }, [session, setOpen]);
   const onAuthFail = useCallback(() => { toast('Token rejected'); signOut(); }, [toast, signOut]);
-  const close = useCallback(() => setOpen(null), []);
+  const close = useCallback(() => setOpen(null), [setOpen]);
 
   return (
     <Box sx={{ maxWidth: 720, mx: 'auto', pb: 4, color: colors.textHi }}>

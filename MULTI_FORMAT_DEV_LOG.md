@@ -92,7 +92,25 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > size (1200x630) now holds 4 bars + footer (5 overflowed and pushed the watermark off). Tests:
 > tests/js/notes_render.test.mjs. Goldens: 19/19 identical vs a clean 4e84c45 worktree server on the same
 > local DB (5 of them non-200 on both: no ball_metrics locally).
-> Next: Notes 7, 8.
+> **Notes step 7 built:** services/note_drafts.py + scripts/draft_notes.py, nightly step "Draft notes" after
+> the content packs (continue-on-error, TYPESAFE_API_KEY passed). Recaps: in-scope matches of the last 10
+> days with a result and no recap note; body = build_recap headline + "How it was won" bullets + win_prob
+> snapshot + "The numbers that stood out" from the match's content_packs rows (facts + ranking snapshots
+> reused, nothing recomputed); title = first pack title passing content_rules, else "T1 v T2: <recap
+> headline>", else the result; no primer and no packs -> skipped. Previews: fixtures starting within 36h,
+> in scope via fixture_scope(); gather_preview_context + typed_preview.build_candidate_facts (Jev curate,
+> else facts in code order and no headline) -- NOT the deterministic sections, which read "0 matches ...
+> N/A" on thin samples; < 5 facts -> skipped; venue batting chart (Impact for T20, runs for ODI). Preview
+> drafts are rejected once the match is loaded or after 2 days. One recap/preview per match (010 index).
+> "Make note" on each Social pack -> POST /admin/content/packs/{id}/note -> analysis draft (bot byline,
+> notes.pack_id) opened via /admin/notes?open=<id>. Lean reason text: "Venue bias: chasing_edge" ->
+> "Venue: chasing sides win more here" (the only golden diff, match_preview, intended). tests/test_note_drafts.py.
+> Local primer data now exists: migration 003 applied to hindsight_local, metric_models row rebuilt from
+> ml/models/primer/dl_params_v1.json (no prod read), compute_primer_metrics incremental -> 756,816 balls /
+> 3,352 matches. xgboost there needs a newer libomp than anaconda's: a throwaway `conda create -p <dir>
+> -c conda-forge llvm-openmp` + DYLD_LIBRARY_PATH=<dir>/lib works without touching ~/cdt/.py312.
+> Committed local goldens are still the pre-ball_metrics capture; recapture them deliberately.
+> Next: Notes 8.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
 > (sync_stats_from_dd double-counted wides/no-balls and charged byes; statsProcessor charged

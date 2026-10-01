@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { Box, Button, Chip, CircularProgress, Snackbar, TextField, Typography } from '@mui/material';
 import axios from 'axios';
 import config from '../../config';
@@ -49,6 +49,14 @@ const CopyBlock = ({ label, text, onCopy, multiline }) => (
 const PackCard = ({ pack, client, onChanged, toast }) => {
   const [postedUrl, setPostedUrl] = useState('');
   const [marking, setMarking] = useState(false);
+  const navigate = useNavigate();
+  // The pack becomes a draft note (or reopens the one it already became) in /admin/notes.
+  const makeNote = async () => {
+    try {
+      const { data } = await client.post(`/admin/content/packs/${pack.id}/note`);
+      navigate(`/admin/notes?open=${data.id}`);
+    } catch (err) { toast(err.response?.data?.detail || 'Could not make a note'); }
+  };
   const facts = pack.facts || {};
   const imageUrl = `${siteOrigin()}/img/${pack.snapshot_id}.png`;
 
@@ -73,6 +81,7 @@ const PackCard = ({ pack, client, onChanged, toast }) => {
           Share image
         </Button>
         <Button variant="outlined" href={`${imageUrl}?download=1`} sx={{ color: C.hi, borderColor: C.line, minHeight: 44 }}>Download</Button>
+        <Button variant="outlined" onClick={makeNote} sx={{ color: C.hi, borderColor: C.line, minHeight: 44 }}>Make note</Button>
       </Box>
 
       <CopyBlock label="Title" text={pack.title} onCopy={copy} />
