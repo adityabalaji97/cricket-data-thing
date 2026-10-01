@@ -141,18 +141,25 @@ def _get_recent_form(
     team: str,
     n: int = 5,
     end_date: Optional[date] = None,
+    fmt: str = "T20",
+    gender: str = "male",
 ) -> Dict[str, Any]:
+    # The team test is parenthesised: AND binds tighter than OR, so unbracketed the end_date
+    # cutoff only applied to matches where the team was team2.
     query = text(
         """
         SELECT date, team1, team2, winner, venue
         FROM matches
-        WHERE team1 = :team OR team2 = :team
-          AND (:end_date IS NULL OR date <= :end_date)
+        WHERE (team1 = :team OR team2 = :team)
+          AND format = :fmt AND gender = :gender
+          AND (CAST(:end_date AS date) IS NULL OR date <= :end_date)
         ORDER BY date DESC
         LIMIT :limit
         """
     )
-    rows = db.execute(query, {"team": team, "limit": n, "end_date": end_date}).fetchall()
+    rows = db.execute(
+        query, {"team": team, "limit": n, "end_date": end_date, "fmt": fmt, "gender": gender}
+    ).fetchall()
     results: List[str] = []
     recent_matches: List[Dict[str, Any]] = []
     for r in rows:
@@ -181,8 +188,17 @@ def _get_recent_form(
     }
 
 
-def _get_latest_elo(db: Session, team: str, before: Optional[date] = None) -> Optional[int]:
-    """Latest recorded Elo; with `before`, the latest from matches strictly before that date."""
+def _get_latest_elo(
+    db: Session,
+    team: str,
+    before: Optional[date] = None,
+    fmt: str = "T20",
+    gender: str = "male",
+) -> Optional[int]:
+    """Latest recorded Elo; with `before`, the latest from matches strictly before that date.
+
+    Elo is a separate stream per format (services/elo.py), so the lookup is scoped to one.
+    """
     variations = get_all_team_name_variations(team)
     placeholders = ", ".join(f":t{i}" for i in range(len(variations)))
     query = text(f"""
@@ -190,12 +206,13 @@ def _get_latest_elo(db: Session, team: str, before: Optional[date] = None) -> Op
         FROM matches
         WHERE (team1 IN ({placeholders}) OR team2 IN ({placeholders}))
           AND (team1_elo IS NOT NULL OR team2_elo IS NOT NULL)
+          AND format = :fmt AND gender = :gender
           AND (CAST(:before AS date) IS NULL OR date < :before)
         ORDER BY date DESC
         LIMIT 20
     """)
     params = {f"t{i}": v for i, v in enumerate(variations)}
-    params["before"] = before
+    params.update(before=before, fmt=fmt, gender=gender)
     rows = db.execute(query, params).fetchall()
     for r in rows:
         if r.team1 in variations and r.team1_elo is not None:
@@ -1672,10 +1689,10 @@ def gather_preview_context(
         db, team1, team2, 10, start_date=start_date, end_date=end_date, venue=venue if venue != "All Venues" else None,
         fmt=fmt, gender=gender
     )
-    form1 = _get_recent_form(db, team1, 5, end_date=end_date)
-    form2 = _get_recent_form(db, team2, 5, end_date=end_date)
-    elo1 = _get_latest_elo(db, team1, before=elo_as_of)
-    elo2 = _get_latest_elo(db, team2, before=elo_as_of)
+    form1 = _get_recent_form(db, team1, 5, end_date=end_date, fmt=fmt, gender=gender)
+    form2 = _get_recent_form(db, team2, 5, end_date=end_date, fmt=fmt, gender=gender)
+    elo1 = _get_latest_elo(db, team1, before=elo_as_of, fmt=fmt, gender=gender)
+    elo2 = _get_latest_elo(db, team2, before=elo_as_of, fmt=fmt, gender=gender)
     match_history_bundle = _get_match_history_bundle(
         db, venue, team1, team2, start_date, end_date, fmt=fmt, gender=gender
     )
