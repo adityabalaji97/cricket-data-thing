@@ -18,9 +18,17 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > fmt/gender (A7), main.py player endpoints bind top_teams=None so include_international w/o top_teams
 > means all (A9), pitch-map wickets LOWER(out) (A4), train_model text import (B1), nl2query cache hits
 > logged model_used='cache' at $0 (A16a), web-only statement_timeout via DB_STATEMENT_TIMEOUT_MS set in
-> Procfile (C9, 25 s). Next: A1/A2 query-builder dates + merge pagination, then one shared
-> legal-ball/bowler-runs/bowler-wicket SQL module for A3/A6/A14 -- those CHANGE T20 goldens, needs
-> sign-off + golden refresh.
+> Procfile (C9, 25 s). Batch 2 (2026-10-01): query_cache key now includes LOGIC_VERSION -- BUMP IT
+> with any change to query-builder semantics, else prod serves cached pre-fix results (the cache had
+> also been masking 5 stale goldens: impact/raa/waa/wpa null in golden, populated live). A1 exact
+> dates (match_date), A2 merge/legacy-only thresholds + pagination applied once after merging,
+> services/metrics/sql_defs.py = shared batter/bowler/team ball, run, wicket, dot SQL (mirrors
+> sync_stats_from_dd); query-builder grouped mode + scorecard (rows, breakdowns, legacy innings
+> wickets) use it. GOLDENS NOT REFRESHED YET: 8 endpoints differ (6 qb_*, 2 scorecard_*) pending user
+> sign-off. Still on old defs: cumulative (through-ball) QB mode and the A14 list (rolling_form,
+> bowling_context, matchups, main.py player breakdowns, wrapped cards, pitch-map runs, rankings).
+> Local bowling_stats is stale vs current sync rules (wide double-count, 'leg before wicket' missed,
+> old score=0 dots) -- check prod before regenerating.
 >
 > **Notes plan, steps 1-2 live (2026-09-30):** plan in ~/.claude/plans/can-you-look-at-iterative-plum.md
 > (order 1 → 2 → 6 → 6b → 6c → 3-5 → 7 → 8). Migration 009 (app_meta, query_cache, chart_snapshots,
