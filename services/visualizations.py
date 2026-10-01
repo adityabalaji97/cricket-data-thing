@@ -405,14 +405,14 @@ def get_pitch_map_data(
                 dd.length,
                 COUNT(*) as balls,
                 SUM(dd.score) as runs,
-                SUM(CASE WHEN dd.out = 'True' THEN 1 ELSE 0 END) as wickets,
+                SUM(CASE WHEN LOWER(dd.out) = 'true' THEN 1 ELSE 0 END) as wickets,
                 SUM(CASE WHEN dd.score = 0 THEN 1 ELSE 0 END) as dots,
                 SUM(CASE WHEN dd.score = 4 THEN 1 ELSE 0 END) as fours,
                 SUM(CASE WHEN dd.score = 6 THEN 1 ELSE 0 END) as sixes,
                 SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) as controlled_shots,
                 CASE
-                    WHEN SUM(CASE WHEN dd.out = 'True' THEN 1 ELSE 0 END) > 0
-                    THEN CAST(SUM(dd.score) AS FLOAT) / SUM(CASE WHEN dd.out = 'True' THEN 1 ELSE 0 END)
+                    WHEN SUM(CASE WHEN LOWER(dd.out) = 'true' THEN 1 ELSE 0 END) > 0
+                    THEN CAST(SUM(dd.score) AS FLOAT) / SUM(CASE WHEN LOWER(dd.out) = 'true' THEN 1 ELSE 0 END)
                     ELSE NULL
                 END as average,
                 CAST(SUM(dd.score) AS FLOAT) * 100.0 / COUNT(*) as strike_rate,
@@ -742,7 +742,7 @@ def get_bowler_pitch_map_data(
                 dd.length,
                 COUNT(*) as balls,
                 SUM(dd.score) as runs,
-                SUM(CASE WHEN dd.out = 'True' THEN 1 ELSE 0 END) as wickets,
+                SUM(CASE WHEN LOWER(dd.out) = 'true' THEN 1 ELSE 0 END) as wickets,
                 SUM(CASE WHEN dd.score = 0 THEN 1 ELSE 0 END) as dots,
                 SUM(CASE WHEN dd.score = 4 THEN 1 ELSE 0 END) as fours,
                 SUM(CASE WHEN dd.score = 6 THEN 1 ELSE 0 END) as sixes,
