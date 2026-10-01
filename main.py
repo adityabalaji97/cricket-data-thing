@@ -69,8 +69,6 @@ import math
 # Shared ball/run/wicket definitions for the per-ball leaderboards below (services/metrics/sql_defs.py).
 _VENUE_BAT = sql_defs.delivery_details_defs(sql_defs.BATTER, "dd")
 _VENUE_BOWL = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
-# Bowler breakdowns read from the legacy table (/player/{name}/bowling_stats, bowling_ball_stats).
-_LEGACY_BOWL = sql_defs.legacy_defs(sql_defs.BOWLER, "d")
 
 
 def _batter_vs_type_balls_cte(match_filter: str) -> str:
@@ -136,6 +134,57 @@ def _batter_vs_type_columns() -> str:
 
 
 _BATTER_VS_TYPE_COLUMNS = _batter_vs_type_columns()
+def _bowler_balls_cte(match_filter: str) -> str:
+    """`balls AS (...)`: one row per ball a bowler bowled, from both ball tables, for the
+    breakdowns of /player/{name}/bowling_stats and bowling_ball_stats.
+
+    Those read only the legacy table (cricsheet-only after 2025, so a 2024+ window showed empty
+    over distribution / handedness / maidens) with no format pin (ODI balls included).
+    delivery_details supplies every match it holds and the legacy table only the rest; men's T20;
+    bowler definitions from services/metrics/sql_defs.py (`runs` are the bowler's: no byes or
+    leg-byes, wides and no-balls included). Bowler names are matched against :player_names.
+    """
+    dd = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
+    lg = sql_defs.legacy_defs(sql_defs.BOWLER, "d")
+    common = """
+            AND (:start_date IS NULL OR m.date >= :start_date)
+            AND (:end_date IS NULL OR m.date <= :end_date)
+            AND (:venue IS NULL OR m.venue = :venue)
+            AND m.format = 'T20' AND m.gender = 'male'
+    """
+    return f"""
+        balls AS (
+            SELECT dd.p_match AS match_id, dd.inns AS innings, dd.over AS over, dd.ball AS ball,
+                   CASE WHEN {dd.legal_ball} THEN 1 ELSE 0 END AS legal,
+                   {dd.runs} AS runs,
+                   CASE WHEN {dd.wicket} THEN 1 ELSE 0 END AS wicket,
+                   CASE WHEN {dd.dot} THEN 1 ELSE 0 END AS dot,
+                   CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END AS boundary,
+                   NULLIF(dd.bat_hand, '') AS batter_hand
+            FROM delivery_details dd
+            JOIN matches m ON m.id = dd.p_match
+            WHERE dd.bowl = ANY(:player_names)
+            {common}
+            {match_filter}
+            UNION ALL
+            SELECT d.match_id, d.innings, d.over, d.ball,
+                   CASE WHEN {lg.legal_ball} THEN 1 ELSE 0 END,
+                   {lg.runs},
+                   CASE WHEN {lg.wicket} THEN 1 ELSE 0 END,
+                   CASE WHEN {lg.dot} THEN 1 ELSE 0 END,
+                   CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END,
+                   NULLIF(p.batting_hand, '')
+            FROM deliveries d
+            JOIN matches m ON d.match_id = m.id
+            LEFT JOIN players p ON p.name = d.batter
+            WHERE d.bowler = ANY(:player_names)
+              AND NOT EXISTS (SELECT 1 FROM delivery_details x WHERE x.p_match = d.match_id)
+            {common}
+            {match_filter}
+        )
+    """
+
+
 # Single style codes only: the feed also has combinations ("OB/LB") and placeholders ("-") that
 # the legacy players table never carried and that no matrix row should show.
 _KNOWN_BOWLER_TYPES = sorted(ALL_KNOWN_PACE_TYPES | ALL_KNOWN_SPIN_TYPES)
@@ -3739,23 +3788,19 @@ def get_player_bowling_stats(
         """)
 
         # SIMPLIFIED: Maidens calculation - more efficient approach
-        maidens_query = text(f"""
-            SELECT COUNT(DISTINCT CONCAT(d.match_id, '_', d.innings, '_', d.over)) as maidens
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            WHERE d.bowler = ANY(:player_names)
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            AND d.match_id || '_' || d.innings || '_' || d.over IN (
-                -- Only complete overs with 6 legal balls and 0 runs
-                SELECT CONCAT(match_id, '_', innings, '_', over)
-                FROM deliveries
-                WHERE bowler = ANY(:player_names) AND wides = 0 AND noballs = 0
-                GROUP BY match_id, innings, over
-                HAVING COUNT(*) = 6 AND SUM(runs_off_bat + extras) = 0
+        # A maiden: a complete over (6 legal balls) in which the bowler conceded nothing. The old
+        # test summed runs over legal balls only, so an over of six dots plus a wide was a maiden.
+        bowler_balls_cte = _bowler_balls_cte(match_filter)
+        bowler_overs_cte = f"""
+            WITH {bowler_balls_cte},
+            overs AS (
+                SELECT match_id, innings, over, SUM(legal) AS legal, SUM(runs) AS runs
+                FROM balls GROUP BY match_id, innings, over
             )
+        """
+        maidens_query = text(f"""
+            {bowler_overs_cte}
+            SELECT COUNT(*) AS maidens FROM overs WHERE legal = 6 AND runs = 0
         """)
 
         # SIMPLIFIED: Phase stats using pre-calculated columns + legal ball counts
@@ -3824,63 +3869,43 @@ def get_player_bowling_stats(
 
         # SIMPLIFIED: Over distribution - already efficient, minor cleanup
         over_distribution_query = text(f"""
-            SELECT 
-                d.over as over_number,
-                COUNT(DISTINCT CONCAT(d.match_id, '_', d.innings)) as instances_bowled,
-                SUM({_LEGACY_BOWL.runs}) as runs,
-                COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
-                SUM(CASE WHEN {_LEGACY_BOWL.wicket}
-                THEN 1 ELSE 0 END) as wickets,
-                SUM(CASE WHEN {_LEGACY_BOWL.dot} THEN 1 ELSE 0 END) as dots,
-                SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-                COUNT(DISTINCT d.match_id) as matches_bowled_in
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            WHERE d.bowler = ANY(:player_names)
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY d.over
-            ORDER BY d.over
+            WITH {bowler_balls_cte}
+            SELECT
+                over AS over_number,
+                COUNT(DISTINCT (match_id, innings)) AS instances_bowled,
+                SUM(runs) AS runs,
+                SUM(legal) AS legal_balls,
+                SUM(wicket) AS wickets,
+                SUM(dot) AS dots,
+                SUM(boundary) AS boundaries,
+                COUNT(DISTINCT match_id) AS matches_bowled_in
+            FROM balls
+            GROUP BY over
+            ORDER BY over
         """)
 
         # SIMPLIFIED: Batter handedness with legal balls only
         batter_handedness_query = text(f"""
-            SELECT 
-                p.batting_hand,
-                COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
-                SUM({_LEGACY_BOWL.runs}) as runs,
-                SUM(CASE WHEN {_LEGACY_BOWL.wicket}
-                THEN 1 ELSE 0 END) as wickets,
-                SUM(CASE WHEN {_LEGACY_BOWL.dot} THEN 1 ELSE 0 END) as dots,
-                SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-                
-                -- Phase-wise legal balls only
-                COUNT(CASE WHEN d.over < 6 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as pp_legal_balls,
-                SUM(CASE WHEN d.over < 6 THEN {_LEGACY_BOWL.runs} ELSE 0 END) as pp_runs,
-                SUM(CASE WHEN d.over < 6 AND {_LEGACY_BOWL.wicket}
-                THEN 1 ELSE 0 END) as pp_wickets,
-                
-                COUNT(CASE WHEN d.over >= 6 AND d.over < 15 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as middle_legal_balls,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 THEN {_LEGACY_BOWL.runs} ELSE 0 END) as middle_runs,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 AND {_LEGACY_BOWL.wicket}
-                THEN 1 ELSE 0 END) as middle_wickets,
-                
-                COUNT(CASE WHEN d.over >= 15 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as death_legal_balls,
-                SUM(CASE WHEN d.over >= 15 THEN {_LEGACY_BOWL.runs} ELSE 0 END) as death_runs,
-                SUM(CASE WHEN d.over >= 15 AND {_LEGACY_BOWL.wicket}
-                THEN 1 ELSE 0 END) as death_wickets
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            JOIN players p ON d.batter = p.name
-            WHERE d.bowler = ANY(:player_names)
-            AND p.batting_hand IS NOT NULL
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY p.batting_hand
+            WITH {bowler_balls_cte}
+            SELECT
+                batter_hand AS batting_hand,
+                SUM(legal) AS legal_balls,
+                SUM(runs) AS runs,
+                SUM(wicket) AS wickets,
+                SUM(dot) AS dots,
+                SUM(boundary) AS boundaries,
+                SUM(CASE WHEN over < 6 THEN legal ELSE 0 END) AS pp_legal_balls,
+                SUM(CASE WHEN over < 6 THEN runs ELSE 0 END) AS pp_runs,
+                SUM(CASE WHEN over < 6 THEN wicket ELSE 0 END) AS pp_wickets,
+                SUM(CASE WHEN over >= 6 AND over < 15 THEN legal ELSE 0 END) AS middle_legal_balls,
+                SUM(CASE WHEN over >= 6 AND over < 15 THEN runs ELSE 0 END) AS middle_runs,
+                SUM(CASE WHEN over >= 6 AND over < 15 THEN wicket ELSE 0 END) AS middle_wickets,
+                SUM(CASE WHEN over >= 15 THEN legal ELSE 0 END) AS death_legal_balls,
+                SUM(CASE WHEN over >= 15 THEN runs ELSE 0 END) AS death_runs,
+                SUM(CASE WHEN over >= 15 THEN wicket ELSE 0 END) AS death_wickets
+            FROM balls
+            WHERE batter_hand IS NOT NULL AND batter_hand NOT IN ('-', 'unknown')
+            GROUP BY batter_hand
         """)
 
         # SIMPLIFIED: Innings query using bowling_stats + legal ball counts
@@ -3941,47 +3966,23 @@ def get_player_bowling_stats(
 
         # SIMPLIFIED: Maidens per innings
         innings_maidens_query = text(f"""
-            SELECT 
-                d.match_id,
-                d.innings,
-                COUNT(DISTINCT d.over) as maidens
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            WHERE d.bowler = ANY(:player_names)
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            AND CONCAT(d.match_id, '_', d.innings, '_', d.over) IN (
-                SELECT CONCAT(match_id, '_', innings, '_', over)
-                FROM deliveries
-                WHERE bowler = ANY(:player_names) AND wides = 0 AND noballs = 0
-                GROUP BY match_id, innings, over
-                HAVING COUNT(*) = 6 AND SUM(runs_off_bat + extras) = 0
-            )
-            GROUP BY d.match_id, d.innings
+            {bowler_overs_cte}
+            SELECT match_id, innings, COUNT(*) AS maidens
+            FROM overs WHERE legal = 6 AND runs = 0
+            GROUP BY match_id, innings
         """)
 
         # SIMPLIFIED: Over combinations - keep existing logic but optimize
         over_combinations_query = text(f"""
-            WITH bowler_overs AS (
-                SELECT 
-                    d.match_id,
-                    d.innings,
-                    d.over,
-                    COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
-                    SUM({_LEGACY_BOWL.runs}) as runs_in_over,
-                    SUM(CASE WHEN {_LEGACY_BOWL.wicket}
-                THEN 1 ELSE 0 END) as wickets_in_over
-                FROM deliveries d
-                JOIN matches m ON d.match_id = m.id
-                WHERE d.bowler = ANY(:player_names)
-                AND (:start_date IS NULL OR m.date >= :start_date)
-                AND (:end_date IS NULL OR m.date <= :end_date)
-                AND (:venue IS NULL OR m.venue = :venue)
-                {match_filter}
-                GROUP BY d.match_id, d.innings, d.over
-                HAVING COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) >= 5
+            WITH {bowler_balls_cte},
+            bowler_overs AS (
+                SELECT match_id, innings, over,
+                       SUM(legal) AS legal_balls,
+                       SUM(runs) AS runs_in_over,
+                       SUM(wicket) AS wickets_in_over
+                FROM balls
+                GROUP BY match_id, innings, over
+                HAVING SUM(legal) >= 5
             ),
             innings_overs AS (
                 SELECT 
@@ -4258,54 +4259,56 @@ def get_player_bowling_ball_stats(
     db: Session = Depends(get_session)
 ):
     try:
+        names = get_player_names(player_name, db)
         params = {
             "player_name": player_name,
+            # Every stored spelling: the exact-name match missed the bowler's other spellings.
+            "player_names": list(dict.fromkeys(filter(None, [
+                player_name, *names.get("all_names", []), names.get("legacy_name"), names.get("details_name"),
+            ]))),
             "start_date": start_date,
             "end_date": end_date,
             "venue": venue,
             "has_leagues": bool(leagues),
-            "leagues": leagues if leagues else [],
+            "leagues": expand_league_abbreviations(leagues) if leagues else [],
             "include_international": include_international,
             "top_teams": top_teams,  # NULL = every international team (the SQL tests :top_teams IS NULL)
             "top_team_list": INTERNATIONAL_TEAMS_RANKED[:top_teams] if top_teams else []
         }
 
+        # Same competition semantics as /player/{name}/bowling_stats. This copy lacked the
+        # "no leagues named = every league" branches, so with no leagues and no internationals it
+        # matched nothing and the ball-position panel was always empty.
         match_filter = """
             AND (
                 (:has_leagues AND m.match_type = 'league' AND m.competition = ANY(:leagues))
-                OR (:include_international AND m.match_type = 'international' 
-                    AND (:top_teams IS NULL OR 
+                OR (:include_international AND m.match_type = 'international'
+                    AND (:top_teams IS NULL OR
                         (m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))
                     )
                 )
+                OR (NOT :has_leagues AND m.match_type = 'league')
+                OR (NOT :has_leagues AND NOT :include_international)
             )
         """
 
         # SIMPLIFIED: Ball position stats with legal deliveries only
         ball_position_query = text(f"""
-            SELECT 
-                d.ball as ball_position,
-                COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
-                COUNT(*) as total_balls,
-                SUM({_LEGACY_BOWL.runs}) as runs,
-                SUM(CASE WHEN {_LEGACY_BOWL.dot} THEN 1 ELSE 0 END) as dots,
-                SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-                SUM(CASE WHEN {_LEGACY_BOWL.wicket}
-                THEN 1 ELSE 0 END) as wickets,
-                
-                -- Phase distribution of legal balls only
-                COUNT(CASE WHEN d.over < 6 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as pp_legal_balls,
-                COUNT(CASE WHEN d.over >= 6 AND d.over < 15 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as middle_legal_balls,
-                COUNT(CASE WHEN d.over >= 15 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as death_legal_balls
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            WHERE d.bowler = :player_name
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY d.ball
-            ORDER BY d.ball
+            WITH {_bowler_balls_cte(match_filter)}
+            SELECT
+                ball AS ball_position,
+                SUM(legal) AS legal_balls,
+                COUNT(*) AS total_balls,
+                SUM(runs) AS runs,
+                SUM(dot) AS dots,
+                SUM(boundary) AS boundaries,
+                SUM(wicket) AS wickets,
+                SUM(CASE WHEN over < 6 THEN legal ELSE 0 END) AS pp_legal_balls,
+                SUM(CASE WHEN over >= 6 AND over < 15 THEN legal ELSE 0 END) AS middle_legal_balls,
+                SUM(CASE WHEN over >= 15 THEN legal ELSE 0 END) AS death_legal_balls
+            FROM balls
+            GROUP BY ball
+            ORDER BY ball
         """)
 
         # Execute query
