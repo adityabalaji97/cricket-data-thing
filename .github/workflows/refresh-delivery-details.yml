@@ -121,6 +121,13 @@ jobs:
           print("data_version:", bump_data_version(db), "| pruned:", prune(db))
           PY
 
+      # Rankings payloads are cached in query_cache, which the step above just invalidated; a cold
+      # player ranking card needs seven league-wide computations (~28 s, 503s in production), so
+      # refill the windows the pages ask for by default. Never blocks the rest of the run.
+      - name: Warm global rankings
+        continue-on-error: true
+        run: python scripts/warm_rankings.py
+
       # Reddit/X-ready content packs for newly loaded matches (services/content_packs.py): record
       # and career-best stats plus the win-probability series, queued in /admin for a human to
       # post. Jev ranks share-worthiness when the TYPESAFE_API_KEY secret is set; without it the

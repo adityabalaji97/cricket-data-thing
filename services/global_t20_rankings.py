@@ -1364,6 +1364,34 @@ def _build_rankings_payload(
         if cached is not None:
             return cached
 
+    def compute() -> Dict[str, Any]:
+        return _compute_rankings_payload(db, mode, start, end, bowl_kind, force_refresh, variation_mode)
+
+    # Persistent second layer: services/query_cache.py (keyed by data_version, so the nightly load
+    # invalidates it; shared by every dyno; survives restarts). A payload took 1-2.5 s locally and
+    # a player trajectory needs 7, so a cold profile request ran ~28 s; scripts/warm_rankings.py
+    # fills the windows the pages ask for right after the nightly load.
+    if force_refresh:
+        payload = compute()
+    else:
+        from services.query_cache import cached_run
+        payload = cached_run(db, {
+            "kind": "global_t20_rankings", "mode": mode, "start": start, "end": end,
+            "bowl_kind": bowl_kind, "variation_mode": variation_mode,
+        }, compute)
+    _cache_set(_RANKINGS_CACHE, cache_key, payload)
+    return payload
+
+
+def _compute_rankings_payload(
+    db: Session,
+    mode: str,
+    start: date,
+    end: date,
+    bowl_kind: str,
+    force_refresh: bool,
+    variation_mode: str,
+) -> Dict[str, Any]:
     try:
         batting_cells = _fetch_batting_cells(db, start, end)
         batting_totals = _fetch_batting_totals(db, start, end)
@@ -1421,8 +1449,6 @@ def _build_rankings_payload(
             "cross_league_samples": comp_weight_payload.get("cross_league_samples", 0),
             "qualification": qualification,
         }
-
-        _cache_set(_RANKINGS_CACHE, cache_key, payload)
         return payload
 
     except HTTPException:
