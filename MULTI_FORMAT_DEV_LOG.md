@@ -48,8 +48,10 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > setup_local_db.sh); migration 014 drops wrong MW Short alias; 015 drops 20 never-used indexes
 > (~300 MB). APPLY 011-015 TO PROD BEFORE DEPLOYING audit-fixes.
 > Open:
-> QB IPL batter x year ~0.6 s main scan, match_date::date casts, cumulative QB mode defs,
-> "MW Short" alias -> both Matthew and D'Arcy Short (looks wrong; review).
+> Done 2026-10-01 (batch 6): QB grouped two-level stage 1 + MATERIALIZED stage 2 + tie order + control
+> grouping 500 fixed (LOGIC_VERSION e); cumulative mode wickets/spell runs on sql_defs (f).
+> match_date::date -> text comparison was measured and REJECTED (slower on venue pages); casts stay.
+> Remaining known: broad all-T20 groupings still ~3-6 s locally (cache-dependent in prod).
 > Local bowling_stats is stale vs current sync rules (wide double-count, 'leg before wicket' missed,
 > old score=0 dots) -- check prod before regenerating.
 >

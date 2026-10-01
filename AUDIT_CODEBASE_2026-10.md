@@ -53,6 +53,21 @@ A24 — profile type/phase breakdowns had no format pin, so ODI balls in the leg
 
 **Deploy order for audit-fixes: apply migrations 011–015 to production first** (015 can run any time).
 
+Batch 6 (last open items):
+- *Query builder grouped mode* `10e5366`: stage 1 aggregates per (group, innings) then per group instead of
+  `COUNT(DISTINCT (p_match, inns))` (a sort of every ball); stage 2 source `MATERIALIZED` so the join hashes
+  on the full group key (was 1.7M intermediate rows for 52k IPL balls); deterministic tie order. Local:
+  all-T20 by phase 6.4 → ~3.3 s, bowler × phase 8.2 → ~3.8 s, IPL batter × year 623 → ~490 ms. Broad
+  all-men's-T20 groupings are still multi-second (≈4.5× that on production) — query_cache is what keeps
+  repeats fast. A27 — grouping by `control` returned 500 on every request (fixed).
+- *Cumulative mode (A3 tail)* `ff35432`: innings windows count real dismissals (striker's own when
+  batter-filtered); spell windows use bowler runs and credited wickets. Windows remain legal-balls-only.
+- *C7, `match_date::date` casts — measured, not changed.* Rewriting all 34 filters as ISO-text comparisons
+  was exactly equivalent (all 4.17M production values are ISO; 12 endpoints byte-identical) but made
+  venue-filtered pages slower (≈30 → 80 ms: the planner ANDs a 378k-entry date bitmap onto the selective
+  ground index) and helped nothing else measurably; a (ground, match_date) index only fixed half of it.
+  Reverted; the casts stay.
+
 ---
 
 ## A. Correctness — wrong numbers shown to users
