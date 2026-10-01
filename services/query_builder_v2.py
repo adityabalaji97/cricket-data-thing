@@ -700,10 +700,18 @@ def build_legacy_where_clause(
     return where_clause, params
 
 
-def query_legacy_ungrouped(where_clause, params, limit, offset, db):
-    """Query legacy deliveries table for individual records."""
+def query_legacy_ungrouped(where_clause, params, limit, offset, db, merge_order=False):
+    """Query legacy deliveries table for individual records.
+
+    merge_order sorts the way merge_ungrouped_results does (year desc, then match, innings,
+    over, ball), so the first N rows here are the first N this table contributes to a merge.
+    """
     legacy_bowler_style_sql = get_legacy_bowler_style_sql()
     legacy_bowl_kind_sql = get_legacy_bowl_kind_sql(legacy_bowler_style_sql)
+    order_by = (
+        'EXTRACT(YEAR FROM m.date) DESC, d.match_id COLLATE "C", d.innings, d.over, d.ball'
+        if merge_order else "m.date DESC, d.over, d.ball"
+    )
     
     main_query = f"""
         SELECT 
@@ -738,7 +746,7 @@ def query_legacy_ungrouped(where_clause, params, limit, offset, db):
         JOIN matches m ON d.match_id = m.id
         LEFT JOIN players p ON p.name = d.bowler
         {where_clause}
-        ORDER BY m.date DESC, d.over, d.ball
+        ORDER BY {order_by}
         LIMIT :limit
         OFFSET :offset
     """
@@ -1010,6 +1018,35 @@ def normalize_partnership_for_merge(value: str, player_aliases_map: Dict[str, st
     return f"{a} & {b}"
 
 
+# Upper bound on delivery_details groups fetched for a merge with the legacy table. Beyond it
+# the response carries a warning rather than silently partial totals.
+MERGE_GROUP_FETCH_CAP = 50_000
+
+
+def _source_page_params(limit: int, offset: int, merging: bool, grouped: bool) -> Dict[str, int]:
+    """LIMIT/OFFSET one source table's query runs with (see the merge comment in the service)."""
+    if not merging:
+        return {"limit": min(limit, 10000), "offset": offset}
+    if grouped:
+        return {"limit": MERGE_GROUP_FETCH_CAP, "offset": 0}
+    return {"limit": offset + limit, "offset": 0}
+
+
+def _apply_group_thresholds(rows, min_balls, max_balls, min_runs, max_runs, min_wickets, max_wickets):
+    """Apply the query builder's min/max group thresholds to already-aggregated rows."""
+    bounds = [
+        ("balls", min_balls, max_balls),
+        ("runs", min_runs, max_runs),
+        ("wickets", min_wickets, max_wickets),
+    ]
+    for key, lo, hi in bounds:
+        if lo is not None:
+            rows = [r for r in rows if (r.get(key) or 0) >= lo]
+        if hi is not None:
+            rows = [r for r in rows if (r.get(key) or 0) <= hi]
+    return rows
+
+
 def merge_grouped_results(
     new_results: List[Dict], 
     legacy_results: List[Dict], 
@@ -1024,6 +1061,7 @@ def merge_grouped_results(
     """
     if not legacy_results:
         return new_results
+
     def _normalize_row(row: Dict) -> None:
         if 'batter' in row and row.get('batter'):
             row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
@@ -1035,14 +1073,6 @@ def merge_grouped_results(
             row['partnership'] = normalize_partnership_for_merge(row['partnership'], player_aliases_map)
         if 'crease_combo' in row and row.get('crease_combo'):
             row['crease_combo'] = row['crease_combo'].lower()
-
-    if not new_results:
-        for row in legacy_results:
-            _normalize_row(row)
-        return legacy_results
-
-    # Build a lookup by group key
-    merged = {}
 
     def make_group_key(row: Dict) -> tuple:
         """Create a hashable key from grouping columns."""
@@ -1058,30 +1088,28 @@ def merge_grouped_results(
             key_parts.append(str(val) if val is not None else '')
         return tuple(key_parts)
 
-    # Add new results first
-    for row in new_results:
-        key = make_group_key(row)
-        merged[key] = row.copy()
+    if not new_results:
+        for row in legacy_results:
+            _normalize_row(row)
+        # Legacy groups by the raw stored spelling; once normalised, two spellings of one player
+        # share a key and must be combined below rather than returned as duplicate rows.
+        keys = [make_group_key(row) for row in legacy_results]
+        if len(set(keys)) == len(keys):
+            return legacy_results
 
-    # Merge legacy results
-    for row in legacy_results:
-        _normalize_row(row)
-        
+    count_fields = ('balls', 'innings_count', 'runs', 'wickets', 'dots', 'boundaries', 'fours', 'sixes')
+    merged = {}
+    # New results first, so their non-additive fields (control_percentage, metrics) are kept.
+    # Any two rows with the same normalised key are combined, from either table.
+    for is_legacy, row in [*((False, r) for r in new_results), *((True, r) for r in legacy_results)]:
+        if is_legacy:
+            _normalize_row(row)
         key = make_group_key(row)
-        
         if key in merged:
-            # Combine raw counts
             existing = merged[key]
-            existing['balls'] = (existing.get('balls') or 0) + (row.get('balls') or 0)
-            existing['innings_count'] = (existing.get('innings_count') or 0) + (row.get('innings_count') or 0)
-            existing['runs'] = (existing.get('runs') or 0) + (row.get('runs') or 0)
-            existing['wickets'] = (existing.get('wickets') or 0) + (row.get('wickets') or 0)
-            existing['dots'] = (existing.get('dots') or 0) + (row.get('dots') or 0)
-            existing['boundaries'] = (existing.get('boundaries') or 0) + (row.get('boundaries') or 0)
-            existing['fours'] = (existing.get('fours') or 0) + (row.get('fours') or 0)
-            existing['sixes'] = (existing.get('sixes') or 0) + (row.get('sixes') or 0)
+            for field in count_fields:
+                existing[field] = (existing.get(field) or 0) + (row.get(field) or 0)
         else:
-            # New group from legacy
             merged[key] = row.copy()
     
     # Convert to list
@@ -2221,14 +2249,18 @@ def query_deliveries_service(
         new_total_balls = 0
         new_total_innings = 0
         
+        # When both tables contribute, neither side may filter or paginate on its own: a group's
+        # min_balls test and its rank depend on the merged totals, and an offset taken inside
+        # each SQL query would then be taken again on the merged list. Each side returns an
+        # unfiltered head from row 0 instead, and thresholds + pagination run once after merging.
+        merging = routing['use_new'] and routing['use_legacy']
+        grouped = bool(group_by)
+
         if routing['use_new']:
             new_date_range = routing['new_date_range']
             new_start, new_end = new_date_range if new_date_range else (DELIVERY_DETAILS_START_DATE, end_date or date.today())
-            
-            new_params = {
-                "limit": min(limit, 10000),
-                "offset": offset
-            }
+
+            new_params = _source_page_params(limit, offset, merging, grouped)
             
             new_where_clause, new_params = build_where_clause(
                 venue=venue,
@@ -2279,22 +2311,36 @@ def query_deliveries_service(
             if not group_by or len(group_by) == 0:
                 # Ungrouped query
                 result = handle_ungrouped_query(
-                    new_where_clause, new_params, limit, offset, db, filters_applied, join_matches=join_new_matches
+                    new_where_clause, new_params, new_params["limit"], new_params["offset"], db,
+                    filters_applied, join_matches=join_new_matches
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_matching_rows']
             else:
                 # Grouped query - get raw results for potential merging
-                result = handle_grouped_query(
-                    new_where_clause, new_params, group_by, min_balls, max_balls,
-                    min_runs, max_runs, limit, offset, db, filters_applied,
-                    has_batter_filters, show_summary_rows, join_matches=join_new_matches,
+                # Thresholds are applied after the merge when merging (see above).
+                side_thresholds = {} if merging else dict(
+                    min_balls=min_balls, max_balls=max_balls, min_runs=min_runs, max_runs=max_runs,
                     min_wickets=min_wickets, max_wickets=max_wickets,
+                )
+                result = handle_grouped_query(
+                    new_where_clause, new_params, group_by,
+                    side_thresholds.get("min_balls"), side_thresholds.get("max_balls"),
+                    side_thresholds.get("min_runs"), side_thresholds.get("max_runs"),
+                    new_params["limit"], new_params["offset"], db, filters_applied,
+                    has_batter_filters, show_summary_rows, join_matches=join_new_matches,
+                    min_wickets=side_thresholds.get("min_wickets"),
+                    max_wickets=side_thresholds.get("max_wickets"),
                     ball_aggregation=ball_aggregation,
                     fmt=fmt, gender=gender,
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_groups']
+                if merging and new_total_count > len(new_results):
+                    delivery_warnings.append(
+                        f"Only the {len(new_results):,} largest of {new_total_count:,} groups from "
+                        "2015 onward were merged with pre-2015 data; narrow the filters for exact totals."
+                    )
                 new_total_innings = result.get("metadata", {}).get("total_innings_in_query", new_total_innings)
             
             data_sources.append(f"delivery_details ({new_start.year}-{new_end.year})")
@@ -2311,10 +2357,7 @@ def query_deliveries_service(
             legacy_date_range = routing['legacy_date_range']
             legacy_start, legacy_end = legacy_date_range if legacy_date_range else (start_date or date(2005, 1, 1), date(2014, 12, 31))
             
-            legacy_params = {
-                "limit": min(limit, 10000),
-                "offset": offset
-            }
+            legacy_params = _source_page_params(limit, offset, merging, grouped)
             
             legacy_where_clause, legacy_params = build_legacy_where_clause(
                 venue=venue,
@@ -2360,7 +2403,8 @@ def query_deliveries_service(
             if not group_by or len(group_by) == 0:
                 # Ungrouped query
                 legacy_results, legacy_total_count = query_legacy_ungrouped(
-                    legacy_where_clause, legacy_params, limit, offset, db
+                    legacy_where_clause, legacy_params, legacy_params["limit"], legacy_params["offset"], db,
+                    merge_order=merging,
                 )
             else:
                 # Grouped query
@@ -2383,10 +2427,10 @@ def query_deliveries_service(
             player_aliases_map = load_player_aliases_for_merge(db)
             
             if not group_by or len(group_by) == 0:
-                # Merge ungrouped results
+                # Merge ungrouped results. Each side returned its first offset+limit rows in the
+                # merge's own order, so the merged page below is exact.
                 merged_data = merge_ungrouped_results(new_results, legacy_results, player_aliases_map)
                 total_innings_in_query = new_total_innings + legacy_total_innings
-                # Apply pagination to merged results
                 merged_data = merged_data[offset:offset + limit]
                 total_count = new_total_count + legacy_total_count
             else:
@@ -2394,15 +2438,9 @@ def query_deliveries_service(
                 merged_data = merge_grouped_results(
                     new_results, legacy_results, group_by, player_aliases_map, total_balls
                 )
-                # Apply min/max filters after merge
-                if min_balls is not None:
-                    merged_data = [r for r in merged_data if r.get('balls', 0) >= min_balls]
-                if max_balls is not None:
-                    merged_data = [r for r in merged_data if r.get('balls', 0) <= max_balls]
-                if min_runs is not None:
-                    merged_data = [r for r in merged_data if r.get('runs', 0) >= min_runs]
-                if max_runs is not None:
-                    merged_data = [r for r in merged_data if r.get('runs', 0) <= max_runs]
+                merged_data = _apply_group_thresholds(
+                    merged_data, min_balls, max_balls, min_runs, max_runs, min_wickets, max_wickets
+                )
                 total_innings_in_query = sum(int(r.get("innings_count") or 0) for r in merged_data)
                 total_count = len(merged_data)
                 # Apply pagination
@@ -2413,17 +2451,29 @@ def query_deliveries_service(
             total_count = new_total_count if routing['use_new'] else legacy_total_count
             if routing['use_legacy'] and not routing['use_new']:
                 player_aliases_map = load_player_aliases_for_merge(db)
-                for row in merged_data:
-                    if row.get('batter'):
-                        row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
-                    if row.get('bowler'):
-                        row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
+                if group_by:
+                    merged_data = merge_grouped_results(
+                        [], legacy_results, group_by, player_aliases_map, legacy_total_balls
+                    )
+                else:
+                    for row in merged_data:
+                        if row.get('batter'):
+                            row['batter'] = normalize_player_name_for_merge(row['batter'], player_aliases_map)
+                        if row.get('bowler'):
+                            row['bowler'] = normalize_player_name_for_merge(row['bowler'], player_aliases_map)
             if not group_by or len(group_by) == 0:
                 total_innings_in_query = new_total_innings if routing['use_new'] else legacy_total_innings
             elif routing['use_new']:
                 total_innings_in_query = result.get("metadata", {}).get("total_innings_in_query", 0)
             else:
-                total_innings_in_query = sum(int(r.get("innings_count") or 0) for r in legacy_results)
+                # query_legacy_grouped returns every group unfiltered: apply the thresholds and
+                # the page here, as the delivery_details path does in SQL.
+                merged_data = _apply_group_thresholds(
+                    merged_data, min_balls, max_balls, min_runs, max_runs, min_wickets, max_wickets
+                )
+                total_count = len(merged_data)
+                total_innings_in_query = sum(int(r.get("innings_count") or 0) for r in merged_data)
+                merged_data = merged_data[offset:offset + limit]
         
         # =====================================================================
         # BUILD RESPONSE

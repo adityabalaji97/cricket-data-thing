@@ -149,7 +149,7 @@ def test_legacy_only_service_response_normalizes_alias_names(monkeypatch):
     monkeypatch.setattr(
         qb,
         "query_legacy_ungrouped",
-        lambda *_: (
+        lambda *_, **__: (
             [
                 {
                     "match_id": "m1",
