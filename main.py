@@ -60,7 +60,7 @@ from services.delivery_data_service import (
     get_venue_phase_stats,
     get_venue_aliases,
 )
-from services.bowler_types import BOWLER_CATEGORY_SQL
+from services.bowler_types import BOWLER_CATEGORY_SQL, PACE_TYPES as ALL_KNOWN_PACE_TYPES, SPIN_TYPES as ALL_KNOWN_SPIN_TYPES
 from services.player_aliases import get_player_names
 from services.metrics import sql_defs
 from services.dismissal_stats import get_dismissal_breakdown
@@ -73,30 +73,72 @@ _VENUE_BOWL = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
 _LEGACY_BOWL = sql_defs.legacy_defs(sql_defs.BOWLER, "d")
 
 
-def _batter_vs_type_columns() -> str:
-    """Overall + T20-phase columns for a batter against a bowler grouping (legacy table).
+def _batter_vs_type_balls_cte(match_filter: str) -> str:
+    """One row per ball a batter faced, from both ball tables, for the pace/spin and bowling-type
+    breakdowns of /player/{name}/stats.
 
-    Runs off the bat, balls excluding wides, and the batter's *own* dismissals. The old columns
-    counted extras as his runs, wides as balls faced, and any non-run-out wicket on a ball he
-    faced -- while dropping his own run outs.
+    These read only the legacy `deliveries` table, which after 2025 holds just cricsheet-loaded
+    matches, so the profile's bowling matchup matrix missed most recent cricket; and with no
+    format pin they took in the ODI balls that table also holds. delivery_details now supplies every
+    match it has and the legacy table only the rest (nothing counted twice), men's T20 only, like
+    the rest of the endpoint. Batter definitions (balls faced, runs off the bat, his own dismissal)
+    from services/metrics/sql_defs.py; `bowler_type` is the style code both tables share.
     """
-    bat = sql_defs.legacy_defs(sql_defs.BATTER, "d")
-    phases = [("", None), ("pp_", "d.over < 6"), ("middle_", "d.over >= 6 AND d.over < 15"), ("death_", "d.over >= 15")]
+    dd = sql_defs.delivery_details_defs(sql_defs.BATTER, "dd")
+    lg = sql_defs.legacy_defs(sql_defs.BATTER, "d")
+    common = """
+            AND (:start_date IS NULL OR m.date >= :start_date)
+            AND (:end_date IS NULL OR m.date <= :end_date)
+            AND (:venue IS NULL OR m.venue = :venue)
+            AND m.format = 'T20' AND m.gender = 'male'
+    """
+    return f"""
+        WITH balls AS (
+            SELECT dd.over AS over, dd.bowl_style AS bowler_type,
+                   CASE WHEN {dd.legal_ball} THEN 1 ELSE 0 END AS ball,
+                   {dd.runs} AS runs,
+                   CASE WHEN {dd.dot} THEN 1 ELSE 0 END AS dot,
+                   CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END AS boundary,
+                   CASE WHEN {dd.wicket} THEN 1 ELSE 0 END AS wicket
+            FROM delivery_details dd
+            JOIN matches m ON m.id = dd.p_match
+            WHERE dd.bat = ANY(:player_names)
+            {common}
+            {match_filter}
+            UNION ALL
+            SELECT d.over, p.bowler_type,
+                   CASE WHEN {lg.legal_ball} THEN 1 ELSE 0 END,
+                   {lg.runs},
+                   CASE WHEN {lg.dot} THEN 1 ELSE 0 END,
+                   CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END,
+                   CASE WHEN {lg.wicket} THEN 1 ELSE 0 END
+            FROM deliveries d
+            JOIN matches m ON d.match_id = m.id
+            JOIN players p ON d.bowler = p.name
+            WHERE d.batter = ANY(:player_names)
+              AND NOT EXISTS (SELECT 1 FROM delivery_details x WHERE x.p_match = d.match_id)
+            {common}
+            {match_filter}
+        )
+    """
+
+
+def _batter_vs_type_columns() -> str:
+    """Overall + T20-phase aggregates over the `balls` CTE above."""
+    phases = [("", None), ("pp_", "over < 6"), ("middle_", "over >= 6 AND over < 15"), ("death_", "over >= 15")]
     cols = []
     for prefix, cond in phases:
-        when = (lambda expr: f"{cond} AND {expr}") if cond else (lambda expr: expr)
-        runs = f"SUM(CASE WHEN {cond} THEN {bat.runs} ELSE 0 END)" if cond else bat.runs_sum
-        cols += [
-            f"{runs} as {prefix}runs",
-            f"SUM(CASE WHEN {when(bat.legal_ball)} THEN 1 ELSE 0 END) as {prefix}balls",
-            f"SUM(CASE WHEN {when(bat.dot)} THEN 1 ELSE 0 END) as {prefix}dots",
-            f"SUM(CASE WHEN {when('d.runs_off_bat >= 4')} THEN 1 ELSE 0 END) as {prefix}boundaries",
-            f"SUM(CASE WHEN {when(bat.wicket)} THEN 1 ELSE 0 END) as {prefix}wickets",
-        ]
+        pick = (lambda col: f"CASE WHEN {cond} THEN {col} ELSE 0 END") if cond else (lambda col: col)
+        cols += [f"SUM({pick(col)}) as {prefix}{name}"
+                 for col, name in (("runs", "runs"), ("ball", "balls"), ("dot", "dots"),
+                                   ("boundary", "boundaries"), ("wicket", "wickets"))]
     return ",\n                ".join(cols)
 
 
 _BATTER_VS_TYPE_COLUMNS = _batter_vs_type_columns()
+# Single style codes only: the feed also has combinations ("OB/LB") and placeholders ("-") that
+# the legacy players table never carried and that no matrix row should show.
+_KNOWN_BOWLER_TYPES = sorted(ALL_KNOWN_PACE_TYPES | ALL_KNOWN_SPIN_TYPES)
 
 from dotenv import load_dotenv
 from pathlib import Path
@@ -2379,45 +2421,27 @@ def get_player_stats(
             ORDER BY m.date DESC
         """)
 
+        balls_cte = _batter_vs_type_balls_cte(match_filter)
+        params["known_bowler_types"] = _KNOWN_BOWLER_TYPES
+
         pace_spin_query = text(f"""
-            WITH BowlerTypes AS (
-                SELECT
-                    p.name,
-                    p.bowler_type,
-                    {BOWLER_CATEGORY_SQL} as bowling_category
-                FROM players p
-                WHERE p.bowler_type IS NOT NULL
-            )
-            SELECT 
-                bt.bowling_category as category,
+            {balls_cte}
+            SELECT
+                {BOWLER_CATEGORY_SQL} as category,
                 {_BATTER_VS_TYPE_COLUMNS}
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            JOIN players p ON d.bowler = p.name
-            JOIN BowlerTypes bt ON p.name = bt.name
-            WHERE d.batter = ANY(:player_names)
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY bt.bowling_category
-            HAVING bt.bowling_category IS NOT NULL
+            FROM balls
+            GROUP BY 1
+            HAVING {BOWLER_CATEGORY_SQL} IS NOT NULL
         """)
 
         bowling_types_query = text(f"""
-            SELECT 
-                p.bowler_type,
+            {balls_cte}
+            SELECT
+                bowler_type,
                 {_BATTER_VS_TYPE_COLUMNS}
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            JOIN players p ON d.bowler = p.name
-            WHERE d.batter = ANY(:player_names)
-            AND p.bowler_type IS NOT NULL
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY p.bowler_type
+            FROM balls
+            WHERE bowler_type = ANY(:known_bowler_types)
+            GROUP BY bowler_type
         """)
 
         # Execute queries
