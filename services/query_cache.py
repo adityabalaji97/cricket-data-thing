@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 MAX_RESULT_BYTES = 1_000_000
 # Bump whenever query-builder semantics change (see module docstring). Format: date + letter.
-LOGIC_VERSION = "2026-10-01d"  # d: shared ball/run/wicket/dot definitions (sql_defs)
+LOGIC_VERSION = "2026-10-01e"  # e: grouped stage-1 two-level aggregation, deterministic tie order, control grouping
 _VERSION_TTL_SECONDS = 300
 _version_cache: Dict[str, Any] = {"value": None, "at": 0.0}
 

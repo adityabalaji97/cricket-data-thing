@@ -3334,6 +3334,7 @@ def handle_grouped_query(
     group_columns = [grouping_columns[col] for col in group_by]
     select_group_clause = ", ".join(f"{db_col} as {col}" for col, db_col in zip(group_by, group_columns))
     group_by_clause = ", ".join(group_columns)
+    group_cols_plain = ", ".join(group_by)
 
     batter_grouping = "batter" in group_by
     use_runs_off_bat_only = batter_grouping or has_batter_filters
@@ -3381,7 +3382,9 @@ def handle_grouped_query(
         runs_calculation = ball_defs.runs_sum
         balls_expr = ball_defs.balls_sum
         wickets_expr = ball_defs.wickets_sum
-        stage2_extra_select = "dd.batruns, dd.wide, dd.noball, dd.control, " + (
+        # The shot-control flag is carried as control_flag: grouping by `control` also puts a
+        # `control` column in stage2_source, and two of them made every such query fail (500).
+        stage2_extra_select = "dd.batruns, dd.wide, dd.noball, dd.control AS control_flag, " + (
             "bm.raa AS m_raa, bm.waa AS m_waa, bm.impact AS m_impact, bm.wpa AS m_wpa, bm.leverage AS m_leverage"
             if metrics_enabled else
             "NULL::real AS m_raa, NULL::real AS m_waa, NULL::real AS m_impact, NULL::real AS m_wpa, NULL::real AS m_leverage"
@@ -3390,8 +3393,8 @@ def handle_grouped_query(
         boundaries_expr = "SUM(CASE WHEN s.batruns IN (4, 6) THEN 1 ELSE 0 END)"
         fours_expr = "SUM(CASE WHEN s.batruns = 4 THEN 1 ELSE 0 END)"
         sixes_expr = "SUM(CASE WHEN s.batruns = 6 THEN 1 ELSE 0 END)"
-        control_num_expr = "SUM(CASE WHEN s.control = 1 THEN 1 ELSE 0 END)"
-        control_den_expr = "SUM(CASE WHEN s.control IS NOT NULL THEN 1 ELSE 0 END)"
+        control_num_expr = "SUM(CASE WHEN s.control_flag = 1 THEN 1 ELSE 0 END)"
+        control_den_expr = "SUM(CASE WHEN s.control_flag IS NOT NULL THEN 1 ELSE 0 END)"
 
     # HAVING in the new pattern is a WHERE on the aggregated CTE; predicates
     # reference the aggregated column aliases (balls/runs/wickets) rather
@@ -3459,11 +3462,13 @@ def handle_grouped_query(
             AVG(CASE WHEN {metric_ball} THEN s.m_leverage::double precision END) as avg_leverage"""
 
     combined_query = f"""
-        WITH {bat_pos_cte}{computed_cte_prefix}all_groups AS (
+        WITH {bat_pos_cte}{computed_cte_prefix}group_innings AS (
+            -- Two-level aggregation: per (group, innings) first, then per group. COUNT(*) of the
+            -- innings rows is exactly COUNT(DISTINCT (p_match, inns)), without the sort of every
+            -- matching ball that the DISTINCT forced (3 s of 6 s for all men's T20 by phase).
             SELECT
                 {select_group_clause},
                 {balls_expr} as balls,
-                COUNT(DISTINCT (dd.p_match, dd.inns)) as innings_count,
                 {runs_calculation} as runs,
                 {wickets_expr} as wickets
             FROM delivery_details dd
@@ -3472,7 +3477,17 @@ def handle_grouped_query(
             {computed_join}
             {join_clause}
             {where_clause}
-            GROUP BY {group_by_clause}
+            GROUP BY {group_by_clause}, dd.p_match, dd.inns
+        ),
+        all_groups AS (
+            SELECT
+                {group_cols_plain},
+                SUM(balls)::bigint as balls,
+                COUNT(*) as innings_count,
+                SUM(runs)::bigint as runs,
+                SUM(wickets)::bigint as wickets
+            FROM group_innings
+            GROUP BY {group_cols_plain}
         ),
         with_totals AS (
             SELECT g.*,
@@ -3486,10 +3501,15 @@ def handle_grouped_query(
                 SUM(innings_count) OVER () as total_innings_after_having
             FROM with_totals
             {having_where_clause}
-            ORDER BY balls DESC
+            -- Group columns break ties, so which tied groups make a page is not left to the plan.
+            ORDER BY balls DESC, {group_cols_plain}
             LIMIT :limit OFFSET :offset
         ),
-        stage2_source AS (
+        -- MATERIALIZED: computed once, with its group keys, before joining to the qualifying groups.
+        -- Inlined, the planner could only hash on the keys it could see before the alias join (e.g.
+        -- year for batter x year), joined every ball to every group sharing that key, then filtered:
+        -- 1.7M intermediate rows for 52k IPL balls, growing with groups-per-key at production scale.
+        stage2_source AS MATERIALIZED (
             SELECT
                 {select_group_clause},
                 {stage2_extra_select}
@@ -3528,7 +3548,7 @@ def handle_grouped_query(
         GROUP BY {final_group_by_carry}, q.balls, q.innings_count, q.runs, q.wickets,
                  q.universe_balls, q.parent_balls,
                  q.total_groups_after_having, q.total_innings_after_having
-        ORDER BY q.balls DESC
+        ORDER BY q.balls DESC, {final_group_by_carry}
     """
 
     result = db.execute(text(combined_query), params).fetchall()

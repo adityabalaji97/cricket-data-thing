@@ -111,7 +111,7 @@ class TestQueryBuilderV2Contracts:
         combined_sql = db.statements[0]
         fallback_sql = db.statements[1]
 
-        assert "stage2_source AS (" in combined_sql
+        assert "stage2_source AS MATERIALIZED (" in combined_sql
         assert "JOIN stage2_source s ON" in combined_sql
         # NULL-safe but hashable (IS NOT DISTINCT FROM forced a nested loop over every ball).
         assert "COALESCE(s.batter::text, '~~null~~') = COALESCE(q.batter::text, '~~null~~')" in combined_sql
@@ -145,7 +145,7 @@ class TestQueryBuilderV2Contracts:
         combined_sql = db.statements[0]
         fallback_sql = db.statements[1]
 
-        assert "stage2_source AS (" in combined_sql
+        assert "stage2_source AS MATERIALIZED (" in combined_sql
         assert "JOIN stage2_source s ON COALESCE(s.partnership::text, '~~null~~') = COALESCE(q.partnership::text, '~~null~~')" in combined_sql
         # Aliases join through the de-duplicated (unambiguous) source, never the raw table.
         assert "pa_bat ON pa_bat.player_name = dd.bat" in fallback_sql
