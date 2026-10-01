@@ -10,6 +10,12 @@ from typing import List, Dict, Optional, Any
 from datetime import date
 import logging
 from services.delivery_data_service import get_venue_aliases
+from services.metrics import sql_defs
+
+# Pitch maps: the batter's view (balls faced, runs off the bat, his own dismissals) and the
+# bowler's view (legal balls, runs less byes/leg-byes, credited wickets) -- services/metrics/sql_defs.py.
+_BAT = sql_defs.delivery_details_defs(sql_defs.BATTER, "dd")
+_BOWL = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
 
 logger = logging.getLogger(__name__)
 
@@ -403,25 +409,24 @@ def get_pitch_map_data(
             SELECT
                 dd.line,
                 dd.length,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs,
-                SUM(CASE WHEN LOWER(dd.out) = 'true' THEN 1 ELSE 0 END) as wickets,
-                SUM(CASE WHEN dd.score = 0 THEN 1 ELSE 0 END) as dots,
-                SUM(CASE WHEN dd.score = 4 THEN 1 ELSE 0 END) as fours,
-                SUM(CASE WHEN dd.score = 6 THEN 1 ELSE 0 END) as sixes,
-                SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) as controlled_shots,
-                CASE
-                    WHEN SUM(CASE WHEN LOWER(dd.out) = 'true' THEN 1 ELSE 0 END) > 0
-                    THEN CAST(SUM(dd.score) AS FLOAT) / SUM(CASE WHEN LOWER(dd.out) = 'true' THEN 1 ELSE 0 END)
-                    ELSE NULL
-                END as average,
-                CAST(SUM(dd.score) AS FLOAT) * 100.0 / COUNT(*) as strike_rate,
-                CAST(SUM(CASE WHEN dd.score = 0 THEN 1 ELSE 0 END) AS FLOAT) * 100.0 / COUNT(*) as dot_percentage,
-                CAST(SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) AS FLOAT) * 100.0 / COUNT(*) as boundary_percentage,
-                CAST(SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) AS FLOAT) * 100.0 / COUNT(*) as control_percentage
+                {_BAT.balls_sum} as balls,
+                {_BAT.runs_sum} as runs,
+                {_BAT.wickets_sum} as wickets,
+                {_BAT.dots_sum} as dots,
+                SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) as fours,
+                SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) as sixes,
+                SUM(CASE WHEN {_BAT.legal_ball} AND dd.control = 1 THEN 1 ELSE 0 END) as controlled_shots,
+                CAST({_BAT.runs_sum} AS FLOAT) / NULLIF({_BAT.wickets_sum}, 0) as average,
+                CAST({_BAT.runs_sum} AS FLOAT) * 100.0 / NULLIF({_BAT.balls_sum}, 0) as strike_rate,
+                CAST({_BAT.dots_sum} AS FLOAT) * 100.0 / NULLIF({_BAT.balls_sum}, 0) as dot_percentage,
+                CAST(SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) AS FLOAT) * 100.0
+                    / NULLIF({_BAT.balls_sum}, 0) as boundary_percentage,
+                CAST(SUM(CASE WHEN {_BAT.legal_ball} AND dd.control = 1 THEN 1 ELSE 0 END) AS FLOAT) * 100.0
+                    / NULLIF({_BAT.balls_sum}, 0) as control_percentage
             FROM delivery_details dd
             WHERE {where_clause}
             GROUP BY dd.line, dd.length
+            HAVING {_BAT.balls_sum} > 0
             ORDER BY dd.line, dd.length
         """)
 
@@ -740,18 +745,20 @@ def get_bowler_pitch_map_data(
             SELECT
                 dd.line,
                 dd.length,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs,
-                SUM(CASE WHEN LOWER(dd.out) = 'true' THEN 1 ELSE 0 END) as wickets,
-                SUM(CASE WHEN dd.score = 0 THEN 1 ELSE 0 END) as dots,
-                SUM(CASE WHEN dd.score = 4 THEN 1 ELSE 0 END) as fours,
-                SUM(CASE WHEN dd.score = 6 THEN 1 ELSE 0 END) as sixes,
-                CAST(SUM(dd.score) AS FLOAT) * 6.0 / COUNT(*) as economy,
-                CAST(SUM(CASE WHEN dd.score = 0 THEN 1 ELSE 0 END) AS FLOAT) * 100.0 / COUNT(*) as dot_percentage,
-                CAST(SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) AS FLOAT) * 100.0 / COUNT(*) as boundary_percentage
+                {_BOWL.balls_sum} as balls,
+                {_BOWL.runs_sum} as runs,
+                {_BOWL.wickets_sum} as wickets,
+                {_BOWL.dots_sum} as dots,
+                SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) as fours,
+                SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) as sixes,
+                CAST({_BOWL.runs_sum} AS FLOAT) * 6.0 / NULLIF({_BOWL.balls_sum}, 0) as economy,
+                CAST({_BOWL.dots_sum} AS FLOAT) * 100.0 / NULLIF({_BOWL.balls_sum}, 0) as dot_percentage,
+                CAST(SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) AS FLOAT) * 100.0
+                    / NULLIF({_BOWL.balls_sum}, 0) as boundary_percentage
             FROM delivery_details dd
             WHERE {where_clause}
             GROUP BY dd.line, dd.length
+            HAVING {_BOWL.balls_sum} > 0
             ORDER BY dd.line, dd.length
         """)
 
