@@ -44,7 +44,10 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > position) now read delivery_details + legacy-for-the-rest via _batter_vs_type_balls_cte /
 > _bowler_balls_cte, men's T20 only (ODI balls had leaked in); maidens = bowler conceded 0 in a
 > complete over; bowling_ball_stats filter matched nothing without leagues (fixed).
-> Open: index cleanup + stored bowling_stats staleness (both need read-only prod queries),
+> Prod (read-only, 2026-10-01): stored bowling_stats are correct (local copy is stale -> rerun
+> setup_local_db.sh); migration 014 drops wrong MW Short alias; 015 drops 20 never-used indexes
+> (~300 MB). APPLY 011-015 TO PROD BEFORE DEPLOYING audit-fixes.
+> Open:
 > QB IPL batter x year ~0.6 s main scan, match_date::date casts, cumulative QB mode defs,
 > "MW Short" alias -> both Matthew and D'Arcy Short (looks wrong; review).
 > Local bowling_stats is stale vs current sync rules (wide double-count, 'leg before wicket' missed,

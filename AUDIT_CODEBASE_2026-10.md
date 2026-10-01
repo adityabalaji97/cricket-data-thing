@@ -40,6 +40,19 @@ A24 — profile type/phase breakdowns had no format pin, so ODI balls in the leg
 (fixed). A25 — maidens counted overs with a wide (runs summed over legal balls only) (fixed). A26 —
 `bowling_ball_stats` returned nothing unless leagues were named (filter missing the catch-all) (fixed).
 
+**Production checks (read-only session, 2026-10-01).**
+- *Stored bowling stats (A20):* production `bowling_stats` match current rules on runs, wickets and dots for
+  all ~126k bowler-innings 2015→now (0 differences); 105 innings (0.08%) count one illegal ball as legal.
+  The staleness was only in the local copy — refresh it with `scripts/dev/setup_local_db.sh`.
+- *Indexes (C8):* DB 4.18 GB; `deliveries` 840 MB with 514 MB of indexes. Migration 015 drops 20 indexes
+  with 0 scans (~300 MB) `see commit`. Not dropped, for review: `idx_dd_guess_innings` (29 MB, 0 scans; the
+  game now reads `guess_innings_pool`, but whatever rebuilds that pool may want it); prefix-redundant but
+  used — `idx_deliveries_bowler`, `_match_id`, `_batter`, `_batter_bowler` (~61 MB), `idx_dd_bat`,
+  `idx_dd_ground`, `idx_players_name`.
+- Alias data: migration 014 removes the wrong `MW Short → D'Arcy Short` row (approved).
+
+**Deploy order for audit-fixes: apply migrations 011–015 to production first** (015 can run any time).
+
 ---
 
 ## A. Correctness — wrong numbers shown to users
