@@ -7,6 +7,14 @@ from datetime import date
 from models import teams_mapping
 from services.delivery_data_service import should_use_delivery_details
 from ipl_rosters import get_team_abbrev_from_name
+from services.metrics import sql_defs
+
+# Head-to-head definitions for a batter-vs-bowler pair: the batter's balls faced, runs off the bat
+# and dots, and the dismissals credited to the bowler (each of which dismisses the striker).
+_H2H_BAT = sql_defs.delivery_details_defs(sql_defs.BATTER, "dd")
+_H2H_BOWL = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
+_H2H_LEGACY_BAT = sql_defs.legacy_defs(sql_defs.BATTER, "d")
+_H2H_LEGACY_BOWL = sql_defs.legacy_defs(sql_defs.BOWLER, "d")
 
 logger = logging.getLogger(__name__)
 
@@ -801,7 +809,7 @@ def get_team_matchups_service(
             team1_players = _dedupe_player_names([row[0] for row in recent_players if row[1] == team1])
             team2_players = _dedupe_player_names([row[0] for row in recent_players if row[1] == team2])
 
-        matchup_query = text("""
+        matchup_query = text(f"""
             WITH alias_map AS (
                 SELECT DISTINCT ON (name_key)
                     name_key,
@@ -820,11 +828,11 @@ def get_team_matchups_service(
                 SELECT
                     COALESCE(bat_alias.canonical_name, d.batter) AS batter,
                     COALESCE(bowl_alias.canonical_name, d.bowler) AS bowler,
-                    COUNT(*) as balls,
-                    SUM(d.runs_off_bat + d.extras) as runs,
-                    SUM(CASE WHEN d.wicket_type IS NOT NULL AND d.wicket_type != 'run out' THEN 1 ELSE 0 END) as wickets,
+                    {_H2H_LEGACY_BAT.balls_sum} as balls,
+                    {_H2H_LEGACY_BAT.runs_sum} as runs,
+                    {_H2H_LEGACY_BOWL.wickets_sum} as wickets,
                     SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-                    SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots
+                    {_H2H_LEGACY_BAT.dots_sum} as dots
                 FROM deliveries d
                 JOIN matches m ON d.match_id = m.id
                 LEFT JOIN alias_map bat_alias ON LOWER(d.batter) = bat_alias.name_key
@@ -848,11 +856,11 @@ def get_team_matchups_service(
                 SELECT
                     COALESCE(bat_alias.canonical_name, dd.bat) AS batter,
                     COALESCE(bowl_alias.canonical_name, dd.bowl) AS bowler,
-                    COUNT(*) as balls,
-                    SUM(dd.score) as runs,
-                    SUM(CASE WHEN dd.out::boolean = true THEN 1 ELSE 0 END) as wickets,
+                    {_H2H_BAT.balls_sum} as balls,
+                    {_H2H_BAT.runs_sum} as runs,
+                    {_H2H_BOWL.wickets_sum} as wickets,
                     SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-                    SUM(CASE WHEN dd.score = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as dots
+                    {_H2H_BAT.dots_sum} as dots
                 FROM delivery_details dd
                 LEFT JOIN matches m2 ON m2.id = dd.p_match
                 LEFT JOIN alias_map bat_alias ON LOWER(dd.bat) = bat_alias.name_key
@@ -874,7 +882,9 @@ def get_team_matchups_service(
                         OR m2.venue = :venue_filter
                         OR dd.ground = :venue_filter
                     )
-                    AND (:innings_position IS NULL OR dd.innings = :innings_position)
+                    -- dd.inns: delivery_details.innings is an unpopulated column, so filtering on it
+                    -- dropped every post-2015 ball whenever an innings position was chosen.
+                    AND (:innings_position IS NULL OR dd.inns = :innings_position)
                     AND (:day_or_night IS NULL OR m2.day_or_night = :day_or_night)
                 GROUP BY COALESCE(bat_alias.canonical_name, dd.bat), COALESCE(bowl_alias.canonical_name, dd.bowl)
             ),
