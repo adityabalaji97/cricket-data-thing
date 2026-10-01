@@ -2300,19 +2300,19 @@ def query_deliveries_service(
                 gender=gender,
             )
             
-            # Get total balls from new table
-            new_join_clause = "JOIN matches m ON m.id = dd.p_match" if join_new_matches else ""
-            # Same ball definition as the grouped rows, so percent_balls adds up after a merge.
-            total_balls_expr = sql_defs.delivery_details_defs(
-                sql_defs.perspective_for(group_by, has_batter_filters)
-            ).balls_sum if group_by else "COUNT(*)"
-            total_balls_query = f"SELECT {total_balls_expr} FROM delivery_details dd {new_join_clause} {new_where_clause}"
-            total_balls_params = {k: v for k, v in new_params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
-            new_total_balls = db.execute(text(total_balls_query), total_balls_params).scalar() or 0
-            total_innings_query = f"SELECT COUNT(DISTINCT (dd.p_match, dd.inns)) FROM delivery_details dd {new_join_clause} {new_where_clause}"
-            new_total_innings = db.execute(text(total_innings_query), total_balls_params).scalar() or 0
-            
             if not group_by or len(group_by) == 0:
+                # Totals for the ungrouped response. Grouped queries skip these two scans: the
+                # grouped handler returns the same totals from window sums over the scan it
+                # already makes (pre-HAVING, same ball definition), which cost ~200 ms here.
+                new_join_clause = "JOIN matches m ON m.id = dd.p_match" if join_new_matches else ""
+                total_balls_params = {k: v for k, v in new_params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
+                new_total_balls = db.execute(text(
+                    f"SELECT COUNT(*) FROM delivery_details dd {new_join_clause} {new_where_clause}"
+                ), total_balls_params).scalar() or 0
+                new_total_innings = db.execute(text(
+                    f"SELECT COUNT(DISTINCT (dd.p_match, dd.inns)) FROM delivery_details dd {new_join_clause} {new_where_clause}"
+                ), total_balls_params).scalar() or 0
+
                 # Ungrouped query
                 result = handle_ungrouped_query(
                     new_where_clause, new_params, new_params["limit"], new_params["offset"], db,
@@ -2340,6 +2340,7 @@ def query_deliveries_service(
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_groups']
+                new_total_balls = result['metadata'].get('total_balls_in_query') or 0
                 if merging and new_total_count > len(new_results):
                     delivery_warnings.append(
                         f"Only the {len(new_results):,} largest of {new_total_count:,} groups from "
