@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query
+from .query_helpers import BAT_DEFS as _W, build_base_filters, execute_query
 from .constants import DEFAULT_TOP_TEAMS
 
 
@@ -60,7 +60,8 @@ def get_chase_masters_data(
                 dd.team_bat as team,
                 dd.p_match,
                 dd.ball_id,
-                dd.score as batruns,
+                dd.batruns as batruns,
+                CASE WHEN {_W.legal_ball} THEN 1 ELSE 0 END as legal_ball,
                 dd.win_prob,
                 LEAD(dd.win_prob) OVER (
                     PARTITION BY dd.p_match 
@@ -79,7 +80,7 @@ def get_chase_masters_data(
             SELECT 
                 player,
                 team,
-                COUNT(*) as balls,
+                SUM(legal_ball) as balls,
                 SUM(batruns) as runs,
                 SUM(CASE 
                     WHEN next_win_prob IS NOT NULL AND next_win_prob != -1 

@@ -8,11 +8,19 @@ from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Session
 
+from services.metrics import sql_defs
+
 from .constants import (
     WRAPPED_DEFAULT_LEAGUES,
     WRAPPED_DEFAULT_TOP_TEAMS,
     INTERNATIONAL_TEAMS_RANKED
 )
+
+# Per-ball definitions every card aggregates with (services/metrics/sql_defs.py), so a Wrapped
+# strike rate or economy is the same number the query builder and scorecard show.
+BAT_DEFS = sql_defs.delivery_details_defs(sql_defs.BATTER, "dd")
+BOWL_DEFS = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
+TEAM_DEFS = sql_defs.delivery_details_defs(sql_defs.TEAM, "dd")
 
 
 def build_competition_filter(

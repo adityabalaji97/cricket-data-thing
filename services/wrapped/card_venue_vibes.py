@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query
+from .query_helpers import TEAM_DEFS as _W, build_base_filters, execute_query
 from .constants import DEFAULT_TOP_TEAMS
 
 
@@ -45,13 +45,15 @@ def get_venue_vibes_data(
         WITH venue_innings AS (
             SELECT 
                 dd.ground as venue,
-                dd.match_id,
-                dd.innings,
-                SUM(dd.score) as inns_runs,
-                COUNT(*) as balls
+                -- p_match / inns: delivery_details.match_id and .innings are never populated, so
+                -- grouping on them lumped every ball at a ground into one "innings".
+                dd.p_match as match_id,
+                dd.inns as innings,
+                {_W.runs_sum} as inns_runs,
+                {_W.balls_sum} as balls
             FROM delivery_details dd
             {where_clause}
-            GROUP BY dd.ground, dd.match_id, dd.innings
+            GROUP BY dd.ground, dd.p_match, dd.inns
         ),
         venue_matches AS (
             SELECT 
@@ -76,7 +78,7 @@ def get_venue_vibes_data(
             FROM venue_matches
             WHERE first_inns_score IS NOT NULL AND second_inns_score IS NOT NULL
             GROUP BY venue
-            HAVING COUNT(DISTINCT p_match) >= 3
+            HAVING COUNT(DISTINCT match_id) >= 3
         )
         SELECT 
             venue,

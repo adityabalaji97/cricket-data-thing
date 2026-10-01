@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query, build_query_url
+from .query_helpers import BAT_DEFS as _W, build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_TOP_TEAMS, DEFAULT_MIN_BALLS
 
 
@@ -44,13 +44,13 @@ def get_batter_hand_breakdown_data(
     agg_query = f"""
         SELECT 
             dd.bat_hand as hand,
-            COUNT(*) as balls,
-            SUM(dd.score) as runs,
-            SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as dismissals,
-            SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
+            {_W.balls_sum} as balls,
+            {_W.runs_sum} as runs,
+            {_W.wickets_sum} as dismissals,
+            SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
             COUNT(DISTINCT dd.bat) as unique_batters,
-            ROUND((SUM(dd.score) * 100.0 / COUNT(*))::numeric, 2) as strike_rate,
-            ROUND((SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) * 100.0 / COUNT(*))::numeric, 2) as boundary_pct
+            ROUND(({_W.runs_sum} * 100.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as strike_rate,
+            ROUND((SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) * 100.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as boundary_pct
         FROM delivery_details dd
         {where_clause}
         GROUP BY dd.bat_hand
@@ -81,14 +81,14 @@ def get_batter_hand_breakdown_data(
         SELECT 
             dd.bat as name,
             dd.team_bat as team,
-            COUNT(*) as balls,
-            SUM(dd.score) as runs,
-            ROUND((SUM(dd.score) * 100.0 / COUNT(*))::numeric, 2) as strike_rate
+            {_W.balls_sum} as balls,
+            {_W.runs_sum} as runs,
+            ROUND(({_W.runs_sum} * 100.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as strike_rate
         FROM delivery_details dd
         {where_clause}
         AND dd.bat_hand = 'LHB'
         GROUP BY dd.bat, dd.team_bat
-        HAVING COUNT(*) >= :min_balls
+        HAVING {_W.balls_sum} >= :min_balls
         ORDER BY strike_rate DESC
         LIMIT 5
     """
@@ -97,14 +97,14 @@ def get_batter_hand_breakdown_data(
         SELECT 
             dd.bat as name,
             dd.team_bat as team,
-            COUNT(*) as balls,
-            SUM(dd.score) as runs,
-            ROUND((SUM(dd.score) * 100.0 / COUNT(*))::numeric, 2) as strike_rate
+            {_W.balls_sum} as balls,
+            {_W.runs_sum} as runs,
+            ROUND(({_W.runs_sum} * 100.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as strike_rate
         FROM delivery_details dd
         {where_clause}
         AND dd.bat_hand = 'RHB'
         GROUP BY dd.bat, dd.team_bat
-        HAVING COUNT(*) >= :min_balls
+        HAVING {_W.balls_sum} >= :min_balls
         ORDER BY strike_rate DESC
         LIMIT 5
     """
@@ -145,9 +145,9 @@ def get_batter_hand_breakdown_data(
                     WHEN dd.crease_combo = 'RHB_RHB' THEN 'RHB_RHB'
                     ELSE 'Other'
                 END as combo,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs,
-                ROUND((SUM(dd.score) * 100.0 / COUNT(*))::numeric, 2) as strike_rate
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs,
+                ROUND(({_W.runs_sum} * 100.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as strike_rate
             FROM delivery_details dd
             {where_clause}
             AND dd.crease_combo IS NOT NULL
@@ -158,7 +158,7 @@ def get_batter_hand_breakdown_data(
                     WHEN dd.crease_combo = 'RHB_RHB' THEN 'RHB_RHB'
                     ELSE 'Other'
                 END
-            HAVING COUNT(*) >= 100
+            HAVING {_W.balls_sum} >= 100
             ORDER BY strike_rate DESC
         """
         

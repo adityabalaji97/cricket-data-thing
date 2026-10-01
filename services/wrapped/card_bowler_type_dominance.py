@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query, build_query_url
+from .query_helpers import BOWL_DEFS as _W, build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_TOP_TEAMS
 
 
@@ -48,14 +48,14 @@ def get_bowler_type_dominance_data(
                 THEN 'pace'
                 ELSE 'spin'
             END as kind,
-            COUNT(*) as balls,
-            SUM(dd.score) as runs,
-            SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
-            SUM(CASE WHEN dd.score = 0 AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) as dots,
-            ROUND((SUM(dd.score) * 6.0 / COUNT(*))::numeric, 2) as economy,
+            {_W.balls_sum} as balls,
+            {_W.runs_sum} as runs,
+            {_W.wickets_sum} as wickets,
+            {_W.dots_sum} as dots,
+            ROUND(({_W.runs_sum} * 6.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as economy,
             CASE 
-                WHEN SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) > 0 
-                THEN ROUND((COUNT(*)::numeric / SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END)), 1)
+                WHEN {_W.wickets_sum} > 0 
+                THEN ROUND(({_W.balls_sum}::numeric / {_W.wickets_sum}), 1)
                 ELSE NULL
             END as strike_rate
         FROM delivery_details dd
@@ -86,16 +86,16 @@ def get_bowler_type_dominance_data(
         SELECT 
             dd.bowl as name,
             dd.team_bowl as team,
-            COUNT(*) as balls,
-            SUM(dd.score) as runs,
-            SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
-            ROUND((SUM(dd.score) * 6.0 / COUNT(*))::numeric, 2) as economy
+            {_W.balls_sum} as balls,
+            {_W.runs_sum} as runs,
+            {_W.wickets_sum} as wickets,
+            ROUND(({_W.runs_sum} * 6.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as economy
         FROM delivery_details dd
         {where_clause}
         AND (LOWER(dd.bowl_kind) LIKE '%pace%' OR LOWER(dd.bowl_kind) LIKE '%fast%' OR LOWER(dd.bowl_kind) LIKE '%seam%' OR LOWER(dd.bowl_kind) LIKE '%medium%')
         GROUP BY dd.bowl, dd.team_bowl
-        HAVING COUNT(*) >= 60
-        ORDER BY SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) DESC
+        HAVING {_W.balls_sum} >= 60
+        ORDER BY {_W.wickets_sum} DESC
         LIMIT 5
     """
     
@@ -117,16 +117,16 @@ def get_bowler_type_dominance_data(
         SELECT 
             dd.bowl as name,
             dd.team_bowl as team,
-            COUNT(*) as balls,
-            SUM(dd.score) as runs,
-            SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
-            ROUND((SUM(dd.score) * 6.0 / COUNT(*))::numeric, 2) as economy
+            {_W.balls_sum} as balls,
+            {_W.runs_sum} as runs,
+            {_W.wickets_sum} as wickets,
+            ROUND(({_W.runs_sum} * 6.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as economy
         FROM delivery_details dd
         {where_clause}
         AND NOT (LOWER(dd.bowl_kind) LIKE '%pace%' OR LOWER(dd.bowl_kind) LIKE '%fast%' OR LOWER(dd.bowl_kind) LIKE '%seam%' OR LOWER(dd.bowl_kind) LIKE '%medium%')
         GROUP BY dd.bowl, dd.team_bowl
-        HAVING COUNT(*) >= 60
-        ORDER BY SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) DESC
+        HAVING {_W.balls_sum} >= 60
+        ORDER BY {_W.wickets_sum} DESC
         LIMIT 5
     """
     
@@ -152,10 +152,10 @@ def get_bowler_type_dominance_data(
                 THEN 'pace'
                 ELSE 'spin'
             END as kind,
-            COUNT(*) as balls,
-            SUM(dd.score) as runs,
-            SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
-            ROUND((SUM(dd.score) * 6.0 / COUNT(*))::numeric, 2) as economy
+            {_W.balls_sum} as balls,
+            {_W.runs_sum} as runs,
+            {_W.wickets_sum} as wickets,
+            ROUND(({_W.runs_sum} * 6.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as economy
         FROM delivery_details dd
         {where_clause}
         AND dd.bowl_style IS NOT NULL
@@ -165,7 +165,7 @@ def get_bowler_type_dominance_data(
                 THEN 'pace'
                 ELSE 'spin'
             END
-        HAVING COUNT(*) >= 500
+        HAVING {_W.balls_sum} >= 500
         ORDER BY economy ASC
     """
     

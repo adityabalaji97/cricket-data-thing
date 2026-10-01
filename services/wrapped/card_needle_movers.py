@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query
+from .query_helpers import BAT_DEFS as _W, build_base_filters, execute_query
 from .constants import DEFAULT_TOP_TEAMS
 
 
@@ -63,7 +63,8 @@ def get_needle_movers_data(
                 dd.p_match,
                 dd.inns,
                 dd.ball_id,
-                dd.score as batruns,
+                dd.batruns as batruns,
+                CASE WHEN {_W.legal_ball} THEN 1 ELSE 0 END as legal_ball,
                 dd.pred_score,
                 LEAD(dd.pred_score) OVER (
                     PARTITION BY dd.p_match, dd.inns 
@@ -81,7 +82,7 @@ def get_needle_movers_data(
             SELECT 
                 player,
                 team,
-                COUNT(*) as balls,
+                SUM(legal_ball) as balls,
                 SUM(batruns) as runs,
                 SUM(CASE 
                     WHEN next_pred_score IS NOT NULL AND next_pred_score != -1 

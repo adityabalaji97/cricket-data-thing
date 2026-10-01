@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query
+from .query_helpers import BAT_DEFS as _W, build_base_filters, execute_query
 from .constants import DEFAULT_MIN_BALLS, DEFAULT_TOP_TEAMS
 
 
@@ -52,8 +52,8 @@ def get_three_sixty_batters_data(
                 dd.team_bat as team,
                 dd.bat_hand,
                 dd.wagon_zone as zone,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs
             FROM delivery_details dd
             {where_clause}
             GROUP BY dd.bat, dd.team_bat, dd.bat_hand, dd.wagon_zone
@@ -132,8 +132,8 @@ def get_three_sixty_batters_data(
         zone_query = f"""
             SELECT 
                 dd.wagon_zone as zone,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs
             FROM delivery_details dd
             {where_clause}
             AND dd.bat = :player_name

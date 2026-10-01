@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query, build_query_url
+from .query_helpers import BAT_DEFS as _W, build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_MIN_BALLS, DEFAULT_TOP_TEAMS
 
 
@@ -67,8 +67,8 @@ def get_length_masters_data(
                 dd.bat as player,
                 dd.team_bat as team,
                 UPPER(REPLACE(dd.length, ' ', '_')) as length_type,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs
             FROM delivery_details dd
             {where_clause}
             GROUP BY dd.bat, dd.team_bat, UPPER(REPLACE(dd.length, ' ', '_'))
@@ -133,15 +133,15 @@ def get_length_masters_data(
         length_query = f"""
             SELECT 
                 UPPER(REPLACE(dd.length, ' ', '_')) as length_type,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs,
-                ROUND((SUM(dd.score) * 100.0 / COUNT(*))::numeric, 2) as strike_rate
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs,
+                ROUND(({_W.runs_sum} * 100.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as strike_rate
             FROM delivery_details dd
             {where_clause}
             AND dd.bat = :player_name
             AND dd.length IS NOT NULL
             GROUP BY UPPER(REPLACE(dd.length, ' ', '_'))
-            HAVING COUNT(*) >= 5
+            HAVING {_W.balls_sum} >= 5
         """
         
         length_params = {**params, "player_name": row.player}

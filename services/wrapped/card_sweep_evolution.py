@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query, build_query_url
+from .query_helpers import BAT_DEFS as _W, build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_MIN_BALLS, DEFAULT_TOP_TEAMS
 
 
@@ -64,8 +64,8 @@ def get_sweep_evolution_data(
                     WHEN dd.bowl_kind ILIKE '%spin%' OR dd.bowl_kind ILIKE '%slow%' THEN 'spin'
                     ELSE 'pace'
                 END as bowl_category,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs
             FROM delivery_details dd
             {where_clause}
             AND UPPER(REPLACE(dd.shot, ' ', '_')) = ANY(:sweep_shots)
@@ -119,8 +119,8 @@ def get_sweep_evolution_data(
                 dd.bat as player,
                 dd.team_bat as team,
                 UPPER(REPLACE(dd.shot, ' ', '_')) as shot_type,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs
             FROM delivery_details dd
             {where_clause}
             AND UPPER(REPLACE(dd.shot, ' ', '_')) = ANY(:sweep_shots)

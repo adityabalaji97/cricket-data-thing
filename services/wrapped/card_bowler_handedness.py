@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query, build_query_url
+from .query_helpers import BOWL_DEFS as _W, build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_TOP_TEAMS
 
 
@@ -49,14 +49,14 @@ def get_bowler_handedness_data(
                 dd.bowl as bowler,
                 dd.team_bowl as team,
                 dd.bat_hand,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs,
-                SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
-                ROUND((SUM(dd.score) * 6.0 / COUNT(*))::numeric, 2) as economy
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs,
+                {_W.wickets_sum} as wickets,
+                ROUND(({_W.runs_sum} * 6.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as economy
             FROM delivery_details dd
             {where_clause}
             GROUP BY dd.bowl, dd.team_bowl, dd.bat_hand
-            HAVING COUNT(*) >= :min_balls
+            HAVING {_W.balls_sum} >= :min_balls
         ),
         bowler_primary_team AS (
             SELECT DISTINCT ON (bowler) bowler, team

@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query, build_query_url
+from .query_helpers import BAT_DEFS as _W, build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_TOP_TEAMS
 
 
@@ -90,14 +90,14 @@ def get_rare_shot_specialists_data(
                 dd.bat as player,
                 dd.team_bat as team,
                 UPPER(REPLACE(dd.shot, ' ', '_')) as shot_type,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs,
-                SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs,
+                SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
             FROM delivery_details dd
             {where_clause}
             AND UPPER(REPLACE(dd.shot, ' ', '_')) = ANY(:rare_shots)
             GROUP BY dd.bat, dd.team_bat, UPPER(REPLACE(dd.shot, ' ', '_'))
-            HAVING COUNT(*) >= :min_balls
+            HAVING {_W.balls_sum} >= :min_balls
         ),
         player_primary_team AS (
             SELECT DISTINCT ON (player) player, team

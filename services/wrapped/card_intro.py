@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query
+from .query_helpers import TEAM_DEFS as _W, build_base_filters, execute_query
 from .constants import DEFAULT_TOP_TEAMS
 
 
@@ -64,9 +64,9 @@ def get_intro_data(
                     WHEN dd.over < 15 THEN 'middle'
                     ELSE 'death'
                 END as phase,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs,
-                ROUND((SUM(dd.score) * 6.0 / COUNT(*))::numeric, 2) as run_rate
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs,
+                ROUND(({_W.runs_sum} * 6.0 / NULLIF({_W.balls_sum}, 0))::numeric, 2) as run_rate
             FROM delivery_details dd
             {where_clause}
             GROUP BY 

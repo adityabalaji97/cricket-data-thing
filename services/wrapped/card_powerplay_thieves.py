@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
-from .query_helpers import build_base_filters, execute_query, build_query_url
+from .query_helpers import BOWL_DEFS as _W, build_base_filters, execute_query, build_query_url
 from .constants import DEFAULT_MIN_BALLS, DEFAULT_TOP_TEAMS
 
 
@@ -49,11 +49,11 @@ def get_powerplay_thieves_data(
             SELECT 
                 dd.bowl as bowler,
                 dd.team_bowl as team,
-                COUNT(*) as balls,
-                SUM(dd.score) as runs,
-                SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as wickets,
-                SUM(CASE WHEN dd.score = 0 AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) as dots,
-                SUM(CASE WHEN dd.score IN (4, 6) THEN 1 ELSE 0 END) as boundaries
+                {_W.balls_sum} as balls,
+                {_W.runs_sum} as runs,
+                {_W.wickets_sum} as wickets,
+                {_W.dots_sum} as dots,
+                SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as boundaries
             FROM delivery_details dd
             {where_clause}
             GROUP BY dd.bowl, dd.team_bowl
