@@ -359,6 +359,9 @@ def main():
 
         if fix_mode and fixes_applied:
             db.commit()
+            # The materialised alias lookups (migration 011) must see the new aliases.
+            from services.player_aliases import refresh_alias_views
+            refresh_alias_views(db)
             print(f"\n  {'='*90}")
             print(f"  FIX MODE: {len(fixes_applied)} alias(es) inserted and committed")
             print(f"  {'='*90}")

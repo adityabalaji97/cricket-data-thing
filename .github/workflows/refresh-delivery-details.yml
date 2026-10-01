@@ -97,6 +97,17 @@ jobs:
       - name: "T20 (men): Primer metrics for new matches"
         run: python scripts/compute_primer_metrics.py incremental --write
 
+      # The materialised alias lookups (migration 011). Aliases change through migrations and the
+      # alias maintenance scripts, which refresh these themselves; this is the safety net.
+      - name: Refresh player alias views
+        run: |
+          python - <<'PY'
+          from database import get_session
+          from services.player_aliases import refresh_alias_views
+          refresh_alias_views(next(get_session()))
+          print("player alias views refreshed")
+          PY
+
       # New data: bump the data version so every cached query result (query_cache, migration
       # 009) is stale from now on, and drop results cached against older versions.
       - name: Invalidate the query cache

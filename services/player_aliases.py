@@ -356,37 +356,16 @@ def load_aliases_map(db: Session) -> Dict[str, str]:
 # splits a player in two. This CTE maps either spelling onto one canonical name so the
 # aggregation merges in SQL, where it can actually sum, rather than being relabelled afterwards.
 
+# Both lookups are materialised views (scripts/migrations/011_player_alias_views.sql) holding exactly
+# the rows the old inline definitions produced. Rebuilding them inside every query cost ~40 ms each,
+# misled the planner (an estimated 200 rows for 7,217) and, joined per ball, cost the match preview
+# 1.8 s. The constants keep their old shapes so call sites are unchanged. After any change to
+# player_aliases call refresh_alias_views().
 ALIAS_MAP_CTE = """
     alias_map AS (
-        SELECT DISTINCT ON (name_key) name_key, canonical_name
-        FROM (
-            -- A canonical name maps to itself. Priority 0 so that if a name is BOTH somebody's
-            -- canonical name and somebody else's legacy form, being canonical wins.
-            SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name, 0 AS priority
-            FROM player_aliases
-            WHERE alias_name IS NOT NULL
-
-            UNION ALL
-
-            -- Legacy form maps to the canonical name, but only where the mapping is
-            -- unambiguous. 39 legacy names map to several full names and some of those are
-            -- genuinely different people -- "A Shukla" is both Arpit and Ayush Shukla -- so
-            -- collapsing them would merge two careers into one. Those are left unmapped, which
-            -- keeps them split exactly as they are today rather than confidently wrong.
-            SELECT LOWER(pa.player_name) AS name_key, pa.alias_name AS canonical_name, 1 AS priority
-            FROM player_aliases pa
-            JOIN (
-                SELECT player_name
-                FROM player_aliases
-                WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
-                GROUP BY player_name
-                HAVING COUNT(DISTINCT alias_name) = 1
-            ) unambiguous ON unambiguous.player_name = pa.player_name
-            WHERE pa.player_name IS NOT NULL AND pa.alias_name IS NOT NULL
-        ) mapped
-        -- DISTINCT ON without ORDER BY returns an arbitrary row, which would make results vary
-        -- between runs for no reason. Order so the choice is deterministic.
-        ORDER BY name_key, priority, canonical_name
+        -- Any spelling (lower-cased) -> canonical name; canonical names map to themselves first,
+        -- legacy forms only when unambiguous ("A Shukla" is two people and stays unmapped).
+        SELECT name_key, canonical_name FROM player_alias_map
     )
 """
 
@@ -395,19 +374,21 @@ ALIAS_MAP_CTE = """
 # already reference `<alias>.alias_name` and only need the fan-out removed. `player_aliases` has
 # no uniqueness on either column, so joining it directly multiplies rows -- and therefore
 # double-counts every aggregate -- for the 39 legacy names that map to several full names.
-# Those same names are excluded here rather than arbitrarily collapsed, for the reason given
-# in ALIAS_MAP_CTE.
-UNAMBIGUOUS_ALIASES = """(
-            SELECT pa.player_name, pa.alias_name
-            FROM player_aliases pa
-            JOIN (
-                SELECT player_name
-                FROM player_aliases
-                WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
-                GROUP BY player_name
-                HAVING COUNT(DISTINCT alias_name) = 1
-            ) unambiguous ON unambiguous.player_name = pa.player_name
-        )"""
+# Those same names are excluded here rather than arbitrarily collapsed.
+UNAMBIGUOUS_ALIASES = "player_alias_unambiguous"
+
+ALIAS_VIEWS = ("player_alias_unambiguous", "player_alias_map")
+
+
+def refresh_alias_views(db: Session) -> None:
+    """Rebuild the materialised alias lookups after player_aliases changes.
+
+    CONCURRENTLY keeps them readable during the refresh (both have the unique index it needs).
+    Commits: callers run this as the last step of an alias edit.
+    """
+    for view in ALIAS_VIEWS:
+        db.execute(text(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {view}"))
+    db.commit()
 
 
 def canonical_name_sql(name_column: str, alias: str = "am") -> str:

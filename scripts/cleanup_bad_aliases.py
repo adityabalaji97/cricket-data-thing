@@ -117,6 +117,13 @@ def delete_invalid_aliases(engine, invalid_aliases, dry_run=False):
 
     print(f"\n✓ Deleted {deleted} invalid aliases")
 
+    # The materialised alias lookups (migration 011) must not keep serving the deleted rows.
+    from sqlalchemy.orm import Session
+    from services.player_aliases import refresh_alias_views
+    with Session(engine) as session:
+        refresh_alias_views(session)
+    print("✓ Refreshed player alias views")
+
 
 def show_summary(engine):
     """Show summary statistics after cleanup."""
