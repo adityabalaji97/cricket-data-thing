@@ -56,8 +56,9 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > fantasy_points (~58k rows) by the writers' current rules; recompute checked equal to
 > StatsFromDeliveryDetails on sample matches. Backup of the four columns (all rows, by id):
 > bowling_stats_backup_derived_20260930 -- drop once nothing looks off. Re-run is a no-op.
-> 6c commit 051c1f1 is on origin/main; **Heroku not yet deployed** (scorecard routing for cricsheet matches
-> needs it -- `git push heroku main`).
+> 6c + backfill deployed: origin/main 1720bf5, Heroku v459 (2026-10-01). First nightly with the Cricsheet
+> step ran clean (nothing new: the ODI CSV still ends 24 Sep, Cricsheet ends 17 Sep -- the India v WI
+> ODIs are in neither source yet; they load automatically when either has them).
 > Next: Notes 3-5.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
