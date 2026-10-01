@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from services.bowler_types import BOWL_STYLE_CATEGORY_SQL
+from services.metrics import sql_defs
 from services.query_builder_v2 import get_legacy_bowler_style_sql, get_legacy_bowl_kind_sql
 
 
@@ -267,16 +268,18 @@ def _build_details_innings(match_id: str, min_balls: int, db: Session, fmt: str 
 
 
 def _build_legacy_innings(match_id: str, min_balls: int, db: Session, fmt: str = "T20", gender: str = "male") -> List[Dict[str, Any]]:
+    team = sql_defs.legacy_defs(sql_defs.TEAM, "d")
     innings_rows = db.execute(
         text(
-            """
+            f"""
             SELECT
                 d.innings,
                 MIN(d.batting_team) AS batting_team,
                 MIN(d.bowling_team) AS bowling_team,
                 SUM(COALESCE(d.runs_off_bat, 0) + COALESCE(d.extras, 0)) AS runs,
-                SUM(CASE WHEN d.wicket_type IS NOT NULL AND d.wicket_type != '' THEN 1 ELSE 0 END) AS wickets,
-                SUM(CASE WHEN COALESCE(d.wides, 0) = 0 AND COALESCE(d.noballs, 0) = 0 THEN 1 ELSE 0 END) AS legal_balls,
+                -- Retired hurt is not a wicket (it was shown as one: 7/165 read 8/165).
+                {team.wickets_sum} AS wickets,
+                {team.balls_sum} AS legal_balls,
                 NULL::numeric AS target,
                 COUNT(*) AS balls
             FROM deliveries d
@@ -322,9 +325,10 @@ def _build_legacy_innings(match_id: str, min_balls: int, db: Session, fmt: str =
 
 
 def _details_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str, Any]]]:
+    bat = sql_defs.delivery_details_defs(sql_defs.BATTER, "b")
     rows = db.execute(
         text(
-            """
+            f"""
             WITH alias_map AS (
                 SELECT DISTINCT ON (name_key) name_key, canonical_name
                 FROM (
@@ -375,11 +379,11 @@ def _details_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str
                 b.batter_name AS name,
                 MIN(b.team_bat) AS team,
                 MIN(b.over * 100 + b.ball) AS order_key,
-                SUM(COALESCE(b.batruns, 0)) AS runs,
-                COUNT(*) AS balls,
+                {bat.runs_sum} AS runs,
+                {bat.balls_sum} AS balls,
                 SUM(CASE WHEN b.batruns = 4 THEN 1 ELSE 0 END) AS fours,
                 SUM(CASE WHEN b.batruns = 6 THEN 1 ELSE 0 END) AS sixes,
-                SUM(CASE WHEN b.score = 0 AND COALESCE(b.wide, 0) = 0 AND COALESCE(b.noball, 0) = 0 THEN 1 ELSE 0 END) AS dots,
+                {bat.dots_sum} AS dots,
                 MAX(o.dismissal) AS dismissal,
                 SUM(CASE WHEN COALESCE(b.wide, 0) = 0 THEN bm.impact END) AS impact,
                 SUM(CASE WHEN COALESCE(b.wide, 0) = 0 THEN bm.wpa END) AS wpa
@@ -396,9 +400,10 @@ def _details_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str
 
 
 def _legacy_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str, Any]]]:
+    bat = sql_defs.legacy_defs(sql_defs.BATTER, "d")
     rows = db.execute(
         text(
-            """
+            f"""
             WITH outs AS (
                 SELECT DISTINCT ON (innings, batter)
                     innings, batter, wicket_type
@@ -413,11 +418,11 @@ def _legacy_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str,
                 COALESCE(pa.alias_name, d.batter) AS name,
                 MIN(d.batting_team) AS team,
                 MIN(d.over * 100 + d.ball) AS order_key,
-                SUM(COALESCE(d.runs_off_bat, 0)) AS runs,
-                SUM(CASE WHEN COALESCE(d.wides, 0) = 0 THEN 1 ELSE 0 END) AS balls,
+                {bat.runs_sum} AS runs,
+                {bat.balls_sum} AS balls,
                 SUM(CASE WHEN d.runs_off_bat = 4 THEN 1 ELSE 0 END) AS fours,
                 SUM(CASE WHEN d.runs_off_bat = 6 THEN 1 ELSE 0 END) AS sixes,
-                SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) = 0 AND COALESCE(d.extras, 0) = 0 THEN 1 ELSE 0 END) AS dots,
+                {bat.dots_sum} AS dots,
                 MAX(o.wicket_type) AS dismissal
             FROM deliveries d
             LEFT JOIN player_aliases pa ON pa.player_name = d.batter
@@ -433,9 +438,10 @@ def _legacy_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str,
 
 
 def _details_bowling_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str, Any]]]:
+    bowl = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
     rows = db.execute(
         text(
-            """
+            f"""
             WITH alias_map AS (
                 SELECT DISTINCT ON (name_key) name_key, canonical_name
                 FROM (
@@ -451,12 +457,11 @@ def _details_bowling_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str
                 COALESCE(pa.canonical_name, dd.bowl) AS name,
                 MIN(dd.team_bowl) AS team,
                 MIN(dd.bowl_style) AS style,
-                SUM(COALESCE(dd.score, 0)) AS runs,
+                {bowl.runs_sum} AS runs,
                 COUNT(*) AS balls,
-                SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != ''
-                          AND LOWER(dd.dismissal) NOT LIKE '%run out%' THEN 1 ELSE 0 END) AS wickets,
-                SUM(CASE WHEN dd.score = 0 AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) AS dots,
-                SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) AS legal_balls,
+                {bowl.wickets_sum} AS wickets,
+                {bowl.dots_sum} AS dots,
+                {bowl.balls_sum} AS legal_balls,
                 -SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 THEN bm.impact END) AS impact,
                 -SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 THEN bm.wpa END) AS wpa
             FROM delivery_details dd
@@ -473,23 +478,20 @@ def _details_bowling_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str
 
 
 def _legacy_bowling_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str, Any]]]:
+    bowl = sql_defs.legacy_defs(sql_defs.BOWLER, "d")
     rows = db.execute(
         text(
-            """
+            f"""
             SELECT
                 d.innings,
                 COALESCE(pa.alias_name, d.bowler) AS name,
                 MIN(d.bowling_team) AS team,
                 MIN(COALESCE(d.bowler_type, p.bowler_type, p.bowling_type, p.bowl_type)) AS style,
-                -- Byes and leg-byes are never the bowler's (same rule as bowling_stats).
-                SUM(COALESCE(d.runs_off_bat, 0) + COALESCE(d.extras, 0)
-                    - COALESCE(d.byes, 0) - COALESCE(d.legbyes, 0)) AS runs,
+                {bowl.runs_sum} AS runs,
                 COUNT(*) AS balls,
-                SUM(CASE WHEN d.wicket_type IS NOT NULL AND d.wicket_type != ''
-                          AND LOWER(d.wicket_type) NOT LIKE '%run out%'
-                          AND LOWER(d.wicket_type) NOT LIKE 'retired%' THEN 1 ELSE 0 END) AS wickets,
-                SUM(CASE WHEN COALESCE(d.runs_off_bat, 0) = 0 AND COALESCE(d.extras, 0) = 0 THEN 1 ELSE 0 END) AS dots,
-                SUM(CASE WHEN COALESCE(d.wides, 0) = 0 AND COALESCE(d.noballs, 0) = 0 THEN 1 ELSE 0 END) AS legal_balls
+                {bowl.wickets_sum} AS wickets,
+                {bowl.dots_sum} AS dots,
+                {bowl.balls_sum} AS legal_balls
             FROM deliveries d
             LEFT JOIN players p ON p.name = d.bowler
             LEFT JOIN player_aliases pa ON pa.player_name = d.bowler
@@ -587,6 +589,22 @@ def _legacy_bowler_breakdowns(match_id: str, min_balls: int, db: Session, fmt: s
     return result
 
 
+def _base_stat_columns(bat: "sql_defs.BallDefs", bowl: "sql_defs.BallDefs") -> str:
+    """Per-ball stat columns every breakdown reads, from the shared definitions.
+
+    The breakdowns run on either table through a normalised `base` CTE; carrying both the
+    batter's and the bowler's view of each ball keeps them from re-deriving balls, runs and
+    wickets (which is how they drifted: wides as balls faced, byes on the bowler, run outs).
+    """
+    return f"""
+                {bowl.runs} AS bowler_runs,
+                CASE WHEN {bat.legal_ball} THEN 1 ELSE 0 END AS batter_ball,
+                CASE WHEN {bowl.legal_ball} THEN 1 ELSE 0 END AS bowler_ball,
+                CASE WHEN {bowl.wicket} THEN 1 ELSE 0 END AS bowler_wicket,
+                CASE WHEN {bat.dot} THEN 1 ELSE 0 END AS batter_dot,
+                CASE WHEN {bowl.dot} THEN 1 ELSE 0 END AS bowler_dot,"""
+
+
 def _details_base_cte() -> str:
     pace_expr = f"""COALESCE(
         CASE
@@ -618,7 +636,10 @@ def _details_base_cte() -> str:
                 COALESCE(dd.score, 0) AS total_runs,
                 COALESCE(dd.batruns, 0) AS batter_runs,
                 COALESCE(dd.wide, 0) AS wide,
-                COALESCE(dd.noball, 0) AS noball,
+                COALESCE(dd.noball, 0) AS noball,{_base_stat_columns(
+                    sql_defs.delivery_details_defs(sql_defs.BATTER, "dd"),
+                    sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd"),
+                )}
                 dd.dismissal,
                 dd.bat_hand,
                 {pace_expr} AS pace_spin,
@@ -649,7 +670,10 @@ def _legacy_base_cte() -> str:
                 COALESCE(d.runs_off_bat, 0) + COALESCE(d.extras, 0) AS total_runs,
                 COALESCE(d.runs_off_bat, 0) AS batter_runs,
                 COALESCE(d.wides, 0) AS wide,
-                COALESCE(d.noballs, 0) AS noball,
+                COALESCE(d.noballs, 0) AS noball,{_base_stat_columns(
+                    sql_defs.legacy_defs(sql_defs.BATTER, "d"),
+                    sql_defs.legacy_defs(sql_defs.BOWLER, "d"),
+                )}
                 d.wicket_type AS dismissal,
                 d.striker_batter_type AS bat_hand,
                 {kind_sql} AS pace_spin,
@@ -670,11 +694,11 @@ def _legacy_base_cte() -> str:
 def _bat_vs_bowler_sql(source_alias: str) -> str:
     return f"""
         SELECT innings, batter_name AS player, bowler_name AS item,
-               COUNT(*) AS balls,
+               SUM(batter_ball) AS balls,
                SUM(batter_runs) AS runs,
                SUM(CASE WHEN batter_runs = 4 THEN 1 ELSE 0 END) AS fours,
                SUM(CASE WHEN batter_runs = 6 THEN 1 ELSE 0 END) AS sixes,
-               SUM(CASE WHEN total_runs = 0 AND wide = 0 AND noball = 0 THEN 1 ELSE 0 END) AS dots
+               SUM(batter_dot) AS dots
         FROM {source_alias}
         WHERE batter_name IS NOT NULL AND bowler_name IS NOT NULL
         GROUP BY innings, batter_name, bowler_name
@@ -688,13 +712,12 @@ def _bat_vs_bowler_sql(source_alias: str) -> str:
 def _bowl_vs_batter_sql() -> str:
     return """
         SELECT innings, bowler_name AS player, batter_name AS item,
-               COUNT(*) AS balls,
-               SUM(total_runs) AS runs,
-               SUM(CASE WHEN dismissal IS NOT NULL AND dismissal != ''
-                         AND LOWER(dismissal) NOT LIKE '%run out%' THEN 1 ELSE 0 END) AS wickets,
+               SUM(bowler_ball) AS balls,
+               SUM(bowler_runs) AS runs,
+               SUM(bowler_wicket) AS wickets,
                SUM(CASE WHEN batter_runs = 4 THEN 1 ELSE 0 END) AS fours,
                SUM(CASE WHEN batter_runs = 6 THEN 1 ELSE 0 END) AS sixes,
-               SUM(CASE WHEN total_runs = 0 AND wide = 0 AND noball = 0 THEN 1 ELSE 0 END) AS dots
+               SUM(bowler_dot) AS dots
         FROM base
         WHERE batter_name IS NOT NULL AND bowler_name IS NOT NULL
         GROUP BY innings, bowler_name, batter_name
@@ -705,12 +728,13 @@ def _bowl_vs_batter_sql() -> str:
 def _phase_sql(player_col: str, batting: bool, fmt: str = "T20", gender: str = "male") -> str:
     from services.analytics_common import phase_case_sql
 
-    runs_col = "batter_runs" if batting else "total_runs"
-    wicket_sql = "0" if batting else "SUM(CASE WHEN dismissal IS NOT NULL AND dismissal != '' AND LOWER(dismissal) NOT LIKE '%run out%' THEN 1 ELSE 0 END)"
+    runs_col = "batter_runs" if batting else "bowler_runs"
+    balls_col = "batter_ball" if batting else "bowler_ball"
+    wicket_sql = "0" if batting else "SUM(bowler_wicket)"
     return f"""
         SELECT innings, {player_col} AS player,
                {phase_case_sql(fmt, gender, over_column="over")} AS item,
-               COUNT(*) AS balls,
+               SUM({balls_col}) AS balls,
                SUM({runs_col}) AS runs,
                {wicket_sql} AS wickets
         FROM base
@@ -721,7 +745,8 @@ def _phase_sql(player_col: str, batting: bool, fmt: str = "T20", gender: str = "
 
 
 def _pace_spin_sql(player_col: str, batting: bool, source: str) -> str:
-    runs_col = "batter_runs" if batting else "total_runs"
+    runs_col = "batter_runs" if batting else "bowler_runs"
+    balls_col = "batter_ball" if batting else "bowler_ball"
     return f"""
         SELECT innings, {player_col} AS player,
                CASE
@@ -731,7 +756,7 @@ def _pace_spin_sql(player_col: str, batting: bool, source: str) -> str:
                         OR LOWER(COALESCE(pace_spin, '')) LIKE '%slow%' THEN 'spin'
                    ELSE 'unknown'
                END AS item,
-               COUNT(*) AS balls,
+               SUM({balls_col}) AS balls,
                SUM({runs_col}) AS runs,
                SUM(CASE WHEN batter_runs IN (4, 6) THEN batter_runs ELSE 0 END) AS boundary_runs
         FROM base
@@ -745,10 +770,9 @@ def _hand_sql(player_col: str, source: str) -> str:
     return f"""
         SELECT innings, {player_col} AS player,
                UPPER(COALESCE(bat_hand, 'unknown')) AS item,
-               COUNT(*) AS balls,
-               SUM(total_runs) AS runs,
-               SUM(CASE WHEN dismissal IS NOT NULL AND dismissal != ''
-                         AND LOWER(dismissal) NOT LIKE '%run out%' THEN 1 ELSE 0 END) AS wickets
+               SUM(bowler_ball) AS balls,
+               SUM(bowler_runs) AS runs,
+               SUM(bowler_wicket) AS wickets
         FROM base
         WHERE {player_col} IS NOT NULL AND bat_hand IS NOT NULL AND bat_hand != ''
         GROUP BY innings, {player_col}, UPPER(COALESCE(bat_hand, 'unknown'))
@@ -757,10 +781,11 @@ def _hand_sql(player_col: str, source: str) -> str:
 
 
 def _zones_sql(player_col: str, batting: bool) -> str:
-    runs_col = "batter_runs" if batting else "total_runs"
+    runs_col = "batter_runs" if batting else "bowler_runs"
+    balls_col = "batter_ball" if batting else "bowler_ball"
     return f"""
         SELECT innings, {player_col} AS player, wagon_zone AS item,
-               COUNT(*) AS balls,
+               SUM({balls_col}) AS balls,
                SUM({runs_col}) AS runs
         FROM base
         WHERE {player_col} IS NOT NULL AND wagon_zone BETWEEN 1 AND 8
@@ -770,12 +795,13 @@ def _zones_sql(player_col: str, batting: bool) -> str:
 
 
 def _line_length_sql(player_col: str, batting: bool) -> str:
-    runs_col = "batter_runs" if batting else "total_runs"
+    runs_col = "batter_runs" if batting else "bowler_runs"
+    balls_col = "batter_ball" if batting else "bowler_ball"
     return f"""
         SELECT innings, {player_col} AS player,
                {_line_bucket_sql("line")} AS line_bucket,
                {_length_bucket_sql("length")} AS length_bucket,
-               COUNT(*) AS balls,
+               SUM({balls_col}) AS balls,
                SUM({runs_col}) AS runs
         FROM base
         WHERE {player_col} IS NOT NULL AND line IS NOT NULL AND length IS NOT NULL
