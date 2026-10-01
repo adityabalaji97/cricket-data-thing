@@ -68,6 +68,8 @@ import math
 # Shared ball/run/wicket definitions for the per-ball leaderboards below (services/metrics/sql_defs.py).
 _VENUE_BAT = sql_defs.delivery_details_defs(sql_defs.BATTER, "dd")
 _VENUE_BOWL = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
+# Bowler breakdowns read from the legacy table (/player/{name}/bowling_stats, bowling_ball_stats).
+_LEGACY_BOWL = sql_defs.legacy_defs(sql_defs.BOWLER, "d")
 
 
 def _batter_vs_type_columns() -> str:
@@ -3800,12 +3802,11 @@ def get_player_bowling_stats(
             SELECT 
                 d.over as over_number,
                 COUNT(DISTINCT CONCAT(d.match_id, '_', d.innings)) as instances_bowled,
-                SUM(d.runs_off_bat + d.extras) as runs,
+                SUM({_LEGACY_BOWL.runs}) as runs,
                 COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
-                SUM(CASE WHEN d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out') 
+                SUM(CASE WHEN {_LEGACY_BOWL.wicket}
                 THEN 1 ELSE 0 END) as wickets,
-                SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
+                SUM(CASE WHEN {_LEGACY_BOWL.dot} THEN 1 ELSE 0 END) as dots,
                 SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
                 COUNT(DISTINCT d.match_id) as matches_bowled_in
             FROM deliveries d
@@ -3824,30 +3825,26 @@ def get_player_bowling_stats(
             SELECT 
                 p.batting_hand,
                 COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
-                SUM(d.runs_off_bat + d.extras) as runs,
-                SUM(CASE WHEN d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out') 
+                SUM({_LEGACY_BOWL.runs}) as runs,
+                SUM(CASE WHEN {_LEGACY_BOWL.wicket}
                 THEN 1 ELSE 0 END) as wickets,
-                SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
+                SUM(CASE WHEN {_LEGACY_BOWL.dot} THEN 1 ELSE 0 END) as dots,
                 SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
                 
                 -- Phase-wise legal balls only
                 COUNT(CASE WHEN d.over < 6 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as pp_legal_balls,
-                SUM(CASE WHEN d.over < 6 THEN d.runs_off_bat + d.extras ELSE 0 END) as pp_runs,
-                SUM(CASE WHEN d.over < 6 AND d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out')
+                SUM(CASE WHEN d.over < 6 THEN {_LEGACY_BOWL.runs} ELSE 0 END) as pp_runs,
+                SUM(CASE WHEN d.over < 6 AND {_LEGACY_BOWL.wicket}
                 THEN 1 ELSE 0 END) as pp_wickets,
                 
                 COUNT(CASE WHEN d.over >= 6 AND d.over < 15 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as middle_legal_balls,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 THEN d.runs_off_bat + d.extras ELSE 0 END) as middle_runs,
-                SUM(CASE WHEN d.over >= 6 AND d.over < 15 AND d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out')
+                SUM(CASE WHEN d.over >= 6 AND d.over < 15 THEN {_LEGACY_BOWL.runs} ELSE 0 END) as middle_runs,
+                SUM(CASE WHEN d.over >= 6 AND d.over < 15 AND {_LEGACY_BOWL.wicket}
                 THEN 1 ELSE 0 END) as middle_wickets,
                 
                 COUNT(CASE WHEN d.over >= 15 AND d.wides = 0 AND d.noballs = 0 THEN 1 END) as death_legal_balls,
-                SUM(CASE WHEN d.over >= 15 THEN d.runs_off_bat + d.extras ELSE 0 END) as death_runs,
-                SUM(CASE WHEN d.over >= 15 AND d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out')
+                SUM(CASE WHEN d.over >= 15 THEN {_LEGACY_BOWL.runs} ELSE 0 END) as death_runs,
+                SUM(CASE WHEN d.over >= 15 AND {_LEGACY_BOWL.wicket}
                 THEN 1 ELSE 0 END) as death_wickets
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
@@ -3948,10 +3945,9 @@ def get_player_bowling_stats(
                     d.innings,
                     d.over,
                     COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
-                    SUM(d.runs_off_bat + d.extras) as runs_in_over,
-                    SUM(CASE WHEN d.wicket_type IS NOT NULL 
-                        AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out') 
-                    THEN 1 ELSE 0 END) as wickets_in_over
+                    SUM({_LEGACY_BOWL.runs}) as runs_in_over,
+                    SUM(CASE WHEN {_LEGACY_BOWL.wicket}
+                THEN 1 ELSE 0 END) as wickets_in_over
                 FROM deliveries d
                 JOIN matches m ON d.match_id = m.id
                 WHERE d.bowler = ANY(:player_names)
@@ -4266,11 +4262,10 @@ def get_player_bowling_ball_stats(
                 d.ball as ball_position,
                 COUNT(CASE WHEN d.wides = 0 AND d.noballs = 0 THEN 1 END) as legal_balls,
                 COUNT(*) as total_balls,
-                SUM(d.runs_off_bat + d.extras) as runs,
-                SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
+                SUM({_LEGACY_BOWL.runs}) as runs,
+                SUM(CASE WHEN {_LEGACY_BOWL.dot} THEN 1 ELSE 0 END) as dots,
                 SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
-                SUM(CASE WHEN d.wicket_type IS NOT NULL 
-                    AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out') 
+                SUM(CASE WHEN {_LEGACY_BOWL.wicket}
                 THEN 1 ELSE 0 END) as wickets,
                 
                 -- Phase distribution of legal balls only
