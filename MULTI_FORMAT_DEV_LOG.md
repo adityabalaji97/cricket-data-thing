@@ -152,6 +152,12 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > unavailable"), record_framings and season_tallies use COALESCE(winner, outcome->>'eliminator'), bot recaps
 > skip "Result unavailable". Local backfill: 3 Super Overs, 1 tie, 7 no-results; 10 unclear (ESPN 502s,
 > mostly 2000-07 ODIs; re-runnable). Goldens 19/19 identical vs ace7b41.
+> **Prod backfill done (2026-10-01, Heroku v462+):** 180 unresolved -> 174 written over two runs (7 Super Over /
+> one-over eliminator incl. KKR v LSG 1529281, ~30 ties, ~137 no-results); 2019 WC final 1144530 =
+> {"tie", eliminator England, method "boundary count"} ("Match tied (England won on boundary count)").
+> Left: 4 unresolved (ESPN unavailable; nightly retries the last 30 days, `resolve_match_results.py --all`
+> for older), and 1532482 Bangladesh v Australia 14 Jun 2026 -- ESPN says "Australia won by 1 wkt (3b
+> rem)" but the feed has no winner: a feed gap, left for a person (the resolver never writes winners).
 > **Notes 3-8 DEPLOYED (2026-10-01):** migration 010 applied to prod (author 'aditya' id 34, pack_id,
 > idx_notes_bot_match); Heroku v460; Vercel from origin/main 9a68aad. Smoke: /notes 200 (empty), admin 403
 > without token, Googlebot /notes gets the server-rendered list, sitemap lists /notes. Prod goldens: 4 diffs,

@@ -16,6 +16,14 @@ def test_super_over_winner_from_the_abbreviation():
     assert out["result"] == "tie" and out["eliminator"] == "Kolkata Knight Riders"
 
 
+def test_boundary_count_decides_a_tie():
+    out = parse_result(_summary("Match tied (England won the boundary count)", teams=(("New Zealand", "NZ"), ("England", "ENG"))),
+                       "New Zealand", "England")
+    assert out["eliminator"] == "England" and out["method"] == "boundary count"
+    assert _result_text({"winner": None, "outcome": {"result": "tie", "eliminator": "England", "method": "boundary count"}}, []) == \
+        "Match tied (England won on boundary count)"
+
+
 def test_plain_tie_and_no_result():
     assert parse_result(_summary("Match tied"), "Kolkata Knight Riders", "Lucknow Super Giants")["result"] == "tie"
     assert parse_result(_summary("No result"), "Kolkata Knight Riders", "Lucknow Super Giants")["result"] == "no result"

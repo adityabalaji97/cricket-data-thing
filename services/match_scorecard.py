@@ -1300,6 +1300,8 @@ def _result_text(match: Dict[str, Any], innings: List[Dict[str, Any]]) -> str:
         result = outcome.get("result") if isinstance(outcome, dict) else None
         if result == "tie":
             eliminator = outcome.get("eliminator")
+            if eliminator and outcome.get("method") == "boundary count":
+                return f"Match tied ({eliminator} won on boundary count)"
             return f"Match tied ({eliminator} won the Super Over)" if eliminator else "Match tied"
         if result == "no result":
             return "No result"

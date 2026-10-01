@@ -30,7 +30,9 @@ logger = logging.getLogger(__name__)
 # 8048 (the IPL) is the one services/cricinfo_scraper.py already uses.
 SUMMARY = "https://site.web.api.espn.com/apis/site/v2/sports/cricket/8048/summary?event={id}"
 UA = {"User-Agent": "Mozilla/5.0 (compatible; CricketDataThing/1.0)", "Accept": "application/json"}
-ELIMINATOR = re.compile(r"\((.+?) won (?:the )?(?:super over|one-over eliminator|eliminator|bowl-?out)", re.I)
+# "(KKR won the Super Over)", "(Oman won the one-over eliminator)", and the 2019 World Cup final's
+# "(England won the boundary count)" after a tied Super Over.
+ELIMINATOR = re.compile(r"\((.+?) won (?:the |on )?(?:super over|one-over eliminator|eliminator|bowl-?out|boundary count)", re.I)
 TIED = re.compile(r"\b(match tied|tied)\b", re.I)
 NO_RESULT = re.compile(r"\b(no result|abandoned|cancelled|called off)\b", re.I)
 
@@ -74,7 +76,8 @@ def parse_result(summary: Dict[str, Any], team1: str, team2: str) -> Optional[Di
     tied = ELIMINATOR.search(text_)
     if tied:
         winner = to_ours(tied.group(1))
-        return {"result": "tie", "eliminator": winner, "text": text_} if winner else None
+        method = {"method": "boundary count"} if re.search(r"boundary count", tied.group(0), re.I) else {}
+        return {"result": "tie", "eliminator": winner, **method, "text": text_} if winner else None
     if TIED.search(text_):
         return {"result": "tie", "text": text_}
     if NO_RESULT.search(text_):
@@ -121,7 +124,7 @@ def resolve(db: Session, days: Optional[int] = None, match_ids: Optional[List[st
             # The feed had no winner but ESPN has one: leave it for a person, never guess a result in.
             summary["won"].append(f"{label}: {parsed['text']}")
             continue
-        outcome = {"result": parsed["result"], **({"eliminator": parsed["eliminator"]} if parsed.get("eliminator") else {})}
+        outcome = {"result": parsed["result"], **{k: parsed[k] for k in ("eliminator", "method") if parsed.get(k)}}
         key = "tie_eliminator" if "eliminator" in outcome else "tie" if outcome["result"] == "tie" else "no_result"
         summary[key].append(f"{label}: {parsed['text']}")
         updates.append({"id": str(m["id"]), "outcome": json.dumps(outcome)})
