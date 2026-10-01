@@ -21,6 +21,7 @@ from services.player_aliases import (
     expand_name_group,
 )
 from services.bowler_types import PACE_TYPES as ALL_KNOWN_PACE_TYPES, SPIN_TYPES as ALL_KNOWN_SPIN_TYPES
+from services.metrics import sql_defs
 import logging
 
 logger = logging.getLogger(__name__)
@@ -824,10 +825,9 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
     group_by_clause = ", ".join(valid_group_columns)
     select_group_clause = ", ".join(select_columns)
     
-    # Determine runs calculation
-    batter_grouping = "batter" in group_by
-    use_runs_off_bat_only = batter_grouping or has_batter_filters
-    runs_calculation = "SUM(d.runs_off_bat)" if use_runs_off_bat_only else "SUM(d.runs_off_bat + d.extras)"
+    # Balls / runs / wickets / dots from the shared definitions, so pre-2015 rows mean the same
+    # thing as the delivery_details rows they are merged with.
+    ball_defs = sql_defs.legacy_defs(sql_defs.perspective_for(group_by, has_batter_filters), "d")
     
     query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
 
@@ -867,11 +867,11 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
         WITH {bat_pos_cte}all_groups AS (
             SELECT
                 {select_group_clause},
-                COUNT(*) as balls,
+                {ball_defs.balls_sum} as balls,
                 COUNT(DISTINCT (d.match_id, d.innings)) as innings_count,
-                {runs_calculation} as runs,
-                SUM(CASE WHEN d.wicket_type IS NOT NULL THEN 1 ELSE 0 END) as wickets,
-                SUM(CASE WHEN d.runs_off_bat = 0 AND d.extras = 0 THEN 1 ELSE 0 END) as dots,
+                {ball_defs.runs_sum} as runs,
+                {ball_defs.wickets_sum} as wickets,
+                {ball_defs.dots_sum} as dots,
                 SUM(CASE WHEN d.runs_off_bat IN (4, 6) THEN 1 ELSE 0 END) as boundaries,
                 SUM(CASE WHEN d.runs_off_bat = 4 THEN 1 ELSE 0 END) as fours,
                 SUM(CASE WHEN d.runs_off_bat = 6 THEN 1 ELSE 0 END) as sixes
@@ -2302,7 +2302,11 @@ def query_deliveries_service(
             
             # Get total balls from new table
             new_join_clause = "JOIN matches m ON m.id = dd.p_match" if join_new_matches else ""
-            total_balls_query = f"SELECT COUNT(*) FROM delivery_details dd {new_join_clause} {new_where_clause}"
+            # Same ball definition as the grouped rows, so percent_balls adds up after a merge.
+            total_balls_expr = sql_defs.delivery_details_defs(
+                sql_defs.perspective_for(group_by, has_batter_filters)
+            ).balls_sum if group_by else "COUNT(*)"
+            total_balls_query = f"SELECT {total_balls_expr} FROM delivery_details dd {new_join_clause} {new_where_clause}"
             total_balls_params = {k: v for k, v in new_params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
             new_total_balls = db.execute(text(total_balls_query), total_balls_params).scalar() or 0
             total_innings_query = f"SELECT COUNT(DISTINCT (dd.p_match, dd.inns)) FROM delivery_details dd {new_join_clause} {new_where_clause}"
@@ -3332,6 +3336,8 @@ def handle_grouped_query(
 
     batter_grouping = "batter" in group_by
     use_runs_off_bat_only = batter_grouping or has_batter_filters
+    perspective = sql_defs.perspective_for(group_by, has_batter_filters)
+    ball_defs = sql_defs.delivery_details_defs(perspective, "dd")
 
     # Snapshot vs cumulative metric expressions. In snapshot mode each row
     # in the underlying scan contributes its own outcome. In cumulative mode
@@ -3369,15 +3375,17 @@ def handle_grouped_query(
             os.environ.get("QB_PRIMER_METRICS", "1") != "0"
             and fmt not in ("ODI", "TEST") and gender != "female"
         )
-        runs_calculation = "SUM(dd.batruns)" if use_runs_off_bat_only else "SUM(dd.score)"
-        balls_expr = "COUNT(*)"
-        wickets_expr = "SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END)"
+        # Shared definitions (services/metrics/sql_defs.py): a batter's balls exclude wides, a
+        # bowler's runs exclude byes/leg-byes, wickets are the perspective's own dismissals.
+        runs_calculation = ball_defs.runs_sum
+        balls_expr = ball_defs.balls_sum
+        wickets_expr = ball_defs.wickets_sum
         stage2_extra_select = "dd.batruns, dd.wide, dd.noball, dd.control, " + (
             "bm.raa AS m_raa, bm.waa AS m_waa, bm.impact AS m_impact, bm.wpa AS m_wpa, bm.leverage AS m_leverage"
             if metrics_enabled else
             "NULL::real AS m_raa, NULL::real AS m_waa, NULL::real AS m_impact, NULL::real AS m_wpa, NULL::real AS m_leverage"
         )
-        dots_expr = "SUM(CASE WHEN s.batruns = 0 AND s.wide = 0 AND s.noball = 0 THEN 1 ELSE 0 END)"
+        dots_expr = sql_defs.delivery_details_defs(perspective, "s").dots_sum
         boundaries_expr = "SUM(CASE WHEN s.batruns IN (4, 6) THEN 1 ELSE 0 END)"
         fours_expr = "SUM(CASE WHEN s.batruns = 4 THEN 1 ELSE 0 END)"
         sixes_expr = "SUM(CASE WHEN s.batruns = 6 THEN 1 ELSE 0 END)"
@@ -3621,7 +3629,7 @@ def handle_grouped_query(
     # — so skip summaries when cumulative is active.
     if show_summary_rows and len(group_by) >= 1 and not cumulative_source:
         summary_data, percentages = generate_summary_data(
-            where_clause, params, group_by, runs_calculation, db, universe_balls,
+            where_clause, params, group_by, ball_defs, db, universe_balls,
             join_matches=join_matches, fmt=fmt, gender=gender,
         )
 
@@ -3647,7 +3655,7 @@ def handle_grouped_query(
     }
 
 
-def generate_summary_data(where_clause, params, group_by, runs_calculation, db, total_balls, join_matches=False,
+def generate_summary_data(where_clause, params, group_by, ball_defs, db, total_balls, join_matches=False,
                           fmt="T20", gender="male"):
     """Generate hierarchical summary data for grouped queries with percent_balls."""
     try:
@@ -3725,13 +3733,13 @@ def generate_summary_data(where_clause, params, group_by, runs_calculation, db, 
                 {summary_bat_pos_cte}
                 SELECT
                     {summary_select_clause},
-                    COUNT(*) as total_balls,
-                    {runs_calculation} as total_runs,
-                    SUM(CASE WHEN dd.dismissal IS NOT NULL AND dd.dismissal != '' THEN 1 ELSE 0 END) as total_wickets,
-                    SUM(CASE WHEN dd.batruns = 0 AND dd.wide = 0 AND dd.noball = 0 THEN 1 ELSE 0 END) as total_dots,
+                    {ball_defs.balls_sum} as total_balls,
+                    {ball_defs.runs_sum} as total_runs,
+                    {ball_defs.wickets_sum} as total_wickets,
+                    {ball_defs.dots_sum} as total_dots,
                     SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as total_boundaries,
-                    CASE WHEN COUNT(*) > 0
-                        THEN (CAST({runs_calculation} AS DECIMAL) * 100.0) / COUNT(*)
+                    CASE WHEN {ball_defs.balls_sum} > 0
+                        THEN (CAST({ball_defs.runs_sum} AS DECIMAL) * 100.0) / {ball_defs.balls_sum}
                         ELSE 0 END as strike_rate
                 FROM delivery_details dd
                 {summary_bat_pos_join}
