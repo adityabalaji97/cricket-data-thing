@@ -120,10 +120,12 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > markdown code in the main bundle -- marked lives in the lazy notes chunk). siteOrigin() (ChartExportButton)
 > honours REACT_APP_EMBED_ORIGIN and NoteBody reuses it. CRA build: a stale node_modules/.cache/.eslintcache
 > (shared with the :3000 dev server) reported a false 'not defined'; deleting it fixed the build.
-> **Notes 3-8 DEPLOY ORDER (not done):** (1) apply migration 010 to prod -- the notes SELECTs read
-> notes.pack_id, and tonight's nightly "Draft notes" step needs it; (2) git push heroku main (new routers);
-> (3) Vercel deploys from origin/main (already pushed when this was written). Until (1)+(2), /notes shows
-> "could not be loaded", the Home strip stays hidden and "Make note" fails; nothing else is affected.
+> **Notes 3-8 DEPLOYED (2026-10-01):** migration 010 applied to prod (author 'aditya' id 34, pack_id,
+> idx_notes_bot_match); Heroku v460; Vercel from origin/main 9a68aad. Smoke: /notes 200 (empty), admin 403
+> without token, Googlebot /notes gets the server-rendered list, sitemap lists /notes. Prod goldens: 4 diffs,
+> none from this deploy -- landing_featured_innings (rolling window), scorecard_legacy_pre2015 (6c wides fix),
+> qb_bowling_stats_mode (wickets backfill), match_preview (Jev typed path vs deterministic golden);
+> recapture them deliberately. First bot drafts arrive with tonight's nightly run.
 > After deploy: the plan's checks -- curl -A Googlebot https://hindsightcricket.com/notes/<slug>, a WhatsApp
 > unfurl, /sitemap.xml lists the note, and the phone flow in /admin/notes after the first nightly draft.
 >
