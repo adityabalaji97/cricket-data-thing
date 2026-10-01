@@ -38,9 +38,15 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > PROD BEFORE DEPLOYING audit-fixes. refresh_alias_views() (refresh CONCURRENTLY + ANALYZE) runs in the
 > nightly workflow after loads and in the alias scripts. Inline alias CTEs are NOT MATERIALIZED.
 > Local warm: match preview 4.05 s -> 0.79 s, scorecard 414 -> 62 ms, QB grouped one scan fewer x2.
-> Open: rankings precompute (~28 s), QB IPL batter x year ~0.6 s main scan, index cleanup (needs prod
-> pg_stat_user_indexes), match_date::date casts, cumulative QB mode defs, /player stats bowling-type
-> matrix legacy-only, "MW Short" alias -> both Matthew and D'Arcy Short (looks wrong; review).
+> Rankings: payloads persisted in query_cache + scripts/warm_rankings.py nightly step (52 payloads,
+> ~80 s local); profile ranking card 0.1-0.3 s warm vs 10-14 s cold. Profile matrices: batter
+> pace/spin + bowling types and all bowler panels (over dist, handedness, combos, maidens, ball
+> position) now read delivery_details + legacy-for-the-rest via _batter_vs_type_balls_cte /
+> _bowler_balls_cte, men's T20 only (ODI balls had leaked in); maidens = bowler conceded 0 in a
+> complete over; bowling_ball_stats filter matched nothing without leagues (fixed).
+> Open: index cleanup + stored bowling_stats staleness (both need read-only prod queries),
+> QB IPL batter x year ~0.6 s main scan, match_date::date casts, cumulative QB mode defs,
+> "MW Short" alias -> both Matthew and D'Arcy Short (looks wrong; review).
 > Local bowling_stats is stale vs current sync rules (wide double-count, 'leg before wicket' missed,
 > old score=0 dots) -- check prod before regenerating.
 >

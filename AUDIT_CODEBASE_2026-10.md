@@ -34,6 +34,12 @@ A22 — Wrapped "Venue Vibes" raised on every request and grouped on unpopulated
 A23 — two alias chains split players (Mitch/Mitchell Owen, Raj Bawa); `audit_roster_names --fix` created
 them and now resolves chains (fixed). Open: "MW Short" aliases to both Matthew and D'Arcy Short.
 
+Batch 5 (open items): rankings persisted + nightly warm `e4d4264` (C1: profile card 10-14 s → 0.1-0.3 s);
+A19 batter matrix on both tables `b0bec78`; bowler panels on both tables + maidens `0f8ea49`.
+A24 — profile type/phase breakdowns had no format pin, so ODI balls in the legacy table counted as T20
+(fixed). A25 — maidens counted overs with a wide (runs summed over legal balls only) (fixed). A26 —
+`bowling_ball_stats` returned nothing unless leagues were named (filter missing the catch-all) (fixed).
+
 ---
 
 ## A. Correctness — wrong numbers shown to users
