@@ -53,6 +53,7 @@ from routers.usage import router as usage_router
 from routers.seo import router as seo_router
 from routers.snapshots import router as snapshots_router
 from routers.content import router as content_router
+from routers.notes import public as notes_router, admin as notes_admin_router, author as notes_author_router
 from services.delivery_data_service import (
     get_venue_match_stats,
     get_match_scores,
@@ -96,6 +97,9 @@ app.include_router(usage_router)
 app.include_router(seo_router)
 app.include_router(snapshots_router)
 app.include_router(content_router)
+app.include_router(notes_router)
+app.include_router(notes_admin_router)
+app.include_router(notes_author_router)
 #app.include_router(query_builder_router)
 app.include_router(query_builder_router_v2)
 app.include_router(players_router)

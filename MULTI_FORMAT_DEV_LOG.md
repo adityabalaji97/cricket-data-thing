@@ -59,7 +59,17 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > 6c + backfill deployed: origin/main 1720bf5, Heroku v459 (2026-10-01). First nightly with the Cricsheet
 > step ran clean (nothing new: the ODI CSV still ends 24 Sep, Cricsheet ends 17 Sep -- the India v WI
 > ODIs are in neither source yet; they load automatically when either has them).
-> Next: Notes 3-5.
+> **Notes step 3 built (2026-10-01, local only):** migration 010 (owner byline 'aditya', unique
+> (kind, match_id) for recap/preview drafts, notes.pack_id) -- NOT yet applied to prod; 009's notes
+> tables had never been created on hindsight_local (only matches.data_source), now applied there.
+> services/notes.py + routers/notes.py: public GET /notes, /notes/{slug} (published only, with chart
+> data); admin /admin/notes queue (list/get/create/patch/publish/reject/draft), POST /admin/notes/charts
+> (pasted /query, /scorecard, /embed, /img URL -> snapshot + ```hindsight chart: id``` fence),
+> /admin/authors (+ token rotate; token shown once, sha256 stored); friends' X-Author-Token routes
+> /author/me, /author/notes (own drafts only; other people's notes read as 404). Shared admin auth was
+> already routers/_auth.py (step 6). tests/test_notes.py: DB-writing tests run only when DATABASE_URL is
+> localhost. Local DB has no ball_metrics: use QB_PRIMER_METRICS=0; scorecards 500 locally.
+> Next: Notes 4 (pages + /admin/notes UI), 5, 7, 8.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
 > (sync_stats_from_dd double-counted wides/no-balls and charged byes; statsProcessor charged
