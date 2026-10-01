@@ -662,7 +662,7 @@
             "wpa": null
           },
           {
-            "balls": 37,
+            "balls": 36,
             "breakdowns": {
               "line_length": {
                 "available": false,
@@ -810,7 +810,7 @@
             "not_out": true,
             "runs": 58,
             "sixes": 2,
-            "strike_rate": 157,
+            "strike_rate": 161,
             "team": "Hobart Hurricanes",
             "wpa": null
           },
@@ -1049,7 +1049,7 @@
             "wpa": null
           },
           {
-            "balls": 9,
+            "balls": 8,
             "breakdowns": {
               "line_length": {
                 "available": false,
@@ -1173,7 +1173,7 @@
             "not_out": false,
             "runs": 5,
             "sixes": 0,
-            "strike_rate": 56,
+            "strike_rate": 62,
             "team": "Hobart Hurricanes",
             "wpa": null
           },
@@ -1433,8 +1433,8 @@
               }
             },
             "dots": 5,
-            "economy": 6.5,
-            "figures": "2.0-0-13",
+            "economy": 6.0,
+            "figures": "2.0-0-12",
             "id": "kane-richardson",
             "impact": null,
             "legal_balls": 12,
@@ -1443,7 +1443,7 @@
             },
             "name": "Kane Richardson",
             "overs": "2.0",
-            "runs": 13,
+            "runs": 12,
             "style": "RM",
             "team": "Adelaide Strikers",
             "wickets": 1,
@@ -1601,8 +1601,8 @@
               }
             },
             "dots": 9,
-            "economy": 5.5,
-            "figures": "4.0-0-22",
+            "economy": 5.2,
+            "figures": "4.0-0-21",
             "id": "craig-simmons",
             "impact": null,
             "legal_balls": 24,
@@ -1611,7 +1611,7 @@
             },
             "name": "Craig Simmons",
             "overs": "4.0",
-            "runs": 22,
+            "runs": 21,
             "style": "NaN",
             "team": "Adelaide Strikers",
             "wickets": 0,
@@ -1797,8 +1797,8 @@
               }
             },
             "dots": 10,
-            "economy": 5.8,
-            "figures": "4.0-0-23",
+            "economy": 5.5,
+            "figures": "4.0-0-22",
             "id": "shaun-tait",
             "impact": null,
             "legal_balls": 24,
@@ -1807,7 +1807,7 @@
             },
             "name": "Shaun Tait",
             "overs": "4.0",
-            "runs": 23,
+            "runs": 22,
             "style": "RF",
             "team": "Adelaide Strikers",
             "wickets": 3,
@@ -2666,7 +2666,7 @@
             "wpa": null
           },
           {
-            "balls": 36,
+            "balls": 35,
             "breakdowns": {
               "line_length": {
                 "available": false,
@@ -2814,7 +2814,7 @@
             "not_out": true,
             "runs": 54,
             "sixes": 6,
-            "strike_rate": 150,
+            "strike_rate": 154,
             "team": "Adelaide Strikers",
             "wpa": null
           },
@@ -3050,8 +3050,8 @@
               }
             },
             "dots": 6,
-            "economy": 11.0,
-            "figures": "3.0-0-33",
+            "economy": 10.7,
+            "figures": "3.0-0-32",
             "id": "timm-van-der-gugten",
             "impact": null,
             "legal_balls": 18,
@@ -3060,7 +3060,7 @@
             },
             "name": "Timm van der Gugten",
             "overs": "3.0",
-            "runs": 33,
+            "runs": 32,
             "style": "RM",
             "team": "Hobart Hurricanes",
             "wickets": 0,
@@ -3582,8 +3582,8 @@
               }
             },
             "dots": 9,
-            "economy": 10.8,
-            "figures": "4.0-0-43",
+            "economy": 10.5,
+            "figures": "4.0-0-42",
             "id": "cameron-boyce",
             "impact": null,
             "legal_balls": 24,
@@ -3592,7 +3592,7 @@
             },
             "name": "Cameron Boyce",
             "overs": "4.0",
-            "runs": 43,
+            "runs": 42,
             "style": "RL",
             "team": "Hobart Hurricanes",
             "wickets": 1,
@@ -3708,8 +3708,8 @@
               }
             },
             "dots": 2,
-            "economy": 5.0,
-            "figures": "1.0-0-5",
+            "economy": 4.0,
+            "figures": "1.0-0-4",
             "id": "evan-gulbis",
             "impact": null,
             "legal_balls": 6,
@@ -3718,7 +3718,7 @@
             },
             "name": "Evan Gulbis",
             "overs": "1.0",
-            "runs": 5,
+            "runs": 4,
             "style": "RM",
             "team": "Hobart Hurricanes",
             "wickets": 0,
@@ -3853,7 +3853,7 @@
         {
           "innings": 1,
           "kind": "top_bowl",
-          "label": "3/23",
+          "label": "3/22",
           "lens": "batter",
           "player": "Shaun Tait",
           "player_id": "shaun-tait",

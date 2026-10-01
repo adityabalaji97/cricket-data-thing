@@ -1,72 +1,75 @@
 {
   "status": 200,
   "body": {
-    "headline": null,
-    "narrative_source": "deterministic",
+    "headline": "Mustafizur Rahman has 23 wickets in 335 balls against Sylhet Titans' likely batters, at 7.06 an over.",
+    "narrative_source": "typed",
     "preview_mode": "hybrid",
     "preview_version": "v3-narrative",
     "sections": [
       {
         "bullets": [
-          "110 matches at Sylhet International Cricket Stadium: 45 bat-first wins vs 59 chases (40% bat-first) \u2014 chasing edge.",
-          "Scoring benchmarks: avg winning score 177, avg chasing score 143 (range 61-254); winning template is death overs driven with 56 runs in that phase."
+          "The last 7 matches here went 2 bat-first wins to 5 chases.",
+          "Winning sides here are built in the death overs, averaging 56 runs in that phase.",
+          "Par for a first innings here is 158, from 110 matches in the window."
         ],
         "evidence_tags": [
-          "match_results_distribution",
-          "innings_scores_analysis",
-          "phase_wise_strategy"
+          "typed_preview"
         ],
         "id": "venue_profile",
         "title": "Venue Profile"
       },
       {
         "bullets": [
-          "Rangpur Riders LWWLL; batting first scored 111, 181, 114, 178 \u2014 reached avg winning score (177) in 2 of 4; chasing 174/173 (W) \u2014 reached avg chasing score (143) in 1 of 1.",
-          "Sylhet Titans LWLWW; batting first scored 180 \u2014 reached avg winning score (177) in 1 of 1; chasing 153/165 (L), 112/111 (W), 142/147 (L), 119/114 (W) \u2014 reached avg chasing score (143) in 1 of 4.",
-          "With a chasing edge at this venue, Rangpur Riders's 1 recent chasing win(s) vs Sylhet Titans's 2 is a key form differentiator; bowling-first restrictions avg 173 (Rangpur Riders) vs 112 (Sylhet Titans)."
+          "Bowling first, Sylhet Titans have conceded 112 on average recently."
         ],
         "evidence_tags": [
-          "match_results_distribution",
-          "innings_scores_analysis"
+          "typed_preview"
         ],
         "id": "form_guide",
         "title": "Form Guide"
       },
       {
         "bullets": [
-          "3 meetings in window: Rangpur Riders 1-2 Sylhet Titans. Most recent (2026-01-20) went to Sylhet Titans at Shere Bangla National Stadium, Mirpur.",
-          "2 H2H match(es) at this venue \u2014 same-venue H2H strengthens the signal."
+          "Sylhet Titans lead Rangpur Riders 2-1 in their last 3 meetings."
         ],
         "evidence_tags": [
-          "head_to_head_stats"
+          "typed_preview"
         ],
         "id": "head_to_head",
         "title": "Head-to-Head"
       },
       {
         "bullets": [
-          "Winning-template pressure point is death overs (43 runs on average in successful chases).",
-          "Top picks \u2014 Rangpur Riders: Mahmudullah (59 exp pts, conf 0.90), Mustafizur Rahman (53 exp pts, conf 0.60); Sylhet Titans: Shohidul Islam (74 exp pts, conf 0.60), Saim Ayub (71 exp pts, conf 0.90).",
-          "Key edges: Khushdil Shah vs Nasum Ahmed (13b, SR 277); Nasum Ahmed threat (360b, 16 wkts, econ 6.95); Mohammad Amir vs Khushdil Shah (6b, SR 300); Mustafizur Rahman threat (335b, 23 wkts, econ 7.06)."
+          "Mustafizur Rahman leads Rangpur Riders' bowling Impact over the last year: 83.7 runs saved in 10 matches (WPA +1.68).",
+          "Nasum Ahmed leads Sylhet Titans' bowling Impact over the last year: 118.3 runs saved in 12 matches (WPA +0.68).",
+          "Mahmudullah leads Rangpur Riders' batting Impact over the last year: +43.6 runs in 8 innings (RAA +24.9, WPA +0.51).",
+          "Parvez Hossain Emon leads Sylhet Titans' batting Impact over the last year: +53.4 runs in 12 innings (RAA +37.6, WPA +0.84)."
         ],
         "evidence_tags": [
-          "phase_wise_strategy",
-          "expected_fantasy_points"
+          "typed_preview"
+        ],
+        "id": "key_players",
+        "title": "Key Players"
+      },
+      {
+        "bullets": [
+          "Mustafizur Rahman has 23 wickets in 335 balls against Sylhet Titans' likely batters, at 7.06 an over.",
+          "Nasum Ahmed has 16 wickets in 360 balls against Rangpur Riders' likely batters, at 6.95 an over.",
+          "Khushdil Shah has scored 36 off 13 balls against Nasum Ahmed (strike rate 277)."
+        ],
+        "evidence_tags": [
+          "typed_preview"
         ],
         "id": "key_matchup_factor",
         "title": "Key Matchup Factor"
       },
       {
         "bullets": [
-          "Lean Sylhet Titans (-6) (ELO: Rangpur Riders 1614 vs Sylhet Titans 1533) \u2014 Recent H2H edge, Venue bias: chasing_edge, Fantasy/matchup edge.",
-          "Toss/innings path: recent venue split is 2 bat-first wins vs 5 chases in the last 7."
+          "Lean Sylhet Titans: Recent H2H edge, Venue: chasing sides win more here, Fantasy/matchup edge.",
+          "Rangpur Riders are rated 81 Elo points higher."
         ],
         "evidence_tags": [
-          "match_results_distribution",
-          "innings_scores_analysis",
-          "recent_matches_at_venue",
-          "phase_wise_strategy",
-          "expected_fantasy_points"
+          "typed_preview"
         ],
         "id": "preview_take",
         "title": "Preview Take"

@@ -3,8 +3,8 @@
   "body": {
     "data": [
       {
-        "average": 28.09,
-        "balls_per_wicket": 19.11,
+        "average": 27.09,
+        "balls_per_wicket": 18.43,
         "bowler": "Bhuvneshwar Kumar",
         "dots": 411,
         "economy": 8.82,
@@ -13,11 +13,11 @@
         "overs": 172.0,
         "runs_conceded": 1517,
         "sixes_conceded": 63,
-        "wickets": 54
+        "wickets": 56
       },
       {
-        "average": 34.46,
-        "balls_per_wicket": 22.57,
+        "average": 31.7,
+        "balls_per_wicket": 20.76,
         "bowler": "Mohammed Siraj",
         "dots": 452,
         "economy": 9.16,
@@ -26,11 +26,11 @@
         "overs": 173.0,
         "runs_conceded": 1585,
         "sixes_conceded": 70,
-        "wickets": 46
+        "wickets": 50
       },
       {
-        "average": 30.67,
-        "balls_per_wicket": 19.02,
+        "average": 28.96,
+        "balls_per_wicket": 17.96,
         "bowler": "Arshdeep Singh",
         "dots": 360,
         "economy": 9.67,
@@ -39,11 +39,11 @@
         "overs": 161.67,
         "runs_conceded": 1564,
         "sixes_conceded": 56,
-        "wickets": 51
+        "wickets": 54
       },
       {
-        "average": 39.91,
-        "balls_per_wicket": 26.66,
+        "average": 34.92,
+        "balls_per_wicket": 23.32,
         "bowler": "Rashid Khan",
         "dots": 295,
         "economy": 8.98,
@@ -52,11 +52,11 @@
         "overs": 155.5,
         "runs_conceded": 1397,
         "sixes_conceded": 89,
-        "wickets": 35
+        "wickets": 40
       },
       {
-        "average": 29.42,
-        "balls_per_wicket": 21.58,
+        "average": 28.62,
+        "balls_per_wicket": 21.0,
         "bowler": "Krunal Pandya",
         "dots": 230,
         "economy": 8.18,
@@ -65,11 +65,11 @@
         "overs": 129.5,
         "runs_conceded": 1059,
         "sixes_conceded": 52,
-        "wickets": 36
+        "wickets": 37
       },
       {
-        "average": 40.42,
-        "balls_per_wicket": 29.46,
+        "average": 34.64,
+        "balls_per_wicket": 25.25,
         "bowler": "Ravindra Jadeja",
         "dots": 205,
         "economy": 8.23,
@@ -78,11 +78,11 @@
         "overs": 117.83,
         "runs_conceded": 970,
         "sixes_conceded": 44,
-        "wickets": 24
+        "wickets": 28
       },
       {
-        "average": 31.65,
-        "balls_per_wicket": 20.09,
+        "average": 29.59,
+        "balls_per_wicket": 18.78,
         "bowler": "Yuzvendra Chahal",
         "dots": 230,
         "economy": 9.45,
@@ -91,11 +91,11 @@
         "overs": 144.0,
         "runs_conceded": 1361,
         "sixes_conceded": 77,
-        "wickets": 43
+        "wickets": 46
       },
       {
-        "average": 40.4,
-        "balls_per_wicket": 29.76,
+        "average": 37.41,
+        "balls_per_wicket": 27.56,
         "bowler": "Axar Patel",
         "dots": 229,
         "economy": 8.15,
@@ -104,11 +104,11 @@
         "overs": 124.0,
         "runs_conceded": 1010,
         "sixes_conceded": 51,
-        "wickets": 25
+        "wickets": 27
       },
       {
-        "average": 26.45,
-        "balls_per_wicket": 22.65,
+        "average": 24.05,
+        "balls_per_wicket": 20.59,
         "bowler": "Sunil Narine",
         "dots": 353,
         "economy": 7.01,
@@ -117,11 +117,11 @@
         "overs": 151.0,
         "runs_conceded": 1058,
         "sixes_conceded": 57,
-        "wickets": 40
+        "wickets": 44
       },
       {
-        "average": 26.55,
-        "balls_per_wicket": 22.23,
+        "average": 25.29,
+        "balls_per_wicket": 21.17,
         "bowler": "Jasprit Bumrah",
         "dots": 388,
         "economy": 7.17,
@@ -130,11 +130,11 @@
         "overs": 148.17,
         "runs_conceded": 1062,
         "sixes_conceded": 34,
-        "wickets": 40
+        "wickets": 42
       },
       {
-        "average": 26.16,
-        "balls_per_wicket": 18.95,
+        "average": 25.0,
+        "balls_per_wicket": 18.11,
         "bowler": "Noor Ahmad",
         "dots": 277,
         "economy": 8.28,
@@ -143,11 +143,11 @@
         "overs": 135.83,
         "runs_conceded": 1125,
         "sixes_conceded": 54,
-        "wickets": 43
+        "wickets": 45
       },
       {
-        "average": 33.08,
-        "balls_per_wicket": 21.4,
+        "average": 31.5,
+        "balls_per_wicket": 20.38,
         "bowler": "Pat Cummins",
         "dots": 313,
         "economy": 9.27,
@@ -156,11 +156,11 @@
         "overs": 142.67,
         "runs_conceded": 1323,
         "sixes_conceded": 60,
-        "wickets": 40
+        "wickets": 42
       },
       {
-        "average": 24.28,
-        "balls_per_wicket": 18.0,
+        "average": 23.29,
+        "balls_per_wicket": 17.27,
         "bowler": "Varun Chakaravarthy",
         "dots": 322,
         "economy": 8.09,
@@ -169,11 +169,11 @@
         "overs": 141.0,
         "runs_conceded": 1141,
         "sixes_conceded": 60,
-        "wickets": 47
+        "wickets": 49
       },
       {
-        "average": 31.75,
-        "balls_per_wicket": 22.17,
+        "average": 27.88,
+        "balls_per_wicket": 19.46,
         "bowler": "Kuldeep Yadav",
         "dots": 252,
         "economy": 8.59,
@@ -182,11 +182,11 @@
         "overs": 133.0,
         "runs_conceded": 1143,
         "sixes_conceded": 70,
-        "wickets": 36
+        "wickets": 41
       },
       {
-        "average": 32.8,
-        "balls_per_wicket": 21.8,
+        "average": 28.7,
+        "balls_per_wicket": 19.07,
         "bowler": "Trent Boult",
         "dots": 289,
         "economy": 9.03,
@@ -195,11 +195,11 @@
         "overs": 127.17,
         "runs_conceded": 1148,
         "sixes_conceded": 49,
-        "wickets": 35
+        "wickets": 40
       },
       {
-        "average": 37.82,
-        "balls_per_wicket": 22.38,
+        "average": 33.84,
+        "balls_per_wicket": 20.03,
         "bowler": "Avesh Khan",
         "dots": 225,
         "economy": 10.14,
@@ -208,11 +208,11 @@
         "overs": 126.83,
         "runs_conceded": 1286,
         "sixes_conceded": 63,
-        "wickets": 34
+        "wickets": 38
       },
       {
-        "average": 35.29,
-        "balls_per_wicket": 20.07,
+        "average": 34.07,
+        "balls_per_wicket": 19.38,
         "bowler": "Hardik Pandya",
         "dots": 173,
         "economy": 10.55,
@@ -221,7 +221,7 @@
         "overs": 93.67,
         "runs_conceded": 988,
         "sixes_conceded": 51,
-        "wickets": 28
+        "wickets": 29
       },
       {
         "average": 34.7,
@@ -237,8 +237,8 @@
         "wickets": 30
       },
       {
-        "average": 33.5,
-        "balls_per_wicket": 21.28,
+        "average": 31.53,
+        "balls_per_wicket": 20.03,
         "bowler": "Khaleel Ahmed",
         "dots": 310,
         "economy": 9.44,
@@ -247,11 +247,11 @@
         "overs": 113.5,
         "runs_conceded": 1072,
         "sixes_conceded": 56,
-        "wickets": 32
+        "wickets": 34
       },
       {
-        "average": 28.51,
-        "balls_per_wicket": 17.27,
+        "average": 26.38,
+        "balls_per_wicket": 15.97,
         "bowler": "Harshal Patel",
         "dots": 186,
         "economy": 9.91,
@@ -260,11 +260,11 @@
         "overs": 106.5,
         "runs_conceded": 1055,
         "sixes_conceded": 41,
-        "wickets": 37
+        "wickets": 40
       },
       {
-        "average": 29.0,
-        "balls_per_wicket": 18.1,
+        "average": 27.62,
+        "balls_per_wicket": 17.24,
         "bowler": "Kagiso Rabada",
         "dots": 297,
         "economy": 9.61,
@@ -273,11 +273,11 @@
         "overs": 120.67,
         "runs_conceded": 1160,
         "sixes_conceded": 66,
-        "wickets": 40
+        "wickets": 42
       },
       {
-        "average": 33.21,
-        "balls_per_wicket": 18.76,
+        "average": 32.26,
+        "balls_per_wicket": 18.23,
         "bowler": "Mukesh Kumar",
         "dots": 216,
         "economy": 10.62,
@@ -286,11 +286,11 @@
         "overs": 106.33,
         "runs_conceded": 1129,
         "sixes_conceded": 53,
-        "wickets": 34
+        "wickets": 35
       },
       {
-        "average": 29.51,
-        "balls_per_wicket": 17.92,
+        "average": 28.0,
+        "balls_per_wicket": 17.0,
         "bowler": "Vaibhav Arora",
         "dots": 248,
         "economy": 9.88,
@@ -299,11 +299,11 @@
         "overs": 110.5,
         "runs_conceded": 1092,
         "sixes_conceded": 48,
-        "wickets": 37
+        "wickets": 39
       },
       {
-        "average": 36.65,
-        "balls_per_wicket": 23.48,
+        "average": 35.12,
+        "balls_per_wicket": 22.5,
         "bowler": "Deepak Chahar",
         "dots": 226,
         "economy": 9.37,
@@ -312,11 +312,11 @@
         "overs": 90.0,
         "runs_conceded": 843,
         "sixes_conceded": 38,
-        "wickets": 23
+        "wickets": 24
       },
       {
-        "average": 27.1,
-        "balls_per_wicket": 15.67,
+        "average": 25.17,
+        "balls_per_wicket": 14.55,
         "bowler": "Mitchell Starc",
         "dots": 247,
         "economy": 10.38,
@@ -325,7 +325,7 @@
         "overs": 101.83,
         "runs_conceded": 1057,
         "sixes_conceded": 48,
-        "wickets": 39
+        "wickets": 42
       },
       {
         "average": 34.63,
@@ -341,8 +341,8 @@
         "wickets": 30
       },
       {
-        "average": 43.54,
-        "balls_per_wicket": 26.12,
+        "average": 40.19,
+        "balls_per_wicket": 24.12,
         "bowler": "Marco Jansen",
         "dots": 222,
         "economy": 10.0,
@@ -351,11 +351,11 @@
         "overs": 104.5,
         "runs_conceded": 1045,
         "sixes_conceded": 56,
-        "wickets": 24
+        "wickets": 26
       },
       {
-        "average": 34.26,
-        "balls_per_wicket": 22.04,
+        "average": 33.04,
+        "balls_per_wicket": 21.25,
         "bowler": "Yash Dayal",
         "dots": 219,
         "economy": 9.33,
@@ -364,11 +364,11 @@
         "overs": 99.17,
         "runs_conceded": 925,
         "sixes_conceded": 34,
-        "wickets": 27
+        "wickets": 28
       },
       {
-        "average": 29.0,
-        "balls_per_wicket": 18.62,
+        "average": 27.39,
+        "balls_per_wicket": 17.58,
         "bowler": "Jofra Archer",
         "dots": 268,
         "economy": 9.35,
@@ -377,11 +377,11 @@
         "overs": 105.5,
         "runs_conceded": 986,
         "sixes_conceded": 38,
-        "wickets": 34
+        "wickets": 36
       },
       {
-        "average": 54.31,
-        "balls_per_wicket": 35.56,
+        "average": 51.12,
+        "balls_per_wicket": 33.47,
         "bowler": "Suyash Sharma",
         "dots": 180,
         "economy": 9.16,
@@ -390,11 +390,11 @@
         "overs": 94.83,
         "runs_conceded": 869,
         "sixes_conceded": 44,
-        "wickets": 16
+        "wickets": 17
       },
       {
-        "average": 22.38,
-        "balls_per_wicket": 14.7,
+        "average": 21.83,
+        "balls_per_wicket": 14.34,
         "bowler": "Prasidh Krishna",
         "dots": 225,
         "economy": 9.13,
@@ -403,11 +403,11 @@
         "overs": 98.0,
         "runs_conceded": 895,
         "sixes_conceded": 46,
-        "wickets": 40
+        "wickets": 41
       },
       {
-        "average": 37.33,
-        "balls_per_wicket": 23.54,
+        "average": 33.19,
+        "balls_per_wicket": 20.93,
         "bowler": "Sandeep Sharma",
         "dots": 161,
         "economy": 9.52,
@@ -416,11 +416,11 @@
         "overs": 94.17,
         "runs_conceded": 896,
         "sixes_conceded": 36,
-        "wickets": 24
+        "wickets": 27
       },
       {
-        "average": 32.9,
-        "balls_per_wicket": 18.14,
+        "average": 31.8,
+        "balls_per_wicket": 17.53,
         "bowler": "Shardul Thakur",
         "dots": 145,
         "economy": 10.88,
@@ -429,11 +429,11 @@
         "overs": 87.67,
         "runs_conceded": 954,
         "sixes_conceded": 43,
-        "wickets": 29
+        "wickets": 30
       },
       {
-        "average": 36.42,
-        "balls_per_wicket": 21.83,
+        "average": 34.96,
+        "balls_per_wicket": 20.96,
         "bowler": "T Natarajan",
         "dots": 160,
         "economy": 10.01,
@@ -442,11 +442,11 @@
         "overs": 87.33,
         "runs_conceded": 874,
         "sixes_conceded": 39,
-        "wickets": 24
+        "wickets": 25
       },
       {
-        "average": 27.2,
-        "balls_per_wicket": 16.37,
+        "average": 26.32,
+        "balls_per_wicket": 15.84,
         "bowler": "Anshul Kamboj",
         "dots": 193,
         "economy": 9.97,
@@ -455,11 +455,11 @@
         "overs": 81.83,
         "runs_conceded": 816,
         "sixes_conceded": 48,
-        "wickets": 30
+        "wickets": 31
       },
       {
-        "average": 25.88,
-        "balls_per_wicket": 16.85,
+        "average": 23.78,
+        "balls_per_wicket": 15.49,
         "bowler": "Josh Hazlewood",
         "dots": 246,
         "economy": 9.21,
@@ -468,11 +468,11 @@
         "overs": 95.5,
         "runs_conceded": 880,
         "sixes_conceded": 47,
-        "wickets": 34
+        "wickets": 37
       },
       {
-        "average": 46.77,
-        "balls_per_wicket": 23.54,
+        "average": 43.43,
+        "balls_per_wicket": 21.86,
         "bowler": "Romario Shepherd",
         "dots": 82,
         "economy": 11.92,
@@ -481,11 +481,11 @@
         "overs": 51.0,
         "runs_conceded": 608,
         "sixes_conceded": 43,
-        "wickets": 13
+        "wickets": 14
       },
       {
-        "average": 25.18,
-        "balls_per_wicket": 15.67,
+        "average": 24.44,
+        "balls_per_wicket": 15.21,
         "bowler": "Harshit Rana",
         "dots": 200,
         "economy": 9.64,
@@ -494,7 +494,7 @@
         "overs": 86.17,
         "runs_conceded": 831,
         "sixes_conceded": 46,
-        "wickets": 33
+        "wickets": 34
       },
       {
         "average": 40.23,
@@ -562,8 +562,8 @@
         "wickets": 16
       },
       {
-        "average": 41.83,
-        "balls_per_wicket": 23.58,
+        "average": 38.62,
+        "balls_per_wicket": 21.77,
         "bowler": "Shahbaz Ahmed",
         "dots": 79,
         "economy": 10.64,
@@ -572,11 +572,11 @@
         "overs": 47.17,
         "runs_conceded": 502,
         "sixes_conceded": 27,
-        "wickets": 12
+        "wickets": 13
       },
       {
-        "average": 24.03,
-        "balls_per_wicket": 15.68,
+        "average": 22.58,
+        "balls_per_wicket": 14.73,
         "bowler": "Eshan Malinga",
         "dots": 173,
         "economy": 9.2,
@@ -585,11 +585,11 @@
         "overs": 81.0,
         "runs_conceded": 745,
         "sixes_conceded": 34,
-        "wickets": 31
+        "wickets": 33
       },
       {
-        "average": 32.53,
-        "balls_per_wicket": 24.0,
+        "average": 29.11,
+        "balls_per_wicket": 21.47,
         "bowler": "Harpreet Brar",
         "dots": 130,
         "economy": 8.13,
@@ -598,7 +598,7 @@
         "overs": 68.0,
         "runs_conceded": 553,
         "sixes_conceded": 24,
-        "wickets": 17
+        "wickets": 19
       },
       {
         "average": 27.57,
@@ -640,8 +640,8 @@
         "wickets": 29
       },
       {
-        "average": 23.04,
-        "balls_per_wicket": 14.76,
+        "average": 21.33,
+        "balls_per_wicket": 13.67,
         "bowler": "Sai Kishore",
         "dots": 113,
         "economy": 9.37,
@@ -650,7 +650,7 @@
         "overs": 61.5,
         "runs_conceded": 576,
         "sixes_conceded": 39,
-        "wickets": 25
+        "wickets": 27
       }
     ],
     "metadata": {

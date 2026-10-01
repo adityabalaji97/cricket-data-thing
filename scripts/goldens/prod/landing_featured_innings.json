@@ -825,247 +825,6 @@
       "venue": "Kensington Oval, Bridgetown, Barbados"
     },
     {
-      "balls": 43,
-      "batter": "Shimron Hetmyer",
-      "competition": "CPL",
-      "date": "2026-08-31",
-      "deliveries": [
-        {
-          "runs": 2,
-          "wagon_x": 35,
-          "wagon_y": 198
-        },
-        {
-          "runs": 0,
-          "wagon_x": 232,
-          "wagon_y": 183
-        },
-        {
-          "runs": 0,
-          "wagon_x": 243,
-          "wagon_y": 157
-        },
-        {
-          "runs": 1,
-          "wagon_x": 254,
-          "wagon_y": 181
-        },
-        {
-          "runs": 0,
-          "wagon_x": 0,
-          "wagon_y": 0
-        },
-        {
-          "runs": 1,
-          "wagon_x": 115,
-          "wagon_y": 309
-        },
-        {
-          "runs": 0,
-          "wagon_x": 249,
-          "wagon_y": 156
-        },
-        {
-          "runs": 6,
-          "wagon_x": 177,
-          "wagon_y": 362
-        },
-        {
-          "runs": 6,
-          "wagon_x": 7,
-          "wagon_y": 222
-        },
-        {
-          "runs": 2,
-          "wagon_x": 97,
-          "wagon_y": 266
-        },
-        {
-          "runs": 1,
-          "wagon_x": 83,
-          "wagon_y": 296
-        },
-        {
-          "runs": 0,
-          "wagon_x": 219,
-          "wagon_y": 245
-        },
-        {
-          "runs": 4,
-          "wagon_x": 6,
-          "wagon_y": 215
-        },
-        {
-          "runs": 4,
-          "wagon_x": 78,
-          "wagon_y": 32
-        },
-        {
-          "runs": 6,
-          "wagon_x": 16,
-          "wagon_y": 287
-        },
-        {
-          "runs": 1,
-          "wagon_x": 86,
-          "wagon_y": 297
-        },
-        {
-          "runs": 1,
-          "wagon_x": 237,
-          "wagon_y": 317
-        },
-        {
-          "runs": 1,
-          "wagon_x": 239,
-          "wagon_y": 317
-        },
-        {
-          "runs": 4,
-          "wagon_x": 231,
-          "wagon_y": 355
-        },
-        {
-          "runs": 1,
-          "wagon_x": 266,
-          "wagon_y": 173
-        },
-        {
-          "runs": 0,
-          "wagon_x": 240,
-          "wagon_y": 183
-        },
-        {
-          "runs": 4,
-          "wagon_x": 357,
-          "wagon_y": 221
-        },
-        {
-          "runs": 1,
-          "wagon_x": 228,
-          "wagon_y": 258
-        },
-        {
-          "runs": 0,
-          "wagon_x": 247,
-          "wagon_y": 184
-        },
-        {
-          "runs": 1,
-          "wagon_x": 57,
-          "wagon_y": 269
-        },
-        {
-          "runs": 1,
-          "wagon_x": 336,
-          "wagon_y": 196
-        },
-        {
-          "runs": 6,
-          "wagon_x": 6,
-          "wagon_y": 245
-        },
-        {
-          "runs": 2,
-          "wagon_x": 86,
-          "wagon_y": 245
-        },
-        {
-          "runs": 4,
-          "wagon_x": 136,
-          "wagon_y": 355
-        },
-        {
-          "runs": 1,
-          "wagon_x": 0,
-          "wagon_y": 0
-        },
-        {
-          "runs": 1,
-          "wagon_x": 249,
-          "wagon_y": 324
-        },
-        {
-          "runs": 6,
-          "wagon_x": 4,
-          "wagon_y": 275
-        },
-        {
-          "runs": 6,
-          "wagon_x": 0,
-          "wagon_y": 190
-        },
-        {
-          "runs": 4,
-          "wagon_x": 293,
-          "wagon_y": 28
-        },
-        {
-          "runs": 6,
-          "wagon_x": 359,
-          "wagon_y": 157
-        },
-        {
-          "runs": 4,
-          "wagon_x": 156,
-          "wagon_y": 357
-        },
-        {
-          "runs": 4,
-          "wagon_x": 354,
-          "wagon_y": 115
-        },
-        {
-          "runs": 3,
-          "wagon_x": 219,
-          "wagon_y": 28
-        },
-        {
-          "runs": 1,
-          "wagon_x": 39,
-          "wagon_y": 140
-        },
-        {
-          "runs": 1,
-          "wagon_x": 0,
-          "wagon_y": 0
-        },
-        {
-          "runs": 0,
-          "wagon_x": 0,
-          "wagon_y": 0
-        },
-        {
-          "runs": 6,
-          "wagon_x": 5,
-          "wagon_y": 240
-        },
-        {
-          "runs": 6,
-          "wagon_x": 50,
-          "wagon_y": 321
-        },
-        {
-          "runs": 1,
-          "wagon_x": 270,
-          "wagon_y": 291
-        },
-        {
-          "runs": 3,
-          "wagon_x": 51,
-          "wagon_y": 201
-        }
-      ],
-      "fours": 8,
-      "match_id": "1534200",
-      "opponent": "Trinbago Knight Riders",
-      "runs": 111,
-      "sixes": 9,
-      "strike_rate": 258.14,
-      "team": "Guyana Amazon Warriors",
-      "venue": "Queen's Park Oval, Port of Spain, Trinidad"
-    },
-    {
       "balls": 34,
       "batter": "Abhishek Sharma",
       "competition": "T20I",
@@ -1561,6 +1320,287 @@
       "strike_rate": 185.96,
       "team": "Barbados Tridents",
       "venue": "Warner Park, Basseterre, St Kitts"
+    },
+    {
+      "balls": 53,
+      "batter": "Lhuan-dre Pretorius",
+      "competition": "T20I",
+      "date": "2026-09-04",
+      "deliveries": [
+        {
+          "runs": 1,
+          "wagon_x": 114,
+          "wagon_y": 309
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 4,
+          "wagon_x": 352,
+          "wagon_y": 100
+        },
+        {
+          "runs": 2,
+          "wagon_x": 262,
+          "wagon_y": 89
+        },
+        {
+          "runs": 1,
+          "wagon_x": 173,
+          "wagon_y": 258
+        },
+        {
+          "runs": 1,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 42,
+          "wagon_y": 137
+        },
+        {
+          "runs": 1,
+          "wagon_x": 164,
+          "wagon_y": 194
+        },
+        {
+          "runs": 1,
+          "wagon_x": 174,
+          "wagon_y": 265
+        },
+        {
+          "runs": 1,
+          "wagon_x": 36,
+          "wagon_y": 126
+        },
+        {
+          "runs": 4,
+          "wagon_x": 362,
+          "wagon_y": 208
+        },
+        {
+          "runs": 2,
+          "wagon_x": 228,
+          "wagon_y": 243
+        },
+        {
+          "runs": 0,
+          "wagon_x": 258,
+          "wagon_y": 191
+        },
+        {
+          "runs": 1,
+          "wagon_x": 154,
+          "wagon_y": 261
+        },
+        {
+          "runs": 4,
+          "wagon_x": 194,
+          "wagon_y": 358
+        },
+        {
+          "runs": 0,
+          "wagon_x": 258,
+          "wagon_y": 203
+        },
+        {
+          "runs": 2,
+          "wagon_x": 45,
+          "wagon_y": 189
+        },
+        {
+          "runs": 6,
+          "wagon_x": 358,
+          "wagon_y": 247
+        },
+        {
+          "runs": 1,
+          "wagon_x": 45,
+          "wagon_y": 225
+        },
+        {
+          "runs": 1,
+          "wagon_x": 129,
+          "wagon_y": 177
+        },
+        {
+          "runs": 6,
+          "wagon_x": 201,
+          "wagon_y": 359
+        },
+        {
+          "runs": 0,
+          "wagon_x": 186,
+          "wagon_y": 196
+        },
+        {
+          "runs": 0,
+          "wagon_x": 217,
+          "wagon_y": 242
+        },
+        {
+          "runs": 1,
+          "wagon_x": 325,
+          "wagon_y": 204
+        },
+        {
+          "runs": 6,
+          "wagon_x": 182,
+          "wagon_y": 360
+        },
+        {
+          "runs": 1,
+          "wagon_x": 144,
+          "wagon_y": 318
+        },
+        {
+          "runs": 1,
+          "wagon_x": 54,
+          "wagon_y": 155
+        },
+        {
+          "runs": 2,
+          "wagon_x": 166,
+          "wagon_y": 257
+        },
+        {
+          "runs": 6,
+          "wagon_x": 178,
+          "wagon_y": 360
+        },
+        {
+          "runs": 4,
+          "wagon_x": 356,
+          "wagon_y": 248
+        },
+        {
+          "runs": 1,
+          "wagon_x": 155,
+          "wagon_y": 313
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 2,
+          "wagon_x": 26,
+          "wagon_y": 158
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 137,
+          "wagon_y": 360
+        },
+        {
+          "runs": 4,
+          "wagon_x": 5,
+          "wagon_y": 232
+        },
+        {
+          "runs": 1,
+          "wagon_x": 58,
+          "wagon_y": 219
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 1,
+          "wagon_x": 46,
+          "wagon_y": 208
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 0,
+          "wagon_x": 250,
+          "wagon_y": 187
+        },
+        {
+          "runs": 6,
+          "wagon_x": 98,
+          "wagon_y": 361
+        },
+        {
+          "runs": 1,
+          "wagon_x": 227,
+          "wagon_y": 187
+        },
+        {
+          "runs": 2,
+          "wagon_x": 130,
+          "wagon_y": 303
+        },
+        {
+          "runs": 2,
+          "wagon_x": 25,
+          "wagon_y": 158
+        },
+        {
+          "runs": 1,
+          "wagon_x": 133,
+          "wagon_y": 307
+        },
+        {
+          "runs": 1,
+          "wagon_x": 257,
+          "wagon_y": 168
+        },
+        {
+          "runs": 0,
+          "wagon_x": 173,
+          "wagon_y": 201
+        },
+        {
+          "runs": 1,
+          "wagon_x": 218,
+          "wagon_y": 184
+        },
+        {
+          "runs": 6,
+          "wagon_x": 255,
+          "wagon_y": 357
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        },
+        {
+          "runs": 6,
+          "wagon_x": 139,
+          "wagon_y": 362
+        },
+        {
+          "runs": 0,
+          "wagon_x": 0,
+          "wagon_y": 0
+        }
+      ],
+      "fours": 5,
+      "match_id": "1549529",
+      "opponent": "Namibia",
+      "runs": 101,
+      "sixes": 8,
+      "strike_rate": 190.57,
+      "team": "South Africa",
+      "venue": "Namibia Cricket Ground, Windhoek"
     }
   ]
 }

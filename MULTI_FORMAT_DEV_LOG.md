@@ -125,7 +125,7 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > without token, Googlebot /notes gets the server-rendered list, sitemap lists /notes. Prod goldens: 4 diffs,
 > none from this deploy -- landing_featured_innings (rolling window), scorecard_legacy_pre2015 (6c wides fix),
 > qb_bowling_stats_mode (wickets backfill), match_preview (Jev typed path vs deterministic golden);
-> recapture them deliberately. First bot drafts arrive with tonight's nightly run.
+> recaptured the same day (19/19 PASS vs v460). First bot drafts arrive with tonight's nightly run.
 > After deploy: the plan's checks -- curl -A Googlebot https://hindsightcricket.com/notes/<slug>, a WhatsApp
 > unfurl, /sitemap.xml lists the note, and the phone flow in /admin/notes after the first nightly draft.
 >
