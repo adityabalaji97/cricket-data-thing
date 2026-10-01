@@ -27,9 +27,22 @@ MIN_PAR_MATCHES = 5
 def _team_rows(db: Session, team: str, start: date, end: date) -> Dict[str, Any]:
     names = get_all_team_name_variations(team)
     params = {"teams": names, "start": start.isoformat(), "end": end.isoformat()}
+    # Start from the team's matches (a few dozen rows) and reach delivery_details through its
+    # p_match index. Filtering delivery_details on team + date directly scanned every ball in the
+    # window (~236k locally) per query: 250-400 ms each, four of these plus a count per preview.
+    # The inner join to matches was already there, so the rows are identical.
+    team_matches = """
+        WITH team_matches AS (
+            SELECT m.id FROM matches m
+            WHERE (m.team1 = ANY(:teams) OR m.team2 = ANY(:teams))
+              AND m.format = 'T20' AND m.gender = 'male'
+              AND m.date BETWEEN CAST(:start AS date) AND CAST(:end AS date)
+        )
+    """
     # Players are grouped under their canonical name: a feed spelling change must not split one
     # player into two leaders.
     batting = db.execute(text(f"""
+        {team_matches}
         SELECT COALESCE(pa.alias_name, dd.bat) AS player,
                COUNT(*) AS balls,
                COUNT(DISTINCT dd.p_match) AS innings,
@@ -38,14 +51,14 @@ def _team_rows(db: Session, team: str, start: date, end: date) -> Dict[str, Any]
                SUM(bm.wpa::double precision) AS wpa
         FROM delivery_details dd
         JOIN ball_metrics bm ON bm.delivery_id = dd.id
-        JOIN matches m ON m.id = dd.p_match
         LEFT JOIN {aliases} pa ON pa.player_name = dd.bat
-        WHERE dd.team_bat = ANY(:teams) AND COALESCE(dd.wide, 0) = 0
-          AND m.format = 'T20' AND m.gender = 'male'
+        WHERE dd.p_match IN (SELECT id FROM team_matches)
+          AND dd.team_bat = ANY(:teams) AND COALESCE(dd.wide, 0) = 0
           AND dd.match_date BETWEEN :start AND :end
         GROUP BY 1
     """), params).mappings().all()
     bowling = db.execute(text(f"""
+        {team_matches}
         SELECT COALESCE(pa.alias_name, dd.bowl) AS player,
                COUNT(*) AS balls,
                COUNT(DISTINCT dd.p_match) AS innings,
@@ -54,19 +67,18 @@ def _team_rows(db: Session, team: str, start: date, end: date) -> Dict[str, Any]
                -SUM(bm.wpa::double precision) AS wpa
         FROM delivery_details dd
         JOIN ball_metrics bm ON bm.delivery_id = dd.id
-        JOIN matches m ON m.id = dd.p_match
         LEFT JOIN {aliases} pa ON pa.player_name = dd.bowl
-        WHERE dd.team_bowl = ANY(:teams) AND COALESCE(dd.wide, 0) = 0
-          AND m.format = 'T20' AND m.gender = 'male'
+        WHERE dd.p_match IN (SELECT id FROM team_matches)
+          AND dd.team_bowl = ANY(:teams) AND COALESCE(dd.wide, 0) = 0
           AND dd.match_date BETWEEN :start AND :end
         GROUP BY 1
     """), params).mappings().all()
-    matches = db.execute(text("""
+    matches = db.execute(text(f"""
+        {team_matches}
         SELECT COUNT(DISTINCT dd.p_match)
         FROM delivery_details dd
-        JOIN matches m ON m.id = dd.p_match
-        WHERE (dd.team_bat = ANY(:teams) OR dd.team_bowl = ANY(:teams))
-          AND m.format = 'T20' AND m.gender = 'male'
+        WHERE dd.p_match IN (SELECT id FROM team_matches)
+          AND (dd.team_bat = ANY(:teams) OR dd.team_bowl = ANY(:teams))
           AND dd.match_date BETWEEN :start AND :end
     """), params).scalar() or 0
     return {"batting": [dict(r) for r in batting], "bowling": [dict(r) for r in bowling], "matches": int(matches)}
