@@ -81,7 +81,11 @@ function barsBody(size, data) {
   // drawn tighter, whatever the headline length.
   const extra = data.row_limit && size.height >= size.width ? Math.min(2, Math.max(0, data.row_limit - size.rows)) : 0;
   const maxRows = extra ? size.rows + extra : size.rows - ((data.title || '').length > 70 ? 1 : 0);
-  const rows = (data.rows || []).filter((r) => typeof r[metric] === 'number').slice(0, maxRows);
+  const all = (data.rows || []).filter((r) => typeof r[metric] === 'number');
+  let rows = all.slice(0, maxRows);
+  // The highlighted row is the point of the chart: never let the row limit cut it off.
+  const hi = all.findIndex((r) => r.highlight === true);
+  if (hi >= maxRows) rows = [...rows.slice(0, maxRows - 1), all[hi]];
   const values = rows.map((r) => r[metric]);
   const max = Math.max(...values.map(Math.abs), 1e-9);
   const min = Math.min(...values);

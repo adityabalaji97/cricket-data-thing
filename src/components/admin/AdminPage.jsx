@@ -71,8 +71,15 @@ const PackCard = ({ pack, client, onChanged, toast }) => {
   return (
     <Box sx={{ bgcolor: C.card, border: `1px solid ${C.line}`, borderRadius: 3, p: 2, mb: 2 }}>
       <Typography sx={{ fontSize: 12, color: C.lo, mb: 1 }}>
-        {pack.team1 ? `${pack.team1} v ${pack.team2} · ${pack.competition} · ${pack.match_date}` : `From an idea · ${String(pack.created_at).slice(0, 10)}`}
+        {pack.team1 ? `${pack.team1} v ${pack.team2} · ${pack.competition} · ${pack.match_date}`
+          : pack.source === 'tally' ? `Season tally · ${String(pack.created_at).slice(0, 10)}`
+            : `From an idea · ${String(pack.created_at).slice(0, 10)}`}
       </Typography>
+      {pack.data_source === 'cricsheet' && (
+        // Loaded from Cricsheet ahead of the ball-by-ball CSV: scorecard numbers only, no Impact,
+        // control % or win probability until the CSV arrives and the match is upgraded.
+        <Chip size="small" label="Basic data · ball-by-ball pending" sx={{ mb: 1, bgcolor: 'rgba(240,180,41,0.14)', color: C.amber, fontWeight: 600 }} />
+      )}
       <Box component="img" src={imageUrl} alt={pack.title} loading="lazy"
         sx={{ display: 'block', width: '100%', maxWidth: 420, aspectRatio: '4 / 5', borderRadius: 2, bgcolor: '#14171e', border: `1px solid ${C.line}` }} />
       <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>

@@ -143,6 +143,14 @@ def _runs(seq: List[Dict[str, Any]], hit) -> List[Dict[str, Any]]:
     return runs
 
 
+def _span(run: Dict[str, Any]) -> str:
+    """'Jun-Sep 2026' / 'Nov 2025-Feb 2026' / 'Mar 2026': tells one side's runs apart on a chart."""
+    a, b = run["first"]["date"], run["last"]["date"]
+    if (a.year, a.month) == (b.year, b.month):
+        return f"{a:%b %Y}"
+    return f"{a:%b}-{b:%b %Y}" if a.year == b.year else f"{a:%b %Y}-{b:%b %Y}"
+
+
 def _years(run: Dict[str, Any]) -> str:
     a, b = run["first"]["date"].year, run["last"]["date"].year
     return str(a) if a == b else f"{a}-{str(b)[2:]}"
@@ -179,6 +187,12 @@ def _streak_fact(kind: str, who: str, team: str, length: int, current: Dict[str,
                      chart, rank, n, since_year=since)
     if ranked_only:
         return None
+    # "Their longest since <year>" is about the subject, so the chart is the subject's own runs.
+    own_rows = sorted(own_before, key=lambda r: (-r["length"], r["last"]["date"]))[:CHART_ROWS - 1]
+    own_chart_rows = sorted([*own_rows, current], key=lambda r: (-r["length"], r["last"]["date"]))
+    chart = {"metric": "length", "group": unit, "metric_label": f"{run_word} length",
+             "rows": [{"rank": _rank_desc([x["length"] for x in own_chart_rows], r["length"])[0], "label": _span(r),
+                       "length": r["length"], "display": str(r["length"]), "highlight": r is current} for r in own_chart_rows]}
     longer = [r for r in own_before if r["length"] >= length]
     if not longer:
         if len(own_before) < 3:

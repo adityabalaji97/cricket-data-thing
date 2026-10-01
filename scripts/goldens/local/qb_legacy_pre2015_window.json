@@ -56,8 +56,9 @@
     ],
     "metadata": {
       "ball_aggregation": "snapshot",
-      "data_source": "deliveries",
+      "data_source": "delivery_details+deliveries",
       "data_sources": [
+        "delivery_details (2013-2014)",
         "deliveries (2013-2014)"
       ],
       "filters_applied": {
@@ -100,7 +101,7 @@
       "has_more": false,
       "has_summaries": false,
       "limit": 100,
-      "note": "Grouped data with cricket aggregations",
+      "note": "Grouped data with cricket aggregations (merged from multiple sources)",
       "offset": 0,
       "query_mode_used": "delivery",
       "recommended_chart": null,

@@ -120,6 +120,14 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > markdown code in the main bundle -- marked lives in the lazy notes chunk). siteOrigin() (ChartExportButton)
 > honours REACT_APP_EMBED_ORIGIN and NoteBody reuses it. CRA build: a stale node_modules/.cache/.eslintcache
 > (shared with the :3000 dev server) reported a false 'not defined'; deleting it fixed the build.
+> **Quick items (2026-10-01):** Social pack cards show "Basic data · ball-by-ball pending" for Cricsheet-only
+> matches (routers/content.py now returns m.data_source; needs a Heroku deploy) and "Season tally" for tally
+> packs. /img never drops the highlighted row past the row limit (an 8th-place hit with a long title vanished,
+> records packs included). "<team>'s longest ... since <year>" streak charts now show the subject's own runs
+> (month-range labels), not the league's. Local goldens recaptured (19/19, all 200; the local
+> guess_innings_pool materialized view had never been refreshed). Stale :8000 API (prod DB, since 30 Sep)
+> stopped. NOT done (permission-gated, left for the owner): set Australia as winner of 1532482, and
+> DROP TABLE bowling_stats_backup_derived_20260930 -- SQL in the session summary.
 > **Records framing (2026-10-01, local):** services/record_framings.py, called from records.match_records
 > (so packs, recap notes and number checks get it unchanged): team winning/losing runs and batter runs of
 > fifties ranked against every run in the scope (or "<team>'s longest ... since <year>"); bowler runs of

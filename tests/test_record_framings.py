@@ -58,6 +58,8 @@ def test_own_longest_run_says_since_when(monkeypatch):
     monkeypatch.setattr(rf, "_team_results", lambda db, scope, g: _results(teams))
     fact = next(f for f in rf.team_streaks(None, _match(), IPL) if f["subject"] == "A")
     assert "A's longest IPL winning run since 2016" in fact["title"] and fact["rank"] is None
+    # The chart is A's own runs, the current one first and highlighted.
+    assert fact["chart"]["rows"][0]["highlight"] and fact["chart"]["rows"][0]["length"] == 5
     _checks(fact)
 
 

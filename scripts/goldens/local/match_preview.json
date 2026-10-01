@@ -1,6 +1,8 @@
 {
   "status": 200,
   "body": {
+    "headline": null,
+    "narrative_source": "deterministic",
     "preview_mode": "hybrid",
     "preview_version": "v3-narrative",
     "sections": [
@@ -44,8 +46,8 @@
       {
         "bullets": [
           "Winning-template pressure point is death overs (41 runs on average in successful chases).",
-          "Top picks \u2014 Rangpur Riders: Dawid Malan (53 exp pts, conf 0.90), Akif Javed (53 exp pts, conf 0.90); Sylhet Titans: Shohidul Islam (73 exp pts, conf 0.90), Khaled Ahmed (49 exp pts, conf 0.90).",
-          "Key edges: Khushdil Shah vs Nasum Ahmed (12b, SR 292); Khaled Ahmed threat (124b, 10 wkts, econ 7.65); Rony Talukdar vs Nahid Rana (11b, SR 218); Mustafizur Rahman threat (144b, 8 wkts, econ 7.38)."
+          "Top picks \u2014 Rangpur Riders: Akif Javed (53 exp pts, conf 0.90), Khushdil Shah (50 exp pts, conf 0.90); Sylhet Titans: Mohammad Amir (76 exp pts, conf 0.60), Shohidul Islam (73 exp pts, conf 0.90).",
+          "Key edges: Khushdil Shah vs Nasum Ahmed (12b, SR 292); Khaled Ahmed threat (124b, 10 wkts, econ 7.65); Mohammad Amir vs Khushdil Shah (6b, SR 300); Mustafizur Rahman threat (144b, 8 wkts, econ 7.38)."
         ],
         "evidence_tags": [
           "phase_wise_strategy",
@@ -56,7 +58,7 @@
       },
       {
         "bullets": [
-          "Lean Sylhet Titans (-6) (ELO: Rangpur Riders 1581 vs Sylhet Titans 1527) \u2014 Recent H2H edge, Venue bias: chasing_edge, Fantasy/matchup edge.",
+          "Lean Sylhet Titans (-6) (ELO: Rangpur Riders 1581 vs Sylhet Titans 1527) \u2014 Recent H2H edge, Venue: chasing sides win more here, Fantasy/matchup edge.",
           "Toss/innings path: recent venue split is 2 bat-first wins vs 5 chases in the last 7."
         ],
         "evidence_tags": [
@@ -74,142 +76,8 @@
     "team1": "Rangpur Riders",
     "team2": "Sylhet Titans",
     "top_ranked_players": {
-      "available": true,
-      "teams": {
-        "Rangpur Riders": {
-          "lineup_size": 17,
-          "top_batting": [
-            {
-              "form_flag": "neutral",
-              "player": "Towhid Hridoy",
-              "quality_score": 86.0,
-              "rank": 6
-            },
-            {
-              "form_flag": "neutral",
-              "player": "Litton Das",
-              "quality_score": 59.5,
-              "rank": 30
-            },
-            {
-              "form_flag": "neutral",
-              "player": "Iftikhar Ahmed",
-              "quality_score": 37.9,
-              "rank": 57
-            }
-          ],
-          "top_bowling": [
-            {
-              "form_flag": "hot",
-              "player": "Nahid Rana",
-              "quality_score": 97.3,
-              "rank": 3
-            },
-            {
-              "form_flag": "hot",
-              "player": "Akif Javed",
-              "quality_score": 94.2,
-              "rank": 4
-            },
-            {
-              "form_flag": "cold",
-              "player": "Mustafizur Rahman",
-              "quality_score": 61.6,
-              "rank": 39
-            }
-          ],
-          "top_overall": [
-            {
-              "batting_quality": null,
-              "bowling_quality": 97.3,
-              "discipline": "bowling",
-              "form_flag": "hot",
-              "player": "Nahid Rana",
-              "quality_score": 97.3,
-              "rank": 3
-            },
-            {
-              "batting_quality": null,
-              "bowling_quality": 94.2,
-              "discipline": "bowling",
-              "form_flag": "hot",
-              "player": "Akif Javed",
-              "quality_score": 94.2,
-              "rank": 4
-            },
-            {
-              "batting_quality": 86.0,
-              "bowling_quality": null,
-              "discipline": "batting",
-              "form_flag": "neutral",
-              "player": "Towhid Hridoy",
-              "quality_score": 86.0,
-              "rank": 6
-            }
-          ]
-        },
-        "Sylhet Titans": {
-          "lineup_size": 18,
-          "top_batting": [
-            {
-              "form_flag": "hot",
-              "player": "Moeen Ali",
-              "quality_score": 14.4,
-              "rank": 85
-            },
-            {
-              "form_flag": "neutral",
-              "player": "Mehidy Hasan Miraz",
-              "quality_score": 9.0,
-              "rank": 88
-            }
-          ],
-          "top_bowling": [
-            {
-              "form_flag": "neutral",
-              "player": "Salman Irshad",
-              "quality_score": 60.1,
-              "rank": 41
-            },
-            {
-              "form_flag": "hot",
-              "player": "Azmatullah Omarzai",
-              "quality_score": 55.8,
-              "rank": 49
-            }
-          ],
-          "top_overall": [
-            {
-              "batting_quality": null,
-              "bowling_quality": 60.1,
-              "discipline": "bowling",
-              "form_flag": "neutral",
-              "player": "Salman Irshad",
-              "quality_score": 60.1,
-              "rank": 41
-            },
-            {
-              "batting_quality": null,
-              "bowling_quality": 55.8,
-              "discipline": "bowling",
-              "form_flag": "hot",
-              "player": "Azmatullah Omarzai",
-              "quality_score": 55.8,
-              "rank": 49
-            },
-            {
-              "batting_quality": 14.4,
-              "bowling_quality": null,
-              "discipline": "batting",
-              "form_flag": "hot",
-              "player": "Moeen Ali",
-              "quality_score": 14.4,
-              "rank": 85
-            }
-          ]
-        }
-      },
-      "top_n": 3
+      "available": false,
+      "teams": {}
     },
     "venue": "Sylhet International Cricket Stadium"
   }

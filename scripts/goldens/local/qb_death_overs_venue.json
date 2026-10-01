@@ -4,6 +4,7 @@
     "data": [
       {
         "average": 18.72,
+        "avg_leverage": null,
         "balls": 2957,
         "balls_per_dismissal": 11.73,
         "boundaries": 609,
@@ -13,15 +14,26 @@
         "dot_percentage": 30.13,
         "dots": 891,
         "fours": 370,
+        "impact": null,
+        "impact_per_100": null,
+        "impact_per_innings": null,
         "innings_count": 131,
+        "metric_balls": 0,
+        "metrics_perspective": "batting",
         "percent_balls": 79.25,
+        "raa": null,
+        "raa_per_100": null,
         "runs": 4717,
         "sixes": 239,
         "strike_rate": 159.52,
-        "wickets": 252
+        "waa": null,
+        "waa_per_100": null,
+        "wickets": 252,
+        "wpa": null
       },
       {
         "average": 17.62,
+        "avg_leverage": null,
         "balls": 756,
         "balls_per_dismissal": 12.6,
         "boundaries": 116,
@@ -31,15 +43,26 @@
         "dot_percentage": 32.14,
         "dots": 243,
         "fours": 51,
+        "impact": null,
+        "impact_per_100": null,
+        "impact_per_innings": null,
         "innings_count": 90,
+        "metric_balls": 0,
+        "metrics_perspective": "batting",
         "percent_balls": 20.26,
+        "raa": null,
+        "raa_per_100": null,
         "runs": 1057,
         "sixes": 65,
         "strike_rate": 139.81,
-        "wickets": 60
+        "waa": null,
+        "waa_per_100": null,
+        "wickets": 60,
+        "wpa": null
       },
       {
         "average": 1.62,
+        "avg_leverage": null,
         "balls": 18,
         "balls_per_dismissal": 2.25,
         "boundaries": 1,
@@ -49,19 +72,29 @@
         "dot_percentage": 50.0,
         "dots": 9,
         "fours": 1,
+        "impact": null,
+        "impact_per_100": null,
+        "impact_per_innings": null,
         "innings_count": 2,
+        "metric_balls": 0,
+        "metrics_perspective": "batting",
         "percent_balls": 0.48,
+        "raa": null,
+        "raa_per_100": null,
         "runs": 13,
         "sixes": 0,
         "strike_rate": 72.22,
-        "wickets": 8
+        "waa": null,
+        "waa_per_100": null,
+        "wickets": 8,
+        "wpa": null
       }
     ],
     "metadata": {
       "ball_aggregation": "snapshot",
       "data_source": "delivery_details+deliveries",
       "data_sources": [
-        "delivery_details (2015-2026)",
+        "delivery_details (2005-2026)",
         "deliveries (2005-2014)"
       ],
       "filters_applied": {
@@ -112,9 +145,7 @@
       "total_balls_in_query": 3731,
       "total_groups": 3,
       "total_innings_in_query": 223,
-      "warnings": [
-        "Legacy bowl classification is inferred using deliveries.bowler_type with players-table fallback; unknown styles are grouped as mixture/unknown."
-      ]
+      "warnings": []
     },
     "percentages": null,
     "summary_data": null

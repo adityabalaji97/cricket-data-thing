@@ -22,7 +22,7 @@ def list_packs(status: str = "ready", limit: int = 60, db: Session = Depends(get
     rows = db.execute(text(f"""
         SELECT p.id, p.match_id, p.snapshot_id, p.title, p.first_comment, p.subreddit, p.flair, p.facts,
                p.rule_warnings, p.status, p.post_by, p.posted_url, p.source, p.created_at,
-               m.date AS match_date, m.team1, m.team2, m.competition, s.kind AS snapshot_kind
+               m.date AS match_date, m.team1, m.team2, m.competition, m.data_source, s.kind AS snapshot_kind
         FROM content_packs p
         LEFT JOIN matches m ON m.id = p.match_id
         LEFT JOIN chart_snapshots s ON s.id = p.snapshot_id
