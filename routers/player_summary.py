@@ -365,7 +365,7 @@ def generate_bowler_fallback_summary(patterns: dict) -> str:
 # =============================================================================
 
 @router.get("/batter/{player_name}", response_model=SummaryResponse)
-async def get_batter_summary(
+def get_batter_summary(
     player_name: str,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
@@ -478,7 +478,7 @@ async def get_batter_summary(
 
 
 @router.get("/bowler/{player_name}", response_model=SummaryResponse)
-async def get_bowler_summary(
+def get_bowler_summary(
     player_name: str,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,

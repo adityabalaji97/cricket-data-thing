@@ -1010,7 +1010,6 @@ def player_profile(
     start_date: Annotated[Optional[date], Field(description="Window start for the style facts (default: 1 January, two years back).")] = None,
     end_date: Annotated[Optional[date], Field(description="Window end (default: today).")] = None,
 ) -> CallToolResult:
-    import asyncio
     from routers.player_summary import get_batter_summary, get_bowler_summary, player_standouts
 
     started = time.monotonic()
@@ -1023,7 +1022,7 @@ def player_profile(
         with _read_only_session() as db:
             stand = player_standouts(role, player, db, **filters)
             summary_fn = get_batter_summary if role == "batter" else get_bowler_summary
-            dna = asyncio.run(summary_fn(player_name=player, include_patterns=False, db=db, **filters))
+            dna = summary_fn(player_name=player, include_patterns=False, db=db, **filters)
     except Exception as exc:
         _log_call("player_profile", ctx, args, started, "error")
         logger.warning("mcp player profile failed: %r", exc)
