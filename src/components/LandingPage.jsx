@@ -21,6 +21,7 @@ import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import XIcon from '@mui/icons-material/X';
 import config from '../config';
+import { siteOrigin } from './ui/ChartExportButton';
 import { fetchUpcomingMatches } from '../data/iplSchedule';
 import ExploreMenu from './nav/ExploreMenu';
 import MiniWagonWheel from './MiniWagonWheel';
@@ -1191,6 +1192,54 @@ const TodaysGamesSection = () => {
   );
 };
 
+// "Latest notes": the three newest published notes (routers/notes.py). Hidden until there are any.
+const NOTE_KIND = { recap: 'Match recap', preview: 'Preview', analysis: 'Analysis', article: 'Article' };
+
+const LatestNotesSection = () => {
+  const [notes, setNotes] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${config.API_URL}/notes?limit=3`)
+      .then((r) => (r.ok ? r.json() : { notes: [] }))
+      .then((d) => { if (!cancelled) setNotes(d.notes || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  if (!notes.length) return null;
+  return (
+    <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
+      <SectionHeader
+        kicker="Notes"
+        title="Latest notes"
+        action={<Typography component={Link} to="/notes" sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap' }}>All notes →</Typography>}
+      />
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.25 }}>
+        {notes.map((note) => (
+          <Box key={note.id} component={Link} to={`/notes/${note.slug}`}
+            sx={{ display: 'flex', gap: 1.5, p: 1.75, borderRadius: 2.5, bgcolor: C.surface, border: `1px solid ${C.hairline}`, textDecoration: 'none', minWidth: 0, '&:hover': { bgcolor: C.raised } }}>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.5 }}>
+                {NOTE_KIND[note.kind] || 'Note'}
+              </Typography>
+              <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1.2,
+                display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                {note.title}
+              </Typography>
+              <Typography sx={{ color: C.soft, fontSize: 12.5, mt: 0.75 }}>
+                {note.author?.name}{note.author?.is_bot ? ' (AI)' : ''}
+              </Typography>
+            </Box>
+            {note.cover && (
+              <Box component="img" alt="" loading="lazy" src={`${siteOrigin()}/img/${note.cover}.png?size=square`}
+                sx={{ width: 64, height: 64, flexShrink: 0, borderRadius: 1.5, objectFit: 'cover', bgcolor: C.inset, alignSelf: 'center' }} />
+            )}
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+};
+
 const LandingPage = ({ showLeagueCounts = true }) => {
   // Match the app-wide breakpoint from App.js rather than a page-specific pixel value;
   // three different mobile thresholds across the hero pages made behaviour inconsistent.
@@ -1299,6 +1348,7 @@ const LandingPage = ({ showLeagueCounts = true }) => {
         <TopBar navOpen={navOpen} setNavOpen={setNavOpen} isMobile={isMobile} hideExplore={isCompactNav} />
         <TodaySection matches={fixtures} loading={fixturesLoading} isMobile={isMobile} />
         <TodaysGamesSection />
+        <LatestNotesSection />
         <RecentMatchesSection
           data={recentData}
           loading={recentLoading}

@@ -21,7 +21,10 @@ import { track } from '../../utils/analytics';
  */
 const SITE = 'https://hindsightcricket.com';
 // Local dev has no /img or /embed functions; point at production there.
-export const siteOrigin = () => (/^(localhost|127\.)/.test(window.location.hostname) ? SITE : window.location.origin);
+// Where /img and /embed are served: this site, or production from a local dev server unless
+// REACT_APP_EMBED_ORIGIN points at scripts/dev/serve_functions.mjs.
+export const siteOrigin = () => process.env.REACT_APP_EMBED_ORIGIN
+  || (/^(localhost|127\.)/.test(window.location.hostname) ? SITE : window.location.origin);
 
 // Phones: hand the PNG itself to the share sheet (WhatsApp, Reddit app, Photos), with the title
 // as text where the target takes it. Elsewhere: download it. Returns false if the user cancelled.

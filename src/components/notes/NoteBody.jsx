@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import { colors, fonts } from '../../theme/hindsightDark';
+import { siteOrigin } from '../ui/ChartExportButton';
 import { markdownToHtml, splitBody } from './noteMarkdown.mjs';
 
 /**
@@ -8,10 +9,7 @@ import { markdownToHtml, splitBody } from './noteMarkdown.mjs';
  * its snapshot. One renderer serves our own pages and every other site that embeds the chart.
  * Each embed posts {type:'hindsight:resize', height}; the frame follows it.
  */
-const SITE = 'https://hindsightcricket.com';
-// Local dev serves the Vercel functions separately (scripts/dev/serve_functions.mjs).
-export const embedOrigin = () => process.env.REACT_APP_EMBED_ORIGIN
-  || (/^(localhost|127\.)/.test(window.location.hostname) ? SITE : window.location.origin);
+export const embedOrigin = siteOrigin;
 
 export const NoteChart = ({ id, chart }) => {
   const ref = useRef(null);

@@ -110,7 +110,22 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > 3,352 matches. xgboost there needs a newer libomp than anaconda's: a throwaway `conda create -p <dir>
 > -c conda-forge llvm-openmp` + DYLD_LIBRARY_PATH=<dir>/lib works without touching ~/cdt/.py312.
 > Committed local goldens are still the pre-ball_metrics capture; recapture them deliberately.
-> Next: Notes 8.
+> **Notes step 8 built:** usage report (GET /admin/usage + scripts/usage_report.py, second table) gains
+> notes_published, note_views, embeds_created (chart_snapshots created_by='web'), embed_views + embed_hosts
+> (embed_view events from hosts other than hindsightcricket.com -- our note pages iframe the same embeds),
+> embed_visitors (page_view with utm_source=embed), packs_posted (by pack week; packs have no posted-at),
+> pack_visitors (utm_campaign=pack-). Fixed: each embed view logged a throwaway "embed-..." anon_id that
+> counted as a WAU user; users/returning/sources/countries now exclude them. Nav: "Notes" in Explore
+> (More sheet + desktop). Home: "Latest notes" strip after Today's games (3 newest, hidden when none; no
+> markdown code in the main bundle -- marked lives in the lazy notes chunk). siteOrigin() (ChartExportButton)
+> honours REACT_APP_EMBED_ORIGIN and NoteBody reuses it. CRA build: a stale node_modules/.cache/.eslintcache
+> (shared with the :3000 dev server) reported a false 'not defined'; deleting it fixed the build.
+> **Notes 3-8 DEPLOY ORDER (not done):** (1) apply migration 010 to prod -- the notes SELECTs read
+> notes.pack_id, and tonight's nightly "Draft notes" step needs it; (2) git push heroku main (new routers);
+> (3) Vercel deploys from origin/main (already pushed when this was written). Until (1)+(2), /notes shows
+> "could not be loaded", the Home strip stays hidden and "Make note" fails; nothing else is affected.
+> After deploy: the plan's checks -- curl -A Googlebot https://hindsightcricket.com/notes/<slug>, a WhatsApp
+> unfurl, /sitemap.xml lists the note, and the phone flow in /admin/notes after the first nightly draft.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
 > (sync_stats_from_dd double-counted wides/no-balls and charged byes; statsProcessor charged

@@ -30,6 +30,12 @@ COLUMNS = [
     ("query_runs", "queries"), ("nl_searches", "NL"), ("game_players", "gamers"), ("shares", "shares"),
     ("calls", "MCP calls"), ("distinct_callers", "MCP users"),
 ]
+# Notes reach: posts and views, embeds on other sites (and visits they send), packs posted (and visits).
+NOTES_COLUMNS = [
+    ("notes_published", "notes"), ("note_views", "note views"), ("embeds_created", "embeds made"),
+    ("embed_views", "embed views"), ("embed_hosts", "embed sites"), ("embed_visitors", "from embeds"),
+    ("packs_posted", "packs posted"), ("pack_visitors", "from packs"),
+]
 
 
 def main() -> None:
@@ -50,11 +56,13 @@ def main() -> None:
         print(json.dumps(report, indent=2, default=str))
         return
 
-    header = f"{'week':<11}" + "".join(f"{label:>10}" for _, label in COLUMNS)
-    print(header)
-    print("-" * len(header))
-    for week in report["weeks"]:
-        print(f"{week['week']:<11}" + "".join(f"{week.get(key, 0) or 0:>10}" for key, _ in COLUMNS))
+    for columns, width in ((COLUMNS, 10), (NOTES_COLUMNS, 13)):
+        header = f"{'week':<11}" + "".join(f"{label:>{width}}" for _, label in columns)
+        print(header)
+        print("-" * len(header))
+        for week in report["weeks"]:
+            print(f"{week['week']:<11}" + "".join(f"{week.get(key, 0) or 0:>{width}}" for key, _ in columns))
+        print()
 
     latest = report["weeks"][0] if report["weeks"] else {}
     stage, goals = TARGETS[0]

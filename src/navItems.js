@@ -20,6 +20,7 @@ export const NAV_ITEMS = [
   { path: '/comparison', label: 'Batter Comparison', title: 'Batter Comparison', t20Only: true, group: 'compare' },
   { path: '/matchups', label: 'Matchups', title: 'Matchups', t20Only: true, group: 'compare' },
   { path: '/query', label: 'Query Builder', title: 'Query Builder', group: 'primary', short: 'Query' },
+  { path: '/notes', label: 'Notes', title: 'Notes', group: 'explore' },
   { path: '/team', label: 'Team Profile', title: 'Team Profile', t20Only: true, group: 'explore' },
   { path: '/team-comparison', label: 'Team Comparison', title: 'Team Comparison', t20Only: true, group: 'compare' },
   { path: '/doppelgangers', label: 'Doppelgangers', title: 'Doppelgangers', t20Only: true, group: 'compare' },
@@ -68,7 +69,7 @@ const UNLISTED_TITLES = [
   { match: (path) => path === '/credits', title: 'Credits & Acknowledgements' },
   { match: (path) => path.startsWith('/scorecard'), title: 'Match Scorecard' },
   { match: (path) => path.startsWith('/wrapped'), title: '2025 Wrapped' },
-  { match: (path) => path === '/notes' || path.startsWith('/notes/'), title: 'Notes' },
+  { match: (path) => path.startsWith('/notes/'), title: 'Notes' },
   { match: (path) => path === '/admin/notes', title: 'Notes queue' },
   { match: (path) => path === '/admin', title: 'Social queue' },
 ];
