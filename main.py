@@ -63,6 +63,7 @@ from services.delivery_data_service import (
 from services.bowler_types import BOWLER_CATEGORY_SQL
 from services.player_aliases import get_player_names
 from services.metrics import sql_defs
+from services.dismissal_stats import get_dismissal_breakdown
 import math
 
 # Shared ball/run/wicket definitions for the per-ball leaderboards below (services/metrics/sql_defs.py).
@@ -4326,101 +4327,12 @@ def get_player_dismissal_stats(
     venue: Optional[str] = None,
     db: Session = Depends(get_session)
 ):
-    """Get dismissal mode distribution for a batter."""
+    """Get dismissal mode distribution for a batter (same service as /players/{name}/dismissal_stats)."""
     try:
-        params = {
-            "player_name": player_name,
-            "start_date": start_date,
-            "end_date": end_date,
-            "venue": venue,
-        }
-
-        if leagues:
-            params["leagues"] = expand_league_abbreviations(leagues)
-        else:
-            params["leagues"] = []
-
-        competition_conditions = []
-        if leagues:
-            competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
-        else:
-            competition_conditions.append("m.match_type = 'league'")
-
-        if include_international:
-            if top_teams:
-                params["top_team_list"] = INTERNATIONAL_TEAMS_RANKED[:top_teams]
-                competition_conditions.append(
-                    "(m.match_type = 'international' AND m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))"
-                )
-            else:
-                competition_conditions.append("m.match_type = 'international'")
-
-        match_filter = "AND (" + " OR ".join(competition_conditions) + ")"
-
-        dismissal_query = text(f"""
-            SELECT
-                d.wicket_type,
-                COUNT(*) as count
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            WHERE d.player_dismissed = :player_name
-            AND d.wicket_type IS NOT NULL
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY d.wicket_type
-            ORDER BY count DESC
-        """)
-
-        phase_dismissal_query = text(f"""
-            SELECT
-                CASE
-                    WHEN d.over < 6 THEN 'powerplay'
-                    WHEN d.over >= 6 AND d.over < 15 THEN 'middle'
-                    ELSE 'death'
-                END as phase,
-                d.wicket_type,
-                COUNT(*) as count
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            WHERE d.player_dismissed = :player_name
-            AND d.wicket_type IS NOT NULL
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY phase, d.wicket_type
-            ORDER BY phase, count DESC
-        """)
-
-        overall = db.execute(dismissal_query, params).fetchall()
-        by_phase = db.execute(phase_dismissal_query, params).fetchall()
-
-        total = sum(row.count for row in overall)
-        dismissals = [
-            {
-                "type": row.wicket_type,
-                "count": row.count,
-                "percentage": round((row.count / total) * 100, 1) if total > 0 else 0
-            }
-            for row in overall
-        ]
-
-        phase_breakdown = {}
-        for row in by_phase:
-            phase_breakdown.setdefault(row.phase, []).append({
-                "type": row.wicket_type,
-                "count": row.count
-            })
-
-        return {
-            "player_name": player_name,
-            "total_dismissals": total,
-            "dismissals": dismissals,
-            "by_phase": phase_breakdown
-        }
-
+        return get_dismissal_breakdown(
+            db, player_name, "batter", start_date=start_date, end_date=end_date, leagues=leagues,
+            include_international=include_international, top_teams=top_teams, venue=venue,
+        )
     except Exception as e:
         logger.error(f"Error in get_player_dismissal_stats: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -4437,103 +4349,12 @@ def get_player_bowling_dismissal_stats(
     venue: Optional[str] = None,
     db: Session = Depends(get_session)
 ):
-    """Get how a bowler takes wickets (dismissal mode distribution)."""
+    """Get how a bowler takes wickets (same service as /players/{name}/bowling_dismissal_stats)."""
     try:
-        params = {
-            "player_name": player_name,
-            "start_date": start_date,
-            "end_date": end_date,
-            "venue": venue,
-        }
-
-        if leagues:
-            params["leagues"] = expand_league_abbreviations(leagues)
-        else:
-            params["leagues"] = []
-
-        competition_conditions = []
-        if leagues:
-            competition_conditions.append("(m.match_type = 'league' AND m.competition = ANY(:leagues))")
-        else:
-            competition_conditions.append("m.match_type = 'league'")
-
-        if include_international:
-            if top_teams:
-                params["top_team_list"] = INTERNATIONAL_TEAMS_RANKED[:top_teams]
-                competition_conditions.append(
-                    "(m.match_type = 'international' AND m.team1 = ANY(:top_team_list) AND m.team2 = ANY(:top_team_list))"
-                )
-            else:
-                competition_conditions.append("m.match_type = 'international'")
-
-        match_filter = "AND (" + " OR ".join(competition_conditions) + ")"
-
-        dismissal_query = text(f"""
-            SELECT
-                d.wicket_type,
-                COUNT(*) as count
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            WHERE d.bowler = :player_name
-            AND d.wicket_type IS NOT NULL
-            AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY d.wicket_type
-            ORDER BY count DESC
-        """)
-
-        phase_dismissal_query = text(f"""
-            SELECT
-                CASE
-                    WHEN d.over < 6 THEN 'powerplay'
-                    WHEN d.over >= 6 AND d.over < 15 THEN 'middle'
-                    ELSE 'death'
-                END as phase,
-                d.wicket_type,
-                COUNT(*) as count
-            FROM deliveries d
-            JOIN matches m ON d.match_id = m.id
-            WHERE d.bowler = :player_name
-            AND d.wicket_type IS NOT NULL
-            AND d.wicket_type NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-            AND (:start_date IS NULL OR m.date >= :start_date)
-            AND (:end_date IS NULL OR m.date <= :end_date)
-            AND (:venue IS NULL OR m.venue = :venue)
-            {match_filter}
-            GROUP BY phase, d.wicket_type
-            ORDER BY phase, count DESC
-        """)
-
-        overall = db.execute(dismissal_query, params).fetchall()
-        by_phase = db.execute(phase_dismissal_query, params).fetchall()
-
-        total = sum(row.count for row in overall)
-        dismissals = [
-            {
-                "type": row.wicket_type,
-                "count": row.count,
-                "percentage": round((row.count / total) * 100, 1) if total > 0 else 0
-            }
-            for row in overall
-        ]
-
-        phase_breakdown = {}
-        for row in by_phase:
-            phase_breakdown.setdefault(row.phase, []).append({
-                "type": row.wicket_type,
-                "count": row.count
-            })
-
-        return {
-            "player_name": player_name,
-            "total_wickets": total,
-            "dismissals": dismissals,
-            "by_phase": phase_breakdown
-        }
-
+        return get_dismissal_breakdown(
+            db, player_name, "bowler", start_date=start_date, end_date=end_date, leagues=leagues,
+            include_international=include_international, top_teams=top_teams, venue=venue,
+        )
     except Exception as e:
         logger.error(f"Error in get_player_bowling_dismissal_stats: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

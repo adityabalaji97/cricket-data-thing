@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List
+from typing import List, Optional
 from database import get_session
+from services.dismissal_stats import get_dismissal_breakdown
 from services.players import get_batters_service, get_bowlers_service
 
 router = APIRouter(prefix="/players", tags=["players"])
@@ -81,101 +83,43 @@ def get_all_players(db: Session = Depends(get_session)):
 
 
 @router.get("/{player_name}/dismissal_stats")
-def get_dismissal_stats(player_name: str, db: Session = Depends(get_session)):
-    """Get dismissal mode distribution for a batter."""
+def get_dismissal_stats(
+    player_name: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    leagues: List[str] = Query(default=[]),
+    include_international: bool = Query(default=False),
+    top_teams: Optional[int] = Query(default=None),
+    venue: Optional[str] = None,
+    db: Session = Depends(get_session),
+):
+    """How a batter gets out, under the profile page's filters (services/dismissal_stats.py)."""
     try:
-        query = text("""
-            SELECT
-                d.wicket_type,
-                COUNT(*) as count,
-                CASE
-                    WHEN d.over < 6 THEN 'powerplay'
-                    WHEN d.over < 16 THEN 'middle'
-                    ELSE 'death'
-                END as phase
-            FROM deliveries d
-            WHERE d.batter = :player_name
-              AND d.wicket_type IS NOT NULL
-              AND d.wicket_type != ''
-            GROUP BY d.wicket_type, phase
-            ORDER BY count DESC
-        """)
-        rows = db.execute(query, {"player_name": player_name}).fetchall()
-
-        overall = {}
-        by_phase_raw = {}
-        for row in rows:
-            wt = row.wicket_type
-            count = row.count
-            phase = row.phase
-            overall[wt] = overall.get(wt, 0) + count
-            if phase not in by_phase_raw:
-                by_phase_raw[phase] = {}
-            by_phase_raw[phase][wt] = by_phase_raw[phase].get(wt, 0) + count
-
-        dismissals = [{"type": k, "count": v} for k, v in overall.items()]
-        total_dismissals = sum(v for v in overall.values())
-        by_phase = {
-            phase: [{"type": k, "count": v} for k, v in types.items()]
-            for phase, types in by_phase_raw.items()
-        }
-
-        return {
-            "player_name": player_name,
-            "dismissals": dismissals,
-            "total_dismissals": total_dismissals,
-            "by_phase": by_phase
-        }
+        return get_dismissal_breakdown(
+            db, player_name, "batter", start_date=start_date, end_date=end_date, leagues=leagues,
+            include_international=include_international, top_teams=top_teams, venue=venue,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch dismissal stats: {str(e)}")
 
 
 @router.get("/{player_name}/bowling_dismissal_stats")
-def get_bowling_dismissal_stats(player_name: str, db: Session = Depends(get_session)):
-    """Get dismissal mode distribution for a bowler (how they take wickets)."""
+def get_bowling_dismissal_stats(
+    player_name: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    leagues: List[str] = Query(default=[]),
+    include_international: bool = Query(default=False),
+    top_teams: Optional[int] = Query(default=None),
+    venue: Optional[str] = None,
+    db: Session = Depends(get_session),
+):
+    """How a bowler takes wickets, under the profile page's filters (services/dismissal_stats.py)."""
     try:
-        query = text("""
-            SELECT
-                d.wicket_type,
-                COUNT(*) as count,
-                CASE
-                    WHEN d.over < 6 THEN 'powerplay'
-                    WHEN d.over < 16 THEN 'middle'
-                    ELSE 'death'
-                END as phase
-            FROM deliveries d
-            WHERE d.bowler = :player_name
-              AND d.wicket_type IS NOT NULL
-              AND d.wicket_type != ''
-            GROUP BY d.wicket_type, phase
-            ORDER BY count DESC
-        """)
-        rows = db.execute(query, {"player_name": player_name}).fetchall()
-
-        overall = {}
-        by_phase_raw = {}
-        for row in rows:
-            wt = row.wicket_type
-            count = row.count
-            phase = row.phase
-            overall[wt] = overall.get(wt, 0) + count
-            if phase not in by_phase_raw:
-                by_phase_raw[phase] = {}
-            by_phase_raw[phase][wt] = by_phase_raw[phase].get(wt, 0) + count
-
-        dismissals = [{"type": k, "count": v} for k, v in overall.items()]
-        total_wickets = sum(v for v in overall.values())
-        by_phase = {
-            phase: [{"type": k, "count": v} for k, v in types.items()]
-            for phase, types in by_phase_raw.items()
-        }
-
-        return {
-            "player_name": player_name,
-            "dismissals": dismissals,
-            "total_wickets": total_wickets,
-            "by_phase": by_phase
-        }
+        return get_dismissal_breakdown(
+            db, player_name, "bowler", start_date=start_date, end_date=end_date, leagues=leagues,
+            include_international=include_international, top_teams=top_teams, venue=venue,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch bowling dismissal stats: {str(e)}")
 
