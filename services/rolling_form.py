@@ -21,17 +21,12 @@ from services.delivery_data_service import (
     build_venue_filter_delivery_details,
 )
 from services.player_aliases import get_all_name_variants, get_player_names, resolve_to_legacy_name
+from services.metrics import sql_defs
+
+_BAT = sql_defs.delivery_details_defs(sql_defs.BATTER, "dd")
+_BOWL = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
 
 
-BOWLER_WICKET_TYPES = (
-    "bowled",
-    "caught",
-    "lbw",
-    "leg before wicket",  # the ball-by-ball feed's spelling
-    "caught and bowled",
-    "stumped",
-    "hit wicket",
-)
 DELIVERY_DETAILS_AUGMENT_GAP_DAYS = 45
 
 
@@ -509,16 +504,12 @@ def _fetch_batting_timeline_dd(
             m.date,
             m.competition,
             m.venue,
-            SUM(COALESCE(dd.batruns, 0)) AS runs,
-            SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 THEN 1 ELSE 0 END) AS balls_faced,
+            {_BAT.runs_sum} AS runs,
+            {_BAT.balls_sum} AS balls_faced,
             SUM(CASE WHEN COALESCE(dd.batruns, 0) = 4 THEN 1 ELSE 0 END) AS fours,
             SUM(CASE WHEN COALESCE(dd.batruns, 0) = 6 THEN 1 ELSE 0 END) AS sixes,
-            SUM(
-                CASE
-                    WHEN LOWER(COALESCE(dd.out::text, '')) IN ('true', 't', '1', 'yes')
-                    THEN 1 ELSE 0
-                END
-            ) AS dismissals
+            -- The striker's own dismissal: a non-striker run out on his ball is not his.
+            {_BAT.wickets_sum} AS dismissals
         FROM delivery_details dd
         JOIN matches m ON m.id = dd.p_match
         WHERE dd.bat = ANY(:player_variants)
@@ -582,7 +573,6 @@ def _fetch_bowling_timeline_dd(
         "start_date": start_date,
         "end_date": end_date,
         "leagues": leagues,
-        "bowler_wickets": list(BOWLER_WICKET_TYPES),
     }
     venue_filter = build_venue_filter_delivery_details(venue, params)
     comp_filter = build_competition_filter_delivery_details(leagues, include_international, None, params)
@@ -594,20 +584,11 @@ def _fetch_bowling_timeline_dd(
             m.date,
             m.competition,
             m.venue,
-            SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END) AS legal_balls,
-            SUM(COALESCE(dd.score, 0)) AS runs_conceded,
-            SUM(
-                CASE
-                    WHEN LOWER(COALESCE(dd.dismissal, '')) = ANY(:bowler_wickets)
-                    THEN 1 ELSE 0
-                END
-            ) AS wickets,
-            SUM(
-                CASE
-                    WHEN COALESCE(dd.score, 0) = 0 AND COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0
-                    THEN 1 ELSE 0
-                END
-            ) AS dots
+            {_BOWL.balls_sum} AS legal_balls,
+            -- Byes and leg-byes are never the bowler's.
+            {_BOWL.runs_sum} AS runs_conceded,
+            {_BOWL.wickets_sum} AS wickets,
+            {_BOWL.dots_sum} AS dots
         FROM delivery_details dd
         JOIN matches m ON m.id = dd.p_match
         WHERE dd.bowl = ANY(:player_variants)

@@ -23,7 +23,14 @@ from services.delivery_data_service import (
     build_venue_filter_delivery_details,
     should_use_delivery_details,
 )
+from services.metrics import sql_defs
 from services.player_aliases import get_all_name_variants, get_player_names
+
+# Per-ball rows for one bowler use the bowler's view of the ball (byes/leg-byes are not his
+# runs, run outs are not his wickets). The per-over team totals below stay on the full score:
+# they measure the pressure the previous over put on the batting side.
+_BOWL_DD = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
+_BOWL_LEGACY = sql_defs.legacy_defs(sql_defs.BOWLER, "d")
 
 
 def classify_pressure_bucket(previous_over_runs: Optional[int], threshold: int) -> str:
@@ -66,13 +73,9 @@ def _fetch_bowler_rows_dd(
             dd.over AS over_num,
             dd.ball AS ball_num,
             dd.bowl AS bowler,
-            COALESCE(dd.score, 0) AS total_runs,
+            {_BOWL_DD.runs} AS total_runs,
             COALESCE(dd.batruns, 0) AS bat_runs,
-            CASE
-                WHEN LOWER(COALESCE(dd.out::text, '')) IN ('true', 't', '1', 'yes')
-                THEN 1
-                ELSE 0
-            END AS wicket,
+            CASE WHEN {_BOWL_DD.wicket} THEN 1 ELSE 0 END AS wicket,
             COALESCE(dd.wide, 0) AS wide,
             COALESCE(dd.noball, 0) AS noball,
             dd.inns_runs,
@@ -161,9 +164,9 @@ def _fetch_bowler_rows_deliveries(
             d.over AS over_num,
             d.ball AS ball_num,
             d.bowler,
-            (COALESCE(d.runs_off_bat, 0) + COALESCE(d.extras, 0)) AS total_runs,
+            {_BOWL_LEGACY.runs} AS total_runs,
             COALESCE(d.runs_off_bat, 0) AS bat_runs,
-            CASE WHEN d.wicket_type IS NOT NULL AND d.wicket_type != '' THEN 1 ELSE 0 END AS wicket,
+            CASE WHEN {_BOWL_LEGACY.wicket} THEN 1 ELSE 0 END AS wicket,
             COALESCE(d.wides, 0) AS wide,
             COALESCE(d.noballs, 0) AS noball
         FROM deliveries d
