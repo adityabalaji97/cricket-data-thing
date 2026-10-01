@@ -25,6 +25,15 @@ double-counted, 'leg before wicket' not a wicket, `score = 0` dots): 26k/3.2k/12
 current rules; check prod (read-only) before regenerating. A21 — `matchups.py` filtered innings on
 `dd.innings` (never populated), so any innings-position filter dropped all post-2015 data (fixed).
 
+Batch 4 (Wrapped + perf): Wrapped cards `58a37ef` (+ Venue Vibes crash: A22). C3 alias views `b4ddcb2`
+(migration 011), preview metrics `c6254ac`, alias chains `4252679` (013, A23), matchups/scorecard alias +
+pre-filter `e2da664` (012), refresh/ANALYZE `488525d`, QB pre-counts `f2b653e`. Measured locally, warm:
+match preview 4.05 s → 0.79 s, scorecard 414 → 62 ms, matchup x6 18.0 → 1.8 s.
+**Deploy order: migrations 011, 012, 013 on production before this branch.**
+A22 — Wrapped "Venue Vibes" raised on every request and grouped on unpopulated columns (fixed).
+A23 — two alias chains split players (Mitch/Mitchell Owen, Raj Bawa); `audit_roster_names --fix` created
+them and now resolves chains (fixed). Open: "MW Short" aliases to both Matthew and D'Arcy Short.
+
 ---
 
 ## A. Correctness — wrong numbers shown to users

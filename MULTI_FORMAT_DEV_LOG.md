@@ -31,8 +31,16 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > `date` was all NULL so windows widened to whole years), dismissal stats (new
 > services/dismissal_stats.py behind /players/... and /player/... routes; filters + all name
 > spellings + dd-or-legacy). PENDING SIGN-OFF: match_preview golden (2 prose bullets from matchups).
-> Not done: Wrapped cards (20 files, seasonal recap -- product call), cumulative QB mode, /player stats
-> bowling-type breakdowns still legacy-table only (post-2025 cricsheet-only coverage).
+> Wrapped: all 20 cards on sql_defs; Venue Vibes card was erroring on every request (fixed).
+> PERF (2026-10-01): migrations 011 (player_alias_map / player_alias_unambiguous MVs behind
+> ALIAS_MAP_CTE / UNAMBIGUOUS_ALIASES), 012 (player_name_spellings MV: stored spellings for indexable
+> pre-filters), 013 (collapse alias chains; Mitchell Owen -> "Mitch Owen", Raj Bawa). APPLY 011-013 TO
+> PROD BEFORE DEPLOYING audit-fixes. refresh_alias_views() (refresh CONCURRENTLY + ANALYZE) runs in the
+> nightly workflow after loads and in the alias scripts. Inline alias CTEs are NOT MATERIALIZED.
+> Local warm: match preview 4.05 s -> 0.79 s, scorecard 414 -> 62 ms, QB grouped one scan fewer x2.
+> Open: rankings precompute (~28 s), QB IPL batter x year ~0.6 s main scan, index cleanup (needs prod
+> pg_stat_user_indexes), match_date::date casts, cumulative QB mode defs, /player stats bowling-type
+> matrix legacy-only, "MW Short" alias -> both Matthew and D'Arcy Short (looks wrong; review).
 > Local bowling_stats is stale vs current sync rules (wide double-count, 'leg before wicket' missed,
 > old score=0 dots) -- check prod before regenerating.
 >
