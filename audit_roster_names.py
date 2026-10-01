@@ -201,8 +201,28 @@ def insert_alias(db, player_name: str, alias_name: str) -> bool:
     if existing:
         return False
 
+    # Never create a chain (see scripts/migrations/013_collapse_alias_chains.sql): the alias map
+    # treats every alias_name as canonical, so A -> X plus X -> Y splits one player in two.
+    # If the target already maps on, point at its canonical name instead...
+    onward = db.execute(
+        text("SELECT alias_name FROM player_aliases WHERE player_name = :an AND alias_name <> :an LIMIT 1"),
+        {"an": alias_name},
+    ).scalar()
+    if onward:
+        alias_name = onward
     db.execute(
-        text("INSERT INTO player_aliases (player_name, alias_name) VALUES (:pn, :an)"),
+        text("INSERT INTO player_aliases (player_name, alias_name) VALUES (:pn, :an) "
+             "ON CONFLICT (player_name, alias_name) DO NOTHING"),
+        {"pn": player_name, "an": alias_name},
+    )
+    # ...and if player_name was itself canonical for other names, repoint those to the new target.
+    db.execute(
+        text("DELETE FROM player_aliases c WHERE c.alias_name = :pn AND EXISTS "
+             "(SELECT 1 FROM player_aliases d WHERE d.player_name = c.player_name AND d.alias_name = :an)"),
+        {"pn": player_name, "an": alias_name},
+    )
+    db.execute(
+        text("UPDATE player_aliases SET alias_name = :an WHERE alias_name = :pn AND player_name <> :an"),
         {"pn": player_name, "an": alias_name},
     )
     return True
