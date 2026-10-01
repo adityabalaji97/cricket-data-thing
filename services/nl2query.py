@@ -3,6 +3,7 @@ Natural Language to Query Builder service.
 Translates natural language cricket queries into structured filters
 for the query builder API.
 """
+import copy
 import os
 import json
 import time
@@ -278,12 +279,26 @@ def _get_cache_key(query: str) -> str:
     return query.strip().lower()
 
 
+# A cache hit made no OpenAI call, so it is logged at zero cost. Before this, the hit
+# carried the original call's _meta and every repeat was billed again in nl_query_log,
+# which inflated the monthly spend that select_model() checks against the cap.
+CACHE_HIT_META = {
+    "model_used": "cache",
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "estimated_cost_usd": 0.0,
+}
+
+
 def _get_cached(query: str) -> Optional[Dict[str, Any]]:
     key = _get_cache_key(query)
     if key in _cache:
         entry = _cache[key]
         if time.time() - entry["timestamp"] < CACHE_TTL:
-            return entry["result"]
+            # A copy, so callers can't mutate the cached entry.
+            result = copy.deepcopy(entry["result"])
+            result["_meta"] = dict(CACHE_HIT_META)
+            return result
         else:
             del _cache[key]
     return None
@@ -291,7 +306,8 @@ def _get_cached(query: str) -> Optional[Dict[str, Any]]:
 
 def _set_cache(query: str, result: Dict[str, Any]):
     key = _get_cache_key(query)
-    _cache[key] = {"result": result, "timestamp": time.time()}
+    stored = copy.deepcopy({k: v for k, v in result.items() if k != "_meta"})
+    _cache[key] = {"result": stored, "timestamp": time.time()}
 
 
 def get_cache_size() -> int:
