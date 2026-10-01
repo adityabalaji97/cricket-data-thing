@@ -8,6 +8,7 @@ from models import teams_mapping
 from services.delivery_data_service import should_use_delivery_details
 from ipl_rosters import get_team_abbrev_from_name
 from services.metrics import sql_defs
+from services.player_aliases import stored_spellings
 
 # Head-to-head definitions for a batter-vs-bowler pair: the batter's balls faced, runs off the bat
 # and dots, and the dismissals credited to the bowler (each of which dismisses the striker).
@@ -169,19 +170,10 @@ def _build_batter_avg_balls_lookup(
 
     avg_balls_query = text(
         """
-        WITH alias_map AS (
-            SELECT DISTINCT ON (name_key)
-                name_key,
-                canonical_name
-            FROM (
-                SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
-                FROM player_aliases
-                WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
-                UNION ALL
-                SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
-                FROM player_aliases
-                WHERE alias_name IS NOT NULL
-            ) mapped_aliases
+        WITH alias_map AS NOT MATERIALIZED (
+            -- Materialised lookup (migration 011): deterministic, and ambiguous legacy names
+            -- ("A Shukla" is two players) are left unmapped rather than picked arbitrarily.
+            SELECT name_key, canonical_name FROM player_alias_map
         )
         SELECT
             COALESCE(am.canonical_name, bs.striker) AS batter,
@@ -240,19 +232,10 @@ def _build_bowler_avg_balls_lookup(
 
     avg_balls_query = text(
         """
-        WITH alias_map AS (
-            SELECT DISTINCT ON (name_key)
-                name_key,
-                canonical_name
-            FROM (
-                SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
-                FROM player_aliases
-                WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
-                UNION ALL
-                SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
-                FROM player_aliases
-                WHERE alias_name IS NOT NULL
-            ) mapped_aliases
+        WITH alias_map AS NOT MATERIALIZED (
+            -- Materialised lookup (migration 011): deterministic, and ambiguous legacy names
+            -- ("A Shukla" is two players) are left unmapped rather than picked arbitrarily.
+            SELECT name_key, canonical_name FROM player_alias_map
         )
         SELECT
             COALESCE(am.canonical_name, bw.bowler) AS bowler,
@@ -718,19 +701,10 @@ def get_team_matchups_service(
                     UNION
                     SELECT id FROM team2_recent
                 ),
-                alias_map AS (
-                    SELECT DISTINCT ON (name_key)
-                        name_key,
-                        canonical_name
-                    FROM (
-                        SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
-                        FROM player_aliases
-                        WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
-                        UNION ALL
-                        SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
-                        FROM player_aliases
-                        WHERE alias_name IS NOT NULL
-                    ) mapped_aliases
+                alias_map AS NOT MATERIALIZED (
+                    -- Materialised lookup (migration 011): deterministic, and ambiguous legacy names
+                    -- ("A Shukla" is two players) are left unmapped rather than picked arbitrarily.
+                    SELECT name_key, canonical_name FROM player_alias_map
                 ),
                 team1_players AS (
                     SELECT DISTINCT COALESCE(am.canonical_name, d.batter) AS player
@@ -810,19 +784,10 @@ def get_team_matchups_service(
             team2_players = _dedupe_player_names([row[0] for row in recent_players if row[1] == team2])
 
         matchup_query = text(f"""
-            WITH alias_map AS (
-                SELECT DISTINCT ON (name_key)
-                    name_key,
-                    canonical_name
-                FROM (
-                    SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
-                    FROM player_aliases
-                    WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
-                    UNION ALL
-                    SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
-                    FROM player_aliases
-                    WHERE alias_name IS NOT NULL
-                ) mapped_aliases
+            WITH alias_map AS NOT MATERIALIZED (
+                -- Materialised lookup (migration 011): deterministic, and ambiguous legacy names
+                -- ("A Shukla" is two players) are left unmapped rather than picked arbitrarily.
+                SELECT name_key, canonical_name FROM player_alias_map
             ),
             raw_stats AS (
                 SELECT
@@ -839,6 +804,9 @@ def get_team_matchups_service(
                 LEFT JOIN alias_map bowl_alias ON LOWER(d.bowler) = bowl_alias.name_key
                 WHERE
                     :use_deliveries = true
+                    -- Indexable pre-filter on the stored spellings; the canonical-name test
+                    -- below still decides which side each player is on.
+                    AND d.batter = ANY(:spellings) AND d.bowler = ANY(:spellings)
                     AND
                     ((COALESCE(bat_alias.canonical_name, d.batter) = ANY(:team1_players)
                       AND COALESCE(bowl_alias.canonical_name, d.bowler) = ANY(:team2_players))
@@ -870,6 +838,9 @@ def get_team_matchups_service(
                     -- On dd, not m2: the join is a LEFT JOIN, so pinning the match side
                     -- would also drop deliveries whose match row is missing.
                     AND dd.format = :fmt AND dd.gender = :gender
+                    -- Indexable pre-filter (idx_dd_bat / idx_dd_bowl). Without it the canonical
+                    -- test below could only be answered by scanning and alias-joining every ball.
+                    AND dd.bat = ANY(:spellings) AND dd.bowl = ANY(:spellings)
                     AND
                     ((COALESCE(bat_alias.canonical_name, dd.bat) = ANY(:team1_players)
                       AND COALESCE(bowl_alias.canonical_name, dd.bowl) = ANY(:team2_players))
@@ -934,6 +905,7 @@ def get_team_matchups_service(
         matchups = db.execute(matchup_query, {
             "team1_players": team1_players,
             "team2_players": team2_players,
+            "spellings": stored_spellings([*team1_players, *team2_players], db),
             "use_deliveries": use_deliveries,
             "use_delivery_details": use_delivery_details,
             "deliveries_start_date": deliveries_start_date,

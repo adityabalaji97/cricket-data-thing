@@ -362,7 +362,7 @@ def load_aliases_map(db: Session) -> Dict[str, str]:
 # 1.8 s. The constants keep their old shapes so call sites are unchanged. After any change to
 # player_aliases call refresh_alias_views().
 ALIAS_MAP_CTE = """
-    alias_map AS (
+    alias_map AS NOT MATERIALIZED (
         -- Any spelling (lower-cased) -> canonical name; canonical names map to themselves first,
         -- legacy forms only when unambiguous ("A Shukla" is two people and stays unmapped).
         SELECT name_key, canonical_name FROM player_alias_map
@@ -377,7 +377,27 @@ ALIAS_MAP_CTE = """
 # Those same names are excluded here rather than arbitrarily collapsed.
 UNAMBIGUOUS_ALIASES = "player_alias_unambiguous"
 
-ALIAS_VIEWS = ("player_alias_unambiguous", "player_alias_map")
+# player_name_spellings (migration 012) is every name stored in the ball tables, so it also needs
+# refreshing after loads; the nightly workflow does that after loading.
+ALIAS_VIEWS = ("player_alias_unambiguous", "player_alias_map", "player_name_spellings")
+
+
+def stored_spellings(names: List[str], db: Session) -> List[str]:
+    """Every spelling stored in delivery_details / deliveries for these players.
+
+    For an indexable pre-filter (`dd.bat = ANY(:spellings)`) in front of a canonical-name match.
+    Expands through the aliases (expand_name_group), then adds case variants the feed stored that
+    no alias row spells -- the alias map matches case-insensitively, an `= ANY` does not. The
+    inputs are always included, so a player with no stored rows still matches nothing extra.
+    """
+    group = expand_name_group(names, db)
+    if not group:
+        return []
+    variants = db.execute(
+        text("SELECT name FROM player_name_spellings WHERE name_key = ANY(:keys)"),
+        {"keys": list({n.lower() for n in group})},
+    ).scalars().all()
+    return list(dict.fromkeys([*group, *variants]))
 
 
 def refresh_alias_views(db: Session) -> None:

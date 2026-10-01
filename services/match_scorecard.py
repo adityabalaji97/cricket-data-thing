@@ -329,15 +329,10 @@ def _details_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str
     rows = db.execute(
         text(
             f"""
-            WITH alias_map AS (
-                SELECT DISTINCT ON (name_key) name_key, canonical_name
-                FROM (
-                    SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
-                    FROM player_aliases WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
-                    UNION ALL
-                    SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
-                    FROM player_aliases WHERE alias_name IS NOT NULL
-                ) a
+            WITH alias_map AS NOT MATERIALIZED (
+                -- Materialised lookup (migration 011): deterministic, and ambiguous legacy names
+                -- ("A Shukla" is two players) are left unmapped rather than picked arbitrarily.
+                SELECT name_key, canonical_name FROM player_alias_map
             ),
             base AS (
                 SELECT dd.*, COALESCE(pa.canonical_name, dd.bat) AS batter_name
@@ -442,15 +437,10 @@ def _details_bowling_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str
     rows = db.execute(
         text(
             f"""
-            WITH alias_map AS (
-                SELECT DISTINCT ON (name_key) name_key, canonical_name
-                FROM (
-                    SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
-                    FROM player_aliases WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
-                    UNION ALL
-                    SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
-                    FROM player_aliases WHERE alias_name IS NOT NULL
-                ) a
+            WITH alias_map AS NOT MATERIALIZED (
+                -- Materialised lookup (migration 011): deterministic, and ambiguous legacy names
+                -- ("A Shukla" is two players) are left unmapped rather than picked arbitrarily.
+                SELECT name_key, canonical_name FROM player_alias_map
             )
             SELECT
                 dd.inns AS innings,
@@ -615,15 +605,10 @@ def _details_base_cte() -> str:
         {BOWL_STYLE_CATEGORY_SQL}
     )"""
     return f"""
-        WITH alias_map AS (
-            SELECT DISTINCT ON (name_key) name_key, canonical_name
-            FROM (
-                SELECT LOWER(player_name) AS name_key, alias_name AS canonical_name
-                FROM player_aliases WHERE player_name IS NOT NULL AND alias_name IS NOT NULL
-                UNION ALL
-                SELECT LOWER(alias_name) AS name_key, alias_name AS canonical_name
-                FROM player_aliases WHERE alias_name IS NOT NULL
-            ) a
+        WITH alias_map AS NOT MATERIALIZED (
+            -- Materialised lookup (migration 011): deterministic, and ambiguous legacy names
+            -- ("A Shukla" is two players) are left unmapped rather than picked arbitrarily.
+            SELECT name_key, canonical_name FROM player_alias_map
         ),
         base AS (
             SELECT
