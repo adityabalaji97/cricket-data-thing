@@ -2251,7 +2251,7 @@ def get_player_stats(
             "venue": venue,
             "has_leagues": bool(leagues),
             "include_international": include_international,
-            "top_teams": top_teams is not None,
+            "top_teams": top_teams,  # NULL = every international team (the SQL tests :top_teams IS NULL)
             "top_team_list": INTERNATIONAL_TEAMS_RANKED[:top_teams] if top_teams else []
         }
 
@@ -2671,7 +2671,7 @@ def get_player_ball_stats(
             "has_leagues": bool(leagues),
             "leagues": leagues if leagues else [],
             "include_international": include_international,
-            "top_teams": top_teams is not None,
+            "top_teams": top_teams,  # NULL = every international team (the SQL tests :top_teams IS NULL)
             "top_team_list": INTERNATIONAL_TEAMS_RANKED[:top_teams] if top_teams else []
         }
 
@@ -3658,7 +3658,7 @@ def get_player_bowling_stats(
             "venue": venue,
             "has_leagues": bool(leagues),
             "include_international": include_international,
-            "top_teams": top_teams is not None,
+            "top_teams": top_teams,  # NULL = every international team (the SQL tests :top_teams IS NULL)
             "top_team_list": INTERNATIONAL_TEAMS_RANKED[:top_teams] if top_teams else []
         }
         
@@ -4274,7 +4274,7 @@ def get_player_bowling_ball_stats(
             "has_leagues": bool(leagues),
             "leagues": leagues if leagues else [],
             "include_international": include_international,
-            "top_teams": top_teams is not None,
+            "top_teams": top_teams,  # NULL = every international team (the SQL tests :top_teams IS NULL)
             "top_team_list": INTERNATIONAL_TEAMS_RANKED[:top_teams] if top_teams else []
         }
 
