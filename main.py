@@ -62,7 +62,12 @@ from services.delivery_data_service import (
 )
 from services.bowler_types import BOWLER_CATEGORY_SQL
 from services.player_aliases import get_player_names
+from services.metrics import sql_defs
 import math
+
+# Shared ball/run/wicket definitions for the per-ball leaderboards below (services/metrics/sql_defs.py).
+_VENUE_BAT = sql_defs.delivery_details_defs(sql_defs.BATTER, "dd")
+_VENUE_BOWL = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
 
 from dotenv import load_dotenv
 from pathlib import Path
@@ -1137,10 +1142,10 @@ def get_venue_stats(
                     dd.bat as name,
                     string_agg(DISTINCT COALESCE(tm.abbreviated_name, dd.team_bat), '/') as batting_team,
                     COUNT(DISTINCT dd.p_match) as innings,
-                    SUM(dd.batruns) as total_runs,
-                    CAST(SUM(dd.batruns)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as average,
-                    CAST((SUM(dd.batruns)::float * 100 / NULLIF(COUNT(*), 0)) AS DECIMAL(10,2)) as strike_rate,
-                    CAST(COUNT(*)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as balls_per_dismissal
+                    {_VENUE_BAT.runs_sum} as total_runs,
+                    CAST({_VENUE_BAT.runs_sum}::float / NULLIF({_VENUE_BAT.wickets_sum}, 0) AS DECIMAL(10,2)) as average,
+                    CAST(({_VENUE_BAT.runs_sum}::float * 100 / NULLIF({_VENUE_BAT.balls_sum}, 0)) AS DECIMAL(10,2)) as strike_rate,
+                    CAST({_VENUE_BAT.balls_sum}::float / NULLIF({_VENUE_BAT.wickets_sum}, 0) AS DECIMAL(10,2)) as balls_per_dismissal
                 FROM (SELECT * FROM delivery_details WHERE format = :fmt AND gender = :gender) dd
                 JOIN match_filter mf ON dd.p_match = mf.id
                 LEFT JOIN team_mapping tm ON dd.team_bat = tm.full_name
@@ -1171,10 +1176,10 @@ def get_venue_stats(
                     dd.bowl as name,
                     string_agg(DISTINCT COALESCE(tm.abbreviated_name, dd.team_bowl), '/') as bowling_team,
                     COUNT(DISTINCT dd.p_match) as innings,
-                    SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END) as total_wickets,
-                    CAST(COUNT(*)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as strike_rate,
-                    CAST(SUM(dd.score)::float / NULLIF(SUM(CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' THEN 1 ELSE 0 END), 0) AS DECIMAL(10,2)) as average,
-                    CAST((SUM(dd.score)::float * 6 / NULLIF(COUNT(*), 0)) AS DECIMAL(10,2)) as economy
+                    {_VENUE_BOWL.wickets_sum} as total_wickets,
+                    CAST({_VENUE_BOWL.balls_sum}::float / NULLIF({_VENUE_BOWL.wickets_sum}, 0) AS DECIMAL(10,2)) as strike_rate,
+                    CAST({_VENUE_BOWL.runs_sum}::float / NULLIF({_VENUE_BOWL.wickets_sum}, 0) AS DECIMAL(10,2)) as average,
+                    CAST(({_VENUE_BOWL.runs_sum}::float * 6 / NULLIF({_VENUE_BOWL.balls_sum}, 0)) AS DECIMAL(10,2)) as economy
                 FROM (SELECT * FROM delivery_details WHERE format = :fmt AND gender = :gender) dd
                 JOIN match_filter mf ON dd.p_match = mf.id
                 LEFT JOIN team_mapping tm ON dd.team_bowl = tm.full_name
