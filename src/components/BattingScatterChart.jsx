@@ -23,6 +23,24 @@ import {
 import ZoomableChart from './common/ZoomableChart';
 import { getAutoscaledDomain } from '../utils/chartDomainUtils';
 
+const TEAM_COLORS = {
+    'CSK': '#eff542',
+    'RCB': '#f54242',
+    'MI': '#42a7f5',
+    'RR': '#FF2AA8',
+    'KKR': '#610048',
+    'PBKS': '#FF004D',
+    'SRH': '#FF7C01',
+    'LSG': '#00BBB3',
+    'DC': '#004BC5',
+    'GT': '#01295B'
+};
+
+const getTeamColor = (team) => {
+    const currentTeam = team?.split('/')?.pop()?.trim();
+    return TEAM_COLORS[currentTeam] || '#000000';
+};
+
 const BattingScatterChart = ({ data, isMobile = false }) => {
     const [minInnings, setMinInnings] = useState(5);
     const [phase, setPhase] = useState('overall');
@@ -104,52 +122,41 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
         return null;
     };
     
-    if (!data || data.length === 0) return <div>No data available</div>;
-
-    const avgBatter = data.find(d => d.name === 'Average Batter');
-    if (!avgBatter) return <div>Average batter data not found</div>;
-
-    const getTeamColor = (team) => {
-        const teamColors = {
-            'CSK': '#eff542',
-            'RCB': '#f54242', 
-            'MI': '#42a7f5',
-            'RR': '#FF2AA8',
-            'KKR': '#610048',
-            'PBKS': '#FF004D',
-            'SRH': '#FF7C01',
-            'LSG': '#00BBB3',
-            'DC': '#004BC5',
-            'GT': '#01295B'
-        };
-        const currentTeam = team?.split('/')?.pop()?.trim();
-        return teamColors[currentTeam] || '#000000';
-    };
+    // Every hook must run before the empty-data early returns below: when `data` arrives after
+    // the first render, a hook behind a return changes the hook count and React throws.
+    const avgBatter = useMemo(
+        () => (data || []).find(d => d.name === 'Average Batter'),
+        [data]
+    );
 
     // Filter data based on minimum innings and phase
-    const filteredData = data
-        .filter(d => {
-            const phasePrefix = phase === 'overall' ? '' : `${phase}_`;
-            const phaseInnings = phase === 'overall' ?
-                d.innings :
-                d[`${phasePrefix}innings`] || 0;
-            return d.name !== 'Average Batter' && phaseInnings >= minInnings;
-        })
-        .map(d => ({
-            ...d,
-            fill: getTeamColor(d.batting_team)
-        }))
-        // Sort players by total runs (descending) to show the most prolific batters
-        .sort((a, b) => {
-            const phasePrefix = phase === 'overall' ? '' : `${phase}_`;
-            const aRuns = phase === 'overall' ? a.total_runs : a[`${phasePrefix}runs`] || 0;
-            const bRuns = phase === 'overall' ? b.total_runs : b[`${phasePrefix}runs`] || 0;
-            return bRuns - aRuns; // Descending order
-        });
+    const filteredData = useMemo(() => {
+        const phasePrefix = phase === 'overall' ? '' : `${phase}_`;
+        return (data || [])
+            .filter(d => {
+                const phaseInnings = phase === 'overall' ?
+                    d.innings :
+                    d[`${phasePrefix}innings`] || 0;
+                return d.name !== 'Average Batter' && phaseInnings >= minInnings;
+            })
+            .map(d => ({
+                ...d,
+                fill: getTeamColor(d.batting_team)
+            }))
+            // Sort players by total runs (descending) to show the most prolific batters
+            .sort((a, b) => {
+                const aRuns = phase === 'overall' ? a.total_runs : a[`${phasePrefix}runs`] || 0;
+                const bRuns = phase === 'overall' ? b.total_runs : b[`${phasePrefix}runs`] || 0;
+                return bRuns - aRuns; // Descending order
+            });
+    }, [data, phase, minInnings]);
 
     // Limit number of players shown on mobile to reduce crowding
     const maxPlayers = isMobile ? 15 : 30;
-    const displayData = filteredData.slice(0, maxPlayers);
+    const displayData = useMemo(
+        () => filteredData.slice(0, maxPlayers),
+        [filteredData, maxPlayers]
+    );
 
     const metrics = getAxesData();
     const { xDomain, yDomain } = useMemo(() => {
@@ -176,6 +183,10 @@ const BattingScatterChart = ({ data, isMobile = false }) => {
             }),
         };
     }, [displayData, avgBatter, metrics.xKey, metrics.yKey]);
+
+    if (!data || data.length === 0) return <div>No data available</div>;
+    if (!avgBatter) return <div>Average batter data not found</div>;
+
     const [minX, maxX] = xDomain;
     const [minY, maxY] = yDomain;
 
