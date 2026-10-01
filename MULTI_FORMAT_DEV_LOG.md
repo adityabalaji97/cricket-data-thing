@@ -11,6 +11,17 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **Codebase audit (2026-10-01), branch `audit-fixes` — NOT merged/deployed:** findings in
+> AUDIT_CODEBASE_2026-10.md (correctness A1-A18, crashes B1-B5, perf C1-C11). Batch 1 committed, all
+> goldens identical, pytest 258 pass: scatter-chart hook crash (F0), player-summary async->def (C4; MCP
+> tool no longer asyncio.run()s it), match-preview recent form AND/OR cutoff + form/Elo scoped by
+> fmt/gender (A7), main.py player endpoints bind top_teams=None so include_international w/o top_teams
+> means all (A9), pitch-map wickets LOWER(out) (A4), train_model text import (B1), nl2query cache hits
+> logged model_used='cache' at $0 (A16a), web-only statement_timeout via DB_STATEMENT_TIMEOUT_MS set in
+> Procfile (C9, 25 s). Next: A1/A2 query-builder dates + merge pagination, then one shared
+> legal-ball/bowler-runs/bowler-wicket SQL module for A3/A6/A14 -- those CHANGE T20 goldens, needs
+> sign-off + golden refresh.
+>
 > **Notes plan, steps 1-2 live (2026-09-30):** plan in ~/.claude/plans/can-you-look-at-iterative-plum.md
 > (order 1 → 2 → 6 → 6b → 6c → 3-5 → 7 → 8). Migration 009 (app_meta, query_cache, chart_snapshots,
 > notes, note_authors, content_packs, content_ideas, matches.data_source). run_deliveries_query goes
