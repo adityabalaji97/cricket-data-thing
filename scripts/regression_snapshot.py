@@ -395,6 +395,13 @@ def cmd_discover(_args: argparse.Namespace) -> int:
 
 def cmd_capture(args: argparse.Namespace) -> int:
     endpoints = load_endpoints()
+    if args.only:
+        # Re-baseline just the endpoints whose change was reviewed and approved; rewriting the
+        # rest would churn their volatile fields for no reason.
+        unknown = set(args.only) - {e["name"] for e in endpoints}
+        if unknown:
+            raise SystemExit(f"Unknown endpoint(s): {', '.join(sorted(unknown))}")
+        endpoints = [e for e in endpoints if e["name"] in set(args.only)]
     out_dir = GOLDENS_DIR / args.env
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -474,7 +481,8 @@ def main() -> int:
 
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("discover", help="Rebuild endpoints.json from data in the database")
-    sub.add_parser("capture", help="Save current responses as goldens")
+    capture = sub.add_parser("capture", help="Save current responses as goldens")
+    capture.add_argument("--only", nargs="+", metavar="NAME", help="Capture only these endpoints")
     sub.add_parser("check", help="Compare current responses against goldens")
 
     args = parser.parse_args()

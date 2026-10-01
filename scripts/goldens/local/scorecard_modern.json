@@ -5,7 +5,7 @@
       {
         "batting": [
           {
-            "balls": 14,
+            "balls": 12,
             "breakdowns": {
               "line_length": {
                 "available": true,
@@ -39,7 +39,7 @@
                     "runs": 5
                   },
                   {
-                    "balls": 1,
+                    "balls": 0,
                     "length": "GOOD_LENGTH",
                     "line": "WIDE_DOWN_LEG",
                     "metric": 0,
@@ -60,7 +60,7 @@
                     "runs": 0
                   },
                   {
-                    "balls": 1,
+                    "balls": 0,
                     "length": "SHORT",
                     "line": "WIDE_DOWN_LEG",
                     "metric": 0,
@@ -135,12 +135,12 @@
                 "empty": "Not enough balls to split pace vs spin.",
                 "rows": [
                   {
-                    "balls": 14,
+                    "balls": 12,
                     "boundary_runs": 8,
                     "key": "pace",
                     "label": "vs Pace",
                     "runs": 12,
-                    "sr": 86
+                    "sr": 100
                   },
                   {
                     "balls": 0,
@@ -157,12 +157,12 @@
                 "empty": "Not enough balls faced to split by phase.",
                 "rows": [
                   {
-                    "balls": 14,
+                    "balls": 12,
                     "key": "powerplay",
                     "label": "Powerplay",
                     "overs": "1-6",
                     "runs": 12,
-                    "sr": 86
+                    "sr": 100
                   },
                   {
                     "balls": 0,
@@ -186,18 +186,6 @@
                 "available": true,
                 "rows": [
                   {
-                    "balls": 7,
-                    "bar_pct": 61,
-                    "dots": 2,
-                    "fours": 2,
-                    "id": "jacob-duffy",
-                    "linkable": true,
-                    "name": "Jacob Duffy",
-                    "runs": 9,
-                    "sixes": 0,
-                    "sr": 129
-                  },
-                  {
                     "balls": 5,
                     "bar_pct": 19,
                     "dots": 4,
@@ -208,6 +196,18 @@
                     "runs": 2,
                     "sixes": 0,
                     "sr": 40
+                  },
+                  {
+                    "balls": 5,
+                    "bar_pct": 86,
+                    "dots": 2,
+                    "fours": 2,
+                    "id": "jacob-duffy",
+                    "linkable": true,
+                    "name": "Jacob Duffy",
+                    "runs": 9,
+                    "sixes": 0,
+                    "sr": 180
                   },
                   {
                     "balls": 2,
@@ -285,18 +285,18 @@
             "not_out": false,
             "runs": 12,
             "sixes": 0,
-            "strike_rate": 86,
+            "strike_rate": 100,
             "team": "Gujarat Titans",
             "wpa": -0.099
           },
           {
-            "balls": 9,
+            "balls": 8,
             "breakdowns": {
               "line_length": {
                 "available": true,
                 "cells": [
                   {
-                    "balls": 1,
+                    "balls": 0,
                     "length": "GOOD_LENGTH",
                     "line": "DOWN_LEG",
                     "metric": 0,
@@ -378,12 +378,12 @@
                 "empty": "Not enough balls to split pace vs spin.",
                 "rows": [
                   {
-                    "balls": 9,
+                    "balls": 8,
                     "boundary_runs": 8,
                     "key": "pace",
                     "label": "vs Pace",
                     "runs": 10,
-                    "sr": 111
+                    "sr": 125
                   },
                   {
                     "balls": 0,
@@ -400,12 +400,12 @@
                 "empty": "Not enough balls faced to split by phase.",
                 "rows": [
                   {
-                    "balls": 9,
+                    "balls": 8,
                     "key": "powerplay",
                     "label": "Powerplay",
                     "overs": "1-6",
                     "runs": 10,
-                    "sr": 111
+                    "sr": 125
                   },
                   {
                     "balls": 0,
@@ -442,18 +442,6 @@
                   },
                   {
                     "balls": 2,
-                    "bar_pct": 24,
-                    "dots": 0,
-                    "fours": 0,
-                    "id": "jacob-duffy",
-                    "linkable": true,
-                    "name": "Jacob Duffy",
-                    "runs": 1,
-                    "sixes": 0,
-                    "sr": 50
-                  },
-                  {
-                    "balls": 2,
                     "bar_pct": 95,
                     "dots": 1,
                     "fours": 1,
@@ -463,6 +451,18 @@
                     "runs": 4,
                     "sixes": 0,
                     "sr": 200
+                  },
+                  {
+                    "balls": 1,
+                    "bar_pct": 48,
+                    "dots": 0,
+                    "fours": 0,
+                    "id": "jacob-duffy",
+                    "linkable": true,
+                    "name": "Jacob Duffy",
+                    "runs": 1,
+                    "sixes": 0,
+                    "sr": 100
                   }
                 ]
               },
@@ -521,7 +521,7 @@
             "not_out": false,
             "runs": 10,
             "sixes": 0,
-            "strike_rate": 111,
+            "strike_rate": 125,
             "team": "Gujarat Titans",
             "wpa": -0.076
           },
@@ -971,7 +971,7 @@
                   {
                     "balls": 5,
                     "bar_pct": 38,
-                    "dots": 0,
+                    "dots": 1,
                     "fours": 0,
                     "id": "jacob-duffy",
                     "linkable": true,
@@ -1069,7 +1069,7 @@
               }
             },
             "dismissal": "stumped",
-            "dots": 7,
+            "dots": 8,
             "fours": 1,
             "id": "jos-buttler",
             "impact": -8.9,
@@ -1085,7 +1085,7 @@
             "wpa": -0.064
           },
           {
-            "balls": 38,
+            "balls": 37,
             "breakdowns": {
               "line_length": {
                 "available": true,
@@ -1133,10 +1133,10 @@
                     "runs": 11
                   },
                   {
-                    "balls": 4,
+                    "balls": 3,
                     "length": "SHORT_OF_A_GOOD_LENGTH",
                     "line": "DOWN_LEG",
-                    "metric": 75,
+                    "metric": 100,
                     "runs": 3
                   },
                   {
@@ -1215,12 +1215,12 @@
                 "empty": "Not enough balls to split pace vs spin.",
                 "rows": [
                   {
-                    "balls": 31,
+                    "balls": 30,
                     "boundary_runs": 20,
                     "key": "pace",
                     "label": "vs Pace",
                     "runs": 45,
-                    "sr": 145
+                    "sr": 150
                   },
                   {
                     "balls": 7,
@@ -1253,12 +1253,12 @@
                     "sr": 110
                   },
                   {
-                    "balls": 17,
+                    "balls": 16,
                     "key": "death",
                     "label": "Death",
                     "overs": "16-20",
                     "runs": 27,
-                    "sr": 159
+                    "sr": 169
                   }
                 ]
               },
@@ -1290,8 +1290,8 @@
                     "sr": 150
                   },
                   {
-                    "balls": 8,
-                    "bar_pct": 83,
+                    "balls": 7,
+                    "bar_pct": 95,
                     "dots": 0,
                     "fours": 2,
                     "id": "josh-hazlewood",
@@ -1299,7 +1299,7 @@
                     "name": "Josh Hazlewood",
                     "runs": 14,
                     "sixes": 0,
-                    "sr": 175
+                    "sr": 200
                   },
                   {
                     "balls": 7,
@@ -1403,7 +1403,7 @@
             "not_out": true,
             "runs": 50,
             "sixes": 0,
-            "strike_rate": 132,
+            "strike_rate": 135,
             "team": "Gujarat Titans",
             "wpa": 0.047
           },
@@ -2471,16 +2471,16 @@
                 "empty": "Not enough balls to split by batter hand.",
                 "rows": [
                   {
-                    "balls": 7,
+                    "balls": 6,
                     "econ": 6.0,
                     "key": "RHB",
                     "label": "vs Right-hand",
-                    "runs": 7,
+                    "runs": 6,
                     "wkts": 0
                   },
                   {
-                    "balls": 20,
-                    "econ": 9.6,
+                    "balls": 18,
+                    "econ": 10.7,
                     "key": "LHB",
                     "label": "vs Left-hand",
                     "runs": 32,
@@ -2507,10 +2507,10 @@
                     "runs": 1
                   },
                   {
-                    "balls": 2,
+                    "balls": 1,
                     "length": "GOOD_LENGTH",
                     "line": "DOWN_LEG",
-                    "metric": 15.0,
+                    "metric": 30.0,
                     "runs": 5
                   },
                   {
@@ -2521,10 +2521,10 @@
                     "runs": 6
                   },
                   {
-                    "balls": 1,
+                    "balls": 0,
                     "length": "GOOD_LENGTH",
                     "line": "WIDE_DOWN_LEG",
-                    "metric": 6.0,
+                    "metric": 0.0,
                     "runs": 1
                   },
                   {
@@ -2542,10 +2542,10 @@
                     "runs": 16
                   },
                   {
-                    "balls": 1,
+                    "balls": 0,
                     "length": "SHORT",
                     "line": "WIDE_DOWN_LEG",
-                    "metric": 6.0,
+                    "metric": 0.0,
                     "runs": 1
                   },
                   {
@@ -2559,8 +2559,8 @@
                     "balls": 7,
                     "length": "SHORT_OF_A_GOOD_LENGTH",
                     "line": "ON_THE_STUMPS",
-                    "metric": 5.1,
-                    "runs": 6
+                    "metric": 4.3,
+                    "runs": 5
                   },
                   {
                     "balls": 2,
@@ -2624,8 +2624,8 @@
                 "empty": "Not enough balls to split by phase.",
                 "rows": [
                   {
-                    "balls": 9,
-                    "econ": 8.7,
+                    "balls": 6,
+                    "econ": 13.0,
                     "key": "powerplay",
                     "label": "Powerplay",
                     "overs": "1-6",
@@ -2634,11 +2634,11 @@
                   },
                   {
                     "balls": 18,
-                    "econ": 8.7,
+                    "econ": 8.3,
                     "key": "middle",
                     "label": "Middle",
                     "overs": "7-15",
-                    "runs": 26,
+                    "runs": 25,
                     "wkts": 0
                   },
                   {
@@ -2670,30 +2670,30 @@
                     "wkts": 0
                   },
                   {
-                    "balls": 7,
-                    "bar_color": "#e5484d",
-                    "bar_pct": 67,
-                    "dots": 2,
-                    "econ": 9.4,
-                    "fours": 2,
-                    "id": "sai-sudharsan",
+                    "balls": 5,
+                    "bar_color": "#b6f24a",
+                    "bar_pct": 34,
+                    "dots": 1,
+                    "econ": 4.8,
+                    "fours": 0,
+                    "id": "jos-buttler",
                     "linkable": true,
-                    "name": "Sai Sudharsan",
-                    "runs": 11,
+                    "name": "Jos Buttler",
+                    "runs": 4,
                     "sixes": 0,
                     "wkts": 0
                   },
                   {
                     "balls": 5,
-                    "bar_color": "#b6f24a",
-                    "bar_pct": 43,
-                    "dots": 0,
-                    "econ": 6.0,
-                    "fours": 0,
-                    "id": "jos-buttler",
+                    "bar_color": "#e5484d",
+                    "bar_pct": 94,
+                    "dots": 2,
+                    "econ": 13.2,
+                    "fours": 2,
+                    "id": "sai-sudharsan",
                     "linkable": true,
-                    "name": "Jos Buttler",
-                    "runs": 5,
+                    "name": "Sai Sudharsan",
+                    "runs": 11,
                     "sixes": 0,
                     "wkts": 0
                   },
@@ -2712,11 +2712,11 @@
                     "wkts": 0
                   },
                   {
-                    "balls": 2,
-                    "bar_color": "#b6f24a",
-                    "bar_pct": 43,
+                    "balls": 1,
+                    "bar_color": "#e5484d",
+                    "bar_pct": 86,
                     "dots": 0,
-                    "econ": 6.0,
+                    "econ": 12.0,
                     "fours": 0,
                     "id": "shubman-gill",
                     "linkable": true,
@@ -2791,9 +2791,9 @@
                 "unsupported": false
               }
             },
-            "dots": 5,
-            "economy": 9.8,
-            "figures": "4.0-0-39",
+            "dots": 6,
+            "economy": 9.5,
+            "figures": "4.0-0-38",
             "id": "jacob-duffy",
             "impact": -10.7,
             "legal_balls": 24,
@@ -2802,7 +2802,7 @@
             },
             "name": "Jacob Duffy",
             "overs": "4.0",
-            "runs": 39,
+            "runs": 38,
             "style": "RFM",
             "team": "Royal Challengers Bengaluru",
             "wickets": 0,
@@ -3176,8 +3176,8 @@
                     "wkts": 1
                   },
                   {
-                    "balls": 19,
-                    "econ": 8.8,
+                    "balls": 18,
+                    "econ": 9.3,
                     "key": "LHB",
                     "label": "vs Left-hand",
                     "runs": 28,
@@ -3246,10 +3246,10 @@
                     "runs": 0
                   },
                   {
-                    "balls": 1,
+                    "balls": 0,
                     "length": "SHORT_OF_A_GOOD_LENGTH",
                     "line": "DOWN_LEG",
-                    "metric": 6.0,
+                    "metric": 0.0,
                     "runs": 1
                   },
                   {
@@ -3346,8 +3346,8 @@
                     "wkts": 1
                   },
                   {
-                    "balls": 7,
-                    "econ": 13.7,
+                    "balls": 6,
+                    "econ": 16.0,
                     "key": "death",
                     "label": "Death",
                     "overs": "16-20",
@@ -3360,11 +3360,11 @@
                 "available": true,
                 "rows": [
                   {
-                    "balls": 8,
+                    "balls": 7,
                     "bar_color": "#e5484d",
-                    "bar_pct": 80,
+                    "bar_pct": 92,
                     "dots": 0,
-                    "econ": 11.2,
+                    "econ": 12.9,
                     "fours": 2,
                     "id": "washington-sundar",
                     "linkable": true,
@@ -4695,7 +4695,7 @@
                   {
                     "balls": 7,
                     "bar_pct": 75,
-                    "dots": 1,
+                    "dots": 2,
                     "fours": 2,
                     "id": "mohammed-siraj",
                     "linkable": true,
@@ -4807,7 +4807,7 @@
               }
             },
             "dismissal": "not out",
-            "dots": 9,
+            "dots": 10,
             "fours": 9,
             "id": "virat-kohli",
             "impact": 31.2,
@@ -5019,7 +5019,7 @@
             "wpa": -0.043
           },
           {
-            "balls": 14,
+            "balls": 13,
             "breakdowns": {
               "line_length": {
                 "available": true,
@@ -5046,10 +5046,10 @@
                     "runs": 2
                   },
                   {
-                    "balls": 4,
+                    "balls": 3,
                     "length": "SHORT",
                     "line": "OUTSIDE_OFFSTUMP",
-                    "metric": 250,
+                    "metric": 333,
                     "runs": 10
                   },
                   {
@@ -5114,12 +5114,12 @@
                 "empty": "Not enough balls to split pace vs spin.",
                 "rows": [
                   {
-                    "balls": 13,
+                    "balls": 12,
                     "boundary_runs": 10,
                     "key": "pace",
                     "label": "vs Pace",
                     "runs": 15,
-                    "sr": 115
+                    "sr": 125
                   },
                   {
                     "balls": 1,
@@ -5144,12 +5144,12 @@
                     "sr": 25
                   },
                   {
-                    "balls": 10,
+                    "balls": 9,
                     "key": "middle",
                     "label": "Middle",
                     "overs": "7-15",
                     "runs": 14,
-                    "sr": 140
+                    "sr": 156
                   },
                   {
                     "balls": 0,
@@ -5165,8 +5165,8 @@
                 "available": true,
                 "rows": [
                   {
-                    "balls": 6,
-                    "bar_pct": 71,
+                    "balls": 5,
+                    "bar_pct": 86,
                     "dots": 2,
                     "fours": 0,
                     "id": "mohammed-siraj",
@@ -5174,7 +5174,7 @@
                     "name": "Mohammed Siraj",
                     "runs": 9,
                     "sixes": 1,
-                    "sr": 150
+                    "sr": 180
                   },
                   {
                     "balls": 4,
@@ -5269,7 +5269,7 @@
             "not_out": false,
             "runs": 15,
             "sixes": 1,
-            "strike_rate": 107,
+            "strike_rate": 115,
             "team": "Royal Challengers Bengaluru",
             "wpa": 0.003
           },
@@ -5954,11 +5954,11 @@
                 "empty": "Not enough balls to split by batter hand.",
                 "rows": [
                   {
-                    "balls": 13,
-                    "econ": 10.2,
+                    "balls": 12,
+                    "econ": 10.5,
                     "key": "RHB",
                     "label": "vs Right-hand",
-                    "runs": 22,
+                    "runs": 21,
                     "wkts": 0
                   },
                   {
@@ -5993,8 +5993,8 @@
                     "balls": 4,
                     "length": "GOOD_LENGTH",
                     "line": "ON_THE_STUMPS",
-                    "metric": 9.0,
-                    "runs": 6
+                    "metric": 7.5,
+                    "runs": 5
                   },
                   {
                     "balls": 3,
@@ -6011,10 +6011,10 @@
                     "runs": 10
                   },
                   {
-                    "balls": 3,
+                    "balls": 2,
                     "length": "SHORT",
                     "line": "OUTSIDE_OFFSTUMP",
-                    "metric": 16.0,
+                    "metric": 24.0,
                     "runs": 8
                   },
                   {
@@ -6087,16 +6087,16 @@
                 "rows": [
                   {
                     "balls": 18,
-                    "econ": 8.7,
+                    "econ": 8.3,
                     "key": "powerplay",
                     "label": "Powerplay",
                     "overs": "1-6",
-                    "runs": 26,
+                    "runs": 25,
                     "wkts": 1
                   },
                   {
-                    "balls": 7,
-                    "econ": 9.4,
+                    "balls": 6,
+                    "econ": 11.0,
                     "key": "middle",
                     "label": "Middle",
                     "overs": "7-15",
@@ -6134,23 +6134,23 @@
                   {
                     "balls": 7,
                     "bar_color": "#e5484d",
-                    "bar_pct": 74,
-                    "dots": 1,
-                    "econ": 10.3,
+                    "bar_pct": 67,
+                    "dots": 2,
+                    "econ": 9.4,
                     "fours": 2,
                     "id": "virat-kohli",
                     "linkable": true,
                     "name": "Virat Kohli",
-                    "runs": 12,
+                    "runs": 11,
                     "sixes": 0,
                     "wkts": 0
                   },
                   {
-                    "balls": 6,
+                    "balls": 5,
                     "bar_color": "#e5484d",
-                    "bar_pct": 71,
+                    "bar_pct": 86,
                     "dots": 2,
-                    "econ": 10.0,
+                    "econ": 12.0,
                     "fours": 0,
                     "id": "rajat-patidar",
                     "linkable": true,
@@ -6239,9 +6239,9 @@
                 "unsupported": false
               }
             },
-            "dots": 9,
-            "economy": 9.2,
-            "figures": "4.0-0-37",
+            "dots": 10,
+            "economy": 9.0,
+            "figures": "4.0-0-36",
             "id": "mohammed-siraj",
             "impact": -2.4,
             "legal_balls": 24,
@@ -6250,7 +6250,7 @@
             },
             "name": "Mohammed Siraj",
             "overs": "4.0",
-            "runs": 37,
+            "runs": 36,
             "style": "RF",
             "team": "Gujarat Titans",
             "wickets": 1,

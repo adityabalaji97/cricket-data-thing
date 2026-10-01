@@ -180,7 +180,7 @@
                   {
                     "balls": 7,
                     "bar_pct": 48,
-                    "dots": 3,
+                    "dots": 4,
                     "fours": 1,
                     "id": "kane-richardson",
                     "linkable": true,
@@ -192,7 +192,7 @@
                   {
                     "balls": 4,
                     "bar_pct": 60,
-                    "dots": 0,
+                    "dots": 1,
                     "fours": 0,
                     "id": "craig-simmons",
                     "linkable": true,
@@ -223,7 +223,7 @@
               }
             },
             "dismissal": "caught",
-            "dots": 6,
+            "dots": 8,
             "fours": 1,
             "id": "tim-paine",
             "impact": null,
@@ -687,12 +687,12 @@
                     "sr": 150
                   },
                   {
-                    "balls": 17,
+                    "balls": 16,
                     "boundary_runs": 18,
                     "key": "spin",
                     "label": "vs Spin",
                     "runs": 31,
-                    "sr": 182
+                    "sr": 194
                   }
                 ]
               },
@@ -709,12 +709,12 @@
                     "sr": 0
                   },
                   {
-                    "balls": 21,
+                    "balls": 20,
                     "key": "middle",
                     "label": "Middle",
                     "overs": "7-15",
                     "runs": 16,
-                    "sr": 76
+                    "sr": 80
                   },
                   {
                     "balls": 16,
@@ -730,8 +730,8 @@
                 "available": true,
                 "rows": [
                   {
-                    "balls": 10,
-                    "bar_pct": 43,
+                    "balls": 9,
+                    "bar_pct": 48,
                     "dots": 2,
                     "fours": 0,
                     "id": "adam-zampa",
@@ -739,7 +739,7 @@
                     "name": "Adam Zampa",
                     "runs": 9,
                     "sixes": 0,
-                    "sr": 90
+                    "sr": 100
                   },
                   {
                     "balls": 8,
@@ -756,7 +756,7 @@
                   {
                     "balls": 8,
                     "bar_pct": 24,
-                    "dots": 3,
+                    "dots": 4,
                     "fours": 0,
                     "id": "shaun-tait",
                     "linkable": true,
@@ -799,7 +799,7 @@
               }
             },
             "dismissal": "not out",
-            "dots": 7,
+            "dots": 8,
             "fours": 5,
             "id": "jonathan-wells",
             "impact": null,
@@ -1066,12 +1066,12 @@
                 "empty": "Not enough balls to split pace vs spin.",
                 "rows": [
                   {
-                    "balls": 6,
+                    "balls": 5,
                     "boundary_runs": 0,
                     "key": "pace",
                     "label": "vs Pace",
                     "runs": 3,
-                    "sr": 50
+                    "sr": 60
                   },
                   {
                     "balls": 3,
@@ -1104,12 +1104,12 @@
                     "sr": 33
                   },
                   {
-                    "balls": 6,
+                    "balls": 5,
                     "key": "death",
                     "label": "Death",
                     "overs": "16-20",
                     "runs": 4,
-                    "sr": 67
+                    "sr": 80
                   }
                 ]
               },
@@ -1130,18 +1130,6 @@
                   },
                   {
                     "balls": 3,
-                    "bar_pct": 32,
-                    "dots": 1,
-                    "fours": 0,
-                    "id": "ben-laughlin",
-                    "linkable": true,
-                    "name": "Ben Laughlin",
-                    "runs": 2,
-                    "sixes": 0,
-                    "sr": 67
-                  },
-                  {
-                    "balls": 3,
                     "bar_pct": 16,
                     "dots": 2,
                     "fours": 0,
@@ -1151,6 +1139,18 @@
                     "runs": 1,
                     "sixes": 0,
                     "sr": 33
+                  },
+                  {
+                    "balls": 2,
+                    "bar_pct": 48,
+                    "dots": 1,
+                    "fours": 0,
+                    "id": "ben-laughlin",
+                    "linkable": true,
+                    "name": "Ben Laughlin",
+                    "runs": 2,
+                    "sixes": 0,
+                    "sr": 100
                   }
                 ]
               },
@@ -1318,10 +1318,10 @@
                 "rows": [
                   {
                     "balls": 10,
-                    "econ": 7.8,
+                    "econ": 7.2,
                     "key": "RHB",
                     "label": "vs Right-hand",
-                    "runs": 13,
+                    "runs": 12,
                     "wkts": 0
                   },
                   {
@@ -1351,11 +1351,11 @@
                 "rows": [
                   {
                     "balls": 12,
-                    "econ": 6.5,
+                    "econ": 6.0,
                     "key": "powerplay",
                     "label": "Powerplay",
                     "overs": "1-6",
-                    "runs": 13,
+                    "runs": 12,
                     "wkts": 1
                   },
                   {
@@ -1384,14 +1384,14 @@
                   {
                     "balls": 7,
                     "bar_color": "#b6f24a",
-                    "bar_pct": 49,
-                    "dots": 3,
-                    "econ": 6.9,
+                    "bar_pct": 43,
+                    "dots": 4,
+                    "econ": 6.0,
                     "fours": 1,
                     "id": "tim-paine",
                     "linkable": true,
                     "name": "Tim Paine",
-                    "runs": 8,
+                    "runs": 7,
                     "sixes": 0,
                     "wkts": 0
                   },
@@ -1432,7 +1432,7 @@
                 "unsupported": true
               }
             },
-            "dots": 5,
+            "dots": 6,
             "economy": 6.0,
             "figures": "2.0-0-12",
             "id": "kane-richardson",
@@ -1458,10 +1458,10 @@
                 "rows": [
                   {
                     "balls": 24,
-                    "econ": 5.5,
+                    "econ": 5.2,
                     "key": "RHB",
                     "label": "vs Right-hand",
-                    "runs": 22,
+                    "runs": 21,
                     "wkts": 0
                   },
                   {
@@ -1491,11 +1491,11 @@
                 "rows": [
                   {
                     "balls": 12,
-                    "econ": 7.0,
+                    "econ": 6.5,
                     "key": "powerplay",
                     "label": "Powerplay",
                     "overs": "1-6",
-                    "runs": 14,
+                    "runs": 13,
                     "wkts": 0
                   },
                   {
@@ -1566,14 +1566,14 @@
                   {
                     "balls": 4,
                     "bar_color": "#f0b429",
-                    "bar_pct": 64,
-                    "dots": 0,
-                    "econ": 9.0,
+                    "bar_pct": 54,
+                    "dots": 1,
+                    "econ": 7.5,
                     "fours": 0,
                     "id": "tim-paine",
                     "linkable": true,
                     "name": "Tim Paine",
-                    "runs": 6,
+                    "runs": 5,
                     "sixes": 0,
                     "wkts": 0
                   },
@@ -1600,7 +1600,7 @@
                 "unsupported": true
               }
             },
-            "dots": 9,
+            "dots": 10,
             "economy": 5.2,
             "figures": "4.0-0-21",
             "id": "craig-simmons",
@@ -1626,10 +1626,10 @@
                 "rows": [
                   {
                     "balls": 24,
-                    "econ": 5.8,
+                    "econ": 5.5,
                     "key": "RHB",
                     "label": "vs Right-hand",
-                    "runs": 23,
+                    "runs": 22,
                     "wkts": 3
                   },
                   {
@@ -1668,11 +1668,11 @@
                   },
                   {
                     "balls": 18,
-                    "econ": 3.0,
+                    "econ": 2.7,
                     "key": "middle",
                     "label": "Middle",
                     "overs": "7-15",
-                    "runs": 9,
+                    "runs": 8,
                     "wkts": 3
                   },
                   {
@@ -1692,14 +1692,14 @@
                   {
                     "balls": 8,
                     "bar_color": "#b6f24a",
-                    "bar_pct": 27,
-                    "dots": 3,
-                    "econ": 3.8,
+                    "bar_pct": 21,
+                    "dots": 4,
+                    "econ": 3.0,
                     "fours": 0,
                     "id": "jonathan-wells",
                     "linkable": true,
                     "name": "Jonathan Wells",
-                    "runs": 5,
+                    "runs": 4,
                     "sixes": 0,
                     "wkts": 0
                   },
@@ -1796,7 +1796,7 @@
                 "unsupported": true
               }
             },
-            "dots": 10,
+            "dots": 11,
             "economy": 5.5,
             "figures": "4.0-0-22",
             "id": "shaun-tait",
@@ -1821,8 +1821,8 @@
                 "empty": "Not enough balls to split by batter hand.",
                 "rows": [
                   {
-                    "balls": 19,
-                    "econ": 8.2,
+                    "balls": 18,
+                    "econ": 8.7,
                     "key": "RHB",
                     "label": "vs Right-hand",
                     "runs": 26,
@@ -1872,8 +1872,8 @@
                     "wkts": 0
                   },
                   {
-                    "balls": 13,
-                    "econ": 11.5,
+                    "balls": 12,
+                    "econ": 12.5,
                     "key": "death",
                     "label": "Death",
                     "overs": "16-20",
@@ -1902,20 +1902,6 @@
                   {
                     "balls": 3,
                     "bar_color": "#b6f24a",
-                    "bar_pct": 43,
-                    "dots": 1,
-                    "econ": 6.0,
-                    "fours": 0,
-                    "id": "ben-hilfenhaus",
-                    "linkable": true,
-                    "name": "Ben Hilfenhaus",
-                    "runs": 3,
-                    "sixes": 0,
-                    "wkts": 1
-                  },
-                  {
-                    "balls": 3,
-                    "bar_color": "#b6f24a",
                     "bar_pct": 0,
                     "dots": 3,
                     "econ": 0.0,
@@ -1940,6 +1926,20 @@
                     "runs": 0,
                     "sixes": 0,
                     "wkts": 0
+                  },
+                  {
+                    "balls": 2,
+                    "bar_color": "#f0b429",
+                    "bar_pct": 64,
+                    "dots": 1,
+                    "econ": 9.0,
+                    "fours": 0,
+                    "id": "ben-hilfenhaus",
+                    "linkable": true,
+                    "name": "Ben Hilfenhaus",
+                    "runs": 3,
+                    "sixes": 0,
+                    "wkts": 1
                   },
                   {
                     "balls": 2,
@@ -2003,8 +2003,8 @@
                 "empty": "Not enough balls to split by batter hand.",
                 "rows": [
                   {
-                    "balls": 25,
-                    "econ": 4.6,
+                    "balls": 24,
+                    "econ": 4.8,
                     "key": "RHB",
                     "label": "vs Right-hand",
                     "runs": 19,
@@ -2045,8 +2045,8 @@
                     "wkts": 0
                   },
                   {
-                    "balls": 19,
-                    "econ": 3.8,
+                    "balls": 18,
+                    "econ": 4.0,
                     "key": "middle",
                     "label": "Middle",
                     "overs": "7-15",
@@ -2068,11 +2068,11 @@
                 "available": true,
                 "rows": [
                   {
-                    "balls": 10,
+                    "balls": 9,
                     "bar_color": "#b6f24a",
-                    "bar_pct": 43,
+                    "bar_pct": 48,
                     "dots": 2,
-                    "econ": 6.0,
+                    "econ": 6.7,
                     "fours": 0,
                     "id": "jonathan-wells",
                     "linkable": true,
@@ -2442,7 +2442,7 @@
                   {
                     "balls": 11,
                     "bar_pct": 74,
-                    "dots": 5,
+                    "dots": 6,
                     "fours": 2,
                     "id": "timm-van-der-gugten",
                     "linkable": true,
@@ -2521,7 +2521,7 @@
               }
             },
             "dismissal": "caught",
-            "dots": 13,
+            "dots": 14,
             "fours": 4,
             "id": "tim-ludeman",
             "impact": null,
@@ -2683,12 +2683,12 @@
                 "empty": "Not enough balls to split pace vs spin.",
                 "rows": [
                   {
-                    "balls": 17,
+                    "balls": 16,
                     "boundary_runs": 6,
                     "key": "pace",
                     "label": "vs Pace",
                     "runs": 15,
-                    "sr": 88
+                    "sr": 94
                   },
                   {
                     "balls": 19,
@@ -2713,12 +2713,12 @@
                     "sr": 67
                   },
                   {
-                    "balls": 33,
+                    "balls": 32,
                     "key": "middle",
                     "label": "Middle",
                     "overs": "7-15",
                     "runs": 52,
-                    "sr": 158
+                    "sr": 162
                   },
                   {
                     "balls": 0,
@@ -2736,7 +2736,7 @@
                   {
                     "balls": 19,
                     "bar_pct": 98,
-                    "dots": 7,
+                    "dots": 8,
                     "fours": 1,
                     "id": "cameron-boyce",
                     "linkable": true,
@@ -2758,16 +2758,16 @@
                     "sr": 62
                   },
                   {
-                    "balls": 5,
-                    "bar_pct": 10,
-                    "dots": 2,
+                    "balls": 4,
+                    "bar_pct": 12,
+                    "dots": 3,
                     "fours": 0,
                     "id": "evan-gulbis",
                     "linkable": true,
                     "name": "Evan Gulbis",
                     "runs": 1,
                     "sixes": 0,
-                    "sr": 20
+                    "sr": 25
                   },
                   {
                     "balls": 2,
@@ -2803,7 +2803,7 @@
               }
             },
             "dismissal": "not out",
-            "dots": 14,
+            "dots": 16,
             "fours": 1,
             "id": "jono-dean",
             "impact": null,
@@ -2935,10 +2935,10 @@
                 "rows": [
                   {
                     "balls": 13,
-                    "econ": 9.2,
+                    "econ": 8.8,
                     "key": "RHB",
                     "label": "vs Right-hand",
-                    "runs": 20,
+                    "runs": 19,
                     "wkts": 0
                   },
                   {
@@ -2968,11 +2968,11 @@
                 "rows": [
                   {
                     "balls": 12,
-                    "econ": 9.0,
+                    "econ": 8.5,
                     "key": "powerplay",
                     "label": "Powerplay",
                     "overs": "1-6",
-                    "runs": 18,
+                    "runs": 17,
                     "wkts": 0
                   },
                   {
@@ -3001,14 +3001,14 @@
                   {
                     "balls": 11,
                     "bar_color": "#e5484d",
-                    "bar_pct": 70,
-                    "dots": 5,
-                    "econ": 9.8,
+                    "bar_pct": 66,
+                    "dots": 6,
+                    "econ": 9.3,
                     "fours": 2,
                     "id": "tim-ludeman",
                     "linkable": true,
                     "name": "Tim Ludeman",
-                    "runs": 18,
+                    "runs": 17,
                     "sixes": 1,
                     "wkts": 0
                   },
@@ -3049,7 +3049,7 @@
                 "unsupported": true
               }
             },
-            "dots": 6,
+            "dots": 7,
             "economy": 10.7,
             "figures": "3.0-0-32",
             "id": "timm-van-der-gugten",
@@ -3481,10 +3481,10 @@
                 "rows": [
                   {
                     "balls": 24,
-                    "econ": 10.8,
+                    "econ": 10.5,
                     "key": "RHB",
                     "label": "vs Right-hand",
-                    "runs": 43,
+                    "runs": 42,
                     "wkts": 1
                   },
                   {
@@ -3523,11 +3523,11 @@
                   },
                   {
                     "balls": 24,
-                    "econ": 10.8,
+                    "econ": 10.5,
                     "key": "middle",
                     "label": "Middle",
                     "overs": "7-15",
-                    "runs": 43,
+                    "runs": 42,
                     "wkts": 1
                   },
                   {
@@ -3547,14 +3547,14 @@
                   {
                     "balls": 19,
                     "bar_color": "#e5484d",
-                    "bar_pct": 90,
-                    "dots": 7,
-                    "econ": 12.6,
+                    "bar_pct": 88,
+                    "dots": 8,
+                    "econ": 12.3,
                     "fours": 1,
                     "id": "jono-dean",
                     "linkable": true,
                     "name": "Jono Dean",
-                    "runs": 40,
+                    "runs": 39,
                     "sixes": 5,
                     "wkts": 0
                   },
@@ -3581,7 +3581,7 @@
                 "unsupported": true
               }
             },
-            "dots": 9,
+            "dots": 10,
             "economy": 10.5,
             "figures": "4.0-0-42",
             "id": "cameron-boyce",
@@ -3606,11 +3606,11 @@
                 "empty": "Not enough balls to split by batter hand.",
                 "rows": [
                   {
-                    "balls": 7,
-                    "econ": 4.3,
+                    "balls": 6,
+                    "econ": 4.0,
                     "key": "RHB",
                     "label": "vs Right-hand",
-                    "runs": 5,
+                    "runs": 4,
                     "wkts": 0
                   },
                   {
@@ -3648,12 +3648,12 @@
                     "wkts": 0
                   },
                   {
-                    "balls": 7,
-                    "econ": 4.3,
+                    "balls": 6,
+                    "econ": 4.0,
                     "key": "middle",
                     "label": "Middle",
                     "overs": "7-15",
-                    "runs": 5,
+                    "runs": 4,
                     "wkts": 0
                   },
                   {
@@ -3671,16 +3671,16 @@
                 "available": true,
                 "rows": [
                   {
-                    "balls": 5,
+                    "balls": 4,
                     "bar_color": "#b6f24a",
-                    "bar_pct": 26,
-                    "dots": 2,
-                    "econ": 3.6,
+                    "bar_pct": 21,
+                    "dots": 3,
+                    "econ": 3.0,
                     "fours": 0,
                     "id": "jono-dean",
                     "linkable": true,
                     "name": "Jono Dean",
-                    "runs": 3,
+                    "runs": 2,
                     "sixes": 0,
                     "wkts": 0
                   },
@@ -3707,7 +3707,7 @@
                 "unsupported": true
               }
             },
-            "dots": 2,
+            "dots": 3,
             "economy": 4.0,
             "figures": "1.0-0-4",
             "id": "evan-gulbis",
