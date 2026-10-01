@@ -48,6 +48,9 @@ import { trackPageView } from './utils/analytics';
 
 // Admin queue: loaded only when visited, so it adds nothing to the public bundle.
 const AdminPage = React.lazy(() => import('./components/admin/AdminPage'));
+const NotesList = React.lazy(() => import('./components/notes/NotesList'));
+const NotePage = React.lazy(() => import('./components/notes/NotePage'));
+const AdminNotes = React.lazy(() => import('./components/notes/AdminNotes'));
 
 const TEAM_NAME_TO_ABBREVIATION = {
   'chennai super kings': 'CSK',
@@ -709,6 +712,9 @@ const AppContent = () => {
         <Route path="/fantasy-planner" element={<MensT20Scope><FantasyPlanner isMobile={isMobile} /></MensT20Scope>} />
         <Route path="/scorecard/:matchId" element={<MatchScorecardPage />} />
         <Route path="/admin" element={<React.Suspense fallback={null}><AdminPage /></React.Suspense>} />
+        <Route path="/admin/notes" element={<React.Suspense fallback={null}><AdminNotes /></React.Suspense>} />
+        <Route path="/notes" element={<React.Suspense fallback={null}><NotesList /></React.Suspense>} />
+        <Route path="/notes/:slug" element={<React.Suspense fallback={null}><NotePage /></React.Suspense>} />
         <Route path="/venue" element={
           <Box sx={{ my: { xs: 1.5, md: 3 }, bgcolor: 'background.default', color: 'text.primary' }}>
             <PreviewFilters

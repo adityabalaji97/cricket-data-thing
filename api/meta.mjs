@@ -8,7 +8,8 @@ let cachedShell = null;
 
 async function shell(host) {
   if (cachedShell) return cachedShell;
-  const response = await fetch(`https://${host}/index.html`);
+  // SHELL_ORIGIN: local dev only (scripts/dev/serve_functions.mjs), where the SPA is on another port.
+  const response = await fetch(`${process.env.SHELL_ORIGIN || `https://${host}`}/index.html`);
   cachedShell = await response.text();
   return cachedShell;
 }

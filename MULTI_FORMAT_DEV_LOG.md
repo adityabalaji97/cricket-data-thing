@@ -69,7 +69,20 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > /author/me, /author/notes (own drafts only; other people's notes read as 404). Shared admin auth was
 > already routers/_auth.py (step 6). tests/test_notes.py: DB-writing tests run only when DATABASE_URL is
 > localhost. Local DB has no ball_metrics: use QB_PRIMER_METRICS=0; scorecards 500 locally.
-> Next: Notes 4 (pages + /admin/notes UI), 5, 7, 8.
+> **Notes step 4 built:** src/components/notes/ -- NotesList (/notes, kind chips, cover thumbnails from
+> /img/<first chart>.png), NotePage (/notes/:slug, note_view event, byline + AI badge + disclosure),
+> NoteBody (chart fences -> /embed iframes that follow hindsight:resize), AdminNotes (/admin/notes: admin
+> token = Drafts/Published/Rejected/Authors, editor with Edit/Preview, Insert chart from a pasted URL,
+> Save & publish / Reject / Unpublish; a friend's author token gets New article + own notes). /admin and
+> /admin/notes link to each other. Markdown = `marked` via noteMarkdown.mjs (raw HTML escaped, only
+> http(s)/relative/mailto links), shared with api/meta.mjs for the bot body (step 5); used instead of
+> react-markdown so people and crawlers get one renderer. Snapshot fix: a query chart with no explicit
+> sort is now ranked by its chart metric (title said "by strike rate" while rows were in balls order;
+> sequences keep their order; economy ascending). Existing snapshots are frozen; new ones after the next
+> data_version bump. Local dev: scripts/dev/serve_functions.mjs (Vercel functions on :3100, /bot/<path> =
+> crawler view), REACT_APP_API_URL / REACT_APP_EMBED_ORIGIN (src/config.js, NoteBody), DEV_CORS_ORIGINS
+> (main.py). NB: a stale uvicorn on :8000 (started 30 Sep) has no DATABASE_URL, i.e. it talks to PROD.
+> Next: Notes 5, 7, 8.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
 > (sync_stats_from_dd double-counted wides/no-balls and charged byes; statsProcessor charged

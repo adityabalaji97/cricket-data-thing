@@ -200,6 +200,12 @@ def default_title(params: Dict[str, Any], metric: Optional[str]) -> str:
     return title + p["window"] + p["minimum"]
 
 
+# Groupings whose natural order is the point of the chart (mcp_server.server._SEQUENTIAL_KEYS + phase).
+_SEQUENCE_GROUPS = {"year", "over", "ball", "ball_in_over", "ball_in_spell", "innings", "batting_position", "phase"}
+# Ranked ascending when a chart is "by" them.
+_LOWER_IS_BETTER = {"economy", "bowling_average", "bowling_strike_rate"}
+
+
 def _query_data(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
     from mcp_server.server import structure_query_result
     from services.query_builder_v2 import run_deliveries_query
@@ -211,14 +217,23 @@ def _query_data(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
     result = run_deliveries_query(db, **query)
     display_params = {k: (v.isoformat() if isinstance(v, date) else v) for k, v in query.items()
                       if k not in ("group_by", "fmt", "gender", "limit")}
-    structured = structure_query_result(
-        result, display_params, query["group_by"], query_mode=query.get("query_mode") or "delivery",
-        format=query.get("fmt") or "ALL", gender=query.get("gender") or "male",
-        batters=query.get("batters"), bowlers=query.get("bowlers"), sort_by=view.get("sort_by"),
-        sort_descending=view.get("sort_descending", True), limit=limit, chart=view.get("chart") or "auto",
-        chart_metric=view.get("chart_metric"), scatter_x=view.get("scatter_x"), scatter_y=view.get("scatter_y"),
-    )
+
+    def structure(sort_by, sort_descending):
+        return structure_query_result(
+            result, display_params, query["group_by"], query_mode=query.get("query_mode") or "delivery",
+            format=query.get("fmt") or "ALL", gender=query.get("gender") or "male",
+            batters=query.get("batters"), bowlers=query.get("bowlers"), sort_by=sort_by,
+            sort_descending=sort_descending, limit=limit, chart=view.get("chart") or "auto",
+            chart_metric=view.get("chart_metric"), scatter_x=view.get("scatter_x"), scatter_y=view.get("scatter_y"),
+        )
+
+    structured = structure(view.get("sort_by"), view.get("sort_descending", True))
     metric = view.get("sort_by") or view.get("chart_metric") or (structured.get("chart") or {}).get("metric")
+    # The title says "by <metric>", so the rows must be the top ones by it -- not the first N in
+    # the API's default (balls) order. Sequences (years, overs, phases) keep their natural order.
+    first = query["group_by"][0]
+    if not view.get("sort_by") and metric and first not in _SEQUENCE_GROUPS:
+        structured = structure(metric, metric not in _LOWER_IS_BETTER)
     structured["title"] = view.get("title") or default_title(query, metric)
     structured["highlight"] = view.get("highlight")
     return structured

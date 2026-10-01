@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Chip, CircularProgress, Snackbar, TextField, Typography } from '@mui/material';
 import axios from 'axios';
 import config from '../../config';
@@ -255,8 +256,11 @@ const AdminPage = () => {
 
   return (
     <Box sx={{ maxWidth: 560, mx: 'auto', px: 2, py: 2, color: C.hi }}>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
-        <Typography sx={{ fontSize: 22, fontWeight: 700 }}>Social queue</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Chip label="Social" sx={{ bgcolor: 'rgba(182,242,74,0.13)', color: C.lime, fontWeight: 700 }} />
+          <Chip component={RouterLink} to="/admin/notes" clickable label="Notes" sx={{ bgcolor: '#1d212b', color: C.mid }} />
+        </Box>
         {token && <Button size="small" onClick={signOut} sx={{ color: C.lo }}>Sign out</Button>}
       </Box>
       {!token ? (

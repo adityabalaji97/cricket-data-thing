@@ -130,7 +130,9 @@ run_mcp = mount_mcp(app)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://hindsightcricket.com", "https://www.hindsightcricket.com", "https://cricket-data-thing.vercel.app", "https://hindsight2020.vercel.app"],
+    allow_origins=["http://localhost:3000", "https://hindsightcricket.com", "https://www.hindsightcricket.com", "https://cricket-data-thing.vercel.app", "https://hindsight2020.vercel.app"]
+    # Extra local dev origins (comma-separated), e.g. a second dev server on another port.
+    + [o.strip() for o in __import__("os").environ.get("DEV_CORS_ORIGINS", "").split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
