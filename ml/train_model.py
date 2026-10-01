@@ -21,6 +21,8 @@ import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import accuracy_score, log_loss, mean_absolute_error, mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 try:
     from xgboost import XGBClassifier, XGBRegressor
