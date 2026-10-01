@@ -1,9 +1,13 @@
 """
 Persistent cache for query-builder results (table query_cache, migration 009).
 
-Keyed by sha256(normalized query params + data_version). The nightly load bumps
+Keyed by sha256(normalized query params + data_version + LOGIC_VERSION). The nightly load bumps
 app_meta.data_version, so new data invalidates every cached result without a sweep; old versions
 are pruned by prune(). Shared by the website, the connector and embeds, and it survives restarts.
+
+LOGIC_VERSION covers the other way a cached result goes stale: a deploy that changes what a query
+*means* (a filter or metric fix). Bump it in the same commit as any such change, or production keeps
+serving the pre-fix numbers until the next nightly load.
 
 The cache must never break a query: any error reading or writing it falls through to running the
 query. Results are stored exactly as FastAPI would serialize them (jsonable_encoder), so a cache
@@ -23,6 +27,8 @@ from sqlalchemy import text
 logger = logging.getLogger(__name__)
 
 MAX_RESULT_BYTES = 1_000_000
+# Bump whenever query-builder semantics change (see module docstring). Format: date + letter.
+LOGIC_VERSION = "2026-10-01a"
 _VERSION_TTL_SECONDS = 300
 _version_cache: Dict[str, Any] = {"value": None, "at": 0.0}
 
@@ -59,7 +65,9 @@ def normalize(params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def cache_key(params: Dict[str, Any], version: str) -> str:
-    payload = json.dumps({"v": version, "p": normalize(params)}, sort_keys=True, default=str)
+    payload = json.dumps(
+        {"v": version, "l": LOGIC_VERSION, "p": normalize(params)}, sort_keys=True, default=str
+    )
     return hashlib.sha256(payload.encode()).hexdigest()
 
 

@@ -18,6 +18,13 @@ def test_group_by_order_and_data_version_change_the_key():
     assert query_cache.cache_key(base, "v1") != query_cache.cache_key(base, "v2")
 
 
+def test_logic_version_changes_the_key(monkeypatch):
+    base = {"group_by": ["batter", "year"]}
+    before = query_cache.cache_key(base, "v1")
+    monkeypatch.setattr(query_cache, "LOGIC_VERSION", query_cache.LOGIC_VERSION + "-next")
+    assert query_cache.cache_key(base, "v1") != before
+
+
 def test_cache_disabled_just_runs(monkeypatch):
     monkeypatch.setenv("QUERY_CACHE", "0")
     assert query_cache.cached_run(None, {"group_by": ["batter"]}, lambda: {"data": [1]}) == {"data": [1]}
