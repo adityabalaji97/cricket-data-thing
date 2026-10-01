@@ -57,7 +57,9 @@ def check_title(title: str, facts: List[Dict[str, Any]], subject: Optional[str] 
     errors: List[str] = []
     warnings: List[str] = []
     t = (title or "").strip()
-    if t.endswith("?") or QUESTION_START.match(t):
+    # A title that opens with its subject's name is not a question ("Will Jacks has made...").
+    leads_with_subject = bool(subject) and t.lower().startswith(subject.lower())
+    if t.endswith("?") or (QUESTION_START.match(t) and not leads_with_subject):
         errors.append("Title is a question; statements do five times better.")
     if not re.search(r"\d", t):
         errors.append("Title has no number.")

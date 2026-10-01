@@ -261,10 +261,15 @@ def match_records(db: Session, match: Dict[str, Any]) -> List[Dict[str, Any]]:
     for template in _templates(scope["fmt"]):
         facts += _rank_facts(db, match, scope, template)
     facts += _career_bests(db, match, scope)
-    # One angle per player: keep the strongest (a record score is also a career-best).
+    # Streaks, firsts, fastest-to-milestone and ground records (services/record_framings.py).
+    from services.record_framings import framing_facts
+
+    facts += framing_facts(db, match, scope)
+    # One angle per player (and per team): keep the strongest (a record score is also a career-best).
     best: Dict[str, Dict[str, Any]] = {}
     for f in sorted(facts, key=lambda f: f["weight"], reverse=True):
-        best.setdefault(f"{f['subject']}|{'bat' if 'bat' in f['kind'] else 'bowl'}", f)
+        side = "bat" if "bat" in f["kind"] else "bowl" if "bowl" in f["kind"] else "team"
+        best.setdefault(f"{f['subject']}|{side}", f)
     for f in best.values():
         f["scope"] = scope["label"]
         if "chart" not in f:

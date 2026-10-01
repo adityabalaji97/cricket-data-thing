@@ -112,6 +112,8 @@ def _ranking_data(fact: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]
         "columns": ["rank", "label", metric, "display"],
         "metric_columns": [metric],
         "metric_label": chart.get("metric_label"),
+        # Fastest-to-a-milestone and lowest-defended charts: the smallest value gets the longest bar.
+        "lower_is_better": chart.get("lower_is_better", False),
         "rows": chart["rows"],
         "chart": {"type": "bar", "label_key": "label", "metric": metric},
         "hindsight_url": f"{content_rules.SITE_URL}/scorecard/{match['id']}",

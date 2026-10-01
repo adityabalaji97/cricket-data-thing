@@ -120,6 +120,17 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > markdown code in the main bundle -- marked lives in the lazy notes chunk). siteOrigin() (ChartExportButton)
 > honours REACT_APP_EMBED_ORIGIN and NoteBody reuses it. CRA build: a stale node_modules/.cache/.eslintcache
 > (shared with the :3000 dev server) reported a false 'not defined'; deleting it fixed the build.
+> **Records framing (2026-10-01, local):** services/record_framings.py, called from records.match_records
+> (so packs, recap notes and number checks get it unchanged): team winning/losing runs and batter runs of
+> fifties ranked against every run in the scope (or "<team>'s longest ... since <year>"); bowler runs of
+> matches with a wicket (ranked only, min 10); head-to-head and ground "first since <year>" after 4+
+> straight defeats (full matches history, pre-2015 included; "for the first time, at the Nth attempt" when
+> every earlier meeting was lost); a batter's fifty after a 12+ (ODI 10+) innings drought; fastest to
+> 50/100(/150) from delivery_details; highest total / top-2 chase / lowest total defended at the ground
+> (full-length innings only). "Since <year>" comes from the population (new leagues and grounds have no
+> 2015). Charts carry lower_is_better (content_packs._ranking_data passes it to /img). content_rules: a
+> title that opens with its subject is not a question ("Will Jacks ..."). Replay on 1,031 local 2025-26
+> matches: 18 s, no errors, 0 rule failures. tests/test_record_framings.py.
 > **Notes 3-8 DEPLOYED (2026-10-01):** migration 010 applied to prod (author 'aditya' id 34, pack_id,
 > idx_notes_bot_match); Heroku v460; Vercel from origin/main 9a68aad. Smoke: /notes 200 (empty), admin 403
 > without token, Googlebot /notes gets the server-rendered list, sitemap lists /notes. Prod goldens: 4 diffs,
