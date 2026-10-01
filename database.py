@@ -22,6 +22,10 @@ DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "1"))
 DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "20"))
 DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "1800"))
 AUTO_CREATE_TABLES = os.getenv("AUTO_CREATE_TABLES", "false").lower() in {"1", "true", "yes"}
+# Per-statement ceiling in ms; 0/unset = none. Only the web dyno sets it (Procfile): Heroku's
+# router abandons a request at 30 s, but a runaway query would otherwise keep its pool slot
+# while every other request queues behind it. Batch jobs share this engine and must not get it.
+DB_STATEMENT_TIMEOUT_MS = int(os.getenv("DB_STATEMENT_TIMEOUT_MS", "0") or 0)
 
 print(
     "DB pool config:",
@@ -29,6 +33,11 @@ print(
     f"max_overflow={DB_MAX_OVERFLOW}",
     f"pool_timeout={DB_POOL_TIMEOUT}",
     f"pool_recycle={DB_POOL_RECYCLE}",
+    f"statement_timeout_ms={DB_STATEMENT_TIMEOUT_MS or 'none'}",
+)
+
+_connect_args = (
+    {"options": f"-c statement_timeout={DB_STATEMENT_TIMEOUT_MS}"} if DB_STATEMENT_TIMEOUT_MS > 0 else {}
 )
 
 database = Database(DATABASE_URL)
@@ -38,7 +47,8 @@ engine = create_engine(
     max_overflow=DB_MAX_OVERFLOW,
     pool_timeout=DB_POOL_TIMEOUT,
     pool_recycle=DB_POOL_RECYCLE,
-    pool_pre_ping=True
+    pool_pre_ping=True,
+    connect_args=_connect_args,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
