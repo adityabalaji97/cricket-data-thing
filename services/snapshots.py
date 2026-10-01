@@ -234,6 +234,8 @@ def _query_data(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
     first = query["group_by"][0]
     if not view.get("sort_by") and metric and first not in _SEQUENCE_GROUPS:
         structured = structure(metric, metric not in _LOWER_IS_BETTER)
+    if metric and structured.get("subtitle"):
+        structured["subtitle"] = structured["subtitle"].replace(f"ranked by {metric}", f"ranked by {metric_label(metric)}")
     structured["title"] = view.get("title") or default_title(query, metric)
     structured["highlight"] = view.get("highlight")
     return structured

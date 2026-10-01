@@ -1,8 +1,10 @@
 // Serves index.html with a page-specific <head> (title, description, Open Graph / Twitter card,
 // canonical) to link unfurlers and search crawlers. vercel.json routes ONLY bot user-agents here,
-// so people keep getting the static app with no extra hop; the page body is the same SPA shell
-// either way, so crawlers see what users see, just with an accurate head.
+// so people keep getting the static app with no extra hop. The body is the same SPA shell, except
+// on notes, where the article (and each chart's numbers as a table) is rendered into #root so
+// crawlers index the words without running JavaScript.
 import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, SITE_URL, summarize } from './_lib/share.mjs';
+import { noteArticleHtml, notesIndexHtml } from './_lib/note_html.mjs';
 
 let cachedShell = null;
 
@@ -16,12 +18,12 @@ async function shell(host) {
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function headTags({ title, description, url, image }) {
-  return [
+function headTags({ title, description, url, image, ogType = 'website', jsonLd = null, article = null }) {
+  const tags = [
     `<title>${esc(title)}</title>`,
     `<meta name="description" content="${esc(description)}" />`,
     `<link rel="canonical" href="${esc(url)}" />`,
-    `<meta property="og:type" content="website" />`,
+    `<meta property="og:type" content="${esc(ogType)}" />`,
     `<meta property="og:site_name" content="Hindsight" />`,
     `<meta property="og:url" content="${esc(url)}" />`,
     `<meta property="og:title" content="${esc(title)}" />`,
@@ -33,7 +35,20 @@ function headTags({ title, description, url, image }) {
     `<meta name="twitter:title" content="${esc(title)}" />`,
     `<meta name="twitter:description" content="${esc(description)}" />`,
     `<meta name="twitter:image" content="${esc(image)}" />`,
-  ].join('\n    ');
+  ];
+  if (article?.published) tags.push(`<meta property="article:published_time" content="${esc(article.published)}" />`);
+  if (article?.modified) tags.push(`<meta property="article:modified_time" content="${esc(article.modified)}" />`);
+  if (article?.author) tags.push(`<meta property="article:author" content="${esc(article.author)}" />`);
+  // JSON inside <script>: escape "<" so no value can close the tag.
+  if (jsonLd) tags.push(`<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`);
+  return tags.join('\n    ');
+}
+
+/** Server-rendered body for crawlers, or null to keep the empty SPA root. */
+function botBody(summary) {
+  if (summary?.kind === 'note') return noteArticleHtml(summary.note, SITE_URL);
+  if (summary?.kind === 'notes') return notesIndexHtml(summary.notes, SITE_URL);
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -55,7 +70,10 @@ export default async function handler(req, res) {
     title: summary?.title || DEFAULT_TITLE,
     description: summary?.description || DEFAULT_DESCRIPTION,
     url: `${SITE_URL}${pagePath}`,
-    image: `${SITE_URL}/_og?path=${encodeURIComponent(pagePath)}`,
+    image: summary?.image || `${SITE_URL}/_og?path=${encodeURIComponent(pagePath)}`,
+    ogType: summary?.ogType,
+    jsonLd: summary?.jsonLd,
+    article: summary?.ogType === 'article' ? summary : null,
   });
 
   let html;
@@ -70,7 +88,10 @@ export default async function handler(req, res) {
   html = html
     .replace(/<title>[\s\S]*?<\/title>/i, '')
     .replace(/<meta\s+(?:name|property)="(?:description|og:[^"]+|twitter:[^"]+)"[^>]*>/gi, '')
-    .replace(/<head>/i, `<head>\n    ${tags}`);
+    // Function replacements: a "$" in a title or article must not be read as a pattern.
+    .replace(/<head>/i, () => `<head>\n    ${tags}`);
+  const body = botBody(summary);
+  if (body) html = html.replace(/<div id="root"><\/div>/i, () => `<div id="root">${body}</div>`);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400');

@@ -2,8 +2,9 @@
 Data for the site's sitemap.xml (growth plan G1), formatted into XML by api/sitemap.mjs on Vercel.
 
 Lists the pages worth indexing: scorecards from the last year, the most-covered men's T20 players
-(their pages carry Impact/WPA nobody else publishes), and the busiest venues. Cached for a day --
-it changes with the nightly ingest at most.
+(their pages carry Impact/WPA nobody else publishes), the busiest venues, and every published note.
+Cached for a day -- it changes with the nightly ingest at most -- except notes, which are read
+fresh (one small query) so a note is in the sitemap the moment it is published.
 """
 
 from __future__ import annotations
@@ -25,6 +26,12 @@ _TTL = 24 * 3600
 
 @router.get("/sitemap-entries")
 def sitemap_entries(db: Session = Depends(get_session)) -> Dict[str, Any]:
+    from services.notes import sitemap_entries as note_entries
+
+    return {**_data_entries(db), "notes": note_entries(db)}
+
+
+def _data_entries(db: Session) -> Dict[str, Any]:
     if _CACHE["data"] is not None and time.time() - _CACHE["ts"] < _TTL:
         return _CACHE["data"]
     matches = db.execute(text("""

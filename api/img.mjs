@@ -28,9 +28,10 @@ const C = {
 };
 
 export const SIZES = {
-  portrait: { width: 1080, height: 1350, rows: 8, headline: 72, label: 36, value: 38, small: 28 },
-  square: { width: 1080, height: 1080, rows: 6, headline: 66, label: 34, value: 36, small: 26 },
-  card: { width: 1200, height: 630, rows: 5, headline: 52, label: 28, value: 30, small: 22 },
+  portrait: { width: 1080, height: 1350, rows: 8, gap: 18, headline: 72, label: 36, value: 38, small: 28 },
+  square: { width: 1080, height: 1080, rows: 6, gap: 22, headline: 66, label: 34, value: 36, small: 26 },
+  // Link previews (og:image for notes): 510px inside the margins holds four bars and the footer.
+  card: { width: 1200, height: 630, rows: 4, gap: 12, headline: 52, label: 28, value: 30, small: 22 },
 };
 
 // Font sizes the phone-legibility rule requires at 1080px width (checked by a test).
@@ -84,7 +85,7 @@ function barsBody(size, data) {
   // Compress the axis when all values are close (e.g. control % 80-90) so differences show.
   const floor = min > 0 && (max - min) / max < 0.25 ? min * 0.9 : 0;
   const highlight = (data.highlight || '').toLowerCase();
-  return h('div', { flexDirection: 'column', marginTop: 34, gap: size.rows > 6 ? 18 : 22 },
+  return h('div', { flexDirection: 'column', marginTop: size.height < size.width ? 24 : 34, gap: size.gap },
     h('div', { color: C.mid, fontSize: size.small }, [data.metric_label ? data.metric_label[0].toUpperCase() + data.metric_label.slice(1) : metricLabel(metric), ...chipsFor(data)].join(' · ')),
     rows.map((r, i) => {
       const label = String(r[labelKey] ?? '');

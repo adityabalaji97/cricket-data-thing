@@ -61,7 +61,7 @@
       "dest": "/api/meta.mjs?__path=/"
     },
     {
-      "src": "/(scorecard/[^/]+|player|venue|query|rankings|games/[^/]+)",
+      "src": "/(scorecard/[^/]+|player|venue|query|rankings|games/[^/]+|notes(?:/[^/]+)?)",
       "has": [
         {
           "type": "header",
@@ -82,6 +82,9 @@
     },
     "api/embed.mjs": {
       "includeFiles": "mcp_server/widget.html"
+    },
+    "api/meta.mjs": {
+      "includeFiles": "src/components/notes/noteMarkdown.mjs"
     }
   }
 }

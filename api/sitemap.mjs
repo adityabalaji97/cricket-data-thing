@@ -4,11 +4,13 @@ import { SITE_URL, getJSON } from './_lib/share.mjs';
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 export default async function handler(req, res) {
-  const data = (await getJSON('/seo/sitemap-entries', 20000)) || { matches: [], players: [], venues: [] };
+  const data = (await getJSON('/seo/sitemap-entries', 20000)) || { matches: [], players: [], venues: [], notes: [] };
   const urls = [
     { loc: `${SITE_URL}/`, priority: '1.0', changefreq: 'daily' },
     { loc: `${SITE_URL}/query`, priority: '0.9', changefreq: 'weekly' },
     { loc: `${SITE_URL}/rankings`, priority: '0.7', changefreq: 'weekly' },
+    { loc: `${SITE_URL}/notes`, priority: '0.8', changefreq: 'daily' },
+    ...(data.notes || []).map((n) => ({ loc: `${SITE_URL}/notes/${encodeURIComponent(n.slug)}`, lastmod: n.lastmod, priority: '0.8', changefreq: 'monthly' })),
     ...data.players.map((name) => ({ loc: `${SITE_URL}/player?name=${encodeURIComponent(name)}`, priority: '0.7', changefreq: 'weekly' })),
     ...data.venues.map((venue) => ({ loc: `${SITE_URL}/venue?venue=${encodeURIComponent(venue)}`, priority: '0.5', changefreq: 'monthly' })),
     ...data.matches.map((m) => ({ loc: `${SITE_URL}/scorecard/${encodeURIComponent(m.id)}`, lastmod: m.date, priority: '0.6', changefreq: 'yearly' })),

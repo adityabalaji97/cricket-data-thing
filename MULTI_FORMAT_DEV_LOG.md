@@ -82,7 +82,17 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > data_version bump. Local dev: scripts/dev/serve_functions.mjs (Vercel functions on :3100, /bot/<path> =
 > crawler view), REACT_APP_API_URL / REACT_APP_EMBED_ORIGIN (src/config.js, NoteBody), DEV_CORS_ORIGINS
 > (main.py). NB: a stale uvicorn on :8000 (started 30 Sep) has no DATABASE_URL, i.e. it talks to PROD.
-> Next: Notes 5, 7, 8.
+> **Notes step 5 built:** vercel.json sends bots on /notes and /notes/:slug to api/meta.mjs. share.mjs
+> noteSummary/notesIndexSummary; meta.mjs adds og:type=article, article:* times/author, JSON-LD Article
+> (bot author = Organization), og:image = the note's first chart as /img/<id>.png?size=card (else the
+> /_og text card "Notes · <kind>"), and renders the article into #root for crawlers via
+> api/_lib/note_html.mjs (same marked renderer; each chart = a table of its numbers + live link; /notes =
+> list of links). Head/body injection now uses function replacements ("$&" in a title was a pattern).
+> Sitemap: /notes + every published note (lastmod), read fresh, the rest still cached a day. img.mjs card
+> size (1200x630) now holds 4 bars + footer (5 overflowed and pushed the watermark off). Tests:
+> tests/js/notes_render.test.mjs. Goldens: 19/19 identical vs a clean 4e84c45 worktree server on the same
+> local DB (5 of them non-200 on both: no ball_metrics locally).
+> Next: Notes 7, 8.
 >
 > **Bowler runs + stats modes (2026-09-30):** bowler runs = ball total less byes/leg-byes
 > (sync_stats_from_dd double-counted wides/no-balls and charged byes; statsProcessor charged

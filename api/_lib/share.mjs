@@ -129,6 +129,62 @@ function querySummary(params) {
   };
 }
 
+// Notes (/notes/:slug): an article. The preview image is the note's first chart as a 1200x630
+// share card when it has one, else the branded text card. `note` rides along for api/meta.mjs,
+// which renders the body into the page for crawlers.
+const NOTE_KIND = { recap: 'Match recap', preview: 'Preview', analysis: 'Analysis', article: 'Article' };
+
+const excerpt = (body, max = 200) => {
+  const first = String(body || '').split(/^```hindsight[\s\S]*?^```/m)[0] || '';
+  const plain = first.replace(/^#+.*$/gm, '').replace(/[*_`>]/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/\s+/g, ' ').trim();
+  return plain.length > max ? `${plain.slice(0, max - 1).trimEnd()}…` : plain;
+};
+
+async function noteSummary(slug) {
+  const note = await getJSON(`/notes/${encodeURIComponent(slug)}`);
+  if (!note?.title) return null;
+  const description = (note.dek || excerpt(note.body_md) || note.title).slice(0, 280);
+  const image = note.cover ? `${SITE_URL}/img/${note.cover}.png?size=card` : null;
+  const author = note.author?.is_bot
+    ? { '@type': 'Organization', name: note.author.name }
+    : { '@type': 'Person', name: note.author?.name };
+  return {
+    kind: 'note',
+    ogType: 'article',
+    title: `${note.title} | ${SITE_NAME}`,
+    description,
+    image,
+    published: note.published_at,
+    modified: note.updated_at,
+    author: note.author?.name,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: note.title.slice(0, 110),
+      description,
+      datePublished: note.published_at,
+      dateModified: note.updated_at || note.published_at,
+      author,
+      publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+      mainEntityOfPage: `${SITE_URL}/notes/${note.slug}`,
+      ...(image ? { image: [image] } : {}),
+    },
+    card: { kicker: `Notes · ${NOTE_KIND[note.kind] || 'Note'}`, headline: note.title, sub: note.dek || null },
+    note,
+  };
+}
+
+async function notesIndexSummary() {
+  const data = await getJSON('/notes?limit=30');
+  return {
+    kind: 'notes',
+    title: `Notes: recaps, previews and analysis | ${SITE_NAME}`,
+    description: 'Match recaps, previews and analysis from ball-by-ball cricket data: Impact, win probability and records, with every chart frozen at the time of writing.',
+    card: { kicker: 'Notes', headline: 'Recaps, previews and analysis', sub: 'From ball-by-ball data' },
+    notes: data?.notes || [],
+  };
+}
+
 /** Summary for a site path + query string, or null for the site-wide card. */
 export async function summarize(pathname, search) {
   const params = new URLSearchParams(search || '');
@@ -137,5 +193,8 @@ export async function summarize(pathname, search) {
   if (pathname.startsWith('/player') && params.get('name')) return playerSummary(params.get('name'));
   if (pathname.startsWith('/venue')) return venueSummary(params);
   if (pathname.startsWith('/query')) return querySummary(params);
+  const note = pathname.match(/^\/notes\/([a-z0-9-]+)\/?$/);
+  if (note) return noteSummary(note[1]);
+  if (/^\/notes\/?$/.test(pathname)) return notesIndexSummary();
   return null;
 }
