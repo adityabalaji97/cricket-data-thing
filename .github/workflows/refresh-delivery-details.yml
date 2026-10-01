@@ -97,8 +97,10 @@ jobs:
       - name: "T20 (men): Primer metrics for new matches"
         run: python scripts/compute_primer_metrics.py incremental --write
 
-      # The materialised alias lookups (migration 011). Aliases change through migrations and the
-      # alias maintenance scripts, which refresh these themselves; this is the safety net.
+      # The materialised name lookups (migrations 011, 012). player_name_spellings lists every name
+      # in the ball tables, so it must refresh after the loads above; the alias views change only
+      # through migrations and the alias scripts (which refresh them too), so for them this is the
+      # safety net.
       - name: Refresh player alias views
         run: |
           python - <<'PY'

@@ -403,11 +403,15 @@ def stored_spellings(names: List[str], db: Session) -> List[str]:
 def refresh_alias_views(db: Session) -> None:
     """Rebuild the materialised alias lookups after player_aliases changes.
 
-    CONCURRENTLY keeps them readable during the refresh (both have the unique index it needs).
-    Commits: callers run this as the last step of an alias edit.
+    CONCURRENTLY keeps them readable during the refresh (each has the unique index it needs). It
+    does not update planner statistics, and these joins are plan-sensitive, so ANALYZE follows.
+    Commits: callers run this as the last step of an alias edit or a load.
     """
     for view in ALIAS_VIEWS:
         db.execute(text(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {view}"))
+    db.commit()
+    for view in ALIAS_VIEWS:
+        db.execute(text(f"ANALYZE {view}"))
     db.commit()
 
 
