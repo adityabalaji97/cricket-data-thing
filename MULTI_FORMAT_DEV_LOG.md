@@ -142,9 +142,16 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > every 7 league matches; batting and bowling Impact leaders (query snapshots) every 10. Replay IPL 2026 as
 > of 1 May: final table = ESPN's for all 10 teams; Sooryavanshi +244 / Bhuvneshwar 250 Impact (validated
 > numbers). content_rules.tracked_url now appends with & when the path has a query. tests/test_season_tallies.py.
-> **Data gap found, not fixed:** a tie settled by a Super Over loads with matches.winner NULL and no outcome
-> (1529281 LSG v KKR, 26 Apr 2026: KKR won the Super Over; dd has no innings 3/4), so Elo, streaks and
-> head-to-heads treat it as no result. The tally reads the winner from ESPN; the sync should set it.
+> **Super Over gap FIXED (2026-10-01):** the feed has no result for a tie, so such matches loaded with winner
+> NULL and no outcome. services/match_results.py reads ESPN's summary (/8048/summary?event=<id> answers for
+> any event) and writes matches.outcome the way Cricsheet rows already do -- winner stays NULL (Elo and stats
+> count a tie as a tie), outcome = {"result": "tie", "eliminator": X} / {"result": "tie"} / {"result": "no
+> result"}; never writes a winner (an ESPN winner the feed lacks is listed for review). run_full_dd_sync
+> runs it after step 2 for the last 30 days; scripts/resolve_match_results.py backfills (--all/--days/--match,
+> --dry-run). Readers: scorecard result line ("Match tied (X won the Super Over)" / "No result"; was "Result
+> unavailable"), record_framings and season_tallies use COALESCE(winner, outcome->>'eliminator'), bot recaps
+> skip "Result unavailable". Local backfill: 3 Super Overs, 1 tie, 7 no-results; 10 unclear (ESPN 502s,
+> mostly 2000-07 ODIs; re-runnable). Goldens 19/19 identical vs ace7b41.
 > **Notes 3-8 DEPLOYED (2026-10-01):** migration 010 applied to prod (author 'aditya' id 34, pack_id,
 > idx_notes_bot_match); Heroku v460; Vercel from origin/main 9a68aad. Smoke: /notes 200 (empty), admin 403
 > without token, Googlebot /notes gets the server-rendered list, sitemap lists /notes. Prod goldens: 4 diffs,

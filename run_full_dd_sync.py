@@ -70,6 +70,20 @@ def run_sync_pipeline(confirm=False, limit=None, skip_elo=False, dry_run=False):
     if upgrade_result['upgraded'] or upgrade_result['errors']:
         print(f"  ⬆️  Cricsheet matches upgraded: {upgrade_result['upgraded']}, errors: {upgrade_result['errors']}")
 
+    # The feed has no result for a tie: look up Super Over winners, ties and no-results on ESPN for
+    # recent matches still without one (services/match_results.py). Never blocks the sync.
+    try:
+        from database import SessionLocal
+        from services.match_results import resolve
+
+        with SessionLocal() as db:
+            res = resolve(db, days=30, dry_run=dry_run)
+        if res["checked"]:
+            print(f"  🤝 Results without a winner: {res['checked']} checked, {len(res['tie_eliminator'])} Super Over, "
+                  f"{len(res['tie'])} tied, {len(res['no_result'])} no result, {len(res['unclear'])} unclear")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ⚠️  Result lookup failed: {exc!r}")
+
     # Step 3: Create stats
     print(f"\n[3/{total_steps}] Creating batting/bowling stats...")
     from sync_stats_from_dd import create_stats_from_delivery_details

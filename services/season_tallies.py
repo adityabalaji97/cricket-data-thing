@@ -146,7 +146,9 @@ def season_schedule(league_id: int) -> List[Dict[str, Any]]:
 # ------------------------------------------------------------------------------------- table
 
 def _results(db: Session, ids: List[str]) -> Dict[str, Dict[str, Any]]:
-    rows = db.execute(text("SELECT id, team1, team2, winner FROM matches WHERE id = ANY(:ids)"), {"ids": ids}).mappings()
+    rows = db.execute(text("""
+        SELECT id, team1, team2, COALESCE(winner, outcome->>'eliminator') AS winner FROM matches WHERE id = ANY(:ids)
+    """), {"ids": ids}).mappings()
     return {str(r["id"]): dict(r) for r in rows}
 
 

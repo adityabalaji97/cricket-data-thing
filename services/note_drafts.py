@@ -138,8 +138,8 @@ def draft_recap(db: Session, match: Dict[str, Any], dry_run: bool = False) -> Op
     scorecard = get_match_scorecard_service(match_id=match_id, min_balls=6, db=db)
     info = scorecard.get("match") or {}
     result = info.get("result_text")
-    if not result:
-        return None  # not finished, or no result recorded yet
+    if not result or result == "Result unavailable":
+        return None  # not finished, or the result is not known yet (services/match_results.py resolves ties)
     primer = (scorecard.get("summary") or {}).get("primer")
     recap = build_recap(scorecard, db) if primer else None
     packs = _match_packs(db, match_id)

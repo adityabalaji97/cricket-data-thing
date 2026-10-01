@@ -110,7 +110,8 @@ def _team_results(db: Session, scope: Dict[str, Any], gender: str) -> Dict[str, 
     """
     def build():
         rows = db.execute(text(f"""
-            SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue FROM matches m
+            -- A tie settled by a Super Over counts for its winner, as in a league table.
+            SELECT m.id, m.date, m.team1, m.team2, COALESCE(m.winner, m.outcome->>'eliminator') AS winner, m.venue FROM matches m
             WHERE {scope['where']} AND m.gender = :gender AND m.date >= :since
             ORDER BY m.date, m.id
         """), _params(scope, gender)).mappings()
@@ -239,7 +240,7 @@ def _article(word: str) -> str:
 def _history(db: Session, match: Dict[str, Any], scope: Dict[str, Any], team: str, extra: str, params: Dict[str, Any]):
     """The team's earlier results in the scope (all of Hindsight's history, not only since 2015)."""
     rows = db.execute(text(f"""
-        SELECT m.id, m.date, m.team1, m.team2, m.winner FROM matches m
+        SELECT m.id, m.date, m.team1, m.team2, COALESCE(m.winner, m.outcome->>'eliminator') AS winner FROM matches m
         WHERE {scope['where']} AND m.gender = :gender AND (m.team1 = :team OR m.team2 = :team) {extra}
           AND (m.date < :d OR (m.date = :d AND m.id < :mid))
         ORDER BY m.date, m.id

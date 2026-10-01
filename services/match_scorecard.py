@@ -1294,9 +1294,16 @@ def _team_accents(innings: List[Dict[str, Any]]) -> List[Dict[str, str]]:
 
 def _result_text(match: Dict[str, Any], innings: List[Dict[str, Any]]) -> str:
     winner = match.get("winner")
-    if not winner:
-        return "Result unavailable"
     outcome = match.get("outcome") or {}
+    if not winner:
+        # Ties and no-results keep winner NULL; outcome says which (services/match_results.py).
+        result = outcome.get("result") if isinstance(outcome, dict) else None
+        if result == "tie":
+            eliminator = outcome.get("eliminator")
+            return f"Match tied ({eliminator} won the Super Over)" if eliminator else "Match tied"
+        if result == "no result":
+            return "No result"
+        return "Result unavailable"
     by = outcome.get("by") if isinstance(outcome, dict) else None
     if isinstance(by, dict):
         if by.get("runs"):
