@@ -11,7 +11,14 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
-> **Codebase audit (2026-10-01), branch `audit-fixes` — NOT merged/deployed:** findings in
+> **DEPLOYED 2026-10-01 (~15:57 UTC):** audit-fixes fast-forwarded into main (dad2ef1), pushed to GitHub
+> and Heroku. Before deploy: backup b008, migrations 011-014 applied to prod; after: 015 (prod DB 4182 ->
+> 3882 MB), rankings warmed on a one-off dyno (52 payloads, 145 s), smoke tests + content checks pass.
+> Prod goldens: 9 endpoints differ exactly in the expected fields (stat definitions) -- re-baseline of
+> scripts/goldens/prod awaiting user OK. Rollback: `heroku rollback` (views/indexes are harmless to old
+> code); alias data edits (013/014) restorable from backup b008.
+>
+> **Codebase audit (2026-10-01), branch `audit-fixes` (now merged):** findings in
 > AUDIT_CODEBASE_2026-10.md (correctness A1-A18, crashes B1-B5, perf C1-C11). Batch 1 committed, all
 > goldens identical, pytest 258 pass: scatter-chart hook crash (F0), player-summary async->def (C4; MCP
 > tool no longer asyncio.run()s it), match-preview recent form AND/OR cutoff + form/Elo scoped by
