@@ -2534,14 +2534,19 @@ def build_where_clause(
         conditions.append("m.day_or_night = :day_or_night")
         params["day_or_night"] = day_or_night
 
-    # Date filters (using year column for efficiency, can add date parsing if needed)
+    # Date filters. `year` alone truncated the window to whole years (a June-only request
+    # returned the full year), so the exact bound is on match_date -- an ISO 'YYYY-MM-DD'
+    # varchar, which compares correctly as text without a cast that would defeat its index.
+    # The year predicate stays as a cheap, exact superset the planner can use.
     if start_date:
-        conditions.append("dd.year >= :start_year")
+        conditions.append("dd.year >= :start_year AND dd.match_date >= :start_date_str")
         params["start_year"] = start_date.year
-    
+        params["start_date_str"] = start_date.isoformat()
+
     if end_date:
-        conditions.append("dd.year <= :end_year")
+        conditions.append("dd.year <= :end_year AND dd.match_date <= :end_date_str")
         params["end_year"] = end_date.year
+        params["end_date_str"] = end_date.isoformat()
     
     # Competition filters (leagues and/or international)
     # These should be OR'd together - a delivery can be from a league OR international
