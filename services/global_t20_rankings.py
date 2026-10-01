@@ -26,7 +26,11 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 
+from services.metrics import sql_defs
 from services.player_aliases import get_player_names
+
+# The bowler's view of a ball (services/metrics/sql_defs.py): legal balls, runs less byes/leg-byes.
+_BOWL = sql_defs.delivery_details_defs(sql_defs.BOWLER, "dd")
 
 try:
     import numpy as np
@@ -310,8 +314,12 @@ def _get_delivery_schema_config(db: Session) -> Dict[str, Any]:
     columns = {str(row[0]) for row in rows}
     column_types = {str(row[0]): str(row[1]).lower() for row in rows}
 
-    batter_cols = [col for col in ("batter", "bat") if col in columns]
-    bowler_cols = [col for col in ("bowler", "bowl") if col in columns]
+    # Authoritative columns first (scripts/recreate_delivery_details.sql has bat/bowl/match_date).
+    # batter/bowler/date survive on some databases as unpopulated leftovers: coalescing them in
+    # cost a TRIM per row for nothing, and preferring `date` (all NULL) sent every row down the
+    # year fallback below, widening a July-June window to two whole calendar years.
+    batter_cols = [col for col in ("bat", "batter") if col in columns][:1]
+    bowler_cols = [col for col in ("bowl", "bowler") if col in columns][:1]
     date_cols = [col for col in ("date", "match_date") if col in columns]
     has_year = "year" in columns
 
@@ -331,27 +339,20 @@ def _get_delivery_schema_config(db: Session) -> Dict[str, Any]:
             detail="delivery_details schema missing date/match_date/year required for rankings",
         )
 
-    if "date" in columns:
-        date_expr = "dd.date"
-    elif "match_date" in columns:
+    date_is_iso_text = False
+    if "match_date" in columns:
         match_date_type = column_types.get("match_date", "")
         if match_date_type == "date":
             date_expr = "dd.match_date"
         elif match_date_type.startswith("timestamp"):
             date_expr = "dd.match_date::date"
         else:
-            # String-like match_date fallback for schemas without a typed date column.
-            # Supports common YYYY-MM-DD and DD/MM/(YY|YYYY) formats.
-            date_expr = (
-                "CASE "
-                "WHEN NULLIF(TRIM(dd.match_date), '') ~ '^\\d{4}-\\d{2}-\\d{2}$' "
-                "THEN TO_DATE(NULLIF(TRIM(dd.match_date), ''), 'YYYY-MM-DD') "
-                "WHEN NULLIF(TRIM(dd.match_date), '') ~ '^\\d{1,2}/\\d{1,2}/\\d{2}$' "
-                "THEN TO_DATE(NULLIF(TRIM(dd.match_date), ''), 'DD/MM/YY') "
-                "WHEN NULLIF(TRIM(dd.match_date), '') ~ '^\\d{1,2}/\\d{1,2}/\\d{4}$' "
-                "THEN TO_DATE(NULLIF(TRIM(dd.match_date), ''), 'DD/MM/YYYY') "
-                "ELSE NULL END"
-            )
+            # VARCHAR holding ISO 'YYYY-MM-DD' (CLAUDE.md): compares correctly as text, with no
+            # per-row parse and no cast to defeat idx_dd_match_date.
+            date_expr = "dd.match_date"
+            date_is_iso_text = True
+    elif "date" in columns:
+        date_expr = "dd.date"
     else:
         date_expr = None
 
@@ -359,6 +360,7 @@ def _get_delivery_schema_config(db: Session) -> Dict[str, Any]:
         "batter_expr": _coalesced_trim_expr("dd", batter_cols),
         "bowler_expr": _coalesced_trim_expr("dd", bowler_cols),
         "date_expr": date_expr,
+        "date_is_iso_text": date_is_iso_text,
         "has_year": has_year,
     }
     _cache_set(_DELIVERY_SCHEMA_CACHE, cache_key, payload)
@@ -372,6 +374,10 @@ def _build_delivery_date_filter(
 ) -> Tuple[str, Dict[str, Any]]:
     date_expr = schema_cfg.get("date_expr")
     has_year = bool(schema_cfg.get("has_year"))
+    # Bound values match the column: ISO strings for a text match_date, dates otherwise.
+    start_bound, end_bound = (
+        (start.isoformat(), end.isoformat()) if schema_cfg.get("date_is_iso_text") else (start, end)
+    )
 
     if date_expr and has_year:
         return (
@@ -380,8 +386,8 @@ def _build_delivery_date_filter(
                 OR ({date_expr} IS NULL AND dd.year >= :start_year AND dd.year <= :end_year)
             )""",
             {
-                "start_date": start,
-                "end_date": end,
+                "start_date": start_bound,
+                "end_date": end_bound,
                 "start_year": int(start.year),
                 "end_year": int(end.year),
             },
@@ -390,7 +396,7 @@ def _build_delivery_date_filter(
     if date_expr:
         return (
             f"{date_expr} >= :start_date AND {date_expr} <= :end_date",
-            {"start_date": start, "end_date": end},
+            {"start_date": start_bound, "end_date": end_bound},
         )
 
     if has_year:
@@ -427,7 +433,7 @@ def _fetch_batting_cells(db: Session, start: date, end: date) -> List[Dict[str, 
                 dd.competition,
                 {LENGTH_BUCKET_SQL} AS length_bucket,
                 {BOWL_KIND_BUCKET_SQL} AS bowl_kind_bucket,
-                COALESCE(dd.score, 0)::float AS runs_scored,
+                COALESCE(dd.batruns, 0)::float AS runs_scored,
                 CASE WHEN COALESCE(dd.control, 0) = 1 THEN 1 ELSE 0 END::float AS controlled_ball
             FROM delivery_details dd
             WHERE {FORMAT_PIN_SQL}
@@ -488,7 +494,7 @@ def _fetch_batting_totals(db: Session, start: date, end: date) -> Dict[Tuple[str
                 dd.competition,
                 {LENGTH_BUCKET_SQL} AS length_bucket,
                 {BOWL_KIND_BUCKET_SQL} AS bowl_kind_bucket,
-                COALESCE(dd.score, 0)::float AS runs_scored,
+                COALESCE(dd.batruns, 0)::float AS runs_scored,
                 CASE WHEN COALESCE(dd.control, 0) = 1 THEN 1 ELSE 0 END::float AS controlled_ball
             FROM delivery_details dd
             WHERE {FORMAT_PIN_SQL}
@@ -537,8 +543,9 @@ def _fetch_bowling_cells(db: Session, start: date, end: date) -> List[Dict[str, 
                 dd.competition,
                 {LENGTH_BUCKET_SQL} AS length_bucket,
                 {BOWL_KIND_BUCKET_SQL} AS bowl_kind_bucket,
-                COALESCE(dd.score, 0)::float AS runs_conceded,
-                CASE WHEN COALESCE(dd.score, 0) = 0 THEN 1 ELSE 0 END::float AS dot_ball
+                ({_BOWL.runs})::float AS runs_conceded,
+                CASE WHEN {_BOWL.dot} THEN 1 ELSE 0 END::float AS dot_ball,
+                CASE WHEN {_BOWL.legal_ball} THEN 1 ELSE 0 END AS legal_ball
             FROM delivery_details dd
             WHERE {FORMAT_PIN_SQL}
               AND {date_filter_sql}
@@ -546,21 +553,20 @@ def _fetch_bowling_cells(db: Session, start: date, end: date) -> List[Dict[str, 
               AND {schema_cfg["bowler_expr"]} IS NOT NULL
               AND dd.competition IS NOT NULL
               AND TRIM(dd.competition) <> ''
-              AND (dd.wide IS NULL OR dd.wide = 0)
         )
         SELECT
             bowler_name AS player,
             competition,
             length_bucket,
             bowl_kind_bucket,
-            COUNT(*)::int AS balls,
+            SUM(legal_ball)::int AS balls,
             SUM(runs_conceded)::float AS runs,
             SUM(dot_ball)::float AS dots
         FROM normalized
         WHERE length_bucket IS NOT NULL
           AND bowl_kind_bucket IS NOT NULL
         GROUP BY bowler_name, competition, length_bucket, bowl_kind_bucket
-        HAVING COUNT(*) >= :min_cell_balls
+        HAVING SUM(legal_ball) >= :min_cell_balls
         """
     )
 
@@ -598,21 +604,21 @@ def _fetch_bowling_totals(db: Session, start: date, end: date) -> Dict[Tuple[str
                 dd.competition,
                 {LENGTH_BUCKET_SQL} AS length_bucket,
                 {BOWL_KIND_BUCKET_SQL} AS bowl_kind_bucket,
-                COALESCE(dd.score, 0)::float AS runs_conceded,
-                CASE WHEN COALESCE(dd.score, 0) = 0 THEN 1 ELSE 0 END::float AS dot_ball
+                ({_BOWL.runs})::float AS runs_conceded,
+                CASE WHEN {_BOWL.dot} THEN 1 ELSE 0 END::float AS dot_ball,
+                CASE WHEN {_BOWL.legal_ball} THEN 1 ELSE 0 END AS legal_ball
             FROM delivery_details dd
             WHERE {FORMAT_PIN_SQL}
               AND {date_filter_sql}
               AND dd.length IS NOT NULL
               AND dd.competition IS NOT NULL
               AND TRIM(dd.competition) <> ''
-              AND (dd.wide IS NULL OR dd.wide = 0)
         )
         SELECT
             competition,
             length_bucket,
             bowl_kind_bucket,
-            COUNT(*)::int AS balls,
+            SUM(legal_ball)::int AS balls,
             SUM(runs_conceded)::float AS runs,
             SUM(dot_ball)::float AS dots
         FROM normalized
