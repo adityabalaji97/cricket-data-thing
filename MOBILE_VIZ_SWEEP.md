@@ -7,8 +7,17 @@
 | 2 | Match preview fixes + mobile structure | [x] 2026-10-02 (preview-text-into-strip moves to chunk 3) |
 | 3 | Match preview new vizs (What to expect, Key Battles, Foresight) | [x] 2026-10-02 (Foresight range/features deferred: match_predictions empty locally, cannot verify) |
 | 4 | Player profile fixes + mobile structure | [x] 2026-10-02 (left: dedupe ball_stats/doppelganger fetches; pass venue to BoundaryAnalysis + doppelgangers) |
-| 5 | Player profile chart rework + new vizs (At a glance, ShotMap, Impact/clutch) | [ ] |
+| 5 | Player profile chart rework + new vizs (At a glance, ShotMap, Impact/clutch) | [~] 2026-10-02 partial: Impact charts, doppelganger dumbbell, phase small multiples, over-combos list, rotated labels/11px floor, caught-map labels, At a glance (batting) DONE. LEFT: ShotMap (wagon wheel + pitch map revival, fold LineLengthProfile in), At a glance for bowlers, StrikeRateIntervals single series, row-tap DetailSheet for TopInnings/BowlingInningsTable/FrequentOvers |
 | 6 | Rest-of-app sweep + dead code | [ ] |
+
+## Deploys / fixes outside the chunks (2026-10-02)
+- Deployed to prod 3x (Vercel main + Heroku): chunks 0-4 + partial 5.
+- Fixed: profile Impact counted internationals only (utils/competitionParams sends explicit league list);
+  CompetitionFilter could never pick a single league; /players collapses spellings via player_alias_map;
+  search -> profile directly (utils/playerProfileUrl); legacy-name profile links (name=V Kohli) autoload again.
+- Local DB: migration 005 applied locally (was only in prod).
+- Small leftovers: dedupe ball_stats/doppelganger fetches; pass venue to BoundaryAnalysis + doppelgangers;
+  sortable table headers 27px tall on phones; Foresight range/features (needs match_predictions rows).
 
 ## CARTA chart checklist
 - **Complete**: sample size + filter context shown; explicit empty state.

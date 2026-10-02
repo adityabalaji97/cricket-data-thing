@@ -11,15 +11,14 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
-> **IN PROGRESS 2026-10-02, branch `mobile-viz-sweep` (pushed to origin, NOT merged/deployed):** mobile-first
-> chart sweep; plan + status tracker in MOBILE_VIZ_SWEEP.md (chunks 0-4 done, 5-6 next). Shared pieces:
-> src/hooks/useIsMobile.js, useMatchPreview.js, src/theme/chartDefaults.js (validated palette + Recharts
-> presets), ui/CollapsibleSection (+openSection), ui/DetailSheet, ui/TakeawayCard. Match preview: What to
-> expect strip (API `expect` block, services/match_preview.build_expect_block; match_preview local golden
-> re-captured), Key battles (KeyBattles.rankBattles), collapsible sections, leaders/boundaries/XI fixes.
-> Player profile: collapsible below md, filters applied on GO only (`applied` state), Advanced Analytics
-> no longer blanks. Mockups: https://claude.ai/artifact/PgfyGxyZvBQQyvf59YsApX. FantasyPlanner.test fails
-> on main too (pre-existing).
+> **MOBILE VIZ SWEEP (2026-10-02) — DEPLOYED through 6d681d4 (main == mobile-viz-sweep, Vercel + Heroku).**
+> Plan + tracker: MOBILE_VIZ_SWEEP.md (chunks 0-4 done, 5 partial, 6 not started; read its "Deploys / fixes"
+> block). Shared pieces: hooks/useIsMobile, hooks/useMatchPreview, theme/chartDefaults (validated palette +
+> Recharts presets), ui/CollapsibleSection (+openSection), ui/DetailSheet, ui/TakeawayCard, charts/DivergingBars,
+> utils/competitionParams, utils/playerProfileUrl. API: /match-preview returns `expect` (build_expect_block;
+> local golden re-captured); /players collapses alias spellings. Next: ShotMap revival, bowler glance cards,
+> chunk 6 sweep. FantasyPlanner.test fails on main too (pre-existing). Mockups artifact:
+> https://claude.ai/artifact/PgfyGxyZvBQQyvf59YsApX
 >
 > **DEPLOYED 2026-10-01 (~15:57 UTC):** audit-fixes fast-forwarded into main (dad2ef1), pushed to GitHub
 > and Heroku. Before deploy: backup b008, migrations 011-014 applied to prod; after: 015 (prod DB 4182 ->
