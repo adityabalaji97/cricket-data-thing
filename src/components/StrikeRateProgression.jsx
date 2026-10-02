@@ -6,7 +6,7 @@ import { EmptyState } from './ui';
 import { colors as designColors } from '../theme/designSystem';
 import config from '../config';
 
-const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, competitionFilters, shouldFetch, isMobile: isMobileProp, wrapInCard = true }) => {
+const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, competitionFilters, shouldFetch, isMobile: isMobileProp, wrapInCard = true, ballStats }) => {
   const [data, setData] = useState([]);
   const theme = useTheme();
   const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
@@ -15,6 +15,11 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
   const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
 
   useEffect(() => {
+    // The profile already loaded /ball_stats (usePlayerData); use it instead of fetching it again.
+    if (Array.isArray(ballStats)) {
+      setData(ballStats);
+      return;
+    }
     const fetchData = async () => {
       if (!selectedPlayer) return;
 
@@ -46,7 +51,7 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
     };
 
     fetchData();
-  }, [selectedPlayer, dateRange, selectedVenue, competitionFilters]); // Removed shouldFetch from dependencies
+  }, [selectedPlayer, dateRange, selectedVenue, competitionFilters, ballStats]); // Removed shouldFetch from dependencies
 
   const chartHeight = isMobile ? 350 : 400;
 

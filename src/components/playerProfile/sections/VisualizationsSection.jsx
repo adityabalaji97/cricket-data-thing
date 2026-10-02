@@ -26,6 +26,7 @@ const BattingVisualizations = ({ stats, selectedPlayer, dateRange, selectedVenue
           dateRange={dateRange}
           selectedVenue={selectedVenue}
           competitionFilters={competitionFilters}
+          ballStats={stats.ball_by_ball_stats}
         />
         <BallRunDistribution innings={stats.innings || []} />
         <StrikeRateIntervals ballStats={stats.ball_by_ball_stats || []} />

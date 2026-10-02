@@ -231,7 +231,6 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         setVenues(['All Venues', ...await venuesRes.json()]);
 
         const playerNameFromURL = getQueryParam('name');
-        const autoload = getQueryParam('autoload') === 'true';
         const tabFromURL = getQueryParam('tab');
         const startDateFromURL = getQueryParam('start_date');
         const endDateFromURL = getQueryParam('end_date');
@@ -255,7 +254,8 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
           const match = playersList.find((p) => p.toLowerCase() === playerNameFromURL.toLowerCase());
           if (!match) setPlayers([...playersList, playerNameFromURL]);
           setSelectedPlayer(match || playerNameFromURL);
-          if (autoload) setTimeout(() => setShouldFetch(true), 500);
+          // Autoload is scheduled by the effect below (once the initial load completes). Scheduling it
+          // here as well ran the whole core fetch (stats, ball_stats, dismissals...) twice.
         }
 
         setInitialLoadComplete(true);
