@@ -769,3 +769,21 @@ thresholds, with the thresholds shown as a subtitle/filter line -- not an averag
 only when the idea asks about the relationship between two metrics ("who combines average and SR", "average v SR
 for openers"), or when there is no sort metric and two metrics are named. Row count matters too: few rows -> bars
 or a stat card; many rows + two metrics -> scatter.
+
+## Public "Make a graphic" — started 2026-10-02
+
+Opening the admin idea-pack chart pipeline (pack_charts + api/img.mjs) to users.
+
+- **Phase 1 (MVP, shipped 2026-10-02):** "Make graphic" on any grouped query-builder result. POST
+  /snapshots/graphic {query_string, metric, highlight} re-runs the viewer's own query server-side (clients never
+  send chart data, so graphics can't carry forged numbers), builds every valid chart form via
+  content_ideas.attempt(created_by="graphic"), returns options best-first; GraphicMaker.jsx shows thumbnails,
+  Share (native share sheet) / Download / Copy link. Shares the snapshot rate limiter. No LLM; one cheap Jev call
+  when ranking non-structural forms.
+- **Phase 1 follow-ups:** lazy snapshots (save only the shown form), log creates/shares to app_events, pass the
+  query builder's own scatter axes, pick highlight by tapping a table row, a /g/:id share page with OG image.
+- **Phase 2:** plain-English "describe a graphic": parse (nl2query, cost-capped) -> editable interpretation chips
+  -> confirm -> render; per-IP daily limit; cache repeat ideas; highlight chosen from results, not guessed.
+- **Phase 3:** gallery of popular graphics, attribution once accounts exist, embeds.
+- **Watch:** Vercel Hobby limits for /img renders at public volume (Pro or render on Heroku); licensed feed stays
+  aggregate-only; titles stay code-built (no free text under our domain).

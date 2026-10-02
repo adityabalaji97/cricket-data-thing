@@ -58,6 +58,47 @@ def create(body: SnapshotRequest, request: Request, db: Session = Depends(get_se
     return {"id": snap["id"], "kind": snap["kind"], "title": snap["title"]}
 
 
+class GraphicRequest(BaseModel):
+    # The site's own /query/deliveries query string (what the viewer is looking at).
+    query_string: str
+    metric: str
+    highlight: Optional[str] = None
+
+
+@router.post("/graphic")
+def create_graphic(body: GraphicRequest, request: Request, db: Session = Depends(get_session)):
+    """'Make a graphic' from a query-builder result: the idea-pack chart forms, without the LLM.
+
+    The query is re-run here from the query string (the client never sends chart data, so a
+    graphic under hindsightcricket.com always shows real numbers). Every chart form the result
+    supports is saved as a snapshot; the response lists them, best first, for the picker.
+    """
+    from services.content_ideas import attempt
+
+    if not _allow(_client(request)):
+        raise HTTPException(status_code=429, detail="Too many graphics made; try again in a few minutes.")
+    try:
+        params = params_from_query_string(body.query_string[:4000])
+        if "format" in params:
+            params["fmt"] = params.pop("format")
+        if not params.get("group_by"):
+            raise SnapshotError("Group the query (by player, team, season...) to make a graphic.")
+        for key in ("start_date", "end_date"):
+            if params.get(key) is not None:
+                params[key] = str(params[key])
+        planned = {"params": params, "metric": body.metric,
+                   "highlight": [body.highlight] if body.highlight else None, "chart": None}
+        description = f"{body.metric.replace('_', ' ')} by {' and '.join(params['group_by'])}"
+        result = attempt(db, description, planned, created_by="graphic")
+    except SnapshotError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if result.get("status") != "resolved":
+        raise HTTPException(status_code=400, detail=result.get("note") or "Nothing to chart for this query.")
+    fact = result["fact"]
+    return {"options": fact.get("chart_options") or [], "picked_by": fact.get("chart_picked_by"),
+            "title": fact.get("title")}
+
+
 @router.get("/{snapshot_id}")
 def read(snapshot_id: str, db: Session = Depends(get_session)):
     if not _ID.match(snapshot_id):

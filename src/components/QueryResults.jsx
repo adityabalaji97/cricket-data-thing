@@ -55,6 +55,7 @@ import ThumbDownAltOutlinedIcon from '@mui/icons-material/ThumbDownAltOutlined';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CloseIcon from '@mui/icons-material/Close';
 import ChartPanel from './ChartPanel';
+import GraphicMaker from './GraphicMaker';
 import { PitchMapContainer, getPitchMapMode } from './PitchMap';
 import config from '../config';
 import { qbButtonSx, qbCardSx, qbColors, qbFonts, qbGhostButtonSx } from './queryBuilderTheme';
@@ -273,6 +274,7 @@ const QueryResults = ({
     groupBy.includes('ball') || groupBy.includes('ball_in_spell')
   );
   const [page, setPage] = useState(0);
+  const [graphicOpen, setGraphicOpen] = useState(false);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
   
   // Sorting state
@@ -1066,6 +1068,15 @@ const QueryResults = ({
                     <>
                       <Button
                         variant="contained"
+                        startIcon={<AutoAwesomeIcon />}
+                        onClick={() => setGraphicOpen(true)}
+                        size="small"
+                        sx={{ ...qbButtonSx, minHeight: 36, fontSize: 11 }}
+                      >
+                        Make graphic
+                      </Button>
+                      <Button
+                        variant="contained"
                         startIcon={<AddIcon />}
                         onClick={handleAddBarChart}
                         size="small"
@@ -1479,6 +1490,17 @@ const QueryResults = ({
             <ToggleButton value="cumulative">Cumulative</ToggleButton>
           </ToggleButtonGroup>
         </Box>
+      )}
+
+      {graphicOpen && (
+        <GraphicMaker
+          open={graphicOpen}
+          onClose={() => setGraphicOpen(false)}
+          apiQueryString={apiQueryString}
+          rows={sortedData.filter((row) => !row.is_summary)}
+          groupBy={groupBy || []}
+          defaultMetric={sortConfig.key}
+        />
       )}
 
       {/* Chart Panel */}

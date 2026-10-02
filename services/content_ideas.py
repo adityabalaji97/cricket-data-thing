@@ -561,7 +561,7 @@ def _diverging_form(rows, label_key, metric, data, parts, title, split_rows):
     return _form_base(data, layout="diverging", title=title, metric=metric, rows=data["rows"]), title
 
 
-def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, Any]:
+def attempt(db: Session, idea_text: str, planned: Dict[str, Any], created_by: str = "idea") -> Dict[str, Any]:
     """Run a planned idea. Returns {status: 'resolved', fact, snapshot} or {status: 'parked', note}."""
     from services.snapshots import create_static_snapshot
 
@@ -696,7 +696,7 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
         snaps[form] = create_static_snapshot(
             db, "ranking", form_payload, form_title,
             {"idea": idea_text, "params": query_params, "metric": metric, "title": form_title, "form": form},
-            created_by="idea")
+            created_by=created_by)
     lead = next(f for f in ranking["order"] if f in snaps)
     snap = snaps[lead]
     title = form_data[lead][1]
