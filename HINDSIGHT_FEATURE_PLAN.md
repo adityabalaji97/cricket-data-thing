@@ -697,8 +697,10 @@ After each chunk, verify by:
 
 > Shipped: `having=metric:op:value` in QB v2 (average, strike_rate, balls_per_dismissal; SQL stage-1 + merge paths),
 > nl2query emits it and returns `warnings` for unsupported metrics, idea packs carry it into titles and refuse
-> ideas they can't apply exactly, QB UI chips/add row, MCP `having`. Phase 2: dot/boundary/control %, Impact and
-> economy thresholds need those aggregates in stage 1 (or a second filtered pass) — today they warn.
+> ideas they can't apply exactly, QB UI chips/add row, MCP `having`. Phase 2 DONE same day: dot/boundary/control %,
+> Impact, impact/100, impact/innings, RAA, WAA, WPA, avg leverage (extra stage-1 totals only when asked; warnings for
+> non-men's-T20, cumulative mode, pre-2015 windows). Remaining: economy (not a delivery-mode column) and thresholds in
+> the batting_stats / bowling_stats modes (they warn).
 
 **Problem.** "ODI batters with 50+ average, 100+ SR sorted by control %, minimum 1000 balls" produced a pack
 topped by Chirag Suri (control 97.7%, rank 1 of 366). The 1000-ball minimum and the sort were honoured; the
