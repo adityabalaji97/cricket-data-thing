@@ -22,6 +22,7 @@ import DismissalSection from './playerProfile/sections/DismissalSection';
 import VisualizationsSection from './playerProfile/sections/VisualizationsSection';
 import ExploreSection from './playerProfile/sections/ExploreSection';
 import RecentFormStrip from './playerProfile/RecentFormStrip';
+import PlayerGlance from './playerProfile/PlayerGlance';
 import AdvancedBowlingAnalyticsSection from './playerProfile/AdvancedBowlingAnalyticsSection';
 import BoundaryAnalysis from './BoundaryAnalysis';
 import LazySection from './ui/LazySection';
@@ -246,8 +247,13 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
 
         if (venueFromURL) setSelectedVenue(venueFromURL);
 
-        if (playerNameFromURL && playersList.includes(playerNameFromURL)) {
-          setSelectedPlayer(playerNameFromURL);
+        // The picker lists one canonical spelling per player, but links from elsewhere (query
+        // builder, matchups, old shares) carry legacy spellings ("V Kohli"). The API resolves any
+        // spelling, so accept the URL name and add it to the options rather than ignoring it.
+        if (playerNameFromURL) {
+          const match = playersList.find((p) => p.toLowerCase() === playerNameFromURL.toLowerCase());
+          if (!match) setPlayers([...playersList, playerNameFromURL]);
+          setSelectedPlayer(match || playerNameFromURL);
           if (autoload) setTimeout(() => setShouldFetch(true), 500);
         }
 
@@ -375,10 +381,17 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     const { player: appliedPlayer, dateRange: appliedRange, venue: appliedVenue, competitionFilters: appliedCompetitions } = applied;
 
     const groups = [
+      ...(activeTab === 'batting' ? [{
+        id: 'glance',
+        label: 'At a glance',
+        defaultOpen: true,
+        takeaway: 'Runs, best phase, pace v spin, toughest bowling type',
+        content: <PlayerGlance stats={currentStats} />,
+      }] : []),
       {
         id: 'overview',
         label: 'Overview',
-        defaultOpen: true,
+        defaultOpen: activeTab !== 'batting',
         takeaway: overviewTakeaway,
         content: <OverviewSection stats={currentStats} mode={activeTab} />,
       },
