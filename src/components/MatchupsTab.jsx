@@ -342,7 +342,7 @@ const MatchupsTab = ({ isMobile }) => {
                 Select Teams to Compare
             </Typography>
             
-            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 2 }}>
                 <Autocomplete
                     value={selectedTeam1}
                     onChange={(event, newValue) => {
@@ -350,7 +350,7 @@ const MatchupsTab = ({ isMobile }) => {
                         setShowMatchups(false);
                     }}
                     options={teams}
-                    sx={{ width: 300 }}
+                    sx={{ width: { xs: '100%', sm: 300 } }}
                     getOptionLabel={(option) => option?.abbreviated_name || ''}
                     renderOption={(props, option) => (
                         <li {...props}>
@@ -374,7 +374,7 @@ const MatchupsTab = ({ isMobile }) => {
                         setShowMatchups(false);
                     }}
                     options={teams.filter(team => team?.full_name !== selectedTeam1?.full_name)}
-                    sx={{ width: 300 }}
+                    sx={{ width: { xs: '100%', sm: 300 } }}
                     getOptionLabel={(option) => option?.abbreviated_name || ''}
                     renderOption={(props, option) => (
                         <li {...props}>
@@ -400,25 +400,26 @@ const MatchupsTab = ({ isMobile }) => {
                 Build Custom Teams
             </Typography>
             
-            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 2 }}>
                 <TextField
                     label="Team 1 Name"
                     value={customTeam1Name}
                     onChange={(e) => setCustomTeam1Name(e.target.value)}
-                    sx={{ width: 200 }}
+                    sx={{ width: { xs: '100%', sm: 200 } }}
                 />
                 
                 <TextField
                     label="Team 2 Name"
                     value={customTeam2Name}
                     onChange={(e) => setCustomTeam2Name(e.target.value)}
-                    sx={{ width: 200 }}
+                    sx={{ width: { xs: '100%', sm: 200 } }}
                 />
             </Box>
             
             <Grid container spacing={2}>
                 {/* Available Players */}
-                <Grid item xs={4}>
+                {/* Phones: the three lists stack (they were fixed 4 / 3.5 / 3.5 columns, ~110px each at 390px). */}
+                <Grid item xs={12} md={4}>
                     <Paper sx={{ width: '100%', height: 400, overflow: 'hidden' }}>
                         <TextField
                             fullWidth
@@ -456,7 +457,7 @@ const MatchupsTab = ({ isMobile }) => {
                 </Grid>
                 
                 {/* Transfer Controls */}
-                <Grid item xs={1} sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                <Grid item xs={12} md={1} sx={{ display: 'flex', flexDirection: { xs: 'row', md: 'column' }, gap: { xs: 1, md: 0 }, justifyContent: 'center', alignItems: 'center' }}>
                     <Button
                         variant="outlined"
                         size="small"
@@ -478,7 +479,7 @@ const MatchupsTab = ({ isMobile }) => {
                 </Grid>
                 
                 {/* Team 1 */}
-                <Grid item xs={3.5}>
+                <Grid item xs={6} md={3.5}>
                     <Paper sx={{ width: '100%', height: 400, overflow: 'hidden' }}>
                         <Typography variant="h6" sx={{ p: 1 }}>
                             {customTeam1Name} ({customTeam1.length} players)
@@ -513,7 +514,7 @@ const MatchupsTab = ({ isMobile }) => {
                 </Grid>
                 
                 {/* Team 2 */}
-                <Grid item xs={3.5}>
+                <Grid item xs={6} md={3.5}>
                     <Paper sx={{ width: '100%', height: 400, overflow: 'hidden' }}>
                         <Typography variant="h6" sx={{ p: 1 }}>
                             {customTeam2Name} ({customTeam2.length} players)
