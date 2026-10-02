@@ -14,6 +14,7 @@ import {
 import config from '../../../config';
 import ScrollTable from '../../ui/ScrollTable';
 import DivergingBars from '../../charts/DivergingBars';
+import { appendCompetitionParams } from '../../../utils/competitionParams';
 
 /**
  * A player's contextual numbers from Ganjoo's T20 Primer -- Impact, RAA/WAA, WPA -- by season.
@@ -33,14 +34,13 @@ const buildParams = ({ playerName, mode, dateRange, selectedVenue, competitionFi
   if (dateRange?.start) params.set('start_date', dateRange.start);
   if (dateRange?.end) params.set('end_date', dateRange.end);
   if (selectedVenue && selectedVenue !== 'All Venues') params.set('venue', selectedVenue);
-  (competitionFilters?.leagues || []).forEach((league) => params.append('leagues', league));
-  if (competitionFilters?.international) {
-    params.set('include_international', 'true');
-    if (competitionFilters.topTeams) params.set('top_teams', String(competitionFilters.topTeams));
-  }
   params.set('limit', '100');
   return params;
 };
+
+// Competition params are added asynchronously: "all leagues" has to be spelled out for the query
+// builder (see utils/competitionParams).
+const withCompetitions = (params, competitionFilters) => appendCompetitionParams(new URLSearchParams(params), competitionFilters);
 
 const signed = (value, digits = 1) => {
   if (value === null || value === undefined) return '–';
@@ -55,6 +55,7 @@ const ImpactSection = ({ playerName, mode = 'batting', dateRange, selectedVenue,
   const [error, setError] = useState(false);
   const [phaseRows, setPhaseRows] = useState(null);
   const [showTable, setShowTable] = useState(false);
+  const [queryLinkParams, setQueryLinkParams] = useState('');
   const params = useMemo(
     () => buildParams({ playerName, mode, dateRange, selectedVenue, competitionFilters }),
     [playerName, mode, dateRange, selectedVenue, competitionFilters],
@@ -72,19 +73,24 @@ const ImpactSection = ({ playerName, mode = 'batting', dateRange, selectedVenue,
     if (!playerName) return undefined;
     let cancelled = false;
     setPhaseRows(null);
-    fetch(`${config.API_URL}/query/deliveries?${phaseParams.toString()}`)
+    withCompetitions(phaseParams, competitionFilters)
+      .then((full) => fetch(`${config.API_URL}/query/deliveries?${full.toString()}`))
       .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
       .then((payload) => { if (!cancelled) setPhaseRows((payload?.data || []).filter((row) => row.metric_balls > 0)); })
       .catch(() => { if (!cancelled) setPhaseRows([]); });
     return () => { cancelled = true; };
-  }, [playerName, phaseParams]);
+  }, [playerName, phaseParams, competitionFilters]);
 
   useEffect(() => {
     if (!playerName) return undefined;
     let cancelled = false;
     setRows(null);
     setError(false);
-    fetch(`${config.API_URL}/query/deliveries?${params.toString()}`)
+    withCompetitions(params, competitionFilters)
+      .then((full) => {
+        if (!cancelled) setQueryLinkParams(full.toString());
+        return fetch(`${config.API_URL}/query/deliveries?${full.toString()}`);
+      })
       .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
       .then((payload) => {
         if (cancelled) return;
@@ -94,7 +100,7 @@ const ImpactSection = ({ playerName, mode = 'batting', dateRange, selectedVenue,
       })
       .catch(() => { if (!cancelled) setError(true); });
     return () => { cancelled = true; };
-  }, [playerName, params]);
+  }, [playerName, params, competitionFilters]);
 
   const total = useMemo(() => {
     if (!rows?.length) return null;
@@ -142,7 +148,7 @@ const ImpactSection = ({ playerName, mode = 'batting', dateRange, selectedVenue,
     );
   }
 
-  const queryLink = `/query?${params.toString()}`;
+  const queryLink = `/query?${queryLinkParams || params.toString()}`;
   const cell = (value, digits, colored = true) => (
     <TableCell align="right" sx={{ color: colored ? tone(value) : undefined, fontVariantNumeric: 'tabular-nums' }}>
       {signed(value, digits)}

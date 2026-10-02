@@ -142,13 +142,17 @@ const CompetitionFilter = ({ onFilterChange, isMobile, value }) => {
 
     // Handle Autocomplete change
     const handleAutocompleteChange = (event, newValue) => {
-        // Check if "All Leagues" is being selected
-        const isAllLeaguesSelected = newValue?.some(league => league.value === 'all');
-        
-        // If "All Leagues" is selected, include all leagues
-        const updatedSelection = isAllLeaguesSelected 
-            ? [{ label: 'All Leagues', value: 'all' }]
-            : newValue;
+        // "All Leagues" and specific leagues are exclusive, decided by what was just picked (MUI
+        // appends it last). This used to collapse to "All Leagues" whenever the chip was still in
+        // the list, so adding IPL next to it was swallowed and a single league could never be
+        // chosen; removing the chip left an empty list, which also synced back to "All".
+        const picked = newValue?.[newValue.length - 1];
+        let updatedSelection;
+        if (!newValue?.length || picked?.value === 'all') {
+            updatedSelection = [buildAllLeaguesOption()];
+        } else {
+            updatedSelection = newValue.filter((league) => league.value !== 'all');
+        }
 
         setSelectedLeagues(updatedSelection);
         handleSelectionChange(updatedSelection, includeInternational, topTeams);
