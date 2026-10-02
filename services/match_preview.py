@@ -1852,3 +1852,99 @@ def gather_preview_context(
 def generate_match_preview_fallback(context: Dict[str, Any]) -> str:
     sections = build_deterministic_preview_sections(context)
     return serialize_sections_to_markdown(sections)
+
+
+def _round_or_none(value: Any, digits: int = 0) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        out = round(float(value), digits)
+        return int(out) if digits == 0 else out
+    except (TypeError, ValueError):
+        return None
+
+
+def _phase_template_runs(template: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Runs per innings by phase from a winning-innings template; middle1 + middle2 fold into one."""
+    if not template:
+        return None
+    def rpi(key):
+        return float(((template.get(key) or {}).get("runs_per_innings")) or 0.0)
+    middle = rpi("middle1") + rpi("middle2")
+    out = {
+        "powerplay": _round_or_none(rpi("powerplay")),
+        "middle": _round_or_none(middle),
+        "death": _round_or_none(rpi("death")),
+    }
+    if not any(out.values()):
+        return None
+    out["total"] = _round_or_none(template.get("template_total_runs")) or sum(v or 0 for v in out.values())
+    return out
+
+
+def build_expect_block(context: Dict[str, Any], decision_scores: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The numbers behind the preview's "What to expect" strip.
+
+    Everything here is already in the gathered context (venue record, screen_story, form, Elo,
+    the lean); it was computed for the prose sections and then thrown away. Returning it lets the
+    page lead with figures instead of paragraphs. No new queries.
+    """
+    team1 = context.get("team1")
+    team2 = context.get("team2")
+    venue_stats = context.get("venue_stats") or {}
+    balance = ((context.get("story_signals") or {}).get("venue_balance")) or {}
+    screen_story = context.get("screen_story") or {}
+    recent_form = context.get("recent_form") or {}
+    elo = context.get("elo") or {}
+    h2h = ((screen_story.get("head_to_head_stats") or {}).get("overall_window_summary")) or {}
+    phases = screen_story.get("phase_wise_strategy") or {}
+    fantasy = ((screen_story.get("expected_fantasy_points") or {}).get("fantasy_top")) or {}
+
+    total = int(venue_stats.get("total_matches") or 0)
+    fantasy_top = []
+    for team, players in fantasy.items():
+        for p in players or []:
+            if p.get("player") and p.get("expected_points") is not None:
+                fantasy_top.append({
+                    "player": p["player"],
+                    "team": team,
+                    "expected_points": _round_or_none(p["expected_points"], 1),
+                    "role": p.get("role"),
+                })
+    fantasy_top.sort(key=lambda p: p["expected_points"] or 0, reverse=True)
+
+    lean = decision_scores or {}
+    return {
+        "venue": {
+            "total_matches": total,
+            "batting_first_wins": int(venue_stats.get("batting_first_wins") or 0),
+            "chasing_wins": int(venue_stats.get("batting_second_wins") or 0),
+            "toss_bias": balance.get("toss_bias") or "balanced",
+            "avg_first_innings": _round_or_none(venue_stats.get("average_first_innings")),
+            "avg_second_innings": _round_or_none(venue_stats.get("average_second_innings")),
+            "avg_winning_score": _round_or_none(venue_stats.get("average_winning_score")),
+            "avg_target_chased": _round_or_none(venue_stats.get("average_chasing_score")),
+            "highest_total_chased": _round_or_none(venue_stats.get("highest_total_chased")),
+            "lowest_total_defended": _round_or_none(venue_stats.get("lowest_total_defended")),
+        } if total else None,
+        "winning_phases": {
+            "batting_first": _phase_template_runs(phases.get("batting_first_wins_template") or {}),
+            "chasing": _phase_template_runs(phases.get("chasing_wins_template") or {}),
+        },
+        "form": [
+            {"team": t, "record": (recent_form.get(t) or {}).get("record")}
+            for t in (team1, team2) if t
+        ],
+        "head_to_head": {
+            "sample_size": int(h2h.get("sample_size") or 0),
+            "team1_wins": int(h2h.get("team1_wins") or 0),
+            "team2_wins": int(h2h.get("team2_wins") or 0),
+        },
+        "elo": {t: elo.get(t) for t in (team1, team2) if t},
+        "lean": {
+            "label": lean.get("label"),
+            "winner": lean.get("winner"),
+            "reasons": [r.get("detail") for r in (lean.get("top_reasons") or []) if r.get("detail")][:3],
+        } if lean.get("label") else None,
+        "fantasy_top": fantasy_top[:5],
+    }

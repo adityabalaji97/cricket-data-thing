@@ -16,6 +16,7 @@ from services.cricinfo_scraper import scrape_match_setup
 from services import jev_client, typed_preview
 from services.match_preview import (
     build_deterministic_preview_sections,
+    build_expect_block,
     build_narrative_data_context,
     gather_preview_context,
     generate_match_preview_fallback,
@@ -431,6 +432,7 @@ def get_match_preview(
             "llm_used": llm_used,
             "narrative_source": narrative_source,
             "headline": headline,
+            "expect": build_expect_block(context, decision_scores),
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "cached": False,
         }

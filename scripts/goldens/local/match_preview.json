@@ -1,6 +1,94 @@
 {
   "status": 200,
   "body": {
+    "expect": {
+      "elo": {
+        "Rangpur Riders": 1581,
+        "Sylhet Titans": 1527
+      },
+      "fantasy_top": [
+        {
+          "expected_points": 87.7,
+          "player": "Mohammad Amir",
+          "role": "all-rounder",
+          "team": "Sylhet Titans"
+        },
+        {
+          "expected_points": 75.3,
+          "player": "Shohidul Islam",
+          "role": "bowler",
+          "team": "Sylhet Titans"
+        },
+        {
+          "expected_points": 59.3,
+          "player": "Saim Ayub",
+          "role": "all-rounder",
+          "team": "Sylhet Titans"
+        },
+        {
+          "expected_points": 53.3,
+          "player": "Iftikhar Ahmed",
+          "role": "all-rounder",
+          "team": "Rangpur Riders"
+        },
+        {
+          "expected_points": 50.5,
+          "player": "Akif Javed",
+          "role": "bowler",
+          "team": "Rangpur Riders"
+        }
+      ],
+      "form": [
+        {
+          "record": "LWWLL",
+          "team": "Rangpur Riders"
+        },
+        {
+          "record": "LWLWW",
+          "team": "Sylhet Titans"
+        }
+      ],
+      "head_to_head": {
+        "sample_size": 3,
+        "team1_wins": 1,
+        "team2_wins": 2
+      },
+      "lean": {
+        "label": "Lean Sylhet Titans",
+        "reasons": [
+          "Recent H2H edge",
+          "Venue: chasing sides win more here",
+          "Fantasy/matchup edge"
+        ],
+        "winner": "Sylhet Titans"
+      },
+      "venue": {
+        "avg_first_innings": 157,
+        "avg_second_innings": 142,
+        "avg_target_chased": 141,
+        "avg_winning_score": 176,
+        "batting_first_wins": 28,
+        "chasing_wins": 37,
+        "highest_total_chased": 205,
+        "lowest_total_defended": 130,
+        "toss_bias": "chasing",
+        "total_matches": 70
+      },
+      "winning_phases": {
+        "batting_first": {
+          "death": 58,
+          "middle": 73,
+          "powerplay": 45,
+          "total": 176
+        },
+        "chasing": {
+          "death": 41,
+          "middle": 59,
+          "powerplay": 41,
+          "total": 142
+        }
+      }
+    },
     "headline": null,
     "narrative_source": "deterministic",
     "preview_mode": "hybrid",
