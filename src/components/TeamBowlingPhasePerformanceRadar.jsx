@@ -12,68 +12,7 @@ import {
   
 } from '@mui/material';
 import ScrollTable from './ui/ScrollTable';
-import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  ResponsiveContainer
-} from 'recharts';
-
-const transformTeamBowlingPhaseData = (bowlingPhaseStats) => {
-  if (!bowlingPhaseStats) return [];
-
-  // Create radar chart data with 9 vertices using normalized values (0-100 scale)
-  // For bowling, higher percentile = better performance (lower bowling avg/SR/economy)
-  return [
-    {
-      phase: 'PP Avg',
-      value: bowlingPhaseStats.powerplay?.normalized_average || 50,
-      absoluteValue: bowlingPhaseStats.powerplay?.bowling_average || 0
-    },
-    {
-      phase: 'PP SR',
-      value: bowlingPhaseStats.powerplay?.normalized_strike_rate || 50,
-      absoluteValue: bowlingPhaseStats.powerplay?.bowling_strike_rate || 0
-    },
-    {
-      phase: 'PP Econ',
-      value: bowlingPhaseStats.powerplay?.normalized_economy || 50,
-      absoluteValue: bowlingPhaseStats.powerplay?.economy_rate || 0
-    },
-    {
-      phase: 'Mid Avg',
-      value: bowlingPhaseStats.middle_overs?.normalized_average || 50,
-      absoluteValue: bowlingPhaseStats.middle_overs?.bowling_average || 0
-    },
-    {
-      phase: 'Mid SR',
-      value: bowlingPhaseStats.middle_overs?.normalized_strike_rate || 50,
-      absoluteValue: bowlingPhaseStats.middle_overs?.bowling_strike_rate || 0
-    },
-    {
-      phase: 'Mid Econ',
-      value: bowlingPhaseStats.middle_overs?.normalized_economy || 50,
-      absoluteValue: bowlingPhaseStats.middle_overs?.economy_rate || 0
-    },
-    {
-      phase: 'Death Avg',
-      value: bowlingPhaseStats.death_overs?.normalized_average || 50,
-      absoluteValue: bowlingPhaseStats.death_overs?.bowling_average || 0
-    },
-    {
-      phase: 'Death SR',
-      value: bowlingPhaseStats.death_overs?.normalized_strike_rate || 50,
-      absoluteValue: bowlingPhaseStats.death_overs?.bowling_strike_rate || 0
-    },
-    {
-      phase: 'Death Econ',
-      value: bowlingPhaseStats.death_overs?.normalized_economy || 50,
-      absoluteValue: bowlingPhaseStats.death_overs?.economy_rate || 0
-    }
-  ];
-};
+import PhasePercentileBars from './charts/PhasePercentileBars';
 
 const createBowlingTableData = (bowlingPhaseStats) => {
   if (!bowlingPhaseStats) return [];
@@ -119,33 +58,8 @@ const createBowlingTableData = (bowlingPhaseStats) => {
 };
 
 // Custom tooltip for the bowling radar chart
-const CustomBowlingTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <Box sx={{ 
-        backgroundColor: 'background.paper', 
-        p: 1, 
-        border: 1, 
-        borderColor: 'divider',
-        borderRadius: 1,
-        boxShadow: 2
-      }}>
-        <Typography variant="body2" fontWeight="bold">{label}</Typography>
-        <Typography variant="body2">
-          Percentile: {data.value.toFixed(1)}
-        </Typography>
-        <Typography variant="body2">
-          Actual: {data.absoluteValue.toFixed(2)}
-        </Typography>
-      </Box>
-    );
-  }
-  return null;
-};
 
 const TeamBowlingPhasePerformanceRadar = ({ bowlingPhaseStats, teamName }) => {
-  const radarData = transformTeamBowlingPhaseData(bowlingPhaseStats);
   const tableData = createBowlingTableData(bowlingPhaseStats);
   
   return (
@@ -169,30 +83,13 @@ const TeamBowlingPhasePerformanceRadar = ({ bowlingPhaseStats, teamName }) => {
           alignItems: 'start'
         }}>
           {/* Radar Chart */}
-          <Box sx={{ width: '100%', height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart outerRadius={100} data={radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
-                <PolarGrid />
-                <PolarAngleAxis 
-                  dataKey="phase" 
-                  tick={{ fontSize: 11 }}
-                />
-                <PolarRadiusAxis 
-                  tick={{ fontSize: 10 }}
-                  domain={[0, 100]}
-                  tickCount={6}
-                />
-                <Radar
-                  name="Percentile"
-                  dataKey="value"
-                  stroke="#e74c3c"
-                  fill="#e74c3c"
-                  fillOpacity={0.3}
-                  strokeWidth={2}
-                />
-                <CustomBowlingTooltip />
-              </RadarChart>
-            </ResponsiveContainer>
+          <Box>
+            {/* Percentile bars around the median replace the radar (rotated axis, 10px ticks). */}
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>Bowling percentile by phase</Typography>
+            <PhasePercentileBars phaseStats={bowlingPhaseStats} metrics={[{ key: 'normalized_average', label: 'Average' }, { key: 'normalized_strike_rate', label: 'Strike rate' }, { key: 'normalized_economy', label: 'Economy' }]} ariaLabel="Bowling percentile by phase" />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              Centre line = median team; right of it is better.
+            </Typography>
           </Box>
           
           {/* Data Table */}

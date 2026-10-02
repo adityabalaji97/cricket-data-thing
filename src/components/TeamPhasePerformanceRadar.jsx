@@ -12,52 +12,7 @@ import {
   
 } from '@mui/material';
 import ScrollTable from './ui/ScrollTable';
-import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  ResponsiveContainer
-} from 'recharts';
-
-const transformTeamPhaseData = (phaseStats) => {
-  if (!phaseStats) return [];
-
-  // Create radar chart data with 6 vertices using normalized values (0-100 scale)
-  return [
-    {
-      phase: 'PP Avg',
-      value: phaseStats.powerplay?.normalized_average || 50,
-      absoluteValue: phaseStats.powerplay?.average || 0
-    },
-    {
-      phase: 'PP SR',
-      value: phaseStats.powerplay?.normalized_strike_rate || 50,
-      absoluteValue: phaseStats.powerplay?.strike_rate || 0
-    },
-    {
-      phase: 'Mid Avg',
-      value: phaseStats.middle_overs?.normalized_average || 50,
-      absoluteValue: phaseStats.middle_overs?.average || 0
-    },
-    {
-      phase: 'Mid SR',
-      value: phaseStats.middle_overs?.normalized_strike_rate || 50,
-      absoluteValue: phaseStats.middle_overs?.strike_rate || 0
-    },
-    {
-      phase: 'Death Avg',
-      value: phaseStats.death_overs?.normalized_average || 50,
-      absoluteValue: phaseStats.death_overs?.average || 0
-    },
-    {
-      phase: 'Death SR',
-      value: phaseStats.death_overs?.normalized_strike_rate || 50,
-      absoluteValue: phaseStats.death_overs?.strike_rate || 0
-    }
-  ];
-};
+import PhasePercentileBars from './charts/PhasePercentileBars';
 
 const createTableData = (phaseStats) => {
   if (!phaseStats) return [];
@@ -97,33 +52,8 @@ const createTableData = (phaseStats) => {
 };
 
 // Custom tooltip for the radar chart
-const CustomTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <Box sx={{ 
-        backgroundColor: 'background.paper', 
-        p: 1, 
-        border: 1, 
-        borderColor: 'divider',
-        borderRadius: 1,
-        boxShadow: 2
-      }}>
-        <Typography variant="body2" fontWeight="bold">{label}</Typography>
-        <Typography variant="body2">
-          Percentile: {data.value.toFixed(1)}
-        </Typography>
-        <Typography variant="body2">
-          Actual: {data.absoluteValue.toFixed(2)}
-        </Typography>
-      </Box>
-    );
-  }
-  return null;
-};
 
 const TeamPhasePerformanceRadar = ({ phaseStats, teamName }) => {
-  const radarData = transformTeamPhaseData(phaseStats);
   const tableData = createTableData(phaseStats);
   
   return (
@@ -147,30 +77,13 @@ const TeamPhasePerformanceRadar = ({ phaseStats, teamName }) => {
           alignItems: 'start'
         }}>
           {/* Radar Chart */}
-          <Box sx={{ width: '100%', height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart outerRadius={120} data={radarData}>
-                <PolarGrid />
-                <PolarAngleAxis 
-                  dataKey="phase" 
-                  tick={{ fontSize: 12 }}
-                />
-                <PolarRadiusAxis 
-                  tick={{ fontSize: 10 }}
-                  domain={[0, 100]}
-                  tickCount={6}
-                />
-                <Radar
-                  name="Percentile"
-                  dataKey="value"
-                  stroke="#8884d8"
-                  fill="#8884d8"
-                  fillOpacity={0.3}
-                  strokeWidth={2}
-                />
-                <CustomTooltip />
-              </RadarChart>
-            </ResponsiveContainer>
+          <Box>
+            {/* Percentile bars around the median replace the radar (rotated axis, 10px ticks). */}
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>Batting percentile by phase</Typography>
+            <PhasePercentileBars phaseStats={phaseStats} metrics={[{ key: 'normalized_average', label: 'Average' }, { key: 'normalized_strike_rate', label: 'Strike rate' }]} ariaLabel="Batting percentile by phase" />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              Centre line = median team; right of it is better.
+            </Typography>
           </Box>
           
           {/* Data Table */}
