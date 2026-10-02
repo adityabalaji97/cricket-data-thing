@@ -1075,7 +1075,18 @@ def get_players(db: Session = Depends(get_session)):
     )
     
     players = set([b[0] for b in batters] + [bo[0] for bo in bowlers])
-    return sorted(list(players))
+    # One entry per player: the stats tables hold several spellings of the same person
+    # ("V Kohli" / "Virat Kohli", "Vaibhav Suryavanshi" / "Vaibhav Sooryavanshi"), which showed up
+    # as separate players in the picker. Map each through player_alias_map (any spelling ->
+    # canonical); the profile endpoints already expand a canonical name back to every spelling.
+    try:
+        canonical = dict(db.execute(text(
+            "SELECT name_key, canonical_name FROM player_alias_map WHERE name_key = ANY(:keys)"
+        ), {"keys": [p.lower() for p in players if p]}).fetchall())
+        players = {canonical.get(p.lower(), p) for p in players if p}
+    except Exception as exc:
+        logger.warning("players list: alias collapse skipped: %s", exc)
+    return sorted(players)
 
 @app.get("/venues")
 def get_venues(db: Session = Depends(get_session)):
