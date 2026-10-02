@@ -13,6 +13,7 @@ import SearchBar from './SearchBar';
 import { findExactSearchMatch } from './SearchBar';
 import PlayerSearchResult from './PlayerSearchResult';
 import { API_BASE_URL } from './searchConfig';
+import playerProfileUrl from '../../utils/playerProfileUrl';
 
 const GoogleSearchLanding = () => {
   const navigate = useNavigate();
@@ -29,13 +30,8 @@ const GoogleSearchLanding = () => {
 
   const routeEntity = (item, replace = false) => {
     if (item.type === 'player') {
-      setSelectedEntity(item);
-      // Build URL with any existing date filters
-      const params = new URLSearchParams();
-      params.set('q', item.name);
-      if (dateFilters.startDate) params.set('start_date', dateFilters.startDate);
-      if (dateFilters.endDate) params.set('end_date', dateFilters.endDate);
-      navigate(`/search?${params.toString()}`, { replace });
+      // Straight to the profile; the intermediate search-result card was an extra tap.
+      navigate(playerProfileUrl(item, dateFilters), { replace });
     } else if (item.type === 'team') {
       navigate(`/team?team=${encodeURIComponent(item.name)}&autoload=true`, { replace });
     } else if (item.type === 'venue') {
@@ -93,13 +89,7 @@ const GoogleSearchLanding = () => {
       const data = response.data;
       
       if (data.type === 'player') {
-        // Use legacy name for profile lookup, full object for state
-        setSelectedEntity(data);
-        const params = new URLSearchParams();
-        params.set('q', data.name);
-        if (dateFilters.startDate) params.set('start_date', dateFilters.startDate);
-        if (dateFilters.endDate) params.set('end_date', dateFilters.endDate);
-        navigate(`/search?${params.toString()}`, { replace: true });
+        navigate(playerProfileUrl(data, dateFilters));
       } else if (data.type === 'team') {
         navigate(`/team?team=${encodeURIComponent(data.name)}&autoload=true`);
       } else if (data.type === 'venue') {

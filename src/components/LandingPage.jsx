@@ -29,6 +29,7 @@ import { getTeamColor, textOn } from '../utils/teamColors';
 import SearchBar from './search/SearchBar';
 import { colors as dark, fonts } from '../theme/hindsightDark';
 import { useFormat } from '../context/FormatContext';
+import playerProfileUrl from '../utils/playerProfileUrl';
 
 // Mapped onto the shared dark-theme tokens rather than redefining them; see
 // src/theme/hindsightDark.js. The names are kept short because they are used densely
@@ -269,7 +270,7 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
 
   const routeEntity = (item) => {
     if (item.type === 'player') {
-      navigate(`/search?q=${encodeURIComponent(item.name)}`);
+      navigate(playerProfileUrl(item));
     } else if (item.type === 'team') {
       navigate(`/team?team=${encodeURIComponent(item.name)}&autoload=true`);
     } else if (item.type === 'venue') {
