@@ -24,8 +24,11 @@ import {
 } from 'recharts';
 import ZoomableChart from './common/ZoomableChart';
 import { getAutoscaledDomain } from '../utils/chartDomainUtils';
+import useIsMobile from '../hooks/useIsMobile';
+import { axisLabel } from '../theme/chartDefaults';
 
 const ComparisonInningsScatter = ({ batters }) => {
+  const { isMobile } = useIsMobile();
   const [xMetric, setXMetric] = useState('balls_faced');
   const [yMetric, setYMetric] = useState('strike_rate');
   const [visiblePlayers, setVisiblePlayers] = useState(
@@ -295,11 +298,7 @@ const ComparisonInningsScatter = ({ batters }) => {
                   domain={yMetricDomain}
                   dataKey={yAxisMetrics[yMetric].key}
                   name={yAxisMetrics[yMetric].label}
-                  label={{
-                    value: yAxisMetrics[yMetric].label,
-                    angle: -90,
-                    position: 'left'
-                  }}
+                  label={axisLabel(isMobile, yAxisMetrics[yMetric].label)}
                 />
                 {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke="#666" strokeDasharray="3 3" />}
                 {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />}

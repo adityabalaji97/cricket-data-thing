@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Paper, Typography, Box, CircularProgress } from '@mui/material';
 import config from '../config';
+import useIsMobile from '../hooks/useIsMobile';
+import { axisLabel } from '../theme/chartDefaults';
 
 // Colors for different batters
 const COLORS = [
@@ -10,6 +12,7 @@ const COLORS = [
 ];
 
 const ComparisonStrikeRateProgression = ({ batters }) => {
+  const { isMobile } = useIsMobile();
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState([]);
@@ -148,11 +151,11 @@ const ComparisonStrikeRateProgression = ({ batters }) => {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
                 dataKey="ball_number"
-                label={{ value: 'Ball Number', position: 'bottom', offset: 10 }}
+                label={axisLabel(isMobile, 'Ball Number', { side: 'bottom' })}
               />
               <YAxis 
                 domain={[minSR, maxSR]}
-                label={{ value: 'Strike Rate', angle: -90, position: 'insideLeft' }}
+                label={axisLabel(isMobile, 'Strike Rate')}
               />
               <Tooltip 
                 formatter={(value, name) => [value ? value.toFixed(2) : 'N/A', name]}
