@@ -286,6 +286,24 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     }
   }, [playerType]);
 
+  // Players who do both open on their main role: a link without ?tab= for a specialist bowler
+  // (Bumrah) opened his batting profile. Bowling wins when he has bowled more than twice the balls
+  // he has faced. Decided once per loaded player, and never over an explicit ?tab= or a tap.
+  const roleChosenFor = useRef(null);
+  useEffect(() => {
+    if (!applied?.player || roleChosenFor.current === applied.player) return;
+    // Wait for both fetches: deciding on the first one to land saw 0 balls bowled.
+    if (loading || (!battingStats && !bowlingStats)) return;
+    roleChosenFor.current = applied.player;
+    if (getQueryParam('tab')) return;
+    // Batting overall has no balls field; runs x 100 / strike rate gives balls faced.
+    const bo = battingStats?.overall;
+    const faced = bo?.balls ?? (bo?.strike_rate ? ((bo.runs || 0) * 100) / bo.strike_rate : 0);
+    const bowled = bowlingStats?.overall?.balls ?? 0;
+    if (bowled > 2 * faced) setActiveTab('bowling');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applied, battingStats, bowlingStats, loading]);
+
   useEffect(() => {
     if (initialLoadComplete && selectedPlayer && getQueryParam('autoload') === 'true' && !battingStats && !bowlingStats && !loading && !shouldFetch) {
       const timer = setTimeout(() => setShouldFetch(true), 500);

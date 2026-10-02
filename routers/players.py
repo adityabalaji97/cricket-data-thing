@@ -126,13 +126,23 @@ def get_bowling_dismissal_stats(
 
 @router.get("/{player_name}/player_type")
 def get_player_type(player_name: str, db: Session = Depends(get_session)):
-    """Detect if player has batting and/or bowling data."""
-    try:
-        batting_query = text("SELECT COUNT(*) FROM deliveries WHERE batter = :name LIMIT 1")
-        bowling_query = text("SELECT COUNT(*) FROM deliveries WHERE bowler = :name LIMIT 1")
+    """Detect if player has batting and/or bowling data.
 
-        has_batting = db.execute(batting_query, {"name": player_name}).scalar() > 0
-        has_bowling = db.execute(bowling_query, {"name": player_name}).scalar() > 0
+    Checks every stored spelling of the player (expand_name_group) in the per-innings stats tables,
+    which hold both naming conventions. It used to look up the exact URL name in the legacy
+    deliveries table only, so full names ("Jasprit Bumrah", which search and the player list now
+    use) came back as no batting and no bowling, and the profile hid its Batting/Bowling toggle.
+    """
+    from services.player_aliases import expand_name_group
+
+    try:
+        names = expand_name_group([player_name], db) or [player_name]
+        has_batting = bool(db.execute(
+            text("SELECT EXISTS (SELECT 1 FROM batting_stats WHERE striker = ANY(:names))"), {"names": names}
+        ).scalar())
+        has_bowling = bool(db.execute(
+            text("SELECT EXISTS (SELECT 1 FROM bowling_stats WHERE bowler = ANY(:names))"), {"names": names}
+        ).scalar())
 
         return {
             "player_name": player_name,
