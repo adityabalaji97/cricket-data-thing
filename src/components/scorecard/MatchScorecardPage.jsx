@@ -730,7 +730,8 @@ const WagonSpokes = ({ rows, color, bowling = false }) => {
   const spokes = buildSpokes(rows.rows);
   return (
     <div className="wagon-wrap">
-      <svg viewBox="0 0 100 100" width="240" height="240">
+      {/* Scales with the card (was a fixed 240px, which drew its 3.6-unit zone labels at ~8.6px). */}
+      <svg viewBox="0 0 100 100" width="100%" style={{ maxWidth: 320 }}>
         <circle cx="50" cy="52" r="44" fill={bowling ? 'rgba(91,141,239,0.04)' : 'rgba(240,180,41,0.04)'} />
         <circle cx="50" cy="52" r="22" />
         {spokes.map((zone) => (
