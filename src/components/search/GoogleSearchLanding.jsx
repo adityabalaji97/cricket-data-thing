@@ -197,27 +197,31 @@ const GoogleSearchLanding = () => {
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
             Quick Links
           </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(4, max-content)' }, gap: 1 }}>
             <Button
               size="small"
-              onClick={() => handleSelect({ name: 'V Kohli', type: 'player' })}
+              sx={{ justifyContent: 'flex-start', minHeight: 36 }}
+              onClick={() => handleSelect({ name: 'Virat Kohli', type: 'player' })}
             >
-              V Kohli
+              Virat Kohli
             </Button>
             <Button
               size="small"
-              onClick={() => handleSelect({ name: 'JJ Bumrah', type: 'player' })}
+              sx={{ justifyContent: 'flex-start', minHeight: 36 }}
+              onClick={() => handleSelect({ name: 'Jasprit Bumrah', type: 'player' })}
             >
-              JJ Bumrah
+              Jasprit Bumrah
             </Button>
             <Button
               size="small"
+              sx={{ justifyContent: 'flex-start', minHeight: 36 }}
               onClick={() => handleSelect({ name: 'MS Dhoni', type: 'player' })}
             >
               MS Dhoni
             </Button>
             <Button
               size="small"
+              sx={{ justifyContent: 'flex-start', minHeight: 36 }}
               onClick={() => handleSelect({ name: 'Hardik Pandya', type: 'player' })}
             >
               Hardik Pandya

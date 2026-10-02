@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
+  IconButton,
   TextField,
   Paper,
   List,
@@ -20,6 +21,7 @@ import StadiumIcon from '@mui/icons-material/Stadium';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL, SEARCH_DEBOUNCE_MS, MIN_SEARCH_LENGTH } from './searchConfig';
+import useIsMobile from '../../hooks/useIsMobile';
 
 export const normalizeSearchText = (value) =>
   String(value || '')
@@ -49,6 +51,7 @@ const SearchBar = ({
   variant = 'dark',
 }) => {
   const navigate = useNavigate();
+  const { isMobile } = useIsMobile();
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -210,18 +213,33 @@ const SearchBar = ({
           autoFocus={autoFocus}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={placeholder}
+          placeholder={isMobile ? 'Players, teams, venues' : placeholder}
           variant="outlined"
           onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
           InputProps={{
-            startAdornment: (
+            // Phones show the (tappable) search icon at the end instead; two magnifiers read as a bug.
+            startAdornment: !isMobile && (
               <InputAdornment position="start">
                 <SearchIcon sx={{ color: dark ? '#9aa1ac' : 'action.active' }} />
               </InputAdornment>
             ),
-            endAdornment: loading && (
+            // Phones: the submit sits inside the field (the separate square button squeezed the
+            // field and cut the placeholder off at 390px).
+            endAdornment: (loading || isMobile) && (
               <InputAdornment position="end">
-                <CircularProgress size={20} />
+                {loading ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  <IconButton
+                    type="submit"
+                    edge="end"
+                    aria-label="Search"
+                    disabled={!query.trim() || submitting}
+                    sx={{ width: 40, height: 40, color: dark ? '#b6f24a' : 'primary.main' }}
+                  >
+                    <SearchIcon />
+                  </IconButton>
+                )}
               </InputAdornment>
             ),
             sx: {
@@ -244,6 +262,9 @@ const SearchBar = ({
           type="submit"
           disabled={!query.trim() || submitting}
           sx={{
+            display: { xs: 'none', sm: 'inline-flex' },
+            alignItems: 'center',
+            justifyContent: 'center',
             border: 0,
             px: { xs: 1.8, sm: 2.5 },
             borderRadius: 3,
