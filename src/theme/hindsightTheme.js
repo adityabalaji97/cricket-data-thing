@@ -167,6 +167,12 @@ const hindsightTheme = createTheme({
         },
       },
     },
+    // Sortable headers were 27px tall tap targets on phones; 32px without changing the row look.
+    MuiTableSortLabel: {
+      styleOverrides: {
+        root: { minHeight: 32 },
+      },
+    },
     MuiTableCell: {
       styleOverrides: {
         root: {
