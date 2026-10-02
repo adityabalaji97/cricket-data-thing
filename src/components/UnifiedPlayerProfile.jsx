@@ -25,12 +25,13 @@ import RecentFormStrip from './playerProfile/RecentFormStrip';
 import AdvancedBowlingAnalyticsSection from './playerProfile/AdvancedBowlingAnalyticsSection';
 import BoundaryAnalysis from './BoundaryAnalysis';
 import LazySection from './ui/LazySection';
+import CollapsibleSection, { openSection } from './ui/CollapsibleSection';
+import useIsMobile from '../hooks/useIsMobile';
 import ImpactSection from './playerProfile/sections/ImpactSection';
 import FilterSummary, { joinSummary, summarizeCompetitions, summarizeDateRange } from './ui/FilterSummary';
 import usePlayerData from '../hooks/usePlayerData';
 import config from '../config';
 import { PROFILE_START_DATE } from '../utils/dateDefaults';
-import { SECTION_SCROLL_MARGIN } from '../theme/layout';
 
 const DEFAULT_START_DATE = PROFILE_START_DATE;
 const TODAY = new Date().toISOString().split('T')[0];
@@ -163,6 +164,9 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   const theme = useTheme();
   const isMobileMedia = useMediaQuery(theme.breakpoints.down('md'));
   const isMobile = isMobileProp ?? isMobileMedia;
+  // Page layout (folded sections + chip nav) runs to md, so portrait tablets (600-899px) no longer
+  // get the desktop 240px sidebar squeezed beside the cards. Charts still size on isMobile.
+  const { isCompact } = useIsMobile();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -357,6 +361,15 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   const hasData = currentStats !== null;
 
   // Build section groups (mirrors VenueNotes pattern)
+  const overviewTakeaway = (() => {
+    const o = currentStats?.overall;
+    if (!o) return undefined;
+    if (activeTab === 'bowling') {
+      return `${o.wickets || 0} wickets at economy ${(o.economy_rate || 0).toFixed(2)} in ${o.matches || 0} matches`;
+    }
+    return `${o.runs || 0} runs at average ${(o.average || 0).toFixed(1)}, strike rate ${(o.strike_rate || 0).toFixed(1)}`;
+  })();
+
   const sectionGroups = useMemo(() => {
     if (!hasData || !applied) return [];
     const { player: appliedPlayer, dateRange: appliedRange, venue: appliedVenue, competitionFilters: appliedCompetitions } = applied;
@@ -365,11 +378,15 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       {
         id: 'overview',
         label: 'Overview',
+        defaultOpen: true,
+        takeaway: overviewTakeaway,
         content: <OverviewSection stats={currentStats} mode={activeTab} />,
       },
       {
         id: 'impact',
         label: 'Impact',
+        defaultOpen: true,
+        takeaway: 'Runs added compared with an average player in the same situations',
         content: (
           <ImpactSection
             playerName={appliedPlayer}
@@ -383,6 +400,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       {
         id: 'global-rank',
         label: 'Global T20 Rank',
+        takeaway: 'Where the player ranks among T20 players worldwide',
         content: (
           <GlobalT20RankSection
             mode={activeTab}
@@ -395,6 +413,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       {
         id: 'dna',
         label: 'DNA & Similar',
+        takeaway: 'Playing style in words, and the most similar players',
         content: (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <PlayerDNASummary
@@ -425,6 +444,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       {
         id: 'performance',
         label: 'Performance',
+        takeaway: 'By phase, against pace and spin, by line and length',
         content: (
           <PerformanceSection
             stats={currentStats}
@@ -444,6 +464,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       groups.push({
         id: 'matchups',
         label: 'Matchups',
+        takeaway: 'Against each bowling type',
         content: (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <BowlingMatchupMatrix stats={battingStats} />
@@ -456,6 +477,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     groups.push({
       id: 'advanced-analytics',
       label: 'Advanced Analytics',
+      takeaway: 'Pressure, spells and rolling form',
       content: (
         activeTab === 'bowling' ? (
           <AdvancedBowlingAnalyticsSection
@@ -479,6 +501,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     groups.push({
       id: 'boundaries',
       label: 'Boundaries',
+      takeaway: 'How often boundaries come, by phase and bowler type',
       content: (
         <BoundaryAnalysis
           context={activeTab === 'bowling' ? 'bowler' : 'batter'}
@@ -495,6 +518,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     groups.push({
       id: 'dismissals',
       label: activeTab === 'bowling' ? 'Wickets' : 'Dismissals',
+      takeaway: 'How and where wickets fall',
       content: (
         <DismissalSection
           dismissalData={currentDismissalStats}
@@ -511,6 +535,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     groups.push({
       id: 'visualizations',
       label: 'Visualizations',
+      takeaway: 'Innings by innings: scores, strike rate, consistency',
       content: (
         <VisualizationsSection
           stats={currentStats}
@@ -526,6 +551,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     groups.push({
       id: 'explore',
       label: 'Explore',
+      takeaway: 'Ready-made questions for the query builder',
       content: (
         <ExploreSection
           playerName={appliedPlayer}
@@ -539,16 +565,21 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     return groups;
   }, [
     hasData, currentStats, currentDismissalStats, activeTab, battingStats,
-    applied, isMobile, fetchTrigger,
+    applied, isMobile, fetchTrigger, overviewTakeaway,
     globalRankPayload, globalRankLoading, globalRankFailed,
   ]);
 
   // Scroll to section handler
   const handleSectionSelect = useCallback((sectionId) => {
     setActiveSectionId(sectionId);
+    if (isCompact) {
+      // Opens the folded section, then scrolls to it.
+      openSection(`section-${sectionId}`);
+      return;
+    }
     const el = sectionRefs.current[sectionId];
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
+  }, [isCompact]);
 
   // Reset active section on tab change or new data
   useEffect(() => {
@@ -637,7 +668,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
               value={selectedVenue}
               onChange={(_, newValue) => setSelectedVenue(newValue)}
               options={venues}
-              sx={{ width: 250 }}
+              sx={{ width: { xs: '100%', md: 250 } }}
               renderInput={(params) => <TextField {...params} label="Select Venue" />}
             />
             <Button
@@ -680,15 +711,15 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
-              <Typography
-                variant={isMobile ? 'h5' : 'h4'}
-                sx={{ fontWeight: 700, lineHeight: 1.15, flex: 1, minWidth: 0 }}
-              >
-                {selectedPlayer}
-                <Typography variant="subtitle1" color="text.secondary" component="span" sx={{ ml: 1 }}>
-                  {activeTab === 'bowling' ? 'Bowling' : 'Batting'} Profile
+              {/* Name and caption stack, so a phone never splits "V / Kohli Batting / Profile". */}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant={isMobile ? 'h5' : 'h4'} sx={{ fontWeight: 700, lineHeight: 1.15 }}>
+                  {selectedPlayer}
                 </Typography>
-              </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {activeTab === 'bowling' ? 'Bowling' : 'Batting'} profile
+                </Typography>
+              </Box>
 
               <ShareButton variant="icon" kind="player" title={`${selectedPlayer} on Hindsight`} />
               {showBattingTab && showBowlingTab && (
@@ -697,7 +728,8 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
                   exclusive
                   onChange={handleTabChange}
                   size="small"
-                  sx={{ flexShrink: 0 }}
+                  fullWidth={isMobile}
+                  sx={{ flexShrink: 0, flexBasis: { xs: '100%', sm: 'auto' } }}
                 >
                   <ToggleButton value="batting" sx={{ px: 2 }}>Batting</ToggleButton>
                   <ToggleButton value="bowling" sx={{ px: 2 }}>Bowling</ToggleButton>
@@ -709,25 +741,31 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
           </Box>
 
           {/* Section navigation + content */}
-          {isMobile ? (
+          {isCompact ? (
             <>
               <VenueSectionTabs
                 sections={sectionGroups.map(({ id, label }) => ({ id, label }))}
                 activeSectionId={activeSectionId}
                 onSectionSelect={handleSectionSelect}
               />
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, px: 1, pb: 2 }}>
-                {sectionGroups.map((section, index) => (
+              {/* Phones and portrait tablets: each section folds to its title and a one-line
+                  takeaway; Overview and Impact start open. A section mounts (and fetches) the
+                  first time it is opened. */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', px: 1, pb: 2 }}>
+                {sectionGroups.map((section) => (
                   <Box
-                    key={section.id}
+                    key={`${activeTab}-${section.id}`}
                     ref={(el) => { sectionRefs.current[section.id] = el; }}
                     data-section-id={section.id}
-                    sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN }}
                   >
-                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, px: 0.5 }}>
-                      {section.label}
-                    </Typography>
-                    <LazySection eager={index < 2}>{section.content}</LazySection>
+                    <CollapsibleSection
+                      id={`section-${section.id}`}
+                      title={section.label}
+                      takeaway={section.takeaway}
+                      defaultOpen={Boolean(section.defaultOpen)}
+                    >
+                      {section.content}
+                    </CollapsibleSection>
                   </Box>
                 ))}
               </Box>
