@@ -106,7 +106,9 @@ def plan(idea: str, fmt_choice: Optional[str], db: Session) -> Dict[str, Any]:
                 filters.pop(key, None)
     metric = _metric_for(idea, parsed)
     params = {**filters, "group_by": group_by, "fmt": fmt, "gender": "male", "query_mode": filters.get("query_mode") or "delivery"}
-    return {"params": params, "metric": metric, "highlight": highlight, "explanation": parsed.get("explanation")}
+    return {"params": params, "metric": metric, "highlight": highlight, "explanation": parsed.get("explanation"),
+            # Kept for the chart chooser: a scatter is offered only when the question named two metrics.
+            "chart": parsed.get("recommended_chart")}
 
 
 def _row_name(row: Dict[str, Any], label_key: str) -> str:
@@ -395,6 +397,53 @@ def _poss_team(name: str) -> str:
     return f"{name}'" if name.endswith("s") else f"{name}'s"
 
 
+def _form_base(data: Dict[str, Any], **extra) -> Dict[str, Any]:
+    keep = ("kicker", "subtitle", "filter_chips", "group_by", "hindsight_url", "total_rows", "source", "metric_label")
+    return {**{k: data[k] for k in keep if k in data}, **extra}
+
+
+def _line_form(rows, label_key, metric, idx, data, parts):
+    """A season trend: rows in time order, the subject's (or latest) season highlighted."""
+    ordered = sorted(rows, key=lambda r: str(r.get(label_key)))
+    hi_label = rows[idx].get(label_key) if idx is not None else ordered[-1].get(label_key)
+    points = [{"x": str(r.get(label_key)), "y": float(r[metric]), "display": _value_text(metric, float(r[metric])),
+               "highlight": r.get(label_key) == hi_label} for r in ordered if r.get(metric) is not None]
+    first, last = points[0], points[-1]
+    who = parts["who"]
+    title = (f"{who + chr(39) + 's ' if who else ''}{metric_label(metric)} by season: "
+             f"{first['display']} in {first['x']}, {last['display']} in {last['x']}")
+    return _form_base(data, layout="line", title=title, metric=metric, points=points), title
+
+
+def _scatter_form(rows, label_key, axes, idx, data, name, total, parts):
+    """Two metrics across the field (top 40 by the ranking metric, plus the subject)."""
+    x, y = axes
+    take = list(range(min(40, len(rows))))
+    if idx is not None and idx not in take:
+        take.append(idx)
+    points = [{"label": _row_name(rows[i], label_key), "x": float(rows[i][x]), "y": float(rows[i][y]),
+               "highlight": i == idx} for i in take if rows[i].get(x) is not None and rows[i].get(y) is not None]
+    subj = rows[idx] if idx is not None else None
+    if subj is not None:
+        title = (f"{name}: {metric_label(y).lower()} {_value_text(y, float(subj[y]))} at "
+                 f"{metric_label(x).lower()} {_value_text(x, float(subj[x]))} among {total:,} {parts['scope']}{parts['window']}")
+    else:
+        title = f"{metric_label(y)} v {metric_label(x)}: {parts['scope']}{parts['window']}"
+    unit = (data.get("group_by") or ["players"])[0].replace("_", " ") + "s"
+    return _form_base(data, layout="scatter", title=title, x_metric=x, y_metric=y, points=points, unit=unit), title
+
+
+def _stat_form(rows, label_key, metric, idx, total, data, name, parts, title):
+    """The single headline number, its rank, and the next three for context."""
+    i = idx or 0
+    value = float(rows[i][metric])
+    context = [{"rank": j + 1, "label": _row_name(rows[j], label_key), "display": _value_text(metric, float(rows[j][metric]))}
+               for j in range(len(rows)) if j != i][:3]
+    rank_text = f"{ordinal(i + 1)} of {total:,} {parts['scope']}{parts['minimum']}{parts['window']}"
+    return _form_base(data, layout="stat", title=title, metric=metric, value_display=_value_text(metric, value),
+                      subject=name, rank_text=rank_text, context=context), title
+
+
 def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, Any]:
     """Run a planned idea. Returns {status: 'resolved', fact, snapshot} or {status: 'parked', note}."""
     from services.snapshots import create_static_snapshot
@@ -430,6 +479,12 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
         metric = (full.get("chart") or {}).get("metric")
     if not rows or not metric:
         return {"status": "parked", "note": "The query returned nothing to chart yet."}
+    # A row without the metric (e.g. no control data for that batter) cannot be ranked; it used to sort
+    # first and crash the build. The total counts only rankable rows.
+    unrankable = sum(1 for r in rows if r.get(metric) is None)
+    rows = [r for r in rows if r.get(metric) is not None]
+    if not rows:
+        return {"status": "parked", "note": "No rows have a value for this metric yet."}
 
     # "…in the first ODI v WI": a per-match question about a named opponent. The subject must come
     # from a recent match against that team, not from any match in history.
@@ -446,7 +501,12 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
                         "note": f"No match v {opponent} in the last {MATCH_WINDOW_DAYS} days is loaded yet.{when}"}
 
     idx = 0
-    mentions = [] if highlight else _mentions(idea_text)
+    # Grouped by season, the rows are years: the player named in the idea is a filter, not a row to find.
+    from services.pack_charts import TIME_KEYS
+    time_rows = label_key in TIME_KEYS
+    mentions = [] if (highlight or time_rows) else _mentions(idea_text)
+    if time_rows:
+        highlight = None
     if highlight or mentions:
         found = _find(candidates, label_key, highlight) if highlight else _find_mentioned(candidates, label_key, mentions)
         idx = rows.index(candidates[found]) if found is not None else None  # rank in the full ordering
@@ -455,7 +515,7 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
             latest = _latest_loaded(db, params.get("fmt") or "ALL")
             when = f" Latest match loaded: {latest:%d %b %Y}." if latest else ""
             return {"status": "parked", "note": f"{' & '.join(highlight)} not in this query's results yet.{when}"}
-    row, total = rows[idx], int(full.get("total_rows") or len(rows))
+    row, total = rows[idx], (int(full.get("total_rows") or len(rows)) - unrankable if unrankable else int(full.get("total_rows") or len(rows)))
     value = float(row[metric])
     parts = title_parts(params)
     name = _row_name(row, label_key).replace(" & ", " and ")
@@ -475,14 +535,43 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
         "chart": {"type": "bar", "label_key": "label", "metric": metric},
         "hindsight_url": full.get("hindsight_url"), "total_rows": total, "source": "ball-by-ball",
     }
-    snap = create_static_snapshot(db, "ranking", data, title, {"idea": idea_text, "params": query_params, "metric": metric, "title": title},
-                                  created_by="idea")
+    # Chart forms (services/pack_charts): every form the data supports gets its own snapshot so the
+    # admin page can switch; Jev (or the rule order) picks which one the pack leads with.
+    from services import pack_charts
+
+    axes = pack_charts.scatter_axes(planned.get("chart"), metric, rows)
+    shape = {"group_by": params["group_by"], "rows": len(rows), "metric": metric, "subject": name,
+             "has_subject": bool(highlight or mentions), "scatter": axes}
+    forms = pack_charts.valid_forms(shape) or ["bars"]
+    ranking = pack_charts.rank_forms(idea_text, shape, forms)
+    form_data = {"bars": (data, title)}
+    if "line" in forms:
+        form_data["line"] = _line_form(rows, label_key, metric, idx, data, parts)
+    if "scatter" in forms:
+        form_data["scatter"] = _scatter_form(rows, label_key, axes, idx, data, name, total, parts)
+    if "stat" in forms:
+        form_data["stat"] = _stat_form(rows, label_key, metric, idx, total, data, name, parts, title)
+    snaps = {}
+    for form in ranking["order"]:
+        form_payload, form_title = form_data.get(form, (None, None))
+        if form_payload is None:
+            continue
+        snaps[form] = create_static_snapshot(
+            db, "ranking", form_payload, form_title,
+            {"idea": idea_text, "params": query_params, "metric": metric, "title": form_title, "form": form},
+            created_by="idea")
+    lead = next(f for f in ranking["order"] if f in snaps)
+    snap = snaps[lead]
+    title = form_data[lead][1]
+    chart_options = [{"form": f, "snapshot_id": snaps[f]["id"], "title": form_data[f][1],
+                      "p": ranking["probabilities"].get(f)} for f in ranking["order"] if f in snaps]
     fact = {
         "kind": "idea", "subject": name, "title": title,
         "numbers": {"value": round(value, 2), "rank": idx + 1, "total": total, "min_balls": params.get("min_balls"),
                     "years": [d.year for d in (params.get("start_date"), params.get("end_date")) if d]},
         "method": f"Ranked by {metric_label(metric)} among {total:,} {parts['scope']}{parts['overs']}{parts['minimum']}{parts['window']}, "
                   "from ball-by-ball data on Hindsight's query builder.",
+        "chart_options": chart_options, "chart_picked_by": ranking["by"],
     }
     return {"status": "resolved", "fact": fact, "snapshot": snap}
 

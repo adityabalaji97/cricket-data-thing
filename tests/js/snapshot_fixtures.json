@@ -1,1 +1,923 @@
-{"query":{"id":"IpmnpGQvo","kind":"query","title":"Most controlled ODI partnerships since 2019 (1,000+ balls)","data":{"title":"Most controlled ODI partnerships since 2019 (1,000+ balls)","subtitle":"8 of 48 rows \u00b7 ranked by control_percentage","filter_chips":["2019-01-01 \u2192 today","ODI"],"group_by":["partnership"],"query_mode":"delivery","columns":["partnership","balls","runs","wickets","innings_count","average","strike_rate","balls_per_dismissal","dot_percentage","boundary_percentage","control_percentage","fours","sixes","dots","boundaries","percent_balls","impact","impact_per_100","impact_per_innings","raa","raa_per_100","waa","waa_per_100","wpa","avg_leverage"],"metric_columns":["balls","runs","wickets","innings_count","average","strike_rate","balls_per_dismissal","dot_percentage","boundary_percentage","control_percentage","fours","sixes","dots","boundaries","percent_balls"],"rows":[{"partnership":"Milind Kumar & Saiteja Mukkamalla","balls":1074,"innings_count":20,"runs":1033,"wickets":7,"dots":479,"boundaries":102,"fours":79,"sixes":23,"average":147.57,"strike_rate":96.18,"balls_per_dismissal":153.43,"dot_percentage":44.6,"boundary_percentage":9.5,"control_percentage":90.19,"percent_balls":0.22,"impact":null,"impact_per_100":null,"impact_per_innings":null,"raa":null,"raa_per_100":null,"waa":null,"waa_per_100":null,"wpa":null,"avg_leverage":null},{"partnership":"Shubman Gill & Virat Kohli","balls":1060,"innings_count":37,"runs":1027,"wickets":19,"dots":489,"boundaries":119,"fours":102,"sixes":17,"average":54.05,"strike_rate":96.89,"balls_per_dismissal":55.79,"dot_percentage":46.13,"boundary_percentage":11.23,"control_percentage":87.31,"percent_balls":0.21,"impact":null,"impact_per_100":null,"impact_per_innings":null,"raa":null,"raa_per_100":null,"waa":null,"waa_per_100":null,"wpa":null,"avg_leverage":null},{"partnership":"KL Rahul & Virat Kohli","balls":1676,"innings_count":48,"runs":1556,"wickets":23,"dots":717,"boundaries":146,"fours":117,"sixes":29,"average":67.65,"strike_rate":92.84,"balls_per_dismissal":72.87,"dot_percentage":42.78,"boundary_percentage":8.71,"control_percentage":86.88,"percent_balls":0.34,"impact":null,"impact_per_100":null,"impact_per_innings":null,"raa":null,"raa_per_100":null,"waa":null,"waa_per_100":null,"wpa":null,"avg_leverage":null},{"partnership":"Marnus Labuschagne & Steven Smith","balls":1198,"innings_count":32,"runs":1020,"wickets":16,"dots":541,"boundaries":90,"fours":86,"sixes":4,"average":63.75,"strike_rate":85.14,"balls_per_dismissal":74.88,"dot_percentage":45.16,"boundary_percentage":7.51,"control_percentage":86.75,"percent_balls":0.24,"impact":null,"impact_per_100":null,"impact_per_innings":null,"raa":null,"raa_per_100":null,"waa":null,"waa_per_100":null,"wpa":null,"avg_leverage":null},{"partnership":"Babar Azam & Mohammad Rizwan","balls":1925,"innings_count":48,"runs":1660,"wickets":27,"dots":926,"boundaries":165,"fours":147,"sixes":18,"average":61.48,"strike_rate":86.23,"balls_per_dismissal":71.3,"dot_percentage":48.1,"boundary_percentage":8.57,"control_percentage":86.5,"percent_balls":0.39,"impact":null,"impact_per_100":null,"impact_per_innings":null,"raa":null,"raa_per_100":null,"waa":null,"waa_per_100":null,"wpa":null,"avg_leverage":null},{"partnership":"Shreyas Iyer & Virat Kohli","balls":1871,"innings_count":52,"runs":1836,"wickets":29,"dots":775,"boundaries":189,"fours":158,"sixes":31,"average":63.31,"strike_rate":98.13,"balls_per_dismissal":64.52,"dot_percentage":41.42,"boundary_percentage":10.1,"control_percentage":86.47,"percent_balls":0.38,"impact":null,"impact_per_100":null,"impact_per_innings":null,"raa":null,"raa_per_100":null,"waa":null,"waa_per_100":null,"wpa":null,"avg_leverage":null},{"partnership":"Aarif Sheikh & Rohit Paudel","balls":1346,"innings_count":38,"runs":990,"wickets":18,"dots":706,"boundaries":74,"fours":67,"sixes":7,"average":55.0,"strike_rate":73.55,"balls_per_dismissal":74.78,"dot_percentage":52.45,"boundary_percentage":5.5,"control_percentage":86.37,"percent_balls":0.27,"impact":null,"impact_per_100":null,"impact_per_innings":null,"raa":null,"raa_per_100":null,"waa":null,"waa_per_100":null,"wpa":null,"avg_leverage":null},{"partnership":"Babar Azam & Imam-ul-Haq","balls":2380,"innings_count":49,"runs":2106,"wickets":26,"dots":1099,"boundaries":202,"fours":194,"sixes":8,"average":81.0,"strike_rate":88.49,"balls_per_dismissal":91.54,"dot_percentage":46.18,"boundary_percentage":8.49,"control_percentage":85.51,"percent_balls":0.48,"impact":null,"impact_per_100":null,"impact_per_innings":null,"raa":null,"raa_per_100":null,"waa":null,"waa_per_100":null,"wpa":null,"avg_leverage":null}],"total_rows":48,"chart":{"type":"bar","label_key":"partnership","metric":"control_percentage"},"hindsight_url":"https://hindsightcricket.com/query?min_balls=1000&start_date=2019-01-01&group_by=partnership&fmt=mens-odi","warnings":[],"note":null,"metrics_perspective":null,"highlight":null},"created_at":"2026-09-30T09:45:31.852536+00:00"},"win_prob":{"id":"i1CGtHQYG","kind":"win_prob","title":"Win probability \u00b7 Chennai Super Kings won by 8 wickets","data":{"match_id":"1529287","date":"2026-05-02","competition":"IPL","venue":"MA Chidambaram Stadium","result":"Chennai Super Kings won by 8 wickets","teams":[{"name":"Mumbai Indians","accent":"#f0b429"},{"name":"Chennai Super Kings","accent":"#5b8def"}],"scores":[{"innings":1,"team":"Mumbai Indians","batting_team":"Mumbai Indians","bowling_team":"Chennai Super Kings","runs":159,"wickets":7,"overs":"20.0","balls":120,"run_rate":7.95,"target":null},{"innings":2,"team":"Chennai Super Kings","batting_team":"Chennai Super Kings","bowling_team":"Mumbai Indians","runs":160,"wickets":2,"overs":"18.1","balls":109,"run_rate":8.81,"target":160}],"primer":{"win_probability":{"team":"Mumbai Indians","points":[0.5079,0.5001,0.4922,0.4922,0.4842,0.4761,0.4678,0.4595,0.3483,0.3413,0.3663,0.3592,0.352,0.3448,0.3858,0.4271,0.4195,0.4201,0.4286,0.429,0.4698,0.4701,0.4622,0.4542,0.4542,0.446,0.4377,0.478,0.4696,0.5091,0.5474,0.5393,0.5763,0.5757,0.5824,0.5743,0.5734,0.5725,0.5715,0.563,0.4817,0.5057,0.4978,0.4899,0.5135,0.5133,0.5051,0.5047,0.5043,0.5037,0.4951,0.518,0.5092,0.5083,0.5072,0.506,0.5282,0.5649,0.5635,0.5545,0.5529,0.5736,0.5936,0.5918,0.5314,0.5307,0.5221,0.5133,0.5122,0.5266,0.5175,0.5238,0.5144,0.5048,0.5029,0.5008,0.4986,0.4398,0.4391,0.4381,0.437,0.4275,0.4179,0.4081,0.4062,0.4286,0.4182,0.4158,0.405,0.4022,0.3992,0.3959,0.3924,0.3806,0.3767,0.3726,0.3602,0.3637,0.3589,0.3539,0.3889,0.3564,0.3522,0.3718,0.3362,0.3252,0.3218,0.318,0.3138,0.3015,0.2966,0.2837,0.2705,0.2718,0.2653,0.2804,0.288,0.2728,0.2535,0.2833,0.2754,0.2669,0.2656,0.2719,0.2707,0.2772,0.2536,0.2526,0.259,0.258,0.2571,0.2639,0.2402,0.333,0.3043,0.2935,0.3006,0.2917,0.2989,0.2706,0.2267,0.2169,0.2232,0.1977,0.2037,0.21,0.2084,0.1687,0.1463,0.1448,0.1432,0.1485,0.1153,0.1199,0.0909,0.0896,0.1396,0.1446,0.15,0.1476,0.1532,0.1281,0.126,0.1239,0.1291,0.1271,0.1252,0.116,0.1142,0.1196,0.0849,0.0893,0.0817,0.0802,0.0846,0.0831,0.0817,0.0803,0.0789,0.0731,0.0718,0.0705,0.0693,0.0681,0.0727,0.0777,0.0767,0.0757,0.0747,0.0675,0.0413,0.0404,0.0396,0.0388,0.038,0.0415,0.0364,0.0357,0.035,0.0343,0.0337,0.0331,0.0325,0.0319,0.0358,0.0354,0.0349,0.0222,0.0217,0.0127,0.0147,0.0171,0.0142,0.0166,0.0162,0.0158,0.0154,0.0125,0.006,0.0057,0.0053,0.0066,0.0025,0.0031,0.0003,0.0005,0.0,0.0001,0.0,0.0001,0.0001,0.0,0.0,0.0,0.0],"wickets":[8,40,64,77,101,104,118,133,156],"innings_break":121}}},"created_at":"2026-09-30T09:45:41.351195+00:00"},"recap":{"id":"BUpnw6PBT","kind":"recap","title":"Mumbai Indians' 159/7 was 30 below par (189).","data":{"match_id":"1529287","date":"2026-05-02","competition":"IPL","venue":"MA Chidambaram Stadium","result":"Chennai Super Kings won by 8 wickets","teams":[{"name":"Mumbai Indians","accent":"#f0b429"},{"name":"Chennai Super Kings","accent":"#5b8def"}],"scores":[{"innings":1,"team":"Mumbai Indians","batting_team":"Mumbai Indians","bowling_team":"Chennai Super Kings","runs":159,"wickets":7,"overs":"20.0","balls":120,"run_rate":7.95,"target":null},{"innings":2,"team":"Chennai Super Kings","batting_team":"Chennai Super Kings","bowling_team":"Mumbai Indians","runs":160,"wickets":2,"overs":"18.1","balls":109,"run_rate":8.81,"target":160}],"recap":{"available":true,"source":"deterministic","headline":"Mumbai Indians' 159/7 was 30 below par (189).","bullets":["The middle overs decided it: Chennai Super Kings batted 20 runs better than Mumbai Indians there by Impact (-2 v -22).","Noor Ahmad's 2/27 in 4 overs saved 18.2 runs (Impact) for Chennai Super Kings.","Anshul Kamboj's 3/33 in 4 overs saved 16.8 runs (Impact) for Chennai Super Kings.","Chennai Super Kings won by 8 wickets (Chased 160 with 11 balls to spare)."]}},"created_at":"2026-09-30T09:45:50.152014+00:00"},"list":{"id":"Nd7Yp34To","kind":"ranking","title":"Australia's 3 centuries v South Africa (Aug 2025) make it one of 5 ODI innings with 3+ centuries since 2000","data":{"layout":"list","title":"Australia's 3 centuries v South Africa (Aug 2025) make it one of 5 ODI innings with 3+ centuries since 2000","kicker":"ODI \u00b7 innings","subtitle":"Every ODI innings with 3+ centuries, latest first","filter_chips":["ODI","since 2000"],"group_by":["innings"],"query_mode":"ranking","rows":[{"label":"Australia v South Africa","date":"2025-08-24","sub":"24 Aug 2025","count":3,"display":"3 centuries","details":["Travis Head 142 (106)","Cameron Green 118 (58)","Mitchell Marsh 100 (109)"]},{"label":"South Africa v Sri Lanka","date":"2023-10-07","sub":"07 Oct 2023","count":3,"display":"3 centuries","details":["Rassie van der Dussen 108 (111)","Aiden Markram 106 (57)","Quinton de Kock 100 (89)"]},{"label":"England v Netherlands","date":"2022-06-17","sub":"17 Jun 2022","count":3,"display":"3 centuries","details":["Jos Buttler 162 (71)","Dawid Malan 125 (117)","Phil Salt 122 (96)"]},{"label":"South Africa v India","date":"2015-10-25","sub":"25 Oct 2015","count":3,"display":"3 centuries","details":["Faf du Plessis 133 (117)","AB de Villiers 119 (65)","Quinton de Kock 109 (89)"]},{"label":"South Africa v West Indies","date":"2015-01-18","sub":"18 Jan 2015","count":3,"display":"3 centuries","details":["Hashim Amla 153 (144)","AB de Villiers 149 (44)","Rilee Rossouw 128 (117)"]}],"columns":["label","sub","display","details"],"metric_columns":["count"],"chart":{"type":"list","label_key":"label","metric":"count"},"hindsight_url":"https://hindsightcricket.com/query?min_runs=100&group_by=match_id&group_by=innings&group_by=batter&fmt=mens-odi","total_rows":5,"source":"ball-by-ball"},"created_at":"2026-09-30T11:55:40.407471+00:00"}}
+{
+ "query": {
+  "id": "IpmnpGQvo",
+  "kind": "query",
+  "title": "Most controlled ODI partnerships since 2019 (1,000+ balls)",
+  "data": {
+   "title": "Most controlled ODI partnerships since 2019 (1,000+ balls)",
+   "subtitle": "8 of 48 rows \u00b7 ranked by control_percentage",
+   "filter_chips": [
+    "2019-01-01 \u2192 today",
+    "ODI"
+   ],
+   "group_by": [
+    "partnership"
+   ],
+   "query_mode": "delivery",
+   "columns": [
+    "partnership",
+    "balls",
+    "runs",
+    "wickets",
+    "innings_count",
+    "average",
+    "strike_rate",
+    "balls_per_dismissal",
+    "dot_percentage",
+    "boundary_percentage",
+    "control_percentage",
+    "fours",
+    "sixes",
+    "dots",
+    "boundaries",
+    "percent_balls",
+    "impact",
+    "impact_per_100",
+    "impact_per_innings",
+    "raa",
+    "raa_per_100",
+    "waa",
+    "waa_per_100",
+    "wpa",
+    "avg_leverage"
+   ],
+   "metric_columns": [
+    "balls",
+    "runs",
+    "wickets",
+    "innings_count",
+    "average",
+    "strike_rate",
+    "balls_per_dismissal",
+    "dot_percentage",
+    "boundary_percentage",
+    "control_percentage",
+    "fours",
+    "sixes",
+    "dots",
+    "boundaries",
+    "percent_balls"
+   ],
+   "rows": [
+    {
+     "partnership": "Milind Kumar & Saiteja Mukkamalla",
+     "balls": 1074,
+     "innings_count": 20,
+     "runs": 1033,
+     "wickets": 7,
+     "dots": 479,
+     "boundaries": 102,
+     "fours": 79,
+     "sixes": 23,
+     "average": 147.57,
+     "strike_rate": 96.18,
+     "balls_per_dismissal": 153.43,
+     "dot_percentage": 44.6,
+     "boundary_percentage": 9.5,
+     "control_percentage": 90.19,
+     "percent_balls": 0.22,
+     "impact": null,
+     "impact_per_100": null,
+     "impact_per_innings": null,
+     "raa": null,
+     "raa_per_100": null,
+     "waa": null,
+     "waa_per_100": null,
+     "wpa": null,
+     "avg_leverage": null
+    },
+    {
+     "partnership": "Shubman Gill & Virat Kohli",
+     "balls": 1060,
+     "innings_count": 37,
+     "runs": 1027,
+     "wickets": 19,
+     "dots": 489,
+     "boundaries": 119,
+     "fours": 102,
+     "sixes": 17,
+     "average": 54.05,
+     "strike_rate": 96.89,
+     "balls_per_dismissal": 55.79,
+     "dot_percentage": 46.13,
+     "boundary_percentage": 11.23,
+     "control_percentage": 87.31,
+     "percent_balls": 0.21,
+     "impact": null,
+     "impact_per_100": null,
+     "impact_per_innings": null,
+     "raa": null,
+     "raa_per_100": null,
+     "waa": null,
+     "waa_per_100": null,
+     "wpa": null,
+     "avg_leverage": null
+    },
+    {
+     "partnership": "KL Rahul & Virat Kohli",
+     "balls": 1676,
+     "innings_count": 48,
+     "runs": 1556,
+     "wickets": 23,
+     "dots": 717,
+     "boundaries": 146,
+     "fours": 117,
+     "sixes": 29,
+     "average": 67.65,
+     "strike_rate": 92.84,
+     "balls_per_dismissal": 72.87,
+     "dot_percentage": 42.78,
+     "boundary_percentage": 8.71,
+     "control_percentage": 86.88,
+     "percent_balls": 0.34,
+     "impact": null,
+     "impact_per_100": null,
+     "impact_per_innings": null,
+     "raa": null,
+     "raa_per_100": null,
+     "waa": null,
+     "waa_per_100": null,
+     "wpa": null,
+     "avg_leverage": null
+    },
+    {
+     "partnership": "Marnus Labuschagne & Steven Smith",
+     "balls": 1198,
+     "innings_count": 32,
+     "runs": 1020,
+     "wickets": 16,
+     "dots": 541,
+     "boundaries": 90,
+     "fours": 86,
+     "sixes": 4,
+     "average": 63.75,
+     "strike_rate": 85.14,
+     "balls_per_dismissal": 74.88,
+     "dot_percentage": 45.16,
+     "boundary_percentage": 7.51,
+     "control_percentage": 86.75,
+     "percent_balls": 0.24,
+     "impact": null,
+     "impact_per_100": null,
+     "impact_per_innings": null,
+     "raa": null,
+     "raa_per_100": null,
+     "waa": null,
+     "waa_per_100": null,
+     "wpa": null,
+     "avg_leverage": null
+    },
+    {
+     "partnership": "Babar Azam & Mohammad Rizwan",
+     "balls": 1925,
+     "innings_count": 48,
+     "runs": 1660,
+     "wickets": 27,
+     "dots": 926,
+     "boundaries": 165,
+     "fours": 147,
+     "sixes": 18,
+     "average": 61.48,
+     "strike_rate": 86.23,
+     "balls_per_dismissal": 71.3,
+     "dot_percentage": 48.1,
+     "boundary_percentage": 8.57,
+     "control_percentage": 86.5,
+     "percent_balls": 0.39,
+     "impact": null,
+     "impact_per_100": null,
+     "impact_per_innings": null,
+     "raa": null,
+     "raa_per_100": null,
+     "waa": null,
+     "waa_per_100": null,
+     "wpa": null,
+     "avg_leverage": null
+    },
+    {
+     "partnership": "Shreyas Iyer & Virat Kohli",
+     "balls": 1871,
+     "innings_count": 52,
+     "runs": 1836,
+     "wickets": 29,
+     "dots": 775,
+     "boundaries": 189,
+     "fours": 158,
+     "sixes": 31,
+     "average": 63.31,
+     "strike_rate": 98.13,
+     "balls_per_dismissal": 64.52,
+     "dot_percentage": 41.42,
+     "boundary_percentage": 10.1,
+     "control_percentage": 86.47,
+     "percent_balls": 0.38,
+     "impact": null,
+     "impact_per_100": null,
+     "impact_per_innings": null,
+     "raa": null,
+     "raa_per_100": null,
+     "waa": null,
+     "waa_per_100": null,
+     "wpa": null,
+     "avg_leverage": null
+    },
+    {
+     "partnership": "Aarif Sheikh & Rohit Paudel",
+     "balls": 1346,
+     "innings_count": 38,
+     "runs": 990,
+     "wickets": 18,
+     "dots": 706,
+     "boundaries": 74,
+     "fours": 67,
+     "sixes": 7,
+     "average": 55.0,
+     "strike_rate": 73.55,
+     "balls_per_dismissal": 74.78,
+     "dot_percentage": 52.45,
+     "boundary_percentage": 5.5,
+     "control_percentage": 86.37,
+     "percent_balls": 0.27,
+     "impact": null,
+     "impact_per_100": null,
+     "impact_per_innings": null,
+     "raa": null,
+     "raa_per_100": null,
+     "waa": null,
+     "waa_per_100": null,
+     "wpa": null,
+     "avg_leverage": null
+    },
+    {
+     "partnership": "Babar Azam & Imam-ul-Haq",
+     "balls": 2380,
+     "innings_count": 49,
+     "runs": 2106,
+     "wickets": 26,
+     "dots": 1099,
+     "boundaries": 202,
+     "fours": 194,
+     "sixes": 8,
+     "average": 81.0,
+     "strike_rate": 88.49,
+     "balls_per_dismissal": 91.54,
+     "dot_percentage": 46.18,
+     "boundary_percentage": 8.49,
+     "control_percentage": 85.51,
+     "percent_balls": 0.48,
+     "impact": null,
+     "impact_per_100": null,
+     "impact_per_innings": null,
+     "raa": null,
+     "raa_per_100": null,
+     "waa": null,
+     "waa_per_100": null,
+     "wpa": null,
+     "avg_leverage": null
+    }
+   ],
+   "total_rows": 48,
+   "chart": {
+    "type": "bar",
+    "label_key": "partnership",
+    "metric": "control_percentage"
+   },
+   "hindsight_url": "https://hindsightcricket.com/query?min_balls=1000&start_date=2019-01-01&group_by=partnership&fmt=mens-odi",
+   "warnings": [],
+   "note": null,
+   "metrics_perspective": null,
+   "highlight": null
+  },
+  "created_at": "2026-09-30T09:45:31.852536+00:00"
+ },
+ "win_prob": {
+  "id": "i1CGtHQYG",
+  "kind": "win_prob",
+  "title": "Win probability \u00b7 Chennai Super Kings won by 8 wickets",
+  "data": {
+   "match_id": "1529287",
+   "date": "2026-05-02",
+   "competition": "IPL",
+   "venue": "MA Chidambaram Stadium",
+   "result": "Chennai Super Kings won by 8 wickets",
+   "teams": [
+    {
+     "name": "Mumbai Indians",
+     "accent": "#f0b429"
+    },
+    {
+     "name": "Chennai Super Kings",
+     "accent": "#5b8def"
+    }
+   ],
+   "scores": [
+    {
+     "innings": 1,
+     "team": "Mumbai Indians",
+     "batting_team": "Mumbai Indians",
+     "bowling_team": "Chennai Super Kings",
+     "runs": 159,
+     "wickets": 7,
+     "overs": "20.0",
+     "balls": 120,
+     "run_rate": 7.95,
+     "target": null
+    },
+    {
+     "innings": 2,
+     "team": "Chennai Super Kings",
+     "batting_team": "Chennai Super Kings",
+     "bowling_team": "Mumbai Indians",
+     "runs": 160,
+     "wickets": 2,
+     "overs": "18.1",
+     "balls": 109,
+     "run_rate": 8.81,
+     "target": 160
+    }
+   ],
+   "primer": {
+    "win_probability": {
+     "team": "Mumbai Indians",
+     "points": [
+      0.5079,
+      0.5001,
+      0.4922,
+      0.4922,
+      0.4842,
+      0.4761,
+      0.4678,
+      0.4595,
+      0.3483,
+      0.3413,
+      0.3663,
+      0.3592,
+      0.352,
+      0.3448,
+      0.3858,
+      0.4271,
+      0.4195,
+      0.4201,
+      0.4286,
+      0.429,
+      0.4698,
+      0.4701,
+      0.4622,
+      0.4542,
+      0.4542,
+      0.446,
+      0.4377,
+      0.478,
+      0.4696,
+      0.5091,
+      0.5474,
+      0.5393,
+      0.5763,
+      0.5757,
+      0.5824,
+      0.5743,
+      0.5734,
+      0.5725,
+      0.5715,
+      0.563,
+      0.4817,
+      0.5057,
+      0.4978,
+      0.4899,
+      0.5135,
+      0.5133,
+      0.5051,
+      0.5047,
+      0.5043,
+      0.5037,
+      0.4951,
+      0.518,
+      0.5092,
+      0.5083,
+      0.5072,
+      0.506,
+      0.5282,
+      0.5649,
+      0.5635,
+      0.5545,
+      0.5529,
+      0.5736,
+      0.5936,
+      0.5918,
+      0.5314,
+      0.5307,
+      0.5221,
+      0.5133,
+      0.5122,
+      0.5266,
+      0.5175,
+      0.5238,
+      0.5144,
+      0.5048,
+      0.5029,
+      0.5008,
+      0.4986,
+      0.4398,
+      0.4391,
+      0.4381,
+      0.437,
+      0.4275,
+      0.4179,
+      0.4081,
+      0.4062,
+      0.4286,
+      0.4182,
+      0.4158,
+      0.405,
+      0.4022,
+      0.3992,
+      0.3959,
+      0.3924,
+      0.3806,
+      0.3767,
+      0.3726,
+      0.3602,
+      0.3637,
+      0.3589,
+      0.3539,
+      0.3889,
+      0.3564,
+      0.3522,
+      0.3718,
+      0.3362,
+      0.3252,
+      0.3218,
+      0.318,
+      0.3138,
+      0.3015,
+      0.2966,
+      0.2837,
+      0.2705,
+      0.2718,
+      0.2653,
+      0.2804,
+      0.288,
+      0.2728,
+      0.2535,
+      0.2833,
+      0.2754,
+      0.2669,
+      0.2656,
+      0.2719,
+      0.2707,
+      0.2772,
+      0.2536,
+      0.2526,
+      0.259,
+      0.258,
+      0.2571,
+      0.2639,
+      0.2402,
+      0.333,
+      0.3043,
+      0.2935,
+      0.3006,
+      0.2917,
+      0.2989,
+      0.2706,
+      0.2267,
+      0.2169,
+      0.2232,
+      0.1977,
+      0.2037,
+      0.21,
+      0.2084,
+      0.1687,
+      0.1463,
+      0.1448,
+      0.1432,
+      0.1485,
+      0.1153,
+      0.1199,
+      0.0909,
+      0.0896,
+      0.1396,
+      0.1446,
+      0.15,
+      0.1476,
+      0.1532,
+      0.1281,
+      0.126,
+      0.1239,
+      0.1291,
+      0.1271,
+      0.1252,
+      0.116,
+      0.1142,
+      0.1196,
+      0.0849,
+      0.0893,
+      0.0817,
+      0.0802,
+      0.0846,
+      0.0831,
+      0.0817,
+      0.0803,
+      0.0789,
+      0.0731,
+      0.0718,
+      0.0705,
+      0.0693,
+      0.0681,
+      0.0727,
+      0.0777,
+      0.0767,
+      0.0757,
+      0.0747,
+      0.0675,
+      0.0413,
+      0.0404,
+      0.0396,
+      0.0388,
+      0.038,
+      0.0415,
+      0.0364,
+      0.0357,
+      0.035,
+      0.0343,
+      0.0337,
+      0.0331,
+      0.0325,
+      0.0319,
+      0.0358,
+      0.0354,
+      0.0349,
+      0.0222,
+      0.0217,
+      0.0127,
+      0.0147,
+      0.0171,
+      0.0142,
+      0.0166,
+      0.0162,
+      0.0158,
+      0.0154,
+      0.0125,
+      0.006,
+      0.0057,
+      0.0053,
+      0.0066,
+      0.0025,
+      0.0031,
+      0.0003,
+      0.0005,
+      0.0,
+      0.0001,
+      0.0,
+      0.0001,
+      0.0001,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "wickets": [
+      8,
+      40,
+      64,
+      77,
+      101,
+      104,
+      118,
+      133,
+      156
+     ],
+     "innings_break": 121
+    }
+   }
+  },
+  "created_at": "2026-09-30T09:45:41.351195+00:00"
+ },
+ "recap": {
+  "id": "BUpnw6PBT",
+  "kind": "recap",
+  "title": "Mumbai Indians' 159/7 was 30 below par (189).",
+  "data": {
+   "match_id": "1529287",
+   "date": "2026-05-02",
+   "competition": "IPL",
+   "venue": "MA Chidambaram Stadium",
+   "result": "Chennai Super Kings won by 8 wickets",
+   "teams": [
+    {
+     "name": "Mumbai Indians",
+     "accent": "#f0b429"
+    },
+    {
+     "name": "Chennai Super Kings",
+     "accent": "#5b8def"
+    }
+   ],
+   "scores": [
+    {
+     "innings": 1,
+     "team": "Mumbai Indians",
+     "batting_team": "Mumbai Indians",
+     "bowling_team": "Chennai Super Kings",
+     "runs": 159,
+     "wickets": 7,
+     "overs": "20.0",
+     "balls": 120,
+     "run_rate": 7.95,
+     "target": null
+    },
+    {
+     "innings": 2,
+     "team": "Chennai Super Kings",
+     "batting_team": "Chennai Super Kings",
+     "bowling_team": "Mumbai Indians",
+     "runs": 160,
+     "wickets": 2,
+     "overs": "18.1",
+     "balls": 109,
+     "run_rate": 8.81,
+     "target": 160
+    }
+   ],
+   "recap": {
+    "available": true,
+    "source": "deterministic",
+    "headline": "Mumbai Indians' 159/7 was 30 below par (189).",
+    "bullets": [
+     "The middle overs decided it: Chennai Super Kings batted 20 runs better than Mumbai Indians there by Impact (-2 v -22).",
+     "Noor Ahmad's 2/27 in 4 overs saved 18.2 runs (Impact) for Chennai Super Kings.",
+     "Anshul Kamboj's 3/33 in 4 overs saved 16.8 runs (Impact) for Chennai Super Kings.",
+     "Chennai Super Kings won by 8 wickets (Chased 160 with 11 balls to spare)."
+    ]
+   }
+  },
+  "created_at": "2026-09-30T09:45:50.152014+00:00"
+ },
+ "list": {
+  "id": "Nd7Yp34To",
+  "kind": "ranking",
+  "title": "Australia's 3 centuries v South Africa (Aug 2025) make it one of 5 ODI innings with 3+ centuries since 2000",
+  "data": {
+   "layout": "list",
+   "title": "Australia's 3 centuries v South Africa (Aug 2025) make it one of 5 ODI innings with 3+ centuries since 2000",
+   "kicker": "ODI \u00b7 innings",
+   "subtitle": "Every ODI innings with 3+ centuries, latest first",
+   "filter_chips": [
+    "ODI",
+    "since 2000"
+   ],
+   "group_by": [
+    "innings"
+   ],
+   "query_mode": "ranking",
+   "rows": [
+    {
+     "label": "Australia v South Africa",
+     "date": "2025-08-24",
+     "sub": "24 Aug 2025",
+     "count": 3,
+     "display": "3 centuries",
+     "details": [
+      "Travis Head 142 (106)",
+      "Cameron Green 118 (58)",
+      "Mitchell Marsh 100 (109)"
+     ]
+    },
+    {
+     "label": "South Africa v Sri Lanka",
+     "date": "2023-10-07",
+     "sub": "07 Oct 2023",
+     "count": 3,
+     "display": "3 centuries",
+     "details": [
+      "Rassie van der Dussen 108 (111)",
+      "Aiden Markram 106 (57)",
+      "Quinton de Kock 100 (89)"
+     ]
+    },
+    {
+     "label": "England v Netherlands",
+     "date": "2022-06-17",
+     "sub": "17 Jun 2022",
+     "count": 3,
+     "display": "3 centuries",
+     "details": [
+      "Jos Buttler 162 (71)",
+      "Dawid Malan 125 (117)",
+      "Phil Salt 122 (96)"
+     ]
+    },
+    {
+     "label": "South Africa v India",
+     "date": "2015-10-25",
+     "sub": "25 Oct 2015",
+     "count": 3,
+     "display": "3 centuries",
+     "details": [
+      "Faf du Plessis 133 (117)",
+      "AB de Villiers 119 (65)",
+      "Quinton de Kock 109 (89)"
+     ]
+    },
+    {
+     "label": "South Africa v West Indies",
+     "date": "2015-01-18",
+     "sub": "18 Jan 2015",
+     "count": 3,
+     "display": "3 centuries",
+     "details": [
+      "Hashim Amla 153 (144)",
+      "AB de Villiers 149 (44)",
+      "Rilee Rossouw 128 (117)"
+     ]
+    }
+   ],
+   "columns": [
+    "label",
+    "sub",
+    "display",
+    "details"
+   ],
+   "metric_columns": [
+    "count"
+   ],
+   "chart": {
+    "type": "list",
+    "label_key": "label",
+    "metric": "count"
+   },
+   "hindsight_url": "https://hindsightcricket.com/query?min_runs=100&group_by=match_id&group_by=innings&group_by=batter&fmt=mens-odi",
+   "total_rows": 5,
+   "source": "ball-by-ball"
+  },
+  "created_at": "2026-09-30T11:55:40.407471+00:00"
+ },
+ "line": {
+  "kind": "ranking",
+  "created_at": "2026-10-02T10:00:00Z",
+  "id": "fxLine01",
+  "title": "Virat Kohli's batting Impact per 100 balls has risen to +20.4 in 2026",
+  "data": {
+   "layout": "line",
+   "title": "Virat Kohli's batting Impact per 100 balls has risen to +20.4 in 2026",
+   "metric": "impact_per_100",
+   "metric_label": "Impact per 100 balls",
+   "filter_chips": [
+    "T20",
+    "2020-01-01 \u2192 today"
+   ],
+   "group_by": [
+    "year"
+   ],
+   "points": [
+    {
+     "x": "2020",
+     "y": -5.5
+    },
+    {
+     "x": "2021",
+     "y": 1.8
+    },
+    {
+     "x": "2022",
+     "y": -9.2
+    },
+    {
+     "x": "2023",
+     "y": -2.9
+    },
+    {
+     "x": "2024",
+     "y": 1.5
+    },
+    {
+     "x": "2025",
+     "y": 4.1
+    },
+    {
+     "x": "2026",
+     "y": 20.4,
+     "highlight": true,
+     "display": "+20.4"
+    }
+   ]
+  }
+ },
+ "scatter": {
+  "kind": "ranking",
+  "created_at": "2026-10-02T10:00:00Z",
+  "id": "fxScat01",
+  "title": "Virat Kohli: average 49.0 at a strike rate of 151 among 134 T20 batters since 2024",
+  "data": {
+   "layout": "scatter",
+   "title": "Virat Kohli: average 49.0 at a strike rate of 151 among 134 T20 batters since 2024",
+   "x_metric": "strike_rate",
+   "y_metric": "average",
+   "unit": "batters",
+   "filter_chips": [
+    "T20",
+    "1,000+ balls"
+   ],
+   "group_by": [
+    "batter"
+   ],
+   "points": [
+    {
+     "label": "Virat Kohli",
+     "x": 151.1,
+     "y": 49.0,
+     "highlight": true
+    },
+    {
+     "label": "Shubman Gill",
+     "x": 150.9,
+     "y": 40.8
+    },
+    {
+     "label": "KL Rahul",
+     "x": 152.7,
+     "y": 45.9
+    },
+    {
+     "label": "Shreyas Iyer",
+     "x": 161.9,
+     "y": 45.6
+    },
+    {
+     "label": "Sai Sudharsan",
+     "x": 152.5,
+     "y": 49.0
+    },
+    {
+     "label": "Nicholas Pooran",
+     "x": 147.0,
+     "y": 36.2
+    },
+    {
+     "label": "Shai Hope",
+     "x": 129.0,
+     "y": 33.1
+    },
+    {
+     "label": "Tim Seifert",
+     "x": 150.2,
+     "y": 31.4
+    },
+    {
+     "label": "Jos Buttler",
+     "x": 155.3,
+     "y": 38.7
+    },
+    {
+     "label": "Phil Salt",
+     "x": 168.4,
+     "y": 30.2
+    },
+    {
+     "label": "Abhishek Sharma",
+     "x": 190.1,
+     "y": 31.5
+    }
+   ]
+  }
+ },
+ "stat": {
+  "kind": "ranking",
+  "created_at": "2026-10-02T10:00:00Z",
+  "id": "fxStat01",
+  "title": "Shubman Gill has the most controlled ODI batting since 2019 among batters averaging 50+ at 100+",
+  "data": {
+   "layout": "stat",
+   "title": "Shubman Gill has the most controlled ODI batting since 2019 among batters averaging 50+ at 100+",
+   "metric": "control_percentage",
+   "metric_label": "Control %",
+   "value_display": "87.5%",
+   "subject": "Shubman Gill",
+   "rank_text": "1st of 4 ODI batters (1,000+ balls, average 50+, strike rate 100+)",
+   "filter_chips": [
+    "ODI",
+    "2019-01-01 \u2192 now"
+   ],
+   "group_by": [
+    "batter"
+   ],
+   "context": [
+    {
+     "rank": 2,
+     "label": "Sean Williams",
+     "display": "82.9%"
+    },
+    {
+     "rank": 3,
+     "label": "Rohit Sharma",
+     "display": "79.1%"
+    },
+    {
+     "rank": 4,
+     "label": "Travis Head",
+     "display": "75.7%"
+    }
+   ]
+  }
+ }
+}

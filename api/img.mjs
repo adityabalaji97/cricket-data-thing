@@ -112,6 +112,92 @@ function barsBody(size, data) {
     }));
 }
 
+// ---- Pack chart forms beyond ranked bars (services/pack_charts.py picks one per idea) ----
+
+const chartHeight = (size) => Math.round(size.height * (size.height > size.width ? 0.44 : 0.34));
+
+// A trend: one series over time (seasons, overs...). Points are labelled where they fit.
+function lineBody(size, data) {
+  const pts = (data.points || []).filter((p) => typeof p.y === 'number');
+  const width = size.width - 120;
+  const height = chartHeight(size);
+  const pad = 16;
+  const ys = pts.map((p) => p.y);
+  const lo = Math.min(...ys, 0 <= Math.min(...ys) ? Math.min(...ys) : 0);
+  const hi = Math.max(...ys);
+  const span = hi - lo || 1;
+  const x = (i) => pad + (i / Math.max(1, pts.length - 1)) * (width - 2 * pad);
+  const y = (v) => pad + (1 - (v - lo) / span) * (height - 2 * pad);
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.y).toFixed(1)}`).join(' ');
+  const children = [
+    { type: 'rect', props: { x: 0, y: 0, width, height, fill: C.surface } },
+    { type: 'path', props: { d, fill: 'none', stroke: C.lime, strokeWidth: 6 } },
+    ...pts.map((p, i) => ({ type: 'circle', props: { cx: x(i), cy: y(p.y), r: p.highlight ? 13 : 9, fill: p.highlight ? C.lime : C.text } })),
+  ];
+  if (lo < 0 && hi > 0) children.splice(1, 0, { type: 'line', props: { x1: 0, y1: y(0), x2: width, y2: y(0), stroke: 'rgba(255,255,255,0.25)', strokeDasharray: '10 10', strokeWidth: 3 } });
+  // Labels under the chart: every point if they fit, else first, last and the highlighted one.
+  const room = Math.floor(width / (size.small * 3.2));
+  const show = pts.length <= room ? pts.map((_, i) => i) : [0, pts.length - 1, pts.findIndex((p) => p.highlight)].filter((i, k, a) => i >= 0 && a.indexOf(i) === k);
+  const last = pts[pts.length - 1];
+  return h('div', { flexDirection: 'column', marginTop: 30, gap: 14 },
+    h('div', { justifyContent: 'space-between', fontSize: size.small, color: C.mid },
+      h('div', {}, [data.metric_label || metricLabel(data.metric), ...chipsFor(data)].join(' · ')),
+      last ? h('div', { color: C.lime, fontWeight: 600 }, `${last.x}: ${last.display ?? formatValue(data.metric, last.y)}`) : null),
+    { type: 'svg', props: { width, height, viewBox: `0 0 ${width} ${height}`, children } },
+    h('div', { position: 'relative', height: size.small + 8, width },
+      show.map((i) => h('div', { position: 'absolute', left: Math.max(0, Math.min(width - size.small * 3, x(i) - size.small * 1.5)), fontSize: size.small, color: pts[i].highlight ? C.lime : C.low }, String(pts[i].x)))));
+}
+
+// Two metrics across many rows: the subject in lime and named, the field in grey, medians dashed.
+function scatterBody(size, data) {
+  const pts = (data.points || []).filter((p) => typeof p.x === 'number' && typeof p.y === 'number');
+  const width = size.width - 120;
+  const height = chartHeight(size);
+  const pad = 22;
+  const ext = (vals) => { const a = Math.min(...vals); const b = Math.max(...vals); const m = (b - a) * 0.06 || 1; return [a - m, b + m]; };
+  const [x0, x1] = ext(pts.map((p) => p.x));
+  const [y0, y1] = ext(pts.map((p) => p.y));
+  const sx = (v) => pad + ((v - x0) / (x1 - x0)) * (width - 2 * pad);
+  const sy = (v) => pad + (1 - (v - y0) / (y1 - y0)) * (height - 2 * pad);
+  const median = (vals) => { const a = [...vals].sort((m, n) => m - n); return a[Math.floor(a.length / 2)]; };
+  const mx = median(pts.map((p) => p.x));
+  const my = median(pts.map((p) => p.y));
+  const subject = pts.filter((p) => p.highlight);
+  const children = [
+    { type: 'rect', props: { x: 0, y: 0, width, height, fill: C.surface } },
+    { type: 'line', props: { x1: sx(mx), y1: 0, x2: sx(mx), y2: height, stroke: 'rgba(255,255,255,0.18)', strokeDasharray: '10 10', strokeWidth: 3 } },
+    { type: 'line', props: { x1: 0, y1: sy(my), x2: width, y2: sy(my), stroke: 'rgba(255,255,255,0.18)', strokeDasharray: '10 10', strokeWidth: 3 } },
+    ...pts.filter((p) => !p.highlight).map((p) => ({ type: 'circle', props: { cx: sx(p.x), cy: sy(p.y), r: 10, fill: C.bar } })),
+    ...subject.map((p) => ({ type: 'circle', props: { cx: sx(p.x), cy: sy(p.y), r: 16, fill: C.lime, stroke: C.bg, strokeWidth: 4 } })),
+  ];
+  const xl = data.x_label || metricLabel(data.x_metric);
+  const yl = data.y_label || metricLabel(data.y_metric);
+  return h('div', { flexDirection: 'column', marginTop: 30, gap: 14 },
+    h('div', { justifyContent: 'space-between', fontSize: size.small, color: C.mid },
+      h('div', {}, `↑ ${yl}`), h('div', {}, `${pts.length} ${data.unit || 'players'} · dashes = median`)),
+    { type: 'svg', props: { width, height, viewBox: `0 0 ${width} ${height}`, children } },
+    h('div', { justifyContent: 'space-between', fontSize: size.small, color: C.mid },
+      h('div', {}, `${formatValue(data.x_metric, x0)}`), h('div', {}, `${xl} →`), h('div', {}, `${formatValue(data.x_metric, x1)}`)),
+    subject.map((p) => h('div', { fontSize: size.label, color: C.lime, fontWeight: 600 },
+      `${p.label}: ${formatValue(data.y_metric, p.y)} ${yl.toLowerCase()}, ${formatValue(data.x_metric, p.x)} ${xl.toLowerCase()}`)));
+}
+
+// One number: the headline value, its rank, and the next few for context.
+function statBody(size, data) {
+  const runners = (data.context || []).slice(0, 3);
+  return h('div', { flexDirection: 'column', marginTop: 40, gap: 18 },
+    h('div', { fontSize: size.small, color: C.mid, letterSpacing: 2 }, (data.metric_label || metricLabel(data.metric)).toUpperCase()),
+    h('div', { alignItems: 'baseline', gap: 24 },
+      h('div', { fontFamily: DISPLAY, fontWeight: 700, fontSize: Math.round(size.headline * 2.6), color: C.lime, lineHeight: 1 }, data.value_display || ''),
+      h('div', { fontSize: size.label, color: C.text, fontWeight: 600 }, data.subject || '')),
+    data.rank_text ? h('div', { fontSize: size.label, color: C.mid }, data.rank_text) : null,
+    runners.length ? h('div', { flexDirection: 'column', gap: 10, marginTop: 20, paddingTop: 20, borderTop: `2px solid ${C.track}` },
+      h('div', { fontSize: size.small, color: C.low }, 'Next on the list'),
+      runners.map((r) => h('div', { justifyContent: 'space-between', fontSize: size.small + 4, color: C.mid },
+        h('div', {}, `${r.rank}. ${r.label}`), h('div', { fontWeight: 600 }, r.display)))) : null,
+    ...chipsFor(data).length ? [h('div', { fontSize: size.small, color: C.low, marginTop: 10 }, chipsFor(data).join(' · '))] : []);
+}
+
 function winProbBody(size, data) {
   const wp = data.primer?.win_probability || {};
   const points = wp.points || [];
@@ -219,6 +305,12 @@ export function renderSnapshot(snap, sizeName = 'portrait') {
   }
   if (data.layout === 'list') {
     return frame(size, data.kicker || '', data.title || snap.title, listBody(size, data), `Data as of ${asOf(snap)} · ${data.source || 'ball-by-ball'}`);
+  }
+  const body = { line: lineBody, scatter: scatterBody, stat: statBody }[data.layout];
+  if (body) {
+    const fmtChip = (data.filter_chips || []).find((c) => /^(T20I?|ODI|Test|T20s?)$/i.test(c));
+    const kick = data.kicker || [fmtChip, ...(data.group_by || []).map((g) => g.replace(/_/g, ' ') + (g.endsWith('s') ? '' : 's'))].filter(Boolean).join(' · ');
+    return frame(size, kick, data.title || snap.title, body(size, data), `Data as of ${asOf(snap)} · ${data.source || 'ball-by-ball'}`);
   }
   // "ODI · partnerships": the format chip, then what each bar is.
   const fmt = (data.filter_chips || []).find((c) => /^(T20I?|ODI|Test|T20s?)$/i.test(c));

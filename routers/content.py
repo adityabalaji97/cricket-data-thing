@@ -37,6 +37,8 @@ class PackUpdate(BaseModel):
     status: Optional[str] = None
     posted_url: Optional[str] = Field(default=None, max_length=500)
     title: Optional[str] = Field(default=None, max_length=300)
+    # Switch the pack's image to another chart form it was built with (facts.chart_options).
+    snapshot_id: Optional[str] = Field(default=None, max_length=32)
 
 
 @router.patch("/packs/{pack_id}")
@@ -61,6 +63,18 @@ def update_pack(pack_id: int, body: PackUpdate, db: Session = Depends(get_sessio
             raise HTTPException(status_code=400, detail=" ".join(errors))
         sets += ["title = :title", "rule_warnings = CAST(:w AS jsonb)"]
         params.update(title=body.title.strip(), w=json.dumps(warnings))
+    if body.snapshot_id is not None:
+        facts = pack["facts"] or {}
+        option = next((o for o in facts.get("chart_options") or [] if o.get("snapshot_id") == body.snapshot_id), None)
+        if not option:
+            raise HTTPException(status_code=400, detail="That chart is not one of this pack's options")
+        sets.append("snapshot_id = :snap")
+        params["snap"] = body.snapshot_id
+        if option.get("title") and body.title is None:
+            known = [facts.get("numbers") or {}, {k: facts.get(k) for k in ("n", "since_year", "rank")}]
+            _errors, warnings = content_rules.check_title(option["title"], known, facts.get("subject"))
+            sets += ["title = :title", "rule_warnings = CAST(:w AS jsonb)"]
+            params.update(title=option["title"], w=json.dumps(_errors + warnings))
     if not sets:
         return {"ok": True}
     from database import engine

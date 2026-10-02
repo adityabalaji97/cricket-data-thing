@@ -82,6 +82,31 @@ const PackCard = ({ pack, client, onChanged, toast }) => {
       )}
       <Box component="img" src={imageUrl} alt={pack.title} loading="lazy"
         sx={{ display: 'block', width: '100%', maxWidth: 420, aspectRatio: '4 / 5', borderRadius: 2, bgcolor: '#14171e', border: `1px solid ${C.line}` }} />
+      {(facts.chart_options || []).length > 1 && (
+        // Other chart forms this pack was built with; Jev's (or the rules') top pick leads.
+        <Box sx={{ mt: 1.5 }}>
+          <Typography sx={{ fontSize: 12, color: C.lo, mb: 0.75 }}>
+            Chart · {facts.chart_picked_by === 'jev' ? "Jev's pick first" : 'rule order'} · tap to switch
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5 }}>
+            {facts.chart_options.map((o, i) => {
+              const active = o.snapshot_id === pack.snapshot_id;
+              return (
+                <Box key={o.snapshot_id} component="button" type="button"
+                  onClick={() => !active && update({ snapshot_id: o.snapshot_id }, `Switched to ${o.form}`)}
+                  sx={{ flex: '0 0 auto', width: 96, p: 0.5, bgcolor: 'transparent', cursor: active ? 'default' : 'pointer',
+                    border: `2px solid ${active ? C.lime : C.line}`, borderRadius: 2, color: C.hi, textAlign: 'center' }}>
+                  <Box component="img" src={`${siteOrigin()}/img/${o.snapshot_id}.png?size=portrait`} alt={o.form} loading="lazy"
+                    sx={{ width: '100%', aspectRatio: '4 / 5', borderRadius: 1, display: 'block', bgcolor: '#14171e' }} />
+                  <Typography sx={{ fontSize: 12, mt: 0.5, color: active ? C.lime : C.mid }}>
+                    {o.form}{i === 0 && facts.chart_picked_by === 'jev' ? ' ★' : ''}{o.p != null ? ` ${Math.round(o.p * 100)}%` : ''}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+      )}
       <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
         <Button variant="contained" onClick={() => shareImage(imageUrl, `hindsight-${pack.snapshot_id}.png`, pack.title, pack.title)}
           sx={{ bgcolor: C.lime, color: C.bg, fontWeight: 700, minHeight: 44, '&:hover': { bgcolor: '#a3dc3f' } }}>
