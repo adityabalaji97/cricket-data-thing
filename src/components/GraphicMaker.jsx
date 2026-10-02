@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import axios from 'axios';
 import {
-  Alert, Autocomplete, Box, Button, CircularProgress, Dialog, IconButton, MenuItem, TextField, Typography,
+  Alert, Box, Button, ButtonBase, CircularProgress, Dialog, IconButton, MenuItem, TextField, Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import config from '../config';
@@ -13,6 +13,13 @@ import { qbButtonSx, qbColors, qbFonts } from './queryBuilderTheme';
 
 const SKIP = new Set(['percent_balls', 'innings_count', 'metric_balls']);
 const label = (key) => key.replace(/_/g, ' ').replace(/\bpercentage\b/, '%');
+const SHOWN = 8;
+
+// Same order the server ranks by (content_ideas._ascending): lower is better for economy, and for
+// a bowler's average / strike rate.
+const ascending = (metric, groupBy) => metric === 'economy'
+  || (groupBy.some((g) => g === 'bowler' || g === 'bowling_team') && ['average', 'strike_rate'].includes(metric));
+const fmt = (v) => (Number.isInteger(v) ? String(v) : Number(v).toFixed(Math.abs(v) >= 100 ? 0 : 1));
 
 /**
  * "Make a graphic" from the result on screen: the same chart forms and phone-sized share images
@@ -26,12 +33,23 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
     return Object.keys(first).filter((k) => !groupBy.includes(k) && !SKIP.has(k) && typeof first[k] === 'number');
   }, [rows, groupBy]);
   const labelKey = groupBy.find((g) => !['match_id', 'innings'].includes(g)) || groupBy[0];
-  const names = useMemo(
-    () => [...new Set((rows || []).map((r) => r[labelKey]).filter((v) => v !== null && v !== undefined).map(String))],
-    [rows, labelKey],
-  );
   const [metric, setMetric] = useState(metrics.includes(defaultMetric) ? defaultMetric : (metrics.includes('runs') ? 'runs' : metrics[0] || ''));
   const [highlight, setHighlight] = useState(null);
+  const [showAll, setShowAll] = useState(false);
+  // One row per name, ranked by the chosen metric: tap one to highlight it in the graphic.
+  const ranked = useMemo(() => {
+    const seen = new Set();
+    const list = (rows || []).filter((r) => {
+      const name = r[labelKey];
+      if (name === null || name === undefined || typeof r[metric] !== 'number' || seen.has(String(name))) return false;
+      seen.add(String(name));
+      return true;
+    }).map((r) => ({ name: String(r[labelKey]), value: r[metric] }));
+    const asc = ascending(metric, groupBy);
+    return list.sort((a, b) => (asc ? a.value - b.value : b.value - a.value));
+  }, [rows, labelKey, metric, groupBy]);
+  const shown = showAll ? ranked : ranked.slice(0, SHOWN);
+  const pinned = highlight && !shown.some((r) => r.name === highlight) ? ranked.find((r) => r.name === highlight) : null;
   const [state, setState] = useState({ loading: false, error: null, options: [], pickedBy: null });
 
   const make = async () => {
@@ -64,13 +82,42 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
         <TextField select size="small" label="Rank by" value={metric} onChange={(e) => setMetric(e.target.value)}>
           {metrics.map((m) => <MenuItem key={m} value={m}>{label(m)}</MenuItem>)}
         </TextField>
-        <Autocomplete
-          size="small"
-          options={names}
-          value={highlight}
-          onChange={(_, v) => setHighlight(v)}
-          renderInput={(params) => <TextField {...params} label={`Highlight (optional): ${label(labelKey)}`} />}
-        />
+        {ranked.length > 1 && (
+          <Box>
+            <Typography sx={{ fontSize: 12, color: qbColors.textLo, mb: 0.5 }}>
+              {highlight ? `Highlighting ${highlight} · tap again to clear` : `Tap a ${label(labelKey)} to highlight it (optional)`}
+            </Typography>
+            <Box role="listbox" aria-label={`Highlight a ${label(labelKey)}`}
+              sx={{ border: `1px solid ${qbColors.border}`, borderRadius: 1 }}>
+              {[...shown, ...(pinned ? [pinned] : [])].map((r) => {
+                const on = r.name === highlight;
+                return (
+                  <ButtonBase key={r.name} role="option" aria-selected={on}
+                    onClick={() => setHighlight(on ? null : r.name)}
+                    sx={{
+                      width: '100%', minHeight: 40, px: 1.5, display: 'flex', gap: 1, justifyContent: 'flex-start',
+                      borderTop: `1px solid ${qbColors.border}`, '&:first-of-type': { borderTop: 'none' },
+                      bgcolor: on ? qbColors.accentSoft : 'transparent',
+                    }}>
+                    <Typography sx={{ width: 24, fontSize: 12, color: qbColors.textLo, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      {ranked.indexOf(r) + 1}
+                    </Typography>
+                    <Typography sx={{ flex: 1, fontSize: 14, textAlign: 'left', fontWeight: on ? 700 : 400,
+                      color: on ? qbColors.accent : qbColors.textHi, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.name}
+                    </Typography>
+                    <Typography sx={{ fontSize: 13, color: qbColors.textLo, fontVariantNumeric: 'tabular-nums' }}>{fmt(r.value)}</Typography>
+                  </ButtonBase>
+                );
+              })}
+            </Box>
+            {ranked.length > SHOWN && (
+              <Button size="small" onClick={() => setShowAll((v) => !v)} sx={{ mt: 0.5, minHeight: 32 }}>
+                {showAll ? 'Show top 8' : `Show all ${ranked.length}`}
+              </Button>
+            )}
+          </Box>
+        )}
         <Button variant="contained" onClick={make} disabled={!metric || state.loading} sx={{ ...qbButtonSx, minHeight: 44 }}>
           {state.loading ? <CircularProgress size={20} color="inherit" /> : 'Make graphic'}
         </Button>

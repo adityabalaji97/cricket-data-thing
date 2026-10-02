@@ -792,6 +792,8 @@ Opening the admin idea-pack chart pipeline (pack_charts + api/img.mjs) to users.
   nl_query_log over 24h (20/day; survives restarts, shared across dynos; in-memory fallback if the log can't be
   read). Example prompts validated against prod: each one yields its intended form (metric words like 'Dot' are
   no longer read as player names).
+- **Tap-a-row highlight (DONE 2026-10-02):** the Make graphic dialog lists the result ranked by the chosen
+  metric (server's order: lower-better for economy / bowling avg & SR); tap a row to highlight it, again to clear.
 - **Phase 2:** plain-English "describe a graphic": parse (nl2query, cost-capped) -> editable interpretation chips
   -> confirm -> render; per-IP daily limit; cache repeat ideas; highlight chosen from results, not guessed.
 - **Phase 3:** gallery of popular graphics, attribution once accounts exist, embeds.
