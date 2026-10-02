@@ -12,12 +12,12 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
 > **MOBILE VIZ SWEEP (2026-10-02) — DEPLOYED through 6d681d4 (main == mobile-viz-sweep, Vercel + Heroku).**
-> Plan + tracker: MOBILE_VIZ_SWEEP.md (chunks 0-4 done, 5 partial, 6 not started; read its "Deploys / fixes"
-> block). Shared pieces: hooks/useIsMobile, hooks/useMatchPreview, theme/chartDefaults (validated palette +
+> Plan + tracker: MOBILE_VIZ_SWEEP.md (chunks 0-6 done; read its "Deploys / fixes" and "Orphaned components"
+> blocks). Shared pieces: hooks/useIsMobile, hooks/useMatchPreview, theme/chartDefaults (validated palette +
 > Recharts presets), ui/CollapsibleSection (+openSection), ui/DetailSheet, ui/TakeawayCard, charts/DivergingBars,
 > utils/competitionParams, utils/playerProfileUrl. API: /match-preview returns `expect` (build_expect_block;
-> local golden re-captured); /players collapses alias spellings. Next: ShotMap revival, bowler glance cards,
-> chunk 6 sweep. FantasyPlanner.test fails on main too (pre-existing). Mockups artifact:
+> local golden re-captured); /players collapses alias spellings. Next: delete the orphaned components once
+> approved; backlog notes in HINDSIGHT_FEATURE_PLAN.md (metric threshold filters; Jev-chosen pack charts). FantasyPlanner.test fails on main too (pre-existing). Mockups artifact:
 > https://claude.ai/artifact/PgfyGxyZvBQQyvf59YsApX
 >
 > **DEPLOYED 2026-10-01 (~15:57 UTC):** audit-fixes fast-forwarded into main (dad2ef1), pushed to GitHub
