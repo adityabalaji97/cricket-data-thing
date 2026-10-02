@@ -24,6 +24,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import ScrollTable from './ui/ScrollTable';
+import KeyBattles from './KeyBattles';
 
 import {
     Info as InfoIcon,
@@ -435,7 +436,7 @@ const MatchupMatrix = ({
                 <Typography variant={isMobile ? "subtitle1" : "h6"}>
                     <CondensedName name={decodeURIComponent(batting_team)} type="team" /> vs <CondensedName name={decodeURIComponent(bowling_team)} type="team" /> Matchups
                 </Typography>
-                <Tooltip title="Runs-Wickets (Balls) @ Strike Rate | Hover for more stats">
+                <Tooltip title="Runs-Wickets (Balls). Tap a cell for strike rate, average, dot % and boundary %.">
                     <InfoIcon size={16} />
                 </Tooltip>
             </Box>
@@ -631,6 +632,12 @@ const Matchups = ({
     // Fantasy projections use T20 (Dream11 T20) scoring, so they are only shown for T20.
     const showFantasy = matchFormat === 'T20';
     const [matchupData, setMatchupData] = React.useState(null);
+    // Phones: key battles first; the full matrices (~1000px wide each) are one tap away.
+    const [showMatrices, setShowMatrices] = React.useState(false);
+    const keyBattleSides = React.useMemo(() => (matchupData ? [
+        { battingTeam: matchupData.team1?.name, bowlingTeam: matchupData.team2?.name, matchups: matchupData.team1?.batting_matchups },
+        { battingTeam: matchupData.team2?.name, bowlingTeam: matchupData.team1?.name, matchups: matchupData.team2?.batting_matchups },
+    ] : []), [matchupData]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [formFlagsByPlayer, setFormFlagsByPlayer] = React.useState({});
@@ -1145,7 +1152,19 @@ const Matchups = ({
                 postTossPlayerLinks={postTossPlayerLinks}
             />}
 
-            {postTossMode === 'off' && (
+            {postTossMode === 'off' && matchupData && (
+                <KeyBattles
+                    sides={keyBattleSides}
+                />
+            )}
+
+            {postTossMode === 'off' && isMobile && !showMatrices && (
+                <Button variant="outlined" onClick={() => setShowMatrices(true)} sx={{ mb: 3, minHeight: 40 }}>
+                    View full matrix
+                </Button>
+            )}
+
+            {postTossMode === 'off' && (!isMobile || showMatrices) && (
                 <>
                     {/* Team 1 vs Team 2 Matchups */}
                     <MatchupMatrix
