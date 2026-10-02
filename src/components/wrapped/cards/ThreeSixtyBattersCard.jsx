@@ -134,7 +134,7 @@ const ThreeSixtyBattersCard = ({ data }) => {
                     px: 0.8, 
                     py: 0.2, 
                     borderRadius: 1,
-                    fontSize: '0.65rem',
+                    fontSize: '0.6875rem',
                     color: 'rgba(255,255,255,0.8)'
                   }}
                 >
@@ -207,7 +207,7 @@ const ThreeSixtyBattersCard = ({ data }) => {
         display: 'grid', 
         gridTemplateColumns: 'repeat(4, 1fr)', 
         gap: 0.5,
-        fontSize: '0.65rem',
+        fontSize: '0.6875rem',
         color: 'rgba(255,255,255,0.6)'
       }}>
         {currentPlayer?.zone_breakdown?.map(zone => (

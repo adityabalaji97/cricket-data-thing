@@ -83,7 +83,7 @@
   cursor: pointer;
   font-family: 'Barlow Semi Condensed', sans-serif;
   font-weight: 600;
-  font-size: 10.5px;
+  font-size: 11px;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   transition: all 150ms ease;
@@ -141,7 +141,7 @@
 .impact-card .wp-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   color: #6b7280;
   margin-bottom: 4px;
 }
@@ -361,7 +361,7 @@
 .worm-axis {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   color: #6b7280;
   margin-top: 6px;
   font-variant-numeric: tabular-nums;
@@ -516,7 +516,7 @@
   border-top: 0;
   color: #6b7280;
   font-family: 'Barlow Semi Condensed', sans-serif;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.05em;
   padding-bottom: 6px;
 }
@@ -535,7 +535,7 @@
 .mini-table small {
   display: block;
   color: #6b7280;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .bowling-mini-row {
@@ -571,7 +571,7 @@
   padding: 14px 22px 6px;
   color: #6b7280;
   font-family: 'Barlow Semi Condensed', sans-serif;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -670,7 +670,7 @@
   display: block;
   color: #6b7280;
   font-weight: 400;
-  font-size: 10.5px;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -754,7 +754,7 @@
   flex-wrap: wrap;
   margin-top: 5px;
   color: #7b828c;
-  font-size: 10.5px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -795,7 +795,7 @@
 
 .split-card small {
   color: #4b5058;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .split-card b {
@@ -822,7 +822,7 @@
 .split-card em {
   display: block;
   color: #9aa1ac;
-  font-size: 10.5px;
+  font-size: 11px;
   font-style: normal;
   margin-top: 2px;
 }
@@ -911,7 +911,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 

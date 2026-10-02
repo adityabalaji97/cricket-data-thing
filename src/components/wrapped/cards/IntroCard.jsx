@@ -96,7 +96,7 @@ const IntroCard = ({ data }) => {
               sx={{ 
                 color: '#b3b3b3',
                 textTransform: 'uppercase',
-                fontSize: '0.65rem',
+                fontSize: '0.6875rem',
                 letterSpacing: 1
               }}
             >
