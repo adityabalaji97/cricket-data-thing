@@ -18,11 +18,13 @@ import ScrollTable from './ui/ScrollTable';
 import { spacing, colors, borderRadius } from '../theme/designSystem';
 import CondensedName from './common/CondensedName';
 import useIsMobile from '../hooks/useIsMobile';
+import DetailSheet from './ui/DetailSheet';
 
 const BowlingInningsTable = ({ stats, wrapInCard = true }) => {
   // Phone layout from the shared hook: callers never passed isMobile, so phones got the desktop chart.
   const { isMobile } = useIsMobile();
   const [displayMode, setDisplayMode] = useState('topWickets');
+  const [openInning, setOpenInning] = useState(null);
   const [sortConfig, setSortConfig] = useState({
     key: displayMode === 'topWickets' ? 'wickets' : 'date',
     direction: 'desc'
@@ -111,7 +113,7 @@ const BowlingInningsTable = ({ stats, wrapInCard = true }) => {
       backgroundColor: colors.neutral[0]
     }}>
       <CardContent sx={{ p: `${isMobile ? spacing.base : spacing.lg}px` }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 1, flexWrap: 'wrap' }}>
           <Typography variant="h6">
             {displayMode === 'topWickets' ? 'Top Wicket-Taking Innings' : 'Recent Form'}
           </Typography>
@@ -144,9 +146,10 @@ const BowlingInningsTable = ({ stats, wrapInCard = true }) => {
                     Date
                   </TableSortLabel>
                 </TableCell>
-                <TableCell>Opposition</TableCell>
-                <TableCell>Venue</TableCell>
-                <TableCell align="right">
+                <TableCell>{isMobile ? 'Opp' : 'Opposition'}</TableCell>
+                {isMobile && <TableCell align="right">Figures</TableCell>}
+                {!isMobile && <TableCell>Venue</TableCell>}
+                {!isMobile && <TableCell align="right">
                   <TableSortLabel
                     active={sortConfig.key === 'overs'}
                     direction={sortConfig.key === 'overs' ? sortConfig.direction : 'desc'}
@@ -154,8 +157,8 @@ const BowlingInningsTable = ({ stats, wrapInCard = true }) => {
                   >
                     Overs
                   </TableSortLabel>
-                </TableCell>
-                <TableCell align="right">
+                </TableCell>}
+                {!isMobile && <TableCell align="right">
                   <TableSortLabel
                     active={sortConfig.key === 'runs'}
                     direction={sortConfig.key === 'runs' ? sortConfig.direction : 'asc'}
@@ -163,8 +166,8 @@ const BowlingInningsTable = ({ stats, wrapInCard = true }) => {
                   >
                     Runs
                   </TableSortLabel>
-                </TableCell>
-                <TableCell align="right">
+                </TableCell>}
+                {!isMobile && <TableCell align="right">
                   <TableSortLabel
                     active={sortConfig.key === 'wickets'}
                     direction={sortConfig.key === 'wickets' ? sortConfig.direction : 'desc'}
@@ -172,17 +175,17 @@ const BowlingInningsTable = ({ stats, wrapInCard = true }) => {
                   >
                     Wickets
                   </TableSortLabel>
-                </TableCell>
+                </TableCell>}
                 <TableCell align="right">
                   <TableSortLabel
                     active={sortConfig.key === 'economy'}
                     direction={sortConfig.key === 'economy' ? sortConfig.direction : 'asc'}
                     onClick={() => handleSort('economy')}
                   >
-                    Economy
+                    {isMobile ? 'Econ' : 'Economy'}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell align="right">
+                {!isMobile && <TableCell align="right">
                   <TableSortLabel
                     active={sortConfig.key === 'dot_percentage'}
                     direction={sortConfig.key === 'dot_percentage' ? sortConfig.direction : 'desc'}
@@ -190,8 +193,8 @@ const BowlingInningsTable = ({ stats, wrapInCard = true }) => {
                   >
                     Dot %
                   </TableSortLabel>
-                </TableCell>
-                <TableCell align="center">Result</TableCell>
+                </TableCell>}
+                {!isMobile && <TableCell align="center">Result</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -205,18 +208,22 @@ const BowlingInningsTable = ({ stats, wrapInCard = true }) => {
                                     'inherit'
                   }}
                   hover
+                  // Phones: 4 columns; tap a row for venue, overs, dots and result.
+                  onClick={isMobile ? () => setOpenInning(inning) : undefined}
+                  style={isMobile ? { cursor: 'pointer' } : undefined}
                 >
                   <TableCell>{inning.formattedDate}</TableCell>
                   <TableCell><CondensedName name={inning.batting_team} type="team" /></TableCell>
-                  <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {isMobile && <TableCell align="right" sx={{ fontWeight: 600 }}>{inning.wickets}/{inning.runs}</TableCell>}
+                  {!isMobile && <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {inning.venue}
-                  </TableCell>
-                  <TableCell align="right">{inning.overs}</TableCell>
-                  <TableCell align="right">{inning.runs}</TableCell>
-                  <TableCell align="right">{inning.wickets}</TableCell>
+                  </TableCell>}
+                  {!isMobile && <TableCell align="right">{inning.overs}</TableCell>}
+                  {!isMobile && <TableCell align="right">{inning.runs}</TableCell>}
+                  {!isMobile && <TableCell align="right">{inning.wickets}</TableCell>}
                   <TableCell align="right">{inning.economy}</TableCell>
-                  <TableCell align="right">{inning.dot_percentage}%</TableCell>
-                  <TableCell align="center" 
+                  {!isMobile && <TableCell align="right">{inning.dot_percentage}%</TableCell>}
+                  {!isMobile && <TableCell align="center" 
                     sx={{ 
                       color: inning.result === 'Won' ? 'success.main' : 
                              inning.result === 'Lost' ? 'error.main' : 
@@ -225,12 +232,24 @@ const BowlingInningsTable = ({ stats, wrapInCard = true }) => {
                     }}
                   >
                     {inning.result}
-                  </TableCell>
+                  </TableCell>}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </ScrollTable>
+        <DetailSheet
+          open={Boolean(openInning)}
+          onClose={() => setOpenInning(null)}
+          title={openInning ? `${openInning.wickets}/${openInning.runs} v ${openInning.batting_team}` : ''}
+          subtitle={openInning ? `${openInning.formattedDate} · ${openInning.venue || ''}` : ''}
+          rows={openInning ? [
+            { label: 'Overs', value: openInning.overs },
+            { label: 'Economy', value: openInning.economy },
+            { label: 'Dot %', value: `${openInning.dot_percentage}%` },
+            { label: 'Result', value: openInning.result || '–' },
+          ] : []}
+        />
       </CardContent>
     </Card>
   );
