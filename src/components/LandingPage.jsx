@@ -118,7 +118,7 @@ const Kicker = ({ children, color = C.lime }) => (
     sx={{
       color,
       fontFamily: fonts.mono,
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: '0.16em',
       textTransform: 'uppercase',
       fontWeight: 600,
@@ -432,7 +432,7 @@ const TodayMatchCard = ({ match }) => {
         <Typography sx={{ ...monoSx, color: live ? C.red : C.soft }}>{status}</Typography>
       </Box>
       <TeamFixtureRow color={team1Color} abbr={match.team1Abbr || match.team1} name={match.team1} />
-      <Typography sx={{ color: C.soft, fontFamily: fonts.mono, fontSize: 10, lineHeight: 1, textAlign: 'center', my: 0.7 }}>
+      <Typography sx={{ color: C.soft, fontFamily: fonts.mono, fontSize: 11, lineHeight: 1, textAlign: 'center', my: 0.7 }}>
         VS
       </Typography>
       <TeamFixtureRow color={team2Color} abbr={match.team2Abbr || match.team2} name={match.team2} />
@@ -466,7 +466,7 @@ const chipSx = {
   py: 0.45,
   borderRadius: 1,
   fontFamily: fonts.mono,
-  fontSize: 10,
+  fontSize: 11,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
   maxWidth: '62%',
@@ -488,6 +488,11 @@ const teamLinkSx = {
   fontWeight: 700,
   fontSize: 23,
   lineHeight: 1,
+  // 32px tap target without changing the type size ("SL" alone is 23px wide).
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: 32,
+  minWidth: 32,
   textDecoration: 'none',
   '&:hover': { color: C.lime },
 };
@@ -746,13 +751,16 @@ const RecentMatchTile = ({ match }) => {
 };
 
 const ScoreRow = ({ team, score, winner }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.75 }}>
+  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.25 }}>
     <Typography component={Link} to={routeTeam(team)} sx={{
       color: winner ? C.lime : C.mid,
       fontFamily: fonts.display,
       fontWeight: winner ? 700 : 600,
       fontSize: 16,
       lineHeight: 1,
+      display: 'inline-flex',
+      alignItems: 'center',
+      minHeight: 32,
       textDecoration: 'none',
       '&:hover': { color: C.lime },
     }}>
@@ -978,7 +986,7 @@ const EloRow = ({ team }) => {
         <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', mt: 0.35 }}>
           {team.team_name}
         </Typography>
-        <Typography sx={{ color: winColor, fontFamily: fonts.mono, fontSize: 10.5, mt: 0.45 }}>
+        <Typography sx={{ color: winColor, fontFamily: fonts.mono, fontSize: 11, mt: 0.45 }}>
           {team.wins || 0}-{team.losses || 0} - {Math.round(winPct)}%
         </Typography>
       </Box>
@@ -986,7 +994,7 @@ const EloRow = ({ team }) => {
         <Typography sx={{ color: C.lime, fontFamily: fonts.display, fontWeight: 700, fontSize: 19, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
           {Math.round(Number(team.current_elo || 0))}
         </Typography>
-        <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: '0.1em' }}>
+        <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.1em' }}>
           ELO
         </Typography>
       </Box>
@@ -1024,7 +1032,7 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
             <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 24, fontVariantNumeric: 'tabular-nums', lineHeight: 1.05, mt: 0.7 }}>
               {(item.match_count || 0).toLocaleString()}
             </Typography>
-            <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 10.5, mt: 0.5 }}>
+            <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 11, mt: 0.5 }}>
               latest {toDateLabel(item.latest_date)}
             </Typography>
           </Box>
@@ -1219,7 +1227,7 @@ const LatestNotesSection = () => {
           <Box key={note.id} component={Link} to={`/notes/${note.slug}`}
             sx={{ display: 'flex', gap: 1.5, p: 1.75, borderRadius: 2.5, bgcolor: C.surface, border: `1px solid ${C.hairline}`, textDecoration: 'none', minWidth: 0, '&:hover': { bgcolor: C.raised } }}>
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.5 }}>
+              <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.5 }}>
                 {NOTE_KIND[note.kind] || 'Note'}
               </Typography>
               <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1.2,
