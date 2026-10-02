@@ -7,19 +7,10 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import {
-  Legend,
-  PolarAngleAxis,
-  PolarGrid,
-  PolarRadiusAxis,
-  Radar,
-  RadarChart,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts';
 import config from '../config';
 import { AlertBanner, VisualizationCard } from './ui';
 import { colors, spacing, typography } from '../theme/designSystem';
+import { colors as hs, fonts } from '../theme/hindsightDark';
 
 const ROLE_LABELS = {
   batter: 'Batter',
@@ -33,35 +24,64 @@ const roleFromPlayerType = (playerType) => {
   return null;
 };
 
-const RadarTooltip = ({ active, payload, label }) => {
-  if (!active || !payload || payload.length === 0) return null;
 
-  const datum = payload[0]?.payload;
-  if (!datum) return null;
+const fmtRaw = (v) => {
+  if (v === null || v === undefined || Number.isNaN(Number(v))) return '–';
+  const n = Number(v);
+  return Math.abs(n) >= 100 ? n.toFixed(0) : n.toFixed(1);
+};
 
+/**
+ * Player v doppelganger, one row per metric: two dots on a shared 0-100 percentile track, raw
+ * values at the end, biggest gaps first.
+ *
+ * Replaced a 10-18 axis radar with 10px angle labels: two near-identical filled shapes that read
+ * as "the same player" even where roles differ sharply (e.g. powerplay v death usage).
+ */
+const SimilarityDumbbells = ({ rows, targetName, compareName }) => {
+  const sorted = [...rows].sort(
+    (x, y) => Math.abs((y.targetPercentile ?? 0) - (y.comparePercentile ?? 0))
+      - Math.abs((x.targetPercentile ?? 0) - (x.comparePercentile ?? 0)),
+  );
+  const dot = (left, color, z) => ({
+    position: 'absolute', top: 1, left: `${left}%`, width: 12, height: 12, ml: '-6px',
+    borderRadius: '50%', bgcolor: color, border: `2px solid ${hs.surface1}`, zIndex: z,
+  });
   return (
-    <Box
-      sx={{
-        backgroundColor: colors.neutral[0],
-        border: `1px solid ${colors.neutral[200]}`,
-        borderRadius: 2,
-        p: `${spacing.sm}px ${spacing.md}px`,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-        maxWidth: 280,
-      }}
-    >
-      <Typography variant="body2" sx={{ fontWeight: typography.fontWeight.semibold, mb: `${spacing.xs}px` }}>
-        {label}
-      </Typography>
-      <Typography variant="caption" color="text.secondary" display="block">
-        Target: {datum.targetPercentile}% ({datum.targetRaw})
-      </Typography>
-      <Typography variant="caption" color="text.secondary" display="block">
-        Match: {datum.comparePercentile}% ({datum.compareRaw})
-      </Typography>
-      <Typography variant="caption" color="text.secondary" display="block">
-        League avg: {datum.leagueAvg}
-      </Typography>
+    <Box>
+      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', fontSize: 12, color: hs.textLo, mb: 1 }}>
+        <span><Box component="span" sx={{ ...dot(0, hs.accent, 1), position: 'relative', display: 'inline-block', top: 1, ml: 0, mr: 0.75 }} />{targetName}</span>
+        <span><Box component="span" sx={{ ...dot(0, hs.textLo, 1), position: 'relative', display: 'inline-block', top: 1, ml: 0, mr: 0.75 }} />{compareName}</span>
+        <span>Percentile among peers · biggest differences first</span>
+      </Box>
+      <Box sx={{ display: 'grid', gap: 0.75 }}>
+        {sorted.map((r) => {
+          const a = Math.max(0, Math.min(100, Number(r.targetPercentile) || 0));
+          const b = Math.max(0, Math.min(100, Number(r.comparePercentile) || 0));
+          return (
+            <Box
+              key={r.metric}
+              aria-label={`${r.metric}: ${targetName} ${fmtRaw(r.targetRaw)}, ${compareName} ${fmtRaw(r.compareRaw)}`}
+              sx={{ display: 'grid', gridTemplateColumns: '84px minmax(0, 1fr) 76px', gap: 1, alignItems: 'center', minHeight: 24 }}
+            >
+              <Typography sx={{ fontSize: 12.5, color: hs.textMed, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {r.metric}
+              </Typography>
+              <Box sx={{ position: 'relative', height: 14 }}>
+                <Box sx={{ position: 'absolute', left: 0, right: 0, top: 6, height: 2, bgcolor: 'rgba(255,255,255,0.07)' }} />
+                <Box sx={{ position: 'absolute', top: 5, height: 4, left: `${Math.min(a, b)}%`, width: `${Math.abs(a - b)}%`, bgcolor: 'rgba(255,255,255,0.28)' }} />
+                <Box sx={dot(b, hs.textLo, 1)} />
+                <Box sx={dot(a, hs.accent, 2)} />
+              </Box>
+              <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <Box component="span" sx={{ color: hs.accent }}>{fmtRaw(r.targetRaw)}</Box>
+                <Box component="span" sx={{ color: hs.textFaint }}> · </Box>
+                <Box component="span" sx={{ color: hs.textLo }}>{fmtRaw(r.compareRaw)}</Box>
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
     </Box>
   );
 };
@@ -227,47 +247,11 @@ const PlayerDoppelgangers = ({
                 <Typography variant="body2" sx={{ mb: 1, fontWeight: typography.fontWeight.medium }}>
                   {data.display_name || data.player_name} vs {selectedDoppelganger.player_name}
                 </Typography>
-                <Box sx={{ width: '100%', height: isMobile ? 360 : 440 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart
-                      data={radarData}
-                      outerRadius={isMobile ? '68%' : 165}
-                      margin={{ top: 8, right: 12, bottom: 8, left: 12 }}
-                    >
-                      <PolarGrid />
-                      <PolarAngleAxis
-                        dataKey="metric"
-                        tick={{ fontSize: isMobile ? 10 : 12, fill: colors.neutral[800] }}
-                      />
-                      <PolarRadiusAxis
-                        domain={[0, 100]}
-                        tickCount={6}
-                        tick={{ fontSize: isMobile ? 9 : 11, fill: colors.neutral[600] }}
-                      />
-                      <Radar
-                        name={data.display_name || data.player_name}
-                        dataKey="targetPercentile"
-                        stroke={colors.chart.blue}
-                        fill={colors.chart.blue}
-                        fillOpacity={0.2}
-                      />
-                      <Radar
-                        name={selectedDoppelganger.player_name}
-                        dataKey="comparePercentile"
-                        stroke={colors.chart.orange}
-                        fill={colors.chart.orange}
-                        fillOpacity={0.2}
-                      />
-                      <Tooltip content={<RadarTooltip />} />
-                      <Legend
-                        wrapperStyle={{
-                          fontSize: isMobile ? '0.75rem' : '0.875rem',
-                          color: colors.neutral[800],
-                        }}
-                      />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </Box>
+                <SimilarityDumbbells
+                  rows={radarData}
+                  targetName={data.display_name || data.player_name}
+                  compareName={selectedDoppelganger.player_name}
+                />
               </Box>
             )}
 
