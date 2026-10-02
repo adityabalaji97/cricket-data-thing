@@ -690,3 +690,30 @@ After each chunk, verify by:
 | `team_phase_stats` | Precomputed team metrics | avg_runs, avg_wickets, avg_run_rate per team/venue/phase |
 | `venue_clusters` | Venue groupings | cluster_type: high_scoring, balanced, bowling_friendly |
 | `wpa_outcomes` | Win probability | target_bucket, over_bucket, wickets_lost, win_probability |
+
+---
+
+## Backlog: metric threshold filters (query builder + idea packs) — noted 2026-10-02
+
+**Problem.** "ODI batters with 50+ average, 100+ SR sorted by control %, minimum 1000 balls" produced a pack
+topped by Chirag Suri (control 97.7%, rank 1 of 366). The 1000-ball minimum and the sort were honoured; the
+average and strike-rate thresholds were silently dropped. nl2query only knows count minimums
+(`min_balls`, `min_runs`, `max_runs`, `min_wickets`, `max_wickets`; services/nl2query.py ~904, ~1161), and the
+query builder has no way to filter on a computed metric.
+
+**Shared path.** Idea packs already parse through the query builder's parser
+(services/content_ideas.plan -> nl2query.parse_nl_query), so one fix serves both.
+
+**Ideal (in-query, from NL input):**
+1. Query builder v2: a generic post-aggregation filter, e.g. `having=average:gte:50&having=strike_rate:gte:100`,
+   on any metric column (average, strike_rate, economy, control_percentage, dot/boundary %, impact_per_100...),
+   applied as SQL HAVING (or on the aggregated rows before sort/limit). Validate against the metric column list.
+   Bump query_cache LOGIC_VERSION; add goldens.
+2. nl2query: teach the prompt + validator to emit `having` for phrases like "50+ average", "SR over 140",
+   "economy under 7". Unknown metrics -> warning shown to the user instead of a silent drop.
+3. Idea packs inherit it; the pack card should list every applied filter so a dropped one is visible.
+
+**Fallback (UI only):** post-query filtering in the results table: per-column min/max on displayed columns,
+reflected in the URL and the share snapshot.
+
+**Also:** surface "filters I couldn't apply" in both the query builder and the idea-pack preview (CARTA: complete).
