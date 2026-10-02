@@ -272,6 +272,9 @@ const FantasyAnalysisCard = ({
     postTossDelta = {},
     postTossPlayerLinks = {},
 }) => {
+    // Top 5 by default, the rest one tap away. This replaced a 220px inner scroll box, which trapped
+    // the thumb inside the page scroll on phones.
+    const [showAll, setShowAll] = React.useState(false);
     if (!fantasyData || !fantasyData.top_fantasy_picks) return null;
 
     const getConfidenceColor = (confidence) => {
@@ -307,14 +310,14 @@ const FantasyAnalysisCard = ({
                     Fantasy Analysis - Top Picks
                 </Typography>
             </Box>
-            <ScrollTable stickyFirstColumn sx={{ maxHeight: 220, overflowY: 'auto' }}>
-                <Table size="small" stickyHeader>
+            <ScrollTable stickyFirstColumn>
+                <Table size="small">
                     <TableHead>
                         <TableRow>
                             <TableCell sx={{ fontWeight: 'bold', py: 1 }}>Player</TableCell>
                             <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>xPoints</TableCell>
                             {hasPostToss && (
-                                <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>xPoints (post-toss)</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', py: 1, whiteSpace: 'nowrap' }}>Post-toss</TableCell>
                             )}
                             {hasPostToss && (
                                 <TableCell align="right" sx={{ fontWeight: 'bold', py: 1 }}>Δ</TableCell>
@@ -323,7 +326,7 @@ const FantasyAnalysisCard = ({
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {sortedPicks.map((player) => {
+                        {(showAll ? sortedPicks : sortedPicks.slice(0, 5)).map((player) => {
                             const formMeta = getPlayerFormMeta(formFlagsByPlayer, player.player_name);
                             const postToss = postTossXpoints?.[player.player_name];
                             const delta = postTossDelta?.[player.player_name];
@@ -382,6 +385,11 @@ const FantasyAnalysisCard = ({
                     </TableBody>
                 </Table>
             </ScrollTable>
+            {sortedPicks.length > 5 && (
+                <Button size="small" onClick={() => setShowAll((prev) => !prev)} sx={{ mt: 1, minHeight: 36 }}>
+                    {showAll ? 'Show top 5' : `Show all ${sortedPicks.length}`}
+                </Button>
+            )}
         </Card>
     );
 };
@@ -415,21 +423,6 @@ const MatchupMatrix = ({
         return cols;
     }, [batters, matchups]);
 
-    const handleBatterClick = (batter) => {
-        const params = new URLSearchParams();
-        params.append('name', batter);
-        if (venue && venue !== "All Venues") {
-            params.append('venue', venue);
-        }
-        if (startDate) {
-            params.append('start_date', startDate);
-        }
-        if (endDate) {
-            params.append('end_date', endDate);
-        }
-        params.append('autoload', 'true');
-        window.open(`${window.location.origin}/player?${params.toString()}`, '_blank');
-    };
 
     return (
         <Card sx={{
@@ -521,7 +514,7 @@ const MatchupMatrix = ({
                         {batters.map((batter) => {
                             const formMeta = getPlayerFormMeta(formFlagsByPlayer, batter);
                             return (
-                            <TableRow key={batter} onClick={() => handleBatterClick(batter)} style={{ cursor: 'pointer' }}>
+                            <TableRow key={batter}>
                                 <TableCell
                                     component="th"
                                     scope="row"
@@ -535,7 +528,6 @@ const MatchupMatrix = ({
                                         cursor: 'pointer',
                                         boxShadow: `inset 3px 0 0 0 ${getFormBorderColor(formMeta)}`
                                     }}
-                                    onClick={() => handleBatterClick(batter)}
                                 >
                                     <a
                                         href={`${window.location.origin}/player?${new URLSearchParams({
