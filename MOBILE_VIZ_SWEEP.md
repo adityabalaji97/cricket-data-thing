@@ -19,10 +19,7 @@
 - Small leftovers: dedupe ball_stats/doppelganger fetches; pass venue to BoundaryAnalysis + doppelgangers;
   sortable table headers 27px tall on phones; Foresight range/features (needs match_predictions rows).
 
-## Orphaned components awaiting deletion sign-off (no live importers, 2026-10-02)
-WagonWheel, PlayerPitchMap, BowlerWagonWheel, BowlerPitchMap, BattingScatterChart (+test), BowlingAnalysis,
-BoundaryPattern, FantasyPointsBarChart, BowlingPhasePerformanceRadar, EloRacerChart, PostTossAnalysis,
-VenueTacticalMap, VenueSimilarity, VenueDeliveryStats, VenueDismissalAnalytics, VenueBoundaryShape (test only).
+## Orphaned components: deleted 2026-10-02 with sign-off (16 components + 2 tests).
 
 ## CARTA chart checklist
 - **Complete**: sample size + filter context shown; explicit empty state.
