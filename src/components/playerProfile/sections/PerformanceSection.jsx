@@ -38,18 +38,7 @@ const PerformanceSection = ({ stats, mode, isMobile, playerName, dateRange, sele
         <PhasePerformanceRadar stats={stats} />
         <PaceSpinBreakdown stats={stats} />
       </Box>
-      {playerName && (
-        <Box sx={{ mt: 3 }}>
-          <LineLengthProfile
-            playerName={playerName}
-            mode="batting"
-            dateRange={dateRange}
-            selectedVenue={selectedVenue}
-            competitionFilters={competitionFilters}
-            isMobile={isMobile}
-          />
-        </Box>
-      )}
+      {/* Batting line & length lives in the Shot map section now. */}
     </>
   );
 };

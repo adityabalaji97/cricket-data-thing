@@ -112,9 +112,15 @@ def get_wagon_wheel_data(
     dismissal: Optional[str] = None,
     dismissal_mode: str = "exact",  # exact | wicket
     max_points: int = 2000,
+    aggregate: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Get wagon wheel data for a batter with optional filters.
+
+    aggregate=True returns per (wagon_zone, phase, bowl_kind, bat_hand) totals over every matching
+    ball instead of individual deliveries. The per-ball list is capped at max_points (and ordered
+    by dd.date, which is always NULL), so totals summed from it on the client covered an arbitrary
+    subset of a long window; the zone view needs the full count.
 
     Returns individual deliveries with wagon coordinates (wagon_x, wagon_y)
     where the ball ended up after the shot.
@@ -230,6 +236,43 @@ def get_wagon_wheel_data(
             params["shot"] = shot
 
         where_clause = " AND ".join(conditions)
+
+        if aggregate:
+            agg_query = text(f"""
+                SELECT
+                    COALESCE(dd.wagon_zone, 0) AS wagon_zone,
+                    CASE
+                        WHEN dd.over BETWEEN 0 AND 5 THEN 'powerplay'
+                        WHEN dd.over BETWEEN 6 AND 14 THEN 'middle'
+                        ELSE 'death'
+                    END AS phase,
+                    dd.bowl_kind,
+                    dd.bat_hand,
+                    {_BAT.balls_sum} AS balls,
+                    {_BAT.runs_sum} AS runs,
+                    {_BAT.wickets_sum} AS wickets,
+                    {_BAT.dots_sum} AS dots,
+                    SUM(CASE WHEN dd.batruns = 4 THEN 1 ELSE 0 END) AS fours,
+                    SUM(CASE WHEN dd.batruns = 6 THEN 1 ELSE 0 END) AS sixes
+                FROM delivery_details dd
+                WHERE {where_clause}
+                GROUP BY 1, 2, 3, 4
+            """)
+            return [
+                {
+                    "wagon_zone": int(row.wagon_zone or 0),
+                    "phase": row.phase,
+                    "bowl_kind": row.bowl_kind,
+                    "bat_hand": row.bat_hand,
+                    "balls": int(row.balls or 0),
+                    "runs": int(row.runs or 0),
+                    "wickets": int(row.wickets or 0),
+                    "dots": int(row.dots or 0),
+                    "fours": int(row.fours or 0),
+                    "sixes": int(row.sixes or 0),
+                }
+                for row in db.execute(agg_query, params).fetchall()
+            ]
 
         query = text(f"""
             SELECT

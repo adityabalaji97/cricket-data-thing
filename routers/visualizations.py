@@ -40,6 +40,7 @@ def get_player_wagon_wheel(
     dismissal: Optional[str] = Query(default=None),
     dismissal_mode: str = Query(default="exact", pattern="^(exact|wicket)$"),
     max_points: int = Query(default=2000, ge=100, le=5000),
+    aggregate: bool = Query(default=False, description="Return zone x phase x bowl_kind x bat_hand totals over all balls"),
     db: Session = Depends(get_session)
 ):
     """
@@ -116,7 +117,11 @@ def get_player_wagon_wheel(
             dismissal=dismissal,
             dismissal_mode=dismissal_mode,
             max_points=max_points,
+            aggregate=aggregate,
         )
+
+        if aggregate:
+            return {"zones": deliveries, "aggregate": True}
 
         return {
             "deliveries": deliveries,

@@ -23,6 +23,7 @@ import VisualizationsSection from './playerProfile/sections/VisualizationsSectio
 import ExploreSection from './playerProfile/sections/ExploreSection';
 import RecentFormStrip from './playerProfile/RecentFormStrip';
 import PlayerGlance from './playerProfile/PlayerGlance';
+import ShotMapSection from './playerProfile/sections/ShotMapSection';
 import AdvancedBowlingAnalyticsSection from './playerProfile/AdvancedBowlingAnalyticsSection';
 import BoundaryAnalysis from './BoundaryAnalysis';
 import LazySection from './ui/LazySection';
@@ -455,6 +456,21 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         ),
       },
       {
+        id: 'shot-map',
+        label: 'Shot map',
+        defaultOpen: true,
+        takeaway: 'Where he scores, and what he is bowled',
+        content: (
+          <ShotMapSection
+            playerName={appliedPlayer}
+            dateRange={appliedRange}
+            selectedVenue={appliedVenue}
+            competitionFilters={appliedCompetitions}
+            isMobile={isMobile}
+          />
+        ),
+      },
+      {
         id: 'performance',
         label: 'Performance',
         takeaway: 'By phase, against pace and spin, by line and length',
@@ -575,7 +591,8 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       ),
     });
 
-    return groups;
+    // The shot map is batting-only (bowlers keep line & length in Performance).
+    return activeTab === 'batting' ? groups : groups.filter((g) => g.id !== 'shot-map');
   }, [
     hasData, currentStats, currentDismissalStats, activeTab, battingStats,
     applied, isMobile, fetchTrigger, overviewTakeaway,
