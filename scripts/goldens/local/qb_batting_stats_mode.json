@@ -637,7 +637,7 @@
       "offset": 0,
       "query_mode_used": "batting_stats",
       "returned_groups": 50,
-      "total_groups": 109,
+      "total_groups": 108,
       "total_innings_in_query": 2730,
       "warnings": []
     },
