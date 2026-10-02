@@ -16,8 +16,11 @@
   CompetitionFilter could never pick a single league; /players collapses spellings via player_alias_map;
   search -> profile directly (utils/playerProfileUrl); legacy-name profile links (name=V Kohli) autoload again.
 - Local DB: migration 005 applied locally (was only in prod).
-- Small leftovers: dedupe ball_stats/doppelganger fetches; pass venue to BoundaryAnalysis + doppelgangers;
-  sortable table headers 27px tall on phones; Foresight range/features (needs match_predictions rows).
+- Leftovers DONE later 2026-10-02: core profile fetch ran twice (fixed), nth-ball SR reuses ball_stats, sortable headers
+  32px, batting_scatter no longer computed, player_type alias-aware (toggle), bowlers open on bowling, orphans deleted.
+- Still open: the two doppelganger calls (DNA card v line & length) use different params, so they are not merged --
+  aligning them is a product call; venue filter not supported by /boundary-analysis or doppelgangers (backend);
+  Foresight range/features (needs match_predictions rows).
 
 ## Orphaned components: deleted 2026-10-02 with sign-off (16 components + 2 tests).
 
