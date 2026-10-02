@@ -14,7 +14,9 @@ import {
   TextField,
   Typography,
   Chip,
+  Collapse,
 } from '@mui/material';
+import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
 import config from '../config';
 import CondensedName from './common/CondensedName';
 
@@ -45,6 +47,7 @@ const PostTossSetup = ({
   onApplyResult,
   espnEventId = null,
 }) => {
+  const [editorOpen, setEditorOpen] = useState(false);
   const [loadingRosters, setLoadingRosters] = useState(true);
   const [rosterError, setRosterError] = useState(null);
   const [team1Roster, setTeam1Roster] = useState([]);
@@ -255,6 +258,7 @@ const PostTossSetup = ({
           : {}),
       });
       onApplyResult?.(response.data);
+      setEditorOpen(false);
     } catch (err) {
       console.error('Post-toss apply failed', err);
       const message = err?.response?.data?.detail || 'Failed to apply post-toss analysis.';
@@ -264,11 +268,33 @@ const PostTossSetup = ({
     }
   };
 
+  const battingFirstLabel = battingFirstTeam ? `${battingFirstTeam} bat first` : 'Toss not set';
+
   return (
-    <Box sx={{ mt: 2, p: { xs: 1.5, sm: 2 }, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)', bgcolor: 'rgba(0,0,0,0.015)' }}>
-      <Typography variant={isMobile ? 'subtitle1' : 'h6'} sx={{ mb: 1 }}>
-        Post-Toss Setup
-      </Typography>
+    <Box sx={{ mt: 2, p: { xs: 1.5, sm: 2 }, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+      {/* Folded by default: the form pre-fills ~25 roster chips per team, which was ~1,400px of
+          scrolling on a phone before anyone reached the matchups. */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Playing XIs and toss</Typography>
+          <Typography variant="body2" color="text.secondary" noWrap>
+            {battingFirstLabel} · {team1Identifier} {team1Xi.length} · {team2Identifier} {team2Xi.length}
+          </Typography>
+        </Box>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<TuneRoundedIcon />}
+          onClick={() => setEditorOpen((prev) => !prev)}
+          aria-expanded={editorOpen}
+          sx={{ flexShrink: 0, minHeight: 36 }}
+        >
+          {editorOpen ? 'Close' : 'Edit'}
+        </Button>
+      </Box>
+
+      <Collapse in={editorOpen} timeout={180}>
+      <Box sx={{ pt: 2 }}>
 
       <Stack direction={isMobile ? 'column' : 'row'} spacing={1} sx={{ mb: 1.5 }}>
         <TextField
@@ -324,6 +350,7 @@ const PostTossSetup = ({
         <Autocomplete
           key={`t1-${inputSource}`}
           multiple
+          limitTags={isMobile ? 4 : 8}
           options={team1Roster}
           freeSolo
           loading={loadingRosters}
@@ -342,6 +369,7 @@ const PostTossSetup = ({
         <Autocomplete
           key={`t2-${inputSource}`}
           multiple
+          limitTags={isMobile ? 4 : 8}
           options={team2Roster}
           freeSolo
           loading={loadingRosters}
@@ -360,6 +388,7 @@ const PostTossSetup = ({
         <Autocomplete
           key={`impact-${inputSource}`}
           multiple
+          limitTags={isMobile ? 4 : 8}
           options={allPlayers}
           freeSolo
           value={impactSubs}
@@ -400,6 +429,8 @@ const PostTossSetup = ({
           'Apply Post-Toss'
         )}
       </Button>
+      </Box>
+      </Collapse>
     </Box>
   );
 };
