@@ -127,13 +127,13 @@ const PaceSpinBreakdown = ({ stats, isMobile: isMobileProp, wrapInCard = true })
               type="number"
               domain={[0, maxValue * 1.1]}
               tickFormatter={(value) => Number(value.toFixed(2))}
-              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
+              tick={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
             />
             <YAxis
               type="category"
               dataKey="phase"
               axisLine={false}
-              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
+              tick={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend

@@ -117,13 +117,13 @@ const WicketDistribution = ({ stats, wrapInCard = true }) => {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="phase"
-              tick={{ fontSize: isMobile ? 10 : 12 }}
+              tick={{ fontSize: isMobile ? 11 : 12 }}
             >
               {!isMobile && <Label value="Match Phase" position="bottom" offset={10} />}
             </XAxis>
             <YAxis
               yAxisId="left"
-              tick={{ fontSize: isMobile ? 9 : 11 }}
+              tick={{ fontSize: isMobile ? 11 : 11 }}
             >
               {!isMobile && <Label value="Wickets" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
             </YAxis>
@@ -131,7 +131,7 @@ const WicketDistribution = ({ stats, wrapInCard = true }) => {
               yAxisId="right"
               orientation="right"
               domain={[0, 15]}
-              tick={{ fontSize: isMobile ? 9 : 11 }}
+              tick={{ fontSize: isMobile ? 11 : 11 }}
             >
               {!isMobile && <Label value="Economy Rate" angle={90} position="insideRight" style={{ textAnchor: 'middle' }} />}
             </YAxis>

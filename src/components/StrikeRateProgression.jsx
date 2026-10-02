@@ -84,19 +84,19 @@ const StrikeRateProgression = ({ selectedPlayer, dateRange, selectedVenue, compe
             <XAxis
               dataKey="ball_number"
               label={isMobile ? undefined : { value: 'Ball Number', position: 'bottom', offset: 10 }}
-              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
+              tick={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
             />
             <YAxis
               yAxisId="left"
               domain={[minSR, maxSR]}
               label={isMobile ? undefined : { value: 'Strike Rate', angle: -90, position: 'insideLeft' }}
-              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
+              tick={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
             />
             <YAxis
               yAxisId="right"
               orientation="right"
               label={isMobile ? undefined : { value: 'Number of Innings', angle: 90, position: 'insideRight' }}
-              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
+              tick={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
             />
             <Tooltip
               formatter={(value, name) => {

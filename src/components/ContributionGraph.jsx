@@ -71,11 +71,11 @@ const ContributionGraph = ({ innings }) => {
             <CartesianGrid stroke={colors.neutral[200]} strokeDasharray="3 3" />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: isMobile ? 10 : 12, fill: colors.neutral[600] }}
+              tick={{ fontSize: isMobile ? 11 : 12, fill: colors.neutral[600] }}
               interval={isMobile ? 4 : 2}
             />
             <YAxis
-              tick={{ fontSize: isMobile ? 10 : 12, fill: colors.neutral[600] }}
+              tick={{ fontSize: isMobile ? 11 : 12, fill: colors.neutral[600] }}
               width={isMobile ? 32 : 40}
             />
             <Tooltip

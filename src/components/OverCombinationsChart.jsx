@@ -1,19 +1,9 @@
 import React, { useState } from 'react';
-import { Card, CardContent, Typography, Box, Table, TableBody, TableCell, TableHead, TableRow, Paper, TableSortLabel, Tooltip, TablePagination } from '@mui/material';
+import { Card, CardContent, Typography, Box, Table, TableBody, TableCell, TableHead, TableRow, TableSortLabel, TablePagination } from '@mui/material';
 import ScrollTable from './ui/ScrollTable';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  Legend,
-  ResponsiveContainer,
-  Label
-} from 'recharts';
 import { spacing, colors, borderRadius } from '../theme/designSystem';
 import useIsMobile from '../hooks/useIsMobile';
+import { SERIES } from '../theme/chartDefaults';
 
 const OverCombinationsChart = ({ stats, wrapInCard = true }) => {
   // Phone layout from the shared hook: callers never passed isMobile, so phones got the desktop chart.
@@ -52,28 +42,7 @@ const OverCombinationsChart = ({ stats, wrapInCard = true }) => {
     .sort((a, b) => b.percentage - a.percentage)
     .slice(0, 5);
 
-  // Custom tooltip for the chart
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <Paper sx={{ p: 2, boxShadow: 3 }}>
-          <Typography variant="subtitle2" gutterBottom>
-            Overs: {label}
-          </Typography>
-          <Typography variant="body2">
-            Wickets/Innings: <strong>{payload[0].value}</strong>
-          </Typography>
-          <Typography variant="body2">
-            Economy Rate: <strong>{payload[1].value}</strong>
-          </Typography>
-          <Typography variant="body2">
-            Frequency: <strong>{processedData.find(d => d.overs === label)?.percentage}%</strong>
-          </Typography>
-        </Paper>
-      );
-    }
-    return null;
-  };
+
 
   // Handle sort request
   const handleRequestSort = (property) => {
@@ -92,7 +61,6 @@ const OverCombinationsChart = ({ stats, wrapInCard = true }) => {
     setPage(0);
   };
 
-  const chartHeight = isMobile ? 220 : 280;
 
   const content = (
     <Card sx={{
@@ -108,33 +76,32 @@ const OverCombinationsChart = ({ stats, wrapInCard = true }) => {
           Analysis of effectiveness across different over combinations
         </Typography>
         
-        <Box sx={{ width: '100%', height: 300, mb: 4 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={top5Data}
-              margin={{
-                top: 20,
-                right: 30,
-                left: 20,
-                bottom: 50,
-              }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="overs" angle={-45} textAnchor="end" height={80}>
-                <Label value="Over Combinations (Top 5)" position="bottom" offset={20} />
-              </XAxis>
-              <YAxis yAxisId="left">
-                <Label value="Wickets per Innings" angle={-90} position="insideLeft" />
-              </YAxis>
-              <YAxis yAxisId="right" orientation="right">
-                <Label value="Economy Rate" angle={90} position="insideRight" />
-              </YAxis>
-              <RechartsTooltip content={<CustomTooltip />} />
-              <Legend />
-              <Bar yAxisId="left" dataKey="wickets_per_innings" name="Wickets/Innings" fill="#8884d8" />
-              <Bar yAxisId="right" dataKey="economy" name="Economy Rate" fill="#82ca9d" />
-            </BarChart>
-          </ResponsiveContainer>
+        {/* Ranked list, one row per combination, each metric on its own scale. Was a dual-axis
+            bar chart (wickets/innings v economy on two y-scales) with -45deg x labels and fixed
+            margins, unreadable at phone width. */}
+        <Box sx={{ display: 'grid', gap: 1.5, mb: 3 }}>
+          {(() => {
+            const maxW = Math.max(...top5Data.map((d) => Number(d.wickets_per_innings) || 0), 1e-9);
+            const maxE = Math.max(...top5Data.map((d) => Number(d.economy) || 0), 1e-9);
+            const bar = (v, max, color) => (
+              <Box sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.06)' }}>
+                <Box sx={{ height: '100%', width: `${((Number(v) || 0) / max) * 100}%`, borderRadius: 3, bgcolor: color }} />
+              </Box>
+            );
+            return top5Data.map((d) => (
+              <Box key={d.overs}>
+                <Typography sx={{ fontWeight: 600, fontSize: 14 }}>Overs {d.overs}</Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '96px minmax(0, 1fr) 44px', alignItems: 'center', columnGap: 1, rowGap: 0.5, mt: 0.5 }}>
+                  <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Wickets / inns</Typography>
+                  {bar(d.wickets_per_innings, maxW, SERIES[0])}
+                  <Typography sx={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: 12, textAlign: 'right' }}>{Number(d.wickets_per_innings || 0).toFixed(2)}</Typography>
+                  <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Economy</Typography>
+                  {bar(d.economy, maxE, SERIES[1])}
+                  <Typography sx={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: 12, textAlign: 'right' }}>{Number(d.economy || 0).toFixed(2)}</Typography>
+                </Box>
+              </Box>
+            ));
+          })()}
         </Box>
         
         <ScrollTable paper>

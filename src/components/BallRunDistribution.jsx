@@ -151,7 +151,7 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp, wrapInCard = tru
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               type="number"
-              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
+              tick={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
             >
               <Label
                 value="Number of Innings"
@@ -163,15 +163,18 @@ const BallRunDistribution = ({ innings, isMobile: isMobileProp, wrapInCard = tru
             <YAxis
               dataKey="ballRange"
               type="category"
-              tick={{ fontSize: isMobile ? 10 : 12, fill: designColors.neutral[800] }}
+              tick={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
             >
+              {/* Desktop only: a rotated title costs a phone plot ~20px; the card title names the axis. */}
+              {!isMobile && (
               <Label
-                value="Balls Faced"
-                angle={-90}
-                position="insideLeft"
-                offset={isMobile ? 5 : 15}
-                style={{ textAnchor: 'middle', fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
-              />
+                  value="Balls Faced"
+                  angle={-90}
+                  position="insideLeft"
+                  offset={isMobile ? 5 : 15}
+                  style={{ textAnchor: 'middle', fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
+                />
+              )}
             </YAxis>
             <Tooltip content={<CustomTooltip />} />
             <Bar

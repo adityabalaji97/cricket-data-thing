@@ -168,7 +168,7 @@ const OverEconomyChart = ({ stats, wrapInCard = true }) => {
             <XAxis
               dataKey="over"
               scale="point"
-              tick={{ fontSize: isMobile ? 10 : 12 }}
+              tick={{ fontSize: isMobile ? 11 : 12 }}
             >
               {!isMobile && <Label value="Over Number" position="bottom" offset={10} />}
             </XAxis>
@@ -178,7 +178,7 @@ const OverEconomyChart = ({ stats, wrapInCard = true }) => {
                 yAxisId="economy"
                 domain={[minEconomy, maxEconomy]}
                 orientation="left"
-                tick={{ fontSize: isMobile ? 9 : 11 }}
+                tick={{ fontSize: isMobile ? 11 : 11 }}
               >
                 {!isMobile && <Label value="Economy Rate" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
               </YAxis>
@@ -189,7 +189,7 @@ const OverEconomyChart = ({ stats, wrapInCard = true }) => {
                 yAxisId="wickets"
                 orientation="right"
                 domain={[0, maxWickets]}
-                tick={{ fontSize: isMobile ? 9 : 11 }}
+                tick={{ fontSize: isMobile ? 11 : 11 }}
               >
                 {!isMobile && <Label value="Wickets" angle={90} position="insideRight" style={{ textAnchor: 'middle' }} />}
               </YAxis>
@@ -200,7 +200,7 @@ const OverEconomyChart = ({ stats, wrapInCard = true }) => {
                 yAxisId="dot_percentage"
                 orientation="left"
                 domain={[0, maxDotPercentage]}
-                tick={{ fontSize: isMobile ? 9 : 11 }}
+                tick={{ fontSize: isMobile ? 11 : 11 }}
               >
                 {!isMobile && <Label value="Dot %" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
               </YAxis>

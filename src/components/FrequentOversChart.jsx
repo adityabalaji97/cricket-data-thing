@@ -113,13 +113,13 @@ const FrequentOversChart = ({ stats, wrapInCard = true }) => {
             }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="over" tick={{ fontSize: isMobile ? 10 : 12 }}>
+            <XAxis dataKey="over" tick={{ fontSize: isMobile ? 11 : 12 }}>
               {!isMobile && <Label value="Over Number" position="bottom" offset={10} />}
             </XAxis>
-            <YAxis yAxisId="left" tick={{ fontSize: isMobile ? 9 : 11 }}>
+            <YAxis yAxisId="left" tick={{ fontSize: isMobile ? 11 : 11 }}>
               {!isMobile && <Label value="Wickets" angle={-90} position="insideLeft" />}
             </YAxis>
-            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: isMobile ? 9 : 11 }}>
+            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: isMobile ? 11 : 11 }}>
               {!isMobile && <Label value="Economy Rate" angle={90} position="insideRight" />}
             </YAxis>
             <RechartsTooltip content={<CustomTooltip />} />

@@ -199,7 +199,7 @@ const InningsScatter = ({ innings, wrapInCard = true, shareView = false }) => {
                 ticks={xMetric === 'phase' ? [0, 1, 2, 3] : undefined}
                 tickFormatter={xMetric === 'phase' ? (value) => ['0-6', '6-10', '10-15', '15-20'][value] : undefined}
                 label={isMobile ? undefined : { value: xAxisMetrics[xMetric].label, position: 'bottom', offset: 0 }}
-                tick={{ fontSize: isCompact ? 8 : 12, fill: designColors.neutral[800] }}
+                tick={{ fontSize: isCompact ? 11 : 12, fill: designColors.neutral[800] }}
               />
               <YAxis
                 type="number"
@@ -212,7 +212,7 @@ const InningsScatter = ({ innings, wrapInCard = true, shareView = false }) => {
                   position: 'insideLeft',
                   offset: 10
                 }}
-                tick={{ fontSize: isCompact ? 8 : 12, fill: designColors.neutral[800] }}
+                tick={{ fontSize: isCompact ? 11 : 12, fill: designColors.neutral[800] }}
               />
               {yMetric === 'strike_rate' && <ReferenceLine y={100} stroke={designColors.neutral[500]} strokeDasharray="3 3" />}
               {yMetric === 'sr_diff' && <ReferenceLine y={0} stroke={designColors.neutral[500]} strokeDasharray="3 3" />}

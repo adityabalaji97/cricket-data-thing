@@ -143,7 +143,7 @@ const GlobalT20RankSection = ({ mode, rankPayload, loading, failed }) => {
           {hasTrajectoryValues ? (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trajectory} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis hide domain={[0, 100]} />
                 <RechartsTooltip content={<GlobalRankTooltip />} />
                 <Line type="monotone" dataKey="score" stroke="#1976d2" strokeWidth={2} dot={false} connectNulls />
