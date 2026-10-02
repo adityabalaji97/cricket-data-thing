@@ -7,7 +7,7 @@
 | 2 | Match preview fixes + mobile structure | [x] 2026-10-02 (preview-text-into-strip moves to chunk 3) |
 | 3 | Match preview new vizs (What to expect, Key Battles, Foresight) | [x] 2026-10-02 (Foresight range/features deferred: match_predictions empty locally, cannot verify) |
 | 4 | Player profile fixes + mobile structure | [x] 2026-10-02 (left: dedupe ball_stats/doppelganger fetches; pass venue to BoundaryAnalysis + doppelgangers) |
-| 5 | Player profile chart rework + new vizs (At a glance, ShotMap, Impact/clutch) | [~] 2026-10-02 partial: Impact charts, doppelganger dumbbell, phase small multiples, over-combos list, rotated labels/11px floor, caught-map labels, At a glance (batting) DONE. LEFT: ShotMap (wagon wheel + pitch map revival, fold LineLengthProfile in), At a glance for bowlers, StrikeRateIntervals single series, row-tap DetailSheet for TopInnings/BowlingInningsTable/FrequentOvers |
+| 5 | Player profile chart rework + new vizs (At a glance, ShotMap, Impact/clutch) | [x] 2026-10-02 (left: FrequentOvers row-tap; TopInnings already has a 4-col phone mode) |
 | 6 | Rest-of-app sweep + dead code | [ ] |
 
 ## Deploys / fixes outside the chunks (2026-10-02)

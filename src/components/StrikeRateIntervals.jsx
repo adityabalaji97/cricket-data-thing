@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Box, useMediaQuery, useTheme } from '@mui/material';
+import { Typography, Box, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import {
   BarChart,
   Bar,
@@ -7,19 +7,32 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer
 } from 'recharts';
 import Card from './ui/Card';
 import FilterBar from './ui/FilterBar';
 import { EmptyState } from './ui';
-import { colors as designColors } from '../theme/designSystem';
+import useIsMobile from '../hooks/useIsMobile';
+import {
+  SERIES, chartMargin, xAxisProps, yAxisProps, axisLabel, tooltipProps, gridProps, barProps,
+  chartHeight as chartHeightFor,
+} from '../theme/chartDefaults';
 
-const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp, wrapInCard = true }) => {  // Add default empty array
-  const [interval, setInterval] = useState(5);
-  const theme = useTheme();
-  const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
-  const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
+const METRICS = {
+  strikeRate: { label: 'Strike rate', short: 'SR', color: SERIES[0], unit: '' },
+  boundaryPercentage: { label: 'Boundary %', short: 'Bnd %', color: SERIES[2], unit: '%' },
+  dotPercentage: { label: 'Dot %', short: 'Dot %', color: SERIES[1], unit: '%' },
+};
+
+/**
+ * Strike rate (or boundary % / dot %) by ball-of-innings interval. One metric at a time on one
+ * axis: this was three bars per interval on two y-scales (SR 0-200 left, percentages right),
+ * which at interval 5 meant ~36 hairline bars on a phone and a misleading cross-scale comparison.
+ */
+const StrikeRateIntervals = ({ ballStats = [], wrapInCard = true }) => {
+  const { isMobile } = useIsMobile();
+  const [interval, setInterval] = useState(isMobile ? 10 : 5);
+  const [metric, setMetric] = useState('strikeRate');
   const Wrapper = wrapInCard ? Card : Box;
   const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
 
@@ -100,8 +113,9 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp, wrapInCar
   const handleFilterChange = (key, value) => {
     if (key === 'interval') setInterval(value);
   };
+  const m = METRICS[metric];
 
-  const chartHeight = isMobile ? 350 : 400;
+  const chartHeight = chartHeightFor(isMobile, 'md');
 
   return (
     <Wrapper {...wrapperProps}>
@@ -125,74 +139,31 @@ const StrikeRateIntervals = ({ ballStats = [], isMobile: isMobileProp, wrapInCar
           />
         </Box>
       </Box>
+      <ToggleButtonGroup
+        exclusive
+        size="small"
+        value={metric}
+        onChange={(_, v) => v && setMetric(v)}
+        sx={{ mb: 1.5 }}
+      >
+        {Object.entries(METRICS).map(([key, def]) => (
+          <ToggleButton key={key} value={key} sx={{ minHeight: 36, px: 1.5 }}>{isMobile ? def.short : def.label}</ToggleButton>
+        ))}
+      </ToggleButtonGroup>
       <Box sx={{ width: '100%', height: chartHeight }}>
         <ResponsiveContainer>
-          <BarChart
-            data={data}
-            margin={{ top: 20, right: isMobile ? 5 : 30, left: isMobile ? 5 : 20, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="ballNumber"
-              label={isMobile ? undefined : {
-                value: 'Ball Number',
-                position: 'bottom',
-                offset: -5
-              }}
-              tick={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
-            />
-            <YAxis
-              yAxisId="left"
-              orientation="left"
-              domain={[0, 200]}
-              label={isMobile ? undefined : {
-                value: 'Strike Rate',
-                angle: -90,
-                position: 'insideLeft',
-                offset: 10
-              }}
-              tick={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
-            />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              domain={[0, 100]}
-              label={isMobile ? undefined : {
-                value: 'Percentage',
-                angle: 90,
-                position: 'insideRight',
-                offset: 10
-              }}
-              tick={{ fontSize: isMobile ? 11 : 12, fill: designColors.neutral[800] }}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend
-              wrapperStyle={{
-                fontSize: isMobile ? '0.75rem' : '0.875rem',
-                color: designColors.neutral[800],
-              }}
-            />
-            <Bar
-              yAxisId="left"
-              dataKey="strikeRate"
-              name="Strike Rate"
-              fill={designColors.chart.blue}
-            />
-            <Bar
-              yAxisId="right"
-              dataKey="boundaryPercentage"
-              name="Boundary %"
-              fill={designColors.chart.green}
-            />
-            <Bar
-              yAxisId="right"
-              dataKey="dotPercentage"
-              name="Dot %"
-              fill={designColors.chart.orange}
-            />
+          <BarChart data={data} margin={chartMargin(isMobile)}>
+            <CartesianGrid {...gridProps} />
+            <XAxis dataKey="ballNumber" {...xAxisProps(isMobile)} label={axisLabel(isMobile, 'Ball of innings', { side: 'bottom' })} />
+            <YAxis {...yAxisProps(isMobile)} tickFormatter={(v) => `${v}${m.unit}`} />
+            <Tooltip content={<CustomTooltip />} {...tooltipProps(isMobile)} />
+            <Bar dataKey={metric} name={m.label} fill={m.color} {...barProps(isMobile)} />
           </BarChart>
         </ResponsiveContainer>
       </Box>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+        {m.label} in each {interval}-ball stretch of his innings (balls 1-{interval}, {interval + 1}-{interval * 2}, ...).
+      </Typography>
     </Wrapper>
   );
 };
