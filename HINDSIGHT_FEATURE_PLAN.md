@@ -780,8 +780,13 @@ Opening the admin idea-pack chart pipeline (pack_charts + api/img.mjs) to users.
   content_ideas.attempt(created_by="graphic"), returns options best-first; GraphicMaker.jsx shows thumbnails,
   Share (native share sheet) / Download / Copy link. Shares the snapshot rate limiter. No LLM; one cheap Jev call
   when ranking non-structural forms.
-- **Phase 1 follow-ups:** lazy snapshots (save only the shown form), log creates/shares to app_events, pass the
-  query builder's own scatter axes, pick highlight by tapping a table row, a /g/:id share page with OG image.
+- **Phase 1 follow-ups:** DONE 2026-10-02: app_events tracking (graphic_made / graphic_download / share kind=graphic,
+  usage report graphics_made + graphic_makers), /g/:id share page with link-preview card, scatter axes from the
+  parser. Left: lazy snapshots (low value: ~2 kB per form), pick highlight by tapping a table row.
+- **Phase 2 via the existing NL box (2026-10-02):** plain English -> query builder's interpretation chips (the
+  confirm-before-render step) -> run -> Make graphic, which now defaults to the parser's metric and offers its
+  scatter. Remaining for a one-step "describe a graphic": a single input on a /graphics landing page, per-IP
+  daily limit on NL parses.
 - **Phase 2:** plain-English "describe a graphic": parse (nl2query, cost-capped) -> editable interpretation chips
   -> confirm -> render; per-IP daily limit; cache repeat ideas; highlight chosen from results, not guessed.
 - **Phase 3:** gallery of popular graphics, attribution once accounts exist, embeds.

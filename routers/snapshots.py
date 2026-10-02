@@ -63,6 +63,8 @@ class GraphicRequest(BaseModel):
     query_string: str
     metric: str
     highlight: Optional[str] = None
+    # {type: 'scatter', x_axis, y_axis} when the viewer's question named two metrics.
+    chart: Optional[Dict[str, Any]] = None
 
 
 @router.post("/graphic")
@@ -87,7 +89,8 @@ def create_graphic(body: GraphicRequest, request: Request, db: Session = Depends
             if params.get(key) is not None:
                 params[key] = str(params[key])
         planned = {"params": params, "metric": body.metric,
-                   "highlight": [body.highlight] if body.highlight else None, "chart": None}
+                   "highlight": [body.highlight] if body.highlight else None,
+                   "chart": body.chart if (body.chart or {}).get("type") == "scatter" else None}
         description = f"{body.metric.replace('_', ' ')} by {' and '.join(params['group_by'])}"
         result = attempt(db, description, planned, created_by="graphic")
     except SnapshotError as exc:

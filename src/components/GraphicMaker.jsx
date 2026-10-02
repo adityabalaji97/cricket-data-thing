@@ -23,7 +23,7 @@ const label = (key) => key.replace(/_/g, ' ').replace(/\bpercentage\b/, '%');
  * as the admin idea packs, from the query the viewer already ran (no LLM). The server re-runs the
  * query from its query string, so the numbers in a graphic are always real.
  */
-const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMetric }) => {
+const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMetric, scatter }) => {
   const { isMobile } = useIsMobile();
   const metrics = useMemo(() => {
     const first = rows?.[0] || {};
@@ -45,6 +45,8 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
     try {
       const { data } = await axios.post(`${config.API_URL}/snapshots/graphic`, {
         query_string: apiQueryString, metric, highlight: highlight || null,
+        // Two metrics in the question (parser's scatter): offer a scatter of them.
+        chart: scatter && scatter.x_axis && scatter.y_axis ? { type: 'scatter', x_axis: scatter.x_axis, y_axis: scatter.y_axis } : null,
       });
       setState({ loading: false, error: null, options: data.options || [], pickedBy: data.picked_by });
       track('graphic_made', { metric, forms: (data.options || []).map((o) => o.form).join(','), highlight: Boolean(highlight) });

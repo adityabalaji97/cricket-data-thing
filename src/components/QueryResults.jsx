@@ -1499,7 +1499,9 @@ const QueryResults = ({
           apiQueryString={apiQueryString}
           rows={sortedData.filter((row) => !row.is_summary)}
           groupBy={groupBy || []}
-          defaultMetric={sortConfig.key}
+          // A plain-English query already said what it is about: default to the parser's metric.
+          defaultMetric={recommendedChart?.y_axis || sortConfig.key}
+          scatter={recommendedChart?.type === 'scatter' ? recommendedChart : null}
         />
       )}
 
