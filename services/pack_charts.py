@@ -65,10 +65,22 @@ def valid_forms(shape: Dict[str, Any]) -> List[str]:
     return out
 
 
+# Forms the data shape itself asks for: a season grouping is a trend, a question naming two metrics
+# is a scatter, a two-way split is a dumbbell, parts of a whole are a stacked bar, zones are a field.
+# In production Jev ranked bars over the line for "impact by season" (59/41) and over the scatter for
+# "average v strike rate" (88/1), so a structural form leads and Jev orders the rest.
+STRUCTURAL = ("field", "line", "scatter", "dumbbell", "stacked")
+
+
 def rank_forms(idea: str, shape: Dict[str, Any], forms: List[str]) -> Dict[str, Any]:
-    """Order the valid forms for this idea. Returns {order: [...], by: 'jev'|'rules', probabilities}."""
-    if len(forms) <= 1 or not jev_client.enabled():
-        return {"order": forms, "by": "rules", "probabilities": {}}
+    """Order the valid forms for this idea. Returns {order, by: 'jev'|'rules'|'shape+jev', probabilities}.
+
+    valid_forms lists structural forms first, so forms[0] is the shape's own answer when there is one.
+    """
+    lead = forms[0] if forms and forms[0] in STRUCTURAL else None
+    rest = forms[1:] if lead else forms
+    if len(rest) <= 1 or not jev_client.enabled():
+        return {"order": forms, "by": "shape" if lead else "rules", "probabilities": {}}
     answers = jev_client.ask(
         {
             "idea": idea,
@@ -82,17 +94,18 @@ def rank_forms(idea: str, shape: Dict[str, Any], forms: List[str]) -> Dict[str, 
             "form": {
                 "type": "choice",
                 "instructions": "Which chart form communicates this cricket stat idea best in a single phone-sized image?",
-                "criteria": {f: FORMS[f] for f in forms},
+                "criteria": {f: FORMS[f] for f in rest},
             }
         },
         timeout=3.0,
     ) or {}
     probs = ((answers.get("form") or {}).get("probabilities")) or {}
-    probs = {f: float(p) for f, p in probs.items() if f in forms}
+    probs = {f: float(p) for f, p in probs.items() if f in rest}
     if not probs:
-        return {"order": forms, "by": "rules", "probabilities": {}}
-    order = sorted(forms, key=lambda f: (-probs.get(f, 0.0), forms.index(f)))
-    return {"order": order, "by": "jev", "probabilities": {f: round(p, 3) for f, p in probs.items()}}
+        return {"order": forms, "by": "shape" if lead else "rules", "probabilities": {}}
+    ordered = sorted(rest, key=lambda f: (-probs.get(f, 0.0), rest.index(f)))
+    return {"order": ([lead] if lead else []) + ordered, "by": "shape+jev" if lead else "jev",
+            "probabilities": {f: round(p, 3) for f, p in probs.items()}}
 
 
 def scatter_axes(parsed_chart: Optional[Dict[str, Any]], metric: str, rows: List[Dict[str, Any]]) -> Optional[tuple]:

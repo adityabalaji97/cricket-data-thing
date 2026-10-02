@@ -639,6 +639,10 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
     name = _row_name(row, label_key).replace(" & ", " and ")
     title = (f"{name} rank {ordinal(idx + 1)} of {total:,} {parts['scope']}{parts['filters']}{parts['minimum']}{parts['venue']}"
              f"{parts['overs']} for {metric_label(metric)}{parts['window'].replace(',', '')}, {_value_phrase(metric, value)}")
+    if time_rows and parts["who"]:
+        # Rows are seasons / phases / zones of one player: "2026 rank 1st of 7 T20 years" read badly.
+        title = (f"{parts['who']}'s best {readable[0].replace('_', ' ')} for {metric_label(metric).lower()}"
+                 f"{parts['window']}: {_split_label(label_key, row.get(label_key))}, {_value_phrase(metric, value)}")
 
     # The image: the top rows, with the subject swapped in at its true rank when it is lower.
     shown = list(range(min(8, len(rows)))) if idx < 8 else list(range(7)) + [idx]

@@ -23,15 +23,26 @@ def test_rank_forms_uses_jev_probabilities(monkeypatch):
     monkeypatch.setattr(pack_charts.jev_client, "enabled", lambda: True)
     monkeypatch.setattr(pack_charts.jev_client, "ask", lambda *a, **k: {
         "form": {"choice": "stat", "probabilities": {"bars": 0.3, "stat": 0.6, "scatter": 0.1}}})
-    out = rank_forms("idea", {"group_by": ["batter"]}, ["scatter", "bars", "stat"])
-    assert out["by"] == "jev" and out["order"] == ["stat", "bars", "scatter"]
+    out = rank_forms("idea", {"group_by": ["batter"]}, ["bars", "stat", "diverging"])
+    assert out["by"] == "jev" and out["order"] == ["stat", "bars", "diverging"]
+
+
+def test_structural_form_leads_and_jev_orders_the_rest(monkeypatch):
+    # Production: Jev put bars over the scatter for "average v strike rate". The shape wins the lead.
+    monkeypatch.setattr(pack_charts.jev_client, "enabled", lambda: True)
+    monkeypatch.setattr(pack_charts.jev_client, "ask", lambda *a, **k: {
+        "form": {"probabilities": {"scatter": 0.01, "bars": 0.11, "stat": 0.88}}})
+    out = rank_forms("Average v strike rate", {}, ["scatter", "bars", "stat"])
+    assert out["order"] == ["scatter", "stat", "bars"] and out["by"] == "shape+jev"
 
 
 def test_rank_forms_falls_back_to_rules(monkeypatch):
     monkeypatch.setattr(pack_charts.jev_client, "enabled", lambda: True)
     monkeypatch.setattr(pack_charts.jev_client, "ask", lambda *a, **k: None)  # Jev failed
-    out = rank_forms("idea", {}, ["line", "bars"])
-    assert out == {"order": ["line", "bars"], "by": "rules", "probabilities": {}}
+    out = rank_forms("idea", {}, ["bars", "stat"])
+    assert out == {"order": ["bars", "stat"], "by": "rules", "probabilities": {}}
+    out = rank_forms("idea", {}, ["line", "bars"])  # the shape's own form leads without Jev
+    assert out["order"] == ["line", "bars"] and out["by"] == "shape"
 
 
 def test_new_forms_follow_data_shape():

@@ -49,6 +49,8 @@ const SearchBar = ({
   autoFocus = false,
   // The app is dark throughout, so dark is the default; 'light' is kept for any light surface.
   variant = 'dark',
+  // The header's slide-down search sits inside the 52px top bar: a 40px field instead of 56px.
+  dense = false,
 }) => {
   const navigate = useNavigate();
   const { isMobile } = useIsMobile();
@@ -214,6 +216,7 @@ const SearchBar = ({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={isMobile ? 'Players, teams, venues' : placeholder}
+          size={dense ? 'small' : 'medium'}
           variant="outlined"
           onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
           InputProps={{
@@ -235,7 +238,7 @@ const SearchBar = ({
                     edge="end"
                     aria-label="Search"
                     disabled={!query.trim() || submitting}
-                    sx={{ width: 40, height: 40, color: dark ? '#b6f24a' : 'primary.main' }}
+                    sx={{ width: dense ? 36 : 40, height: dense ? 36 : 40, color: dark ? '#b6f24a' : 'primary.main' }}
                   >
                     <SearchIcon />
                   </IconButton>

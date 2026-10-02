@@ -593,6 +593,8 @@ const AppContent = () => {
                 }}
                 placeholder="Search players, teams, venues..."
                 variant="dark"
+                dense
+                autoFocus
               />
             </Box>
             <IconButton

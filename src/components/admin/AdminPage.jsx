@@ -40,7 +40,10 @@ const CopyBlock = ({ label, text, onCopy, multiline }) => (
       <Typography sx={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: C.lo }}>{label}</Typography>
       <Button size="small" onClick={() => onCopy(text, label)} sx={{ color: C.lime, minHeight: 32, fontWeight: 700 }}>Copy</Button>
     </Box>
-    <Typography sx={{ fontSize: multiline ? 13 : 15, fontWeight: multiline ? 400 : 600, color: multiline ? C.mid : C.hi, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+    <Typography sx={{ fontSize: multiline ? 13 : 15, fontWeight: multiline ? 400 : 600, color: multiline ? C.mid : C.hi, whiteSpace: 'pre-wrap', lineHeight: 1.4,
+      // The first comment carries a long query URL with no spaces; let it break so it cannot widen
+      // the page (it made the admin page side-scroll and zoom out on phones).
+      overflowWrap: 'anywhere' }}>
       {text}
     </Typography>
   </Box>
@@ -86,7 +89,7 @@ const PackCard = ({ pack, client, onChanged, toast }) => {
         // Other chart forms this pack was built with; Jev's (or the rules') top pick leads.
         <Box sx={{ mt: 1.5 }}>
           <Typography sx={{ fontSize: 12, color: C.lo, mb: 0.75 }}>
-            Chart · {facts.chart_picked_by === 'jev' ? "Jev's pick first" : 'rule order'} · tap to switch
+            Chart · {{ jev: "Jev's pick first", 'shape+jev': 'led by the data shape, then Jev', shape: 'led by the data shape' }[facts.chart_picked_by] || 'rule order'} · tap to switch
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5 }}>
             {facts.chart_options.map((o, i) => {
@@ -99,7 +102,7 @@ const PackCard = ({ pack, client, onChanged, toast }) => {
                   <Box component="img" src={`${siteOrigin()}/img/${o.snapshot_id}.png?size=portrait`} alt={o.form} loading="lazy"
                     sx={{ width: '100%', aspectRatio: '4 / 5', borderRadius: 1, display: 'block', bgcolor: '#14171e' }} />
                   <Typography sx={{ fontSize: 12, mt: 0.5, color: active ? C.lime : C.mid }}>
-                    {o.form}{i === 0 && facts.chart_picked_by === 'jev' ? ' ★' : ''}{o.p != null ? ` ${Math.round(o.p * 100)}%` : ''}
+                    {o.form}{i === 0 && String(facts.chart_picked_by || '').includes('jev') && o.p != null ? ' ★' : ''}{o.p != null ? ` ${Math.round(o.p * 100)}%` : ''}
                   </Typography>
                 </Box>
               );
