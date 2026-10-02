@@ -187,6 +187,10 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [activeSectionId, setActiveSectionId] = useState('overview');
   const [fetchTrigger, setFetchTrigger] = useState(0);
+  // The filters as of the last GO. Sections read these, not the live form: they used to refetch on
+  // every date keystroke and venue pick while the user was still editing (and while the phone
+  // filter sheet was open), before GO.
+  const [applied, setApplied] = useState(null);
   const [globalRankPayload, setGlobalRankPayload] = useState(null);
   const [globalRankLoading, setGlobalRankLoading] = useState(false);
   const [globalRankFailed, setGlobalRankFailed] = useState(false);
@@ -294,13 +298,14 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   useEffect(() => {
     if (shouldFetch && selectedPlayer) {
       fetchAllData();
+      setApplied({ player: selectedPlayer, dateRange, venue: selectedVenue, competitionFilters });
       setFetchTrigger(prev => prev + 1);
       setShouldFetch(false);
     }
-  }, [shouldFetch, selectedPlayer, fetchAllData]);
+  }, [shouldFetch, selectedPlayer, fetchAllData, dateRange, selectedVenue, competitionFilters]);
 
   useEffect(() => {
-    if (!selectedPlayer || fetchTrigger <= 0) return;
+    if (!applied?.player || fetchTrigger <= 0) return;
 
     let cancelled = false;
 
@@ -309,13 +314,13 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         setGlobalRankLoading(true);
         setGlobalRankFailed(false);
         const params = new URLSearchParams();
-        params.set('start_date', dateRange.start);
-        params.set('end_date', dateRange.end);
+        params.set('start_date', applied.dateRange.start);
+        params.set('end_date', applied.dateRange.end);
         params.set('snapshots', '6');
         params.set('mode', activeTab === 'bowling' ? 'bowling' : 'batting');
 
         const response = await fetch(
-          `${config.API_URL}/rankings/player/${encodeURIComponent(selectedPlayer)}?${params.toString()}`,
+          `${config.API_URL}/rankings/player/${encodeURIComponent(applied.player)}?${params.toString()}`,
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
@@ -333,7 +338,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
 
     fetchGlobalRanking();
     return () => { cancelled = true; };
-  }, [selectedPlayer, fetchTrigger, dateRange.start, dateRange.end, activeTab]);
+  }, [applied, fetchTrigger, activeTab]);
 
   const handleFetch = () => {
     if (!selectedPlayer) return;
@@ -353,7 +358,8 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
 
   // Build section groups (mirrors VenueNotes pattern)
   const sectionGroups = useMemo(() => {
-    if (!hasData) return [];
+    if (!hasData || !applied) return [];
+    const { player: appliedPlayer, dateRange: appliedRange, venue: appliedVenue, competitionFilters: appliedCompetitions } = applied;
 
     const groups = [
       {
@@ -366,11 +372,11 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         label: 'Impact',
         content: (
           <ImpactSection
-            playerName={selectedPlayer}
+            playerName={appliedPlayer}
             mode={activeTab}
-            dateRange={dateRange}
-            selectedVenue={selectedVenue}
-            competitionFilters={competitionFilters}
+            dateRange={appliedRange}
+            selectedVenue={appliedVenue}
+            competitionFilters={appliedCompetitions}
           />
         ),
       },
@@ -392,24 +398,24 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         content: (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <PlayerDNASummary
-              playerName={selectedPlayer}
+              playerName={appliedPlayer}
               playerType={activeTab === 'bowling' ? 'bowler' : 'batter'}
-              startDate={dateRange.start}
-              endDate={dateRange.end}
-              leagues={competitionFilters.leagues}
-              includeInternational={competitionFilters.international}
-              topTeams={competitionFilters.topTeams}
-              venue={selectedVenue !== 'All Venues' ? selectedVenue : undefined}
+              startDate={appliedRange.start}
+              endDate={appliedRange.end}
+              leagues={appliedCompetitions.leagues}
+              includeInternational={appliedCompetitions.international}
+              topTeams={appliedCompetitions.topTeams}
+              venue={appliedVenue !== 'All Venues' ? appliedVenue : undefined}
               fetchTrigger={fetchTrigger}
             />
             <PlayerDoppelgangers
-              playerName={selectedPlayer}
+              playerName={appliedPlayer}
               playerType={activeTab === 'bowling' ? 'bowler' : 'batter'}
-              startDate={dateRange.start}
-              endDate={dateRange.end}
-              leagues={competitionFilters.leagues}
-              includeInternational={competitionFilters.international}
-              topTeams={competitionFilters.topTeams}
+              startDate={appliedRange.start}
+              endDate={appliedRange.end}
+              leagues={appliedCompetitions.leagues}
+              includeInternational={appliedCompetitions.international}
+              topTeams={appliedCompetitions.topTeams}
               fetchTrigger={fetchTrigger}
               isMobile={isMobile}
             />
@@ -424,10 +430,10 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
             stats={currentStats}
             mode={activeTab}
             isMobile={isMobile}
-            playerName={selectedPlayer}
-            dateRange={dateRange}
-            selectedVenue={selectedVenue}
-            competitionFilters={competitionFilters}
+            playerName={appliedPlayer}
+            dateRange={appliedRange}
+            selectedVenue={appliedVenue}
+            competitionFilters={appliedCompetitions}
           />
         ),
       },
@@ -453,10 +459,10 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       content: (
         activeTab === 'bowling' ? (
           <AdvancedBowlingAnalyticsSection
-            playerName={selectedPlayer}
-            dateRange={dateRange}
-            selectedVenue={selectedVenue}
-            competitionFilters={competitionFilters}
+            playerName={appliedPlayer}
+            dateRange={appliedRange}
+            selectedVenue={appliedVenue}
+            competitionFilters={appliedCompetitions}
             isMobile={isMobile}
             // LazySection already defers the mount until the section nears the viewport. Gating
             // on the *active* section blanked the content as soon as you scrolled past it.
@@ -476,11 +482,11 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       content: (
         <BoundaryAnalysis
           context={activeTab === 'bowling' ? 'bowler' : 'batter'}
-          name={selectedPlayer}
-          startDate={dateRange.start}
-          endDate={dateRange.end}
-          leagues={competitionFilters.leagues}
-          includeInternational={competitionFilters.international}
+          name={appliedPlayer}
+          startDate={appliedRange.start}
+          endDate={appliedRange.end}
+          leagues={appliedCompetitions.leagues}
+          includeInternational={appliedCompetitions.international}
           isMobile={isMobile}
         />
       ),
@@ -493,10 +499,10 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         <DismissalSection
           dismissalData={currentDismissalStats}
           mode={activeTab}
-          playerName={selectedPlayer}
-          dateRange={dateRange}
-          selectedVenue={selectedVenue}
-          competitionFilters={competitionFilters}
+          playerName={appliedPlayer}
+          dateRange={appliedRange}
+          selectedVenue={appliedVenue}
+          competitionFilters={appliedCompetitions}
           isMobile={isMobile}
         />
       ),
@@ -509,10 +515,10 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
         <VisualizationsSection
           stats={currentStats}
           mode={activeTab}
-          selectedPlayer={selectedPlayer}
-          dateRange={dateRange}
-          selectedVenue={selectedVenue}
-          competitionFilters={competitionFilters}
+          appliedPlayer={appliedPlayer}
+          dateRange={appliedRange}
+          selectedVenue={appliedVenue}
+          competitionFilters={appliedCompetitions}
         />
       ),
     });
@@ -522,10 +528,10 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       label: 'Explore',
       content: (
         <ExploreSection
-          playerName={selectedPlayer}
+          playerName={appliedPlayer}
           mode={activeTab}
-          dateRange={dateRange}
-          venue={selectedVenue}
+          dateRange={appliedRange}
+          venue={appliedVenue}
         />
       ),
     });
@@ -533,7 +539,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     return groups;
   }, [
     hasData, currentStats, currentDismissalStats, activeTab, battingStats,
-    selectedPlayer, dateRange, selectedVenue, competitionFilters, isMobile, fetchTrigger,
+    applied, isMobile, fetchTrigger,
     globalRankPayload, globalRankLoading, globalRankFailed,
   ]);
 
