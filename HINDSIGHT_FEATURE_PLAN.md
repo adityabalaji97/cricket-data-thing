@@ -717,3 +717,35 @@ query builder has no way to filter on a computed metric.
 reflected in the URL and the share snapshot.
 
 **Also:** surface "filters I couldn't apply" in both the query builder and the idea-pack preview (CARTA: complete).
+
+## Backlog: more chart types for idea packs, chosen by Jev (or the user) — noted 2026-10-02
+
+**Today.** Pack images (api/img.mjs, Satori) draw one form for stat packs: a ranked bar list (`barsBody`), plus
+the `win_prob` and `recap` kinds. Every idea becomes a bar chart, even when the idea is a trend, a two-metric
+trade-off or a split.
+
+**Forms to add (each a body renderer in img.mjs + a matching live chart on /query and the embed):**
+| Idea shape | Form | Example |
+|---|---|---|
+| One metric, ranked | bars (exists) | most sixes in the death |
+| Two metrics, many players | scatter, highlighted player labelled, median cross-hairs | average v SR, 1000+ balls |
+| Change over time | line / slope chart (first v last season) | Kohli impact/100 by season |
+| Player v player or v baseline | dumbbell | Gill v Kohli by phase |
+| Split of a whole | stacked bar / 100% bar | dismissal types, runs by phase |
+| Above/below an average | diverging bars | impact by phase v pace/spin |
+| Single headline number | stat card (big number + context line) | "1st of 366 for control %" |
+| Zones on a field / pitch | wagon wheel / pitch grid | runs by zone, SR by line & length |
+
+**Who picks.** Jev already makes typed judgements here (services/typed_preview, fact_curation, search_routing).
+Add one more: given the parsed query (group_by, metrics, filters, row count) + the idea text, return a ranked
+list of {form, x, y, highlight, why} with probabilities. Code validates each option against the data shape (e.g.
+scatter needs 2 numeric metrics and >= 8 rows; line needs a time group_by) and drops invalid ones.
+- Default: render Jev's top valid choice.
+- Admin pack UI: show the top 2-3 as thumbnails ("Jev's pick" badge); one tap swaps the form before posting.
+- Without Jev configured: deterministic fallback from the data shape (time group_by -> line, 2 metrics ->
+  scatter, single row -> stat card, else bars).
+
+**Build order.** (1) deterministic shape -> form chooser + scatter and line renderers; (2) stat card, dumbbell,
+diverging; (3) Jev ranking + admin picker; (4) stacked + field forms. Reuse theme/chartDefaults palette (validated
+for dark) so images match the site. Ties into the metric-threshold backlog item above (a scatter of avg v SR is
+the natural pack for that idea).
