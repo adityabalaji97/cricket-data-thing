@@ -523,7 +523,7 @@ def query_cricket_data(
     min_balls: Annotated[Optional[int], Field(ge=1, description="Drop groups with fewer balls (use for leaderboards, e.g. 120).")] = None,
     min_runs: Annotated[Optional[int], Field(ge=0, description="Drop groups with fewer runs.")] = None,
     min_wickets: Annotated[Optional[int], Field(ge=0, description="Drop groups with fewer wickets.")] = None,
-    having: Annotated[List[str], Field(description="Thresholds on computed metrics, each 'metric:op:value' with op gte/lte/gt/lt; metrics average, strike_rate, balls_per_dismissal. E.g. ['average:gte:50','strike_rate:gte:100'] for '50+ average, 100+ SR'. Applied before sorting and the row limit.")] = [],
+    having: Annotated[List[str], Field(description="Thresholds on computed metrics, each 'metric:op:value' with op gte/lte/gt/lt; metrics average, strike_rate, balls_per_dismissal, dot_percentage, boundary_percentage, control_percentage, impact, impact_per_100, impact_per_innings, raa(_per_100), waa(_per_100), wpa, avg_leverage (Impact-family: men's T20 only). E.g. ['average:gte:50','strike_rate:gte:100'] for '50+ average, 100+ SR'. Applied before sorting and the row limit.")] = [],
     sort_by: Annotated[Optional[str], Field(description="Column to rank by, e.g. 'strike_rate', 'runs', 'economy', 'wickets'.")] = None,
     sort_descending: Annotated[bool, Field(description="Highest first (set False for economy-style metrics where lower is better).")] = True,
     limit: Annotated[int, Field(ge=1, le=MAX_ROWS, description=f"Rows to return (max {MAX_ROWS}).")] = DEFAULT_ROWS,

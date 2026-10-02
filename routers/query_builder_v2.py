@@ -147,7 +147,9 @@ def query_deliveries(
     having: List[str] = Query(
         default=[],
         description="Metric thresholds on grouped results, metric:op:value (op gte|lte|gt|lt), e.g. "
-                    "average:gte:50, strike_rate:gte:100. Supported: average, strike_rate, balls_per_dismissal.",
+                    "average:gte:50, strike_rate:gte:100, control_percentage:gte:80. Supported: average, strike_rate, "
+                    "balls_per_dismissal, dot/boundary/control_percentage, impact(_per_100/_per_innings), raa(_per_100), "
+                    "waa(_per_100), wpa, avg_leverage (Impact family men's T20 only).",
     ),
     
     # Pagination and limits

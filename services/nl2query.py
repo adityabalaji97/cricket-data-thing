@@ -158,11 +158,13 @@ Return a JSON object with these fields:
 - "min_wickets": minimum wickets threshold (use with bowler grouping, e.g. group_by=["match_id","innings","bowler"])
 - "max_wickets": maximum wickets threshold (use with bowler grouping)
 - "having": list of metric thresholds on grouped rows, each "metric:op:value" with op one of gte, lte, gt, lt.
-  Supported metrics: "average", "strike_rate", "balls_per_dismissal". Use it for phrases like "50+ average",
-  "average over 40", "strike rate above 140", "SR under 120". Example: "batters averaging 50+ at a strike rate of
-  100+" -> "having": ["average:gte:50", "strike_rate:gte:100"]. A threshold is a filter, not a sort: keep the
-  sort the user asked for separately. For thresholds on other metrics (dot %, boundary %, control %, impact,
-  economy) still include them in "having" so the user is told they could not be applied.
+  Metrics: "average", "strike_rate", "balls_per_dismissal", "dot_percentage", "boundary_percentage",
+  "control_percentage", "impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "waa",
+  "waa_per_100", "wpa", "avg_leverage". Use it for phrases like "50+ average", "strike rate above 140",
+  "control over 80%", "dot ball % under 30", "positive impact". Example: "batters averaging 50+ at a strike rate of
+  100+" -> "having": ["average:gte:50", "strike_rate:gte:100"]. Percentages are 0-100 numbers ("80%" -> 80). A
+  threshold is a filter, not a sort: keep the sort the user asked for separately. Economy is not available as a
+  threshold; if asked, still include "economy:lte:7" so the user is told it could not be applied.
 - "start_date": "YYYY-MM-DD" format
 - "end_date": "YYYY-MM-DD" format
 

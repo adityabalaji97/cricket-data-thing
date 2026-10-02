@@ -55,6 +55,13 @@ const THRESHOLD_METRICS = [
   ['average', 'Average'],
   ['strike_rate', 'Strike rate'],
   ['balls_per_dismissal', 'Balls per dismissal'],
+  ['dot_percentage', 'Dot %'],
+  ['boundary_percentage', 'Boundary %'],
+  ['control_percentage', 'Control %'],
+  ['impact_per_100', 'Impact / 100 balls'],
+  ['impact', 'Impact'],
+  ['wpa', 'WPA'],
+  ['raa_per_100', 'RAA / 100 balls'],
 ];
 const THRESHOLD_OPS = { gte: '≥', lte: '≤', gt: '>', lt: '<' };
 

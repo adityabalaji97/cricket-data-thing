@@ -2246,6 +2246,14 @@ def query_deliveries_service(
         )
         if metric_thresholds and not group_by:
             delivery_warnings.append("Metric filters (average, strike rate...) apply to grouped results only; add a group by.")
+        if metric_thresholds and routing.get("use_legacy"):
+            from services.metric_thresholds import PRIMER
+            late = sorted({m for m, _, _ in metric_thresholds if m in PRIMER or m == "control_percentage"})
+            if late:
+                delivery_warnings.append(
+                    f"Data for {', '.join(m.replace('_', ' ') for m in late)} starts in 2015: groups that include "
+                    "earlier seasons have no value and do not pass. Start the window in 2015 for a full comparison."
+                )
         # day_or_night filter requires joining matches in the modern (delivery_details) path
         join_new_matches = match_context_used or bool(day_or_night)
 
@@ -3502,6 +3510,44 @@ def handle_grouped_query(
             {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_wpa::double precision END) as wpa,
             AVG(CASE WHEN {metric_ball} THEN s.m_leverage::double precision END) as avg_leverage"""
 
+    # Metric thresholds on stage-2 metrics (dot/boundary/control %, Impact...) need those totals in
+    # stage 1, before ORDER BY / LIMIT. Added only when a threshold asks for them; definitions match
+    # the stage-2 columns below (services/metric_thresholds).
+    from services.metric_thresholds import needs as threshold_needs
+    extra_needs = threshold_needs(metric_thresholds or [])
+    inner_extra, outer_extra = [], []
+    stage1_metrics_join = ""
+    if "dots" in extra_needs:
+        inner_extra.append(f"{ball_defs.dots_sum} as t_dots")
+        outer_extra.append("SUM(t_dots)::bigint as t_dots")
+    if "boundaries" in extra_needs:
+        inner_extra.append("SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as t_boundaries")
+        outer_extra.append("SUM(t_boundaries)::bigint as t_boundaries")
+    if "control" in extra_needs:
+        inner_extra.append("SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) as t_ctrl_num")
+        inner_extra.append("SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END) as t_ctrl_den")
+        outer_extra.append("SUM(t_ctrl_num)::bigint as t_ctrl_num")
+        outer_extra.append("SUM(t_ctrl_den)::bigint as t_ctrl_den")
+    if "metrics" in extra_needs and metrics_enabled:
+        stage1_metrics_join = "LEFT JOIN ball_metrics bm ON bm.delivery_id = dd.id"
+        mb = "dd.wide = 0 AND bm.impact IS NOT NULL"
+        inner_extra += [
+            f"SUM(CASE WHEN {mb} THEN 1 ELSE 0 END) as t_metric_balls",
+            f"{metric_sign} * SUM(CASE WHEN {mb} THEN bm.impact::double precision END) as t_impact",
+            f"{metric_sign} * SUM(CASE WHEN {mb} THEN bm.raa::double precision END) as t_raa",
+            f"{metric_sign} * SUM(CASE WHEN {mb} THEN bm.waa::double precision END) as t_waa",
+            f"{metric_sign} * SUM(CASE WHEN {mb} THEN bm.wpa::double precision END) as t_wpa",
+            f"SUM(CASE WHEN {mb} THEN bm.leverage::double precision END) as t_lev_sum",
+            f"COUNT(CASE WHEN {mb} THEN bm.leverage END) as t_lev_n",
+        ]
+        outer_extra += [
+            "SUM(t_metric_balls)::bigint as t_metric_balls", "SUM(t_impact) as t_impact", "SUM(t_raa) as t_raa",
+            "SUM(t_waa) as t_waa", "SUM(t_wpa) as t_wpa", "SUM(t_lev_sum) as t_lev_sum",
+            "SUM(t_lev_n)::bigint as t_lev_n",
+        ]
+    stage1_inner_extra = "".join(f",\n                {c}" for c in inner_extra)
+    stage1_outer_extra = "".join(f",\n                {c}" for c in outer_extra)
+
     combined_query = f"""
         WITH {bat_pos_cte}{computed_cte_prefix}group_innings AS (
             -- Two-level aggregation: per (group, innings) first, then per group. COUNT(*) of the
@@ -3511,12 +3557,13 @@ def handle_grouped_query(
                 {select_group_clause},
                 {balls_expr} as balls,
                 {runs_calculation} as runs,
-                {wickets_expr} as wickets
+                {wickets_expr} as wickets{stage1_inner_extra}
             FROM delivery_details dd
             {bat_pos_join}
             {pa_join}
             {computed_join}
             {join_clause}
+            {stage1_metrics_join}
             {where_clause}
             GROUP BY {group_by_clause}, dd.p_match, dd.inns
         ),
@@ -3526,7 +3573,7 @@ def handle_grouped_query(
                 SUM(balls)::bigint as balls,
                 COUNT(*) as innings_count,
                 SUM(runs)::bigint as runs,
-                SUM(wickets)::bigint as wickets
+                SUM(wickets)::bigint as wickets{stage1_outer_extra}
             FROM group_innings
             GROUP BY {group_cols_plain}
         ),
@@ -3969,6 +4016,18 @@ def _run_deliveries_query_uncached(
         metric_thresholds, threshold_warnings = parse_thresholds(having)
     except ThresholdError as exc:
         raise QueryValidationError(str(exc))
+    if metric_thresholds and query_mode == "delivery":
+        from services.metric_thresholds import applicable
+        metric_thresholds, more = applicable(
+            metric_thresholds,
+            # Same rule as handle_grouped_query's metrics_enabled (ball_metrics is men's T20 only).
+            primer_available=(
+                os.environ.get("QB_PRIMER_METRICS", "1") != "0"
+                and fmt not in ("ODI", "TEST") and gender != "female"
+            ),
+            cumulative=(ball_aggregation == "cumulative"),
+        )
+        threshold_warnings = threshold_warnings + more
     if metric_thresholds and query_mode != "delivery":
         # The innings-table modes do not support them yet: say so rather than drop them silently.
         threshold_warnings = threshold_warnings + [
