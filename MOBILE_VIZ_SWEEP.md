@@ -8,7 +8,7 @@
 | 3 | Match preview new vizs (What to expect, Key Battles, Foresight) | [x] 2026-10-02 (Foresight range/features deferred: match_predictions empty locally, cannot verify) |
 | 4 | Player profile fixes + mobile structure | [x] 2026-10-02 (left: dedupe ball_stats/doppelganger fetches; pass venue to BoundaryAnalysis + doppelgangers) |
 | 5 | Player profile chart rework + new vizs (At a glance, ShotMap, Impact/clutch) | [x] 2026-10-02 (left: FrequentOvers row-tap; TopInnings already has a 4-col phone mode) |
-| 6 | Rest-of-app sweep + dead code | [~] 2026-10-02: full 27-route sweep at 390px run. Fixed: home (text/targets), team radars -> percentile bars, IPL predictions radar -> dot rows, scorecard spokes + 11px floor, Wrapped 11px, search bar. Every route now 0 rotated SVG text, 0 SVG text < 11px, no overflow. LEFT: query-builder ChartPanel presets, comparison charts review, MatchupsTab transfer list, sortable-header tap height, dead code (batting_scatter, PlayerProfile/BowlerProfile, App.js.bak) |
+| 6 | Rest-of-app sweep + dead code | [x] 2026-10-02: full 27-route sweep; home, team radars, IPL radar, scorecard, Wrapped, search bar, Matchups custom picker, query-builder charts (horizontal bars on phones), comparison axis titles; removed PlayerProfile/BowlerProfile + 9 .bak files. Orphaned components listed for sign-off (see below). Not done: batting_scatter server compute in main.py (backend/golden change), sortable-header tap height |
 
 ## Deploys / fixes outside the chunks (2026-10-02)
 - Deployed to prod 3x (Vercel main + Heroku): chunks 0-4 + partial 5.
@@ -18,6 +18,11 @@
 - Local DB: migration 005 applied locally (was only in prod).
 - Small leftovers: dedupe ball_stats/doppelganger fetches; pass venue to BoundaryAnalysis + doppelgangers;
   sortable table headers 27px tall on phones; Foresight range/features (needs match_predictions rows).
+
+## Orphaned components awaiting deletion sign-off (no live importers, 2026-10-02)
+WagonWheel, PlayerPitchMap, BowlerWagonWheel, BowlerPitchMap, BattingScatterChart (+test), BowlingAnalysis,
+BoundaryPattern, FantasyPointsBarChart, BowlingPhasePerformanceRadar, EloRacerChart, PostTossAnalysis,
+VenueTacticalMap, VenueSimilarity, VenueDeliveryStats, VenueDismissalAnalytics, VenueBoundaryShape (test only).
 
 ## CARTA chart checklist
 - **Complete**: sample size + filter context shown; explicit empty state.
