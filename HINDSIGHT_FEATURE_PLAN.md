@@ -747,5 +747,11 @@ scatter needs 2 numeric metrics and >= 8 rows; line needs a time group_by) and d
 
 **Build order.** (1) deterministic shape -> form chooser + scatter and line renderers; (2) stat card, dumbbell,
 diverging; (3) Jev ranking + admin picker; (4) stacked + field forms. Reuse theme/chartDefaults palette (validated
-for dark) so images match the site. Ties into the metric-threshold backlog item above (a scatter of avg v SR is
-the natural pack for that idea).
+for dark) so images match the site.
+
+**Rule for the chooser: the charted metric is the sort/ranking metric; threshold filters only narrow the rows.**
+"50+ average, 100+ SR sorted by control %" -> ranked bars of control % over the (few) batters who clear both
+thresholds, with the thresholds shown as a subtitle/filter line -- not an average v SR scatter. A scatter is right
+only when the idea asks about the relationship between two metrics ("who combines average and SR", "average v SR
+for openers"), or when there is no sort metric and two metrics are named. Row count matters too: few rows -> bars
+or a stat card; many rows + two metrics -> scatter.
