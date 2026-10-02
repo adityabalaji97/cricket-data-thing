@@ -19,6 +19,7 @@ import {
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
 import config from '../config';
 import CondensedName from './common/CondensedName';
+import { getTeamAbbr } from '../utils/teamAbbreviations';
 
 const uniqueNames = (names = []) => {
   const seen = new Set();
@@ -268,7 +269,8 @@ const PostTossSetup = ({
     }
   };
 
-  const battingFirstLabel = battingFirstTeam ? `${battingFirstTeam} bat first` : 'Toss not set';
+  const abbr = (team) => getTeamAbbr(team) || team;
+  const battingFirstLabel = battingFirstTeam ? `${abbr(battingFirstTeam)} bat first` : 'Toss not set';
 
   return (
     <Box sx={{ mt: 2, p: { xs: 1.5, sm: 2 }, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
@@ -278,7 +280,7 @@ const PostTossSetup = ({
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Playing XIs and toss</Typography>
           <Typography variant="body2" color="text.secondary" noWrap>
-            {battingFirstLabel} · {team1Identifier} {team1Xi.length} · {team2Identifier} {team2Xi.length}
+            {battingFirstLabel} · {abbr(team1Identifier)} {team1Xi.length} v {abbr(team2Identifier)} {team2Xi.length} players
           </Typography>
         </Box>
         <Button

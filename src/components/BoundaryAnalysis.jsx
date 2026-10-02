@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { textOn } from '../utils/teamColors';
 import {
   Box,
   Typography,
@@ -12,19 +11,19 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  useMediaQuery,
-  useTheme,
 } from '@mui/material';
 import ScrollTable from './ui/ScrollTable';
 import Card from './ui/Card';
 import { fetchAnalyticsJson } from '../utils/analyticsApi';
-import { colors as designColors } from '../theme/designSystem';
+import { colors as hs } from '../theme/hindsightDark';
+import useIsMobile from '../hooks/useIsMobile';
 import { useFormat } from '../context/FormatContext';
 
 const MIN_BALLS = 30;
 
 const PHASES = ['powerplay', 'middle', 'death'];
 const PHASE_LABELS = { powerplay: 'PP', middle: 'Mid', death: 'Death' };
+const PHASE_NAMES = { powerplay: 'Powerplay', middle: 'Middle', death: 'Death' };
 
 const formatShotName = (name) => {
   if (!name) return '';
@@ -34,11 +33,12 @@ const formatShotName = (name) => {
     .join(' ');
 };
 
+// One hue, stronger = boundaries come more often (fewer balls per boundary).
 const getBoundaryStyle = (ballsPerBoundary) => {
-  if (ballsPerBoundary <= 4) return { bgcolor: designColors.success[700], color: textOn(designColors.success[700]) };
-  if (ballsPerBoundary <= 6) return { bgcolor: designColors.success[500], color: textOn(designColors.success[500]) };
-  if (ballsPerBoundary <= 10) return { bgcolor: designColors.success[50], color: designColors.neutral[900] };
-  return { bgcolor: designColors.neutral[200], color: designColors.neutral[900] };
+  if (ballsPerBoundary <= 4) return { bgcolor: '#3987e5', color: '#0a0c11' };
+  if (ballsPerBoundary <= 6) return { bgcolor: 'rgba(57,135,229,0.55)', color: hs.textHi };
+  if (ballsPerBoundary <= 10) return { bgcolor: 'rgba(57,135,229,0.25)', color: hs.textHi };
+  return { bgcolor: 'rgba(255,255,255,0.06)', color: hs.textMed };
 };
 
 const getTopShots = (shots, totalBoundaries) => {
@@ -68,8 +68,8 @@ const StatCard = ({ group, isMobile }) => {
   if (!group || group.total_balls === 0) {
     return (
       <Box sx={{
-        p: isMobile ? 1 : 1.5, borderRadius: 1, border: `1px solid ${designColors.neutral[200]}`,
-        bgcolor: designColors.neutral[50], minHeight: 80,
+        p: isMobile ? 1 : 1.5, borderRadius: 1, border: `1px solid ${hs.border}`,
+        bgcolor: hs.surface2, minHeight: 80,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <Typography variant="caption" color="text.disabled">No data</Typography>
@@ -80,8 +80,8 @@ const StatCard = ({ group, isMobile }) => {
   if (group.boundaries === 0) {
     return (
       <Box sx={{
-        p: isMobile ? 1 : 1.5, borderRadius: 1, border: `1px solid ${designColors.neutral[200]}`,
-        bgcolor: designColors.neutral[50], minHeight: 80,
+        p: isMobile ? 1 : 1.5, borderRadius: 1, border: `1px solid ${hs.border}`,
+        bgcolor: hs.surface2, minHeight: 80,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       }}>
         <Typography variant="caption" color="text.disabled">No boundaries</Typography>
@@ -96,8 +96,8 @@ const StatCard = ({ group, isMobile }) => {
 
   return (
     <Box sx={{
-      p: isMobile ? 1 : 1.5, borderRadius: 1, border: `1px solid ${designColors.neutral[200]}`,
-      bgcolor: designColors.neutral[0], display: 'flex', flexDirection: 'column', gap: 0.5,
+      p: isMobile ? 1 : 1.5, borderRadius: 1, border: `1px solid ${hs.border}`,
+      bgcolor: hs.surface2, display: 'flex', flexDirection: 'column', gap: 0.5,
     }}>
       {/* Balls per boundary — primary metric */}
       <Box sx={{
@@ -111,19 +111,19 @@ const StatCard = ({ group, isMobile }) => {
       </Box>
 
       {/* 4s × 6s */}
-      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: isMobile ? '0.7rem' : '0.8rem' }}>
+      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.8125rem' }}>
         {group.fours}×4&nbsp;&nbsp;{group.sixes}×6
       </Typography>
 
       {/* Balls */}
-      <Typography variant="caption" sx={{ color: designColors.neutral[400], fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
+      <Typography variant="caption" sx={{ color: hs.textLo, fontSize: '0.75rem' }}>
         {group.total_balls} balls
       </Typography>
 
       {/* Top 3 shots */}
       {topShots.map((shot) => (
         <Typography key={shot.name} variant="caption" sx={{
-          color: designColors.neutral[600], fontSize: isMobile ? '0.65rem' : '0.75rem',
+          color: hs.textMed, fontSize: '0.75rem',
           lineHeight: 1.3,
         }}>
           {formatShotName(shot.name)}&nbsp;&nbsp;{shot.pct}%
@@ -133,22 +133,6 @@ const StatCard = ({ group, isMobile }) => {
   );
 };
 
-/* ---------- Row of cards for one group ---------- */
-const CardRow = ({ label, phaseData, isMobile }) => (
-  <Box sx={{ display: 'contents' }}>
-    {/* Row label */}
-    <Box sx={{
-      display: 'flex', alignItems: 'center',
-      fontWeight: 600, fontSize: '0.875rem',
-      pr: 1, minWidth: isMobile ? 'auto' : 70,
-    }}>
-      {label}
-    </Box>
-    {PHASES.map((phase) => (
-      <StatCard key={phase} group={phaseData[phase]} isMobile={isMobile} />
-    ))}
-  </Box>
-);
 
 /* ---------- Build grid data ---------- */
 const buildGridRows = (data, drillDown, context) => {
@@ -209,15 +193,14 @@ const buildGridRows = (data, drillDown, context) => {
 };
 
 /* ---------- Main component ---------- */
-const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeInternational, topTeams, isMobile: isMobileProp, enabled = true }) => {
+const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeInternational, topTeams, enabled = true }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [drillDown, setDrillDown] = useState(false);
+  const [phase, setPhase] = useState('powerplay');
 
-  const theme = useTheme();
-  const isMobileDetected = useMediaQuery(theme.breakpoints.down('sm'));
-  const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
+  const { isMobile } = useIsMobile();
 
   const { pinnedFormatParams } = useFormat();
 
@@ -296,38 +279,56 @@ const BoundaryAnalysis = ({ context, name, startDate, endDate, leagues, includeI
         </Box>
       )}
 
-      {/* Card Grid */}
-      {gridRows.length > 0 && (
+      {/* Phones: one phase at a time, one full-width row per group. The 4-column grid left each
+          card ~80px wide with 10px text at 360px. Desktop keeps the grid. */}
+      {gridRows.length > 0 && isMobile && (
+        <Box sx={{ mb: 3 }}>
+          <ToggleButtonGroup
+            value={phase}
+            exclusive
+            fullWidth
+            onChange={(_, v) => v && setPhase(v)}
+            size="small"
+            sx={{ mb: 1.5 }}
+          >
+            {PHASES.map((p) => (
+              <ToggleButton key={p} value={p} sx={{ minHeight: 36 }}>{PHASE_NAMES[p]}</ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+          <Box sx={{ display: 'grid', gap: 1 }}>
+            {gridRows.map((row) => (
+              <Box key={row.label} sx={{ display: 'grid', gridTemplateColumns: '72px minmax(0, 1fr)', gap: 1, alignItems: 'stretch' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', fontWeight: 600, fontSize: '0.8125rem' }}>{row.label}</Box>
+                <StatCard group={row.phaseData[phase]} isMobile={isMobile} />
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      {gridRows.length > 0 && !isMobile && (
         <Box sx={{
           display: 'grid',
           gridTemplateColumns: 'auto 1fr 1fr 1fr',
-          gap: isMobile ? 0.5 : 1,
+          gap: 1,
           mb: 3,
         }}>
-          {/* Column headers */}
           <Box />
-          {PHASES.map((phase) => (
-            <Typography key={phase} variant="caption" sx={{
-              fontWeight: 600, textAlign: 'center', color: designColors.neutral[500],
+          {PHASES.map((p) => (
+            <Typography key={p} variant="caption" sx={{
+              fontWeight: 600, textAlign: 'center', color: hs.textLo,
               textTransform: 'uppercase', letterSpacing: '0.05em', pb: 0.5,
-              fontSize: isMobile ? '0.65rem' : undefined,
             }}>
-              {PHASE_LABELS[phase]}
+              {PHASE_LABELS[p]}
             </Typography>
           ))}
-
-          {/* Data rows */}
           {gridRows.map((row) => (
             <React.Fragment key={row.label}>
-              <Box sx={{
-                display: 'flex', alignItems: 'center',
-                fontWeight: 600, fontSize: isMobile ? '0.7rem' : '0.8rem',
-                pr: isMobile ? 0.5 : 1, minWidth: isMobile ? 'auto' : 70,
-              }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', fontWeight: 600, fontSize: '0.8rem', pr: 1, minWidth: 70 }}>
                 {row.label}
               </Box>
-              {PHASES.map((phase) => (
-                <StatCard key={phase} group={row.phaseData[phase]} isMobile={isMobile} />
+              {PHASES.map((p) => (
+                <StatCard key={p} group={row.phaseData[p]} isMobile={isMobile} />
               ))}
             </React.Fragment>
           ))}
