@@ -35,8 +35,6 @@ import {
     ReferenceLine,
     ReferenceArea,
 } from 'recharts';
-import ReactECharts from 'echarts-for-react';
-import { ECHARTS_THEME } from '../theme/chartTheme';
 import MatchHistory from './MatchHistory';
 import Matchups from './Matchups';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
@@ -609,179 +607,77 @@ const WinPercentagesPie = ({ data }) => {
     );
 };
 
+/**
+ * "What total wins here": the venue's first-innings benchmarks on one scale.
+ *
+ * This replaced a back-to-back ECharts bar labelled "1st innings | 2nd innings" whose Winning and
+ * Def/Chase rows were in fact all first-innings totals (average_chasing_score is the average target
+ * that was chased down; highest_total_chased is a first-innings score) -- so half the chart was
+ * drawn under the wrong heading. It also sat on fixed pixel gutters and %-placed labels. Each
+ * benchmark is now a row with a dot on a shared scale, coloured by who won: blue = the side
+ * batting first defended it, orange = it was chased down.
+ */
+const TOTAL_COLORS = { defended: '#3987e5', chased: '#d95926', neutral: hsColors.textLo };
+
 const ScoresBarChart = ({ data }) => {
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const rows = [
+        { label: 'Lowest total defended', value: data.lowest_total_defended, kind: 'defended' },
+        { label: 'Average target chased down', value: data.average_chasing_score, kind: 'chased' },
+        { label: 'Average first innings', value: data.average_first_innings, kind: 'neutral' },
+        { label: 'Average total defended', value: data.average_winning_score, kind: 'defended' },
+        { label: 'Highest total chased', value: data.highest_total_chased, kind: 'chased' },
+    ]
+        .filter((row) => Number(row.value) > 0)
+        .map((row) => ({ ...row, value: Math.round(Number(row.value)) }))
+        .sort((x, y) => x.value - y.value);
 
-    const scoreData = [
-        {
-            name: 'Average',
-            firstInnings: Math.round(data.average_first_innings || 0),
-            secondInnings: Math.round(data.average_second_innings || 0),
-        },
-        {
-            name: 'Winning',
-            firstInnings: Math.round(data.average_winning_score || 0),
-            secondInnings: Math.round(data.average_chasing_score || 0),
-        },
-        {
-            name: 'Def/Chase',
-            firstInnings: Math.round(data.lowest_total_defended || 0),
-            secondInnings: Math.round(data.highest_total_chased || 0),
-        },
-    ];
+    if (rows.length === 0) return null;
 
-    const maxAbsValue = Math.max(
-        1,
-        ...scoreData.flatMap((row) => [Math.abs(row.firstInnings), Math.abs(row.secondInnings)])
-    );
-    const chartLimit = Math.ceil((maxAbsValue * 1.05) / 5) * 5;
-    const chartOption = {
-        animation: false,
-        grid: {
-            left: isMobile ? 80 : 104,
-            right: isMobile ? 10 : 20,
-            top: isMobile ? 26 : 30,
-            bottom: 4,
-            containLabel: false,
-        },
-        xAxis: {
-            type: 'value',
-            min: -chartLimit,
-            max: chartLimit,
-            axisLine: { show: false },
-            axisTick: { show: false },
-            axisLabel: { show: false },
-            splitLine: { show: false },
-        },
-        yAxis: {
-            type: 'category',
-            inverse: true,
-            data: scoreData.map((row) => row.name),
-            axisTick: { show: false },
-            axisLine: { show: false },
-            axisLabel: {
-                color: hsColors.textLo,
-                width: isMobile ? 56 : 74,
-                overflow: 'truncate',
-                fontSize: isMobile ? 10 : 12,
-                lineHeight: isMobile ? 12 : 15,
-                fontWeight: 700,
-                margin: isMobile ? 10 : 14,
-                align: 'right',
-            },
-        },
-        graphic: [
-            {
-                type: 'text',
-                left: isMobile ? '39%' : '40%',
-                top: 0,
-                style: {
-                    text: '1st innings',
-                    fill: '#64748b',
-                    fontSize: isMobile ? 11 : 12,
-                    fontWeight: 700,
-                    textAlign: 'center',
-                },
-            },
-            {
-                type: 'text',
-                left: isMobile ? '63%' : '62%',
-                top: 0,
-                style: {
-                    text: '2nd innings',
-                    fill: '#64748b',
-                    fontSize: isMobile ? 11 : 12,
-                    fontWeight: 700,
-                    textAlign: 'center',
-                },
-            },
-        ],
-        series: [
-            {
-                name: '1st innings',
-                type: 'bar',
-                stack: 'innings',
-                data: scoreData.map((row) => -row.firstInnings),
-                barWidth: isMobile ? 22 : 26,
-                itemStyle: {
-                    color: '#2563eb',
-                    borderRadius: [6, 0, 0, 6],
-                },
-                label: {
-                    show: true,
-                    position: 'insideLeft',
-                    formatter: ({ value }) => Math.abs(value),
-                    color: '#ffffff',
-                    fontSize: isMobile ? 11 : 12,
-                    fontWeight: 700,
-                    padding: [0, 0, 0, 8],
-                },
-                emphasis: { disabled: true },
-            },
-            {
-                name: '2nd innings',
-                type: 'bar',
-                stack: 'innings',
-                data: scoreData.map((row) => row.secondInnings),
-                barWidth: isMobile ? 22 : 26,
-                itemStyle: {
-                    color: '#0f766e',
-                    borderRadius: [0, 6, 6, 0],
-                },
-                label: {
-                    show: true,
-                    position: 'insideRight',
-                    formatter: ({ value }) => Math.abs(value),
-                    color: '#ffffff',
-                    fontSize: isMobile ? 11 : 12,
-                    fontWeight: 700,
-                    padding: [0, 8, 0, 0],
-                },
-                markLine: {
-                    symbol: 'none',
-                    silent: true,
-                    lineStyle: {
-                        color: '#cbd5e1',
-                        width: 2,
-                    },
-                    label: { show: false },
-                    data: [{ xAxis: 0 }],
-                },
-                emphasis: { disabled: true },
-            },
-        ],
-        tooltip: {
-            trigger: 'axis',
-            axisPointer: {
-                type: 'shadow',
-            },
-            formatter: (params) => {
-                const first = params.find((item) => item.seriesName === '1st innings');
-                const second = params.find((item) => item.seriesName === '2nd innings');
-                return [
-                    `<strong>${params[0]?.axisValue || ''}</strong>`,
-                    `1st innings: ${Math.abs(first?.value || 0)}`,
-                    `2nd innings: ${Math.abs(second?.value || 0)}`,
-                ].join('<br/>');
-            },
-        },
-    };
+    const values = rows.map((row) => row.value);
+    const lo = Math.floor((Math.min(...values) - 10) / 10) * 10;
+    const hi = Math.ceil((Math.max(...values) + 10) / 10) * 10;
+    const pos = (v) => `${((v - lo) / (hi - lo)) * 100}%`;
+    const secondInnings = Math.round(Number(data.average_second_innings) || 0);
 
     return (
-        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? 1 : 2, px: { xs: 1, sm: 0 }, py: { xs: 0.75, sm: 1.5 } }}>
-            <Typography variant={isMobile ? "body2" : "subtitle1"} sx={{ fontWeight: 700, textAlign: isMobile ? 'center' : 'left' }}>
-                Innings Comparison
-            </Typography>
-            <Box sx={{ height: isMobile ? 214 : 272 }}>
-                <ReactECharts
-                    theme={ECHARTS_THEME}
-                    option={chartOption}
-                    notMerge
-                    lazyUpdate
-                    style={{ width: '100%', height: '100%' }}
-                    opts={{ renderer: 'svg' }}
-                />
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1.25, py: { xs: 0.75, sm: 1.5 } }}>
+            <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>What total wins here</Typography>
+                <Typography variant="body2" color="text.secondary">First-innings totals</Typography>
+            </Box>
+            <Box sx={{ display: 'grid', gap: 0.75 }}>
+                {rows.map((row) => (
+                    <Box
+                        key={row.label}
+                        sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1fr) 40px', alignItems: 'center', gap: 1.25, minHeight: 28 }}
+                    >
+                        <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', lineHeight: 1.25 }}>{row.label}</Typography>
+                        <Box sx={{ position: 'relative', height: 14 }}>
+                            <Box sx={{ position: 'absolute', left: 0, right: 0, top: 6, height: 2, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.08)' }} />
+                            <Box
+                                sx={{
+                                    position: 'absolute',
+                                    left: pos(row.value),
+                                    top: 0,
+                                    width: 14,
+                                    height: 14,
+                                    ml: '-7px',
+                                    borderRadius: '50%',
+                                    bgcolor: TOTAL_COLORS[row.kind],
+                                    border: `2px solid ${hsColors.surface1}`,
+                                }}
+                            />
+                        </Box>
+                        <Typography sx={{ fontFamily: 'IBM Plex Mono, monospace', fontWeight: 600, fontSize: '0.875rem', textAlign: 'right' }}>
+                            {row.value}
+                        </Typography>
+                    </Box>
+                ))}
+            </Box>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, fontSize: '0.75rem', color: 'text.secondary' }}>
+                <span><Box component="span" sx={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', bgcolor: TOTAL_COLORS.defended, mr: 0.75 }} />Batting side won</span>
+                <span><Box component="span" sx={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', bgcolor: TOTAL_COLORS.chased, mr: 0.75 }} />Chased down</span>
+                {secondInnings > 0 && <span>Average second innings: {secondInnings}</span>}
             </Box>
         </Box>
     );
