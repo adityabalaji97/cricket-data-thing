@@ -9,3 +9,6 @@ export { default as Section } from './Section';
 export { default as Skeleton } from './Skeleton';
 export { default as StatCard } from './StatCard';
 export { default as VisualizationCard } from './VisualizationCard';
+export { default as CollapsibleSection, openSection } from './CollapsibleSection';
+export { default as DetailSheet } from './DetailSheet';
+export { default as TakeawayCard, TakeawayStrip } from './TakeawayCard';

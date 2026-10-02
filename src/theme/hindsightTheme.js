@@ -230,6 +230,9 @@ const hindsightTheme = createTheme({
       styleOverrides: { root: { borderColor: colors.border } },
     },
     MuiTooltip: {
+      // Touch: MUI's default is a 700ms long-press, which nobody discovers, so cell and chip
+      // details were effectively hover-only on phones. Open on tap, stay long enough to read.
+      defaultProps: { enterTouchDelay: 0, leaveTouchDelay: 4000 },
       styleOverrides: {
         tooltip: {
           backgroundColor: colors.surface3,

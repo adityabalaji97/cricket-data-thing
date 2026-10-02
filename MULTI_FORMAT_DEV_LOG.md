@@ -11,6 +11,15 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **IN PROGRESS 2026-10-02, branch `mobile-viz-sweep` (uncommitted):** mobile-first chart sweep, plan and
+> tracker in MOBILE_VIZ_SWEEP.md. Chunk 0 done: src/hooks/useIsMobile.js, src/theme/chartDefaults.js
+> (validated dark categorical palette, Recharts presets: no rotated labels, 11px ticks, one y-axis),
+> ui/CollapsibleSection (+ openSection()), ui/DetailSheet, ui/TakeawayCard (+ TakeawayStrip), MuiTooltip
+> opens on tap (theme), ui_sweep.mjs gains player_bowling route, auto-expands sections, and probes rotated /
+> sub-11px / overwide SVG text. Baseline 390px: player rotated=12 svgSmall=67, player_bowling 17/29.
+> Chunk 1 mockups published (private artifact https://claude.ai/artifact/PgfyGxyZvBQQyvf59YsApX);
+> WAITING ON USER SIGN-OFF before Chunks 2-6. No backend changes yet.
+>
 > **DEPLOYED 2026-10-01 (~15:57 UTC):** audit-fixes fast-forwarded into main (dad2ef1), pushed to GitHub
 > and Heroku. Before deploy: backup b008, migrations 011-014 applied to prod; after: 015 (prod DB 4182 ->
 > 3882 MB), rankings warmed on a one-off dyno (52 payloads, 145 s), smoke tests + content checks pass.

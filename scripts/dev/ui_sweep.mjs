@@ -5,10 +5,14 @@
 //   WIDTH=1440 HEIGHT=900 node scripts/dev/ui_sweep.mjs out       # desktop
 //   ONLY=player,venue_empty node scripts/dev/ui_sweep.mjs out     # subset of routes
 //   LOAD_MS=40000 SETTLE_MS=20000 ...                              # slow API (local against prod DB)
+//   WIDTH=360 ... / WIDTH=768 HEIGHT=1024 ...                      # small phone / portrait tablet
+//   EXPAND=0 ...                                                   # leave collapsed sections shut
 //
 // Writes a full-page PNG per route plus report.json: horizontal overflow and its offending
 // elements, tap targets under 32px, text under 11px, body background, light surfaces and text
-// under 3:1 contrast (theme escapes), and failed requests.
+// under 3:1 contrast (theme escapes), and failed requests. Chart probe (MOBILE_VIZ_SWEEP.md):
+// rotated SVG text, SVG text under 11px, and charts wider than the viewport. Collapsed page
+// sections (CollapsibleSection) are opened first, so every chart is audited.
 //
 // Why CDP and not `chrome --headless --screenshot --window-size=390,...`: headless Chrome will
 // not lay a page out narrower than 500px, so plain screenshots at 390px are a 500px layout
@@ -29,6 +33,7 @@ const ROUTES = [
   ['venue_empty', '/venue?venue=Korogi%20Sports%20Park%2C%20Nisshin&team1=AFG&team2=NEP&includeInternational=true&topTeams=20&autoload=true'],
   ['venue_full', '/venue?venue=Wankhede%20Stadium%2C%20Mumbai&team1=Mumbai%20Indians&team2=Chennai%20Super%20Kings&autoload=true'],
   ['player', '/player?name=V%20Kohli&autoload=true'],
+  ['player_bowling', '/player?name=JJ%20Bumrah&tab=bowling&autoload=true'],
   ['comparison', '/comparison'],
   ['comparison_full', '/comparison?batters=V%20Kohli,RG%20Sharma'],
   ['matchups', '/matchups'],
@@ -103,6 +108,10 @@ for (const [name, path] of ROUTES.filter(([n]) => !ONLY || ONLY.includes(n))) {
   if (MOBILE) await s('Network.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
   await s('Page.navigate', { url: B + path });
   await sleep(Number(process.env.LOAD_MS || 14000));
+  if (process.env.EXPAND !== '0') {
+    await s('Runtime.evaluate', { expression: `document.querySelectorAll('section > div > button[aria-expanded="false"]').forEach((b) => b.click())` });
+    await sleep(Number(process.env.EXPAND_MS || 6000));
+  }
   const probe = await s('Runtime.evaluate', { returnByValue: true, expression: `(() => {
     const vw = window.innerWidth, sw = document.documentElement.scrollWidth;
     const off = [];
@@ -184,12 +193,30 @@ for (const [name, path] of ROUTES.filter(([n]) => !ONLY || ONLY.includes(n))) {
     return { lightIslands: islands.length, islands: islands.slice(0, 30), lowContrast: low.length, low: low.slice(0, 60) };
   })()` });
   Object.assign(info, colour.result?.result?.value || { colourProbeError: colour.result?.exceptionDetails?.text });
+  const charts = await s('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+    const vw = window.innerWidth;
+    const where = (el) => (el.closest('section, .MuiCard-root, .MuiPaper-root')?.querySelector('h2, h3, h4, h5, h6')?.innerText || '').trim().slice(0, 40);
+    const rotated = []; const small = []; const wide = [];
+    const isRot = (t) => /rotate\\((?!0[ ,)])|matrix\\((?!1[ ,]+0[ ,]+0[ ,]+1)/.test(t || '');
+    for (const t of document.querySelectorAll('svg text')) {
+      const r = t.getBoundingClientRect(); if (!r.width || !(t.textContent || '').trim()) continue;
+      let rot = false; for (let a = t; a && a.tagName !== 'svg' && !rot; a = a.parentElement) rot = isRot(a.getAttribute('transform')) || isRot(getComputedStyle(a).transform === 'none' ? '' : getComputedStyle(a).transform);
+      if (rot) rotated.push({ text: t.textContent.trim().slice(0, 24), chart: where(t) });
+      const fs = parseFloat(getComputedStyle(t).fontSize); if (fs < 11) small.push({ fs, text: t.textContent.trim().slice(0, 24), chart: where(t) });
+    }
+    for (const svg of document.querySelectorAll('svg')) {
+      const r = svg.getBoundingClientRect(); if (r.width > vw + 1) wide.push({ w: Math.round(r.width), chart: where(svg) });
+    }
+    const uniq = (xs) => [...new Map(xs.map((x) => [JSON.stringify(x), x])).values()];
+    return { rotatedSvgText: rotated.length, rotatedSamples: uniq(rotated).slice(0, 20), svgTextUnder11px: small.length, svgSmallSamples: uniq(small).slice(0, 20), svgWiderThanViewport: wide.length, wideSamples: wide.slice(0, 10) };
+  })()` });
+  Object.assign(info, charts.result?.result?.value || { chartProbeError: charts.result?.exceptionDetails?.text });
   const shot = await s('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: W, height: h, scale: 1 } });
   if (shot.result?.data) writeFileSync(`${OUT}/${name}.png`, Buffer.from(shot.result.data, 'base64'));
   report[name] = { ...info, failures: [...new Set(failures)].slice(0, 12) };
   listeners.splice(listeners.indexOf(onMsg), 1);
   await send('Target.closeTarget', { targetId });
-  console.log(name, JSON.stringify({ overflow: info.overflow, sw: info.sw, docH: info.docH, tiny: info.tinyTapTargets, small: info.textUnder11px, light: info.lightIslands, lowContrast: info.lowContrast, fails: report[name].failures.length }));
+  console.log(name, JSON.stringify({ overflow: info.overflow, sw: info.sw, docH: info.docH, tiny: info.tinyTapTargets, small: info.textUnder11px, light: info.lightIslands, lowContrast: info.lowContrast, rotated: info.rotatedSvgText, svgSmall: info.svgTextUnder11px, svgWide: info.svgWiderThanViewport, fails: report[name].failures.length }));
 }
 writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 2));
 ws.close(); chrome.kill();
