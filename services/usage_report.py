@@ -27,6 +27,9 @@ def build_usage_report(db: Session, weeks: int = 8) -> Dict[str, Any]:
                COUNT(*) FILTER (WHERE event = 'page_view') AS page_views,
                COUNT(*) FILTER (WHERE event = 'query_run') AS query_runs,
                COUNT(*) FILTER (WHERE event = 'share') AS shares,
+               -- "Make a graphic" (query builder): graphics made, and the people making them.
+               COUNT(*) FILTER (WHERE event = 'graphic_made') AS graphics_made,
+               COUNT(DISTINCT anon_id) FILTER (WHERE event = 'graphic_made') AS graphic_makers,
                COUNT(DISTINCT anon_id) FILTER (WHERE event = 'game_finish') AS game_players,
                COUNT(*) FILTER (WHERE event = 'game_finish') AS games_finished,
                COUNT(*) FILTER (WHERE event = 'note_view') AS note_views,

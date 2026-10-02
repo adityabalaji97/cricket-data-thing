@@ -50,6 +50,7 @@ import { trackPageView } from './utils/analytics';
 const AdminPage = React.lazy(() => import('./components/admin/AdminPage'));
 const NotesList = React.lazy(() => import('./components/notes/NotesList'));
 const NotePage = React.lazy(() => import('./components/notes/NotePage'));
+const GraphicPage = React.lazy(() => import('./components/GraphicPage'));
 const AdminNotes = React.lazy(() => import('./components/notes/AdminNotes'));
 
 const TEAM_NAME_TO_ABBREVIATION = {
@@ -717,6 +718,7 @@ const AppContent = () => {
         <Route path="/admin/notes" element={<React.Suspense fallback={null}><AdminNotes /></React.Suspense>} />
         <Route path="/notes" element={<React.Suspense fallback={null}><NotesList /></React.Suspense>} />
         <Route path="/notes/:slug" element={<React.Suspense fallback={null}><NotePage /></React.Suspense>} />
+        <Route path="/g/:id" element={<React.Suspense fallback={null}><GraphicPage /></React.Suspense>} />
         <Route path="/venue" element={
           <Box sx={{ my: { xs: 1.5, md: 3 }, bgcolor: 'background.default', color: 'text.primary' }}>
             <PreviewFilters

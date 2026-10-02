@@ -7,6 +7,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import config from '../config';
 import { shareImage, siteOrigin } from './ui/ChartExportButton';
 import useIsMobile from '../hooks/useIsMobile';
+import { track } from '../utils/analytics';
 import { qbButtonSx, qbColors, qbFonts } from './queryBuilderTheme';
 
 const FORM_NAMES = {
@@ -46,6 +47,7 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
         query_string: apiQueryString, metric, highlight: highlight || null,
       });
       setState({ loading: false, error: null, options: data.options || [], pickedBy: data.picked_by });
+      track('graphic_made', { metric, forms: (data.options || []).map((o) => o.form).join(','), highlight: Boolean(highlight) });
       setSelected((data.options || [])[0] || null);
     } catch (err) {
       setState({ loading: false, error: err.response?.data?.detail || 'Could not make a graphic for this result.', options: [], pickedBy: null });
@@ -108,13 +110,17 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
                   sx={{ width: '100%', maxWidth: 420, aspectRatio: '4 / 5', display: 'block', mx: 'auto', borderRadius: 2, bgcolor: '#14171e' }} />
                 <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
                   <Button variant="contained" sx={{ ...qbButtonSx, minHeight: 44, flex: 1 }}
-                    onClick={() => shareImage(imageUrl, `hindsight-${selected.snapshot_id}.png`, selected.title, `${selected.title} · hindsightcricket.com`)}>
+                    onClick={() => {
+                      // 'share' is the usage report's existing share count; kind tells graphics apart.
+                      track('share', { kind: 'graphic', form: selected.form });
+                      shareImage(imageUrl, `hindsight-${selected.snapshot_id}.png`, selected.title, `${selected.title} · hindsightcricket.com`);
+                    }}>
                     Share
                   </Button>
-                  <Button variant="outlined" href={`${imageUrl}?download=1`} sx={{ minHeight: 44, flex: 1, color: qbColors.textHi, borderColor: 'rgba(255,255,255,0.2)' }}>
+                  <Button variant="outlined" href={`${imageUrl}?download=1`} onClick={() => track('graphic_download', { form: selected.form })} sx={{ minHeight: 44, flex: 1, color: qbColors.textHi, borderColor: 'rgba(255,255,255,0.2)' }}>
                     Download
                   </Button>
-                  <Button variant="outlined" onClick={() => navigator.clipboard?.writeText(imageUrl)}
+                  <Button variant="outlined" onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/g/${selected.snapshot_id}`)}
                     sx={{ minHeight: 44, flex: 1, color: qbColors.textHi, borderColor: 'rgba(255,255,255,0.2)' }}>
                     Copy link
                   </Button>

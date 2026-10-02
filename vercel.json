@@ -66,7 +66,7 @@
       "dest": "/api/meta.mjs?__path=/"
     },
     {
-      "src": "/(scorecard/[^/]+|player|venue|query|rankings|games/[^/]+|notes(?:/[^/]+)?)",
+      "src": "/(scorecard/[^/]+|player|venue|query|rankings|games/[^/]+|notes(?:/[^/]+)?|g/[^/]+)",
       "has": [
         {
           "type": "header",

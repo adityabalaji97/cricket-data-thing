@@ -185,8 +185,22 @@ async function notesIndexSummary() {
   };
 }
 
+// A shared graphic (/g/:id): its own title and the image itself as the preview card.
+async function graphicSummary(id) {
+  const snap = await getJSON(`/snapshots/${encodeURIComponent(id)}`);
+  if (!snap) return null;
+  return {
+    kind: 'graphic',
+    title: snap.title || 'A Hindsight graphic',
+    description: 'Made on Hindsight from ball-by-ball cricket data. Make your own at hindsightcricket.com/query.',
+    image: `${SITE_URL}/img/${encodeURIComponent(id)}.png?size=card`,
+  };
+}
+
 /** Summary for a site path + query string, or null for the site-wide card. */
 export async function summarize(pathname, search) {
+  const graphic = pathname.match(/^\/g\/([A-Za-z0-9]{6,16})\/?$/);
+  if (graphic) return graphicSummary(graphic[1]);
   const params = new URLSearchParams(search || '');
   const scorecard = pathname.match(/^\/scorecard\/([^/]+)/);
   if (scorecard) return scorecardSummary(decodeURIComponent(scorecard[1]));
