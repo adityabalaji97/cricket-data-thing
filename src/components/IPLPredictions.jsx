@@ -11,22 +11,14 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import TuneIcon from '@mui/icons-material/Tune';
-import {
-  Legend,
-  PolarAngleAxis,
-  PolarGrid,
-  PolarRadiusAxis,
-  Radar,
-  RadarChart,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts';
 
 import config from '../config';
 import VenueSectionTabs from './VenueSectionTabs';
 import { SECTION_SCROLL_MARGIN } from '../theme/layout';
+import { SERIES } from '../theme/chartDefaults';
 
-const TEAM_COLORS = ['#1976d2', '#ef6c00', '#2e7d32'];
+// First three validated categorical slots (colour-blind safe all-pairs; theme/chartDefaults).
+const TEAM_COLORS = SERIES.slice(0, 3);
 
 const CATEGORY_KEYS = [
   'win_rate', 'elo', 'batting', 'bowling',
@@ -52,7 +44,7 @@ const DATE_PRESETS = [
 const SECTIONS = [
   { id: 'controls', label: 'Controls' },
   { id: 'leaderboard', label: 'Leaderboard' },
-  { id: 'radar', label: 'Top 3 Radar' },
+  { id: 'radar', label: 'Top 3 compared' },
 ];
 
 const formatLabel = (value) =>
@@ -88,19 +80,6 @@ const normalizeWeights = (weights) => {
 
 const toDateStr = (d) => d.toISOString().slice(0, 10);
 
-const RadarTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', p: 1.25, borderRadius: 1 }}>
-      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{label}</Typography>
-      {payload.map((entry) => (
-        <Typography key={entry.name} variant="caption" sx={{ display: 'block', color: entry.color }}>
-          {entry.name}: {Number(entry.value || 0).toFixed(1)}
-        </Typography>
-      ))}
-    </Box>
-  );
-};
 
 const IPLPredictions = () => {
   const [loading, setLoading] = useState(true);
@@ -237,7 +216,8 @@ const IPLPredictions = () => {
     () => CATEGORY_KEYS.map((cat) => {
       const point = { category: formatLabel(cat) };
       topThree.forEach((team) => {
-        point[team.team] = Number(team.category_scores?.[cat]?.score || 0);
+        const raw = team.category_scores?.[cat]?.score;
+        point[team.team] = raw === null || raw === undefined ? null : Number(raw);
       });
       return point;
     }),
@@ -544,14 +524,14 @@ const IPLPredictions = () => {
         </Box>
       </Box>
 
-      {/* Section 3: Top 3 Radar */}
+      {/* Section 3: Top 3 compared */}
       <Box
         ref={setSectionRef('radar')}
         data-section="radar"
         sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN, px: { xs: 2, sm: 2.5 }, pt: 3, pb: 2 }}
       >
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
-          Top 3 Radar
+          Top 3 compared
         </Typography>
 
         {topThree.length > 0 && (
@@ -559,28 +539,42 @@ const IPLPredictions = () => {
             borderRadius: 3, border: '1px solid', borderColor: 'divider',
             boxShadow: 1, bgcolor: 'background.paper', p: { xs: 1, sm: 2 },
           }}>
-            <Box sx={{ width: '100%', height: { xs: 280, md: 380 } }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData} outerRadius="72%">
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="category" tick={{ fontSize: 11 }} />
-                  <PolarRadiusAxis domain={[0, 100]} tickCount={6} />
-                  {topThree.map((team, i) => (
-                    <Radar
-                      key={team.team}
-                      name={`${team.rank}. ${team.team}`}
-                      dataKey={team.team}
-                      stroke={TEAM_COLORS[i % TEAM_COLORS.length]}
-                      fill={TEAM_COLORS[i % TEAM_COLORS.length]}
-                      fillOpacity={0.18}
-                      strokeWidth={2}
-                    />
-                  ))}
-                  <Legend />
-                  <Tooltip content={<RadarTooltip />} />
-                </RadarChart>
-              </ResponsiveContainer>
+            {/* Category rows with one dot per team on a shared 0-100 track. Replaced a 3-team
+                radar (rotated 0-100 axis, overlapping fills, missing scores drawn as 0). */}
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1.5 }}>
+              {topThree.map((team, i) => (
+                <Box key={team.team} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 13 }}>
+                  <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: TEAM_COLORS[i % TEAM_COLORS.length] }} />
+                  {team.rank}. {team.team}
+                </Box>
+              ))}
             </Box>
+            <Box sx={{ display: 'grid', gap: 1 }}>
+              {radarData.map((row) => (
+                <Box key={row.category} sx={{ display: 'grid', gridTemplateColumns: { xs: '96px minmax(0,1fr)', sm: '140px minmax(0,1fr)' }, alignItems: 'center', gap: 1, minHeight: 26 }}>
+                  <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.2 }}>{row.category}</Typography>
+                  <Box sx={{ position: 'relative', height: 16 }}>
+                    <Box sx={{ position: 'absolute', left: 0, right: 0, top: 7, height: 2, bgcolor: 'rgba(255,255,255,0.08)' }} />
+                    {topThree.map((team, i) => {
+                      const v = row[team.team];
+                      if (v === null || v === undefined || Number.isNaN(v)) return null;
+                      return (
+                        <Box
+                          key={team.team}
+                          title={`${team.team}: ${v.toFixed(0)}`}
+                          sx={{
+                            position: 'absolute', top: 2, left: `${Math.max(0, Math.min(100, v))}%`, ml: '-6px',
+                            width: 12, height: 12, borderRadius: '50%', border: '2px solid', borderColor: 'background.paper',
+                            bgcolor: TEAM_COLORS[i % TEAM_COLORS.length], zIndex: 3 - i,
+                          }}
+                        />
+                      );
+                    })}
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Category scores, 0-100.</Typography>
           </Box>
         )}
       </Box>
