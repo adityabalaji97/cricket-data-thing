@@ -13,6 +13,7 @@ import {
 } from '../PitchMap/pitchMapConstants';
 import { colors } from '../../theme/designSystem';
 import config from '../../config';
+import { appendCompetitionParams } from '../../utils/competitionParams';
 
 const MIN_BALLS = 20;
 
@@ -350,15 +351,8 @@ const LineLengthProfile = ({ playerName, mode, dateRange, selectedVenue, competi
         if (dateRange?.start) params.append('start_date', dateRange.start);
         if (dateRange?.end) params.append('end_date', dateRange.end);
         if (selectedVenue && selectedVenue !== 'All Venues') params.append('venue', selectedVenue);
-        if (competitionFilters?.leagues) {
-          competitionFilters.leagues.forEach((l) => params.append('leagues', l));
-        }
-        if (competitionFilters?.international) {
-          params.append('include_international', 'true');
-        }
-        if (competitionFilters?.topTeams) {
-          params.append('top_teams', competitionFilters.topTeams);
-        }
+        // "No leagues + internationals" means T20Is only to this endpoint; spell out "all leagues".
+        await appendCompetitionParams(params, competitionFilters);
         similarPlayers.forEach((name) => params.append('similar_players', name));
 
         const url = `${config.API_URL}/player/${encodeURIComponent(playerName)}/line-length-profile?${params}`;

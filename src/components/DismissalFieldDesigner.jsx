@@ -31,6 +31,7 @@ import {
   SCORING_ZONE_CLOCKWISE_FROM_TOP,
 } from '../utils/wagonZones';
 import { useFormat } from '../context/FormatContext';
+import { appendCompetitionParams } from '../utils/competitionParams';
 
 const DEFAULT_FILTERS = {
   phase: 'overall',
@@ -113,9 +114,9 @@ const DismissalFieldDesigner = ({
           params.append('venue', scopedVenue);
         }
 
-        (leagues || []).forEach((league) => params.append('leagues', league));
-        params.append('include_international', String(!!includeInternational));
-        if (includeInternational && topTeams) params.append('top_teams', String(topTeams));
+        // "No leagues + internationals" means internationals only to this endpoint; spell out
+        // "all leagues" (utils/competitionParams).
+        await appendCompetitionParams(params, { leagues, international: includeInternational, topTeams });
 
         if (filters.phase !== 'overall') params.append('phase', filters.phase);
         if (filters.bowlKind !== 'all') params.append('bowl_kind', filters.bowlKind);
