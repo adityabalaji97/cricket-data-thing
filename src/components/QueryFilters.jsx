@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Box,
+  Button,
   Grid,
   TextField,
   Autocomplete,
@@ -48,6 +49,68 @@ const CoverageWarning = ({ coverage, columnName }) => {
 
 const ORDINALS = ['1st', '2nd', '3rd', '4th'];
 const ordinalInnings = (n) => `${ORDINALS[n - 1] || `${n}th`} Innings`;
+
+
+const THRESHOLD_METRICS = [
+  ['average', 'Average'],
+  ['strike_rate', 'Strike rate'],
+  ['balls_per_dismissal', 'Balls per dismissal'],
+];
+const THRESHOLD_OPS = { gte: '≥', lte: '≤', gt: '>', lt: '<' };
+
+const thresholdLabel = (raw) => {
+  const [metric, op, value] = String(raw).split(':');
+  const name = (THRESHOLD_METRICS.find(([k]) => k === metric) || [metric, metric.replace(/_/g, ' ')])[1];
+  return `${name} ${THRESHOLD_OPS[op] || op} ${value}`;
+};
+
+/** Grouped-result thresholds on computed metrics, stored as 'metric:op:value' strings. */
+const MetricThresholds = ({ value, onChange }) => {
+  const [metric, setMetric] = useState('average');
+  const [op, setOp] = useState('gte');
+  const [amount, setAmount] = useState('');
+  const add = () => {
+    const n = Number(amount);
+    if (amount === '' || Number.isNaN(n)) return;
+    const key = `${metric}:${op}:${n}`;
+    onChange([...value.filter((v) => !v.startsWith(`${metric}:${op}:`)), key]);
+    setAmount('');
+  };
+  return (
+    <Box>
+      <Typography variant="body2" gutterBottom sx={{ color: qbColors.textMed }}>
+        Metric filters (grouped results)
+      </Typography>
+      {value.length > 0 && (
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+          {value.map((v) => (
+            <Chip key={v} label={thresholdLabel(v)} size="small" onDelete={() => onChange(value.filter((x) => x !== v))} />
+          ))}
+        </Box>
+      )}
+      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+        <TextField select size="small" value={metric} onChange={(e) => setMetric(e.target.value)} sx={{ minWidth: 150, flex: { xs: '1 1 100%', sm: '0 0 auto' } }}>
+          {THRESHOLD_METRICS.map(([k, l]) => <MenuItem key={k} value={k}>{l}</MenuItem>)}
+        </TextField>
+        <TextField select size="small" value={op} onChange={(e) => setOp(e.target.value)} sx={{ width: 76 }}>
+          {Object.entries(THRESHOLD_OPS).map(([k, l]) => <MenuItem key={k} value={k}>{l}</MenuItem>)}
+        </TextField>
+        <TextField
+          size="small"
+          type="number"
+          placeholder="Value"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          sx={{ width: 100 }}
+        />
+        <Button size="small" variant="outlined" onClick={add} disabled={amount === ''} sx={{ minHeight: 40 }}>
+          Add
+        </Button>
+      </Box>
+    </Box>
+  );
+};
 
 const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColumns, isMobile }) => {
   // On phones the two specialist groups fold away (about 1.5 screens of fields) unless one of
@@ -747,6 +810,14 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
           />
         </Grid>
         
+        {/* Metric thresholds ("50+ average"): applied to grouped rows before sorting and the limit. */}
+        <Grid item xs={12}>
+          <MetricThresholds
+            value={filters.having || []}
+            onChange={(next) => handleFilterChange('having', next)}
+          />
+        </Grid>
+
         {/* Row 10: Query Settings */}
         <Grid item xs={12} sm={6}>
           <Box>

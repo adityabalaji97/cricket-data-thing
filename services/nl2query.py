@@ -157,6 +157,12 @@ Return a JSON object with these fields:
 - "max_runs": maximum runs threshold for grouped/stat queries
 - "min_wickets": minimum wickets threshold (use with bowler grouping, e.g. group_by=["match_id","innings","bowler"])
 - "max_wickets": maximum wickets threshold (use with bowler grouping)
+- "having": list of metric thresholds on grouped rows, each "metric:op:value" with op one of gte, lte, gt, lt.
+  Supported metrics: "average", "strike_rate", "balls_per_dismissal". Use it for phrases like "50+ average",
+  "average over 40", "strike rate above 140", "SR under 120". Example: "batters averaging 50+ at a strike rate of
+  100+" -> "having": ["average:gte:50", "strike_rate:gte:100"]. A threshold is a filter, not a sort: keep the
+  sort the user asked for separately. For thresholds on other metrics (dot %, boundary %, control %, impact,
+  economy) still include them in "having" so the user is told they could not be applied.
 - "start_date": "YYYY-MM-DD" format
 - "end_date": "YYYY-MM-DD" format
 
@@ -222,6 +228,7 @@ format, venue, country, match_id, competition, year, batting_team, bowling_team,
    when the user pins one format ("his T20 record", "in ODIs") or asks for a different breakdown
    that would make format redundant.
 2. Set "min_balls" to a reasonable value (20-50) for statistical significance unless the user specifies otherwise.
+2a. Never drop a numeric condition on a metric ("50+ average", "SR over 140"): put it in "having".
 3. For "vs spin" queries, use "bowl_kind": ["spin bowler"]. For specific types like "vs leg spin", use "bowl_style": ["RL", "LC"].
 4. For "vs pace" queries, use "bowl_kind": ["pace bowler"].
 5. Use correct phase over ranges: powerplay=0-5, middle=6-14, death=15-19.
@@ -905,6 +912,14 @@ def _derive_entities_from_filters(filters: Dict[str, Any], query: str) -> List[D
         if filters.get(key) is not None:
             _add("filter", f"{key}: {filters[key]}")
 
+    if filters.get("having"):
+        from services.metric_thresholds import describe, parse as parse_thresholds
+        try:
+            for chip in describe(parse_thresholds(filters["having"])[0]):
+                _add("filter", chip)
+        except Exception:
+            pass
+
     over_min = filters.get("over_min")
     over_max = filters.get("over_max")
     if over_min is not None or over_max is not None:
@@ -1168,6 +1183,26 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
         validated["min_wickets"] = max(0, int(filters["min_wickets"]))
     if "max_wickets" in filters and filters["max_wickets"] is not None:
         validated["max_wickets"] = max(0, int(filters["max_wickets"]))
+    # Metric thresholds ("50+ average"): keep the supported ones in canonical form; report the rest
+    # (unsupported metric or malformed) instead of dropping them silently.
+    raw_having = filters.get("having")
+    if isinstance(raw_having, str):
+        raw_having = [raw_having]
+    if isinstance(raw_having, list) and raw_having:
+        from services.metric_thresholds import ThresholdError, parse as parse_thresholds
+        kept, notes = [], []
+        for item in raw_having:
+            try:
+                parsed_t, warn = parse_thresholds([str(item)])
+            except ThresholdError as exc:
+                notes.append(str(exc))
+                continue
+            kept.extend(f"{m}:{op}:{v:g}" for m, op, v in parsed_t)
+            notes.extend(warn)
+        if kept:
+            validated["having"] = kept
+        if notes:
+            validated["_threshold_notes"] = notes
 
     # Date filters
     for key in ["start_date", "end_date"]:
@@ -1212,6 +1247,7 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
         explanation = interpretation["summary"]
     suggestions = interpretation.get("suggestions", suggestions)
 
+    threshold_notes = validated.pop("_threshold_notes", [])
     return {
         "filters": validated,
         "group_by": group_by,
@@ -1221,6 +1257,8 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
         "recommended_columns": recommended_columns,
         "recommended_chart": recommended_chart,
         "interpretation": interpretation,
+        # Conditions the user asked for that the query cannot apply (shown, never silently dropped).
+        "warnings": threshold_notes,
     }
 
 

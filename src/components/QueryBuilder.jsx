@@ -77,6 +77,8 @@ const getDefaultFilters = () => ({
   max_runs: null,
   min_wickets: null,
   max_wickets: null,
+  // Metric thresholds on grouped rows, 'metric:op:value' (e.g. 'average:gte:50')
+  having: [],
 
   // Pagination
   limit: 1000,
@@ -136,7 +138,7 @@ const ACTIVE_FILTER_KEYS = [
   'line', 'length', 'shot', 'control', 'wagon_zone', 'dismissal',
   'innings', 'over_min', 'over_max',
   'match_outcome', 'is_chase', 'chase_outcome', 'toss_decision',
-  'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets'
+  'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets', 'having'
 ];
 
 const getActiveFilterCount = (filters, groupBy) => {
@@ -176,6 +178,8 @@ const QueryBuilder = ({ isMobile }) => {
   const [nlRawFilters, setNlRawFilters] = useState({});
   const [nlRecommendedColumns, setNlRecommendedColumns] = useState([]);
   const [nlRecommendedChart, setNlRecommendedChart] = useState(null);
+  // Conditions from the question the query could not apply (e.g. an unsupported metric threshold).
+  const [nlWarnings, setNlWarnings] = useState([]);
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const [nlExpanded, setNlExpanded] = useState(true);
   // Phones open with the filter card folded: the NL search is the quick path there, and the
@@ -371,6 +375,7 @@ const QueryBuilder = ({ isMobile }) => {
     recommendedColumns,
     recommendedChart,
     interpretation,
+    warnings,
   }) => {
     // Reset to defaults then apply NL filters
     const defaultFilters = getDefaultFilters();
@@ -391,6 +396,7 @@ const QueryBuilder = ({ isMobile }) => {
     setNlRawFilters(nlFilters || {});
     setNlRecommendedColumns(Array.isArray(recommendedColumns) ? recommendedColumns : []);
     setNlRecommendedChart(recommendedChart || null);
+    setNlWarnings(Array.isArray(warnings) ? warnings : []);
     setQueryTab(0);
     setHasLoadedFromUrl(true);
     setNlExpanded(false);
@@ -441,7 +447,7 @@ const QueryBuilder = ({ isMobile }) => {
       'line', 'length', 'shot', 'control', 'wagon_zone',
       'innings', 'over_min', 'over_max',
       'match_outcome', 'is_chase', 'chase_outcome', 'toss_decision',
-      'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets'
+      'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets', 'having'
     ];
     
     return filterKeys.some(key => {
@@ -608,6 +614,12 @@ const QueryBuilder = ({ isMobile }) => {
               onClose={dismissInterpretation}
               disabled={loading || isApplyingSuggestion}
             />
+          )}
+
+          {nlWarnings.length > 0 && (
+            <Alert severity="warning" onClose={() => setNlWarnings([])} sx={{ bgcolor: 'rgba(240,180,41,0.08)', color: qbColors.textHi, border: '1px solid rgba(240,180,41,0.28)' }}>
+              {nlWarnings.join(' ')}
+            </Alert>
           )}
 
           {error && (

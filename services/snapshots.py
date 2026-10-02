@@ -34,13 +34,13 @@ QUERY_PARAMS = {
     "control", "wagon_zone", "dismissal", "innings", "over_min", "over_max", "match_outcome", "is_chase",
     "chase_outcome", "toss_decision", "day_or_night", "group_by", "ball_aggregation", "min_balls",
     "max_balls", "min_runs", "max_runs", "min_wickets", "max_wickets", "include_international",
-    "top_teams", "query_mode", "fmt", "gender",
+    "top_teams", "query_mode", "fmt", "gender", "having",
 }
 PRESENTATION = {"sort_by", "sort_descending", "limit", "chart", "chart_metric", "scatter_x", "scatter_y",
                 "highlight", "title"}
 LIST_PARAMS = {"leagues", "teams", "batting_teams", "bowling_teams", "players", "batters", "bowlers",
                "bowl_style", "bowl_kind", "crease_combo", "line", "length", "shot", "wagon_zone",
-               "dismissal", "match_outcome", "chase_outcome", "toss_decision", "group_by"}
+               "dismissal", "match_outcome", "chase_outcome", "toss_decision", "group_by", "having"}
 
 
 class SnapshotError(ValueError):
@@ -181,8 +181,26 @@ def title_parts(params: Dict[str, Any]) -> Dict[str, str]:
         "scope": scope,
         "venue": f" at {params['venue']}" if params.get("venue") else "",
         "window": window,
-        "minimum": f" ({params['min_balls']:,}+ balls)" if params.get("min_balls") else "",
+        "minimum": _minimum_phrase(params),
     }
+
+
+_THRESHOLD_WORDS = {"gte": "{v}+", "gt": "over {v}", "lte": "{v} or less", "lt": "under {v}"}
+
+
+def _minimum_phrase(params: Dict[str, Any]) -> str:
+    """" (1,000+ balls, average 50+, strike rate 100+)": the sample bar and any metric thresholds, so
+    a ranking shows every condition it was built under."""
+    parts = [f"{params['min_balls']:,}+ balls"] if params.get("min_balls") else []
+    for raw in params.get("having") or []:
+        try:
+            metric, op, value = str(raw).split(":")
+            number = float(value)
+        except ValueError:
+            continue
+        shown = f"{number:g}"
+        parts.append(f"{metric.replace('_', ' ')} {_THRESHOLD_WORDS.get(op, '{v}').format(v=shown)}")
+    return f" ({', '.join(parts)})" if parts else ""
 
 
 def default_title(params: Dict[str, Any], metric: Optional[str]) -> str:

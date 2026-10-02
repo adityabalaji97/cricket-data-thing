@@ -90,6 +90,8 @@ export const parseUrlParams = (search) => {
   filters.max_runs = getIntParam('max_runs');
   filters.min_wickets = getIntParam('min_wickets');
   filters.max_wickets = getIntParam('max_wickets');
+  // Metric thresholds, metric:op:value (e.g. average:gte:50)
+  filters.having = getArrayParam('having');
   
   // Pagination
   filters.limit = getIntParam('limit', 1000);

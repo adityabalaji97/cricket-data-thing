@@ -80,6 +80,10 @@ def plan(idea: str, fmt_choice: Optional[str], db: Session) -> Dict[str, Any]:
                                   execution_time_ms=None)
     if not parsed.get("success", True) or not parsed.get("group_by"):
         raise SnapshotError(parsed.get("error") or "Could not turn the idea into a query (no grouping).")
+    if parsed.get("warnings"):
+        # A condition the query can't apply (e.g. a control % threshold) would make the pack rank
+        # the wrong group, as "50+ average, 100+ SR" once did; refuse and say which.
+        raise SnapshotError("Can't build this pack exactly: " + " ".join(parsed["warnings"]))
     filters = {k: v for k, v in (parsed.get("filters") or {}).items() if k in QUERY_PARAMS and v not in (None, [], "")}
     group_by = [g for g in parsed["group_by"] if g != "format"]
     fmt = _format_for(idea, fmt_choice)

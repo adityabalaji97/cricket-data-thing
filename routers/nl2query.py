@@ -111,6 +111,8 @@ class NLQueryResponse(BaseModel):
     recommended_columns: List[str] = Field(default_factory=list)
     recommended_chart: Optional[NLRecommendedChart] = None
     interpretation: NLInterpretation = Field(default_factory=NLInterpretation)
+    # Conditions from the question the query cannot apply (e.g. an unsupported metric threshold).
+    warnings: List[str] = Field(default_factory=list)
     error: Optional[str] = None
 
 
