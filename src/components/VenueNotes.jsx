@@ -46,7 +46,7 @@ import VenueNotesDesktopNav from './VenueNotesDesktopNav';
 import BoundaryAnalysis from './BoundaryAnalysis';
 import ForesightCard from './ForesightCard';
 import EmptyState from './ui/EmptyState';
-import { SECTION_SCROLL_MARGIN } from '../theme/layout';
+import CollapsibleSection, { openSection } from './ui/CollapsibleSection';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -879,6 +879,23 @@ const VenueNotes = ({
     const isT20Preview = pinnedFormatParams.format === 'T20' && pinnedFormatParams.gender === 'male';
     const formatSlug = `${pinnedFormatParams.gender === 'male' ? 'mens' : 'womens'}-${pinnedFormatParams.format.toLowerCase()}`;
 
+    // One-line takeaways for the folded section headers on phones.
+    const venueTakeaway = (() => {
+        const total = venueStats?.total_matches || 0;
+        if (!total) return undefined;
+        const batFirst = venueStats.batting_first_wins || 0;
+        const chase = venueStats.batting_second_wins || 0;
+        return `Batting first ${batFirst}, chasing ${chase} of ${total}`;
+    })();
+    const leadersTakeaway = (() => {
+        const bat = statsData?.batting_leaders?.[0];
+        const bowl = statsData?.bowling_leaders?.[0];
+        const parts = [];
+        if (bat) parts.push(`${bat.name}: ${bat.batRuns} runs`);
+        if (bowl) parts.push(`${bowl.name}: ${bowl.bowlWickets} wickets`);
+        return parts.join(' · ') || undefined;
+    })();
+
     const [activeSectionId, setActiveSectionId] = useState('summary');
     const [activatedSections, setActivatedSections] = useState(() => new Set(['summary', 'preview', 'teams']));
     const [postTossSelection, setPostTossSelection] = useState(null);
@@ -927,6 +944,8 @@ const VenueNotes = ({
             {
                 id: 'summary',
                 label: 'Summary',
+                defaultOpen: true,
+                takeaway: venueTakeaway,
                 content: noVenueMatches ? (
                     <EmptyState
                         title={`No matches at ${venue} for these filters`}
@@ -952,6 +971,7 @@ const VenueNotes = ({
             groups.push({
                 id: 'preview',
                 label: 'Preview',
+                takeaway: 'Written preview: venue, form, head to head, key players',
                 content: (
                     <MatchPreviewCard
                         venue={venue}
@@ -975,6 +995,8 @@ const VenueNotes = ({
             groups.push({
                 id: 'teams',
                 label: 'Teams',
+                defaultOpen: true,
+                takeaway: 'Head to head, form, playing XIs and batter v bowler matchups',
                 content: (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                         {matchHistory ? (
@@ -1033,6 +1055,7 @@ const VenueNotes = ({
         groups.push({
             id: 'boundaries',
             label: 'Boundaries',
+            takeaway: 'How often boundaries come against pace and spin, by phase',
             content: (
                 <BoundaryAnalysis
                     context="venue"
@@ -1053,6 +1076,7 @@ const VenueNotes = ({
             groups.push({
                 id: 'leaders',
                 label: 'Leaders',
+                takeaway: leadersTakeaway,
                 content: (
                     <Grid container spacing={isMobile ? 2 : 3}>
                         {statsData?.batting_leaders?.length > 0 && (
@@ -1074,6 +1098,7 @@ const VenueNotes = ({
         groups.push({
             id: 'explore',
             label: 'Explore',
+            takeaway: 'Ready-made questions to open in the query builder',
             content: (
                 <ContextualQueryPrompts
                     queries={getVenueContextualQueries(venue, {
@@ -1094,6 +1119,7 @@ const VenueNotes = ({
             groups.push({
                 id: 'foresight',
                 label: 'Foresight',
+                takeaway: 'Model forecast: win probability and predicted scores',
                 content: (
                     <ForesightCard
                         venue={venue}
@@ -1113,6 +1139,8 @@ const VenueNotes = ({
         }
         return groups;
     }, [
+        venueTakeaway,
+        leadersTakeaway,
         isT20Preview,
         formatSlug,
         noVenueMatches,
@@ -1157,11 +1185,16 @@ const VenueNotes = ({
     const handleSectionSelect = useCallback((sectionId) => {
         markSectionActivated(sectionId);
         setActiveSectionId(sectionId);
+        if (isMobile) {
+            // Opens the folded section, then scrolls to it.
+            openSection(`section-${sectionId}`);
+            return;
+        }
         const sectionElement = sectionRefs.current[sectionId];
         if (sectionElement) {
             sectionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-    }, [markSectionActivated]);
+    }, [markSectionActivated, isMobile]);
 
     useEffect(() => {
         setActiveSectionId('summary');
@@ -1287,18 +1320,24 @@ return (
                     activeSectionId={activeSectionId}
                     onSectionSelect={handleSectionSelect}
                 />
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, px: 1, pb: 2 }}>
+                {/* Phones: every section folds to its title and a one-line takeaway, and only the
+                    ones that answer "what to expect" start open. A section mounts (and fetches) the
+                    first time it is opened. */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', px: 1, pb: 2 }}>
                     {sectionGroups.map((section) => (
                         <Box
                             key={section.id}
                             ref={(el) => { sectionRefs.current[section.id] = el; }}
                             data-section-id={section.id}
-                            sx={{ scrollMarginTop: SECTION_SCROLL_MARGIN }}
                         >
-                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, px: 0.5 }}>
-                                {section.label}
-                            </Typography>
-                            {renderSectionContent(section)}
+                            <CollapsibleSection
+                                id={`section-${section.id}`}
+                                title={section.label}
+                                takeaway={section.takeaway}
+                                defaultOpen={Boolean(section.defaultOpen)}
+                            >
+                                {renderSectionContent(section)}
+                            </CollapsibleSection>
                         </Box>
                     ))}
                 </Box>
