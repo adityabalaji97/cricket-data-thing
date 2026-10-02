@@ -2,7 +2,11 @@ name: Refresh delivery details
 
 on:
   schedule:
-    - cron: "30 23 * * *"  # Daily, 5am IST (11:30pm UTC)
+    # 01:47 IST (20:17 UTC), to be done by ~5am IST. GitHub starts scheduled runs late -- the old
+    # 23:30 UTC ("5am IST") cron began 1h40m-3h late in Sep 2026 and finished ~07:00-08:15 IST --
+    # and :00 / :30 are its busiest minutes. Matches ending after ~2am IST (Americas) load the next
+    # night; trigger workflow_dispatch to load them sooner.
+    - cron: "17 20 * * *"
   workflow_dispatch:
 
 # Never let two refreshes overlap. They write the same tables, and a manual

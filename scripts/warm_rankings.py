@@ -11,8 +11,9 @@ nightly load invalidates them; this script refills the ones the pages request by
 * the rankings page: today minus 2 years -> today, all / pace / spin;
 * the trajectory snapshots: the last SNAPSHOTS month-ends (24-month windows), every mode and kind.
 
-"Today" is the UTC date, as the frontend computes it (toISOString); the workflow runs at 23:30 UTC,
-so tomorrow's date-dependent windows are warmed too. Keep the constants in step with
+"Today" is the UTC date, as the frontend computes it (toISOString). The nightly run (scheduled 20:17
+UTC, often started hours late) can finish either side of UTC midnight, so tomorrow's date-dependent
+windows are warmed too. Keep the constants in step with
 src/utils/dateDefaults.js (PROFILE_WINDOW_YEARS), GlobalT20Rankings.jsx (2-year preset, snapshots=6)
 and UnifiedPlayerProfile.jsx (snapshots=6).
 
