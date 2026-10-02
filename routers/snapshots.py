@@ -102,6 +102,67 @@ def create_graphic(body: GraphicRequest, request: Request, db: Session = Depends
             "title": fact.get("title")}
 
 
+# Ideas cost a natural-language parse (OpenAI, under the monthly cap): a per-client daily allowance
+# on top of the short-window chart limit. In memory per dyno, which is enough to stop casual abuse.
+IDEA_DAILY_LIMIT = 20
+_idea_days: Dict[str, deque] = defaultdict(deque)
+
+
+def _allow_idea(client: str) -> bool:
+    now = time.time()
+    q = _idea_days[client]
+    while q and now - q[0] > 86400:
+        q.popleft()
+    if len(q) >= IDEA_DAILY_LIMIT:
+        return False
+    q.append(now)
+    return True
+
+
+class IdeaGraphicRequest(BaseModel):
+    text: str
+    format: Optional[str] = None  # 'T20' | 'ODI' | None (auto)
+
+
+@router.post("/idea")
+def create_idea_graphic(body: IdeaGraphicRequest, request: Request, db: Session = Depends(get_session)):
+    """'Make a graphic' from a plain-English idea: the admin idea box, for everyone.
+
+    The idea is parsed into a query (nl2query), run, and every chart form it supports is saved;
+    no content pack is made. Conditions the query cannot apply are refused with the reason
+    (content_ideas.plan), so a graphic never silently drops part of the question.
+    """
+    from services.content_ideas import attempt, plan
+
+    text = (body.text or "").strip()
+    if len(text) < 6 or len(text) > 300:
+        raise HTTPException(status_code=400, detail="Describe the stat in 6-300 characters.")
+    client = _client(request)
+    if not _allow(client) or not _allow_idea(client):
+        raise HTTPException(status_code=429, detail=f"That's today's limit of {IDEA_DAILY_LIMIT} ideas; try again tomorrow, "
+                                                    "or build it in the query builder.")
+    fmt = body.format if body.format in ("T20", "ODI") else None
+    try:
+        planned = plan(text, fmt, db)
+        result = attempt(db, text, planned, created_by="graphic")
+    except SnapshotError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if result.get("status") != "resolved":
+        raise HTTPException(status_code=400, detail=result.get("note") or "Nothing to chart for this idea yet.")
+    fact = result["fact"]
+    snap = result["snapshot"]
+    options = fact.get("chart_options") or [{"form": "bars", "snapshot_id": snap["id"], "title": fact.get("title"), "p": None}]
+    return {
+        "options": options,
+        "picked_by": fact.get("chart_picked_by"),
+        "title": fact.get("title"),
+        "explanation": planned.get("explanation"),
+        # Readable chips of what was run ("Batter: Virat Kohli", "2024-01-01 -> today", "T20").
+        "chips": (snap.get("data") or {}).get("filter_chips") or [],
+        "query_url": (snap.get("data") or {}).get("hindsight_url"),
+    }
+
+
 @router.get("/{snapshot_id}")
 def read(snapshot_id: str, db: Session = Depends(get_session)):
     if not _ID.match(snapshot_id):

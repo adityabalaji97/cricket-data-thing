@@ -20,8 +20,8 @@ export const NAV_ITEMS = [
   { path: '/comparison', label: 'Batter Comparison', title: 'Batter Comparison', t20Only: true, group: 'compare' },
   { path: '/matchups', label: 'Matchups', title: 'Matchups', t20Only: true, group: 'compare' },
   { path: '/query', label: 'Query Builder', title: 'Query Builder', group: 'primary', short: 'Query' },
-  { path: '/notes', label: 'Notes', title: 'Notes', group: 'explore' },
   { path: '/graphics', label: 'Make a Graphic', title: 'Make a Graphic', group: 'explore' },
+  { path: '/notes', label: 'Notes', title: 'Notes', group: 'explore' },
   { path: '/team', label: 'Team Profile', title: 'Team Profile', t20Only: true, group: 'explore' },
   { path: '/team-comparison', label: 'Team Comparison', title: 'Team Comparison', t20Only: true, group: 'compare' },
   { path: '/doppelgangers', label: 'Doppelgangers', title: 'Doppelgangers', t20Only: true, group: 'compare' },
@@ -52,6 +52,8 @@ export const NAV_ITEMS = [
  * tabs and the mobile nav cannot drift apart again.
  */
 export const PRIMARY_NAV_PATHS = ['/', '/search', '/venue', '/query'];
+// Shown in the desktop menu's Main group right after the bottom-bar pages, without becoming a tab.
+export const MAIN_MENU_EXTRA = ['/graphics'];
 
 export const MORE_NAV_GROUPS = [
   { key: 'explore', label: 'Explore' },

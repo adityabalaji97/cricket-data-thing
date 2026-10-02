@@ -11,18 +11,19 @@ import { Box, Button, IconButton, Typography } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { NAV_ITEMS, PRIMARY_NAV_PATHS, MORE_NAV_GROUPS, MORE_EXTRA_LINKS } from '../../navItems';
+import { NAV_ITEMS, PRIMARY_NAV_PATHS, MAIN_MENU_EXTRA, MORE_NAV_GROUPS, MORE_EXTRA_LINKS } from '../../navItems';
 import { useFormat } from '../../context/FormatContext';
 import { colors, fonts } from '../../theme/hindsightDark';
 
 const GROUPS = [{ key: 'main', label: 'Main' }, ...MORE_NAV_GROUPS];
 
-const groupFor = (item) => (PRIMARY_NAV_PATHS.includes(item.path) ? 'main' : item.group);
+const MAIN_PATHS = [...PRIMARY_NAV_PATHS, ...MAIN_MENU_EXTRA];
+const groupFor = (item) => (MAIN_PATHS.includes(item.path) ? 'main' : item.group);
 
 const menuItems = [
-  // Main in the bottom-bar order, then everything else as listed.
-  ...PRIMARY_NAV_PATHS.map((path) => NAV_ITEMS.find((item) => item.path === path)).filter(Boolean),
-  ...NAV_ITEMS.filter((item) => !PRIMARY_NAV_PATHS.includes(item.path)),
+  // Main in the bottom-bar order (then Make a Graphic, next to Query Builder), then everything else.
+  ...MAIN_PATHS.map((path) => NAV_ITEMS.find((item) => item.path === path)).filter(Boolean),
+  ...NAV_ITEMS.filter((item) => !MAIN_PATHS.includes(item.path)),
   ...MORE_EXTRA_LINKS.filter((item) => item.group),
 ];
 

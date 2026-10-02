@@ -5,15 +5,11 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import config from '../config';
-import { shareImage, siteOrigin } from './ui/ChartExportButton';
 import useIsMobile from '../hooks/useIsMobile';
 import { track } from '../utils/analytics';
+import GraphicOptions from './GraphicOptions';
 import { qbButtonSx, qbColors, qbFonts } from './queryBuilderTheme';
 
-const FORM_NAMES = {
-  bars: 'Ranked bars', line: 'Trend line', scatter: 'Scatter', stat: 'Big number',
-  diverging: 'Above / below', dumbbell: 'Dumbbell', stacked: 'Stacked', field: 'Field map',
-};
 
 const SKIP = new Set(['percent_balls', 'innings_count', 'metric_balls']);
 const label = (key) => key.replace(/_/g, ' ').replace(/\bpercentage\b/, '%');
@@ -37,11 +33,9 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
   const [metric, setMetric] = useState(metrics.includes(defaultMetric) ? defaultMetric : (metrics.includes('runs') ? 'runs' : metrics[0] || ''));
   const [highlight, setHighlight] = useState(null);
   const [state, setState] = useState({ loading: false, error: null, options: [], pickedBy: null });
-  const [selected, setSelected] = useState(null);
 
   const make = async () => {
     setState({ loading: true, error: null, options: [], pickedBy: null });
-    setSelected(null);
     try {
       const { data } = await axios.post(`${config.API_URL}/snapshots/graphic`, {
         query_string: apiQueryString, metric, highlight: highlight || null,
@@ -50,13 +44,10 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
       });
       setState({ loading: false, error: null, options: data.options || [], pickedBy: data.picked_by });
       track('graphic_made', { metric, forms: (data.options || []).map((o) => o.form).join(','), highlight: Boolean(highlight) });
-      setSelected((data.options || [])[0] || null);
     } catch (err) {
       setState({ loading: false, error: err.response?.data?.detail || 'Could not make a graphic for this result.', options: [], pickedBy: null });
     }
   };
-
-  const imageUrl = selected ? `${siteOrigin()}/img/${selected.snapshot_id}.png` : null;
 
   return (
     <Dialog open={open} onClose={onClose} fullScreen={isMobile} maxWidth="sm" fullWidth
@@ -85,52 +76,7 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
         </Button>
         {state.error && <Alert severity="warning">{state.error}</Alert>}
 
-        {state.options.length > 0 && (
-          <>
-            {state.options.length > 1 && (
-              <Box>
-                <Typography sx={{ fontSize: 12, color: qbColors.textLo, mb: 0.75 }}>Chart · tap to switch</Typography>
-                <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5 }}>
-                  {state.options.map((o) => {
-                    const active = selected?.snapshot_id === o.snapshot_id;
-                    return (
-                      <Box key={o.snapshot_id} component="button" type="button" onClick={() => setSelected(o)}
-                        sx={{ flex: '0 0 auto', width: 92, p: 0.5, bgcolor: 'transparent', cursor: 'pointer', color: qbColors.textHi,
-                          border: `2px solid ${active ? qbColors.accent || '#b6f24a' : 'rgba(255,255,255,0.12)'}`, borderRadius: 2 }}>
-                        <Box component="img" src={`${siteOrigin()}/img/${o.snapshot_id}.png`} alt={FORM_NAMES[o.form] || o.form} loading="lazy"
-                          sx={{ width: '100%', aspectRatio: '4 / 5', display: 'block', borderRadius: 1, bgcolor: '#14171e' }} />
-                        <Typography sx={{ fontSize: 12, mt: 0.5 }}>{FORM_NAMES[o.form] || o.form}</Typography>
-                      </Box>
-                    );
-                  })}
-                </Box>
-              </Box>
-            )}
-            {selected && (
-              <Box>
-                <Box component="img" src={imageUrl} alt={selected.title}
-                  sx={{ width: '100%', maxWidth: 420, aspectRatio: '4 / 5', display: 'block', mx: 'auto', borderRadius: 2, bgcolor: '#14171e' }} />
-                <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
-                  <Button variant="contained" sx={{ ...qbButtonSx, minHeight: 44, flex: 1 }}
-                    onClick={() => {
-                      // 'share' is the usage report's existing share count; kind tells graphics apart.
-                      track('share', { kind: 'graphic', form: selected.form });
-                      shareImage(imageUrl, `hindsight-${selected.snapshot_id}.png`, selected.title, `${selected.title} · hindsightcricket.com`);
-                    }}>
-                    Share
-                  </Button>
-                  <Button variant="outlined" href={`${imageUrl}?download=1`} onClick={() => track('graphic_download', { form: selected.form })} sx={{ minHeight: 44, flex: 1, color: qbColors.textHi, borderColor: 'rgba(255,255,255,0.2)' }}>
-                    Download
-                  </Button>
-                  <Button variant="outlined" onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/g/${selected.snapshot_id}`)}
-                    sx={{ minHeight: 44, flex: 1, color: qbColors.textHi, borderColor: 'rgba(255,255,255,0.2)' }}>
-                    Copy link
-                  </Button>
-                </Box>
-              </Box>
-            )}
-          </>
-        )}
+        {state.options.length > 0 && <GraphicOptions options={state.options} source="query" />}
       </Box>
     </Dialog>
   );
