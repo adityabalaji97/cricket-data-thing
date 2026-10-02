@@ -43,8 +43,12 @@ const CaughtDismissalScatterMap = ({
   selectedZone = 'all',
   onZoneSelect,
 }) => {
-  const width = isMobile ? 320 : 420;
+  // Field size plus side gutters for the outer zone labels, which sat at ~1.1x the boundary radius
+  // and were clipped by the SVG edge ("Point", "Square Leg"). On phones the whole drawing is ~360
+  // units so it renders near 1:1 and 11px labels stay 11px.
+  const width = isMobile ? 260 : 420;
   const height = width;
+  const labelPad = isMobile ? 50 : 64;
   const centerX = width / 2;
   const centerY = height / 2;
   const maxRadius = width * 0.42;
@@ -75,7 +79,7 @@ const CaughtDismissalScatterMap = ({
           key={`caught-point-${index}-${delivery.match_id || 'm'}-${delivery.over || 0}`}
           cx={x}
           cy={y}
-          r={inSelectedZone ? (isMobile ? 3 : 3.5) : 2}
+          r={inSelectedZone ? (isMobile ? 4 : 3.5) : (isMobile ? 3 : 2)}
           fill={pointColor}
           opacity={inSelectedZone ? 0.78 : 0.18}
         >
@@ -147,7 +151,7 @@ const CaughtDismissalScatterMap = ({
         y={y}
         textAnchor={anchor}
         dominantBaseline="middle"
-        fontSize={isMobile ? 10 : 11}
+        fontSize={11}
         fontWeight={600}
         fill={fieldSvg.label}
         style={{ pointerEvents: 'none' }}
@@ -174,7 +178,7 @@ const CaughtDismissalScatterMap = ({
         )}
       </Box>
       <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ maxWidth: '100%', height: 'auto' }}>
+        <svg width={width + 2 * labelPad} height={height} viewBox={`${-labelPad} 0 ${width + 2 * labelPad} ${height}`} style={{ maxWidth: '100%', height: 'auto' }}>
           <circle cx={centerX} cy={centerY} r={maxRadius} fill={fieldSvg.ground} stroke={fieldSvg.boundary} strokeWidth="2" />
           {zoneWedges}
           <circle cx={centerX} cy={centerY} r={maxRadius * 0.5} fill="none" stroke={fieldSvg.ring} strokeWidth="1" strokeDasharray="4,4" />
