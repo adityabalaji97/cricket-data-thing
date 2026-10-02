@@ -3,8 +3,11 @@ import { Box, Typography } from '@mui/material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { EmptyState } from './ui';
 import { colors, spacing } from '../theme/designSystem';
+import useIsMobile from '../hooks/useIsMobile';
 
-const ContributionGraph = ({ innings, isMobile = false }) => {
+const ContributionGraph = ({ innings }) => {
+  // Phone layout from the shared hook: callers never passed isMobile, so phones got the desktop chart.
+  const { isMobile } = useIsMobile();
   const { data, stats } = useMemo(() => {
     if (!innings || innings.length === 0) {
       return { data: [], stats: { total: 0, avgFantasy: 0, maxFantasy: 0 } };

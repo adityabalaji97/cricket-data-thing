@@ -17,8 +17,11 @@ import {
 import ScrollTable from './ui/ScrollTable';
 import { spacing, colors, borderRadius } from '../theme/designSystem';
 import CondensedName from './common/CondensedName';
+import useIsMobile from '../hooks/useIsMobile';
 
-const BowlingInningsTable = ({ stats, isMobile = false, wrapInCard = true }) => {
+const BowlingInningsTable = ({ stats, wrapInCard = true }) => {
+  // Phone layout from the shared hook: callers never passed isMobile, so phones got the desktop chart.
+  const { isMobile } = useIsMobile();
   const [displayMode, setDisplayMode] = useState('topWickets');
   const [sortConfig, setSortConfig] = useState({
     key: displayMode === 'topWickets' ? 'wickets' : 'date',

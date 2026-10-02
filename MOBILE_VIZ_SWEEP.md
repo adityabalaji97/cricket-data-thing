@@ -5,7 +5,7 @@
 | 0 | Shared foundations (useIsMobile, touch tooltips, chartDefaults, CollapsibleSection, DetailSheet, TakeawayCard, ui_sweep 360/768) | [x] 2026-10-02 |
 | 1 | Mockups artifact — user sign-off gate | [x] 2026-10-02 (signed off; defaults taken on all 5 calls) |
 | 2 | Match preview fixes + mobile structure | [x] 2026-10-02 (preview-text-into-strip moves to chunk 3) |
-| 3 | Match preview new vizs (What to expect, Key Battles, Foresight) | [ ] |
+| 3 | Match preview new vizs (What to expect, Key Battles, Foresight) | [x] 2026-10-02 (Foresight range/features deferred: match_predictions empty locally, cannot verify) |
 | 4 | Player profile fixes + mobile structure | [ ] |
 | 5 | Player profile chart rework + new vizs (At a glance, ShotMap, Impact/clutch) | [ ] |
 | 6 | Rest-of-app sweep + dead code | [ ] |

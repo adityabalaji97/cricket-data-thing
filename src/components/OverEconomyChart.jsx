@@ -14,8 +14,11 @@ import {
   Label
 } from 'recharts';
 import { spacing, colors, typography, borderRadius } from '../theme/designSystem';
+import useIsMobile from '../hooks/useIsMobile';
 
-const OverEconomyChart = ({ stats, isMobile = false, wrapInCard = true }) => {
+const OverEconomyChart = ({ stats, wrapInCard = true }) => {
+  // Phone layout from the shared hook: callers never passed isMobile, so phones got the desktop chart.
+  const { isMobile } = useIsMobile();
   const [selectedMetrics, setSelectedMetrics] = useState(['economy', 'wickets']);
 
   // Early return if no data is provided

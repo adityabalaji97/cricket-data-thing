@@ -458,7 +458,9 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
             selectedVenue={selectedVenue}
             competitionFilters={competitionFilters}
             isMobile={isMobile}
-            enabled={activeSectionId === 'advanced-analytics'}
+            // LazySection already defers the mount until the section nears the viewport. Gating
+            // on the *active* section blanked the content as soon as you scrolled past it.
+            enabled
           />
         ) : (
           <Typography variant="body2" color="text.secondary">
@@ -532,7 +534,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   }, [
     hasData, currentStats, currentDismissalStats, activeTab, battingStats,
     selectedPlayer, dateRange, selectedVenue, competitionFilters, isMobile, fetchTrigger,
-    globalRankPayload, globalRankLoading, globalRankFailed, activeSectionId,
+    globalRankPayload, globalRankLoading, globalRankFailed,
   ]);
 
   // Scroll to section handler
@@ -580,8 +582,10 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
 
   // Get recent innings for the form strip
   const recentInnings = useMemo(() => {
-    if (activeTab === 'bowling' && bowlingStats?.innings) return bowlingStats.innings;
-    if (activeTab === 'batting' && battingStats?.innings) return battingStats.innings;
+    // Innings arrive newest first, every one in the window (100+ for a long range); the strip is
+    // for recent form, so it shows the last 10.
+    if (activeTab === 'bowling' && bowlingStats?.innings) return bowlingStats.innings.slice(0, 10);
+    if (activeTab === 'batting' && battingStats?.innings) return battingStats.innings.slice(0, 10);
     return [];
   }, [activeTab, battingStats, bowlingStats]);
 

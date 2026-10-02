@@ -13,8 +13,11 @@ import {
   Label
 } from 'recharts';
 import { spacing, colors, borderRadius } from '../theme/designSystem';
+import useIsMobile from '../hooks/useIsMobile';
 
-const OverCombinationsChart = ({ stats, isMobile = false, wrapInCard = true }) => {
+const OverCombinationsChart = ({ stats, wrapInCard = true }) => {
+  // Phone layout from the shared hook: callers never passed isMobile, so phones got the desktop chart.
+  const { isMobile } = useIsMobile();
   const [orderBy, setOrderBy] = useState('percentage');
   const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(0);

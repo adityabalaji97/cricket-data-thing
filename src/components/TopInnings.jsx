@@ -14,8 +14,11 @@ import FilterBar from './ui/FilterBar';
 import { EmptyState } from './ui';
 import { spacing } from '../theme/designSystem';
 import CondensedName from './common/CondensedName';
+import useIsMobile from '../hooks/useIsMobile';
 
-const TopInnings = ({ innings, count = 10, isMobile = false, wrapInCard = true }) => {
+const TopInnings = ({ innings, count = 10, wrapInCard = true }) => {
+  // Phone layout from the shared hook: callers never passed isMobile, so phones got the desktop chart.
+  const { isMobile } = useIsMobile();
   const [viewMode, setViewMode] = useState('topScoring');
   const Wrapper = wrapInCard ? Card : Box;
   const wrapperProps = wrapInCard ? { isMobile } : { sx: { width: '100%' } };
