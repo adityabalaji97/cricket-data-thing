@@ -524,6 +524,10 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
         }))
       : null;
     const selectedMetricData = availableMetrics.find(m => m.key === chart.selectedMetric);
+    // Phones: the first 25 rows (in the table's current sort). One 30px row per group made a
+    // 398-batter leaderboard a 12,000px chart.
+    const MOBILE_BAR_LIMIT = 25;
+    const barData = isMobile ? chartData.slice(0, MOBILE_BAR_LIMIT) : chartData;
     const titleLabel = isStacked
       ? stackedData.map((d) => d.metric?.label || d.key).join(' + ')
       : (selectedMetricData?.label || chart.selectedMetric);
@@ -549,7 +553,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
           {/* Chart Controls */}
           {!isStacked && (
             <Stack direction={isMobile ? "column" : "row"} spacing={2} sx={{ mb: 3 }}>
-              <FormControl sx={{ minWidth: 200 }}>
+              <FormControl sx={{ minWidth: { xs: '100%', sm: 200 } }}>
                 <InputLabel>Metric</InputLabel>
                 <Select
                   value={chart.selectedMetric}
@@ -567,34 +571,35 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
           )}
 
           {/* Bar Chart */}
-          <Box sx={{ width: '100%', height: isMobile ? 300 : 400 }}>
+          {/* Phones: horizontal bars, names down the left. Vertical bars rotated every category label
+              -45deg with interval 0 at 10px, which for 10+ players was unreadable. */}
+          <Box sx={{ width: '100%', height: isMobile ? Math.max(260, barData.length * 30 + 60) : 400 }}>
             <ResponsiveContainer>
               <BarChart
-                data={chartData}
-                margin={{
-                  top: 20,
-                  right: 30,
-                  left: 20,
-                  bottom: isMobile ? 60 : 40
-                }}
+                data={barData}
+                layout={isMobile ? 'vertical' : 'horizontal'}
+                margin={isMobile ? { top: 8, right: 16, left: 4, bottom: 4 } : { top: 20, right: 30, left: 20, bottom: 40 }}
               >
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis
-                  dataKey="name"
-                  angle={isMobile ? -45 : 0}
-                  textAnchor={isMobile ? "end" : "middle"}
-                  height={isMobile ? 80 : 40}
-                  interval={0}
-                  fontSize={isMobile ? 10 : 12}
-                />
-                <YAxis
-                  tickFormatter={(value) => formatAxisTick(value, isStacked ? chart.stackedMetrics[0] : chart.selectedMetric)}
-                  fontSize={12}
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={!isMobile} vertical={isMobile} />
+                {isMobile ? (
+                  <>
+                    <XAxis type="number" fontSize={11} tickFormatter={(value) => formatAxisTick(value, isStacked ? chart.stackedMetrics[0] : chart.selectedMetric)}
                   {...(!isStacked && {
                     domain: getDataDomain(chart.selectedMetric),
                     ticks: generateNiceTicks(...getDataDomain(chart.selectedMetric), 6),
-                  })}
-                />
+                  })} />
+                    <YAxis type="category" dataKey="name" width={96} interval={0} fontSize={11} tickLine={false} />
+                  </>
+                ) : (
+                  <>
+                    <XAxis dataKey="name" height={40} interval={0} fontSize={12} />
+                    <YAxis fontSize={12} tickFormatter={(value) => formatAxisTick(value, isStacked ? chart.stackedMetrics[0] : chart.selectedMetric)}
+                  {...(!isStacked && {
+                    domain: getDataDomain(chart.selectedMetric),
+                    ticks: generateNiceTicks(...getDataDomain(chart.selectedMetric), 6),
+                  })} />
+                  </>
+                )}
                 <Tooltip content={(props) => <CustomTooltip {...props} chartConfig={chart} />} />
                 <Legend />
                 {isStacked
@@ -605,7 +610,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
                         stackId="a"
                         fill={d.metric?.color || getFallbackColor(idx)}
                         name={d.metric?.label || d.key}
-                        radius={idx === stackedData.length - 1 ? [2, 2, 0, 0] : 0}
+                        radius={idx === stackedData.length - 1 ? (isMobile ? [0, 2, 2, 0] : [2, 2, 0, 0]) : 0}
                       />
                     ))
                   : (
@@ -613,12 +618,17 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
                       dataKey={chart.selectedMetric}
                       fill={selectedMetricData?.color || '#8884d8'}
                       name={selectedMetricData?.label || chart.selectedMetric}
-                      radius={[2, 2, 0, 0]}
+                      radius={isMobile ? [0, 2, 2, 0] : [2, 2, 0, 0]}
                     />
                   )}
               </BarChart>
             </ResponsiveContainer>
           </Box>
+          {isMobile && chartData.length > MOBILE_BAR_LIMIT && (
+            <Typography variant="caption" sx={{ display: 'block', mt: 1, color: qbColors.textLo }}>
+              Showing the first {MOBILE_BAR_LIMIT} of {chartData.length} rows, in the table&apos;s current order. Sort the table to change which rows appear.
+            </Typography>
+          )}
         </CardContent>
       </Card>
     );
@@ -639,7 +649,7 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
             </IconButton>
           </Box>
           <Stack direction={isMobile ? "column" : "row"} spacing={2} sx={{ mb: 3 }}>
-            <FormControl sx={{ minWidth: 200 }}>
+            <FormControl sx={{ minWidth: { xs: '100%', sm: 200 } }}>
               <InputLabel>Metric</InputLabel>
               <Select
                 value={chart.selectedMetric}
@@ -658,16 +668,16 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
             <ResponsiveContainer>
               <LineChart
                 data={chartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: isMobile ? 60 : 40 }}
+                margin={{ top: 20, right: isMobile ? 12 : 30, left: isMobile ? 0 : 20, bottom: isMobile ? 8 : 40 }}
               >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                {/* Flat labels; Recharts drops colliding ones on phones instead of rotating all of them. */}
                 <XAxis
                   dataKey="name"
-                  angle={isMobile ? -45 : 0}
-                  textAnchor={isMobile ? "end" : "middle"}
-                  height={isMobile ? 80 : 40}
-                  interval={0}
-                  fontSize={isMobile ? 10 : 12}
+                  height={isMobile ? 24 : 40}
+                  interval={isMobile ? 'preserveStartEnd' : 0}
+                  minTickGap={6}
+                  fontSize={isMobile ? 11 : 12}
                 />
                 <YAxis
                   tickFormatter={(value) => formatAxisTick(value, chart.selectedMetric)}
@@ -867,9 +877,9 @@ const ChartPanel = forwardRef(({ data, groupBy, isVisible, onToggle, initialReco
                               x={cx}
                               y={cy + 18}
                               textAnchor="middle"
-                              fontSize={10}
+                              fontSize={11}
                               fontWeight="500"
-                              fill="#333"
+                              fill="#c3c8d0"
                             >
                               {payload.shortName || payload.name}
                             </text>
