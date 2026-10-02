@@ -9267,7 +9267,8 @@
         "min_runs",
         "max_runs",
         "min_wickets",
-        "max_wickets"
+        "max_wickets",
+        "having"
       ],
       "match": [
         "innings",

@@ -144,6 +144,11 @@ def query_deliveries(
     max_runs: Optional[int] = Query(default=None, ge=0, description="Maximum runs for grouped results"),
     min_wickets: Optional[int] = Query(default=None, ge=0, description="Minimum wickets for bowling grouped/innings results"),
     max_wickets: Optional[int] = Query(default=None, ge=0, description="Maximum wickets for bowling grouped/innings results"),
+    having: List[str] = Query(
+        default=[],
+        description="Metric thresholds on grouped results, metric:op:value (op gte|lte|gt|lt), e.g. "
+                    "average:gte:50, strike_rate:gte:100. Supported: average, strike_rate, balls_per_dismissal.",
+    ),
     
     # Pagination and limits
     limit: int = Query(default=1000, le=10000, description="Maximum results (max 10,000)"),
@@ -261,6 +266,7 @@ def query_deliveries(
             max_runs=max_runs,
             min_wickets=min_wickets,
             max_wickets=max_wickets,
+            having=preprocess_list_param(having),
             limit=limit,
             offset=offset,
             include_international=include_international,
@@ -393,7 +399,7 @@ def get_available_columns(
                 "batter": ["bat_hand", "crease_combo"],
                 "bowler": ["bowl_style", "bowl_kind"],
                 "delivery": ["line", "length", "shot", "control", "wagon_zone", "dismissal"],
-                "grouped_filters": ["min_balls", "max_balls", "min_runs", "max_runs", "min_wickets", "max_wickets"]
+                "grouped_filters": ["min_balls", "max_balls", "min_runs", "max_runs", "min_wickets", "max_wickets", "having"]
             },
             
             "group_by_columns": list(GROUP_BY_COLUMNS),

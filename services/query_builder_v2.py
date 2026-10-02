@@ -1032,8 +1032,10 @@ def _source_page_params(limit: int, offset: int, merging: bool, grouped: bool) -
     return {"limit": offset + limit, "offset": 0}
 
 
-def _apply_group_thresholds(rows, min_balls, max_balls, min_runs, max_runs, min_wickets, max_wickets):
-    """Apply the query builder's min/max group thresholds to already-aggregated rows."""
+def _apply_group_thresholds(rows, min_balls, max_balls, min_runs, max_runs, min_wickets, max_wickets,
+                            metric_thresholds=None):
+    """Apply the query builder's min/max group thresholds (and any metric thresholds, see
+    services/metric_thresholds) to already-aggregated rows."""
     bounds = [
         ("balls", min_balls, max_balls),
         ("runs", min_runs, max_runs),
@@ -1044,6 +1046,9 @@ def _apply_group_thresholds(rows, min_balls, max_balls, min_runs, max_runs, min_
             rows = [r for r in rows if (r.get(key) or 0) >= lo]
         if hi is not None:
             rows = [r for r in rows if (r.get(key) or 0) <= hi]
+    if metric_thresholds:
+        from services.metric_thresholds import row_passes
+        rows = [r for r in rows if row_passes(r, metric_thresholds)]
     return rows
 
 
@@ -2061,6 +2066,8 @@ def query_deliveries_service(
     day_or_night: Optional[str] = None,
     fmt: str = "T20",
     gender: str = "male",
+    metric_thresholds: Optional[list] = None,
+    threshold_warnings: Optional[list] = None,
 ):
     """
     Main service function to query cricket delivery data with flexible filtering and grouping.
@@ -2234,7 +2241,11 @@ def query_deliveries_service(
             toss_decision=toss_decision,
             group_by=group_by,
         )
-        delivery_warnings = list(routing["warnings"]) + _match_context_warning(match_context_used)
+        delivery_warnings = (
+            list(routing["warnings"]) + _match_context_warning(match_context_used) + list(threshold_warnings or [])
+        )
+        if metric_thresholds and not group_by:
+            delivery_warnings.append("Metric filters (average, strike rate...) apply to grouped results only; add a group by.")
         # day_or_night filter requires joining matches in the modern (delivery_details) path
         join_new_matches = match_context_used or bool(day_or_night)
 
@@ -2337,6 +2348,7 @@ def query_deliveries_service(
                     max_wickets=side_thresholds.get("max_wickets"),
                     ball_aggregation=ball_aggregation,
                     fmt=fmt, gender=gender,
+                    metric_thresholds=None if merging else metric_thresholds,
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_groups']
@@ -2444,7 +2456,8 @@ def query_deliveries_service(
                     new_results, legacy_results, group_by, player_aliases_map, total_balls
                 )
                 merged_data = _apply_group_thresholds(
-                    merged_data, min_balls, max_balls, min_runs, max_runs, min_wickets, max_wickets
+                    merged_data, min_balls, max_balls, min_runs, max_runs, min_wickets, max_wickets,
+                    metric_thresholds=metric_thresholds,
                 )
                 total_innings_in_query = sum(int(r.get("innings_count") or 0) for r in merged_data)
                 total_count = len(merged_data)
@@ -2474,7 +2487,8 @@ def query_deliveries_service(
                 # query_legacy_grouped returns every group unfiltered: apply the thresholds and
                 # the page here, as the delivery_details path does in SQL.
                 merged_data = _apply_group_thresholds(
-                    merged_data, min_balls, max_balls, min_runs, max_runs, min_wickets, max_wickets
+                    merged_data, min_balls, max_balls, min_runs, max_runs, min_wickets, max_wickets,
+                    metric_thresholds=metric_thresholds,
                 )
                 total_count = len(merged_data)
                 total_innings_in_query = sum(int(r.get("innings_count") or 0) for r in merged_data)
@@ -3248,6 +3262,7 @@ def handle_grouped_query(
     min_wickets=None, max_wickets=None,
     ball_aggregation="snapshot",
     fmt="T20", gender="male",
+    metric_thresholds=None,
 ):
     """Return aggregated cricket statistics grouped by specified columns.
 
@@ -3439,6 +3454,11 @@ def handle_grouped_query(
     if max_wickets is not None:
         having_conditions.append("wickets <= :max_wickets")
         params["max_wickets"] = max_wickets
+    if metric_thresholds:
+        # average / strike_rate / balls_per_dismissal from the same balls/runs/wickets aliases,
+        # so they filter before ORDER BY and LIMIT, like the count thresholds above.
+        from services.metric_thresholds import sql_conditions
+        having_conditions.extend(sql_conditions(metric_thresholds, params))
 
     having_predicate = " AND ".join(having_conditions) if having_conditions else "TRUE"
     having_where_clause = f"WHERE {having_predicate}" if having_conditions else ""
@@ -3940,10 +3960,21 @@ def _run_deliveries_query_uncached(
     query_mode: str = "delivery",
     fmt: str = "ALL",
     gender: str = "male",
+    having: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Validate and run a query-builder request. Raises QueryValidationError on bad bounds."""
     validate_format_bounds(fmt, gender, over_min, over_max, innings)
-    return query_deliveries_service(
+    from services.metric_thresholds import ThresholdError, parse as parse_thresholds
+    try:
+        metric_thresholds, threshold_warnings = parse_thresholds(having)
+    except ThresholdError as exc:
+        raise QueryValidationError(str(exc))
+    if metric_thresholds and query_mode != "delivery":
+        # The innings-table modes do not support them yet: say so rather than drop them silently.
+        threshold_warnings = threshold_warnings + [
+            "Metric filters (average, strike rate...) currently apply in ball-by-ball mode only; not applied here."
+        ]
+    result = query_deliveries_service(
         venue=venue,
         start_date=start_date,
         end_date=end_date,
@@ -3989,7 +4020,16 @@ def _run_deliveries_query_uncached(
         day_or_night=day_or_night,
         fmt=fmt,
         gender=gender,
+        metric_thresholds=metric_thresholds if query_mode == "delivery" else None,
+        threshold_warnings=threshold_warnings,
     )
+    if metric_thresholds and query_mode == "delivery" and isinstance(result, dict):
+        from services.metric_thresholds import describe
+        result.setdefault("metadata", {})["metric_filters"] = describe(metric_thresholds)
+    if query_mode != "delivery" and threshold_warnings and isinstance(result, dict):
+        result.setdefault("metadata", {}).setdefault("warnings", [])
+        result["metadata"]["warnings"] = list(result["metadata"]["warnings"] or []) + threshold_warnings
+    return result
 
 
 def run_deliveries_query(db, **kwargs):
