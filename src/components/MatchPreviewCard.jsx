@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   CircularProgress,
@@ -8,9 +8,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import axios from 'axios';
-import config from '../config';
-import { useFormat } from '../context/FormatContext';
+import useMatchPreview from '../hooks/useMatchPreview';
 import CondensedName from './common/CondensedName';
 
 const MatchPreviewCard = ({
@@ -25,27 +23,22 @@ const MatchPreviewCard = ({
   isMobile = false,
   dayNightFilter = 'all',
   onDayNightFilterChange = null,
+  previewState = null,
 }) => {
-  // Pinned: a preview is a single fixture, so 'ALL' has no meaning and the endpoint
-  // rejects it.
-  const { pinnedFormatParams: previewFormat } = useFormat();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const requestKey = useMemo(
-    () => JSON.stringify({
-      venue,
-      team1Identifier,
-      team2Identifier,
-      startDate: startDate || null,
-      endDate: endDate || null,
-      includeInternational,
-      topTeams,
-      dayNightFilter,
-    }),
-    [venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams, dayNightFilter]
-  );
+  // `previewState` ({ data, loading, error }) comes from the page's useMatchPreview when it also
+  // feeds the "What to expect" strip; without it the card fetches for itself.
+  const own = useMatchPreview({
+    venue,
+    team1: team1Identifier,
+    team2: team2Identifier,
+    startDate,
+    endDate,
+    includeInternational,
+    topTeams,
+    dayNightFilter,
+    enabled: enabled && !previewState,
+  });
+  const { data, loading, error } = previewState || own;
 
   const parsedPreview = useMemo(() => {
     if (Array.isArray(data?.sections) && data.sections.length > 0) {
@@ -81,48 +74,6 @@ const MatchPreviewCard = ({
     if (current) sections.push(current);
     return sections;
   }, [data?.preview, data?.sections]);
-
-  useEffect(() => {
-    if (!enabled || !venue || !team1Identifier || !team2Identifier) return;
-    let cancelled = false;
-
-    const fetchPreview = async () => {
-      setData(null);
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await axios.get(
-          `${config.API_URL}/match-preview/${encodeURIComponent(venue)}/${encodeURIComponent(team1Identifier)}/${encodeURIComponent(team2Identifier)}`,
-          {
-            params: {
-              ...(startDate ? { start_date: startDate } : {}),
-              ...(endDate ? { end_date: endDate } : {}),
-              include_international: includeInternational,
-              top_teams: topTeams,
-              // A fixture is one format; the preview endpoint rejects 'ALL'.
-              format: previewFormat.format,
-              gender: previewFormat.gender,
-              ...(dayNightFilter !== 'all' ? { day_or_night: dayNightFilter } : {}),
-            }
-          }
-        );
-        if (!cancelled) {
-          setData(response.data);
-        }
-      } catch (err) {
-        console.error('Error fetching match preview:', err);
-        if (!cancelled) setError('Failed to load match preview');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetchPreview();
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, requestKey, venue, team1Identifier, team2Identifier, startDate, endDate, includeInternational, topTeams, dayNightFilter,
-      previewFormat.format, previewFormat.gender]);
 
   if (!enabled || !venue || !team1Identifier || !team2Identifier) return null;
 

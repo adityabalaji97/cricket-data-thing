@@ -39,6 +39,8 @@ import MatchHistory from './MatchHistory';
 import Matchups from './Matchups';
 import ContextualQueryPrompts from './ContextualQueryPrompts';
 import MatchPreviewCard from './MatchPreviewCard';
+import ExpectStrip from './ExpectStrip';
+import useMatchPreview from '../hooks/useMatchPreview';
 import PostTossSetup from './PostTossSetup';
 import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 import VenueSectionTabs from './VenueSectionTabs';
@@ -897,7 +899,7 @@ const VenueNotes = ({
     })();
 
     const [activeSectionId, setActiveSectionId] = useState('summary');
-    const [activatedSections, setActivatedSections] = useState(() => new Set(['summary', 'preview', 'teams']));
+    const [activatedSections, setActivatedSections] = useState(() => new Set(['expect', 'summary', 'preview', 'teams']));
     const [postTossSelection, setPostTossSelection] = useState(null);
     const sectionRefs = useRef({});
     const foresightEnabled = activeSectionId === 'foresight' || activatedSections.has('foresight');
@@ -929,6 +931,22 @@ const VenueNotes = ({
         && venue !== 'All Venues'
         && (venueStats.total_matches || 0) === 0;
 
+    // One preview request feeds both the "What to expect" strip and the (folded) written preview.
+    const previewState = useMatchPreview({
+        venue,
+        team1: selectedTeam1?.full_name || selectedTeam1?.abbreviated_name,
+        team2: selectedTeam2?.full_name || selectedTeam2?.abbreviated_name,
+        startDate,
+        endDate,
+        // The page's own filters, so the strip and the venue summary count the same matches.
+        // (The endpoint has no leagues filter; with leagues selected the strip covers all leagues.)
+        includeInternational: Boolean(includeInternational),
+        topTeams: topTeams || 20,
+        dayNightFilter,
+        enabled: Boolean(selectedTeam1 && selectedTeam2),
+    });
+    const expectBlock = previewState.data?.expect || null;
+
     const sectionGroups = useMemo(() => {
         const emptyReasons = [
             startDate ? 'The date range may be too narrow — matches before it are excluded.' : null,
@@ -944,7 +962,7 @@ const VenueNotes = ({
             {
                 id: 'summary',
                 label: 'Summary',
-                defaultOpen: true,
+                defaultOpen: !(selectedTeam1 && selectedTeam2),
                 takeaway: venueTakeaway,
                 content: noVenueMatches ? (
                     <EmptyState
@@ -966,12 +984,31 @@ const VenueNotes = ({
             },
         ];
 
+        // What to expect: the preview's numbers, first and open (needs both teams).
+        if (selectedTeam1 && selectedTeam2 && (expectBlock || previewState.loading)) {
+            groups.unshift({
+                id: 'expect',
+                label: 'What to expect',
+                defaultOpen: true,
+                takeaway: expectBlock?.lean?.label || 'Par score, toss, form and head to head',
+                content: expectBlock ? (
+                    <ExpectStrip
+                        expect={expectBlock}
+                        team1={selectedTeam1.full_name}
+                        team2={selectedTeam2.full_name}
+                    />
+                ) : (
+                    <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}><CircularProgress size={24} /></Box>
+                ),
+            });
+        }
+
         // 2. AI PREVIEW (only when both teams selected)
         if (selectedTeam1 && selectedTeam2) {
             groups.push({
                 id: 'preview',
-                label: 'Preview',
-                takeaway: 'Written preview: venue, form, head to head, key players',
+                label: 'Full preview',
+                takeaway: previewState.data?.headline || 'Written preview: venue, form, head to head, key players',
                 content: (
                     <MatchPreviewCard
                         venue={venue}
@@ -985,6 +1022,7 @@ const VenueNotes = ({
                         isMobile={isMobile}
                         dayNightFilter={dayNightFilter}
                         onDayNightFilterChange={onDayNightFilterChange}
+                        previewState={previewState}
                     />
                 ),
             });
@@ -1134,13 +1172,15 @@ const VenueNotes = ({
 
         if (noVenueMatches) {
             // Sections built on the ground's own history have nothing to show.
-            const teamSections = new Set(['summary', 'preview', 'teams', 'foresight']);
+            const teamSections = new Set(['expect', 'summary', 'preview', 'teams', 'foresight']);
             return groups.filter((group) => teamSections.has(group.id));
         }
         return groups;
     }, [
         venueTakeaway,
         leadersTakeaway,
+        expectBlock,
+        previewState,
         isT20Preview,
         formatSlug,
         noVenueMatches,
@@ -1198,7 +1238,7 @@ const VenueNotes = ({
 
     useEffect(() => {
         setActiveSectionId('summary');
-        setActivatedSections(new Set(['summary', 'preview', 'teams']));
+        setActivatedSections(new Set(['expect', 'summary', 'preview', 'teams']));
     }, [selectedTeam1, selectedTeam2, venue]);
 
     useEffect(() => {

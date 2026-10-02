@@ -107,6 +107,8 @@ export const TakeawayStrip = ({ children, columns = 4, sx = {} }) => (
   <Box
     sx={{
       display: 'grid',
+      // Equal-height cards (footnote pinned to the bottom) read as one strip when swiped.
+      alignItems: 'stretch',
       gridAutoFlow: { xs: 'column', md: 'row' },
       gridAutoColumns: { xs: '78%', sm: '44%' },
       gridTemplateColumns: { md: `repeat(${columns}, minmax(0, 1fr))` },
