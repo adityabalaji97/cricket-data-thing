@@ -693,7 +693,12 @@ After each chunk, verify by:
 
 ---
 
-## Backlog: metric threshold filters (query builder + idea packs) — noted 2026-10-02
+## Backlog: metric threshold filters (query builder + idea packs) — noted 2026-10-02 — DONE 2026-10-02 (phase 1)
+
+> Shipped: `having=metric:op:value` in QB v2 (average, strike_rate, balls_per_dismissal; SQL stage-1 + merge paths),
+> nl2query emits it and returns `warnings` for unsupported metrics, idea packs carry it into titles and refuse
+> ideas they can't apply exactly, QB UI chips/add row, MCP `having`. Phase 2: dot/boundary/control %, Impact and
+> economy thresholds need those aggregates in stage 1 (or a second filtered pass) — today they warn.
 
 **Problem.** "ODI batters with 50+ average, 100+ SR sorted by control %, minimum 1000 balls" produced a pack
 topped by Chirag Suri (control 97.7%, rank 1 of 366). The 1000-ball minimum and the sort were honoured; the
