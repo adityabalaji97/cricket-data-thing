@@ -730,8 +730,9 @@ reflected in the URL and the share snapshot.
 > Shipped: services/pack_charts.py (valid forms from the data shape: line for season groupings, scatter only when
 > the question names two metrics, bars, stat card; Jev `choice` ranks them, rule order without Jev); every valid
 > form saved as its own snapshot in facts.chart_options; api/img.mjs lineBody / scatterBody / statBody; admin
-> thumbnails switch the pack image + title (PATCH snapshot_id, limited to the pack's own options). Next: dumbbell,
-> diverging, stacked, field forms.
+> thumbnails switch the pack image + title (PATCH snapshot_id, limited to the pack's own options). Same day: dumbbell
+> (2-way splits), diverging (signed metrics with mixed signs), stacked (additive metric over 3-6 parts, re-queried
+> without per-part minimums), field (wagon zones) -- all 8 forms done.
 
 **Today.** Pack images (api/img.mjs, Satori) draw one form for stat packs: a ranked bar list (`barsBody`), plus
 the `win_prob` and `recap` kinds. Every idea becomes a bar chart, even when the idea is a trend, a two-metric

@@ -16,12 +16,20 @@ from services import jev_client
 TIME_KEYS = ("year",)
 MIN_LINE_POINTS = 3
 MIN_SCATTER_ROWS = 8
+# Metrics that are naturally above/below zero (the T20 Primer's runs/wins-above-average family).
+SIGNED = {"impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "waa", "waa_per_100", "wpa"}
+# Metrics that add up across a split, so a 100% stacked bar of them means something.
+ADDITIVE = {"runs", "balls", "wickets", "fours", "sixes", "boundaries", "dots", "innings_count"}
 
 FORMS = {
     "bars": "A ranked bar list: who leads on one stat, with the subject highlighted at its rank.",
     "line": "A trend line over seasons: how one stat changed over time.",
     "scatter": "A scatter of two stats across many players or teams, the subject highlighted: how two qualities combine.",
     "stat": "One big headline number with its rank: the single striking fact, little else.",
+    "diverging": "Bars either side of zero: which rows add value and which cost it (above or below average).",
+    "dumbbell": "Two dots per player on one scale, one per split (e.g. v pace and v spin): the gap between two conditions.",
+    "stacked": "A 100% bar per player split into parts (e.g. runs by phase): how a total is made up.",
+    "field": "A field map of wagon-wheel zones: where on the ground the runs go.",
 }
 
 
@@ -33,7 +41,18 @@ def valid_forms(shape: Dict[str, Any]) -> List[str]:
     group_by = shape.get("group_by") or []
     n = int(shape.get("rows") or 0)
     time_key = next((g for g in group_by if g in TIME_KEYS), None)
+    metric = shape.get("metric")
     out: List[str] = []
+    if group_by == ["wagon_zone"] and n >= 4:
+        out.append("field")
+    if len(group_by) == 2 and not time_key and (shape.get("entities") or 0) >= 3:
+        split_n = int(shape.get("split_values") or 0)
+        if split_n == 2:
+            out.append("dumbbell")
+        elif 3 <= split_n <= 6 and metric in ADDITIVE:
+            out.append("stacked")
+    if metric in SIGNED and shape.get("mixed_signs"):
+        out.append("diverging")
     # A trend is the point when the idea is grouped by season with a single series.
     if time_key and len(group_by) == 1 and n >= MIN_LINE_POINTS:
         out.append("line")

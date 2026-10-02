@@ -32,3 +32,17 @@ def test_rank_forms_falls_back_to_rules(monkeypatch):
     monkeypatch.setattr(pack_charts.jev_client, "ask", lambda *a, **k: None)  # Jev failed
     out = rank_forms("idea", {}, ["line", "bars"])
     assert out == {"order": ["line", "bars"], "by": "rules", "probabilities": {}}
+
+
+def test_new_forms_follow_data_shape():
+    assert valid_forms({"group_by": ["wagon_zone"], "rows": 8, "metric": "runs"})[0] == "field"
+    two = {"group_by": ["batter", "bowl_kind"], "rows": 20, "entities": 10, "split_values": 2, "metric": "strike_rate"}
+    assert valid_forms(two)[0] == "dumbbell"
+    three = {"group_by": ["batter", "phase"], "rows": 30, "entities": 10, "split_values": 3, "metric": "runs"}
+    assert valid_forms(three)[0] == "stacked"
+    three["metric"] = "strike_rate"  # strike rates do not add up across phases: no stacked bar
+    assert "stacked" not in valid_forms(three)
+    signed = {"group_by": ["phase"], "rows": 3, "metric": "impact_per_100", "mixed_signs": True}
+    assert valid_forms(signed)[0] == "diverging"
+    signed["mixed_signs"] = False
+    assert "diverging" not in valid_forms(signed)

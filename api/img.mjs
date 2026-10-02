@@ -198,6 +198,118 @@ function statBody(size, data) {
     ...chipsFor(data).length ? [h('div', { fontSize: size.small, color: C.low, marginTop: 10 }, chipsFor(data).join(' · '))] : []);
 }
 
+// Bars either side of zero for signed metrics (Impact, RAA, WPA): below-average reads as below.
+function divergingBody(size, data) {
+  const metric = data.metric;
+  const rows = (data.rows || []).filter((r) => typeof r[metric] === 'number').slice(0, size.rows);
+  const max = Math.max(...rows.map((r) => Math.abs(r[metric])), 1e-9);
+  return h('div', { flexDirection: 'column', marginTop: 34, gap: size.gap },
+    h('div', { color: C.mid, fontSize: size.small }, [data.metric_label || metricLabel(metric), ...chipsFor(data)].join(' · ')),
+    rows.map((r, i) => {
+      const v = r[metric];
+      const w = Math.max(1, (Math.abs(v) / max) * 50);
+      const isHi = r.highlight === true;
+      return h('div', { flexDirection: 'column', gap: 6 },
+        h('div', { justifyContent: 'space-between', alignItems: 'baseline', fontSize: size.label, color: isHi ? C.lime : C.text, fontWeight: isHi ? 600 : 400 },
+          h('div', { maxWidth: '74%' }, `${r.rank ?? i + 1}. ${r.label}`),
+          h('div', { fontSize: size.value, fontWeight: 600 }, r.display ?? formatValue(metric, v))),
+        h('div', { height: 14, width: '100%', background: C.track, borderRadius: 7, position: 'relative' },
+          h('div', { position: 'absolute', left: '50%', top: -4, width: 3, height: 22, background: 'rgba(255,255,255,0.35)' }),
+          h('div', { position: 'absolute', top: 0, height: 14, borderRadius: 7, left: v >= 0 ? '50%' : `${50 - w}%`, width: `${w}%`,
+            background: isHi ? C.lime : (v >= 0 ? '#3987e5' : '#e66767') })));
+    }));
+}
+
+// Two splits per entity (v pace / v spin, 1st / 2nd innings): two dots on one shared scale.
+function dumbbellBody(size, data) {
+  const rows = (data.rows || []).filter((r) => typeof r.a === 'number' && typeof r.b === 'number').slice(0, size.rows);
+  const vals = rows.flatMap((r) => [r.a, r.b]);
+  const lo = Math.min(...vals);
+  const hi = Math.max(...vals);
+  const span = hi - lo || 1;
+  const pos = (v) => `${(4 + ((v - lo) / span) * 92).toFixed(1)}%`;
+  const [la, lb] = data.series || ['A', 'B'];
+  const ca = '#3987e5';
+  const cb = '#d95926';
+  const dot = (left, color, big) => h('div', { position: 'absolute', top: big ? -7 : -5, left, width: big ? 28 : 24, height: big ? 28 : 24, marginLeft: big ? -14 : -12, borderRadius: 14, background: color, border: `4px solid ${C.bg}` });
+  return h('div', { flexDirection: 'column', marginTop: 34, gap: size.gap },
+    h('div', { gap: 28, fontSize: size.small, color: C.mid, alignItems: 'center' },
+      h('div', {}, data.metric_label || metricLabel(data.metric)),
+      h('div', { alignItems: 'center', gap: 8 }, h('div', { width: 20, height: 20, borderRadius: 10, background: ca }), la),
+      h('div', { alignItems: 'center', gap: 8 }, h('div', { width: 20, height: 20, borderRadius: 10, background: cb }), lb)),
+    rows.map((r) => {
+      const isHi = r.highlight === true;
+      const left = Math.min(r.a, r.b);
+      const right = Math.max(r.a, r.b);
+      return h('div', { flexDirection: 'column', gap: 10 },
+        h('div', { justifyContent: 'space-between', fontSize: size.label, color: isHi ? C.lime : C.text, fontWeight: isHi ? 600 : 400 },
+          h('div', { maxWidth: '58%' }, r.label),
+          h('div', { fontSize: size.small + 4, color: C.mid, gap: 14 },
+            h('div', { color: ca }, formatValue(data.metric, r.a)), h('div', { color: cb }, formatValue(data.metric, r.b)))),
+        h('div', { height: 14, width: '100%', position: 'relative' },
+          h('div', { position: 'absolute', top: 5, left: 0, right: 0, height: 4, background: C.track }),
+          h('div', { position: 'absolute', top: 3, height: 8, left: pos(left), width: `${(((right - left) / span) * 92).toFixed(1)}%`, background: 'rgba(255,255,255,0.35)' }),
+          dot(pos(r.a), ca, isHi), dot(pos(r.b), cb, isHi)));
+    }));
+}
+
+// A split of a whole per entity (runs by phase, dismissals by type) as 100% bars.
+const STACK_COLORS = ['#3987e5', '#199e70', '#d95926', '#c98500', '#9085e9', '#d55181'];
+function stackedBody(size, data) {
+  const parts = data.parts || [];
+  const rows = (data.rows || []).slice(0, size.rows);
+  return h('div', { flexDirection: 'column', marginTop: 34, gap: size.gap },
+    h('div', { gap: 22, flexWrap: 'wrap', fontSize: size.small, color: C.mid, alignItems: 'center' },
+      parts.map((p, i) => h('div', { alignItems: 'center', gap: 8 }, h('div', { width: 20, height: 20, borderRadius: 4, background: STACK_COLORS[i % STACK_COLORS.length] }), p))),
+    rows.map((r) => {
+      const total = parts.reduce((t, p) => t + (r.values?.[p] || 0), 0) || 1;
+      const isHi = r.highlight === true;
+      return h('div', { flexDirection: 'column', gap: 8 },
+        h('div', { justifyContent: 'space-between', fontSize: size.label, color: isHi ? C.lime : C.text, fontWeight: isHi ? 600 : 400 },
+          h('div', { maxWidth: '70%' }, r.label), h('div', { fontSize: size.small + 4, color: C.mid }, r.display || '')),
+        h('div', { height: 34, width: '100%', borderRadius: 8, overflow: 'hidden', gap: 3 },
+          parts.map((p, i) => {
+            const share = (r.values?.[p] || 0) / total;
+            return share > 0 ? h('div', { width: `${(share * 100).toFixed(1)}%`, height: 34, background: STACK_COLORS[i % STACK_COLORS.length],
+              alignItems: 'center', paddingLeft: 8, fontSize: size.small, color: C.bg, fontWeight: 600 }, share >= 0.14 ? `${Math.round(share * 100)}%` : '') : null;
+          })));
+    }));
+}
+
+// Runs by wagon-wheel zone: eight wedges, length = share of runs (area-honest), subject's biggest zone in lime.
+function fieldBody(size, data) {
+  const zones = data.zones || [];
+  const total = zones.reduce((t, z) => t + (z.value || 0), 0) || 1;
+  const maxShare = Math.max(...zones.map((z) => (z.value || 0) / total), 1e-9);
+  const S = Math.min(size.width - 120, chartHeight(size) + 160);
+  const cx = S / 2;
+  const cy = S / 2;
+  const R = S * 0.36;
+  const pt = (deg, r) => { const a = ((deg - 90) * Math.PI) / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+  const order = [8, 1, 2, 3, 4, 5, 6, 7];
+  const top = [...zones].sort((a, b) => (b.value || 0) - (a.value || 0))[0];
+  const children = [{ type: 'circle', props: { cx, cy, r: R, fill: C.surface, stroke: 'rgba(255,255,255,0.18)', strokeWidth: 3 } }];
+  const labels = [];
+  order.forEach((zn, i) => {
+    const z = zones.find((q) => q.zone === zn);
+    if (!z || !z.value) return;
+    const share = z.value / total;
+    const r = R * 0.95 * Math.sqrt(share / maxShare);
+    const [x0, y0] = pt(i * 45 - 21, r);
+    const [x1, y1] = pt(i * 45 + 21, r);
+    children.push({ type: 'path', props: { d: `M${cx},${cy} L${x0.toFixed(1)},${y0.toFixed(1)} A${r.toFixed(1)},${r.toFixed(1)} 0 0 1 ${x1.toFixed(1)},${y1.toFixed(1)} Z`, fill: z === top ? C.lime : '#3987e5', fillOpacity: z === top ? 1 : 0.8 } });
+    const [lx, ly] = pt(i * 45, R + size.small * 1.6);
+    labels.push(h('div', { position: 'absolute', left: lx - 90, top: ly - size.small, width: 180, flexDirection: 'column', alignItems: 'center', fontSize: size.small, color: z === top ? C.lime : C.mid },
+      h('div', {}, z.label), h('div', { fontWeight: 600, color: z === top ? C.lime : C.text }, `${Math.round(share * 100)}%`)));
+  });
+  children.push({ type: 'rect', props: { x: cx - 6, y: cy - 16, width: 12, height: 32, rx: 3, fill: C.text } });
+  return h('div', { flexDirection: 'column', marginTop: 24, gap: 10, alignItems: 'center' },
+    h('div', { color: C.mid, fontSize: size.small, alignSelf: 'flex-start' }, [`Share of ${(data.metric_label || 'runs').toLowerCase()} by zone`, ...chipsFor(data)].join(' · ')),
+    h('div', { position: 'relative', width: S, height: S },
+      { type: 'svg', props: { width: S, height: S, viewBox: `0 0 ${S} ${S}`, children } },
+      labels));
+}
+
 function winProbBody(size, data) {
   const wp = data.primer?.win_probability || {};
   const points = wp.points || [];
@@ -306,7 +418,7 @@ export function renderSnapshot(snap, sizeName = 'portrait') {
   if (data.layout === 'list') {
     return frame(size, data.kicker || '', data.title || snap.title, listBody(size, data), `Data as of ${asOf(snap)} · ${data.source || 'ball-by-ball'}`);
   }
-  const body = { line: lineBody, scatter: scatterBody, stat: statBody }[data.layout];
+  const body = { line: lineBody, scatter: scatterBody, stat: statBody, diverging: divergingBody, dumbbell: dumbbellBody, stacked: stackedBody, field: fieldBody }[data.layout];
   if (body) {
     const fmtChip = (data.filter_chips || []).find((c) => /^(T20I?|ODI|Test|T20s?)$/i.test(c));
     const kick = data.kicker || [fmtChip, ...(data.group_by || []).map((g) => g.replace(/_/g, ' ') + (g.endsWith('s') ? '' : 's'))].filter(Boolean).join(' · ');

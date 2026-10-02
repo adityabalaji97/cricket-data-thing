@@ -444,6 +444,123 @@ def _stat_form(rows, label_key, metric, idx, total, data, name, parts, title):
                       subject=name, rank_text=rank_text, context=context), title
 
 
+PHASE_ORDER = ["powerplay", "middle", "death"]
+
+
+def _split_label(key: str, value: Any) -> str:
+    v = str(value)
+    if key == "bowl_kind":
+        return {"pace bowler": "v pace", "spin bowler": "v spin"}.get(v, v)
+    if key == "innings":
+        return {"1": "1st innings", "2": "2nd innings"}.get(v, f"innings {v}")
+    return v.replace("_", " ").capitalize()
+
+
+def _pivot(rows, label_key, split_key, metric):
+    """{entity: {split: value}} in first-seen (i.e. ranked) entity order."""
+    out: Dict[str, Dict[str, float]] = {}
+    for r in rows:
+        if r.get(metric) is None:
+            continue
+        out.setdefault(_row_name(r, label_key), {})[str(r.get(split_key))] = float(r[metric])
+    return out
+
+
+def _dumbbell_form(rows, label_key, split_key, metric, subject_label, data):
+    """Two splits per entity (v pace / v spin...): entities with both values, the subject included."""
+    splits = sorted({str(r.get(split_key)) for r in rows if r.get(split_key) is not None})[:2]
+    pivot = {e: v for e, v in _pivot(rows, label_key, split_key, metric).items() if all(s in v for s in splits)}
+    names = list(pivot)[:8]
+    subject = _row_name({label_key: subject_label}, label_key) if subject_label is not None else None
+    if subject and subject in pivot and subject not in names:
+        names = names[:7] + [subject]
+    out_rows = [{"label": e, "a": pivot[e][splits[0]], "b": pivot[e][splits[1]], "highlight": e == subject} for e in names]
+    la, lb = _split_label(split_key, splits[0]), _split_label(split_key, splits[1])
+    if subject and subject in pivot:
+        va, vb = pivot[subject][splits[0]], pivot[subject][splits[1]]
+        title = f"{subject}: {metric_label(metric).lower()} {_value_text(metric, va)} {la}, {_value_text(metric, vb)} {lb}"
+    else:
+        title = f"{metric_label(metric)} {la} and {lb}"
+    return _form_base(data, layout="dumbbell", title=title, metric=metric, series=[la, lb], rows=out_rows), title
+
+
+ENTITY_FILTERS = {"batter": "batters", "bowler": "bowlers", "batting_team": "batting_teams", "bowling_team": "bowling_teams"}
+
+
+def _complete_split_rows(db: Session, rows, label_key, query_params):
+    """Rows for a stacked split with every part present.
+
+    The idea's minimums (min_balls...) apply to each (player, part) row, so a player's small parts
+    (Kohli's death overs) dropped out and his bar showed a share of a smaller total. Re-query the
+    players on show without the per-row minimums. Falls back to the rows given when the entity
+    cannot be filtered on.
+    """
+    from services.snapshots import _clean_query_params, _query_data
+
+    key = ENTITY_FILTERS.get(label_key)
+    if not key:
+        return rows
+    names = list(dict.fromkeys(r.get(label_key) for r in rows if r.get(label_key)))[:12]
+    params = {k: v for k, v in query_params.items()
+              if k not in ("min_balls", "max_balls", "min_runs", "max_runs", "min_wickets", "max_wickets", "having",
+                           "sort_by", "sort_descending")}
+    params[key] = names
+    try:
+        full = _query_data(db, _clean_query_params(params))
+    except Exception:
+        return rows
+    return full.get("rows") or rows
+
+
+def _stacked_form(rows, label_key, split_key, metric, subject_label, data):
+    """How each entity's total splits into parts (runs by phase...), biggest totals first."""
+    pivot = _pivot(rows, label_key, split_key, metric)
+    parts = sorted({p for v in pivot.values() for p in v},
+                   key=lambda p: (PHASE_ORDER.index(p) if p in PHASE_ORDER else 99, -sum(v.get(p, 0) for v in pivot.values())))
+    by_total = sorted(pivot, key=lambda e: -sum(pivot[e].values()))
+    names = by_total[:8]
+    subject = _row_name({label_key: subject_label}, label_key) if subject_label is not None else None
+    if subject and subject in pivot and subject not in names:
+        names = names[:7] + [subject]
+    pretty = {p: _split_label(split_key, p) for p in parts}
+    out_rows = [{"label": e, "values": {pretty[p]: pivot[e].get(p, 0) for p in parts},
+                 "display": f"{_value_text(metric, sum(pivot[e].values()))} {metric_label(metric).lower()}",
+                 "highlight": e == subject} for e in names]
+    focus = subject if subject in pivot else names[0]
+    tot = sum(pivot[focus].values()) or 1
+    big = max(parts, key=lambda p: pivot[focus].get(p, 0))
+    title = f"{focus}: {round(pivot[focus].get(big, 0) * 100 / tot)}% of {metric_label(metric).lower()} come {pretty[big].lower()}"
+    if split_key == "phase":
+        title = f"{focus} scores {round(pivot[focus].get(big, 0) * 100 / tot)}% of his {metric_label(metric).lower()} in the {pretty[big].lower()}"
+    return _form_base(data, layout="stacked", title=title, metric=metric, parts=[pretty[p] for p in parts], rows=out_rows), title
+
+
+def _field_form(rows, metric, data, parts):
+    """Share of the metric by wagon-wheel zone (zone 0 = no recorded direction, left out)."""
+    from services.match_scorecard import ZONE_LABELS
+
+    zones = [{"zone": int(r["wagon_zone"]), "label": ZONE_LABELS.get(int(r["wagon_zone"]), str(r["wagon_zone"])),
+              "value": float(r[metric] or 0)} for r in rows if r.get("wagon_zone") not in (None, 0, "0") and r.get(metric) is not None]
+    total = sum(z["value"] for z in zones) or 1
+    top = max(zones, key=lambda z: z["value"]) if zones else {"label": "", "value": 0}
+    who = parts["who"]
+    title = f"{who + ' takes ' if who else ''}{round(top['value'] * 100 / total)}% of {'his ' if who else ''}{metric_label(metric).lower()} through {top['label'].lower()}"
+    title = title[:1].upper() + title[1:]
+    return _form_base(data, layout="field", title=title, metric=metric, zones=zones), title
+
+
+def _diverging_form(rows, label_key, metric, data, parts, title, split_rows):
+    """Bars either side of zero. For one player's splits (phases, bowler types) the title names him
+    and the best and worst split instead of 'powerplay rank 1st of 3 phases'."""
+    if split_rows and parts["who"]:
+        ranked = sorted(rows, key=lambda r: -float(r[metric]))
+        best, worst = ranked[0], ranked[-1]
+        title = (f"{parts['who']}: {metric_label(metric).lower()} {_value_text(metric, float(best[metric]))} "
+                 f"{_split_label(label_key, best.get(label_key)).lower()}, {_value_text(metric, float(worst[metric]))} "
+                 f"{_split_label(label_key, worst.get(label_key)).lower()}")
+    return _form_base(data, layout="diverging", title=title, metric=metric, rows=data["rows"]), title
+
+
 def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, Any]:
     """Run a planned idea. Returns {status: 'resolved', fact, snapshot} or {status: 'parked', note}."""
     from services.snapshots import create_static_snapshot
@@ -501,9 +618,10 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
                         "note": f"No match v {opponent} in the last {MATCH_WINDOW_DAYS} days is loaded yet.{when}"}
 
     idx = 0
-    # Grouped by season, the rows are years: the player named in the idea is a filter, not a row to find.
-    from services.pack_charts import TIME_KEYS
-    time_rows = label_key in TIME_KEYS
+    # Grouped by season, zone, phase, bowler type...: the rows are not people, so the player named in
+    # the idea is a filter, not a row to find (finding "Kohli" among years used to park the idea).
+    time_rows = label_key in ("year", "wagon_zone", "phase", "bowl_kind", "bowl_style", "line", "length", "shot",
+                              "over", "innings", "dismissal", "bat_hand", "match_outcome", "toss_decision")
     mentions = [] if (highlight or time_rows) else _mentions(idea_text)
     if time_rows:
         highlight = None
@@ -540,8 +658,12 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
     from services import pack_charts
 
     axes = pack_charts.scatter_axes(planned.get("chart"), metric, rows)
+    split_key = params["group_by"][1] if len(params["group_by"]) == 2 else None
     shape = {"group_by": params["group_by"], "rows": len(rows), "metric": metric, "subject": name,
-             "has_subject": bool(highlight or mentions), "scatter": axes}
+             "has_subject": bool(highlight or mentions), "scatter": axes,
+             "entities": len({r.get(label_key) for r in rows}),
+             "split_values": len({r.get(split_key) for r in rows}) if split_key else 0,
+             "mixed_signs": any(float(r[metric]) < 0 for r in rows[:8]) and any(float(r[metric]) > 0 for r in rows[:8])}
     forms = pack_charts.valid_forms(shape) or ["bars"]
     ranking = pack_charts.rank_forms(idea_text, shape, forms)
     form_data = {"bars": (data, title)}
@@ -551,6 +673,17 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any]) -> Dict[str, A
         form_data["scatter"] = _scatter_form(rows, label_key, axes, idx, data, name, total, parts)
     if "stat" in forms:
         form_data["stat"] = _stat_form(rows, label_key, metric, idx, total, data, name, parts, title)
+    if "diverging" in forms:
+        form_data["diverging"] = _diverging_form(rows, label_key, metric, data, parts, title, time_rows)
+    if "dumbbell" in forms or "stacked" in forms:
+        subject_label = rows[idx].get(label_key) if (highlight or mentions) else None
+        if "dumbbell" in forms:
+            form_data["dumbbell"] = _dumbbell_form(rows, label_key, split_key, metric, subject_label, data)
+        if "stacked" in forms:
+            form_data["stacked"] = _stacked_form(_complete_split_rows(db, rows, label_key, query_params),
+                                                 label_key, split_key, metric, subject_label, data)
+    if "field" in forms:
+        form_data["field"] = _field_form(rows, metric, data, parts)
     snaps = {}
     for form in ranking["order"]:
         form_payload, form_title = form_data.get(form, (None, None))

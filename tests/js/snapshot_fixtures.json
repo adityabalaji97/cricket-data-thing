@@ -919,5 +919,243 @@
     }
    ]
   }
+ },
+ "diverging": {
+  "kind": "ranking",
+  "created_at": "2026-10-02T10:00:00Z",
+  "id": "fxDiv01",
+  "title": "Virat Kohli adds runs against pace in the powerplay, and loses them against spin in the middle overs",
+  "data": {
+   "layout": "diverging",
+   "title": "Virat Kohli adds runs against pace in the powerplay, and loses them against spin in the middle overs",
+   "metric": "impact_per_100",
+   "metric_label": "Impact per 100 balls",
+   "filter_chips": [
+    "T20",
+    "2024-01-01 \u2192 now"
+   ],
+   "group_by": [
+    "phase"
+   ],
+   "rows": [
+    {
+     "rank": 1,
+     "label": "Powerplay v pace",
+     "impact_per_100": 28.5,
+     "display": "+28.5",
+     "highlight": true
+    },
+    {
+     "rank": 2,
+     "label": "Death v pace",
+     "impact_per_100": 18.2,
+     "display": "+18.2"
+    },
+    {
+     "rank": 3,
+     "label": "Powerplay v spin",
+     "impact_per_100": 12.9,
+     "display": "+12.9"
+    },
+    {
+     "rank": 4,
+     "label": "Middle v spin",
+     "impact_per_100": -13.4,
+     "display": "-13.4"
+    },
+    {
+     "rank": 5,
+     "label": "Middle v pace",
+     "impact_per_100": -17.7,
+     "display": "-17.7"
+    }
+   ]
+  }
+ },
+ "dumbbell": {
+  "kind": "ranking",
+  "created_at": "2026-10-02T10:00:00Z",
+  "id": "fxDumb01",
+  "title": "Virat Kohli scores 35 strike-rate points slower against spin than pace in the IPL since 2024",
+  "data": {
+   "layout": "dumbbell",
+   "title": "Virat Kohli scores 35 strike-rate points slower against spin than pace in the IPL since 2024",
+   "metric": "strike_rate",
+   "metric_label": "Strike rate",
+   "series": [
+    "v pace",
+    "v spin"
+   ],
+   "filter_chips": [
+    "IPL",
+    "2024-01-01 \u2192 now"
+   ],
+   "group_by": [
+    "batter",
+    "bowl_kind"
+   ],
+   "rows": [
+    {
+     "label": "Abhishek Sharma",
+     "a": 186.4,
+     "b": 237.6
+    },
+    {
+     "label": "Travis Head",
+     "a": 184.1,
+     "b": 159.5
+    },
+    {
+     "label": "Suryakumar Yadav",
+     "a": 170.4,
+     "b": 154.1
+    },
+    {
+     "label": "Virat Kohli",
+     "a": 167.9,
+     "b": 133.0,
+     "highlight": true
+    },
+    {
+     "label": "Shubman Gill",
+     "a": 152.7,
+     "b": 162.3
+    }
+   ]
+  }
+ },
+ "stacked": {
+  "kind": "ranking",
+  "created_at": "2026-10-02T10:00:00Z",
+  "id": "fxStack01",
+  "title": "Abhishek Sharma scores 65% of his IPL runs in the powerplay",
+  "data": {
+   "layout": "stacked",
+   "title": "Abhishek Sharma scores 65% of his IPL runs in the powerplay",
+   "metric": "runs",
+   "metric_label": "Runs",
+   "parts": [
+    "Powerplay",
+    "Middle",
+    "Death"
+   ],
+   "filter_chips": [
+    "IPL",
+    "2024-01-01 \u2192 now"
+   ],
+   "group_by": [
+    "batter",
+    "phase"
+   ],
+   "rows": [
+    {
+     "label": "Abhishek Sharma",
+     "values": {
+      "Powerplay": 972,
+      "Middle": 478,
+      "Death": 36
+     },
+     "display": "1,486 runs",
+     "highlight": true
+    },
+    {
+     "label": "Travis Head",
+     "values": {
+      "Powerplay": 1000,
+      "Middle": 351,
+      "Death": 0
+     },
+     "display": "1,351 runs"
+    },
+    {
+     "label": "Virat Kohli",
+     "values": {
+      "Powerplay": 1051,
+      "Middle": 821,
+      "Death": 201
+     },
+     "display": "2,073 runs"
+    },
+    {
+     "label": "Shubman Gill",
+     "values": {
+      "Powerplay": 806,
+      "Middle": 846,
+      "Death": 156
+     },
+     "display": "1,808 runs"
+    },
+    {
+     "label": "Suryakumar Yadav",
+     "values": {
+      "Powerplay": 244,
+      "Middle": 910,
+      "Death": 177
+     },
+     "display": "1,331 runs"
+    }
+   ]
+  }
+ },
+ "field": {
+  "kind": "ranking",
+  "created_at": "2026-10-02T10:00:00Z",
+  "id": "fxField01",
+  "title": "Virat Kohli takes 30% of his T20 runs through midwicket",
+  "data": {
+   "layout": "field",
+   "title": "Virat Kohli takes 30% of his T20 runs through midwicket",
+   "metric": "runs",
+   "metric_label": "Runs",
+   "filter_chips": [
+    "T20",
+    "2024-01-01 \u2192 now"
+   ],
+   "group_by": [
+    "wagon_zone"
+   ],
+   "zones": [
+    {
+     "zone": 1,
+     "label": "Fine Leg",
+     "value": 129
+    },
+    {
+     "zone": 2,
+     "label": "Square Leg",
+     "value": 231
+    },
+    {
+     "zone": 3,
+     "label": "Midwicket",
+     "value": 677
+    },
+    {
+     "zone": 4,
+     "label": "Long On",
+     "value": 344
+    },
+    {
+     "zone": 5,
+     "label": "Long Off",
+     "value": 282
+    },
+    {
+     "zone": 6,
+     "label": "Cover",
+     "value": 324
+    },
+    {
+     "zone": 7,
+     "label": "Point",
+     "value": 137
+    },
+    {
+     "zone": 8,
+     "label": "Behind",
+     "value": 128
+    }
+   ]
+  }
  }
 }
