@@ -4,7 +4,7 @@ import axios from 'axios';
 import { Alert, Box, Button, Chip, CircularProgress, TextField, Typography } from '@mui/material';
 import config from '../config';
 import GraphicOptions from './GraphicOptions';
-import { GRAPHIC_EXAMPLES } from '../utils/graphicExamples';
+import GraphicPromptList from './GraphicPromptList';
 import { track } from '../utils/analytics';
 import { colors as hs, fonts } from '../theme/hindsightDark';
 
@@ -109,18 +109,8 @@ const GraphicsLanding = () => {
         </Box>
       )}
 
-      {!state.result && !state.loading && (
-        <Box>
-          <Typography sx={{ fontSize: 13, color: hs.textLo, mb: 1 }}>Or start from an example (one per chart type)</Typography>
-          {GRAPHIC_EXAMPLES.map(([form, idea, fmt]) => (
-            <Box key={form} component="button" type="button" onClick={() => make(idea, fmt)}
-              sx={{ display: 'block', width: '100%', textAlign: 'left', bgcolor: hs.surface1, border: `1px solid ${hs.border}`,
-                borderRadius: 2, p: 1.5, mb: 1, cursor: 'pointer', color: hs.textHi, '&:hover': { borderColor: hs.accent } }}>
-              <Typography component="span" sx={{ display: 'block', fontSize: 12, color: hs.accent, fontWeight: 600 }}>{form}</Typography>
-              <Typography component="span" sx={{ display: 'block', fontSize: 14, color: hs.textMed }}>{idea}</Typography>
-            </Box>
-          ))}
-        </Box>
+      {!state.loading && (
+        <GraphicPromptList onPick={(prompt, fmt) => { window.scrollTo({ top: 0, behavior: 'smooth' }); make(prompt, fmt); }} />
       )}
     </Box>
   );

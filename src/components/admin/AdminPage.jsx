@@ -4,7 +4,7 @@ import { Box, Button, Chip, CircularProgress, Snackbar, TextField, Typography } 
 import axios from 'axios';
 import config from '../../config';
 import { shareImage, siteOrigin } from '../ui/ChartExportButton';
-import { GRAPHIC_EXAMPLES } from '../../utils/graphicExamples';
+import GraphicPromptList from '../GraphicPromptList';
 
 /**
  * /admin: the phone-first admin queue. "Social" lists content packs (services/content_packs.py):
@@ -164,7 +164,6 @@ const IDEA_STATUS_COLOR = { pending: C.lo, parked: C.amber, resolved: C.lime, fa
 
 // One worked example per chart form (services/pack_charts.py). A form is offered only when the
 // parsed query has the right shape, and Jev may still lead with another valid form.
-const IDEA_EXAMPLES = GRAPHIC_EXAMPLES;
 
 // "Idea -> pack": a hunch in plain English becomes a query, a highlighted chart and a pack. Ideas
 // about matches not loaded yet are parked and retried after each nightly load.
@@ -225,23 +224,13 @@ const IdeaBox = ({ client, toast, onPackCreated }) => {
       </Box>
       <Button size="small" onClick={() => setShowExamples((v) => !v)} aria-expanded={showExamples}
         sx={{ mt: 1, px: 0, minHeight: 32, color: C.lime, textTransform: 'none', fontWeight: 600 }}>
-        {showExamples ? 'Hide example ideas' : 'Example ideas by chart type'}
+        {showExamples ? 'Hide prompts' : 'Prompts to try, by chart type'}
       </Button>
       {showExamples && (
+        // Same prompt list as the public /graphics page; here a tap only fills the box.
         <Box sx={{ mt: 0.5 }}>
-          <Typography sx={{ fontSize: 12, color: C.lo, mb: 1 }}>
-            Tap one to fill the box. Each chart is offered when the data fits; Jev may lead with another, and the rest
-            appear as thumbnails on the pack.
-          </Typography>
-          {IDEA_EXAMPLES.map(([form, idea, fmt]) => (
-            <Box key={form} component="button" type="button"
-              onClick={() => { setTextValue(idea); setFormat(fmt); }}
-              sx={{ display: 'block', width: '100%', textAlign: 'left', bgcolor: '#14171e', border: `1px solid ${C.line}`,
-                borderRadius: 2, p: 1.25, mb: 0.75, cursor: 'pointer', color: C.hi, '&:hover': { borderColor: C.lime } }}>
-              <Typography component="span" sx={{ display: 'block', fontSize: 12, color: C.lime, fontWeight: 600 }}>{form}</Typography>
-              <Typography component="span" sx={{ display: 'block', fontSize: 13, color: C.mid }}>{idea}</Typography>
-            </Box>
-          ))}
+          <GraphicPromptList title="Tap one to fill the box. A chart is offered when the data fits; the rest appear as thumbnails."
+            onPick={(prompt, fmt) => { setTextValue(prompt); setFormat(fmt); }} />
         </Box>
       )}
       {ideas.map((i) => (
