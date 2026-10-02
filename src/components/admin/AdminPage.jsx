@@ -158,6 +158,19 @@ const PackCard = ({ pack, client, onChanged, toast }) => {
 
 const IDEA_STATUS_COLOR = { pending: C.lo, parked: C.amber, resolved: C.lime, failed: C.red };
 
+// One worked example per chart form (services/pack_charts.py). A form is offered only when the
+// parsed query has the right shape, and Jev may still lead with another valid form.
+const IDEA_EXAMPLES = [
+  ['Ranked bars', 'Most sixes in the death overs in IPL 2025, 100+ balls', 'T20'],
+  ['Trend line', 'Virat Kohli impact per 100 balls by season since 2020', 'T20'],
+  ['Scatter', 'Average v strike rate for T20 batters since 2024 with 1000+ balls, highlight Virat Kohli', 'T20'],
+  ['Single number', 'Shubman Gill control % among ODI batters since 2019 averaging 50+ at a strike rate of 100+, 1000+ balls', 'ODI'],
+  ['Above / below zero', 'Virat Kohli impact per 100 balls by phase since 2024', 'T20'],
+  ['Dumbbell', 'Virat Kohli strike rate v pace and spin compared to other IPL batters since 2024, 150+ balls', 'T20'],
+  ['Stacked', 'Abhishek Sharma runs by phase compared with other IPL batters since 2024', 'T20'],
+  ['Field', 'Virat Kohli runs by wagon zone since 2024', 'T20'],
+];
+
 // "Idea -> pack": a hunch in plain English becomes a query, a highlighted chart and a pack. Ideas
 // about matches not loaded yet are parked and retried after each nightly load.
 const IdeaBox = ({ client, toast, onPackCreated }) => {
@@ -165,6 +178,7 @@ const IdeaBox = ({ client, toast, onPackCreated }) => {
   const [format, setFormat] = useState('');
   const [ideas, setIdeas] = useState([]);
   const [sending, setSending] = useState(false);
+  const [showExamples, setShowExamples] = useState(false);
 
   const loadIdeas = useCallback(async () => {
     try {
@@ -214,6 +228,27 @@ const IdeaBox = ({ client, toast, onPackCreated }) => {
           Make pack
         </Button>
       </Box>
+      <Button size="small" onClick={() => setShowExamples((v) => !v)} aria-expanded={showExamples}
+        sx={{ mt: 1, px: 0, minHeight: 32, color: C.lime, textTransform: 'none', fontWeight: 600 }}>
+        {showExamples ? 'Hide example ideas' : 'Example ideas by chart type'}
+      </Button>
+      {showExamples && (
+        <Box sx={{ mt: 0.5 }}>
+          <Typography sx={{ fontSize: 12, color: C.lo, mb: 1 }}>
+            Tap one to fill the box. Each chart is offered when the data fits; Jev may lead with another, and the rest
+            appear as thumbnails on the pack.
+          </Typography>
+          {IDEA_EXAMPLES.map(([form, idea, fmt]) => (
+            <Box key={form} component="button" type="button"
+              onClick={() => { setTextValue(idea); setFormat(fmt); }}
+              sx={{ display: 'block', width: '100%', textAlign: 'left', bgcolor: '#14171e', border: `1px solid ${C.line}`,
+                borderRadius: 2, p: 1.25, mb: 0.75, cursor: 'pointer', color: C.hi, '&:hover': { borderColor: C.lime } }}>
+              <Typography component="span" sx={{ display: 'block', fontSize: 12, color: C.lime, fontWeight: 600 }}>{form}</Typography>
+              <Typography component="span" sx={{ display: 'block', fontSize: 13, color: C.mid }}>{idea}</Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
       {ideas.map((i) => (
         <Box key={i.id} sx={{ mt: 1.5, pt: 1.5, borderTop: `1px solid ${C.line}` }}>
           <Typography sx={{ fontSize: 13, color: C.mid }}>{i.text}</Typography>
