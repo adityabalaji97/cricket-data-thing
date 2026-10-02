@@ -22,7 +22,7 @@ import DismissalSection from './playerProfile/sections/DismissalSection';
 import VisualizationsSection from './playerProfile/sections/VisualizationsSection';
 import ExploreSection from './playerProfile/sections/ExploreSection';
 import RecentFormStrip from './playerProfile/RecentFormStrip';
-import PlayerGlance from './playerProfile/PlayerGlance';
+import PlayerGlance, { BowlerGlance } from './playerProfile/PlayerGlance';
 import ShotMapSection from './playerProfile/sections/ShotMapSection';
 import AdvancedBowlingAnalyticsSection from './playerProfile/AdvancedBowlingAnalyticsSection';
 import BoundaryAnalysis from './BoundaryAnalysis';
@@ -191,7 +191,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   const [activeTab, setActiveTab] = useState('batting');
   const [shouldFetch, setShouldFetch] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [activeSectionId, setActiveSectionId] = useState('overview');
+  const [activeSectionId, setActiveSectionId] = useState('glance');
   const [fetchTrigger, setFetchTrigger] = useState(0);
   // The filters as of the last GO. Sections read these, not the live form: they used to refetch on
   // every date keystroke and venue pick while the user was still editing (and while the phone
@@ -359,7 +359,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   const handleTabChange = (_, newTab) => {
     if (newTab !== null) {
       setActiveTab(newTab);
-      setActiveSectionId('overview');
+      setActiveSectionId('glance');
     }
   };
 
@@ -382,17 +382,19 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     const { player: appliedPlayer, dateRange: appliedRange, venue: appliedVenue, competitionFilters: appliedCompetitions } = applied;
 
     const groups = [
-      ...(activeTab === 'batting' ? [{
+      {
         id: 'glance',
         label: 'At a glance',
         defaultOpen: true,
-        takeaway: 'Runs, best phase, pace v spin, toughest bowling type',
-        content: <PlayerGlance stats={currentStats} />,
-      }] : []),
+        takeaway: activeTab === 'batting'
+          ? 'Runs, best phase, pace v spin, toughest bowling type'
+          : 'Wickets, wicket phase, control, left v right',
+        content: activeTab === 'batting' ? <PlayerGlance stats={currentStats} /> : <BowlerGlance stats={currentStats} />,
+      },
       {
         id: 'overview',
         label: 'Overview',
-        defaultOpen: activeTab !== 'batting',
+        defaultOpen: false,
         takeaway: overviewTakeaway,
         content: <OverviewSection stats={currentStats} mode={activeTab} />,
       },
@@ -613,7 +615,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
 
   // Reset active section on tab change or new data
   useEffect(() => {
-    setActiveSectionId('overview');
+    setActiveSectionId('glance');
   }, [activeTab, selectedPlayer]);
 
   // IntersectionObserver for auto-tracking active section

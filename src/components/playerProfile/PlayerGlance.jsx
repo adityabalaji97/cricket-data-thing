@@ -90,4 +90,77 @@ const PlayerGlance = ({ stats }) => {
   return <TakeawayStrip columns={4}>{cards}</TakeawayStrip>;
 };
 
+const PHASE_ORDER = ['powerplay', 'middle', 'death'];
+const fmt1 = (v) => (v == null || Number.isNaN(Number(v)) ? '–' : Number(v).toFixed(1));
+
+/**
+ * "At a glance" for a bowler, from /player/{name}/bowling_stats: wickets & economy, the phase where
+ * wickets come fastest, control (dots v boundaries), and left- v right-handers. 60+ balls each.
+ */
+export const BowlerGlance = ({ stats }) => {
+  const o = stats?.overall;
+  const ps = stats?.phase_stats;
+  if (!o) return null;
+  const cards = [];
+
+  cards.push(
+    <TakeawayCard
+      key="wkts"
+      highlight
+      label="Wickets · economy"
+      value={o.wickets ?? 0}
+      unit={`at economy ${fmt1(o.economy_rate)}`}
+      caption={`Average ${fmt1(o.bowling_average)}, a wicket every ${fmt1(o.bowling_strike_rate)} balls.`}
+      footnote={`${o.matches || 0} matches · ${o.balls || 0} balls`}
+    />,
+  );
+
+  const phases = PHASE_ORDER
+    .map((key) => [key, ps?.[key]])
+    .filter(([, v]) => v && (v.balls || 0) >= MIN_BALLS && (v.wickets || 0) > 0);
+  if (phases.length) {
+    const [key, best] = phases.reduce((a, b) => (b[1].bowling_strike_rate < a[1].bowling_strike_rate ? b : a));
+    const share = o.wickets ? Math.round((best.wickets * 100) / o.wickets) : 0;
+    cards.push(
+      <TakeawayCard
+        key="phase"
+        label="Wicket phase"
+        value={PHASE_NAME[key]}
+        unit={`a wicket every ${fmt1(best.bowling_strike_rate)} balls`}
+        caption={`${best.wickets} wickets (${share}% of his total) at economy ${fmt1(best.economy)}.`}
+        footnote={`${best.balls} balls`}
+      />,
+    );
+  }
+
+  cards.push(
+    <TakeawayCard
+      key="control"
+      label="Control"
+      value={`${fmt1(o.dot_percentage)}%`}
+      unit="dot balls"
+      caption={`Boundaries off ${fmt1(o.boundary_percentage)}% of balls.`}
+      footnote={`${o.balls || 0} balls`}
+    />,
+  );
+
+  const lhb = stats?.batter_handedness?.LHB?.overall;
+  const rhb = stats?.batter_handedness?.RHB?.overall;
+  if (lhb?.balls >= MIN_BALLS && rhb?.balls >= MIN_BALLS) {
+    const better = lhb.economy <= rhb.economy ? ['left', lhb, 'right', rhb] : ['right', rhb, 'left', lhb];
+    cards.push(
+      <TakeawayCard
+        key="hand"
+        label="Left v right"
+        value={`Econ ${fmt1(better[1].economy)}`}
+        unit={`v ${better[0]}-handers`}
+        caption={`Economy ${fmt1(better[3].economy)} v ${better[2]}-handers; a wicket every ${fmt1(better[1].bowling_strike_rate)} v ${fmt1(better[3].bowling_strike_rate)} balls.`}
+        footnote={`${lhb.balls} balls v LHB · ${rhb.balls} v RHB`}
+      />,
+    );
+  }
+
+  return <TakeawayStrip columns={4}>{cards}</TakeawayStrip>;
+};
+
 export default PlayerGlance;
