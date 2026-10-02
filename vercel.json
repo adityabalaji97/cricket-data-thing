@@ -2,6 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
+  "git": {
+    "deploymentEnabled": {
+      "mobile-viz-sweep": false
+    }
+  },
   "routes": [
     {
       "src": "/(?!api/)(.*)",
