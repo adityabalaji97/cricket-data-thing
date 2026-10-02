@@ -788,6 +788,10 @@ Opening the admin idea-pack chart pipeline (pack_charts + api/img.mjs) to users.
   scatter. /graphics landing page (DONE same day): one input + examples -> /query?nl=...&graphic=1 -> the maker
   opens itself once the grouped result is in; 'Make a Graphic' in the nav. Left: per-IP daily limit on NL
   parses (today only the monthly spend cap), lazy snapshots, highlight by tapping a row, gallery (phase 3).
+- **Daily limit (DONE 2026-10-02):** POST /snapshots/idea counts the client's '[graphic] ...' rows in
+  nl_query_log over 24h (20/day; survives restarts, shared across dynos; in-memory fallback if the log can't be
+  read). Example prompts validated against prod: each one yields its intended form (metric words like 'Dot' are
+  no longer read as player names).
 - **Phase 2:** plain-English "describe a graphic": parse (nl2query, cost-capped) -> editable interpretation chips
   -> confirm -> render; per-IP daily limit; cache repeat ideas; highlight chosen from results, not guessed.
 - **Phase 3:** gallery of popular graphics, attribution once accounts exist, embeds.

@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from database import get_session
@@ -108,7 +109,24 @@ IDEA_DAILY_LIMIT = 20
 _idea_days: Dict[str, deque] = defaultdict(deque)
 
 
-def _allow_idea(client: str) -> bool:
+def ideas_today(db: Session, client: str) -> Optional[int]:
+    """Public ideas this client made in the last 24h, from nl_query_log (survives restarts and
+    is shared across dynos). None when the log can't be read; the caller falls back to memory."""
+    from services.nl2query import _hash_ip
+
+    try:
+        return db.execute(text(
+            "SELECT COUNT(*) FROM nl_query_log WHERE query_text LIKE '[graphic]%' AND ip_hash = :h "
+            "AND created_at > now() - interval '1 day'"), {"h": _hash_ip(client)}).scalar() or 0
+    except Exception:
+        db.rollback()
+        return None
+
+
+def _allow_idea(client: str, db: Optional[Session] = None) -> bool:
+    used = ideas_today(db, client) if db is not None else None
+    if used is not None:
+        return used < IDEA_DAILY_LIMIT
     now = time.time()
     q = _idea_days[client]
     while q and now - q[0] > 86400:
@@ -134,17 +152,17 @@ def create_idea_graphic(body: IdeaGraphicRequest, request: Request, db: Session 
     """
     from services.content_ideas import attempt, plan
 
-    text = (body.text or "").strip()
-    if len(text) < 6 or len(text) > 300:
+    idea = (body.text or "").strip()
+    if len(idea) < 6 or len(idea) > 300:
         raise HTTPException(status_code=400, detail="Describe the stat in 6-300 characters.")
     client = _client(request)
-    if not _allow(client) or not _allow_idea(client):
+    if not _allow(client) or not _allow_idea(client, db):
         raise HTTPException(status_code=429, detail=f"That's today's limit of {IDEA_DAILY_LIMIT} ideas; try again tomorrow, "
                                                     "or build it in the query builder.")
     fmt = body.format if body.format in ("T20", "ODI") else None
     try:
-        planned = plan(text, fmt, db)
-        result = attempt(db, text, planned, created_by="graphic")
+        planned = plan(idea, fmt, db, client=client)
+        result = attempt(db, idea, planned, created_by="graphic")
     except SnapshotError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if result.get("status") != "resolved":

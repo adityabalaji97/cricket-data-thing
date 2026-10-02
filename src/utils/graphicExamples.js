@@ -43,7 +43,7 @@ export const GRAPHIC_EXAMPLE_GROUPS = [
     hint: 'Value added or lost',
     prompts: [
       ['Virat Kohli impact per 100 balls by phase since 2024', 'T20'],
-      ['Suryakumar Yadav impact by bowler type since 2024', 'T20'],
+      ['Glenn Maxwell impact per 100 balls by season since 2018', 'T20'],
       ['MS Dhoni impact per 100 balls by season since 2019', 'T20'],
     ],
   },
@@ -52,8 +52,8 @@ export const GRAPHIC_EXAMPLE_GROUPS = [
     hint: 'Two splits per player',
     prompts: [
       ['IPL batters strike rate v pace and spin since 2024, 150+ balls', 'T20'],
-      ['T20 openers strike rate in the 1st v 2nd innings since 2024, 300+ balls', 'T20'],
-      ['IPL batters average v left-arm and right-arm pace since 2023, 100+ balls', 'T20'],
+      ['T20 batters average v pace and spin since 2024, 1000+ balls', 'T20'],
+      ['IPL bowlers economy v left- and right-handed batters since 2024, 300+ balls', 'T20'],
     ],
   },
   {
@@ -62,7 +62,7 @@ export const GRAPHIC_EXAMPLE_GROUPS = [
     prompts: [
       ['IPL batters runs by phase since 2024', 'T20'],
       ['IPL bowlers wickets by phase since 2024', 'T20'],
-      ['T20 batters runs by bowler type since 2024, 1000+ balls', 'T20'],
+      ['T20 batters runs by phase since 2025, 1000+ balls', 'T20'],
     ],
   },
   {

@@ -65,18 +65,27 @@ def _metric_for(idea: str, parsed: Dict[str, Any]) -> Optional[str]:
     return chart.get("y_axis") or (parsed.get("recommended_columns") or [None])[0]
 
 
-def plan(idea: str, fmt_choice: Optional[str], db: Session) -> Dict[str, Any]:
-    """Parse the idea: {spec, scope} for count-within / race ideas, else query-builder params."""
+def plan(idea: str, fmt_choice: Optional[str], db: Session, client: str = "admin") -> Dict[str, Any]:
+    """Parse the idea: {spec, scope} for count-within / race ideas, else query-builder params.
+
+    Every idea is logged to nl_query_log under `client` (public graphics as "[graphic] ..."), which
+    is also what the public daily limit counts (routers/snapshots.ideas_today).
+    """
+    from services.nl2query import log_nl_query_event_background
+
+    tag = "[idea]" if client == "admin" else "[graphic]"
     spec = idea_stats.parse_race(idea) or idea_stats.parse_debut(idea) or idea_stats.parse_count_within(idea)
     if spec:
+        log_nl_query_event_background(query_text=f"{tag} {idea}", parse_result={"success": True}, ip_address=client,
+                                      execution_time_ms=None)
         return {"spec": spec, "scope": idea_stats.parse_scope(idea, db, fmt_choice)}
     if WITHIN.search(idea) and re.search(r"\b(\d{1,2}|" + "|".join(NUMBER_WORDS) + r")\b", idea, re.I):
         raise SnapshotError("Counting players within one innings or match only works for centuries, fifties and "
                             "wicket hauls so far; the query builder can't express this one yet.")
-    from services.nl2query import log_nl_query_event_background, parse_nl_query
+    from services.nl2query import parse_nl_query
 
     parsed = parse_nl_query(idea, db=db)
-    log_nl_query_event_background(query_text=f"[idea] {idea}", parse_result=parsed, ip_address="admin",
+    log_nl_query_event_background(query_text=f"{tag} {idea}", parse_result=parsed, ip_address=client,
                                   execution_time_ms=None)
     if not parsed.get("success", True) or not parsed.get("group_by"):
         raise SnapshotError(parsed.get("error") or "Could not turn the idea into a query (no grouping).")
@@ -122,7 +131,9 @@ NOT_NAMES = {"odi", "odis", "t20", "t20i", "t20is", "ipl", "bbl", "psl", "cpl", 
              "top", "fastest", "slowest", "biggest", "partnerships", "partnership", "batters", "bowlers", "death",
              "powerplay", "middle", "overs", "strike", "rate", "economy", "runs", "wickets", "and", "with", "for",
              "january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
-             "november", "december", "wi", "sa", "nz", "aus", "eng", "ind", "pak", "sl", "ban", "afg", "ire", "zim"}
+             "november", "december", "dot", "dots", "ball", "balls", "boundary", "boundaries", "average", "impact",
+             "openers", "pace", "spin", "season", "seasons", "year", "phase", "innings", "economy", "teams", "players",
+             "left-arm", "right-arm", "spinners", "seamers", "batter", "bowler", "wi", "sa", "nz", "aus", "eng", "ind", "pak", "sl", "ban", "afg", "ire", "zim"}
 
 
 def _mentions(idea: str) -> List[str]:
