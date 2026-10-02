@@ -21,6 +21,7 @@ export const NAV_ITEMS = [
   { path: '/matchups', label: 'Matchups', title: 'Matchups', t20Only: true, group: 'compare' },
   { path: '/query', label: 'Query Builder', title: 'Query Builder', group: 'primary', short: 'Query' },
   { path: '/notes', label: 'Notes', title: 'Notes', group: 'explore' },
+  { path: '/graphics', label: 'Make a Graphic', title: 'Make a Graphic', group: 'explore' },
   { path: '/team', label: 'Team Profile', title: 'Team Profile', t20Only: true, group: 'explore' },
   { path: '/team-comparison', label: 'Team Comparison', title: 'Team Comparison', t20Only: true, group: 'compare' },
   { path: '/doppelgangers', label: 'Doppelgangers', title: 'Doppelgangers', t20Only: true, group: 'compare' },

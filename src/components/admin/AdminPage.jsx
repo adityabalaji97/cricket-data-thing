@@ -4,6 +4,7 @@ import { Box, Button, Chip, CircularProgress, Snackbar, TextField, Typography } 
 import axios from 'axios';
 import config from '../../config';
 import { shareImage, siteOrigin } from '../ui/ChartExportButton';
+import { GRAPHIC_EXAMPLES } from '../../utils/graphicExamples';
 
 /**
  * /admin: the phone-first admin queue. "Social" lists content packs (services/content_packs.py):
@@ -163,16 +164,7 @@ const IDEA_STATUS_COLOR = { pending: C.lo, parked: C.amber, resolved: C.lime, fa
 
 // One worked example per chart form (services/pack_charts.py). A form is offered only when the
 // parsed query has the right shape, and Jev may still lead with another valid form.
-const IDEA_EXAMPLES = [
-  ['Ranked bars', 'Most sixes in the death overs in IPL 2025, 100+ balls', 'T20'],
-  ['Trend line', 'Virat Kohli impact per 100 balls by season since 2020', 'T20'],
-  ['Scatter', 'Average v strike rate for T20 batters since 2024 with 1000+ balls, highlight Virat Kohli', 'T20'],
-  ['Single number', 'Shubman Gill control % among ODI batters since 2019 averaging 50+ at a strike rate of 100+, 1000+ balls', 'ODI'],
-  ['Above / below zero', 'Virat Kohli impact per 100 balls by phase since 2024', 'T20'],
-  ['Dumbbell', 'Virat Kohli strike rate v pace and spin compared to other IPL batters since 2024, 150+ balls', 'T20'],
-  ['Stacked', 'Abhishek Sharma runs by phase compared with other IPL batters since 2024', 'T20'],
-  ['Field', 'Virat Kohli runs by wagon zone since 2024', 'T20'],
-];
+const IDEA_EXAMPLES = GRAPHIC_EXAMPLES;
 
 // "Idea -> pack": a hunch in plain English becomes a query, a highlighted chart and a pack. Ideas
 // about matches not loaded yet are parked and retried after each nightly load.

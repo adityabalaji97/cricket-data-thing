@@ -269,12 +269,14 @@ const QueryResults = ({
   ballAggregation = 'snapshot',
   apiQueryString = '',
   onBallAggregationChange,
+  autoOpenGraphic = false,
 }) => {
   const ballAggregationApplicable = Array.isArray(groupBy) && (
     groupBy.includes('ball') || groupBy.includes('ball_in_spell')
   );
   const [page, setPage] = useState(0);
   const [graphicOpen, setGraphicOpen] = useState(false);
+  const autoOpened = useRef(false);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
   
   // Sorting state
@@ -501,6 +503,14 @@ const QueryResults = ({
     setFeedbackError(null);
     setFeedbackSuccess(false);
   }, [nlSourceQuery, metadata.total_matching_rows, metadata.returned_groups]);
+
+  // From /graphics: open the graphic maker once, the first time a grouped result arrives.
+  useEffect(() => {
+    if (autoOpenGraphic && !autoOpened.current && isGrouped && data.length > 0) {
+      autoOpened.current = true;
+      setGraphicOpen(true);
+    }
+  }, [autoOpenGraphic, isGrouped, data.length]);
 
   // Apply column filters to displayData
   const filteredData = useMemo(() => {

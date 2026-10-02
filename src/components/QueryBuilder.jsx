@@ -180,6 +180,8 @@ const QueryBuilder = ({ isMobile }) => {
   const [nlRecommendedChart, setNlRecommendedChart] = useState(null);
   // Conditions from the question the query could not apply (e.g. an unsupported metric threshold).
   const [nlWarnings, setNlWarnings] = useState([]);
+  // /graphics sends ?graphic=1: open the graphic maker once the grouped result is in.
+  const [autoGraphic] = useState(() => new URLSearchParams(window.location.search).get('graphic') === '1');
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const [nlExpanded, setNlExpanded] = useState(true);
   // Phones open with the filter card folded: the NL search is the quick path there, and the
@@ -761,6 +763,7 @@ const QueryBuilder = ({ isMobile }) => {
                 isMobile={isMobile}
                 ballAggregation={ballAggregation}
                 apiQueryString={lastQueryString}
+                autoOpenGraphic={autoGraphic}
                 onBallAggregationChange={(mode) => {
                   setBallAggregation(mode);
                   setTimeout(() => executeQueryRef.current && executeQueryRef.current(), 0);

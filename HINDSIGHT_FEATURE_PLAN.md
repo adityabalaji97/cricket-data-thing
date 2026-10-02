@@ -785,8 +785,9 @@ Opening the admin idea-pack chart pipeline (pack_charts + api/img.mjs) to users.
   parser. Left: lazy snapshots (low value: ~2 kB per form), pick highlight by tapping a table row.
 - **Phase 2 via the existing NL box (2026-10-02):** plain English -> query builder's interpretation chips (the
   confirm-before-render step) -> run -> Make graphic, which now defaults to the parser's metric and offers its
-  scatter. Remaining for a one-step "describe a graphic": a single input on a /graphics landing page, per-IP
-  daily limit on NL parses.
+  scatter. /graphics landing page (DONE same day): one input + examples -> /query?nl=...&graphic=1 -> the maker
+  opens itself once the grouped result is in; 'Make a Graphic' in the nav. Left: per-IP daily limit on NL
+  parses (today only the monthly spend cap), lazy snapshots, highlight by tapping a row, gallery (phase 3).
 - **Phase 2:** plain-English "describe a graphic": parse (nl2query, cost-capped) -> editable interpretation chips
   -> confirm -> render; per-IP daily limit; cache repeat ideas; highlight chosen from results, not guessed.
 - **Phase 3:** gallery of popular graphics, attribution once accounts exist, embeds.
