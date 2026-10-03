@@ -1,0 +1,313 @@
+{
+  "hypothesis": "H6",
+  "slug": "h6-bumrah-death",
+  "claim": "A common claim is that Jasprit Bumrah is the best death bowler in T20 cricket.",
+  "verdict": "Partly",
+  "headline": "Bumrah ranks 3 of 170 death bowlers on leverage-weighted RAA (+26.5 per 100 balls); ahead of the next best in 7% of resamples.",
+  "effects": [
+    {
+      "name": "Bumrah's leverage-weighted death RAA per 100 minus the best other bowler's",
+      "estimate": -4.2266,
+      "ci": [
+        -30.4838,
+        3.5677
+      ],
+      "p_value": null,
+      "test": "bootstrap over each bowler's matches (gap to the best other bowler in each replicate)",
+      "unit": "RAA per 100 balls (leverage-weighted)",
+      "direction": "positive",
+      "meaningful": 0.0,
+      "n": {
+        "bowlers": 170,
+        "bumrah_matches": 209
+      },
+      "detail": {
+        "rank": 3,
+        "next_best": "Sunil Narine",
+        "share_of_resamples_ranked_first": 0.0664
+      }
+    }
+  ],
+  "charts": [
+    {
+      "key": "lw_raa",
+      "caption": "Death overs (16-20) since 2015, 600+ balls: leverage-weighted RAA per 100 balls (bowling view)",
+      "params": {
+        "group_by": [
+          "bowler"
+        ],
+        "min_balls": 600,
+        "fmt": "T20",
+        "over_min": 15,
+        "over_max": 19,
+        "start_date": "2015-01-01"
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "raa_lw_per_100",
+        "sort_by": "raa_lw_per_100",
+        "limit": 10,
+        "highlight": "Jasprit Bumrah"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?min_balls=600&over_min=15&over_max=19&start_date=2015-01-01&group_by=bowler&fmt=mens-t20",
+      "title": "Death overs (16-20) since 2015, 600+ balls: leverage-weighted RAA per 100 balls (bowling view)"
+    },
+    {
+      "key": "wpa",
+      "caption": "Death overs since 2015, 600+ balls: win probability added (total)",
+      "params": {
+        "group_by": [
+          "bowler"
+        ],
+        "min_balls": 600,
+        "fmt": "T20",
+        "over_min": 15,
+        "over_max": 19,
+        "start_date": "2015-01-01"
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "wpa",
+        "sort_by": "wpa",
+        "limit": 10,
+        "highlight": "Jasprit Bumrah"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?min_balls=600&over_min=15&over_max=19&start_date=2015-01-01&group_by=bowler&fmt=mens-t20",
+      "title": "Death overs since 2015, 600+ balls: win probability added (total)"
+    },
+    {
+      "key": "bumrah_year",
+      "caption": "Bumrah at the death by year: leverage-weighted RAA per 100 balls",
+      "params": {
+        "bowlers": [
+          "Jasprit Bumrah"
+        ],
+        "group_by": [
+          "year"
+        ],
+        "fmt": "T20",
+        "over_min": 15,
+        "over_max": 19,
+        "start_date": "2015-01-01"
+      },
+      "presentation": {
+        "chart": "line",
+        "chart_metric": "raa_lw_per_100"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowlers=Jasprit+Bumrah&over_min=15&over_max=19&start_date=2015-01-01&group_by=year&fmt=mens-t20",
+      "title": "Bumrah at the death by year: leverage-weighted RAA per 100 balls"
+    }
+  ],
+  "parts": {},
+  "tables": {
+    "top15": [
+      {
+        "rank": 1,
+        "bowler": "Sunil Narine",
+        "raa_lw_per_100": 30.71,
+        "ci": [
+          20.0,
+          40.43
+        ],
+        "wpa_per_100": 0.386,
+        "death_balls": 1895,
+        "raa_per_100": 31.07,
+        "economy": 7.14
+      },
+      {
+        "rank": 2,
+        "bowler": "Bilal Khan",
+        "raa_lw_per_100": 26.85,
+        "ci": [
+          9.91,
+          42.34
+        ],
+        "wpa_per_100": 0.357,
+        "death_balls": 866,
+        "raa_per_100": 16.61,
+        "economy": 7.99
+      },
+      {
+        "rank": 3,
+        "bowler": "Jasprit Bumrah",
+        "raa_lw_per_100": 26.48,
+        "ci": [
+          12.81,
+          39.59
+        ],
+        "wpa_per_100": 0.435,
+        "death_balls": 2112,
+        "raa_per_100": 29.35,
+        "economy": 7.74
+      },
+      {
+        "rank": 4,
+        "bowler": "Harry Gurney",
+        "raa_lw_per_100": 26.26,
+        "ci": [
+          9.63,
+          39.68
+        ],
+        "wpa_per_100": 0.484,
+        "death_balls": 874,
+        "raa_per_100": 18.08,
+        "economy": 8.91
+      },
+      {
+        "rank": 5,
+        "bowler": "Nathan Ellis",
+        "raa_lw_per_100": 24.75,
+        "ci": [
+          11.49,
+          37.47
+        ],
+        "wpa_per_100": 0.343,
+        "death_balls": 1448,
+        "raa_per_100": 16.92,
+        "economy": 8.88
+      },
+      {
+        "rank": 6,
+        "bowler": "Ehsan Khan",
+        "raa_lw_per_100": 23.71,
+        "ci": [
+          6.01,
+          39.91
+        ],
+        "wpa_per_100": 0.516,
+        "death_balls": 608,
+        "raa_per_100": 23.65,
+        "economy": 6.82
+      },
+      {
+        "rank": 7,
+        "bowler": "Richard Ngarava",
+        "raa_lw_per_100": 23.45,
+        "ci": [
+          8.48,
+          36.0
+        ],
+        "wpa_per_100": 0.331,
+        "death_balls": 1016,
+        "raa_per_100": 7.46,
+        "economy": 8.71
+      },
+      {
+        "rank": 8,
+        "bowler": "Mujeeb Ur Rahman",
+        "raa_lw_per_100": 22.9,
+        "ci": [
+          8.26,
+          36.72
+        ],
+        "wpa_per_100": 0.347,
+        "death_balls": 1018,
+        "raa_per_100": 16.38,
+        "economy": 8.06
+      },
+      {
+        "rank": 9,
+        "bowler": "Scott Currie",
+        "raa_lw_per_100": 22.7,
+        "ci": [
+          0.38,
+          44.58
+        ],
+        "wpa_per_100": 0.62,
+        "death_balls": 496,
+        "raa_per_100": 14.36,
+        "economy": 9.02
+      },
+      {
+        "rank": 10,
+        "bowler": "Sandeep Lamichhane",
+        "raa_lw_per_100": 22.2,
+        "ci": [
+          1.79,
+          41.96
+        ],
+        "wpa_per_100": 0.326,
+        "death_balls": 600,
+        "raa_per_100": 15.61,
+        "economy": 7.38
+      },
+      {
+        "rank": 11,
+        "bowler": "Wayne Parnell",
+        "raa_lw_per_100": 21.58,
+        "ci": [
+          3.27,
+          37.09
+        ],
+        "wpa_per_100": 0.528,
+        "death_balls": 1057,
+        "raa_per_100": 7.64,
+        "economy": 9.35
+      },
+      {
+        "rank": 12,
+        "bowler": "Rashid Khan",
+        "raa_lw_per_100": 21.29,
+        "ci": [
+          10.0,
+          31.54
+        ],
+        "wpa_per_100": 0.423,
+        "death_balls": 2465,
+        "raa_per_100": 19.57,
+        "economy": 7.77
+      },
+      {
+        "rank": 13,
+        "bowler": "Ben Raine",
+        "raa_lw_per_100": 21.02,
+        "ci": [
+          8.48,
+          33.46
+        ],
+        "wpa_per_100": 0.481,
+        "death_balls": 815,
+        "raa_per_100": 21.35,
+        "economy": 8.67
+      },
+      {
+        "rank": 14,
+        "bowler": "Matheesha Pathirana",
+        "raa_lw_per_100": 19.64,
+        "ci": [
+          2.09,
+          36.43
+        ],
+        "wpa_per_100": 0.332,
+        "death_balls": 933,
+        "raa_per_100": 16.91,
+        "economy": 8.82
+      },
+      {
+        "rank": 15,
+        "bowler": "Fred Klaassen",
+        "raa_lw_per_100": 19.44,
+        "ci": [
+          5.94,
+          30.78
+        ],
+        "wpa_per_100": 0.428,
+        "death_balls": 785,
+        "raa_per_100": 1.11,
+        "economy": 9.86
+      }
+    ]
+  },
+  "caveats": [
+    "All men's T20 competitions with Primer metrics since 2015 (The Hundred excluded by the metrics).",
+    "Leverage-weighted RAA weights each ball by how much was at stake on it."
+  ],
+  "samples": {
+    "qualifying_bowlers": 170
+  },
+  "data_through": "2026-10-03",
+  "database": "localhost/hindsight_analysis"
+}

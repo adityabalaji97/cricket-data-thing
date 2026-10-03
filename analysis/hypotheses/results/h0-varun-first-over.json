@@ -1,0 +1,409 @@
+{
+  "hypothesis": "H0",
+  "slug": "h0-varun-first-over",
+  "claim": "A common claim is that Varun Chakravarthy can't recover from an expensive first over, is better used in the middle overs than the powerplay, and suffers when the bowler at the other end leaks runs.",
+  "verdict": "Partly",
+  "headline": "After a 10+ first over, Varun's RAA per over for the rest of the match moves by -0.64 (95% CI -1.87 to +0.55, p = 0.32) vs a 0-6 first over (34 and 69 matches).",
+  "effects": [
+    {
+      "name": "Varun: rest-of-match RAA/over, 10+ first over minus 0-6",
+      "estimate": -0.6361,
+      "ci": [
+        -1.8673,
+        0.5538
+      ],
+      "p_value": 0.3153,
+      "test": "Welch t-test",
+      "unit": "RAA per over",
+      "direction": "negative",
+      "meaningful": -0.5,
+      "n": {
+        "10+": 34,
+        "0-6": 69
+      },
+      "detail": {
+        "t": -1.0137,
+        "mean_10+": -0.2884,
+        "mean_0-6": 0.3477
+      }
+    },
+    {
+      "name": "Five IPL spinners pooled: same effect",
+      "estimate": -0.6479,
+      "ci": [
+        -1.1049,
+        -0.2022
+      ],
+      "p_value": 0.0052,
+      "test": "Welch t-test",
+      "unit": "RAA per over",
+      "direction": "negative",
+      "meaningful": -0.5,
+      "n": {
+        "10+": 258,
+        "0-6": 531
+      },
+      "detail": {
+        "t": -2.811,
+        "mean_10+": -0.0119,
+        "mean_0-6": 0.6361
+      }
+    },
+    {
+      "name": "Varun's effect minus the peers' effect",
+      "estimate": 0.0118,
+      "ci": [
+        -1.299,
+        1.3306
+      ],
+      "p_value": 0.9908,
+      "test": "bootstrap difference-in-differences",
+      "unit": "RAA per over",
+      "direction": "negative",
+      "meaningful": -0.5,
+      "n": {
+        "varun_matches": 103,
+        "peer_matches": 789
+      },
+      "detail": {}
+    },
+    {
+      "name": "Varun: match RAA/over, middle-overs entry minus powerplay entry",
+      "estimate": -0.2779,
+      "ci": [
+        -1.1574,
+        0.5696
+      ],
+      "p_value": 0.5329,
+      "test": "Welch t-test",
+      "unit": "RAA per over",
+      "direction": "positive",
+      "meaningful": 0.5,
+      "n": {
+        "middle": 51,
+        "powerplay": 89
+      },
+      "detail": {
+        "t": -0.6259,
+        "mean_middle": 0.2763,
+        "mean_powerplay": 0.5542
+      }
+    },
+    {
+      "name": "Varun: RAA/over of his over, previous over 10+ minus 0-6",
+      "estimate": 0.4425,
+      "ci": [
+        -0.4438,
+        1.3503
+      ],
+      "p_value": 0.3472,
+      "test": "bootstrap over matches",
+      "unit": "RAA per over",
+      "direction": "negative",
+      "meaningful": -0.5,
+      "n": {
+        "overs_0-6": 214,
+        "overs_7-9": 116,
+        "overs_10+": 195
+      },
+      "detail": {
+        "mean_0-6": 0.2795,
+        "mean_7-9": 0.7035,
+        "mean_10+": 0.722
+      }
+    },
+    {
+      "name": "Placebo: same split by the NEXT over's runs",
+      "estimate": -0.7361,
+      "ci": [
+        -1.5462,
+        0.0723
+      ],
+      "p_value": 0.0762,
+      "test": "bootstrap over matches",
+      "unit": "RAA per over",
+      "direction": "negative",
+      "meaningful": -0.5,
+      "n": {
+        "overs_0-6": 210,
+        "overs_7-9": 125,
+        "overs_10+": 189
+      },
+      "detail": {
+        "mean_0-6": 1.0004,
+        "mean_7-9": 0.1583,
+        "mean_10+": 0.2643
+      }
+    }
+  ],
+  "charts": [
+    {
+      "key": "first_over",
+      "caption": "Varun's rest-of-match RAA per over, by runs off his first over (bowling view)",
+      "params": {
+        "bowlers": [
+          "Varun Chakaravarthy"
+        ],
+        "group_by": [
+          "bowler_first_over_runs_bucket"
+        ],
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01",
+        "metrics_perspective": "bowling",
+        "dimension_filters": [
+          "bowler_over_number:gte:2"
+        ]
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "raa_per_over"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowlers=Varun+Chakaravarthy&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&dimension_filters=bowler_over_number%3Agte%3A2&group_by=bowler_first_over_runs_bucket&fmt=mens-t20",
+      "title": "Varun's rest-of-match RAA per over, by runs off his first over (bowling view)"
+    },
+    {
+      "key": "peers",
+      "caption": "Five IPL spinners pooled: rest-of-match RAA per over by first-over runs",
+      "params": {
+        "bowlers": [
+          "Yuzvendra Chahal",
+          "Rashid Khan",
+          "Kuldeep Yadav",
+          "Ravi Bishnoi",
+          "Axar Patel"
+        ],
+        "group_by": [
+          "bowler_first_over_runs_bucket"
+        ],
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01",
+        "metrics_perspective": "bowling",
+        "dimension_filters": [
+          "bowler_over_number:gte:2"
+        ]
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "raa_per_over"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowlers=Yuzvendra+Chahal&bowlers=Rashid+Khan&bowlers=Kuldeep+Yadav&bowlers=Ravi+Bishnoi&bowlers=Axar+Patel&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&dimension_filters=bowler_over_number%3Agte%3A2&group_by=bowler_first_over_runs_bucket&fmt=mens-t20",
+      "title": "Five IPL spinners pooled: rest-of-match RAA per over by first-over runs"
+    },
+    {
+      "key": "entry",
+      "caption": "Varun's RAA per over by the over he came on (0 = first over of the innings)",
+      "params": {
+        "bowlers": [
+          "Varun Chakaravarthy"
+        ],
+        "group_by": [
+          "bowler_entry_over"
+        ],
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01",
+        "metrics_perspective": "bowling"
+      },
+      "presentation": {
+        "chart": "line",
+        "chart_metric": "raa_per_over"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowlers=Varun+Chakaravarthy&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&group_by=bowler_entry_over&fmt=mens-t20",
+      "title": "Varun's RAA per over by the over he came on (0 = first over of the innings)"
+    },
+    {
+      "key": "pressure",
+      "caption": "Varun's RAA per over by runs off the previous over from the other end",
+      "params": {
+        "bowlers": [
+          "Varun Chakaravarthy"
+        ],
+        "group_by": [
+          "prev_over_runs_bucket"
+        ],
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01",
+        "metrics_perspective": "bowling"
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "raa_per_over"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowlers=Varun+Chakaravarthy&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&group_by=prev_over_runs_bucket&fmt=mens-t20",
+      "title": "Varun's RAA per over by runs off the previous over from the other end"
+    },
+    {
+      "key": "placebo",
+      "caption": "Placebo: Varun's RAA per over by runs off the NEXT over",
+      "params": {
+        "bowlers": [
+          "Varun Chakaravarthy"
+        ],
+        "group_by": [
+          "next_over_runs_bucket"
+        ],
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01",
+        "metrics_perspective": "bowling"
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "raa_per_over"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowlers=Varun+Chakaravarthy&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&group_by=next_over_runs_bucket&fmt=mens-t20",
+      "title": "Placebo: Varun's RAA per over by runs off the NEXT over"
+    }
+  ],
+  "parts": {
+    "a. 10+ first over hurts the rest of his match": "Inconclusive",
+    "b. better entering in the middle overs": "Inconclusive",
+    "c. hurt by a big over from the other end": "Not supported"
+  },
+  "tables": {
+    "first_over": {
+      "0-6": {
+        "matches": 69,
+        "matches_with_rest": 69,
+        "mean_raa_per_over_rest": 0.3477,
+        "economy_rest": 7.61,
+        "peer_matches_with_rest": 531,
+        "peer_mean_raa_per_over_rest": 0.6361
+      },
+      "7-9": {
+        "matches": 37,
+        "matches_with_rest": 37,
+        "mean_raa_per_over_rest": 0.5768,
+        "economy_rest": 7.8,
+        "peer_matches_with_rest": 249,
+        "peer_mean_raa_per_over_rest": 0.1166
+      },
+      "10+": {
+        "matches": 34,
+        "matches_with_rest": 34,
+        "mean_raa_per_over_rest": -0.2884,
+        "economy_rest": 8.17,
+        "peer_matches_with_rest": 258,
+        "peer_mean_raa_per_over_rest": -0.0119
+      }
+    },
+    "per_peer": {
+      "Yuzvendra Chahal": {
+        "estimate": -0.3953,
+        "ci": [
+          -1.25,
+          0.4357
+        ],
+        "p": 0.3679,
+        "n": {
+          "10+": 69,
+          "0-6": 115
+        }
+      },
+      "Rashid Khan": {
+        "estimate": -1.5907,
+        "ci": [
+          -2.8166,
+          -0.4551
+        ],
+        "p": 0.0116,
+        "n": {
+          "10+": 50,
+          "0-6": 164
+        }
+      },
+      "Kuldeep Yadav": {
+        "estimate": -0.8107,
+        "ci": [
+          -1.9608,
+          0.3425
+        ],
+        "p": 0.1805,
+        "n": {
+          "10+": 37,
+          "0-6": 76
+        }
+      },
+      "Ravi Bishnoi": {
+        "estimate": 0.1163,
+        "ci": [
+          -1.1521,
+          1.3592
+        ],
+        "p": 0.8595,
+        "n": {
+          "10+": 35,
+          "0-6": 60
+        }
+      },
+      "Axar Patel": {
+        "estimate": -0.0486,
+        "ci": [
+          -0.8592,
+          0.7476
+        ],
+        "p": 0.9073,
+        "n": {
+          "10+": 67,
+          "0-6": 116
+        }
+      }
+    },
+    "entry": {
+      "powerplay (overs 1-6)": {
+        "matches": 89,
+        "mean_raa_per_over": 0.5542
+      },
+      "middle (overs 7-15)": {
+        "matches": 51,
+        "mean_raa_per_over": 0.2763
+      },
+      "death (overs 16-20, not tested)": {
+        "matches": 0,
+        "mean_raa_per_over": null
+      }
+    },
+    "pressure_economy": {
+      "0-6": 7.43,
+      "7-9": 7.36,
+      "10+": 8.14
+    }
+  },
+  "caveats": [
+    "Line/length is not used here. RAA is per six balls that carry metrics (wides carry none).",
+    "Matches where he bowled one over have no rest of match and are excluded from part a.",
+    "Peers are pooled by match, so bowlers with more matches weigh more."
+  ],
+  "samples": {
+    "first_over_matches": {
+      "0-6": 69,
+      "7-9": 37,
+      "10+": 34
+    }
+  },
+  "data_through": "2026-10-03",
+  "database": "localhost/hindsight_analysis"
+}

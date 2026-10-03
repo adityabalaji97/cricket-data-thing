@@ -1,0 +1,217 @@
+{
+  "hypothesis": "H4",
+  "slug": "h4-india-openers",
+  "claim": "A common claim is that India's T20I openers Sanju Samson, Abhishek Sharma and Ishan Kishan are all or nothing: they either win the game or fail cheaply.",
+  "verdict": "Supported",
+  "headline": "The three's Impact per innings is 1.36x as spread out as other India openers' (95% CI 1.12-1.63); India win 90% when they fire vs 69% when they fail.",
+  "effects": [
+    {
+      "name": "SD ratio (named three / other India openers)",
+      "estimate": 1.3635,
+      "ci": [
+        1.1202,
+        1.6298
+      ],
+      "p_value": 0.002,
+      "test": "bootstrap over innings",
+      "unit": "ratio",
+      "direction": "positive",
+      "meaningful": 1.2,
+      "n": {
+        "named_innings": 121,
+        "comparison_innings": 310
+      },
+      "detail": {
+        "sd_named": 20.0683,
+        "sd_comparison": 14.7185,
+        "comparison_openers": [
+          "Rohit Sharma",
+          "Shubman Gill",
+          "Shikhar Dhawan",
+          "Virat Kohli",
+          "Ruturaj Gaikwad",
+          "KL Rahul",
+          "Yashasvi Jaiswal"
+        ]
+      }
+    },
+    {
+      "name": "Spread of Impact per innings: SD(named) / SD(other openers), log scale",
+      "estimate": 0.31,
+      "ci": [
+        0.1135,
+        0.4885
+      ],
+      "p_value": 0.002,
+      "test": "bootstrap over innings",
+      "unit": "log SD ratio",
+      "direction": "positive",
+      "meaningful": 0.1823,
+      "n": {},
+      "detail": {}
+    },
+    {
+      "name": "India win % when the opener fires minus when he fails",
+      "estimate": 21.5726,
+      "ci": [
+        4.7043,
+        37.5134
+      ],
+      "p_value": 0.0299,
+      "test": "Fisher's exact test; bootstrap CI over innings",
+      "unit": "percentage points",
+      "direction": "positive",
+      "meaningful": 20,
+      "n": {
+        "fire": 31,
+        "fail": 48
+      },
+      "detail": {
+        "win_pct_fire": 90.3226,
+        "win_pct_fail": 68.75,
+        "wpa_per_innings_fire": 0.2238,
+        "wpa_per_innings_fail": -0.0926
+      }
+    }
+  ],
+  "charts": [
+    {
+      "key": "impact",
+      "caption": "India T20I innings: Impact per innings by batting position (named openers)",
+      "params": {
+        "batters": [
+          "Sanju Samson",
+          "Abhishek Sharma",
+          "Ishan Kishan"
+        ],
+        "group_by": [
+          "batter",
+          "batting_position"
+        ],
+        "fmt": "T20",
+        "batting_teams": [
+          "India"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01"
+      },
+      "presentation": {
+        "chart": "table"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?batters=Sanju+Samson&batters=Abhishek+Sharma&batters=Ishan+Kishan&batting_teams=India&include_international=true&start_date=2015-01-01&group_by=batter&group_by=batting_position&fmt=mens-t20",
+      "title": "India T20I innings: Impact per innings by batting position (named openers)"
+    },
+    {
+      "key": "result",
+      "caption": "Impact per innings for the three, India wins vs losses",
+      "params": {
+        "batters": [
+          "Sanju Samson",
+          "Abhishek Sharma",
+          "Ishan Kishan"
+        ],
+        "group_by": [
+          "batter",
+          "match_outcome"
+        ],
+        "fmt": "T20",
+        "batting_teams": [
+          "India"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01"
+      },
+      "presentation": {
+        "chart": "table"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?batters=Sanju+Samson&batters=Abhishek+Sharma&batters=Ishan+Kishan&batting_teams=India&include_international=true&start_date=2015-01-01&group_by=batter&group_by=match_outcome&fmt=mens-t20",
+      "title": "Impact per innings for the three, India wins vs losses"
+    },
+    {
+      "key": "wpa",
+      "caption": "Win probability added per innings, India T20Is (all positions)",
+      "params": {
+        "batters": [
+          "Sanju Samson",
+          "Abhishek Sharma",
+          "Ishan Kishan",
+          "Rohit Sharma",
+          "Shubman Gill",
+          "Shikhar Dhawan",
+          "Virat Kohli",
+          "Ruturaj Gaikwad",
+          "KL Rahul"
+        ],
+        "group_by": [
+          "batter"
+        ],
+        "fmt": "T20",
+        "batting_teams": [
+          "India"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01"
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "wpa_per_innings"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?batters=Sanju+Samson&batters=Abhishek+Sharma&batters=Ishan+Kishan&batters=Rohit+Sharma&batters=Shubman+Gill&batters=Shikhar+Dhawan&batters=Virat+Kohli&batters=Ruturaj+Gaikwad&batters=KL+Rahul&batting_teams=India&include_international=true&start_date=2015-01-01&group_by=batter&fmt=mens-t20",
+      "title": "Win probability added per innings, India T20Is (all positions)"
+    }
+  ],
+  "parts": {},
+  "tables": {
+    "shares": {
+      "Sanju Samson": {
+        "innings": 35,
+        "fail_pct": 48.6,
+        "fire_pct": 22.9,
+        "mean_impact": 2.94,
+        "sd_impact": 20.22,
+        "small_sample": false
+      },
+      "Abhishek Sharma": {
+        "innings": 51,
+        "fail_pct": 33.3,
+        "fire_pct": 37.3,
+        "mean_impact": 8.69,
+        "sd_impact": 22.15,
+        "small_sample": false
+      },
+      "Ishan Kishan": {
+        "innings": 35,
+        "fail_pct": 48.6,
+        "fire_pct": 20.0,
+        "mean_impact": -0.36,
+        "sd_impact": 15.42,
+        "small_sample": false
+      },
+      "other India openers": {
+        "innings": 310,
+        "fail_pct": 43.9,
+        "fire_pct": 26.8,
+        "mean_impact": 1.35,
+        "sd_impact": 14.72,
+        "small_sample": false
+      }
+    }
+  },
+  "caveats": [
+    "Fail = Impact below -5, fire = above +10 runs added to the projected total.",
+    "Batting position is the order of arrival at the crease; position 1-2 = opener.",
+    "A spread measure says nothing about the average; both are shown."
+  ],
+  "samples": {
+    "opening_innings": {
+      "Sanju Samson": 35,
+      "Abhishek Sharma": 51,
+      "Ishan Kishan": 35
+    }
+  },
+  "data_through": "2026-10-03",
+  "database": "localhost/hindsight_analysis"
+}
