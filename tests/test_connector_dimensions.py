@@ -288,3 +288,18 @@ def test_connector_returns_full_csv_and_canonical_names():
     res = query_cricket_data(None, group_by=["bowler"], bowlers=["CV Varun"], format="T20")
     assert res.structured_content["rows"][0]["bowler"] == "Varun Chakaravarthy"
     assert "Varun Chakaravarthy" in res.structured_content["title"]
+
+
+@local_db
+def test_next_over_placebo_and_match_date(db):
+    from sqlalchemy import text
+
+    mid = _varun_match(db)
+    rows = _q(db, bowlers=["Varun Chakravarthy"], match_ids=[mid], group_by=["over", "next_over_runs", "match_date"])
+    date_ = db.execute(text("SELECT MIN(match_date) FROM delivery_details WHERE p_match = :m"), {"m": mid}).scalar()
+    for r in rows:
+        expected = db.execute(text("SELECT SUM(COALESCE(score,0)) FROM delivery_details WHERE p_match=:m AND over=:o "
+                                   "AND inns = (SELECT MIN(inns) FROM delivery_details WHERE p_match=:m AND bowl=:b)"),
+                              {"m": mid, "o": r["over"] + 1, "b": STORED}).scalar()
+        assert r["next_over_runs"] == expected
+        assert r["match_date"] == date_

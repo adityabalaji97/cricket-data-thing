@@ -194,11 +194,12 @@ _PLAYER_COLUMNS = ("batter", "bowler", "non_striker", "player")
 _ROW_INTERNAL = {"metric_balls", "metrics_perspective"}
 _SEQUENTIAL_KEYS = {"year", "over", "ball", "ball_in_over", "ball_in_spell", "innings", "batting_position",
                     "bowler_over_number", "bowler_entry_over", "spell_number", "bowler_first_over_runs",
-                    "prev_over_runs", "prev_over_raa", "batter_balls_faced", "season"}
+                    "prev_over_runs", "prev_over_raa", "next_over_runs", "batter_balls_faced", "season", "match_date"}
 # Bucketed dimensions sort in their natural order, not alphabetically ('10+' after '7-9').
 _BUCKET_ORDER = {
     "bowler_first_over_runs_bucket": ("0-6", "7-9", "10+"),
     "prev_over_runs_bucket": ("0-6", "7-9", "10+"),
+    "next_over_runs_bucket": ("0-6", "7-9", "10+"),
     "prev_over_raa_bucket": ("below -2", "-2 to +2", "above +2"),
     "batter_balls_faced_bucket": ("1-9", "10-19", "20-29", "30-39", "40-49", "50+"),
     "impact_player_era": ("pre-2023", "2023+"),
@@ -517,7 +518,8 @@ How to use the tools:
    Filters: match_ids, exclude_batters, exclude_bowlers. Match-context dimensions, usable in
    group_by and as dimension_filters 'name:op:value': bowler_over_number (his 1st/2nd/... over),
    bowler_entry_over, spell_number, bowler_first_over_runs(_bucket '0-6'/'7-9'/'10+'),
-   prev_over_runs(_bucket), prev_over_raa(_bucket), batter_balls_faced(_bucket),
+   prev_over_runs(_bucket), prev_over_raa(_bucket), next_over_runs(_bucket) (a placebo),
+   batter_balls_faced(_bucket),
    impact_player_era ('pre-2023'/'2023+'), season ('2024' or '2024/25' for BBL-style seasons).
    Example, "does a bad first over hurt him for the rest of the match": bowlers=[X],
    group_by=['match_id','bowler_first_over_runs_bucket'], dimension_filters=['bowler_over_number:gte:2'],
@@ -662,7 +664,7 @@ def structure_query_result(
         "set it explicitly for bowler questions grouped by anything else. The perspective is printed "
         "with every result. Match-context dimensions (group_by and dimension_filters): "
         "bowler_over_number, bowler_entry_over, spell_number, bowler_first_over_runs(_bucket), "
-        "prev_over_runs(_bucket), prev_over_raa(_bucket), batter_balls_faced(_bucket), "
+        "prev_over_runs(_bucket), prev_over_raa(_bucket), next_over_runs(_bucket), batter_balls_faced(_bucket), match_date, "
         "impact_player_era, season. query_mode='team_innings' returns one record per team innings "
         "(total, wickets, run rate, phase run rates, 200+/250+ rates, result)."
     ),

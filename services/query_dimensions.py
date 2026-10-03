@@ -11,6 +11,8 @@ as `dimension_filters` ('name:op:value').
                                    innings -- bowled from the other end
     prev_over_raa(_bucket)         the previous over's RAA from the batting side (+ = the batters did
                                    better than average for the game state), men's T20 only
+    next_over_runs(_bucket)        runs off the NEXT over of the innings -- a placebo: what happens
+                                   after a ball cannot cause it, so any pattern here is confounding
     batter_balls_faced(_bucket)    balls the batter faced in that innings (wides excluded)
     impact_player_era              'pre-2023' / '2023+' (the IPL's Impact Player rule began in 2023)
     season                         the year, or 'YYYY/YY' for leagues whose season straddles New Year
@@ -93,6 +95,9 @@ def dimensions(competition_expr: str) -> Dict[str, Dimension]:
         "prev_over_runs_bucket": Dimension(
             _int_bucket_sql("po.runs", RUNS_BUCKETS), "prev_over", False, order=tuple(b[0] for b in RUNS_BUCKETS)),
         # Grouped as whole runs (a raw float would make one group per over); filtered unrounded.
+        "next_over_runs": Dimension("nxo.runs", "next_over", True),
+        "next_over_runs_bucket": Dimension(
+            _int_bucket_sql("nxo.runs", RUNS_BUCKETS), "next_over", False, order=tuple(b[0] for b in RUNS_BUCKETS)),
         "prev_over_raa": Dimension("ROUND(po.raa::numeric)::int", "prev_over", True, filter_expr="po.raa"),
         "prev_over_raa_bucket": Dimension(_float_bucket_sql("po.raa"), "prev_over", False,
                                           order=tuple(b[0] for b in RAA_BUCKETS)),
@@ -109,7 +114,7 @@ def dimensions(competition_expr: str) -> Dict[str, Dimension]:
 DIMENSION_NAMES = (
     "bowler_over_number", "bowler_entry_over", "spell_number", "bowler_first_over_runs",
     "bowler_first_over_runs_bucket", "prev_over_runs", "prev_over_runs_bucket", "prev_over_raa",
-    "prev_over_raa_bucket", "batter_balls_faced", "batter_balls_faced_bucket", "impact_player_era", "season",
+    "prev_over_raa_bucket", "next_over_runs", "next_over_runs_bucket", "batter_balls_faced", "batter_balls_faced_bucket", "impact_player_era", "season",
 )
 
 
@@ -204,7 +209,7 @@ def build_ctes(families: Sequence[str], scope_from_where: str, metrics_enabled: 
         )""")
         joins.append("LEFT JOIN bowler_over_ctx bo ON bo.p_match = dd.p_match AND bo.inns = dd.inns "
                      "AND bo.bowl = dd.bowl AND bo.over = dd.over")
-    if "prev_over" in families:
+    if "prev_over" in families or "next_over" in families:
         raa = ("SUM(CASE WHEN COALESCE(d.wide, 0) = 0 THEN pbm.raa::double precision END)"
                if metrics_enabled else "NULL::double precision")
         metrics_join = "LEFT JOIN ball_metrics pbm ON pbm.delivery_id = d.id" if metrics_enabled else ""
@@ -215,8 +220,12 @@ def build_ctes(families: Sequence[str], scope_from_where: str, metrics_enabled: 
             WHERE {in_scope}
             GROUP BY d.p_match, d.inns, d.over
         )""")
-        joins.append("LEFT JOIN innings_over po ON po.p_match = dd.p_match AND po.inns = dd.inns "
-                     "AND po.over = dd.over - 1")
+        if "prev_over" in families:
+            joins.append("LEFT JOIN innings_over po ON po.p_match = dd.p_match AND po.inns = dd.inns "
+                         "AND po.over = dd.over - 1")
+        if "next_over" in families:
+            joins.append("LEFT JOIN innings_over nxo ON nxo.p_match = dd.p_match AND nxo.inns = dd.inns "
+                         "AND nxo.over = dd.over + 1")
     if "batter_inns" in families:
         ctes.append(f"""batter_inns AS (
             SELECT d.p_match, d.inns, d.bat,

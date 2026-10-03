@@ -48,7 +48,7 @@ ADVANCED_COLUMNS = {
 COMMON_COLUMNS = {
     'venue', 'competition', 'year', 'batting_team', 'bowling_team',
     'batter', 'bowler', 'innings', 'phase', 'match_id', 'country',
-    'dismissal', 'over'
+    'dismissal', 'over', 'match_date'
 }
 
 # Columns that exist in both but have different coverage
@@ -461,6 +461,7 @@ def get_legacy_grouping_columns_map():
         
         # Match identifiers
         "match_id": "d.match_id",
+        "match_date": "TO_CHAR(m.date, 'YYYY-MM-DD')",
         "competition": competition_canonical_sql("m.competition"),
         "year": "EXTRACT(YEAR FROM m.date)",
         
@@ -3235,6 +3236,7 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
         
         # Match identifiers
         "match_id": "dd.p_match",
+        "match_date": "dd.match_date",
         "competition": competition_canonical_sql("dd.competition"),
         "year": "dd.year",
         
@@ -4037,7 +4039,7 @@ def generate_summary_data(where_clause, params, group_by, ball_defs, db, total_b
 #: Columns the query builder can group by. Advertised by /query/deliveries/columns and used as
 #: the MCP tool's enum, so both stay in step with what the service supports.
 GROUP_BY_COLUMNS = (
-    "venue", "country", "match_id", "competition", "year",
+    "venue", "country", "match_id", "match_date", "competition", "year",
     "batting_team", "bowling_team",
     "batter", "bowler", "non_striker", "partnership", "batting_position",
     "innings", "phase",
