@@ -303,3 +303,19 @@ def test_next_over_placebo_and_match_date(db):
                               {"m": mid, "o": r["over"] + 1, "b": STORED}).scalar()
         assert r["next_over_runs"] == expected
         assert r["match_date"] == date_
+
+
+@local_db
+def test_batter_innings_strike_rate_and_era(db):
+    from sqlalchemy import text
+
+    rows = _q(db, batters=["Virat Kohli"], leagues=["IPL"], group_by=["match_id", "batter_innings_strike_rate"],
+              dimension_filters=["batter_balls_faced:gte:30"])
+    assert rows
+    for r in rows[:5]:
+        runs, balls = db.execute(text("""SELECT SUM(COALESCE(batruns,0)), SUM(CASE WHEN COALESCE(wide,0)=0 THEN 1 ELSE 0 END)
+            FROM delivery_details WHERE p_match = :m AND bat = 'Virat Kohli'"""), {"m": r["match_id"]}).one()
+        assert balls >= 30 and r["batter_innings_strike_rate"] == round(runs * 100.0 / balls)
+    # Era follows the season's start: January 2024 BBL matches belong to 2023/24, i.e. 2023+.
+    eras = {(r["season"], r["impact_player_era"]) for r in _q(db, leagues=["BBL"], group_by=["season", "impact_player_era"])}
+    assert all(era == "2023+" for season, era in eras if season.startswith("2023"))

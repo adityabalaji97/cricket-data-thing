@@ -33,7 +33,7 @@ TOTAL_THRESHOLDS = (160, 180, 200, 220, 250)
 #: group_by columns this mode accepts, with their expression over the per-innings CTE `i`.
 GROUP_BY = {
     "match_id": "i.match_id", "innings": "i.innings", "competition": "i.competition", "year": "i.year",
-    "season": "i.season", "impact_player_era": "i.impact_player_era", "venue": "i.venue",
+    "season": "i.season", "season_start_year": "i.season_start_year", "impact_player_era": "i.impact_player_era", "venue": "i.venue",
     "country": "i.country", "batting_team": "i.batting_team", "bowling_team": "i.bowling_team",
     "match_outcome": "i.result", "toss_decision": "i.toss_decision", "format": "i.format",
     "full_length": "i.full_length", "total_bucket": "i.total_bucket",
@@ -44,6 +44,7 @@ GROUP_BY = {
 FILTERS = {
     "total": ("i.total", True), "wickets": ("i.wickets", True), "balls": ("i.balls", True),
     "full_length": ("i.full_length", True), "year": ("i.year", True), "season": ("i.season", False),
+    "season_start_year": ("i.season_start_year", True),
     "impact_player_era": ("i.impact_player_era", False), "match_outcome": ("i.result", False),
     "total_bucket": ("i.total_bucket", False), "country": ("i.country", False), "venue": ("i.venue", False),
     "innings": ("i.innings", True),
@@ -54,6 +55,8 @@ _TOTAL_BUCKETS = (("<140", 139), ("140-159", 159), ("160-179", 179), ("180-199",
 
 
 _COUNT_COLUMNS = {"runs", "balls", "innings_count", "matches", "highest_total", "lowest_total", "wins", "losses",
+                  "boundaries", "dots", "powerplay_runs", "powerplay_balls", "middle_runs", "middle_balls",
+                  "death_runs", "death_balls",
                   *(f"count_{t}_plus" for t in TOTAL_THRESHOLDS)}
 
 
@@ -126,7 +129,8 @@ def query_team_innings(
         for t in TOTAL_THRESHOLDS
     )
     phase_rr = ",\n".join(
-        f"ROUND(SUM(i.{k}_runs) * 6.0 / NULLIF(SUM(i.{k}_balls), 0), 2) AS {k}_run_rate" for k in phases
+        f"ROUND(SUM(i.{k}_runs) * 6.0 / NULLIF(SUM(i.{k}_balls), 0), 2) AS {k}_run_rate,\n"
+        f"SUM(i.{k}_runs) AS {k}_runs, SUM(i.{k}_balls) AS {k}_balls" for k in phases
     )
     params.update({"limit": int(limit), "offset": int(offset)})
 
@@ -158,7 +162,8 @@ def query_team_innings(
         i AS (
             SELECT r.*,
                    {query_dimensions.season_sql('r.competition', 'r.match_date', 'r.year')} AS season,
-                   (CASE WHEN r.year >= 2023 THEN '2023+' ELSE 'pre-2023' END) AS impact_player_era,
+                   {query_dimensions.season_start_sql('r.competition', 'r.match_date', 'r.year')} AS season_start_year,
+                   {query_dimensions.era_sql('r.competition', 'r.match_date', 'r.year')} AS impact_player_era,
                    (CASE WHEN {full_balls} > 0 AND COALESCE(r.max_balls, 0) >= {full_balls} THEN 1 ELSE 0 END) AS full_length,
                    {_total_bucket_sql('r.total')} AS total_bucket
             FROM innings_rows r
@@ -177,6 +182,7 @@ def query_team_innings(
                    {phase_rr},
                    ROUND(100.0 * SUM(i.boundaries) / NULLIF(SUM(i.balls), 0), 2) AS boundary_percentage,
                    ROUND(100.0 * SUM(i.dots) / NULLIF(SUM(i.balls), 0), 2) AS dot_percentage,
+                   SUM(i.boundaries) AS boundaries, SUM(i.dots) AS dots,
                    {pct_cols},
                    SUM(CASE WHEN i.result = 'win' THEN 1 ELSE 0 END) AS wins,
                    SUM(CASE WHEN i.result = 'loss' THEN 1 ELSE 0 END) AS losses,

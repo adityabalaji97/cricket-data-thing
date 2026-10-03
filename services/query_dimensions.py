@@ -14,7 +14,9 @@ as `dimension_filters` ('name:op:value').
     next_over_runs(_bucket)        runs off the NEXT over of the innings -- a placebo: what happens
                                    after a ball cannot cause it, so any pattern here is confounding
     batter_balls_faced(_bucket)    balls the batter faced in that innings (wides excluded)
-    impact_player_era              'pre-2023' / '2023+' (the IPL's Impact Player rule began in 2023)
+    batter_innings_strike_rate(_bucket) the batter's strike rate over that whole innings
+    impact_player_era              'pre-2023' / '2023+' by the season's start year (the IPL's Impact
+                                   Player rule began in 2023; BBL 2022/23 counts as pre-2023)
     season                         the year, or 'YYYY/YY' for leagues whose season straddles New Year
 
 Each comes from a CTE over every ball of the matches the query touches (scope_matches), not just
@@ -44,6 +46,12 @@ RUNS_BUCKETS = (("0-6", None, 6), ("7-9", 7, 9), ("10+", 10, None))
 RAA_BUCKETS = (("below -2", None, -2), ("-2 to +2", -2, 2), ("above +2", 2, None))
 BALLS_FACED_BUCKETS = (("1-9", None, 9), ("10-19", 10, 19), ("20-29", 20, 29), ("30-39", 30, 39),
                        ("40-49", 40, 49), ("50+", 50, None))
+STRIKE_RATE_BUCKETS = ("under 110", "110-129", "130-149", "150+")
+
+
+def _strike_rate_bucket_sql(expr: str) -> str:
+    return (f"(CASE WHEN {expr} IS NULL THEN NULL WHEN {expr} < 110 THEN 'under 110' "
+            f"WHEN {expr} < 130 THEN '110-129' WHEN {expr} < 150 THEN '130-149' ELSE '150+' END)")
 
 
 def _int_bucket_sql(expr: str, buckets: Sequence[Tuple[str, Optional[int], Optional[int]]]) -> str:
@@ -59,17 +67,26 @@ def _float_bucket_sql(expr: str) -> str:
             f"WHEN {expr} > 2 THEN 'above +2' ELSE '-2 to +2' END)")
 
 
+def season_start_sql(competition_expr: str, date_expr: str = "dd.match_date", year_expr: str = "dd.year") -> str:
+    """The calendar year a match's season began in (a January BBL match -> the previous year)."""
+    comps = ", ".join(f"'{c}'" for c in CROSS_YEAR_COMPETITIONS)
+    month = f"CAST(SUBSTRING({date_expr} FROM 6 FOR 2) AS integer)"
+    return (f"(CASE WHEN {competition_expr} IN ({comps}) AND {month} < 7 THEN {year_expr} - 1 "
+            f"ELSE {year_expr} END)")
+
+
 def season_sql(competition_expr: str, date_expr: str = "dd.match_date", year_expr: str = "dd.year") -> str:
     """'2024' for most leagues; '2024/25' for a cross-year league's season (match_date is ISO text)."""
     comps = ", ".join(f"'{c}'" for c in CROSS_YEAR_COMPETITIONS)
-    month = f"CAST(SUBSTRING({date_expr} FROM 6 FOR 2) AS integer)"
-    start = f"(CASE WHEN {month} >= 7 THEN {year_expr} ELSE {year_expr} - 1 END)"
+    start = season_start_sql(competition_expr, date_expr, year_expr)
     return (f"(CASE WHEN {competition_expr} IN ({comps}) THEN "
             f"{start}::text || '/' || LPAD(((({start}) + 1) % 100)::text, 2, '0') "
             f"ELSE {year_expr}::text END)")
 
 
-ERA_SQL = "(CASE WHEN dd.year >= 2023 THEN '2023+' ELSE 'pre-2023' END)"
+def era_sql(competition_expr: str, date_expr: str = "dd.match_date", year_expr: str = "dd.year") -> str:
+    start = season_start_sql(competition_expr, date_expr, year_expr)
+    return f"(CASE WHEN {start} >= 2023 THEN '2023+' ELSE 'pre-2023' END)"
 
 
 @dataclass(frozen=True)
@@ -105,7 +122,11 @@ def dimensions(competition_expr: str) -> Dict[str, Dimension]:
         "batter_balls_faced_bucket": Dimension(
             _int_bucket_sql("bi.balls_faced", BALLS_FACED_BUCKETS), "batter_inns", False,
             order=tuple(b[0] for b in BALLS_FACED_BUCKETS)),
-        "impact_player_era": Dimension(ERA_SQL, None, False, order=("pre-2023", "2023+")),
+        "batter_innings_strike_rate": Dimension("ROUND(bi.strike_rate)::int", "batter_inns", True,
+                                                filter_expr="bi.strike_rate"),
+        "batter_innings_strike_rate_bucket": Dimension(_strike_rate_bucket_sql("bi.strike_rate"), "batter_inns", False,
+                                                       order=STRIKE_RATE_BUCKETS),
+        "impact_player_era": Dimension(era_sql(competition_expr), None, False, order=("pre-2023", "2023+")),
         "season": Dimension(season_sql(competition_expr), None, False),
     }
 
@@ -114,7 +135,8 @@ def dimensions(competition_expr: str) -> Dict[str, Dimension]:
 DIMENSION_NAMES = (
     "bowler_over_number", "bowler_entry_over", "spell_number", "bowler_first_over_runs",
     "bowler_first_over_runs_bucket", "prev_over_runs", "prev_over_runs_bucket", "prev_over_raa",
-    "prev_over_raa_bucket", "next_over_runs", "next_over_runs_bucket", "batter_balls_faced", "batter_balls_faced_bucket", "impact_player_era", "season",
+    "prev_over_raa_bucket", "next_over_runs", "next_over_runs_bucket", "batter_balls_faced", "batter_balls_faced_bucket", "batter_innings_strike_rate",
+    "batter_innings_strike_rate_bucket", "impact_player_era", "season",
 )
 
 
@@ -229,7 +251,9 @@ def build_ctes(families: Sequence[str], scope_from_where: str, metrics_enabled: 
     if "batter_inns" in families:
         ctes.append(f"""batter_inns AS (
             SELECT d.p_match, d.inns, d.bat,
-                   SUM(CASE WHEN COALESCE(d.wide, 0) = 0 THEN 1 ELSE 0 END) AS balls_faced
+                   SUM(CASE WHEN COALESCE(d.wide, 0) = 0 THEN 1 ELSE 0 END) AS balls_faced,
+                   SUM(COALESCE(d.batruns, 0)) * 100.0
+                       / NULLIF(SUM(CASE WHEN COALESCE(d.wide, 0) = 0 THEN 1 ELSE 0 END), 0) AS strike_rate
             FROM delivery_details d
             WHERE {in_scope}
             GROUP BY d.p_match, d.inns, d.bat

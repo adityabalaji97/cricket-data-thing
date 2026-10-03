@@ -180,7 +180,7 @@ _METRIC_ORDER = [
     "boundaries", "percent_balls",
     # T20 Primer metrics (men's T20 only; null elsewhere).
     "impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "raa_per_over", "raa_lw_per_100", "waa",
-    "waa_per_100", "waa_per_over", "wpa", "avg_leverage",
+    "waa_per_100", "waa_per_over", "wpa", "wpa_per_innings", "avg_leverage",
     # team_innings mode
     "avg_total", "avg_wickets", "run_rate", "powerplay_run_rate", "middle_run_rate",
     "death_run_rate", "pct_160_plus", "pct_180_plus", "pct_200_plus", "pct_220_plus", "pct_250_plus",
@@ -188,7 +188,7 @@ _METRIC_ORDER = [
 ]
 # Primer columns whose sign depends on the perspective; labelled in the text table.
 _SIGNED_METRICS = ("impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "raa_per_over", "raa_lw_per_100",
-                   "waa", "waa_per_100", "waa_per_over", "wpa")
+                   "waa", "waa_per_100", "waa_per_over", "wpa", "wpa_per_innings")
 _PLAYER_COLUMNS = ("batter", "bowler", "non_striker", "player")
 # Bookkeeping that rides along with the Primer metrics; reported once in metadata, not per row.
 _ROW_INTERNAL = {"metric_balls", "metrics_perspective"}
@@ -202,6 +202,7 @@ _BUCKET_ORDER = {
     "next_over_runs_bucket": ("0-6", "7-9", "10+"),
     "prev_over_raa_bucket": ("below -2", "-2 to +2", "above +2"),
     "batter_balls_faced_bucket": ("1-9", "10-19", "20-29", "30-39", "40-49", "50+"),
+    "batter_innings_strike_rate_bucket": ("under 110", "110-129", "130-149", "150+"),
     "impact_player_era": ("pre-2023", "2023+"),
     "total_bucket": ("<140", "140-159", "160-179", "180-199", "200-219", "220-249", "250+"),
 }
@@ -589,6 +590,8 @@ def structure_query_result(
             for f in ("raa", "waa"):
                 if raw.get(f) is not None:
                     row[f"{f}_per_over"] = round(float(raw[f]) * 6.0 / float(metric_balls), 3)
+            if raw.get("wpa") is not None and raw.get("innings_count"):
+                row["wpa_per_innings"] = round(float(raw["wpa"]) / float(raw["innings_count"]), 4)
         rows.append(row)
     if bowler_centric:
         rows = [_with_economy(row, query_mode) for row in rows]
