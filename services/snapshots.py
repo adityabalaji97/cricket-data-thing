@@ -35,12 +35,14 @@ QUERY_PARAMS = {
     "chase_outcome", "toss_decision", "day_or_night", "group_by", "ball_aggregation", "min_balls",
     "max_balls", "min_runs", "max_runs", "min_wickets", "max_wickets", "include_international",
     "top_teams", "query_mode", "fmt", "gender", "having",
+    "match_ids", "exclude_batters", "exclude_bowlers", "dimension_filters", "metrics_perspective",
 }
 PRESENTATION = {"sort_by", "sort_descending", "limit", "chart", "chart_metric", "scatter_x", "scatter_y",
                 "highlight", "title"}
 LIST_PARAMS = {"leagues", "teams", "batting_teams", "bowling_teams", "players", "batters", "bowlers",
                "bowl_style", "bowl_kind", "crease_combo", "line", "length", "shot", "wagon_zone",
-               "dismissal", "match_outcome", "chase_outcome", "toss_decision", "group_by", "having"}
+               "dismissal", "match_outcome", "chase_outcome", "toss_decision", "group_by", "having",
+               "match_ids", "exclude_batters", "exclude_bowlers", "dimension_filters"}
 
 
 class SnapshotError(ValueError):
@@ -219,7 +221,13 @@ def default_title(params: Dict[str, Any], metric: Optional[str]) -> str:
 
 
 # Groupings whose natural order is the point of the chart (mcp_server.server._SEQUENTIAL_KEYS + phase).
-_SEQUENCE_GROUPS = {"year", "over", "ball", "ball_in_over", "ball_in_spell", "innings", "batting_position", "phase"}
+_SEQUENCE_GROUPS = {"year", "over", "ball", "ball_in_over", "ball_in_spell", "innings", "batting_position", "phase",
+                    # Match-context dimensions and their buckets keep their natural order too.
+                    "season", "impact_player_era", "bowler_over_number", "bowler_entry_over", "spell_number",
+                    "bowler_first_over_runs", "bowler_first_over_runs_bucket", "prev_over_runs",
+                    "prev_over_runs_bucket", "prev_over_raa", "prev_over_raa_bucket", "next_over_runs",
+                    "next_over_runs_bucket", "match_date", "batter_balls_faced",
+                    "batter_balls_faced_bucket", "total_bucket"}
 # Ranked ascending when a chart is "by" them.
 _LOWER_IS_BETTER = {"economy", "bowling_average", "bowling_strike_rate"}
 

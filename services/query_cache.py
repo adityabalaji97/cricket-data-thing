@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 MAX_RESULT_BYTES = 1_000_000
 # Bump whenever query-builder semantics change (see module docstring). Format: date + letter.
-LOGIC_VERSION = "2026-10-02a"  # a: metric thresholds on stage-2 metrics (phase 1 cached them unfiltered)
+LOGIC_VERSION = "2026-10-03b"  # b: "BBL 2023" / "CPL 2023" / "CPL 2024" are BBL / CPL; a: dimensions, team_innings, perspective
 _VERSION_TTL_SECONDS = 300
 _version_cache: Dict[str, Any] = {"value": None, "at": 0.0}
 

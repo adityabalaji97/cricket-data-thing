@@ -49,6 +49,13 @@ _register("LPL", "Lanka Premier League")
 _register("MLC", "Major League Cricket")
 _register("ILT20", "International League T20")
 
+# Whole seasons the feed filed under a year-suffixed name, checked against the base name: no
+# "BBL" match falls in BBL 2023's window (2023-12-07 to 2024-01-24, the 2023/24 season), "CPL"
+# has none in CPL 2024's and two different fixtures in CPL 2023's. Without these a "BBL" filter
+# silently dropped the 2023/24 season and "CPL" two seasons. (GSL 2024 stays unmerged: AMBIGUOUS.)
+_register("BBL", "BBL 2023")
+_register("CPL", "CPL 2023", "CPL 2024")
+
 # England's domestic T20, renamed by sponsor. leagues_mapping already displays these as
 # "T20 Blast", so that is the canonical form.
 _register("T20 Blast", "Vitality Blast", "NatWest T20 Blast")
