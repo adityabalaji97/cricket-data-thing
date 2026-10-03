@@ -22,6 +22,13 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > connector: limit 10,000 + offset, full CSV/JSON block, perspective in text + headers, canonical names,
 > player_advanced tool; bowling_context buckets carry raa_per_over/waa_per_over. LOGIC_VERSION 2026-10-03a.
 > Local goldens: only additive metadata keys differ (filters_applied.*, columns endpoint lists).
+> Phase 2 (lab/2-hypotheses): analysis/hypotheses (pre-registrations committed first, h0-h8 scripts,
+> common.py stats/verdicts, run_all.py); scripts/dev/setup_analysis_db.sh builds hindsight_analysis (full
+> men's T20 2015+, read-only from prod) -- results NOT yet run (needs that DB). Phase 3 (lab/3-notes):
+> scripts/notes/build_hypothesis_notes.py prepare (analysis DB -> analysis/hypotheses/notes/<slug>/ note.md,
+> charts.json, cards.json, card-N.png via scripts/notes/render_cards.mjs) / load (DATABASE_URL -> static
+> 'ranking' snapshots + DRAFT notes slug hypothesis-<slug>, re-runs update). Feed credit placeholder in
+> analysis/hypotheses/credits.py.
 >
 > **MOBILE VIZ SWEEP (2026-10-02) — DEPLOYED through 6d681d4 (main == mobile-viz-sweep, Vercel + Heroku).**
 > Plan + tracker: MOBILE_VIZ_SWEEP.md (chunks 0-6 done; read its "Deploys / fixes" and "Orphaned components"
