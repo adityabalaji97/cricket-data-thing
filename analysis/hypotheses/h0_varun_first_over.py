@@ -140,8 +140,13 @@ def run() -> Result:
     v_a = verdict_directional(a_eff, a_min)
     v_b = verdict_directional(b_eff, b_min)
     v_c = verdict_directional(c_eff, c_min)
-    if v_c == SUPPORTED and c_placebo.ci[0] is not None and (c_placebo.ci[1] < 0 or c_placebo.ci[0] > 0):
-        v_c = NOT_SUPPORTED + " (placebo also shifts: confounded)"
+    # Pre-registered: supported only if the placebo's CI includes zero; a placebo shift in the same
+    # (negative) direction means the previous-over pattern is confounding.
+    if v_c == SUPPORTED and c_placebo.ci[1] is not None:
+        if c_placebo.ci[1] < 0:
+            v_c = NOT_SUPPORTED + " (placebo shifts the same way: confounded)"
+        elif c_placebo.ci[0] > 0:
+            v_c = INCONCLUSIVE + " (placebo shifts the other way)"
     parts = {"a. 10+ first over hurts the rest of his match": v_a, "b. better entering in the middle overs": v_b,
              "c. hurt by a big over from the other end": v_c}
     distinct = {v.split(" (")[0] for v in parts.values()}
