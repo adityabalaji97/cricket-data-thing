@@ -22,6 +22,7 @@ from services.player_aliases import (
 )
 from services.bowler_types import PACE_TYPES as ALL_KNOWN_PACE_TYPES, SPIN_TYPES as ALL_KNOWN_SPIN_TYPES
 from services.metrics import sql_defs
+from services import query_dimensions
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,8 @@ ADVANCED_COLUMNS = {
     'bat_hand',
     # Computed ball-position columns require the delivery_details schema.
     'ball_in_over', 'ball', 'ball_in_spell',
+    # Match-context dimensions are computed from delivery_details (services/query_dimensions.py).
+    *query_dimensions.DIMENSION_NAMES,
 }
 
 # Columns available in both tables (can be queried across full date range)
@@ -532,7 +535,7 @@ def build_legacy_where_clause(
     players, batters, bowlers, bowl_style, bowl_kind, crease_combo, dismissal, innings, over_min, over_max,
     match_outcome, is_chase, chase_outcome, toss_decision,
     include_international, top_teams, group_by, base_params, db,
-    day_or_night=None,
+    day_or_night=None, match_ids=None, exclude_batters=None, exclude_bowlers=None,
 ):
     """Build dynamic WHERE clause for legacy deliveries table."""
     conditions = ["1=1"]
@@ -696,9 +699,30 @@ def build_legacy_where_clause(
     if over_max is not None:
         conditions.append("d.over <= :over_max")
         params["over_max"] = over_max
-    
+
+    conditions.extend(_match_and_exclusion_conditions(
+        params, db, "d.match_id", "d.batter", "d.bowler", match_ids, exclude_batters, exclude_bowlers,
+        expand=get_all_player_variants,
+    ))
+
     where_clause = "WHERE " + " AND ".join(conditions)
     return where_clause, params
+
+
+def _match_and_exclusion_conditions(params, db, match_col, bat_col, bowl_col, match_ids, exclude_batters,
+                                    exclude_bowlers, expand=None):
+    """match_ids / exclude_batters / exclude_bowlers, shared by both tables. Excluded names expand to
+    every stored spelling, so excluding "Varun Chakravarthy" also drops rows stored as "CV Varun"."""
+    conditions = []
+    if match_ids:
+        conditions.append(f"{match_col} = ANY(:match_ids)")
+        params["match_ids"] = [str(m) for m in match_ids]
+    for key, col, names in (("exclude_batters", bat_col, exclude_batters), ("exclude_bowlers", bowl_col, exclude_bowlers)):
+        if names:
+            variants = expand(names, db) if (expand and db) else list(names)
+            conditions.append(f"({col} IS NULL OR NOT ({col} = ANY(:{key})))")
+            params[key] = variants
+    return conditions
 
 
 def query_legacy_ungrouped(where_clause, params, limit, offset, db, merge_order=False):
@@ -974,19 +998,30 @@ def get_legacy_total_balls(where_clause, params, db):
 # MERGE FUNCTIONS FOR COMBINING RESULTS FROM BOTH TABLES
 # =============================================================================
 
+class _CanonicalNames(dict):
+    """Any stored spelling -> canonical name, matched case-insensitively (keys are lower-case)."""
+
+    def get(self, name, default=None):  # type: ignore[override]
+        if not isinstance(name, str):
+            return default
+        return super().get(name.lower(), default)
+
+
 def load_player_aliases_for_merge(db) -> Dict[str, str]:
     """
-    Load all player aliases into a dict for efficient lookup during merge.
-    Returns: {old_name: new_name, ...}
+    Spelling -> canonical name, for normalising merged rows.
+
+    Reads player_alias_map (migration 011), the same lookup the stats modes group by. The raw
+    player_aliases table has no uniqueness: "DJ Bravo" has rows for both Dwayne and Darren Bravo,
+    so a dict built from it kept whichever row came last and could file one player's legacy
+    balls under another. The map leaves ambiguous spellings unmapped instead.
     """
     try:
-        query = text("SELECT player_name, alias_name FROM player_aliases")
-        result = db.execute(query).fetchall()
-        # player_name is OLD (deliveries), alias_name is NEW (delivery_details)
-        return {row[0]: row[1] for row in result}
+        rows = db.execute(text("SELECT name_key, canonical_name FROM player_alias_map")).fetchall()
+        return _CanonicalNames({row[0]: row[1] for row in rows})
     except Exception as e:
         logger.warning(f"Error loading player aliases: {e}")
-        return {}
+        return _CanonicalNames()
 
 
 def normalize_player_name_for_merge(name: str, player_aliases_map: Dict[str, str]) -> str:
@@ -2068,6 +2103,11 @@ def query_deliveries_service(
     gender: str = "male",
     metric_thresholds: Optional[list] = None,
     threshold_warnings: Optional[list] = None,
+    match_ids: Optional[List[str]] = None,
+    exclude_batters: Optional[List[str]] = None,
+    exclude_bowlers: Optional[List[str]] = None,
+    dimension_filters: Optional[list] = None,
+    metrics_perspective: Optional[str] = None,
 ):
     """
     Main service function to query cricket delivery data with flexible filtering and grouping.
@@ -2111,6 +2151,15 @@ def query_deliveries_service(
             min_wickets=min_wickets,
             max_wickets=max_wickets,
         )
+
+        if query_mode != "delivery":
+            delivery_only = [name for name, value in (
+                ("match_ids", match_ids), ("exclude_batters", exclude_batters),
+                ("exclude_bowlers", exclude_bowlers), ("dimension_filters", dimension_filters),
+            ) if value]
+            if delivery_only:
+                raise HTTPException(status_code=400,
+                                    detail=f"Unsupported filters for query_mode={query_mode}: {delivery_only}")
 
         if query_mode == "batting_stats":
             return query_batting_stats_service(
@@ -2187,7 +2236,12 @@ def query_deliveries_service(
             'wagon_zone': wagon_zone,
             'dismissal': dismissal,
         }
-        
+        # A filter on a match-context dimension routes like grouping by it (delivery_details only).
+        for name, _op, _values in dimension_filters or []:
+            filters_for_routing[name] = True
+        if dimension_filters and not group_by:
+            raise HTTPException(status_code=400, detail="dimension_filters need a group_by.")
+
         # Analyze query to determine which tables to use
         routing = analyze_query_requirements(
             start_date=start_date,
@@ -2231,6 +2285,11 @@ def query_deliveries_service(
             "toss_decision": toss_decision,
             "min_wickets": min_wickets,
             "max_wickets": max_wickets,
+            "match_ids": match_ids or [],
+            "exclude_batters": exclude_batters or [],
+            "exclude_bowlers": exclude_bowlers or [],
+            "dimension_filters": [f"{n}:{op}:{'|'.join(v)}" for n, op, v in (dimension_filters or [])],
+            "metrics_perspective": metrics_perspective,
             "group_by": group_by
         }
         
@@ -2317,6 +2376,9 @@ def query_deliveries_service(
                 day_or_night=day_or_night,
                 fmt=fmt,
                 gender=gender,
+                match_ids=match_ids,
+                exclude_batters=exclude_batters,
+                exclude_bowlers=exclude_bowlers,
             )
             
             if not group_by or len(group_by) == 0:
@@ -2357,6 +2419,8 @@ def query_deliveries_service(
                     ball_aggregation=ball_aggregation,
                     fmt=fmt, gender=gender,
                     metric_thresholds=None if merging else metric_thresholds,
+                    dimension_filters=dimension_filters,
+                    metrics_perspective=metrics_perspective,
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_groups']
@@ -2412,6 +2476,9 @@ def query_deliveries_service(
                 base_params=legacy_params,
                 db=db,
                 day_or_night=day_or_night,
+                match_ids=match_ids,
+                exclude_batters=exclude_batters,
+                exclude_bowlers=exclude_bowlers,
             )
             
             legacy_total_balls = get_legacy_total_balls(legacy_where_clause, legacy_params, db) or 0
@@ -2585,6 +2652,7 @@ def build_where_clause(
     match_outcome, is_chase, chase_outcome, toss_decision,
     include_international, top_teams, group_by, base_params, db=None,
     day_or_night=None, fmt="T20", gender="male",
+    match_ids=None, exclude_batters=None, exclude_bowlers=None,
 ):
     """Build dynamic WHERE clause for delivery_details table.
 
@@ -2802,7 +2870,12 @@ def build_where_clause(
     if over_max is not None:
         conditions.append("dd.over <= :over_max")
         params["over_max"] = over_max
-    
+
+    conditions.extend(_match_and_exclusion_conditions(
+        params, db, "dd.p_match", "dd.bat", "dd.bowl", match_ids, exclude_batters, exclude_bowlers,
+        expand=_expand_player_names,
+    ))
+
     where_clause = "WHERE " + " AND ".join(conditions)
     return where_clause, params
 
@@ -3233,6 +3306,10 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
         "chase_outcome": chase_outcome_sql,
         "toss_decision": "LOWER(COALESCE(m.toss_decision, ''))",
         "toss_match_outcome": get_toss_match_outcome_sql("m.toss_winner", "m.winner", "m.outcome"),
+        # Match-context dimensions (services/query_dimensions.py); their CTEs and joins are added
+        # by handle_grouped_query.
+        **{name: dim.expr for name, dim in query_dimensions.dimensions(
+            competition_canonical_sql("dd.competition")).items()},
     }
 
 
@@ -3271,8 +3348,15 @@ def handle_grouped_query(
     ball_aggregation="snapshot",
     fmt="T20", gender="male",
     metric_thresholds=None,
+    dimension_filters=None,
+    metrics_perspective=None,
 ):
     """Return aggregated cricket statistics grouped by specified columns.
+
+    dimension_filters: parsed services.query_dimensions filters (name, op, values).
+    metrics_perspective: 'bowling' / 'batting' pins the sign of the Primer metrics (and, for
+    'bowling', bowler-charged runs); None keeps the inferred view (bowling when grouped by bowler
+    and not batter).
 
     Single-statement plan with two scans of delivery_details:
       Stage 1 (CTE all_groups): cheap aggregates per group (balls, innings,
@@ -3362,6 +3446,27 @@ def handle_grouped_query(
         if spec:
             computed_ctes.extend(spec["ctes"])
             computed_joins.append(spec["join"])
+    # Match-context dimensions (services/query_dimensions.py): scoped to the matches this query
+    # touches, then joined per ball. Their filters go into the WHERE after the scope is taken, so
+    # e.g. "overs 2+ of the bowler" still numbers overs from his real first one.
+    primer_enabled = (
+        os.environ.get("QB_PRIMER_METRICS", "1") != "0" and fmt not in ("ODI", "TEST") and gender != "female"
+    )
+    dims = query_dimensions.dimensions(competition_canonical_sql("dd.competition"))
+    dimension_filters = dimension_filters or []
+    dim_names = list(group_by) + [f[0] for f in dimension_filters]
+    families = query_dimensions.needed_families(dim_names, dims)
+    dim_ctes, dim_joins = query_dimensions.build_ctes(
+        families, f"FROM delivery_details dd {join_clause} {where_clause}", primer_enabled,
+    )
+    computed_ctes.extend(dim_ctes)
+    computed_joins.extend(dim_joins)
+    if dimension_filters:
+        where_clause = where_clause + " AND " + " AND ".join(
+            query_dimensions.filter_sql(dimension_filters, dims, params)
+        )
+    uses_dimensions = any(n in dims for n in dim_names)
+
     computed_cte_prefix = ""
     if computed_ctes:
         computed_cte_prefix = ",\n        ".join(computed_ctes) + ",\n        "
@@ -3375,6 +3480,9 @@ def handle_grouped_query(
     batter_grouping = "batter" in group_by
     use_runs_off_bat_only = batter_grouping or has_batter_filters
     perspective = sql_defs.perspective_for(group_by, has_batter_filters)
+    if metrics_perspective == "bowling" and "batter" not in group_by:
+        # A bowling view charges the bowler only with his own runs (no byes / leg-byes).
+        perspective = sql_defs.BOWLER
     ball_defs = sql_defs.delivery_details_defs(perspective, "dd")
 
     # Snapshot vs cumulative metric expressions. In snapshot mode each row
@@ -3417,10 +3525,7 @@ def handle_grouped_query(
     else:
         # ball_metrics covers men's T20 only: skip the join elsewhere (an ODI query joined 1.4M
         # metric rows for nothing).
-        metrics_enabled = (
-            os.environ.get("QB_PRIMER_METRICS", "1") != "0"
-            and fmt not in ("ODI", "TEST") and gender != "female"
-        )
+        metrics_enabled = primer_enabled
         # Shared definitions (services/metrics/sql_defs.py): a batter's balls exclude wides, a
         # bowler's runs exclude byes/leg-byes, wickets are the perspective's own dismissals.
         runs_calculation = ball_defs.runs_sum
@@ -3499,7 +3604,10 @@ def handle_grouped_query(
     # tens of thousands of balls wobble in the last shown digit with parallel aggregation order.
     # QB_PRIMER_METRICS=0 drops the join (kill switch if it ever costs too much on a big scan).
     metrics_join = "LEFT JOIN ball_metrics bm ON bm.delivery_id = dd.id" if metrics_enabled else ""
-    metric_sign = -1 if ("bowler" in group_by and "batter" not in group_by) else 1
+    if metrics_perspective in ("bowling", "batting"):
+        metric_sign = -1 if metrics_perspective == "bowling" else 1
+    else:
+        metric_sign = -1 if ("bowler" in group_by and "batter" not in group_by) else 1
     metrics_perspective = "bowling" if metric_sign == -1 else "batting"
     metric_ball = "s.wide = 0 AND s.m_impact IS NOT NULL"
     metric_selects = f"""
@@ -3736,7 +3844,8 @@ def handle_grouped_query(
     # over deliveries). They don't have a clean meaning in cumulative mode —
     # the metrics there are already cross-innings averages of running totals
     # — so skip summaries when cumulative is active.
-    if show_summary_rows and len(group_by) >= 1 and not cumulative_source:
+    # Summary rows are built without the dimension joins; skip them when dimensions are in play.
+    if show_summary_rows and len(group_by) >= 1 and not cumulative_source and not uses_dimensions:
         summary_data, percentages = generate_summary_data(
             where_clause, params, group_by, ball_defs, db, universe_balls,
             join_matches=join_matches, fmt=fmt, gender=gender,
@@ -3926,6 +4035,7 @@ GROUP_BY_COLUMNS = (
     "bowl_style", "bowl_kind", "crease_combo",
     "line", "length", "shot", "control", "wagon_zone", "dismissal",
     "format",
+    *query_dimensions.DIMENSION_NAMES,
 )
 
 
@@ -4008,9 +4118,36 @@ def _run_deliveries_query_uncached(
     fmt: str = "ALL",
     gender: str = "male",
     having: Optional[List[str]] = None,
+    match_ids: Optional[List[str]] = None,
+    exclude_batters: Optional[List[str]] = None,
+    exclude_bowlers: Optional[List[str]] = None,
+    dimension_filters: Optional[List[str]] = None,
+    metrics_perspective: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Validate and run a query-builder request. Raises QueryValidationError on bad bounds."""
     validate_format_bounds(fmt, gender, over_min, over_max, innings)
+    if metrics_perspective not in (None, "", "auto", "bowling", "batting"):
+        raise QueryValidationError("metrics_perspective must be 'bowling' or 'batting' (or omitted to infer it).")
+    metrics_perspective = metrics_perspective if metrics_perspective in ("bowling", "batting") else None
+    if query_mode == "team_innings":
+        from services.team_innings import query_team_innings
+        return query_team_innings(
+            db, venue=venue, start_date=start_date, end_date=end_date, leagues=leagues or [],
+            teams=teams or [], batting_teams=batting_teams or [], bowling_teams=bowling_teams or [],
+            innings=innings, match_outcome=match_outcome or [], is_chase=is_chase, toss_decision=toss_decision or [],
+            day_or_night=day_or_night, group_by=group_by or [], include_international=include_international,
+            top_teams=top_teams, fmt=fmt, gender=gender, match_ids=match_ids or [],
+            dimension_filters=dimension_filters or [], limit=limit, offset=offset,
+            ball_level=dict(players=players, batters=batters, bowlers=bowlers, bat_hand=bat_hand,
+                            bowl_style=bowl_style, bowl_kind=bowl_kind, crease_combo=crease_combo, line=line,
+                            length=length, shot=shot, control=control, wagon_zone=wagon_zone, dismissal=dismissal,
+                            over_min=over_min, over_max=over_max, exclude_batters=exclude_batters,
+                            exclude_bowlers=exclude_bowlers, having=having),
+        )
+    try:
+        parsed_dimension_filters = query_dimensions.parse_filters(dimension_filters, query_dimensions.DIMENSION_NAMES)
+    except query_dimensions.DimensionFilterError as exc:
+        raise QueryValidationError(str(exc))
     from services.metric_thresholds import ThresholdError, parse as parse_thresholds
     try:
         metric_thresholds, threshold_warnings = parse_thresholds(having)
@@ -4081,6 +4218,11 @@ def _run_deliveries_query_uncached(
         gender=gender,
         metric_thresholds=metric_thresholds if query_mode == "delivery" else None,
         threshold_warnings=threshold_warnings,
+        match_ids=match_ids or [],
+        exclude_batters=exclude_batters or [],
+        exclude_bowlers=exclude_bowlers or [],
+        dimension_filters=parsed_dimension_filters,
+        metrics_perspective=metrics_perspective,
     )
     if metric_thresholds and query_mode == "delivery" and isinstance(result, dict):
         from services.metric_thresholds import describe

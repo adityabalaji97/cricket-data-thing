@@ -11,6 +11,18 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **HYPOTHESIS LAB (2026-10-03), stacked branches lab/0-orient -> lab/1-connector -> lab/2-hypotheses ->
+> lab/3-notes, NOT deployed.** Orientation + data provenance: docs/notes-pipeline.md (the 2015+ CSV feed's
+> provider is not named in the repo). Phase 1: services/query_dimensions.py (bowler_over_number,
+> bowler_entry_over, spell_number [new spell when overs are not exactly 2 apart], bowler_first_over_runs(_bucket),
+> prev_over_runs/raa(_bucket), batter_balls_faced(_bucket), impact_player_era, season) as group_by +
+> `dimension_filters` (name:op:value), scoped by a scope_matches CTE; services/team_innings.py
+> (query_mode=team_innings); match_ids / exclude_batters / exclude_bowlers; metrics_perspective (bowling/batting);
+> legacy merge now normalises names with player_alias_map (raw player_aliases maps "DJ Bravo" to two people);
+> connector: limit 10,000 + offset, full CSV/JSON block, perspective in text + headers, canonical names,
+> player_advanced tool; bowling_context buckets carry raa_per_over/waa_per_over. LOGIC_VERSION 2026-10-03a.
+> Local goldens: only additive metadata keys differ (filters_applied.*, columns endpoint lists).
+>
 > **MOBILE VIZ SWEEP (2026-10-02) — DEPLOYED through 6d681d4 (main == mobile-viz-sweep, Vercel + Heroku).**
 > Plan + tracker: MOBILE_VIZ_SWEEP.md (chunks 0-6 done; read its "Deploys / fixes" and "Orphaned components"
 > blocks). Shared pieces: hooks/useIsMobile, hooks/useMatchPreview, theme/chartDefaults (validated palette +

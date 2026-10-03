@@ -1,11 +1,13 @@
 """
 Hindsight MCP server: the query builder as tools for Claude, ChatGPT and other MCP hosts.
 
-Three read-only tools:
+Read-only tools:
   * find_entities       - resolve "kohli", "chinnaswamy", "ipl" to the exact names the data uses
   * get_query_options   - valid values for the enum-like filters (line, length, shot, ...)
   * query_cricket_data  - the query builder itself; renders an interactive table/chart
-                          (MCP Apps view ui://hindsight/query-result) and links back to /query
+                          (MCP Apps view ui://hindsight/query-result), returns every row up to
+                          `limit` as CSV/JSON for the model, and links back to /query
+  * preview_match, match_recap, player_profile, player_advanced - packaged views
 
 Served over streamable HTTP at /mcp from the existing FastAPI app (see mount_mcp). Stateless with
 plain JSON responses: every request stands alone (fits a single Heroku dyno and its 30s router
@@ -18,6 +20,8 @@ chatty assistant cannot starve the small DB pool the website shares.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import os
@@ -42,6 +46,7 @@ from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
 from database import SessionLocal
 from services.query_builder_v2 import GROUP_BY_COLUMNS, QueryValidationError, run_deliveries_query
+from services.team_innings import GROUP_BY as TEAM_INNINGS_GROUP_BY
 
 logger = logging.getLogger("hindsight.mcp")
 
@@ -49,14 +54,17 @@ WEB_URL = os.getenv("HINDSIGHT_WEB_URL", "https://hindsightcricket.com").rstrip(
 UI_URI = "ui://hindsight/query-result"
 STATEMENT_TIMEOUT_MS = int(os.getenv("MCP_STATEMENT_TIMEOUT_MS", "15000"))
 DEFAULT_ROWS = 50
-MAX_ROWS = 500
+# Same cap as the website's query builder (routers/query_builder_v2.py), with offset paging.
+MAX_ROWS = 10000
 # Rows fetched before sorting/truncating, so "top 10 by strike rate" ranks the whole result
 # rather than whichever 10 groups the service happened to return first.
-SORT_FETCH_LIMIT = 2000
+SORT_FETCH_LIMIT = MAX_ROWS
+# Rows shown in the human-readable markdown table; the full result rides along as CSV/JSON.
+TEXT_TABLE_ROWS = 25
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
 
-GroupByColumn = Literal[GROUP_BY_COLUMNS]  # type: ignore[valid-type]
+GroupByColumn = Literal[tuple(dict.fromkeys([*GROUP_BY_COLUMNS, *TEAM_INNINGS_GROUP_BY]))]  # type: ignore[valid-type]
 
 
 # --------------------------------------------------------------------------------------------
@@ -171,17 +179,37 @@ _METRIC_ORDER = [
     "dot_percentage", "boundary_percentage", "control_percentage", "fours", "sixes", "dots",
     "boundaries", "percent_balls",
     # T20 Primer metrics (men's T20 only; null elsewhere).
-    "impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "waa", "waa_per_100",
-    "wpa", "avg_leverage",
+    "impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "raa_per_over", "waa",
+    "waa_per_100", "waa_per_over", "wpa", "avg_leverage",
+    # team_innings mode
+    "avg_total", "avg_wickets", "run_rate", "powerplay_run_rate", "middle_run_rate",
+    "death_run_rate", "pct_160_plus", "pct_180_plus", "pct_200_plus", "pct_220_plus", "pct_250_plus",
+    "count_200_plus", "count_250_plus", "highest_total", "win_percentage",
 ]
+# Primer columns whose sign depends on the perspective; labelled in the text table.
+_SIGNED_METRICS = ("impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "raa_per_over",
+                   "waa", "waa_per_100", "waa_per_over", "wpa")
+_PLAYER_COLUMNS = ("batter", "bowler", "non_striker", "player")
 # Bookkeeping that rides along with the Primer metrics; reported once in metadata, not per row.
 _ROW_INTERNAL = {"metric_balls", "metrics_perspective"}
-_SEQUENTIAL_KEYS = {"year", "over", "ball", "ball_in_over", "ball_in_spell", "innings", "batting_position"}
+_SEQUENTIAL_KEYS = {"year", "over", "ball", "ball_in_over", "ball_in_spell", "innings", "batting_position",
+                    "bowler_over_number", "bowler_entry_over", "spell_number", "bowler_first_over_runs",
+                    "prev_over_runs", "prev_over_raa", "batter_balls_faced", "season"}
+# Bucketed dimensions sort in their natural order, not alphabetically ('10+' after '7-9').
+_BUCKET_ORDER = {
+    "bowler_first_over_runs_bucket": ("0-6", "7-9", "10+"),
+    "prev_over_runs_bucket": ("0-6", "7-9", "10+"),
+    "prev_over_raa_bucket": ("below -2", "-2 to +2", "above +2"),
+    "batter_balls_faced_bucket": ("1-9", "10-19", "20-29", "30-39", "40-49", "50+"),
+    "impact_player_era": ("pre-2023", "2023+"),
+    "total_bucket": ("<140", "140-159", "160-179", "180-199", "200-219", "220-249", "250+"),
+}
 # The first of these present is charted by default, per query mode.
 _DEFAULT_CHART_METRIC = {
     "delivery": ["strike_rate", "runs", "balls"],
     "batting_stats": ["runs", "strike_rate", "average"],
     "bowling_stats": ["wickets", "economy", "runs_conceded"],
+    "team_innings": ["avg_total", "pct_200_plus", "run_rate"],
 }
 
 
@@ -216,6 +244,9 @@ def _sequence_key(column: str, value: Any) -> tuple:
         return (2, 0, "")
     if column == "phase":
         return (0, _PHASE_ORDER.get(str(value).lower(), 99), str(value))
+    if column in _BUCKET_ORDER:
+        order = _BUCKET_ORDER[column]
+        return (0, order.index(value) if value in order else len(order), str(value))
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return (0, value, "")
     return (1, 0, str(value))
@@ -280,8 +311,13 @@ def _format_slug(fmt: str, gender: str) -> str:
     return f"{'mens' if gender == 'male' else 'womens'}-{fmt.lower()}"
 
 
-def _hindsight_url(params: Dict[str, Any], group_by: List[str], fmt: str, gender: str) -> str:
-    """Deep link that reopens the same query on the website's /query page (it auto-runs)."""
+def _hindsight_url(params: Dict[str, Any], group_by: List[str], fmt: str, gender: str,
+                   limit: Optional[int] = None, offset: int = 0) -> str:
+    """Deep link that reopens the same query on the website's /query page (it auto-runs).
+
+    limit/offset ride along when they differ from the site's defaults (1,000 rows from 0), so a
+    10,000-row pull opens as the same page of rows.
+    """
     pairs: List[tuple] = []
     for key, value in params.items():
         if value is None or value == [] or value == "" or value is False:
@@ -295,6 +331,10 @@ def _hindsight_url(params: Dict[str, Any], group_by: List[str], fmt: str, gender
         else:
             pairs.append((key, str(value)))
     pairs.extend(("group_by", g) for g in group_by)
+    if limit and limit > 1000:
+        pairs.append(("limit", str(limit)))
+    if offset:
+        pairs.append(("offset", str(offset)))
     pairs.append(("fmt", _format_slug(fmt, gender)))
     return f"{WEB_URL}/query?{urlencode(pairs)}"
 
@@ -307,6 +347,8 @@ def _filter_chips(params: Dict[str, Any], fmt: str) -> List[str]:
         "bowl_kind": "Bowl kind", "bowl_style": "Bowl style", "bat_hand": "Bat hand", "line": "Line",
         "length": "Length", "shot": "Shot", "dismissal": "Dismissal", "innings": "Innings",
         "match_outcome": "Result", "chase_outcome": "Chase result", "toss_decision": "Toss",
+        "match_ids": "Matches", "exclude_batters": "Excluding batters", "exclude_bowlers": "Excluding bowlers",
+        "dimension_filters": "Where",
     }
     for key, label in labels.items():
         value = params.get(key)
@@ -325,6 +367,8 @@ def _filter_chips(params: Dict[str, Any], fmt: str) -> List[str]:
         chips.append("Chasing" if params["is_chase"] else "Setting")
     if params.get("include_international"):
         chips.append("Incl. internationals" + (f" (top {params['top_teams']})" if params.get("top_teams") else ""))
+    if params.get("metrics_perspective"):
+        chips.append(f"{params['metrics_perspective'].capitalize()} view")
     chips.append("All formats" if fmt == "ALL" else fmt)
     return chips
 
@@ -338,8 +382,22 @@ def _title(params: Dict[str, Any], group_by: List[str]) -> str:
     return subject
 
 
-def _markdown_table(columns: List[str], rows: List[Dict[str, Any]], max_rows: int = 25,
-                    must_show: Optional[List[str]] = None) -> str:
+def perspective_label(perspective: Optional[str]) -> Optional[str]:
+    """How to read the sign of Impact/RAA/WAA/WPA."""
+    if perspective == "bowling":
+        return "bowling view: + = good for bowler"
+    if perspective == "batting":
+        return "batting view: + = good for batter"
+    return None
+
+
+def _header(column: str, perspective: Optional[str]) -> str:
+    label = perspective_label(perspective)
+    return f"{column} ({label})" if label and column in _SIGNED_METRICS else column
+
+
+def _markdown_table(columns: List[str], rows: List[Dict[str, Any]], max_rows: int = TEXT_TABLE_ROWS,
+                    must_show: Optional[List[str]] = None, perspective: Optional[str] = None) -> str:
     # The first ten columns, plus whatever the rows were ranked or charted by -- otherwise a
     # "ranked by wpa" table could hide the very numbers it was ranked on.
     extra = []
@@ -350,12 +408,89 @@ def _markdown_table(columns: List[str], rows: List[Dict[str, Any]], max_rows: in
         if c and c in columns and c not in columns[:10] and c not in extra:
             extra.append(c)
     shown = columns[:10] + extra
-    lines = ["| " + " | ".join(shown) + " |", "|" + "---|" * len(shown)]
+    lines = ["| " + " | ".join(_header(c, perspective) for c in shown) + " |", "|" + "---|" * len(shown)]
     for row in rows[:max_rows]:
         lines.append("| " + " | ".join("" if row.get(c) is None else str(row.get(c)) for c in shown) + " |")
     if len(rows) > max_rows:
-        lines.append(f"| … {len(rows) - max_rows} more rows (shown in the widget) |")
+        lines.append(f"| … {len(rows) - max_rows} more rows (all of them are in the full result below and in the widget) |")
     return "\n".join(lines)
+
+
+def rows_as_csv(columns: List[str], rows: List[Dict[str, Any]]) -> str:
+    buf = io.StringIO()
+    writer = csv.writer(buf, lineterminator="\n")
+    writer.writerow(columns)
+    for row in rows:
+        writer.writerow(["" if row.get(c) is None else row.get(c) for c in columns])
+    return buf.getvalue()
+
+
+# --------------------------------------------------------------------------------------------
+# Canonical player names
+# --------------------------------------------------------------------------------------------
+
+_ADDITIVE = ("balls", "innings_count", "runs", "wickets", "dots", "boundaries", "fours", "sixes",
+             "metric_balls", "impact", "raa", "waa", "wpa")
+
+
+def _alias_map(db: Any) -> Dict[str, str]:
+    """lower(spelling) -> canonical name (player_alias_map: unambiguous spellings only)."""
+    try:
+        return {k: v for k, v in db.execute(text("SELECT name_key, canonical_name FROM player_alias_map"))}
+    except Exception as exc:  # pragma: no cover - the view exists in every environment
+        logger.warning("alias map unavailable: %r", exc)
+        return {}
+
+
+def canonical_name(name: Any, alias_map: Dict[str, str]) -> Any:
+    if not isinstance(name, str) or not name:
+        return name
+    return alias_map.get(name.lower(), name)
+
+
+def canonicalize_rows(rows: List[Dict[str, Any]], group_by: List[str], alias_map: Dict[str, str]) -> tuple:
+    """
+    One name per player in every output row, whatever the grouping. The engine already groups on
+    canonical names; this is the backstop for spellings it keys exactly (case variants, legacy
+    rows). Rows that collapse onto one key are combined: counts and Primer totals add, rates are
+    recomputed. Returns (rows, number of rows merged away).
+    """
+    if not alias_map or not rows:
+        return rows, 0
+    for row in rows:
+        for col in _PLAYER_COLUMNS:
+            if col in row:
+                row[col] = canonical_name(row[col], alias_map)
+        if row.get("partnership") and " & " in str(row["partnership"]):
+            a, b = (canonical_name(x.strip(), alias_map) for x in str(row["partnership"]).split(" & ", 1))
+            row["partnership"] = " & ".join(sorted([a, b]))
+    keyed: Dict[tuple, Dict[str, Any]] = {}
+    merged = 0
+    for row in rows:
+        key = tuple(str(row.get(g)) for g in group_by)
+        if key not in keyed:
+            keyed[key] = row
+            continue
+        merged += 1
+        into = keyed[key]
+        for f in _ADDITIVE:
+            if isinstance(row.get(f), (int, float, Decimal)) or isinstance(into.get(f), (int, float, Decimal)):
+                into[f] = float(into.get(f) or 0) + float(row.get(f) or 0)
+        balls, runs, wkts = float(into.get("balls") or 0), float(into.get("runs") or 0), float(into.get("wickets") or 0)
+        mb = float(into.get("metric_balls") or 0)
+        if "strike_rate" in into:
+            into["strike_rate"] = round(runs * 100 / balls, 2) if balls else 0
+        if "average" in into:
+            into["average"] = round(runs / wkts, 2) if wkts else None
+        if "balls_per_dismissal" in into:
+            into["balls_per_dismissal"] = round(balls / wkts, 2) if wkts else None
+        for f, num in (("dot_percentage", "dots"), ("boundary_percentage", "boundaries")):
+            if f in into:
+                into[f] = round(float(into.get(num) or 0) * 100 / balls, 2) if balls else 0
+        for f in ("impact", "raa", "waa"):
+            if f"{f}_per_100" in into:
+                into[f"{f}_per_100"] = round(float(into.get(f) or 0) * 100 / mb, 2) if mb else None
+    return list(keyed.values()), merged
 
 
 # --------------------------------------------------------------------------------------------
@@ -376,6 +511,20 @@ How to use the tools:
    For leaderboards, group by batter or bowler, set
    min_balls (e.g. 120) to drop small samples, and sort_by the metric. Group by "phase" for
    powerplay/middle/death, "year" for trends, "format" when mixing T20 and ODI.
+   The text shows the first 25 rows; every row up to `limit` (max 10,000, page with `offset`)
+   follows as CSV (or JSON via result_format). Do arithmetic and statistics on that full block.
+   Player names are canonical in every output (one name per player); any spelling works as input.
+   Filters: match_ids, exclude_batters, exclude_bowlers. Match-context dimensions, usable in
+   group_by and as dimension_filters 'name:op:value': bowler_over_number (his 1st/2nd/... over),
+   bowler_entry_over, spell_number, bowler_first_over_runs(_bucket '0-6'/'7-9'/'10+'),
+   prev_over_runs(_bucket), prev_over_raa(_bucket), batter_balls_faced(_bucket),
+   impact_player_era ('pre-2023'/'2023+'), season ('2024' or '2024/25' for BBL-style seasons).
+   Example, "does a bad first over hurt him for the rest of the match": bowlers=[X],
+   group_by=['match_id','bowler_first_over_runs_bucket'], dimension_filters=['bowler_over_number:gte:2'],
+   metrics_perspective='bowling'.
+   query_mode='team_innings' gives one record per team innings (total, wickets, run rate, phase run
+   rates, pct_200_plus/pct_250_plus, win %): "how often do IPL teams pass 200" = leagues=['IPL'],
+   group_by=['season'], dimension_filters=['full_length:eq:1'].
 Overs are 0-indexed (over_min=0, over_max=5 is the powerplay). Default format is ALL, which
 mixes T20 and ODI: ALWAYS pin format="ODI" for ODI questions and format="T20" for T20 ones.
 ODIs are all internationals -- for format="ODI" leave include_international, top_teams and
@@ -388,9 +537,12 @@ includes a link to open the same query on the Hindsight website — mention it t
    with Himanish Ganjoo's T20 Primer method and returned on every query_cricket_data row:
    impact (runs added to the team's projected total; impact_per_100, impact_per_innings),
    raa / waa (runs and wickets above average for the game state; *_per_100), wpa (win
-   probability added, 1.0 = one match won) and avg_leverage. They come from the batting side,
-   or the bowling side when grouped by bowler. For "most valuable / most impactful / match-
-   winning" questions, pin format="T20" and sort_by="impact" or "wpa" -- do not approximate them.
+   probability added, 1.0 = one match won) and avg_leverage. Their sign is the
+   metrics_perspective: by default the batting side, or the bowling side when grouped by bowler
+   (and not batter). For any bowler question grouped by something else (match, phase, bucket),
+   pass metrics_perspective='bowling'. Every result states its perspective, e.g. "raa (bowling
+   view: + = good for bowler)". For "most valuable / most impactful / match-winning" questions,
+   pin format="T20" and sort_by="impact" or "wpa" -- do not approximate them.
 6. preview_match also returns "Hindsight's take": the site's own preview facts (incl. par and
    each side's Impact leaders for T20), ranked by importance. Quote these rather than rederiving.
 7. match_recap explains how a finished men's T20 was won (biggest Impact and WPA performances,
@@ -399,6 +551,9 @@ includes a link to open the same query on the Hindsight website — mention it t
 8. player_profile gives what stands out about a player (Impact/RAA/WPA by season with rank,
    style, matchups) and Hindsight's fact-checked Player DNA. Use it for "tell me about X" or
    "how good has X been" questions before drilling in with query_cricket_data.
+9. player_advanced returns a bowler's Advanced Analytics as JSON: pressure split by the previous
+   over, spell shape, entry point, first/last-ball boundary rates, rolling form. Economy there is
+   unadjusted for game state; prefer the raa_per_over / waa_per_over next to it.
 """
 
 apps = Apps()
@@ -409,18 +564,30 @@ def structure_query_result(
     format: str = "ALL", gender: str = "male", batters: Optional[List[str]] = None,
     bowlers: Optional[List[str]] = None, sort_by: Optional[str] = None, sort_descending: bool = True,
     limit: int = 25, chart: str = "auto", chart_metric: Optional[str] = None,
-    scatter_x: Optional[str] = None, scatter_y: Optional[str] = None,
+    scatter_x: Optional[str] = None, scatter_y: Optional[str] = None, offset: int = 0,
+    paged_by_engine: bool = False,
 ) -> Dict[str, Any]:
     """Shape a query-builder result for display: ordered columns, chart spec, title, link.
 
     Shared by the connector (query_cricket_data) and chart snapshots/embeds, so the widget renders
-    both the same way.
+    both the same way. Rows are sorted here when sort_by is given, then the page
+    [offset, offset + limit) is kept -- unless the engine already applied the offset
+    (paged_by_engine), in which case only `limit` applies.
     """
     raw_rows = result.get("data") or []
     # A bowling question: bowlers are filtered, or rows are split by bowler, and no batter is picked.
     bowler_centric = (bool(bowlers) or "bowler" in group_by) and not batters
     metrics_perspective = next((r.get("metrics_perspective") for r in raw_rows if r.get("metric_balls")), None)
-    rows = [{k: _normalise_value(v) for k, v in row.items() if k not in _ROW_INTERNAL} for row in raw_rows]
+    rows = []
+    for raw in raw_rows:
+        row = {k: _normalise_value(v) for k, v in raw.items() if k not in _ROW_INTERNAL}
+        metric_balls = raw.get("metric_balls")
+        if metric_balls:
+            # Per over (six balls with metrics), the unit bowling questions are usually asked in.
+            for f in ("raa", "waa"):
+                if raw.get(f) is not None:
+                    row[f"{f}_per_over"] = round(float(raw[f]) * 6.0 / float(metric_balls), 3)
+        rows.append(row)
     if bowler_centric:
         rows = [_with_economy(row, query_mode) for row in rows]
     meta = result.get("metadata") or {}
@@ -434,10 +601,11 @@ def structure_query_result(
             _num(r.get(sort_by)) is None,
             -(_num(r.get(sort_by)) or 0.0) if sort_descending else (_num(r.get(sort_by)) or 0.0),
         ))
-    elif group_by and (group_by[0] in _SEQUENTIAL_KEYS or group_by[0] == "phase"):
+    elif group_by and (group_by[0] in _SEQUENTIAL_KEYS or group_by[0] == "phase" or group_by[0] in _BUCKET_ORDER):
         rows.sort(key=lambda r: _sequence_key(group_by[0], r.get(group_by[0])))
     total_rows = meta.get("total_groups") or meta.get("total_rows") or len(rows)
-    rows = rows[:limit]
+    start = 0 if paged_by_engine else offset
+    rows = rows[start:start + limit]
 
     columns = _order_columns(rows, group_by)
     metric_columns = [
@@ -446,12 +614,15 @@ def structure_query_result(
     ]
     default_metric = chart_metric or sort_by or ("economy" if bowler_centric and "economy" in metric_columns else None)
     chart_spec = _choose_chart(chart, group_by, rows, metric_columns, query_mode, default_metric, scatter_x, scatter_y)
-    url = _hindsight_url(params, group_by, format, gender)
+    url = _hindsight_url(params, group_by, format, gender, limit=limit, offset=offset)
     warnings = [w for w in (meta.get("warnings") or []) if w]
+    next_offset = offset + len(rows) if offset + len(rows) < total_rows else None
 
     structured = {
         "title": _title(params, group_by),
-        "subtitle": f"{len(rows)} of {total_rows} rows" + (f" · ranked by {sort_by}" if sort_by else ""),
+        "subtitle": (f"{len(rows)} of {total_rows} rows" if not offset
+                     else f"rows {offset + 1}–{offset + len(rows)} of {total_rows}")
+                    + (f" · ranked by {sort_by}" if sort_by else ""),
         "filter_chips": _filter_chips(params, format),
         "group_by": group_by,
         "query_mode": query_mode,
@@ -459,11 +630,14 @@ def structure_query_result(
         "metric_columns": metric_columns,
         "rows": rows,
         "total_rows": total_rows,
+        "offset": offset,
+        "next_offset": next_offset,
         "chart": chart_spec,
         "hindsight_url": url,
         "warnings": warnings,
         "note": " ".join(warnings) if warnings else None,
         "metrics_perspective": metrics_perspective,
+        "metrics_perspective_label": perspective_label(metrics_perspective),
     }
 
     return structured
@@ -476,22 +650,33 @@ def structure_query_result(
     description=(
         "Run a Hindsight query-builder query over ball-by-ball cricket data and return aggregated "
         "rows (runs, balls, strike rate, average, dot %, boundary %, wickets, economy...) plus an "
-        "interactive chart/table and a link to open it on the website. Use find_entities for "
-        "exact names and get_query_options for filter values first. Men's T20 rows also carry "
-        "contextual metrics from Ganjoo's T20 Primer: impact (runs added to the team's projected "
-        "total, DL-based; impact_per_100 per 100 balls), raa/waa (runs and wickets above average "
-        "for the game state), wpa (win probability added, in matches won) and avg_leverage (how "
-        "much was at stake per ball). They are from the batting side, or the bowling side when "
-        "grouped by bowler; use sort_by='impact' or 'wpa' for 'most valuable' questions."
+        "interactive chart/table and a link to open it on the website. The text shows a short summary "
+        "and the first 25 rows; EVERY row up to `limit` (max 10,000; page with `offset`) follows as "
+        "CSV (or JSON with result_format='json') -- compute from that, not from the preview table. "
+        "Use find_entities for exact names and get_query_options for filter values first. Men's T20 "
+        "rows also carry contextual metrics from Ganjoo's T20 Primer: impact (runs added to the "
+        "team's projected total), raa/waa (runs and wickets above average for the game state; "
+        "*_per_100, *_per_over), wpa (win probability added) and avg_leverage. Their sign follows "
+        "metrics_perspective: 'bowling' (+ = good for the bowler) or 'batting' (+ = good for the "
+        "batter); by default bowling when grouped by bowler (and not batter), batting otherwise -- "
+        "set it explicitly for bowler questions grouped by anything else. The perspective is printed "
+        "with every result. Match-context dimensions (group_by and dimension_filters): "
+        "bowler_over_number, bowler_entry_over, spell_number, bowler_first_over_runs(_bucket), "
+        "prev_over_runs(_bucket), prev_over_raa(_bucket), batter_balls_faced(_bucket), "
+        "impact_player_era, season. query_mode='team_innings' returns one record per team innings "
+        "(total, wickets, run rate, phase run rates, 200+/250+ rates, result)."
     ),
     annotations=READ_ONLY,
 )
 def query_cricket_data(
     ctx: Context,
-    group_by: Annotated[List[GroupByColumn], Field(min_length=1, description="Columns to aggregate by (required), e.g. ['batter'], ['bowl_kind','year'], ['phase'].")],
-    batters: Annotated[List[str], Field(description="Exact batter names from find_entities, e.g. ['V Kohli'].")] = [],
-    bowlers: Annotated[List[str], Field(description="Exact bowler names from find_entities.")] = [],
+    group_by: Annotated[List[GroupByColumn], Field(min_length=1, description="Columns to aggregate by (required), e.g. ['batter'], ['bowl_kind','year'], ['phase'], ['match_id','bowler_first_over_runs_bucket']. team_innings mode: match_id, innings, competition, year, season, impact_player_era, venue, country, batting_team, bowling_team, match_outcome, toss_decision, format, full_length, total_bucket.")],
+    batters: Annotated[List[str], Field(description="Batter names from find_entities, e.g. ['V Kohli']; any spelling resolves.")] = [],
+    bowlers: Annotated[List[str], Field(description="Bowler names from find_entities; any spelling resolves.")] = [],
     players: Annotated[List[str], Field(description="Players matched as batter OR bowler.")] = [],
+    exclude_batters: Annotated[List[str], Field(description="Drop balls faced by these batters (every spelling).")] = [],
+    exclude_bowlers: Annotated[List[str], Field(description="Drop balls bowled by these bowlers (every spelling), e.g. the subject when comparing his team-mates.")] = [],
+    match_ids: Annotated[List[str], Field(description="Only these matches (ids as returned when grouping by match_id).")] = [],
     batting_teams: Annotated[List[str], Field(description="Team batting, exact names.")] = [],
     bowling_teams: Annotated[List[str], Field(description="Team bowling, exact names.")] = [],
     teams: Annotated[List[str], Field(description="Team either batting or bowling.")] = [],
@@ -503,7 +688,7 @@ def query_cricket_data(
     end_date: Annotated[Optional[date], Field(description="YYYY-MM-DD inclusive.")] = None,
     format: Annotated[Literal["T20", "ODI", "ALL"], Field(description="Cricket format. Set format='ODI' for any ODI question and format='T20' for T20 ones; ALL mixes T20 and ODI rows (add 'format' to group_by if you really want both).")] = "ALL",
     gender: Annotated[Literal["male", "female"], Field(description="Men's or women's cricket.")] = "male",
-    query_mode: Annotated[Literal["delivery", "batting_stats", "bowling_stats"], Field(description="delivery = ball-by-ball aggregates (supports line/length/shot filters); batting_stats / bowling_stats = per-innings scorecard aggregates (faster for career totals, 50s/100s-style questions).")] = "delivery",
+    query_mode: Annotated[Literal["delivery", "batting_stats", "bowling_stats", "team_innings"], Field(description="delivery = ball-by-ball aggregates (supports line/length/shot filters and the match-context dimensions); batting_stats / bowling_stats = per-innings scorecard aggregates; team_innings = one record per team innings (total, wickets, run rate, runs by phase, result) aggregated by group_by -- e.g. group_by=['season'] gives pct_200_plus / pct_250_plus per season.")] = "delivery",
     innings: Annotated[Optional[int], Field(ge=1, le=4, description="1 = batting first, 2 = chasing.")] = None,
     over_min: Annotated[Optional[int], Field(ge=0, description="First over, 0-indexed (0 = first over).")] = None,
     over_max: Annotated[Optional[int], Field(ge=0, description="Last over, 0-indexed (5 = end of the T20 powerplay, 19 = last T20 over).")] = None,
@@ -520,13 +705,17 @@ def query_cricket_data(
     is_chase: Annotated[Optional[bool], Field(description="True = chasing innings only, False = setting only.")] = None,
     chase_outcome: Annotated[List[Literal["win", "loss", "tie", "no_result"]], Field(description="Result of the chase (chasing side's view).")] = [],
     toss_decision: Annotated[List[Literal["bat", "field"]], Field(description="Toss decision.")] = [],
+    dimension_filters: Annotated[List[str], Field(description="Filters on match-context dimensions, each 'name:op:value' (op eq/ne/gt/gte/lt/lte/in; 'in' values separated by '|'). E.g. ['bowler_over_number:gte:2'] = the bowler's overs after his first; ['prev_over_runs_bucket:in:10+']; ['batter_balls_faced:gte:30']; ['impact_player_era:eq:2023+']. team_innings mode: total, wickets, balls, full_length, year, season, impact_player_era, match_outcome, total_bucket (e.g. ['full_length:eq:1']). Bucket labels: '0-6','7-9','10+'; RAA buckets 'below -2','-2 to +2','above +2'.")] = [],
+    metrics_perspective: Annotated[Optional[Literal["bowling", "batting"]], Field(description="Sign of impact/raa/waa/wpa. 'bowling' = + is good for the bowler (and runs exclude byes/leg-byes); 'batting' = + is good for the batter. Omit to infer: bowling when grouped by bowler and not batter, batting otherwise. Set 'bowling' for any bowler question not grouped by bowler.")] = None,
     min_balls: Annotated[Optional[int], Field(ge=1, description="Drop groups with fewer balls (use for leaderboards, e.g. 120).")] = None,
     min_runs: Annotated[Optional[int], Field(ge=0, description="Drop groups with fewer runs.")] = None,
     min_wickets: Annotated[Optional[int], Field(ge=0, description="Drop groups with fewer wickets.")] = None,
     having: Annotated[List[str], Field(description="Thresholds on computed metrics, each 'metric:op:value' with op gte/lte/gt/lt; metrics average, strike_rate, balls_per_dismissal, dot_percentage, boundary_percentage, control_percentage, impact, impact_per_100, impact_per_innings, raa(_per_100), waa(_per_100), wpa, avg_leverage (Impact-family: men's T20 only). E.g. ['average:gte:50','strike_rate:gte:100'] for '50+ average, 100+ SR'. Applied before sorting and the row limit.")] = [],
-    sort_by: Annotated[Optional[str], Field(description="Column to rank by, e.g. 'strike_rate', 'runs', 'economy', 'wickets'.")] = None,
+    sort_by: Annotated[Optional[str], Field(description="Column to rank by, e.g. 'strike_rate', 'runs', 'economy', 'wickets', 'raa_per_over', 'pct_200_plus'.")] = None,
     sort_descending: Annotated[bool, Field(description="Highest first (set False for economy-style metrics where lower is better).")] = True,
-    limit: Annotated[int, Field(ge=1, le=MAX_ROWS, description=f"Rows to return (max {MAX_ROWS}).")] = DEFAULT_ROWS,
+    limit: Annotated[int, Field(ge=1, le=MAX_ROWS, description=f"Rows to return, all of them in the machine-readable result (max {MAX_ROWS:,}, same as the website).")] = DEFAULT_ROWS,
+    offset: Annotated[int, Field(ge=0, description="Rows to skip, for paging; the result says next_offset when more rows exist.")] = 0,
+    result_format: Annotated[Literal["csv", "json"], Field(description="Format of the full result block: csv (compact) or json (list of row objects).")] = "csv",
     chart: Annotated[Literal["auto", "table", "bar", "line", "scatter"], Field(description="Visual for the widget. auto picks line for year/over, bar for one categorical group.")] = "auto",
     chart_metric: Annotated[Optional[str], Field(description="Metric to plot for bar/line, e.g. 'strike_rate'.")] = None,
     scatter_x: Annotated[Optional[str], Field(description="Scatter x metric, e.g. 'strike_rate'.")] = None,
@@ -547,7 +736,9 @@ def query_cricket_data(
         "over_max": over_max, "match_outcome": match_outcome, "is_chase": is_chase,
         "chase_outcome": chase_outcome, "toss_decision": toss_decision, "min_balls": min_balls,
         "min_runs": min_runs, "min_wickets": min_wickets, "include_international": include_international,
-        "top_teams": top_teams, "query_mode": query_mode, "having": having,
+        "top_teams": top_teams, "query_mode": query_mode, "having": having, "match_ids": match_ids,
+        "exclude_batters": exclude_batters, "exclude_bowlers": exclude_bowlers,
+        "dimension_filters": dimension_filters, "metrics_perspective": metrics_perspective,
     }
     group_by = list(dict.fromkeys(group_by))
     if not group_by:
@@ -559,7 +750,10 @@ def query_cricket_data(
         _log_call("query_cricket_data", ctx, params, started, "busy")
         return _BUSY
 
-    fetch_limit = SORT_FETCH_LIMIT if (sort_by and group_by) else limit
+    # With sort_by the connector ranks the whole result itself, so it fetches every group (up to
+    # the cap) from row 0 and pages after sorting; otherwise the engine pages.
+    sorting = bool(sort_by)
+    fetch_limit, fetch_offset = (SORT_FETCH_LIMIT, 0) if sorting else (limit, offset)
     try:
         with _read_only_session() as db:
             result = run_deliveries_query(
@@ -572,9 +766,12 @@ def query_cricket_data(
                 over_max=over_max, match_outcome=match_outcome, is_chase=is_chase,
                 chase_outcome=chase_outcome, toss_decision=toss_decision, group_by=group_by,
                 min_balls=min_balls, min_runs=min_runs, min_wickets=min_wickets, having=having, limit=fetch_limit,
-                offset=0, include_international=include_international, top_teams=top_teams,
-                query_mode=query_mode, fmt=format, gender=gender,
+                offset=fetch_offset, include_international=include_international, top_teams=top_teams,
+                query_mode=query_mode, fmt=format, gender=gender, match_ids=match_ids,
+                exclude_batters=exclude_batters, exclude_bowlers=exclude_bowlers,
+                dimension_filters=dimension_filters, metrics_perspective=metrics_perspective,
             )
+            alias_map = _alias_map(db)
     except QueryValidationError as exc:
         _log_call("query_cricket_data", ctx, params, started, "invalid")
         return _error(str(exc))
@@ -583,28 +780,58 @@ def query_cricket_data(
         logger.warning("mcp query failed: %r", exc)
         return _error(_user_message(exc, "That query could not be run."))
 
+    # Titles, chips and the link name players canonically too, whatever spelling was asked for.
+    for key in ("batters", "bowlers", "players", "exclude_batters", "exclude_bowlers"):
+        if params.get(key):
+            params[key] = list(dict.fromkeys(canonical_name(n, alias_map) for n in params[key]))
+    result = dict(result)
+    result["data"], merged = canonicalize_rows([dict(r) for r in result.get("data") or []], group_by, alias_map)
     structured = structure_query_result(
         result, params, group_by, query_mode=query_mode, format=format, gender=gender, batters=batters,
         bowlers=bowlers, sort_by=sort_by, sort_descending=sort_descending, limit=limit, chart=chart,
-        chart_metric=chart_metric, scatter_x=scatter_x, scatter_y=scatter_y,
+        chart_metric=chart_metric, scatter_x=scatter_x, scatter_y=scatter_y, offset=offset,
+        paged_by_engine=not sorting,
     )
     rows, columns, url, warnings = structured["rows"], structured["columns"], structured["hindsight_url"], structured["warnings"]
     total_rows, chart_spec = structured["total_rows"], structured["chart"]
+    perspective = structured["metrics_perspective"]
+    if merged:
+        warnings.append(f"{merged} rows under other spellings of the same player were combined into one name each.")
+    if sorting and total_rows > SORT_FETCH_LIMIT:
+        warnings.append(f"Ranked within the {SORT_FETCH_LIMIT:,} largest of {total_rows:,} groups; add filters for an exact ranking.")
 
+    content = []
     if not rows:
         summary = "No rows match these filters. Check exact names with find_entities, or loosen filters (dates, min_balls, competitions)."
     else:
+        span = (f"{len(rows)} of {total_rows} rows" if not offset
+                else f"rows {offset + 1}–{offset + len(rows)} of {total_rows}")
+        perspective_line = (
+            f"Metric perspective: {perspective} view — impact/raa/waa/wpa are + when good for the "
+            f"{'bowler' if perspective == 'bowling' else 'batter'}."
+            if perspective else "Metric perspective: none (no T20 Primer metrics in these rows)."
+        )
         summary = (
-            f"{structured['title']} — {len(rows)} of {total_rows} rows"
-            + (f", ranked by {sort_by}" if sort_by else "") + ".\n\n"
-            + _markdown_table(columns, rows, must_show=[sort_by, chart_spec.get("metric")])
+            f"{structured['title']} — {span}" + (f", ranked by {sort_by}" if sort_by else "") + ".\n"
+            + perspective_line + "\n\n"
+            + _markdown_table(columns, rows, must_show=[sort_by, chart_spec.get("metric")], perspective=perspective)
+            + (f"\n\nMore rows: call again with offset={structured['next_offset']}." if structured["next_offset"] else "")
             + f"\n\nOpen this query on Hindsight: {url}"
         )
         if warnings:
             summary += "\n\nNotes: " + " ".join(warnings)
+    content.append(TextContent(type="text", text=summary))
+    if rows:
+        if result_format == "json":
+            body = json.dumps({"metrics_perspective": perspective, "columns": columns, "rows": rows}, default=str)
+            content.append(TextContent(type="text", text=f"Full result as JSON ({len(rows)} rows):\n{body}"))
+        else:
+            header = f"Full result as CSV ({len(rows)} rows" + (
+                f"; impact/raa/waa/wpa columns are the {perspective_label(perspective)}" if perspective else "") + "):"
+            content.append(TextContent(type="text", text=f"{header}\n```csv\n{rows_as_csv(columns, rows)}```"))
 
     _log_call("query_cricket_data", ctx, params, started, "ok")
-    return CallToolResult(content=[TextContent(type="text", text=summary)], structured_content=structured)
+    return CallToolResult(content=content, structured_content=structured)
 
 
 apps.add_html_resource(
@@ -1042,6 +1269,86 @@ def player_profile(
         lines.append("No T20 data for this player in the window.")
     lines += ["", f"Profile on Hindsight: {link}"]
     _log_call("player_profile", ctx, args, started, "ok")
+    return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
+
+
+@mcp.tool(
+    name="player_advanced",
+    title="A bowler's advanced analytics",
+    description=(
+        "The player profile's Advanced Analytics as JSON (men's T20 bowling): pressure split (how the "
+        "bowler does after a high- / neutral- / low-scoring previous over from the other end), spell "
+        "shape (first spell vs later spells, spell lengths), entry-point stats (by the over he came "
+        "on), first-/last-ball boundary rates, state on entry and rolling form. Each bucket carries "
+        "economy (raw, unadjusted for game state) AND raa_per_over / waa_per_over (T20 Primer, "
+        "game-state adjusted, bowling view: + = good for the bowler) -- prefer the RAA versions when "
+        "comparing situations. Use find_entities for the name."
+    ),
+    annotations=READ_ONLY,
+)
+def player_advanced(
+    ctx: Context,
+    player: Annotated[str, Field(description="Player name from find_entities; any spelling resolves.")],
+    start_date: Annotated[Optional[date], Field(description="Window start (default: all data).")] = None,
+    end_date: Annotated[Optional[date], Field(description="Window end (default: today).")] = None,
+    leagues: Annotated[List[str], Field(description="Competitions, e.g. ['IPL'] (empty = all).")] = [],
+    include_international: Annotated[bool, Field(description="Add T20Is.")] = False,
+    venue: Annotated[Optional[str], Field(description="Exact venue name.")] = None,
+    pressure_threshold: Annotated[int, Field(ge=4, le=30, description="Previous-over runs at or above which an over counts as high pressure (low = threshold-4 or fewer). The profile uses 10.")] = 10,
+    rolling_window: Annotated[int, Field(ge=1, le=30, description="Matches in the rolling-form window.")] = 10,
+) -> CallToolResult:
+    from services.bowling_context import get_bowling_context
+    from services.rolling_form import get_player_rolling_form
+
+    started = time.monotonic()
+    args = {"player": player, "leagues": leagues, "include_international": include_international}
+    if not _budget.try_acquire():
+        return _BUSY
+    try:
+        with _read_only_session() as db:
+            name = canonical_name(player, _alias_map(db))
+            context = get_bowling_context(
+                db=db, player_name=name, start_date=start_date, end_date=end_date, leagues=leagues,
+                include_international=include_international, venue=venue, min_overs=10,
+                pressure_threshold=pressure_threshold,
+            )
+            form = get_player_rolling_form(
+                db=db, player_name=name, window=rolling_window, role="bowling", start_date=start_date,
+                end_date=end_date, leagues=leagues, include_international=include_international, venue=venue,
+            )
+    except Exception as exc:
+        _log_call("player_advanced", ctx, args, started, "error")
+        logger.warning("mcp player advanced failed: %r", exc)
+        return _error(_user_message(exc, "Those analytics could not be built."))
+
+    link = f"{WEB_URL}/player?" + urlencode([("name", name), ("tab", "bowling"), ("autoload", "true")])
+    structured = {
+        "player": name, "role": "bowler", "metrics_perspective": "bowling",
+        "metrics_perspective_label": perspective_label("bowling"),
+        "bowling_context": json.loads(json.dumps(context, default=str)),
+        "rolling_form": json.loads(json.dumps(form, default=str)),
+        "hindsight_url": link,
+    }
+    lines = [f"**{name}** — advanced bowling analytics (men's T20). Metric perspective: bowling view, + = good for the bowler.",
+             "Economy columns are raw (unadjusted for game state); raa_per_over / waa_per_over are game-state adjusted.", ""]
+    total = context.get("total_overs_analyzed") or 0
+    if not total:
+        lines.append("No bowling in this window.")
+    else:
+        pressure = context.get("previous_over_pressure_stats") or {}
+        lines.append(f"{total} overs analysed. Pressure (previous over ≥ {pressure.get('threshold_runs')} runs = high):")
+        for key in ("high_pressure", "neutral_pressure", "low_pressure"):
+            b = pressure.get(key) or {}
+            lines.append(f"- {key.replace('_', ' ')}: {b.get('overs')} overs, economy {b.get('economy')} (unadjusted), "
+                         f"RAA/over {b.get('raa_per_over')}, WAA/over {b.get('waa_per_over')}")
+        spells = context.get("spell_stats") or {}
+        for key in ("first_spell", "later_spells"):
+            b = spells.get(key) or {}
+            lines.append(f"- {key.replace('_', ' ')}: {b.get('overs')} overs, economy {b.get('economy')} (unadjusted), RAA/over {b.get('raa_per_over')}")
+        fb = context.get("first_ball_last_ball_stats") or {}
+        lines.append(f"- first-ball boundary rate {fb.get('first_ball_boundary_rate_pct')}%, last-ball {fb.get('last_ball_boundary_rate_pct')}%")
+    lines += ["", "Full JSON:", json.dumps(structured["bowling_context"], default=str), "", f"Profile on Hindsight: {link}"]
+    _log_call("player_advanced", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
 
 

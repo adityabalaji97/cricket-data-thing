@@ -11,6 +11,8 @@ from typing import List, Optional, Literal
 from datetime import date
 from database import get_session
 from services.query_builder_v2 import GROUP_BY_COLUMNS, QueryValidationError, run_deliveries_query
+from services.query_dimensions import DIMENSION_NAMES as _DIMENSION_NAMES
+from services.team_innings import FILTERS as _TEAM_INNINGS_FILTERS, GROUP_BY as _TEAM_INNINGS_GROUP_BY
 try:
     from venue_standardization import VENUE_STANDARDIZATION
 except Exception:  # pragma: no cover - defensive fallback
@@ -128,6 +130,20 @@ def query_deliveries(
     chase_outcome: List[str] = Query(default=[], description="Filter by batting-side chase outcome (win, loss, tie, no_result)"),
     toss_decision: List[str] = Query(default=[], description="Filter by toss decision (bat, field)"),
     day_or_night: Optional[str] = Query(default=None, pattern="^(day|night)$", description="Filter by day/night classification (IPL only)"),
+    match_ids: List[str] = Query(default=[], description="Only these matches (ESPNcricinfo match ids)"),
+    exclude_batters: List[str] = Query(default=[], description="Drop balls faced by these batters (any spelling)"),
+    exclude_bowlers: List[str] = Query(default=[], description="Drop balls bowled by these bowlers (any spelling)"),
+    dimension_filters: List[str] = Query(
+        default=[],
+        description="Filters on match-context dimensions, name:op:value (op eq|ne|gt|gte|lt|lte|in, 'in' values "
+                    "separated by |), e.g. bowler_over_number:gte:2, prev_over_runs_bucket:in:7-9|10+. "
+                    "team_innings mode: total, wickets, full_length, season, impact_player_era, match_outcome.",
+    ),
+    metrics_perspective: Optional[Literal["bowling", "batting"]] = Query(
+        default=None,
+        description="Sign of Impact/RAA/WAA/WPA: bowling (+ = good for the bowler) or batting. Default: "
+                    "bowling when grouped by bowler and not batter, batting otherwise.",
+    ),
 
     # Grouping and aggregation
     group_by: List[str] = Query(default=[], description="Group results by columns"),
@@ -159,9 +175,10 @@ def query_deliveries(
     # Include international matches
     include_international: bool = Query(default=False, description="Include international T20I matches"),
     top_teams: Optional[int] = Query(default=None, description="Include only top N international teams"),
-    query_mode: Literal["delivery", "batting_stats", "bowling_stats"] = Query(
+    query_mode: Literal["delivery", "batting_stats", "bowling_stats", "team_innings"] = Query(
         default="delivery",
-        description="Query source mode: delivery (default), batting_stats, bowling_stats"
+        description="Query source mode: delivery (default), batting_stats, bowling_stats, team_innings "
+                    "(one record per team innings: total, wickets, run rate, phase runs, result)"
     ),
 
     # Cross-format by default: "how does he compare across formats" is a first-class question
@@ -221,6 +238,9 @@ def query_deliveries(
         chase_outcome = preprocess_list_param(chase_outcome)
         toss_decision = preprocess_list_param(toss_decision)
         group_by = preprocess_list_param(group_by)
+        match_ids = preprocess_list_param(match_ids)
+        exclude_batters = preprocess_list_param(exclude_batters)
+        exclude_bowlers = preprocess_list_param(exclude_bowlers)
         
         # Handle wagon_zone separately since it's List[int]
         wagon_zone = preprocess_int_list_param(wagon_zone)
@@ -276,6 +296,11 @@ def query_deliveries(
             query_mode=query_mode,
             fmt=format,
             gender=gender,
+            match_ids=match_ids,
+            exclude_batters=exclude_batters,
+            exclude_bowlers=exclude_bowlers,
+            dimension_filters=[f for f in dimension_filters if f and f.strip()],
+            metrics_perspective=metrics_perspective,
         )
         return result
     except QueryValidationError as e:
@@ -405,6 +430,10 @@ def get_available_columns(
             },
             
             "group_by_columns": list(GROUP_BY_COLUMNS),
+            # Match-context dimensions (also filterable via dimension_filters) and the team_innings mode.
+            "dimension_columns": list(_DIMENSION_NAMES),
+            "team_innings_group_by_columns": list(_TEAM_INNINGS_GROUP_BY),
+            "team_innings_filter_columns": list(_TEAM_INNINGS_FILTERS),
 
             "query_mode_options": ["delivery", "batting_stats", "bowling_stats"],
             "match_outcome_options": ["win", "loss", "tie", "no_result"],

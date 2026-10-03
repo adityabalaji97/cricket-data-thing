@@ -79,6 +79,13 @@ const getDefaultFilters = () => ({
   max_wickets: null,
   // Metric thresholds on grouped rows, 'metric:op:value' (e.g. 'average:gte:50')
   having: [],
+  // Set by shared links (the connector's "Open in Hindsight"): match ids, excluded players,
+  // match-context dimension filters ('bowler_over_number:gte:2') and the metric perspective.
+  match_ids: [],
+  exclude_batters: [],
+  exclude_bowlers: [],
+  dimension_filters: [],
+  metrics_perspective: null,
 
   // Pagination
   limit: 1000,
@@ -138,7 +145,8 @@ const ACTIVE_FILTER_KEYS = [
   'line', 'length', 'shot', 'control', 'wagon_zone', 'dismissal',
   'innings', 'over_min', 'over_max',
   'match_outcome', 'is_chase', 'chase_outcome', 'toss_decision',
-  'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets', 'having'
+  'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets', 'having',
+  'match_ids', 'exclude_batters', 'exclude_bowlers', 'dimension_filters', 'metrics_perspective'
 ];
 
 const getActiveFilterCount = (filters, groupBy) => {

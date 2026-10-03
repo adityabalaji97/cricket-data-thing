@@ -80,8 +80,12 @@ def _fetch_bowler_rows_dd(
             COALESCE(dd.noball, 0) AS noball,
             dd.inns_runs,
             dd.inns_wkts,
-            dd.inns_rr
+            dd.inns_rr,
+            -- T20 Primer metrics, stored from the batting side (men's T20 only; NULL elsewhere).
+            bm.raa AS bat_raa,
+            bm.waa AS bat_waa
         FROM delivery_details dd
+        LEFT JOIN ball_metrics bm ON bm.delivery_id = dd.id
         WHERE dd.bowl = ANY(:bowler_names)
           AND (:start_date IS NULL OR dd.match_date::date >= :start_date)
           AND (:end_date IS NULL OR dd.match_date::date <= :end_date)
@@ -244,6 +248,11 @@ def _aggregate_bowler_overs(rows: List[Dict]) -> Dict[Tuple[str, int, int], Dict
                 "entry_runs": row.get("inns_runs"),
                 "entry_wkts": row.get("inns_wkts"),
                 "entry_rr": row.get("inns_rr"),
+                # Bowling-side RAA/WAA (+ = good for the bowler); wides carry no metric, as in
+                # the Primer. metric_balls counts the balls that have one.
+                "raa": 0.0,
+                "waa": 0.0,
+                "metric_balls": 0,
             }
 
         over = over_map[key]
@@ -267,11 +276,30 @@ def _aggregate_bowler_overs(rows: List[Dict]) -> Dict[Tuple[str, int, int], Dict
             over["legal_balls"] += 1
             if total_runs == 0:
                 over["dots"] += 1
+        if wide == 0 and row.get("bat_raa") is not None:
+            over["raa"] -= float(row["bat_raa"])
+            over["waa"] -= float(row.get("bat_waa") or 0.0)
+            over["metric_balls"] += 1
 
     for over in over_map.values():
         if over["first_ball_boundary"] is None:
             over["first_ball_boundary"] = False
     return over_map
+
+
+def _raa_fields(agg: Dict) -> Dict:
+    """Game-state-adjusted versions of a bucket: bowling-side RAA/WAA per over (6 metric balls)."""
+    metric_balls = int(agg.get("metric_balls", 0))
+    if not metric_balls:
+        return {"raa": None, "raa_per_over": None, "waa": None, "waa_per_over": None, "metric_balls": 0}
+    raa, waa = float(agg.get("raa", 0.0)), float(agg.get("waa", 0.0))
+    return {
+        "raa": round(raa, 2),
+        "raa_per_over": round(raa * 6.0 / metric_balls, 3),
+        "waa": round(waa, 3),
+        "waa_per_over": round(waa * 6.0 / metric_balls, 4),
+        "metric_balls": metric_balls,
+    }
 
 
 def _finalize_over_bucket(agg: Dict) -> Dict:
@@ -281,6 +309,7 @@ def _finalize_over_bucket(agg: Dict) -> Dict:
     wickets = int(agg.get("wickets", 0))
     boundaries = int(agg.get("boundaries", 0))
     return {
+        **_raa_fields(agg),
         "overs": overs,
         "runs": runs,
         "wickets": wickets,
@@ -410,7 +439,8 @@ def get_bowling_context(
     for over in bowler_overs:
         innings_over_map[(over["match_id"], over["innings"])].append(over)
 
-    entry_group: Dict[int, Dict] = defaultdict(lambda: {"innings": 0, "overs": 0, "runs": 0, "wickets": 0, "legal_balls": 0})
+    entry_group: Dict[int, Dict] = defaultdict(lambda: {"innings": 0, "overs": 0, "runs": 0, "wickets": 0, "legal_balls": 0,
+                                                         "raa": 0.0, "waa": 0.0, "metric_balls": 0})
     entry_states = []
     spell_records = []
     spell_len_dist: Dict[int, int] = defaultdict(int)
@@ -424,6 +454,8 @@ def get_bowling_context(
         entry_stats["runs"] += sum(int(o["runs"]) for o in innings_overs)
         entry_stats["wickets"] += sum(int(o["wickets"]) for o in innings_overs)
         entry_stats["legal_balls"] += sum(int(o["legal_balls"]) for o in innings_overs)
+        for key in ("raa", "waa", "metric_balls"):
+            entry_stats[key] += sum(o[key] for o in innings_overs)
 
         entry_states.append(
             {
@@ -447,6 +479,9 @@ def get_bowling_context(
                 "legal_balls": legal_balls,
                 "boundaries": sum(int(o["boundaries"]) for o in spell_overs),
                 "dots": sum(int(o["dots"]) for o in spell_overs),
+                "raa": sum(o["raa"] for o in spell_overs),
+                "waa": sum(o["waa"] for o in spell_overs),
+                "metric_balls": sum(o["metric_balls"] for o in spell_overs),
             }
             spell_records.append(spell_record)
             spell_len_dist[len(spell_overs)] += 1
@@ -462,15 +497,17 @@ def get_bowling_context(
                 if agg["legal_balls"]
                 else None,
                 "wickets_per_over": round((agg["wickets"] / agg["overs"]), 3) if agg["overs"] else None,
+                **_raa_fields(agg),
             }
         )
 
-    first_spell_agg = {"overs": 0, "runs": 0, "wickets": 0, "legal_balls": 0, "boundaries": 0, "dots": 0}
-    later_spell_agg = {"overs": 0, "runs": 0, "wickets": 0, "legal_balls": 0, "boundaries": 0, "dots": 0}
+    first_spell_agg = {"overs": 0, "runs": 0, "wickets": 0, "legal_balls": 0, "boundaries": 0, "dots": 0,
+                       "raa": 0.0, "waa": 0.0, "metric_balls": 0}
+    later_spell_agg = dict(first_spell_agg)
     for record in spell_records:
         target = first_spell_agg if record["is_first_spell"] else later_spell_agg
         for key in target:
-            target[key] += int(record.get(key, 0))
+            target[key] += record.get(key, 0)
 
     first_ball_boundaries = sum(1 for over in bowler_overs if over["first_ball_boundary"])
     last_ball_boundaries = sum(1 for over in bowler_overs if over["last_ball_boundary"])
@@ -488,6 +525,9 @@ def get_bowling_context(
             "dots": 0,
             "previous_runs_sum": 0,
             "previous_wickets_sum": 0,
+            "raa": 0.0,
+            "waa": 0.0,
+            "metric_balls": 0,
         }
     )
 
@@ -506,6 +546,9 @@ def get_bowling_context(
         agg["boundaries"] += int(over["boundaries"])
         agg["dots"] += int(over["dots"])
         agg["previous_runs_sum"] += int(prev_runs or 0)
+        agg["raa"] += over["raa"]
+        agg["waa"] += over["waa"]
+        agg["metric_balls"] += over["metric_balls"]
         agg["previous_wickets_sum"] += int(prev.get("wickets") or 0) if prev else 0
 
     pressure_stats = {
@@ -548,6 +591,14 @@ def get_bowling_context(
     payload = {
         "player_name": player_name,
         "resolved_names": names,
+        # economy / boundary % / dot % are raw rates, not adjusted for game state (phase, wickets,
+        # par). raa_per_over / waa_per_over are the T20 Primer's game-state-adjusted versions, from
+        # the bowling side (+ = better than an average bowler in the same situations).
+        "metric_notes": {
+            "economy": "unadjusted for game state",
+            "raa_per_over": "runs above average per over for the game state, bowling view (+ = good for the bowler); men's T20 2015+",
+            "waa_per_over": "wickets above average per over for the game state, bowling view",
+        },
         "total_overs_analyzed": total_overs,
         "insufficient_sample": insufficient_sample,
         "entry_point_stats": entry_point_stats,
