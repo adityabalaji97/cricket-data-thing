@@ -154,10 +154,11 @@ def run() -> Result:
 
     common = dict(bowlers=[varun], group_by=["bowler_first_over_runs_bucket"], fmt="T20", **SCOPE)
     charts = [
-        Chart("first_over", "Varun's rest-of-match RAA per over, by runs off his first over (bowling view)",
+        Chart("first_over", "Varun's rest-of-match RAA per over by runs off his first over, pooled over all those balls "
+              "(bowling view; the test compares per-match averages)",
               dict(common, dimension_filters=["bowler_over_number:gte:2"]),
               {"chart": "bar", "chart_metric": "raa_per_over"}, small({b: a_table[b]["matches_with_rest"] for b in BUCKETS})),
-        Chart("peers", "Five IPL spinners pooled: rest-of-match RAA per over by first-over runs",
+        Chart("peers", "Five IPL spinners pooled: rest-of-match RAA per over by first-over runs (all their balls)",
               dict(common, bowlers=peers, dimension_filters=["bowler_over_number:gte:2"]),
               {"chart": "bar", "chart_metric": "raa_per_over"}),
         Chart("entry", "Varun's RAA per over by the over he came on (0 = first over of the innings)",

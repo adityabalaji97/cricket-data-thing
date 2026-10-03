@@ -139,7 +139,7 @@
   "charts": [
     {
       "key": "first_over",
-      "caption": "Varun's rest-of-match RAA per over, by runs off his first over (bowling view)",
+      "caption": "Varun's rest-of-match RAA per over by runs off his first over, pooled over all those balls (bowling view; the test compares per-match averages)",
       "params": {
         "bowlers": [
           "Varun Chakaravarthy"
@@ -164,11 +164,11 @@
       },
       "small_samples": [],
       "url": "https://hindsightcricket.com/query?bowlers=Varun+Chakaravarthy&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&dimension_filters=bowler_over_number%3Agte%3A2&group_by=bowler_first_over_runs_bucket&fmt=mens-t20",
-      "title": "Varun's rest-of-match RAA per over, by runs off his first over (bowling view)"
+      "title": "Varun's rest-of-match RAA per over by runs off his first over, pooled over all those balls (bowling view; the test compares per-match averages)"
     },
     {
       "key": "peers",
-      "caption": "Five IPL spinners pooled: rest-of-match RAA per over by first-over runs",
+      "caption": "Five IPL spinners pooled: rest-of-match RAA per over by first-over runs (all their balls)",
       "params": {
         "bowlers": [
           "Yuzvendra Chahal",
@@ -197,7 +197,7 @@
       },
       "small_samples": [],
       "url": "https://hindsightcricket.com/query?bowlers=Yuzvendra+Chahal&bowlers=Rashid+Khan&bowlers=Kuldeep+Yadav&bowlers=Ravi+Bishnoi&bowlers=Axar+Patel&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&dimension_filters=bowler_over_number%3Agte%3A2&group_by=bowler_first_over_runs_bucket&fmt=mens-t20",
-      "title": "Five IPL spinners pooled: rest-of-match RAA per over by first-over runs"
+      "title": "Five IPL spinners pooled: rest-of-match RAA per over by first-over runs (all their balls)"
     },
     {
       "key": "entry",
