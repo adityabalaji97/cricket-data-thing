@@ -142,8 +142,9 @@ def note_markdown(result: Dict[str, Any], chart_titles: Dict[str, str] | None = 
     parts += ["| Effect | Estimate | 95% CI | p | Test | n |", "|---|---|---|---|---|---|"]
     for e in effects:
         d = _digits(e)
-        n = ", ".join(f"{k}: {v}" for k, v in (e.get("n") or {}).items())
-        parts.append(f"| {e['name']} ({e['unit']}) | {_num(e['estimate'], d)} | {_ci(e, d)} | {_p(e)} | {e['test']} | {n} |")
+        n = ", ".join(f"{_label(k)}: {v}" for k, v in (e.get("n") or {}).items())
+        name = e["name"] if e["unit"].lower() in e["name"].lower() else f"{e['name']} ({e['unit']})"
+        parts.append(f"| {name} | {_num(e['estimate'], d)} | {_ci(e, d)} | {_p(e)} | {e['test']} | {n} |")
     parts += ["", f"## Verdict: {result['verdict']}", ""]
     if result.get("parts"):
         parts += [f"- {k}: **{v}**" for k, v in result["parts"].items()] + [""]

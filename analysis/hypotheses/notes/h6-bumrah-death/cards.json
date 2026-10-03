@@ -1,0 +1,38 @@
+{
+ "slug": "h6-bumrah-death",
+ "footer": "Data: Hindsight \u00b7 hindsightcricket.com",
+ "credits": "Pre-2015 & fallback ball-by-ball: Cricsheet (ODC-By) \u00b7 2015+ feed: [feed provider TBC] \u00b7 Impact/RAA/WAA/WPA: Himanish Ganjoo's T20 Primer method",
+ "cards": [
+  {
+   "kind": "claim",
+   "kicker": "HYPOTHESIS LAB \u00b7 H6",
+   "eyebrow": "A common claim",
+   "title": "Jasprit Bumrah is the best death bowler in T20 cricket.",
+   "verdict": "Partly",
+   "verdict_colour": "amber",
+   "parts": [],
+   "headline": "Bumrah ranks 3 of 170 death bowlers on leverage-weighted RAA (+26.5 per 100 balls); he ranks first in 7% of bootstrap resamples."
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H6",
+   "eyebrow": "Is Jasprit Bumrah the best death bowler in T20?",
+   "stat": "-4.2",
+   "stat_label": "Bumrah's leverage-weighted death RAA per 100 minus the best other bowler's (RAA per 100 balls (leverage-weighted))",
+   "sub": "95% CI -30.5 to +3.6 \u00b7 p n/a",
+   "rows": [
+    {
+     "label": "rank",
+     "value": "+3.0"
+    },
+    {
+     "label": "share of resamples ranked first",
+     "value": "+0.1"
+    }
+   ],
+   "verdict": "Partly",
+   "verdict_label": "VERDICT",
+   "verdict_colour": "amber"
+  }
+ ]
+}

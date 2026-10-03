@@ -1,0 +1,56 @@
+{
+ "slug": "h3-iyer-anchor",
+ "footer": "Data: Hindsight \u00b7 hindsightcricket.com",
+ "credits": "Pre-2015 & fallback ball-by-ball: Cricsheet (ODC-By) \u00b7 2015+ feed: [feed provider TBC] \u00b7 Impact/RAA/WAA/WPA: Himanish Ganjoo's T20 Primer method",
+ "cards": [
+  {
+   "kind": "claim",
+   "kicker": "HYPOTHESIS LAB \u00b7 H3",
+   "eyebrow": "A common claim",
+   "title": "Shreyas Iyer anchors rather than accelerates in the middle overs, and struggles against the short ball.",
+   "verdict": "Inconclusive",
+   "verdict_colour": "grey",
+   "parts": [],
+   "headline": "In the middle overs Iyer adds +19.0 Impact per 100 balls vs +7.1 for the comparison group: +11.8 (95% CI -7.6 to +29.5, p = 0.22)."
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H3",
+   "eyebrow": "Is Shreyas Iyer an anchor, not an accelerator?",
+   "stat": "+11.8",
+   "stat_label": "Iyer minus peers: middle-overs Impact per 100 balls (Impact per 100 balls)",
+   "sub": "95% CI -7.6 to +29.5 \u00b7 p 0.22",
+   "rows": [
+    {
+     "label": "iyer",
+     "value": "+19.0"
+    },
+    {
+     "label": "peers",
+     "value": "+7.1"
+    }
+   ],
+   "verdict": "Inconclusive",
+   "verdict_label": "VERDICT",
+   "verdict_colour": "grey"
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H3",
+   "eyebrow": "The comparison",
+   "stat": "+13.0",
+   "stat_label": "Iyer minus peers: middle-overs strike rate (strike rate)",
+   "sub": "95% CI -1.5 to +27.3 \u00b7 p 0.08",
+   "rows": [
+    {
+     "label": "iyer",
+     "value": "+152.8"
+    },
+    {
+     "label": "peers",
+     "value": "+139.8"
+    }
+   ]
+  }
+ ]
+}

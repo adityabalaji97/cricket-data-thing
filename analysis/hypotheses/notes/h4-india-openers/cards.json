@@ -1,0 +1,47 @@
+{
+ "slug": "h4-india-openers",
+ "footer": "Data: Hindsight \u00b7 hindsightcricket.com",
+ "credits": "Pre-2015 & fallback ball-by-ball: Cricsheet (ODC-By) \u00b7 2015+ feed: [feed provider TBC] \u00b7 Impact/RAA/WAA/WPA: Himanish Ganjoo's T20 Primer method",
+ "cards": [
+  {
+   "kind": "claim",
+   "kicker": "HYPOTHESIS LAB \u00b7 H4",
+   "eyebrow": "A common claim",
+   "title": "India's T20I openers Sanju Samson, Abhishek Sharma and Ishan Kishan are all or nothing: they either win the game or fail cheaply.",
+   "verdict": "Supported",
+   "verdict_colour": "lime",
+   "parts": [],
+   "headline": "The three's Impact per innings is 1.36x as spread out as other India openers' (95% CI 1.12-1.63); India win 90% when they fire vs 69% when they fail."
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H4",
+   "eyebrow": "Are India's T20I openers all or nothing?",
+   "stat": "+1.36",
+   "stat_label": "SD ratio (named three / other India openers) (ratio)",
+   "sub": "95% CI +1.12 to +1.63 \u00b7 p < 0.01",
+   "rows": [
+    {
+     "label": "sd named",
+     "value": "+20.07"
+    },
+    {
+     "label": "sd comparison",
+     "value": "+14.72"
+    }
+   ],
+   "verdict": "Supported",
+   "verdict_label": "VERDICT",
+   "verdict_colour": "lime"
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H4",
+   "eyebrow": "The comparison",
+   "stat": "+0.31",
+   "stat_label": "Spread of Impact per innings: SD(named) / SD(other openers), log scale (log SD ratio)",
+   "sub": "95% CI +0.11 to +0.49 \u00b7 p < 0.01",
+   "rows": []
+  }
+ ]
+}

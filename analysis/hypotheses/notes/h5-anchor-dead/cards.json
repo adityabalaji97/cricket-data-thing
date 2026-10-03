@@ -1,0 +1,72 @@
+{
+ "slug": "h5-anchor-dead",
+ "footer": "Data: Hindsight \u00b7 hindsightcricket.com",
+ "credits": "Pre-2015 & fallback ball-by-ball: Cricsheet (ODC-By) \u00b7 2015+ feed: [feed provider TBC] \u00b7 Impact/RAA/WAA/WPA: Himanish Ganjoo's T20 Primer method",
+ "cards": [
+  {
+   "kind": "claim",
+   "kicker": "HYPOTHESIS LAB \u00b7 H5",
+   "eyebrow": "A common claim",
+   "title": "The anchor is dead: a long, slow innings used to be useful in T20 and now loses games.",
+   "verdict": "Not supported",
+   "verdict_colour": "red",
+   "parts": [],
+   "headline": "A sub-110 30-ball innings vs a 150+ one: the WPA gap changed by +0.044 (95% CI +0.014 to +0.076, p < 0.01) per innings between 2015-19 and 2023-26."
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H5",
+   "eyebrow": "Is the T20 anchor dead?",
+   "stat": "+0.044",
+   "stat_label": "Slow (<110) minus fast (150+) 30-ball innings, WPA per innings: 2023-26 minus 2015-19 (WPA per innings)",
+   "sub": "95% CI +0.014 to +0.076 \u00b7 p < 0.01",
+   "rows": [
+    {
+     "label": "2023-26 under 110",
+     "value": "-0.010"
+    },
+    {
+     "label": "2023-26 150+",
+     "value": "+0.192"
+    },
+    {
+     "label": "2015-19 under 110",
+     "value": "-0.012"
+    },
+    {
+     "label": "2015-19 150+",
+     "value": "+0.234"
+    }
+   ],
+   "verdict": "Not supported",
+   "verdict_label": "VERDICT",
+   "verdict_colour": "red"
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H5",
+   "eyebrow": "The comparison",
+   "stat": "-0.4",
+   "stat_label": "Same contrast in team win % (percentage points)",
+   "sub": "95% CI -14.0 to +13.5 \u00b7 p 0.96",
+   "rows": [
+    {
+     "label": "2023-26 under 110",
+     "value": "+48.4"
+    },
+    {
+     "label": "2023-26 150+",
+     "value": "+63.6"
+    },
+    {
+     "label": "2015-19 under 110",
+     "value": "+48.6"
+    },
+    {
+     "label": "2015-19 150+",
+     "value": "+63.4"
+    }
+   ]
+  }
+ ]
+}

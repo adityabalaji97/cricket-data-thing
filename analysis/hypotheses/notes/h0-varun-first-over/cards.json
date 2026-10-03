@@ -1,0 +1,69 @@
+{
+ "slug": "h0-varun-first-over",
+ "footer": "Data: Hindsight \u00b7 hindsightcricket.com",
+ "credits": "Pre-2015 & fallback ball-by-ball: Cricsheet (ODC-By) \u00b7 2015+ feed: [feed provider TBC] \u00b7 Impact/RAA/WAA/WPA: Himanish Ganjoo's T20 Primer method",
+ "cards": [
+  {
+   "kind": "claim",
+   "kicker": "HYPOTHESIS LAB \u00b7 H0",
+   "eyebrow": "A common claim",
+   "title": "Varun Chakravarthy can't recover from an expensive first over, is better used in the middle overs than the powerplay, and suffers when the bowler at the other end leaks runs.",
+   "verdict": "Partly",
+   "verdict_colour": "amber",
+   "parts": [
+    {
+     "label": "a. 10+ first over hurts the rest of his match",
+     "value": "Inconclusive"
+    },
+    {
+     "label": "b. better entering in the middle overs",
+     "value": "Inconclusive"
+    },
+    {
+     "label": "c. hurt by a big over from the other end",
+     "value": "Not supported"
+    }
+   ],
+   "headline": "After a 10+ first over, Varun's RAA per over for the rest of the match moves by -0.64 (95% CI -1.87 to +0.55, p = 0.32) vs a 0-6 first over (34 and 69 matches)."
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H0",
+   "eyebrow": "Does one bad over break Varun Chakravarthy?",
+   "stat": "-0.64",
+   "stat_label": "Varun: rest-of-match RAA/over, 10+ first over minus 0-6 (RAA per over)",
+   "sub": "95% CI -1.87 to +0.55 \u00b7 p 0.32",
+   "rows": [
+    {
+     "label": "average, 10+",
+     "value": "-0.29"
+    },
+    {
+     "label": "average, 0-6",
+     "value": "+0.35"
+    }
+   ],
+   "verdict": "Inconclusive",
+   "verdict_label": "VERDICT \u00b7 a",
+   "verdict_colour": "grey"
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H0",
+   "eyebrow": "The comparison",
+   "stat": "-0.65",
+   "stat_label": "Five IPL spinners pooled: same effect (RAA per over)",
+   "sub": "95% CI -1.10 to -0.20 \u00b7 p < 0.01",
+   "rows": [
+    {
+     "label": "average, 10+",
+     "value": "-0.01"
+    },
+    {
+     "label": "average, 0-6",
+     "value": "+0.64"
+    }
+   ]
+  }
+ ]
+}
