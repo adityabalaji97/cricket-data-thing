@@ -101,7 +101,7 @@ def run() -> Result:
               dict(bowlers=[bumrah], group_by=["year"], fmt="T20", **DEATH), {"chart": "line", "chart_metric": "raa_lw_per_100"}),
     ]
     headline = (f"Bumrah ranks {rank} of {len(names)} death bowlers on leverage-weighted RAA "
-                f"({point[bumrah]:+.1f} per 100 balls); ahead of the next best in {100 * p_first:.0f}% of resamples."
+                f"({point[bumrah]:+.1f} per 100 balls); he ranks first in {100 * p_first:.0f}% of bootstrap resamples."
                 if rank else "Bumrah does not reach the sample minimum.")
     return Result(
         hypothesis="H6", slug="h6-bumrah-death", verdict=verdict, headline=headline,

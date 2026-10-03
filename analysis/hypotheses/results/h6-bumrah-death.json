@@ -3,7 +3,7 @@
   "slug": "h6-bumrah-death",
   "claim": "A common claim is that Jasprit Bumrah is the best death bowler in T20 cricket.",
   "verdict": "Partly",
-  "headline": "Bumrah ranks 3 of 170 death bowlers on leverage-weighted RAA (+26.5 per 100 balls); ahead of the next best in 7% of resamples.",
+  "headline": "Bumrah ranks 3 of 170 death bowlers on leverage-weighted RAA (+26.5 per 100 balls); he ranks first in 7% of bootstrap resamples.",
   "effects": [
     {
       "name": "Bumrah's leverage-weighted death RAA per 100 minus the best other bowler's",
