@@ -1,0 +1,275 @@
+{
+  "hypothesis": "H3",
+  "slug": "h3-iyer-anchor",
+  "claim": "A common claim is that Shreyas Iyer anchors rather than accelerates in the middle overs, and struggles against the short ball.",
+  "verdict": "Inconclusive",
+  "headline": "In the middle overs Iyer adds +19.0 Impact per 100 balls vs +7.1 for the comparison group: +11.8 (95% CI -7.6 to +29.5, p = 0.22).",
+  "effects": [
+    {
+      "name": "Iyer minus peers: middle-overs Impact per 100 balls",
+      "estimate": 11.8311,
+      "ci": [
+        -7.5886,
+        29.4725
+      ],
+      "p_value": 0.2234,
+      "test": "bootstrap over innings (ratio estimator)",
+      "unit": "Impact per 100 balls",
+      "direction": "negative",
+      "meaningful": -5,
+      "n": {
+        "iyer_innings": 45,
+        "peer_innings": 181
+      },
+      "detail": {
+        "iyer": 18.9561,
+        "peers": 7.125
+      }
+    },
+    {
+      "name": "Iyer minus peers: middle-overs strike rate",
+      "estimate": 12.9708,
+      "ci": [
+        -1.4721,
+        27.2584
+      ],
+      "p_value": 0.08,
+      "test": "bootstrap over innings (ratio estimator)",
+      "unit": "strike rate",
+      "direction": "negative",
+      "meaningful": -10,
+      "n": {
+        "iyer_innings": 45,
+        "peer_innings": 181
+      },
+      "detail": {
+        "iyer": 152.8121,
+        "peers": 139.8413
+      }
+    },
+    {
+      "name": "Iyer minus peers vs pace: Impact per 100 (exploratory)",
+      "estimate": 12.5769,
+      "ci": [
+        -15.7814,
+        37.6452
+      ],
+      "p_value": 0.3612,
+      "test": "bootstrap over innings (ratio estimator)",
+      "unit": "Impact per 100 balls",
+      "direction": "negative",
+      "meaningful": -5,
+      "n": {
+        "iyer_innings": 41,
+        "peer_innings": 147
+      },
+      "detail": {
+        "iyer": 16.3659,
+        "peers": 3.7891
+      }
+    },
+    {
+      "name": "Iyer minus peers vs spin: Impact per 100 (exploratory)",
+      "estimate": 11.9903,
+      "ci": [
+        -10.8324,
+        34.7461
+      ],
+      "p_value": 0.306,
+      "test": "bootstrap over innings (ratio estimator)",
+      "unit": "Impact per 100 balls",
+      "direction": "negative",
+      "meaningful": -5,
+      "n": {
+        "iyer_innings": 40,
+        "peer_innings": 160
+      },
+      "detail": {
+        "iyer": 21.4663,
+        "peers": 9.476
+      }
+    }
+  ],
+  "charts": [
+    {
+      "key": "middle_impact",
+      "caption": "Middle overs (7-15), 2024-26: Impact per 100 balls (batting view)",
+      "params": {
+        "batters": [
+          "Shreyas Iyer",
+          "Suryakumar Yadav",
+          "Tilak Varma",
+          "Rinku Singh"
+        ],
+        "fmt": "T20",
+        "start_date": "2024-01-01",
+        "group_by": [
+          "batter"
+        ],
+        "over_min": 6,
+        "over_max": 14
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "impact_per_100"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?batters=Shreyas+Iyer&batters=Suryakumar+Yadav&batters=Tilak+Varma&batters=Rinku+Singh&start_date=2024-01-01&over_min=6&over_max=14&group_by=batter&fmt=mens-t20",
+      "title": "Middle overs (7-15), 2024-26: Impact per 100 balls (batting view)"
+    },
+    {
+      "key": "middle_sr",
+      "caption": "Middle overs (7-15), 2024-26: strike rate",
+      "params": {
+        "batters": [
+          "Shreyas Iyer",
+          "Suryakumar Yadav",
+          "Tilak Varma",
+          "Rinku Singh"
+        ],
+        "fmt": "T20",
+        "start_date": "2024-01-01",
+        "group_by": [
+          "batter"
+        ],
+        "over_min": 6,
+        "over_max": 14
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "strike_rate"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?batters=Shreyas+Iyer&batters=Suryakumar+Yadav&batters=Tilak+Varma&batters=Rinku+Singh&start_date=2024-01-01&over_min=6&over_max=14&group_by=batter&fmt=mens-t20",
+      "title": "Middle overs (7-15), 2024-26: strike rate"
+    },
+    {
+      "key": "kind",
+      "caption": "Middle overs vs pace and spin, 2024-26",
+      "params": {
+        "batters": [
+          "Shreyas Iyer",
+          "Suryakumar Yadav",
+          "Tilak Varma",
+          "Rinku Singh"
+        ],
+        "fmt": "T20",
+        "start_date": "2024-01-01",
+        "group_by": [
+          "batter",
+          "bowl_kind"
+        ],
+        "over_min": 6,
+        "over_max": 14
+      },
+      "presentation": {
+        "chart": "table"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?batters=Shreyas+Iyer&batters=Suryakumar+Yadav&batters=Tilak+Varma&batters=Rinku+Singh&start_date=2024-01-01&over_min=6&over_max=14&group_by=batter&group_by=bowl_kind&fmt=mens-t20",
+      "title": "Middle overs vs pace and spin, 2024-26"
+    },
+    {
+      "key": "short",
+      "caption": "Against short and short-of-a-length balls, 2024-26 (balls with length recorded)",
+      "params": {
+        "batters": [
+          "Shreyas Iyer",
+          "Suryakumar Yadav",
+          "Tilak Varma",
+          "Rinku Singh"
+        ],
+        "fmt": "T20",
+        "start_date": "2024-01-01",
+        "group_by": [
+          "batter"
+        ],
+        "length": [
+          "SHORT",
+          "SHORT_OF_A_GOOD_LENGTH"
+        ]
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "strike_rate"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?batters=Shreyas+Iyer&batters=Suryakumar+Yadav&batters=Tilak+Varma&batters=Rinku+Singh&start_date=2024-01-01&length=SHORT&length=SHORT_OF_A_GOOD_LENGTH&group_by=batter&fmt=mens-t20",
+      "title": "Against short and short-of-a-length balls, 2024-26 (balls with length recorded)"
+    }
+  ],
+  "parts": {},
+  "tables": {
+    "players": {
+      "Shreyas Iyer": {
+        "middle_balls": 729,
+        "innings": 45,
+        "strike_rate": 152.8121,
+        "impact_per_100": 18.9561
+      },
+      "Suryakumar Yadav": {
+        "middle_balls": 1060,
+        "innings": 68,
+        "strike_rate": 157.8302,
+        "impact_per_100": 21.8566
+      },
+      "Tilak Varma": {
+        "middle_balls": 1075,
+        "innings": 74,
+        "strike_rate": 132.093,
+        "impact_per_100": 4.2865
+      },
+      "Rinku Singh": {
+        "middle_balls": 385,
+        "innings": 39,
+        "strike_rate": 111.9481,
+        "impact_per_100": -25.5091
+      }
+    },
+    "short_balls": {
+      "Tilak Varma": {
+        "balls": 592,
+        "strike_rate": 141.3851,
+        "impact_per_100": 16.37,
+        "balls_per_dismissal": 34.8235,
+        "coverage_pct_of_all_balls": 32.8
+      },
+      "Shreyas Iyer": {
+        "balls": 414,
+        "strike_rate": 166.9082,
+        "impact_per_100": 27.35,
+        "balls_per_dismissal": 37.6364,
+        "coverage_pct_of_all_balls": 35.3
+      },
+      "Suryakumar Yadav": {
+        "balls": 394,
+        "strike_rate": 160.1523,
+        "impact_per_100": 7.86,
+        "balls_per_dismissal": 20.7368,
+        "coverage_pct_of_all_balls": 24.2
+      },
+      "Rinku Singh": {
+        "balls": 266,
+        "strike_rate": 141.3534,
+        "impact_per_100": -7.77,
+        "balls_per_dismissal": 20.4615,
+        "coverage_pct_of_all_balls": 34.2
+      }
+    },
+    "dropped_for_sample": []
+  },
+  "caveats": [
+    "All men's T20 competitions in the window, so opposition strength differs between players.",
+    "Length is recorded for part of the balls only; short-ball numbers are exploratory."
+  ],
+  "samples": {
+    "middle_balls": {
+      "Shreyas Iyer": 729,
+      "Suryakumar Yadav": 1060,
+      "Tilak Varma": 1075,
+      "Rinku Singh": 385
+    }
+  },
+  "data_through": "2026-10-03",
+  "database": "localhost/hindsight_analysis"
+}

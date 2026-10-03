@@ -1,0 +1,380 @@
+{
+  "hypothesis": "H1",
+  "slug": "h1-impact-player",
+  "claim": "A common claim is that the Impact Player rule, introduced in IPL 2023, inflated IPL scoring.",
+  "verdict": "Supported",
+  "headline": "IPL scoring rose from 8.31 to 9.50 runs per over; after netting out BBL, PSL and CPL over the same seasons the Impact Player era adds +0.66 (95% CI +0.37 to +0.96, p < 0.01) runs per over.",
+  "effects": [
+    {
+      "name": "DiD: runs per over",
+      "estimate": 0.6634,
+      "ci": [
+        0.3733,
+        0.9552
+      ],
+      "p_value": 0.0,
+      "test": "bootstrap difference-in-differences (matches)",
+      "unit": "runs per over",
+      "direction": "positive",
+      "meaningful": 0.3,
+      "n": {
+        "treated_post_innings": 570,
+        "treated_pre_innings": 388,
+        "control_post_innings": 753,
+        "control_pre_innings": 707
+      },
+      "detail": {
+        "treated_post": 9.5043,
+        "treated_pre": 8.3091,
+        "control_post": 8.649,
+        "control_pre": 8.1171
+      }
+    },
+    {
+      "name": "DiD: powerplay runs per over",
+      "estimate": 0.8823,
+      "ci": [
+        0.4921,
+        1.2633
+      ],
+      "p_value": 0.0,
+      "test": "bootstrap difference-in-differences (matches)",
+      "unit": "powerplay runs per over",
+      "direction": "positive",
+      "meaningful": 0.3,
+      "n": {
+        "treated_post_innings": 570,
+        "treated_pre_innings": 388,
+        "control_post_innings": 753,
+        "control_pre_innings": 707
+      },
+      "detail": {
+        "treated_post": 9.4659,
+        "treated_pre": 7.7564,
+        "control_post": 8.3428,
+        "control_pre": 7.5157
+      }
+    },
+    {
+      "name": "DiD: middle-overs runs per over",
+      "estimate": 0.7005,
+      "ci": [
+        0.3535,
+        1.0526
+      ],
+      "p_value": 0.0,
+      "test": "bootstrap difference-in-differences (matches)",
+      "unit": "middle-overs runs per over",
+      "direction": "positive",
+      "meaningful": 0.3,
+      "n": {
+        "treated_post_innings": 570,
+        "treated_pre_innings": 388,
+        "control_post_innings": 753,
+        "control_pre_innings": 707
+      },
+      "detail": {
+        "treated_post": 8.8827,
+        "treated_pre": 7.8168,
+        "control_post": 8.073,
+        "control_pre": 7.7076
+      }
+    },
+    {
+      "name": "DiD: death runs per over",
+      "estimate": 0.2665,
+      "ci": [
+        -0.2494,
+        0.7872
+      ],
+      "p_value": 0.3104,
+      "test": "bootstrap difference-in-differences (matches)",
+      "unit": "death runs per over",
+      "direction": "positive",
+      "meaningful": 0.3,
+      "n": {
+        "treated_post_innings": 570,
+        "treated_pre_innings": 388,
+        "control_post_innings": 753,
+        "control_pre_innings": 707
+      },
+      "detail": {
+        "treated_post": 10.8454,
+        "treated_pre": 10.0503,
+        "control_post": 10.3643,
+        "control_pre": 9.8358
+      }
+    },
+    {
+      "name": "DiD: boundary % of balls",
+      "estimate": 2.1067,
+      "ci": [
+        1.1383,
+        3.0703
+      ],
+      "p_value": 0.0,
+      "test": "bootstrap difference-in-differences (matches)",
+      "unit": "boundary % of balls",
+      "direction": "positive",
+      "meaningful": 1.0,
+      "n": {
+        "treated_post_innings": 570,
+        "treated_pre_innings": 388,
+        "control_post_innings": 753,
+        "control_pre_innings": 707
+      },
+      "detail": {
+        "treated_post": 21.0747,
+        "treated_pre": 16.961,
+        "control_post": 17.8537,
+        "control_pre": 15.8467
+      }
+    },
+    {
+      "name": "DiD: dot % of balls",
+      "estimate": -2.5001,
+      "ci": [
+        -3.8877,
+        -1.1414
+      ],
+      "p_value": 0.0002,
+      "test": "bootstrap difference-in-differences (matches)",
+      "unit": "dot % of balls",
+      "direction": "negative",
+      "meaningful": -1.0,
+      "n": {
+        "treated_post_innings": 570,
+        "treated_pre_innings": 388,
+        "control_post_innings": 753,
+        "control_pre_innings": 707
+      },
+      "detail": {
+        "treated_post": 34.5098,
+        "treated_pre": 37.5891,
+        "control_post": 37.6382,
+        "control_pre": 38.2174
+      }
+    },
+    {
+      "name": "DiD: first innings 200+ (%)",
+      "estimate": 17.23,
+      "ci": [
+        8.0551,
+        26.227
+      ],
+      "p_value": 0.0,
+      "test": "bootstrap difference-in-differences (matches)",
+      "unit": "first innings 200+ (%)",
+      "direction": "positive",
+      "meaningful": 5.0,
+      "n": {
+        "treated_post_innings": 570,
+        "treated_pre_innings": 388,
+        "control_post_innings": 753,
+        "control_pre_innings": 707
+      },
+      "detail": {
+        "treated_post": 41.6084,
+        "treated_pre": 14.433,
+        "control_post": 19.9454,
+        "control_pre": 10.0
+      }
+    },
+    {
+      "name": "DiD: first innings 250+ (%)",
+      "estimate": 3.8272,
+      "ci": [
+        0.9834,
+        6.8555
+      ],
+      "p_value": 0.0058,
+      "test": "bootstrap difference-in-differences (matches)",
+      "unit": "first innings 250+ (%)",
+      "direction": "positive",
+      "meaningful": 1.0,
+      "n": {
+        "treated_post_innings": 570,
+        "treated_pre_innings": 388,
+        "control_post_innings": 753,
+        "control_pre_innings": 707
+      },
+      "detail": {
+        "treated_post": 4.8951,
+        "treated_pre": 0.0,
+        "control_post": 1.6393,
+        "control_pre": 0.5714
+      }
+    },
+    {
+      "name": "DiD: runs per over (pre = 2022 only)",
+      "estimate": 0.4752,
+      "ci": [
+        0.0906,
+        0.8691
+      ],
+      "p_value": 0.0118,
+      "test": "bootstrap difference-in-differences (matches)",
+      "unit": "runs per over (pre = 2022 only)",
+      "direction": "positive",
+      "meaningful": 0.3,
+      "n": {
+        "treated_post_innings": 570,
+        "treated_pre_innings": 148,
+        "control_post_innings": 753,
+        "control_pre_innings": 237
+      },
+      "detail": {
+        "treated_post": 9.5043,
+        "treated_pre": 8.5375,
+        "control_post": 8.649,
+        "control_pre": 8.1574
+      }
+    }
+  ],
+  "charts": [
+    {
+      "key": "ipl_rr",
+      "caption": "IPL runs per over by season (full-length innings)",
+      "params": {
+        "query_mode": "team_innings",
+        "fmt": "T20",
+        "start_date": "2019-07-01",
+        "dimension_filters": [
+          "full_length:eq:1",
+          "season_start_year:gte:2020"
+        ],
+        "leagues": [
+          "IPL"
+        ],
+        "group_by": [
+          "season"
+        ]
+      },
+      "presentation": {
+        "chart": "line",
+        "chart_metric": "run_rate"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?query_mode=team_innings&start_date=2019-07-01&dimension_filters=full_length%3Aeq%3A1&dimension_filters=season_start_year%3Agte%3A2020&leagues=IPL&group_by=season&fmt=mens-t20",
+      "title": "IPL runs per over by season (full-length innings)"
+    },
+    {
+      "key": "leagues",
+      "caption": "Runs per over before and after 2023: IPL vs leagues without the rule",
+      "params": {
+        "query_mode": "team_innings",
+        "fmt": "T20",
+        "start_date": "2019-07-01",
+        "dimension_filters": [
+          "full_length:eq:1",
+          "season_start_year:gte:2020"
+        ],
+        "leagues": [
+          "IPL",
+          "BBL",
+          "PSL",
+          "CPL"
+        ],
+        "group_by": [
+          "competition",
+          "impact_player_era"
+        ]
+      },
+      "presentation": {
+        "chart": "table",
+        "limit": 20
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?query_mode=team_innings&start_date=2019-07-01&dimension_filters=full_length%3Aeq%3A1&dimension_filters=season_start_year%3Agte%3A2020&leagues=IPL&leagues=BBL&leagues=PSL&leagues=CPL&group_by=competition&group_by=impact_player_era&fmt=mens-t20",
+      "title": "Runs per over before and after 2023: IPL vs leagues without the rule"
+    },
+    {
+      "key": "ipl_200",
+      "caption": "IPL first innings reaching 200, by season (%)",
+      "params": {
+        "query_mode": "team_innings",
+        "fmt": "T20",
+        "start_date": "2019-07-01",
+        "dimension_filters": [
+          "full_length:eq:1",
+          "season_start_year:gte:2020"
+        ],
+        "leagues": [
+          "IPL"
+        ],
+        "innings": 1,
+        "group_by": [
+          "season"
+        ]
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "pct_200_plus"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?query_mode=team_innings&start_date=2019-07-01&dimension_filters=full_length%3Aeq%3A1&dimension_filters=season_start_year%3Agte%3A2020&leagues=IPL&innings=1&group_by=season&fmt=mens-t20",
+      "title": "IPL first innings reaching 200, by season (%)"
+    },
+    {
+      "key": "phases",
+      "caption": "Runs per over by phase, IPL and control leagues, before and after 2023",
+      "params": {
+        "query_mode": "team_innings",
+        "fmt": "T20",
+        "start_date": "2019-07-01",
+        "dimension_filters": [
+          "full_length:eq:1",
+          "season_start_year:gte:2020"
+        ],
+        "leagues": [
+          "IPL",
+          "BBL",
+          "PSL",
+          "CPL"
+        ],
+        "group_by": [
+          "impact_player_era",
+          "competition"
+        ]
+      },
+      "presentation": {
+        "chart": "table",
+        "limit": 20
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?query_mode=team_innings&start_date=2019-07-01&dimension_filters=full_length%3Aeq%3A1&dimension_filters=season_start_year%3Agte%3A2020&leagues=IPL&leagues=BBL&leagues=PSL&leagues=CPL&group_by=impact_player_era&group_by=competition&fmt=mens-t20",
+      "title": "Runs per over by phase, IPL and control leagues, before and after 2023"
+    }
+  ],
+  "parts": {},
+  "tables": {
+    "cells_innings": {
+      "PSL|pre": 191,
+      "IPL|pre": 388,
+      "BBL|pre": 340,
+      "CPL|pre": 176,
+      "SA20|pre": 64,
+      "PSL|post": 262,
+      "IPL|post": 570,
+      "CPL|post": 254,
+      "BBL|post": 237,
+      "SA20|post": 183
+    },
+    "sa20_runs_per_over": {
+      "2022": 8.2,
+      "2023": 8.62,
+      "2024": 7.99,
+      "2025": 8.36
+    }
+  },
+  "caveats": [
+    "Difference-in-differences attributes to the rule every IPL-specific change from 2023 (squads, conditions, balls, strategy), not only the extra batter.",
+    "IPL 2020 and part of 2021 were played in the UAE; the 2022-only sensitivity check addresses that.",
+    "SA20 started in 2023, so it has no before period and is shown for context only."
+  ],
+  "samples": {
+    "innings": 2665
+  },
+  "data_through": "2026-10-03",
+  "database": "localhost/hindsight_analysis"
+}

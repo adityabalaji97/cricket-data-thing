@@ -1,0 +1,213 @@
+{
+  "hypothesis": "H5",
+  "slug": "h5-anchor-dead",
+  "claim": "A common claim is that the anchor is dead: a long, slow innings used to be useful in T20 and now loses games.",
+  "verdict": "Not supported",
+  "headline": "A sub-110 30-ball innings vs a 150+ one: the WPA gap changed by +0.044 (95% CI +0.014 to +0.076, p < 0.01) per innings between 2015-19 and 2023-26.",
+  "effects": [
+    {
+      "name": "Slow (<110) minus fast (150+) 30-ball innings, WPA per innings: 2023-26 minus 2015-19",
+      "estimate": 0.0443,
+      "ci": [
+        0.0138,
+        0.0756
+      ],
+      "p_value": 0.0054,
+      "test": "bootstrap difference-in-differences (innings)",
+      "unit": "WPA per innings",
+      "direction": "negative",
+      "meaningful": -0.03,
+      "n": {
+        "2023-26 under 110": 98,
+        "2023-26 150+": 639,
+        "2015-19 under 110": 184,
+        "2015-19 150+": 440
+      },
+      "detail": {
+        "2023-26 under 110": -0.01,
+        "2023-26 150+": 0.1917,
+        "2015-19 under 110": -0.0121,
+        "2015-19 150+": 0.2339
+      }
+    },
+    {
+      "name": "Same contrast in team win %",
+      "estimate": -0.3936,
+      "ci": [
+        -14.0055,
+        13.4563
+      ],
+      "p_value": 0.9554,
+      "test": "bootstrap difference-in-differences (innings)",
+      "unit": "percentage points",
+      "direction": "negative",
+      "meaningful": -10,
+      "n": {
+        "2023-26 under 110": 98,
+        "2023-26 150+": 639,
+        "2015-19 under 110": 184,
+        "2015-19 150+": 440
+      },
+      "detail": {
+        "2023-26 under 110": 48.4211,
+        "2023-26 150+": 63.6218,
+        "2015-19 under 110": 48.6188,
+        "2015-19 150+": 63.4259
+      }
+    }
+  ],
+  "charts": [
+    {
+      "key": "result_2015-19",
+      "caption": "Innings of 30+ balls by strike rate, 2015-19: team result and WPA (batting view)",
+      "params": {
+        "group_by": [
+          "batter_innings_strike_rate_bucket",
+          "match_outcome"
+        ],
+        "dimension_filters": [
+          "batter_balls_faced:gte:30"
+        ],
+        "start_date": "2015-01-01",
+        "end_date": "2019-12-31",
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "top_teams": 10
+      },
+      "presentation": {
+        "chart": "table"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?dimension_filters=batter_balls_faced%3Agte%3A30&start_date=2015-01-01&end_date=2019-12-31&leagues=IPL&include_international=true&top_teams=10&group_by=batter_innings_strike_rate_bucket&group_by=match_outcome&fmt=mens-t20",
+      "title": "Innings of 30+ balls by strike rate, 2015-19: team result and WPA (batting view)"
+    },
+    {
+      "key": "result_2023-26",
+      "caption": "Innings of 30+ balls by strike rate, 2023-26: team result and WPA (batting view)",
+      "params": {
+        "group_by": [
+          "batter_innings_strike_rate_bucket",
+          "match_outcome"
+        ],
+        "dimension_filters": [
+          "batter_balls_faced:gte:30"
+        ],
+        "start_date": "2023-01-01",
+        "end_date": "2026-10-03",
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "top_teams": 10
+      },
+      "presentation": {
+        "chart": "table"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?dimension_filters=batter_balls_faced%3Agte%3A30&start_date=2023-01-01&end_date=2026-10-03&leagues=IPL&include_international=true&top_teams=10&group_by=batter_innings_strike_rate_bucket&group_by=match_outcome&fmt=mens-t20",
+      "title": "Innings of 30+ balls by strike rate, 2023-26: team result and WPA (batting view)"
+    },
+    {
+      "key": "impact_2023",
+      "caption": "Innings of 30+ balls, 2023-26: Impact per 100 balls by strike-rate band",
+      "params": {
+        "group_by": [
+          "batter_innings_strike_rate_bucket"
+        ],
+        "dimension_filters": [
+          "batter_balls_faced:gte:30"
+        ],
+        "start_date": "2023-01-01",
+        "end_date": "2026-10-03",
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "top_teams": 10
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "impact_per_100"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?dimension_filters=batter_balls_faced%3Agte%3A30&start_date=2023-01-01&end_date=2026-10-03&leagues=IPL&include_international=true&top_teams=10&group_by=batter_innings_strike_rate_bucket&fmt=mens-t20",
+      "title": "Innings of 30+ balls, 2023-26: Impact per 100 balls by strike-rate band"
+    }
+  ],
+  "parts": {},
+  "tables": {
+    "cells": {
+      "2015-19": {
+        "under 110": {
+          "innings": 184,
+          "wpa_per_innings": -0.0121,
+          "team_win_pct": 48.6188
+        },
+        "110-129": {
+          "innings": 253,
+          "wpa_per_innings": 0.0446,
+          "team_win_pct": 50.2008
+        },
+        "130-149": {
+          "innings": 290,
+          "wpa_per_innings": 0.1143,
+          "team_win_pct": 59.6491
+        },
+        "150+": {
+          "innings": 440,
+          "wpa_per_innings": 0.2339,
+          "team_win_pct": 63.4259
+        }
+      },
+      "2023-26": {
+        "under 110": {
+          "innings": 98,
+          "wpa_per_innings": -0.01,
+          "team_win_pct": 48.4211
+        },
+        "110-129": {
+          "innings": 170,
+          "wpa_per_innings": 0.0448,
+          "team_win_pct": 42.0732
+        },
+        "130-149": {
+          "innings": 237,
+          "wpa_per_innings": 0.0877,
+          "team_win_pct": 60.262
+        },
+        "150+": {
+          "innings": 639,
+          "wpa_per_innings": 0.1917,
+          "team_win_pct": 63.6218
+        }
+      }
+    },
+    "share_of_long_innings_under_110": {
+      "2015-19": 15.8,
+      "2023-26": 8.6
+    }
+  },
+  "caveats": [
+    "A slow innings is often a response to early wickets; WPA credits the batter only for what happened on his balls, but team result also reflects the collapse around him.",
+    "T20Is restricted to matches between the top 10 teams."
+  ],
+  "samples": {
+    "innings": {
+      "2015-19 under 110": 184,
+      "2015-19 110-129": 253,
+      "2015-19 130-149": 290,
+      "2015-19 150+": 440,
+      "2023-26 under 110": 98,
+      "2023-26 110-129": 170,
+      "2023-26 130-149": 237,
+      "2023-26 150+": 639
+    }
+  },
+  "data_through": "2026-10-03",
+  "database": "localhost/hindsight_analysis"
+}

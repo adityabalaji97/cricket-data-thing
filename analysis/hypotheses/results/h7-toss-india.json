@@ -1,0 +1,291 @@
+{
+  "hypothesis": "H7",
+  "slug": "h7-toss-india",
+  "claim": "A common claim is that the toss doesn't matter at Indian venues.",
+  "verdict": "Inconclusive",
+  "headline": "Toss winners won 177 of 355 decided matches in India (49.9%); the 95% CI for the edge is -5.2 to +4.9 points.",
+  "effects": [
+    {
+      "name": "Toss winner's win % minus 50",
+      "estimate": -0.1408,
+      "ci": [
+        -5.2113,
+        4.9296
+      ],
+      "p_value": 1.0,
+      "test": "exact binomial test; bootstrap CI over matches",
+      "unit": "percentage points",
+      "direction": "none",
+      "meaningful": 5.0,
+      "n": {
+        "decided_matches": 355
+      },
+      "detail": {
+        "toss_winner_wins": 177,
+        "wilson_ci_pct": [
+          44.6874,
+          55.0339
+        ]
+      }
+    }
+  ],
+  "charts": [
+    {
+      "key": "venues",
+      "caption": "Toss winner's win % by venue in India, IPL and T20Is 2023-26 (first-innings row per match)",
+      "params": {
+        "query_mode": "team_innings",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2023-01-01",
+        "innings": 1,
+        "dimension_filters": [
+          "country:eq:India"
+        ],
+        "fmt": "T20",
+        "group_by": [
+          "venue"
+        ]
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "toss_winner_win_percentage",
+        "limit": 15
+      },
+      "small_samples": [
+        "Maharashtra Cricket Association Stadium (2)",
+        "Saurashtra Cricket Association Stadium, Rajkot (2)",
+        "JSCA International Stadium Complex, Ranchi (1)",
+        "Punjab Cricket Association IS Bindra Stadium (6)",
+        "Barsapara Cricket Stadium, Guwahati (10)",
+        "Himachal Pradesh Cricket Association Stadium (10)"
+      ],
+      "url": "https://hindsightcricket.com/query?query_mode=team_innings&leagues=IPL&include_international=true&start_date=2023-01-01&innings=1&dimension_filters=country%3Aeq%3AIndia&group_by=venue&fmt=mens-t20",
+      "title": "Toss winner's win % by venue in India, IPL and T20Is 2023-26 (first-innings row per match) \u00b7 small sample (<15): Maharashtra Cricket Association Stadium (2), Saurashtra Cricket Association Stadium, Rajkot (2), JSCA International Stadium Complex, Ranchi (1), Punjab Cricket Association IS Bindra Stadium (6), Barsapara Cricket Stadium, Guwahati (10), Himachal Pradesh Cricket Association Stadium (10)"
+    },
+    {
+      "key": "decision",
+      "caption": "Bat-first win % by toss decision (India, 2023-26)",
+      "params": {
+        "query_mode": "team_innings",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2023-01-01",
+        "innings": 1,
+        "dimension_filters": [
+          "country:eq:India"
+        ],
+        "fmt": "T20",
+        "group_by": [
+          "toss_decision"
+        ]
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "win_percentage"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?query_mode=team_innings&leagues=IPL&include_international=true&start_date=2023-01-01&innings=1&dimension_filters=country%3Aeq%3AIndia&group_by=toss_decision&fmt=mens-t20",
+      "title": "Bat-first win % by toss decision (India, 2023-26)"
+    },
+    {
+      "key": "season",
+      "caption": "Toss winner's win % by season (India)",
+      "params": {
+        "query_mode": "team_innings",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2023-01-01",
+        "innings": 1,
+        "dimension_filters": [
+          "country:eq:India"
+        ],
+        "fmt": "T20",
+        "group_by": [
+          "season"
+        ]
+      },
+      "presentation": {
+        "chart": "line",
+        "chart_metric": "toss_winner_win_percentage"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?query_mode=team_innings&leagues=IPL&include_international=true&start_date=2023-01-01&innings=1&dimension_filters=country%3Aeq%3AIndia&group_by=season&fmt=mens-t20",
+      "title": "Toss winner's win % by season (India)"
+    }
+  ],
+  "parts": {},
+  "tables": {
+    "by_venue": {
+      "Narendra Modi Stadium": {
+        "matches": 43,
+        "toss_wins": 20,
+        "bat_first_wins": 24,
+        "chose_field": 33,
+        "toss_winner_win_pct": 46.5,
+        "toss_winner_ci": [
+          32.5,
+          61.1
+        ],
+        "chase_win_pct": 44.2,
+        "chose_field_pct": 76.7,
+        "binomial_p": 0.761
+      },
+      "MA Chidambaram Stadium": {
+        "matches": 39,
+        "toss_wins": 17,
+        "bat_first_wins": 16,
+        "chose_field": 25,
+        "toss_winner_win_pct": 43.6,
+        "toss_winner_ci": [
+          29.3,
+          59.0
+        ],
+        "chase_win_pct": 59.0,
+        "chose_field_pct": 64.1,
+        "binomial_p": 0.522
+      },
+      "Wankhede Stadium": {
+        "matches": 38,
+        "toss_wins": 18,
+        "bat_first_wins": 19,
+        "chose_field": 35,
+        "toss_winner_win_pct": 47.4,
+        "toss_winner_ci": [
+          32.5,
+          62.7
+        ],
+        "chase_win_pct": 50.0,
+        "chose_field_pct": 92.1,
+        "binomial_p": 0.871
+      },
+      "Feroz Shah Kotla": {
+        "matches": 35,
+        "toss_wins": 18,
+        "bat_first_wins": 15,
+        "chose_field": 27,
+        "toss_winner_win_pct": 51.4,
+        "toss_winner_ci": [
+          35.6,
+          67.0
+        ],
+        "chase_win_pct": 57.1,
+        "chose_field_pct": 77.1,
+        "binomial_p": 1.0
+      },
+      "Eden Gardens": {
+        "matches": 34,
+        "toss_wins": 14,
+        "bat_first_wins": 18,
+        "chose_field": 28,
+        "toss_winner_win_pct": 41.2,
+        "toss_winner_ci": [
+          26.4,
+          57.8
+        ],
+        "chase_win_pct": 47.1,
+        "chose_field_pct": 82.4,
+        "binomial_p": 0.392
+      },
+      "Ekana Cricket Stadium": {
+        "matches": 28,
+        "toss_wins": 18,
+        "bat_first_wins": 11,
+        "chose_field": 21,
+        "toss_winner_win_pct": 64.3,
+        "toss_winner_ci": [
+          45.8,
+          79.3
+        ],
+        "chase_win_pct": 60.7,
+        "chose_field_pct": 75.0,
+        "binomial_p": 0.185
+      },
+      "Rajiv Gandhi International Stadium": {
+        "matches": 26,
+        "toss_wins": 13,
+        "bat_first_wins": 14,
+        "chose_field": 15,
+        "toss_winner_win_pct": 50.0,
+        "toss_winner_ci": [
+          32.1,
+          67.9
+        ],
+        "chase_win_pct": 46.2,
+        "chose_field_pct": 57.7,
+        "binomial_p": 1.0
+      },
+      "M Chinnaswamy Stadium": {
+        "matches": 26,
+        "toss_wins": 13,
+        "bat_first_wins": 12,
+        "chose_field": 25,
+        "toss_winner_win_pct": 50.0,
+        "toss_winner_ci": [
+          32.1,
+          67.9
+        ],
+        "chase_win_pct": 53.8,
+        "chose_field_pct": 96.2,
+        "binomial_p": 1.0
+      },
+      "Sawai Mansingh Stadium": {
+        "matches": 21,
+        "toss_wins": 13,
+        "bat_first_wins": 9,
+        "chose_field": 12,
+        "toss_winner_win_pct": 61.9,
+        "toss_winner_ci": [
+          40.9,
+          79.2
+        ],
+        "chase_win_pct": 57.1,
+        "chose_field_pct": 57.1,
+        "binomial_p": 0.383
+      },
+      "Maharaja Yadavindra Singh International Cricket Stadium, Mullanpur": {
+        "matches": 18,
+        "toss_wins": 10,
+        "bat_first_wins": 9,
+        "chose_field": 13,
+        "toss_winner_win_pct": 55.6,
+        "toss_winner_ci": [
+          33.7,
+          75.4
+        ],
+        "chase_win_pct": 50.0,
+        "chose_field_pct": 72.2,
+        "binomial_p": 0.815
+      },
+      "other venues": {
+        "matches": 47,
+        "toss_wins": 23,
+        "bat_first_wins": 26,
+        "chose_field": 41,
+        "toss_winner_win_pct": 48.9,
+        "toss_winner_ci": [
+          35.3,
+          62.8
+        ],
+        "chase_win_pct": 44.7,
+        "chose_field_pct": 87.2,
+        "binomial_p": 1.0
+      }
+    }
+  },
+  "caveats": [
+    "Venue-level results are exploratory: many grounds, few matches each.",
+    "'Doesn't matter' is tested as an equivalence band of +/-5 points around 50%."
+  ],
+  "samples": {
+    "decided_matches": 355
+  },
+  "data_through": "2026-10-03",
+  "database": "localhost/hindsight_analysis"
+}

@@ -1,0 +1,625 @@
+{
+  "hypothesis": "H2",
+  "slug": "h2-varun-figured-out",
+  "claim": "A common claim is that batters have figured Varun Chakravarthy out.",
+  "verdict": "Inconclusive",
+  "headline": "Varun's RAA per over in 2025-26 vs earlier: -0.33 (95% CI -1.19 to +0.53, p = 0.45) (57 recent and 83 earlier matches).",
+  "effects": [
+    {
+      "name": "Varun: per-match RAA/over, 2025-26 minus earlier seasons",
+      "estimate": -0.3284,
+      "ci": [
+        -1.1868,
+        0.5335
+      ],
+      "p_value": 0.4518,
+      "test": "Welch t-test",
+      "unit": "RAA per over",
+      "direction": "negative",
+      "meaningful": -0.5,
+      "n": {
+        "2025-26": 57,
+        "earlier": 83
+      },
+      "detail": {
+        "t": -0.7553,
+        "mean_2025-26": 0.2582,
+        "mean_earlier": 0.5866
+      }
+    },
+    {
+      "name": "Varun: per-match WAA/over, 2025-26 minus earlier",
+      "estimate": 0.1028,
+      "ci": [
+        -0.0007,
+        0.2102
+      ],
+      "p_value": 0.0611,
+      "test": "Welch t-test",
+      "unit": "WAA per over",
+      "direction": "negative",
+      "meaningful": -0.05,
+      "n": {
+        "2025-26": 57,
+        "earlier": 83
+      },
+      "detail": {
+        "t": 1.8916,
+        "mean_2025-26": 0.0986,
+        "mean_earlier": -0.0042
+      }
+    },
+    {
+      "name": "Trend: change in per-match RAA/over per year",
+      "estimate": -0.1362,
+      "ci": [
+        -0.3395,
+        0.0655
+      ],
+      "p_value": null,
+      "test": "OLS slope, bootstrap over matches",
+      "unit": "RAA per over per year",
+      "direction": "negative",
+      "meaningful": -0.25,
+      "n": {
+        "matches": 140
+      },
+      "detail": {}
+    }
+  ],
+  "charts": [
+    {
+      "key": "season",
+      "caption": "Varun's RAA per over by season (bowling view)",
+      "params": {
+        "bowlers": [
+          "Varun Chakaravarthy"
+        ],
+        "group_by": [
+          "season"
+        ],
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01",
+        "metrics_perspective": "bowling"
+      },
+      "presentation": {
+        "chart": "line",
+        "chart_metric": "raa_per_over"
+      },
+      "small_samples": [
+        "2019 (1)",
+        "2020 (13)",
+        "2022 (11)",
+        "2023 (14)"
+      ],
+      "url": "https://hindsightcricket.com/query?bowlers=Varun+Chakaravarthy&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&group_by=season&fmt=mens-t20",
+      "title": "Varun's RAA per over by season (bowling view) \u00b7 small sample (<15): 2019 (1), 2020 (13), 2022 (11), 2023 (14)"
+    },
+    {
+      "key": "hand",
+      "caption": "Varun's RAA per over against left- and right-handers, by season",
+      "params": {
+        "bowlers": [
+          "Varun Chakaravarthy"
+        ],
+        "group_by": [
+          "season",
+          "bat_hand"
+        ],
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01",
+        "metrics_perspective": "bowling"
+      },
+      "presentation": {
+        "chart": "table",
+        "limit": 40
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowlers=Varun+Chakaravarthy&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&group_by=season&group_by=bat_hand&fmt=mens-t20",
+      "title": "Varun's RAA per over against left- and right-handers, by season"
+    },
+    {
+      "key": "length",
+      "caption": "Varun's RAA per 100 balls by length (balls with length recorded)",
+      "params": {
+        "bowlers": [
+          "Varun Chakaravarthy"
+        ],
+        "group_by": [
+          "length"
+        ],
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01",
+        "metrics_perspective": "bowling"
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "raa_per_100"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowlers=Varun+Chakaravarthy&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&group_by=length&fmt=mens-t20",
+      "title": "Varun's RAA per 100 balls by length (balls with length recorded)"
+    },
+    {
+      "key": "dismissal",
+      "caption": "How Varun's wickets fall (all seasons)",
+      "params": {
+        "bowlers": [
+          "Varun Chakaravarthy"
+        ],
+        "group_by": [
+          "dismissal"
+        ],
+        "fmt": "T20",
+        "leagues": [
+          "IPL"
+        ],
+        "include_international": true,
+        "start_date": "2015-01-01",
+        "metrics_perspective": "bowling"
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "wickets"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowlers=Varun+Chakaravarthy&leagues=IPL&include_international=true&start_date=2015-01-01&metrics_perspective=bowling&group_by=dismissal&fmt=mens-t20",
+      "title": "How Varun's wickets fall (all seasons)"
+    }
+  ],
+  "parts": {},
+  "tables": {
+    "by_season": {
+      "2019": {
+        "matches": 1,
+        "raa_per_over": -2.87,
+        "waa_per_over": 0.0737
+      },
+      "2020": {
+        "matches": 13,
+        "raa_per_over": 1.3912,
+        "waa_per_over": -0.0104
+      },
+      "2021": {
+        "matches": 23,
+        "raa_per_over": 1.2169,
+        "waa_per_over": -0.0763
+      },
+      "2022": {
+        "matches": 11,
+        "raa_per_over": -0.5786,
+        "waa_per_over": -0.1711
+      },
+      "2023": {
+        "matches": 14,
+        "raa_per_over": 0.6804,
+        "waa_per_over": 0.0364
+      },
+      "2024": {
+        "matches": 21,
+        "raa_per_over": 0.1107,
+        "waa_per_over": 0.1352
+      },
+      "2025": {
+        "matches": 31,
+        "raa_per_over": 0.5743,
+        "waa_per_over": 0.152
+      },
+      "2026": {
+        "matches": 26,
+        "raa_per_over": -0.1186,
+        "waa_per_over": 0.035
+      }
+    },
+    "half_seasons": {
+      "IPL 2019 1st half": {
+        "matches": 1,
+        "raa_per_over": -2.87
+      },
+      "IPL 2019 2nd half": {
+        "matches": 0,
+        "raa_per_over": null
+      },
+      "IPL 2020 1st half": {
+        "matches": 7,
+        "raa_per_over": 1.2975
+      },
+      "IPL 2020 2nd half": {
+        "matches": 6,
+        "raa_per_over": 1.5004
+      },
+      "IPL 2021 1st half": {
+        "matches": 9,
+        "raa_per_over": 0.6786
+      },
+      "IPL 2021 2nd half": {
+        "matches": 8,
+        "raa_per_over": 1.6885
+      },
+      "IPL 2022 1st half": {
+        "matches": 6,
+        "raa_per_over": -1.0003
+      },
+      "IPL 2022 2nd half": {
+        "matches": 5,
+        "raa_per_over": -0.0725
+      },
+      "IPL 2023 1st half": {
+        "matches": 7,
+        "raa_per_over": 1.1933
+      },
+      "IPL 2023 2nd half": {
+        "matches": 7,
+        "raa_per_over": 0.1675
+      },
+      "IPL 2024 1st half": {
+        "matches": 7,
+        "raa_per_over": -0.4253
+      },
+      "IPL 2024 2nd half": {
+        "matches": 7,
+        "raa_per_over": 0.4124
+      },
+      "IPL 2025 1st half": {
+        "matches": 7,
+        "raa_per_over": 1.6015
+      },
+      "IPL 2025 2nd half": {
+        "matches": 6,
+        "raa_per_over": -0.4515
+      },
+      "IPL 2026 1st half": {
+        "matches": 6,
+        "raa_per_over": -0.0558
+      },
+      "IPL 2026 2nd half": {
+        "matches": 5,
+        "raa_per_over": 0.484
+      }
+    },
+    "by_hand": [
+      {
+        "season": "2025",
+        "bat_hand": "RHB",
+        "balls": 514,
+        "raa_per_100": 6.81,
+        "economy": null,
+        "runs": 634,
+        "wickets": 43
+      },
+      {
+        "season": "2021",
+        "bat_hand": "RHB",
+        "balls": 399,
+        "raa_per_100": 22.45,
+        "economy": null,
+        "runs": 420,
+        "wickets": 14
+      },
+      {
+        "season": "2026",
+        "bat_hand": "RHB",
+        "balls": 365,
+        "raa_per_100": 12.04,
+        "economy": null,
+        "runs": 484,
+        "wickets": 21
+      },
+      {
+        "season": "2024",
+        "bat_hand": "RHB",
+        "balls": 364,
+        "raa_per_100": 3.45,
+        "economy": null,
+        "runs": 468,
+        "wickets": 28
+      },
+      {
+        "season": "2020",
+        "bat_hand": "RHB",
+        "balls": 246,
+        "raa_per_100": 21.76,
+        "economy": null,
+        "runs": 284,
+        "wickets": 10
+      },
+      {
+        "season": "2026",
+        "bat_hand": "LHB",
+        "balls": 205,
+        "raa_per_100": -24.49,
+        "economy": null,
+        "runs": 359,
+        "wickets": 10
+      },
+      {
+        "season": "2025",
+        "bat_hand": "LHB",
+        "balls": 188,
+        "raa_per_100": 20.17,
+        "economy": null,
+        "runs": 224,
+        "wickets": 10
+      },
+      {
+        "season": "2023",
+        "bat_hand": "RHB",
+        "balls": 174,
+        "raa_per_100": 15.14,
+        "economy": null,
+        "runs": 230,
+        "wickets": 14
+      },
+      {
+        "season": "2021",
+        "bat_hand": "LHB",
+        "balls": 144,
+        "raa_per_100": 13.53,
+        "economy": null,
+        "runs": 160,
+        "wickets": 6
+      },
+      {
+        "season": "2023",
+        "bat_hand": "LHB",
+        "balls": 142,
+        "raa_per_100": 9.12,
+        "economy": null,
+        "runs": 199,
+        "wickets": 6
+      },
+      {
+        "season": "2022",
+        "bat_hand": "RHB",
+        "balls": 125,
+        "raa_per_100": -10.42,
+        "economy": null,
+        "runs": 191,
+        "wickets": 4
+      },
+      {
+        "season": "2022",
+        "bat_hand": "LHB",
+        "balls": 109,
+        "raa_per_100": 2.86,
+        "economy": null,
+        "runs": 137,
+        "wickets": 2
+      },
+      {
+        "season": "2024",
+        "bat_hand": "LHB",
+        "balls": 104,
+        "raa_per_100": 2.69,
+        "economy": null,
+        "runs": 141,
+        "wickets": 10
+      },
+      {
+        "season": "2020",
+        "bat_hand": "LHB",
+        "balls": 66,
+        "raa_per_100": 28.49,
+        "economy": null,
+        "runs": 72,
+        "wickets": 7
+      },
+      {
+        "season": "2019",
+        "bat_hand": "LHB",
+        "balls": 10,
+        "raa_per_100": -87.5,
+        "economy": null,
+        "runs": 24,
+        "wickets": 1
+      },
+      {
+        "season": "2019",
+        "bat_hand": "RHB",
+        "balls": 8,
+        "raa_per_100": 1.69,
+        "economy": null,
+        "runs": 11,
+        "wickets": 0
+      }
+    ],
+    "by_length": [
+      {
+        "length": "GOOD_LENGTH",
+        "balls": 1759,
+        "raa_per_100": 35.13,
+        "runs": 1761,
+        "wickets": 107
+      },
+      {
+        "length": "FULL",
+        "balls": 678,
+        "raa_per_100": -37.11,
+        "runs": 1197,
+        "wickets": 48
+      },
+      {
+        "length": "SHORT_OF_A_GOOD_LENGTH",
+        "balls": 628,
+        "raa_per_100": -8.62,
+        "runs": 926,
+        "wickets": 28
+      },
+      {
+        "length": "SHORT",
+        "balls": 39,
+        "raa_per_100": -84.09,
+        "runs": 87,
+        "wickets": 2
+      },
+      {
+        "length": "FULL_TOSS",
+        "balls": 37,
+        "raa_per_100": -24.37,
+        "runs": 57,
+        "wickets": 1
+      },
+      {
+        "length": "YORKER",
+        "balls": 16,
+        "raa_per_100": 41.82,
+        "runs": 9,
+        "wickets": 0
+      },
+      {
+        "length": null,
+        "balls": 6,
+        "raa_per_100": 123.55,
+        "runs": 1,
+        "wickets": 0
+      }
+    ],
+    "by_shot": [
+      {
+        "shot": "FLICK",
+        "balls": 514,
+        "raa_per_100": 38.33,
+        "runs": 492,
+        "wickets": 13
+      },
+      {
+        "shot": "ON_DRIVE",
+        "balls": 486,
+        "raa_per_100": -10.86,
+        "runs": 713,
+        "wickets": 25
+      },
+      {
+        "shot": "COVER_DRIVE",
+        "balls": 338,
+        "raa_per_100": 7.41,
+        "runs": 447,
+        "wickets": 18
+      },
+      {
+        "shot": "CUT_SHOT",
+        "balls": 337,
+        "raa_per_100": 22.68,
+        "runs": 400,
+        "wickets": 3
+      },
+      {
+        "shot": "PUSH",
+        "balls": 284,
+        "raa_per_100": 81.78,
+        "runs": 133,
+        "wickets": 8
+      },
+      {
+        "shot": "DEFENDED",
+        "balls": 261,
+        "raa_per_100": 112.97,
+        "runs": 14,
+        "wickets": 16
+      },
+      {
+        "shot": "PULL",
+        "balls": 236,
+        "raa_per_100": -66.46,
+        "runs": 500,
+        "wickets": 22
+      },
+      {
+        "shot": "SLOG_SHOT",
+        "balls": 160,
+        "raa_per_100": -81.04,
+        "runs": 359,
+        "wickets": 33
+      },
+      {
+        "shot": "SLOG_SWEEP",
+        "balls": 114,
+        "raa_per_100": -80.22,
+        "runs": 260,
+        "wickets": 31
+      },
+      {
+        "shot": "SWEEP_SHOT",
+        "balls": 100,
+        "raa_per_100": -33.96,
+        "runs": 169,
+        "wickets": 5
+      },
+      {
+        "shot": "REVERSE_SWEEP",
+        "balls": 67,
+        "raa_per_100": -1.56,
+        "runs": 92,
+        "wickets": 5
+      },
+      {
+        "shot": "SQUARE_DRIVE",
+        "balls": 56,
+        "raa_per_100": 36.25,
+        "runs": 51,
+        "wickets": 0
+      },
+      {
+        "shot": "STRAIGHT_DRIVE",
+        "balls": 53,
+        "raa_per_100": -189.73,
+        "runs": 177,
+        "wickets": 1
+      },
+      {
+        "shot": "STEERED",
+        "balls": 40,
+        "raa_per_100": 37.01,
+        "runs": 38,
+        "wickets": 1
+      },
+      {
+        "shot": "DAB",
+        "balls": 31,
+        "raa_per_100": 67.76,
+        "runs": 19,
+        "wickets": 0
+      }
+    ],
+    "dismissal_share": {
+      "earlier": {
+        "caught": 61.8,
+        "bowled": 24.5,
+        "leg before wicket": 8.8,
+        "stumped": 4.9,
+        "run out": 0.0
+      },
+      "2025-26": {
+        "caught": 54.8,
+        "bowled": 36.9,
+        "leg before wicket": 4.8,
+        "run out": 0.0,
+        "stumped": 3.6
+      }
+    }
+  },
+  "caveats": [
+    "Length and shot are recorded for part of the balls only (coverage in samples).",
+    "Seasons mix IPL and T20Is; T20Is cluster around tournaments."
+  ],
+  "samples": {
+    "matches": 140,
+    "coverage_percent": {
+      "length": 99.8
+    }
+  },
+  "data_through": "2026-10-03",
+  "database": "localhost/hindsight_analysis"
+}

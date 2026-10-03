@@ -1,0 +1,447 @@
+{
+  "hypothesis": "H8",
+  "slug": "h8-matchups",
+  "claim": "A common claim is that bowling matchups (leg-spin to left-handers, left-arm pace to right-handers in the powerplay) are overrated.",
+  "verdict": "Partly",
+  "headline": "Leg-spin to left-handers: -5.90 (95% CI -8.29 to -3.69, p < 0.01) RAA per 100 balls vs the same bowlers to right-handers; left-arm pace to right-handers in the powerplay: +0.76 (95% CI -1.57 to +3.21, p = 0.52).",
+  "effects": [
+    {
+      "name": "leg-spin to left-handers: within-bowler RAA per 100 balls, matchup hand minus other hand",
+      "estimate": -5.9044,
+      "ci": [
+        -8.2929,
+        -3.6944
+      ],
+      "p_value": 0.0,
+      "test": "weighted mean of within-bowler differences, bootstrap over bowlers",
+      "unit": "RAA per 100 balls",
+      "direction": "none",
+      "meaningful": 3.0,
+      "n": {
+        "bowlers": 94
+      },
+      "detail": {}
+    },
+    {
+      "name": "left-arm pace to right-handers, powerplay: within-bowler RAA per 100 balls, matchup hand minus other hand",
+      "estimate": 0.756,
+      "ci": [
+        -1.5746,
+        3.212
+      ],
+      "p_value": 0.5184,
+      "test": "weighted mean of within-bowler differences, bootstrap over bowlers",
+      "unit": "RAA per 100 balls",
+      "direction": "none",
+      "meaningful": 3.0,
+      "n": {
+        "bowlers": 87
+      },
+      "detail": {}
+    }
+  ],
+  "charts": [
+    {
+      "key": "A_pooled",
+      "caption": "Leg-spin to left-handers: RAA per 100 balls by batter's hand (bowling view)",
+      "params": {
+        "bowl_style": [
+          "LB",
+          "LBG"
+        ],
+        "fmt": "T20",
+        "metrics_perspective": "bowling",
+        "start_date": "2015-01-01",
+        "group_by": [
+          "bat_hand"
+        ]
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "raa_per_100"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowl_style=LB&bowl_style=LBG&metrics_perspective=bowling&start_date=2015-01-01&group_by=bat_hand&fmt=mens-t20",
+      "title": "Leg-spin to left-handers: RAA per 100 balls by batter's hand (bowling view)"
+    },
+    {
+      "key": "B_pooled",
+      "caption": "Left-arm pace to right-handers, powerplay: RAA per 100 balls by batter's hand (bowling view)",
+      "params": {
+        "bowl_style": [
+          "LF",
+          "LFM",
+          "LMF",
+          "LM"
+        ],
+        "fmt": "T20",
+        "metrics_perspective": "bowling",
+        "over_min": 0,
+        "over_max": 5,
+        "start_date": "2015-01-01",
+        "group_by": [
+          "bat_hand"
+        ]
+      },
+      "presentation": {
+        "chart": "bar",
+        "chart_metric": "raa_per_100"
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowl_style=LF&bowl_style=LFM&bowl_style=LMF&bowl_style=LM&metrics_perspective=bowling&over_min=0&over_max=5&start_date=2015-01-01&group_by=bat_hand&fmt=mens-t20",
+      "title": "Left-arm pace to right-handers, powerplay: RAA per 100 balls by batter's hand (bowling view)"
+    },
+    {
+      "key": "A_bowlers",
+      "caption": "Leg-spin to left-handers: each bowler by batter's hand (120+ balls)",
+      "params": {
+        "bowl_style": [
+          "LB",
+          "LBG"
+        ],
+        "fmt": "T20",
+        "metrics_perspective": "bowling",
+        "start_date": "2015-01-01",
+        "group_by": [
+          "bowler",
+          "bat_hand"
+        ],
+        "min_balls": 120
+      },
+      "presentation": {
+        "chart": "table",
+        "limit": 60
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowl_style=LB&bowl_style=LBG&metrics_perspective=bowling&start_date=2015-01-01&min_balls=120&group_by=bowler&group_by=bat_hand&fmt=mens-t20",
+      "title": "Leg-spin to left-handers: each bowler by batter's hand (120+ balls)"
+    },
+    {
+      "key": "B_bowlers",
+      "caption": "Left-arm pace to right-handers, powerplay: each bowler by batter's hand (120+ balls)",
+      "params": {
+        "bowl_style": [
+          "LF",
+          "LFM",
+          "LMF",
+          "LM"
+        ],
+        "fmt": "T20",
+        "metrics_perspective": "bowling",
+        "over_min": 0,
+        "over_max": 5,
+        "start_date": "2015-01-01",
+        "group_by": [
+          "bowler",
+          "bat_hand"
+        ],
+        "min_balls": 120
+      },
+      "presentation": {
+        "chart": "table",
+        "limit": 60
+      },
+      "small_samples": [],
+      "url": "https://hindsightcricket.com/query?bowl_style=LF&bowl_style=LFM&bowl_style=LMF&bowl_style=LM&metrics_perspective=bowling&over_min=0&over_max=5&start_date=2015-01-01&min_balls=120&group_by=bowler&group_by=bat_hand&fmt=mens-t20",
+      "title": "Left-arm pace to right-handers, powerplay: each bowler by batter's hand (120+ balls)"
+    }
+  ],
+  "parts": {
+    "A. leg-spin to left-handers": "Not supported \u2014 the matchup backfires",
+    "B. left-arm pace to right-handers, powerplay": "Inconclusive"
+  },
+  "tables": {
+    "A": {
+      "economy_by_hand": {
+        "LHB": {
+          "balls": 49474,
+          "economy": 7.8,
+          "waa_per_100": 0.62
+        },
+        "RHB": {
+          "balls": 129380,
+          "economy": 7.39,
+          "waa_per_100": 0.331
+        }
+      },
+      "bowlers": [
+        {
+          "bowler": "Rashid Khan",
+          "diff_raa_per_100": 0.79,
+          "min_balls": 3713
+        },
+        {
+          "bowler": "Imran Tahir",
+          "diff_raa_per_100": -10.33,
+          "min_balls": 2339
+        },
+        {
+          "bowler": "Shadab Khan",
+          "diff_raa_per_100": 3.21,
+          "min_balls": 2180
+        },
+        {
+          "bowler": "Adam Zampa",
+          "diff_raa_per_100": -8.1,
+          "min_balls": 1913
+        },
+        {
+          "bowler": "Yuzvendra Chahal",
+          "diff_raa_per_100": -14.67,
+          "min_balls": 1844
+        },
+        {
+          "bowler": "Adil Rashid",
+          "diff_raa_per_100": -1.59,
+          "min_balls": 1645
+        },
+        {
+          "bowler": "Ish Sodhi",
+          "diff_raa_per_100": -8.12,
+          "min_balls": 1596
+        },
+        {
+          "bowler": "Qais Ahmad",
+          "diff_raa_per_100": -1.66,
+          "min_balls": 1223
+        },
+        {
+          "bowler": "Ravi Bishnoi",
+          "diff_raa_per_100": 2.68,
+          "min_balls": 1128
+        },
+        {
+          "bowler": "Sandeep Lamichhane",
+          "diff_raa_per_100": -11.2,
+          "min_balls": 1089
+        },
+        {
+          "bowler": "Shahid Afridi",
+          "diff_raa_per_100": -19.98,
+          "min_balls": 1033
+        },
+        {
+          "bowler": "Fawad Ahmed",
+          "diff_raa_per_100": -1.37,
+          "min_balls": 1031
+        },
+        {
+          "bowler": "Varun Chakaravarthy",
+          "diff_raa_per_100": -7.17,
+          "min_balls": 988
+        },
+        {
+          "bowler": "Nathan Sowter",
+          "diff_raa_per_100": -4.86,
+          "min_balls": 941
+        },
+        {
+          "bowler": "Usama Mir",
+          "diff_raa_per_100": 14.76,
+          "min_balls": 877
+        },
+        {
+          "bowler": "Wanindu Hasaranga",
+          "diff_raa_per_100": -7.25,
+          "min_balls": 854
+        },
+        {
+          "bowler": "Seekkuge Prasanna",
+          "diff_raa_per_100": -13.96,
+          "min_balls": 807
+        },
+        {
+          "bowler": "Wanindu Hasaranga de Silva",
+          "diff_raa_per_100": -11.71,
+          "min_balls": 788
+        },
+        {
+          "bowler": "Rahul Chahar",
+          "diff_raa_per_100": 3.49,
+          "min_balls": 728
+        },
+        {
+          "bowler": "Piyush Chawla",
+          "diff_raa_per_100": -8.14,
+          "min_balls": 709
+        },
+        {
+          "bowler": "Abrar Ahmed",
+          "diff_raa_per_100": -13.05,
+          "min_balls": 645
+        },
+        {
+          "bowler": "Matt Parkinson",
+          "diff_raa_per_100": -21.69,
+          "min_balls": 631
+        },
+        {
+          "bowler": "Mason Crane",
+          "diff_raa_per_100": -5.92,
+          "min_balls": 629
+        },
+        {
+          "bowler": "Matt Critchley",
+          "diff_raa_per_100": -16.71,
+          "min_balls": 611
+        },
+        {
+          "bowler": "Samuel Badree",
+          "diff_raa_per_100": -9.73,
+          "min_balls": 606
+        }
+      ]
+    },
+    "B": {
+      "economy_by_hand": {
+        "LHB": {
+          "balls": 32156,
+          "economy": 7.57,
+          "waa_per_100": 0.326
+        },
+        "RHB": {
+          "balls": 66279,
+          "economy": 7.44,
+          "waa_per_100": -0.101
+        }
+      },
+      "bowlers": [
+        {
+          "bowler": "Mohammad Amir",
+          "diff_raa_per_100": -6.51,
+          "min_balls": 1297
+        },
+        {
+          "bowler": "David Willey",
+          "diff_raa_per_100": -8.3,
+          "min_balls": 1218
+        },
+        {
+          "bowler": "Trent Boult",
+          "diff_raa_per_100": -4.26,
+          "min_balls": 1169
+        },
+        {
+          "bowler": "Shaheen Shah Afridi",
+          "diff_raa_per_100": -2.64,
+          "min_balls": 1000
+        },
+        {
+          "bowler": "Luke Wood",
+          "diff_raa_per_100": 8.39,
+          "min_balls": 793
+        },
+        {
+          "bowler": "Marco Jansen",
+          "diff_raa_per_100": -3.17,
+          "min_balls": 760
+        },
+        {
+          "bowler": "Sohail Tanvir",
+          "diff_raa_per_100": 4.42,
+          "min_balls": 753
+        },
+        {
+          "bowler": "Jason Behrendorff",
+          "diff_raa_per_100": 6.84,
+          "min_balls": 744
+        },
+        {
+          "bowler": "Mustafizur Rahman",
+          "diff_raa_per_100": -0.71,
+          "min_balls": 716
+        },
+        {
+          "bowler": "Arshdeep Singh",
+          "diff_raa_per_100": 6.44,
+          "min_balls": 708
+        },
+        {
+          "bowler": "Reece Topley",
+          "diff_raa_per_100": -1.96,
+          "min_balls": 703
+        },
+        {
+          "bowler": "Sam Curran",
+          "diff_raa_per_100": 7.31,
+          "min_balls": 693
+        },
+        {
+          "bowler": "Ben Dwarshuis",
+          "diff_raa_per_100": -17.74,
+          "min_balls": 668
+        },
+        {
+          "bowler": "Chris Wood",
+          "diff_raa_per_100": -5.5,
+          "min_balls": 651
+        },
+        {
+          "bowler": "Binura Fernando",
+          "diff_raa_per_100": 0.35,
+          "min_balls": 651
+        },
+        {
+          "bowler": "Daniel Sams",
+          "diff_raa_per_100": 7.24,
+          "min_balls": 594
+        },
+        {
+          "bowler": "Shoriful Islam",
+          "diff_raa_per_100": 0.38,
+          "min_balls": 591
+        },
+        {
+          "bowler": "Fazalhaq Farooqi",
+          "diff_raa_per_100": 5.65,
+          "min_balls": 585
+        },
+        {
+          "bowler": "David Payne",
+          "diff_raa_per_100": 12.47,
+          "min_balls": 558
+        },
+        {
+          "bowler": "Tymal Mills",
+          "diff_raa_per_100": 10.62,
+          "min_balls": 552
+        },
+        {
+          "bowler": "Wahab Riaz",
+          "diff_raa_per_100": -2.87,
+          "min_balls": 550
+        },
+        {
+          "bowler": "Wayne Parnell",
+          "diff_raa_per_100": -14.05,
+          "min_balls": 525
+        },
+        {
+          "bowler": "Mitchell McClenaghan",
+          "diff_raa_per_100": 11.62,
+          "min_balls": 508
+        },
+        {
+          "bowler": "Richard Ngarava",
+          "diff_raa_per_100": 9.89,
+          "min_balls": 470
+        },
+        {
+          "bowler": "Mohammad Irfan",
+          "diff_raa_per_100": -0.62,
+          "min_balls": 470
+        }
+      ]
+    }
+  },
+  "caveats": [
+    "Balls to each hand come from the overs captains chose; a bowler kept away from a hand faces it in different situations. RAA adjusts for game state, not for that selection.",
+    "'Overrated' is tested as an equivalence band of +/-3 RAA per 100 balls."
+  ],
+  "samples": {
+    "A": 25,
+    "B": 25
+  },
+  "data_through": "2026-10-03",
+  "database": "localhost/hindsight_analysis"
+}
