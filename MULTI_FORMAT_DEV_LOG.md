@@ -29,6 +29,10 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > charts.json, cards.json, card-N.png via scripts/notes/render_cards.mjs) / load (DATABASE_URL -> static
 > 'ranking' snapshots + DRAFT notes slug hypothesis-<slug>, re-runs update). Feed credit placeholder in
 > analysis/hypotheses/credits.py.
+> RESULTS (2026-10-03): hindsight_analysis built (2.43M men's T20 balls 2015+, read-only from prod); validation
+> reproduced (69/37/34, p 0.32); run_all done; notes + cards in analysis/hypotheses/notes; drafts loaded into
+> hindsight_local only (ids 253-261). NOT loaded to prod, NOT deployed. Fixed: BBL 2023 / CPL 2023 / CPL 2024
+> season names were dropped by league filters (competition_aliases).
 >
 > **MOBILE VIZ SWEEP (2026-10-02) — DEPLOYED through 6d681d4 (main == mobile-viz-sweep, Vercel + Heroku).**
 > Plan + tracker: MOBILE_VIZ_SWEEP.md (chunks 0-6 done; read its "Deploys / fixes" and "Orphaned components"
