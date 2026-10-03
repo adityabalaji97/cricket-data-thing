@@ -1,0 +1,56 @@
+{
+ "slug": "h2-varun-figured-out",
+ "footer": "Data: Hindsight \u00b7 hindsightcricket.com",
+ "credits": "Pre-2015 & fallback ball-by-ball: Cricsheet (ODC-By) \u00b7 2015+ feed: [feed provider TBC] \u00b7 Impact/RAA/WAA/WPA: Himanish Ganjoo's T20 Primer method",
+ "cards": [
+  {
+   "kind": "claim",
+   "kicker": "HYPOTHESIS LAB \u00b7 H2",
+   "eyebrow": "A common claim",
+   "title": "Batters have figured Varun Chakravarthy out.",
+   "verdict": "Inconclusive",
+   "verdict_colour": "grey",
+   "parts": [],
+   "headline": "Varun's RAA per over in 2025-26 vs earlier: -0.33 (95% CI -1.19 to +0.53, p = 0.45) (57 recent and 83 earlier matches)."
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H2",
+   "eyebrow": "Have batters figured Varun Chakravarthy out?",
+   "stat": "-0.33",
+   "stat_label": "Varun: per-match RAA/over, 2025-26 minus earlier seasons (RAA per over)",
+   "sub": "95% CI -1.19 to +0.53 \u00b7 p 0.45",
+   "rows": [
+    {
+     "label": "average, 2025-26",
+     "value": "+0.26"
+    },
+    {
+     "label": "average, earlier",
+     "value": "+0.59"
+    }
+   ],
+   "verdict": "Inconclusive",
+   "verdict_label": "VERDICT",
+   "verdict_colour": "grey"
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H2",
+   "eyebrow": "The comparison",
+   "stat": "+0.103",
+   "stat_label": "Varun: per-match WAA/over, 2025-26 minus earlier (WAA per over)",
+   "sub": "95% CI -0.001 to +0.210 \u00b7 p 0.06",
+   "rows": [
+    {
+     "label": "average, 2025-26",
+     "value": "+0.099"
+    },
+    {
+     "label": "average, earlier",
+     "value": "-0.004"
+    }
+   ]
+  }
+ ]
+}

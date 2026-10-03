@@ -1,0 +1,47 @@
+{
+ "slug": "h8-matchups",
+ "footer": "Data: Hindsight \u00b7 hindsightcricket.com",
+ "credits": "Pre-2015 & fallback ball-by-ball: Cricsheet (ODC-By) \u00b7 2015+ feed: [feed provider TBC] \u00b7 Impact/RAA/WAA/WPA: Himanish Ganjoo's T20 Primer method",
+ "cards": [
+  {
+   "kind": "claim",
+   "kicker": "HYPOTHESIS LAB \u00b7 H8",
+   "eyebrow": "A common claim",
+   "title": "Bowling matchups (leg-spin to left-handers, left-arm pace to right-handers in the powerplay) are overrated.",
+   "verdict": "Partly",
+   "verdict_colour": "amber",
+   "parts": [
+    {
+     "label": "A. leg-spin to left-handers",
+     "value": "Not supported \u2014 the matchup backfires"
+    },
+    {
+     "label": "B. left-arm pace to right-handers, powerplay",
+     "value": "Inconclusive"
+    }
+   ],
+   "headline": "Leg-spin to left-handers: -5.90 (95% CI -8.29 to -3.69, p < 0.01) RAA per 100 balls vs the same bowlers to right-handers; left-arm pace to right-handers in the powerplay: +0.76 (95% CI -1.57 to +3.21, p = 0.52)."
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H8",
+   "eyebrow": "Are bowling matchups overrated?",
+   "stat": "-5.9",
+   "stat_label": "leg-spin to left-handers: within-bowler RAA per 100 balls, matchup hand minus other hand (RAA per 100 balls)",
+   "sub": "95% CI -8.3 to -3.7 \u00b7 p < 0.01",
+   "rows": [],
+   "verdict": "Not supported \u2014 the matchup backfires",
+   "verdict_label": "VERDICT \u00b7 A",
+   "verdict_colour": "red"
+  },
+  {
+   "kind": "number",
+   "kicker": "HYPOTHESIS LAB \u00b7 H8",
+   "eyebrow": "The comparison",
+   "stat": "+0.8",
+   "stat_label": "left-arm pace to right-handers, powerplay: within-bowler RAA per 100 balls, matchup hand minus other hand (RAA per 100 balls)",
+   "sub": "95% CI -1.6 to +3.2 \u00b7 p 0.52",
+   "rows": []
+  }
+ ]
+}
