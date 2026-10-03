@@ -179,7 +179,7 @@ _METRIC_ORDER = [
     "dot_percentage", "boundary_percentage", "control_percentage", "fours", "sixes", "dots",
     "boundaries", "percent_balls",
     # T20 Primer metrics (men's T20 only; null elsewhere).
-    "impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "raa_per_over", "waa",
+    "impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "raa_per_over", "raa_lw_per_100", "waa",
     "waa_per_100", "waa_per_over", "wpa", "avg_leverage",
     # team_innings mode
     "avg_total", "avg_wickets", "run_rate", "powerplay_run_rate", "middle_run_rate",
@@ -187,7 +187,7 @@ _METRIC_ORDER = [
     "count_200_plus", "count_250_plus", "highest_total", "win_percentage",
 ]
 # Primer columns whose sign depends on the perspective; labelled in the text table.
-_SIGNED_METRICS = ("impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "raa_per_over",
+_SIGNED_METRICS = ("impact", "impact_per_100", "impact_per_innings", "raa", "raa_per_100", "raa_per_over", "raa_lw_per_100",
                    "waa", "waa_per_100", "waa_per_over", "wpa")
 _PLAYER_COLUMNS = ("batter", "bowler", "non_striker", "player")
 # Bookkeeping that rides along with the Primer metrics; reported once in metadata, not per row.

@@ -3313,14 +3313,21 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
     }
 
 
-def _primer_metric_fields(values, innings_count, perspective: str) -> Dict:
-    """Totals and rates for the T20 Primer metrics on one grouped row (None where uncovered)."""
+def _primer_metric_fields(values, innings_count, perspective: str, leverage_values=(None, None)) -> Dict:
+    """Totals and rates for the T20 Primer metrics on one grouped row (None where uncovered).
+
+    raa_lw_per_100 is leverage-weighted RAA per 100 balls: 100 * sum(raa * leverage) / sum(leverage),
+    i.e. the stakes-weighted mean RAA per ball. A run saved at a high-leverage moment counts for
+    more than one saved when the game was settled; on a group with average stakes it equals
+    raa_per_100.
+    """
     metric_balls, impact, raa, waa, wpa, avg_leverage = values
+    raa_lev, lev_sum = leverage_values if leverage_values else (None, None)
     metric_balls = int(metric_balls or 0)
     if not metric_balls:
         return {"metric_balls": 0, "metrics_perspective": perspective, "impact": None, "impact_per_100": None,
                 "impact_per_innings": None, "raa": None, "raa_per_100": None, "waa": None, "waa_per_100": None,
-                "wpa": None, "avg_leverage": None}
+                "wpa": None, "avg_leverage": None, "raa_lw_per_100": None}
 
     def rate(total):
         return round(float(total) * 100.0 / metric_balls, 2) if total is not None else None
@@ -3337,6 +3344,8 @@ def _primer_metric_fields(values, innings_count, perspective: str) -> Dict:
         "waa_per_100": rate(waa),
         "wpa": round(float(wpa), 3) if wpa is not None else None,
         "avg_leverage": round(float(avg_leverage), 3) if avg_leverage is not None else None,
+        "raa_lw_per_100": (round(float(raa_lev) * 100.0 / float(lev_sum), 2)
+                           if raa_lev is not None and lev_sum else None),
     }
 
 
@@ -3616,7 +3625,10 @@ def handle_grouped_query(
             {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_raa::double precision END) as raa,
             {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_waa::double precision END) as waa,
             {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_wpa::double precision END) as wpa,
-            AVG(CASE WHEN {metric_ball} THEN s.m_leverage::double precision END) as avg_leverage"""
+            AVG(CASE WHEN {metric_ball} THEN s.m_leverage::double precision END) as avg_leverage,
+            -- Leverage-weighted RAA: each ball's RAA weighted by its stakes (see _primer_metric_fields).
+            {metric_sign} * SUM(CASE WHEN {metric_ball} THEN s.m_raa::double precision * s.m_leverage::double precision END) as raa_lev,
+            SUM(CASE WHEN {metric_ball} THEN s.m_leverage::double precision END) as lev_sum"""
 
     # Metric thresholds on stage-2 metrics (dot/boundary/control %, Impact...) need those totals in
     # stage 1, before ORDER BY / LIMIT. Added only when a threshold asks for them; definitions match
@@ -3800,7 +3812,7 @@ def handle_grouped_query(
             "boundary_percentage": float(boundary_percentage) if boundary_percentage is not None else 0,
             "control_percentage": float(control_percentage) if control_percentage is not None else None,
             "percent_balls": percent_balls,
-            **_primer_metric_fields(row[n + 18:n + 24], innings_count, metrics_perspective),
+            **_primer_metric_fields(row[n + 18:n + 24], innings_count, metrics_perspective, row[n + 24:n + 26]),
         })
         formatted_results.append(row_dict)
 

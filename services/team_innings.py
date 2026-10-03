@@ -37,6 +37,7 @@ GROUP_BY = {
     "country": "i.country", "batting_team": "i.batting_team", "bowling_team": "i.bowling_team",
     "match_outcome": "i.result", "toss_decision": "i.toss_decision", "format": "i.format",
     "full_length": "i.full_length", "total_bucket": "i.total_bucket",
+    "batted_after_winning_toss": "i.batted_after_winning_toss",
 }
 
 #: dimension_filters this mode accepts: name -> (expression, numeric).
@@ -44,7 +45,8 @@ FILTERS = {
     "total": ("i.total", True), "wickets": ("i.wickets", True), "balls": ("i.balls", True),
     "full_length": ("i.full_length", True), "year": ("i.year", True), "season": ("i.season", False),
     "impact_player_era": ("i.impact_player_era", False), "match_outcome": ("i.result", False),
-    "total_bucket": ("i.total_bucket", False),
+    "total_bucket": ("i.total_bucket", False), "country": ("i.country", False), "venue": ("i.venue", False),
+    "innings": ("i.innings", True),
 }
 
 _TOTAL_BUCKETS = (("<140", 139), ("140-159", 159), ("160-179", 179), ("180-199", 199), ("200-219", 219),
@@ -141,6 +143,12 @@ def query_team_innings(
                    MAX(dd.max_balls) AS max_balls,
                    MIN({result_sql}) AS result,
                    MIN(LOWER(COALESCE(m.toss_decision, ''))) AS toss_decision,
+                   -- 1 when the batting side won the toss, 0 when it lost it, NULL if unknown.
+                   MIN(CASE WHEN COALESCE(m.toss_winner, '') = '' THEN NULL
+                            WHEN LOWER(m.toss_winner) = LOWER(dd.team_bat) THEN 1 ELSE 0 END) AS batted_after_winning_toss,
+                   -- 1 when the toss winner won the match, 0 when it lost; NULL for ties / no result.
+                   MIN(CASE WHEN COALESCE(m.toss_winner, '') = '' OR COALESCE(m.winner, '') = '' THEN NULL
+                            WHEN LOWER(m.toss_winner) = LOWER(m.winner) THEN 1 ELSE 0 END) AS toss_winner_won,
                    {', '.join(phase_cols)}
             FROM delivery_details dd
             LEFT JOIN matches m ON m.id = dd.p_match
@@ -173,7 +181,9 @@ def query_team_innings(
                    SUM(CASE WHEN i.result = 'win' THEN 1 ELSE 0 END) AS wins,
                    SUM(CASE WHEN i.result = 'loss' THEN 1 ELSE 0 END) AS losses,
                    ROUND(100.0 * SUM(CASE WHEN i.result = 'win' THEN 1 ELSE 0 END)
-                         / NULLIF(SUM(CASE WHEN i.result IN ('win', 'loss') THEN 1 ELSE 0 END), 0), 2) AS win_percentage
+                         / NULLIF(SUM(CASE WHEN i.result IN ('win', 'loss') THEN 1 ELSE 0 END), 0), 2) AS win_percentage,
+                   ROUND(100.0 * AVG(i.toss_winner_won), 2) AS toss_winner_win_percentage,
+                   ROUND(100.0 * AVG(i.batted_after_winning_toss), 2) AS pct_batting_side_won_toss
             FROM i
             {filter_where}
             GROUP BY {group_clause}
