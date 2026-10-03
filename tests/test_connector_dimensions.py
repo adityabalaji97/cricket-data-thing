@@ -319,3 +319,14 @@ def test_batter_innings_strike_rate_and_era(db):
     # Era follows the season's start: January 2024 BBL matches belong to 2023/24, i.e. 2023+.
     eras = {(r["season"], r["impact_player_era"]) for r in _q(db, leagues=["BBL"], group_by=["season", "impact_player_era"])}
     assert all(era == "2023+" for season, era in eras if season.startswith("2023"))
+
+
+def test_year_suffixed_seasons_are_their_league():
+    from services.competition_aliases import canonical_competition
+    from utils.league_utils import expand_league_abbreviations
+
+    assert canonical_competition("BBL 2023") == "BBL"
+    assert canonical_competition("CPL 2024") == "CPL"
+    assert canonical_competition("GSL 2024") == "GSL 2024"  # ambiguous: left alone
+    assert {"BBL 2023"} <= set(expand_league_abbreviations(["BBL"]))
+    assert {"CPL 2023", "CPL 2024"} <= set(expand_league_abbreviations(["CPL"]))
