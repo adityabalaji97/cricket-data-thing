@@ -105,8 +105,31 @@ def _samples_lines(samples: Dict[str, Any]) -> List[str]:
     return lines
 
 
-def note_markdown(result: Dict[str, Any]) -> str:
+BLANK_KEYS = (None, "", "-")
+
+
+def _tidy_chart(data: Dict[str, Any], title: str) -> str:
+    """Drop rows whose group value is unrecorded (no previous over, length not logged, unknown
+    hand) and flag every bucket under 15 innings on the chart title itself."""
+    group_by = data.get("group_by") or []
+    kept = [r for r in data.get("rows") or [] if not any(r.get(g) in BLANK_KEYS for g in group_by)]
+    dropped = len(data.get("rows") or []) - len(kept)
+    data["rows"] = kept
+    if "small sample" not in title:
+        thin = [f"{' / '.join(str(r.get(g)) for g in group_by)} ({r['innings_count']})"
+                for r in kept if isinstance(r.get("innings_count"), (int, float)) and r["innings_count"] < 15]
+        if thin:
+            more = f" +{len(thin) - 4} more" if len(thin) > 4 else ""
+            title += " · small sample (<15 innings): " + ", ".join(thin[:4]) + more
+    if dropped:
+        title += " · unrecorded values left out"
+    data["title"] = title
+    return title
+
+
+def note_markdown(result: Dict[str, Any], chart_titles: Dict[str, str] | None = None) -> str:
     title, prereg = META[result["slug"]]
+    chart_titles = chart_titles or {}
     effects = result["effects"]
     tests = sorted({e["test"] for e in effects if e.get("test")})
     parts = [f"*{result['headline']}*", "", "## The claim", "", result["claim"], "",
@@ -130,11 +153,24 @@ def note_markdown(result: Dict[str, Any]) -> str:
               "## Caveats and sample sizes", ""]
     parts += [f"- {c}" for c in result.get("caveats", [])]
     parts += [f"- {l}" for l in _samples_lines(result.get("samples", {}))]
-    parts += [f"- {l}" for l in _small_sample_lines(result)]
+    flagged = [t for t in chart_titles.values() if "small sample" in t]
+    parts += [f"- {t.replace(' · small sample', ': small sample')}" for t in flagged] or [f"- {l}" for l in _small_sample_lines(result)]
     parts += [f"- Data through {result['data_through']}.", "", "## Reproduce this", ""]
     parts += [f"- [{c['caption']}]({c['url']})" for c in result["charts"]]
     parts += ["- Code: `analysis/hypotheses` in the Hindsight repository.", "", credits.credits_block(", ".join(tests))]
     return "\n".join(parts) + "\n"
+
+
+# Readable labels for effect details on the cards.
+_LABEL_WORDS = [("treated_post", "IPL 2023-26"), ("treated_pre", "IPL 2020-22"),
+                ("control_post", "BBL/PSL/CPL 2023-26"), ("control_pre", "BBL/PSL/CPL 2020-22"),
+                ("mean_", "average, "), ("_", " ")]
+
+
+def _label(key: str) -> str:
+    for old, new in _LABEL_WORDS:
+        key = key.replace(old, new)
+    return key
 
 
 def card_specs(result: Dict[str, Any]) -> Dict[str, Any]:
@@ -151,7 +187,7 @@ def card_specs(result: Dict[str, Any]) -> Dict[str, Any]:
     number_verdict, number_label = (parts[0][1], f"VERDICT · {parts[0][0].split('.')[0]}") if parts else (result["verdict"], "VERDICT")
 
     def rows(effect, digits):
-        return [{"label": k, "value": _num(v, digits)} for k, v in (effect.get("detail") or {}).items()
+        return [{"label": _label(k), "value": _num(v, digits)} for k, v in (effect.get("detail") or {}).items()
                 if isinstance(v, (int, float)) and k not in ("t",)][:5]
 
     cards = [{
@@ -159,6 +195,7 @@ def card_specs(result: Dict[str, Any]) -> Dict[str, Any]:
         "title": claim,
         "verdict": result["verdict"], "verdict_colour": VERDICT_COLOUR.get(result["verdict"].split(" (")[0], "grey"),
         "parts": [{"label": k, "value": v} for k, v in (result.get("parts") or {}).items()],
+        "headline": result["headline"],
     }, {
         "kind": "number", "kicker": f"HYPOTHESIS LAB · {result['hypothesis']}", "eyebrow": title,
         "stat": _num(primary["estimate"], d), "stat_label": f"{primary['name']} ({primary['unit']})",
@@ -205,9 +242,10 @@ def prepare(keys: List[str]) -> None:
                 presentation["title"] = chart["title"]
                 data = _query_data(db, _clean_query_params({**params, **presentation}))
                 data["hindsight_url"] = chart["url"]
-                charts[chart["key"]] = {"title": chart["title"], "data": data, "params": chart["params"]}
+                title = _tidy_chart(data, chart["title"])
+                charts[chart["key"]] = {"title": title, "data": data, "params": chart["params"]}
         (out / "charts.json").write_text(json.dumps(charts, indent=1, default=str))
-        (out / "note.md").write_text(note_markdown(result))
+        (out / "note.md").write_text(note_markdown(result, {k: v["title"] for k, v in charts.items()}))
         (out / "cards.json").write_text(json.dumps(card_specs(result), indent=1))
         subprocess.run(["node", str(ROOT / "scripts" / "notes" / "render_cards.mjs"), str(out)], check=True)
         print(f"prepared {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out}")

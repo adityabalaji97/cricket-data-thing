@@ -52,6 +52,9 @@ function claimCard(card) {
     h('div', { fontFamily: DISPLAY, fontSize: long ? 56 : 68, fontWeight: 700, lineHeight: 1.12, marginTop: 14, color: C.text },
       card.title),
     verdictBlock(card, true),
+    card.headline && !(card.parts && card.parts.length > 2)
+      ? h('div', { color: C.mid, fontSize: 36, lineHeight: 1.3, marginTop: 30 }, card.headline)
+      : null,
     card.parts && card.parts.length
       ? h('div', { flexDirection: 'column', gap: 14, marginTop: 26 },
         card.parts.map((p) => h('div', { justifyContent: 'space-between', gap: 20, fontSize: 34 },
@@ -70,7 +73,7 @@ function numberCard(card) {
     card.rows && card.rows.length
       ? h('div', { flexDirection: 'column', gap: 12, marginTop: 34 },
         card.rows.map((r) => h('div', { justifyContent: 'space-between', fontSize: 34, padding: '10px 0', borderBottom: `1px solid ${C.track}` },
-          h('div', { color: C.mid }, String(r.label).replace(/_/g, ' ')),
+          h('div', { color: C.mid }, String(r.label)),
           h('div', { color: C.text, fontWeight: 600 }, r.value))))
       : null,
     verdictBlock(card, false),
