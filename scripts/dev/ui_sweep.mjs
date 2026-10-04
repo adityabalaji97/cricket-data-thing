@@ -56,7 +56,7 @@ const ROUTES = [
   ['scorecard_t20', '/scorecard/1473438'],
   ['preview_odi', '/venue?venue=Kingsmead%2C%20Durban&team1=Australia&team2=South%20Africa&includeInternational=true&topTeams=10&autoload=true&fmt=mens-odi'],
   // Story-style preview (MATCH_PREVIEW_VIZ_PLAN.md): one route per card, opened by its deep link.
-  ...['glance', 'par', 'winning-phases', 'results', 'totals', 'innings-shape', 'phases', 'pace-spin', 'recent-results', 'head-to-head', 'form', 'where-won', 'phase-strength', 'rating', 'last-meeting', 'xis'].map((card) => [
+  ...['glance', 'par', 'winning-phases', 'results', 'totals', 'innings-shape', 'phases', 'pace-spin', 'recent-results', 'head-to-head', 'form', 'where-won', 'phase-strength', 'rating', 'last-meeting', 'xis', 'key-battles', 'death-hitters', 'death-bowlers', 'form-strips', 'suits-ground', 'milestones', 'how-they-bowl'].map((card) => [
     `story_${card.replace(/-/g, '_')}`,
     `/venue?venue=Wankhede%20Stadium%2C%20Mumbai&team1=Mumbai%20Indians&team2=Chennai%20Super%20Kings&autoload=true&story=1#${card}`,
   ]),

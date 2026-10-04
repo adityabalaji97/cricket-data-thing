@@ -4,7 +4,7 @@ import { WinningPhases } from '../ExpectStrip';
 import { TeamFormCard, TeamSplitHeader, VenueRecentMatches } from '../MatchHistory';
 import { ScoresBarChart, WinPercentagesPie } from '../venue/VenueResultCharts';
 import DivergingBars from '../charts/DivergingBars';
-import { KIND_COLORS, SERIES } from '../../theme/chartDefaults';
+import { DIVERGING, KIND_COLORS, SERIES } from '../../theme/chartDefaults';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { useStoryNav } from './StoryNav';
 import { getTeamColor, readableOnDark } from '../../utils/teamColors';
@@ -528,6 +528,186 @@ const Xis = ({ payload }) => (
   </Box>
 );
 
+const surname = (name) => name.split(' ').slice(-1)[0];
+const sideColor = (side, team1, team2) => {
+  const [c1, c2] = pairColors(team1, team2);
+  return side === team1 ? c1 : c2;
+};
+
+/** D1: likely edge per batter-bowler pair (bar either side of the middle); the scoreline is what happened. */
+const Battles = ({ payload }) => {
+  const span = Math.max(20, ...payload.rows.map((r) => Math.abs(r.edge)));
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.25 }}>
+      {payload.rows.map((r) => {
+        const w = (50 * Math.abs(r.edge)) / span;
+        return (
+          <Box key={`${r.batter}-${r.bowler}`} sx={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 1, alignItems: 'center' }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography noWrap sx={{ fontSize: 14, color: colors.textHi }}>{`${r.batter} v ${r.bowler}`}</Typography>
+              <Typography noWrap sx={{ fontSize: 12, color: colors.textLo, fontFamily: fonts.mono }}>
+                {`${r.runs} off ${r.balls}${r.outs ? `, out ${r.outs}` : ', not out'}`}
+              </Typography>
+            </Box>
+            <Box component="svg" viewBox="0 0 120 22" role="img" aria-label={`Likely edge ${signed(r.edge)} runs per 100 balls`} sx={{ width: '100%', display: 'block' }}>
+              <line x1="60" x2="60" y1="0" y2="22" stroke={colors.textFaint} />
+              <rect x={r.edge >= 0 ? 60 : 60 - (120 * w) / 100} y="6" width={Math.max(2, (120 * w) / 100)} height="10" rx="3"
+                fill={r.edge >= 0 ? DIVERGING.positive : DIVERGING.negative} />
+              <text x={r.edge >= 0 ? 4 : 116} y="15" textAnchor={r.edge >= 0 ? 'start' : 'end'} style={{ ...svgText, fill: colors.textMed }}>{signed(r.edge)}</text>
+            </Box>
+          </Box>
+        );
+      })}
+      <Typography sx={{ fontSize: 12, color: colors.textLo }}>Likely edge, runs per 100 balls · blue: batter ahead · red: bowler ahead</Typography>
+    </Box>
+  );
+};
+
+/** D2: ranked bars for players from both XIs, coloured by side. */
+const PlayerBars = ({ payload, teams }) => {
+  const rows = payload.rows;
+  const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
+  const sides = [...new Set(rows.map((r) => r.side))];
+  const [t1, t2] = teams || sides;
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.75 }}>
+      {rows.map((r) => (
+        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: '112px 1fr 44px', gap: 1, alignItems: 'center' }}>
+          <Typography noWrap sx={{ fontSize: 13, color: colors.textHi }}>{r.name}</Typography>
+          <Box sx={{ position: 'relative', height: 14 }}>
+            <Box sx={{ position: 'absolute', left: 0, top: 2, height: 10, borderRadius: '0 4px 4px 0', width: `${Math.max(3, (100 * Math.max(0, r.value)) / max)}%`, bgcolor: sideColor(r.side, t1, t2), opacity: r.value > 0 ? 1 : 0.35 }} />
+          </Box>
+          <Typography sx={{ fontSize: 13, color: colors.textMed, fontFamily: fonts.mono, textAlign: 'right' }}>
+            {payload.signed ? signed(r.value) : r.value}
+          </Typography>
+        </Box>
+      ))}
+      <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
+        {rows.map((r) => `${surname(r.name)} ${payload.extra === 'sr' ? `SR ${r.sr}` : `${r.econ} an over`}`).join(' · ')}
+      </Typography>
+      <Legend items={[[t1, sideColor(t1, t1, t2)], [t2, sideColor(t2, t1, t2)]].filter(([t]) => t)} />
+    </Box>
+  );
+};
+
+/** D3: runs in each of the last ten innings, oldest first; 50+ in the accent colour. */
+const FormStrips = ({ payload, teams }) => {
+  const [t1, t2] = teams || [];
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
+      {payload.strips.map((f) => (
+        <Box key={f.name} sx={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: 1, alignItems: 'end' }}>
+          <Typography sx={{ fontSize: 13, color: colors.textHi, lineHeight: 1.2 }}>{f.name}</Typography>
+          <Box component="svg" viewBox="0 0 200 36" role="img" aria-label={`${f.name}: ${f.innings.map((i) => i.runs).join(', ')}`} sx={{ width: '100%', display: 'block' }}>
+            {f.innings.map((i, k) => {
+              const h = Math.max(2, Math.min(34, (34 * i.runs) / 100));
+              const fifty = i.runs >= 50;
+              return (
+                <rect key={k} x={k * 20 + 2} y={36 - h} width="15" height={h} rx="2"
+                  fill={fifty ? colors.textHi : sideColor(f.side, t1, t2)} fillOpacity={fifty ? 1 : 0.6}>
+                  <title>{`${i.date}: ${i.runs}${i.out ? '' : '*'} off ${i.balls}`}</title>
+                </rect>
+              );
+            })}
+          </Box>
+        </Box>
+      ))}
+      <Legend items={[['50 or more', colors.textHi], ...(t1 ? [[t1, sideColor(t1, t1, t2)], [t2, sideColor(t2, t1, t2)]] : [])]} />
+    </Box>
+  );
+};
+
+/** D4: record here against elsewhere; above the diagonal is better here. */
+const SuitsScatter = ({ payload, teams }) => {
+  const [t1, t2] = teams || [];
+  const vals = payload.rows.flatMap((r) => [r.here, r.elsewhere]);
+  const span = Math.max(20, Math.ceil(Math.max(...vals.map(Math.abs)) / 10) * 10);
+  const W = 300; const H = 186; const left = 10; const right = 10; const top = 16; const bottom = 154;
+  const x = (v) => left + ((v + span) / (2 * span)) * (W - left - right);
+  const y = (v) => bottom - ((v + span) / (2 * span)) * (bottom - top);
+  const gaps = payload.rows.map((r) => Math.abs(r.here - r.elsewhere)).sort((a, b) => b - a);
+  const labelled = new Set(payload.rows.filter((r) => Math.abs(r.here - r.elsewhere) >= (gaps[2] ?? 0)).map((r) => r.name));
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Runs above average per 100 balls at ${payload.ground} against elsewhere`} sx={{ width: '100%' }}>
+        <line x1={x(-span)} y1={y(-span)} x2={x(span)} y2={y(span)} stroke={colors.textFaint} strokeDasharray="4 4" />
+        <line x1={x(0)} x2={x(0)} y1={top} y2={bottom} stroke={colors.border} />
+        <line x1={left} x2={W - right} y1={y(0)} y2={y(0)} stroke={colors.border} />
+        {payload.rows.map((r) => (
+          <g key={r.name}>
+            <circle cx={x(r.elsewhere)} cy={y(r.here)} r="5" fill={sideColor(r.side, t1, t2)} stroke={colors.surface1} strokeWidth="1.5">
+              <title>{`${r.name}: ${signed(r.here)} here (${r.balls_here} balls), ${signed(r.elsewhere)} elsewhere`}</title>
+            </circle>
+            {labelled.has(r.name) && (
+              <text x={x(r.elsewhere) + 8} y={y(r.here) + 4} style={{ fontFamily: fonts.body, fontSize: 12, fill: colors.textHi }}>{surname(r.name)}</text>
+            )}
+          </g>
+        ))}
+        <text x={x(-span)} y={H - 18} style={{ ...svgText, fill: colors.textFaint }}>{signed(-span)}</text>
+        <text x={x(span)} y={H - 18} textAnchor="end" style={{ ...svgText, fill: colors.textFaint }}>{signed(span)}</text>
+        <text x={(left + W - right) / 2} y={H - 2} textAnchor="middle" style={{ ...svgText, fill: colors.textLo }}>Elsewhere</text>
+        <text x="4" y={top + 8} style={{ ...svgText, fill: colors.textLo }}>{`At ${payload.ground}`}</text>
+      </Box>
+      {t1 && <Legend items={[[t1, sideColor(t1, t1, t2)], [t2, sideColor(t2, t1, t2)]]} />}
+    </Box>
+  );
+};
+
+/** D5: milestones within reach, one line each. */
+const Milestones = ({ payload, teams }) => {
+  const [t1, t2] = teams || [];
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.25 }}>
+      {payload.rows.map((m) => (
+        <Box key={`${m.player}-${m.stat}`} sx={{ display: 'flex', gap: 1, alignItems: 'baseline' }}>
+          <Box sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: sideColor(m.side, t1, t2), flexShrink: 0, transform: 'translateY(-1px)' }} />
+          <Typography sx={{ fontSize: 15, color: colors.textHi, lineHeight: 1.35 }}>
+            <Box component="span" sx={{ fontWeight: 600 }}>{m.player}</Box>
+            {` ${m.text}`}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
+/** D6: the bowler's share of balls by line and length; a dot marks 1.5× the usual share or more. */
+const LENGTH_LABEL = { FULL_TOSS: 'Full toss', YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good', SHORT_OF_A_GOOD_LENGTH: 'Back of length', SHORT: 'Short' };
+const LINE_LABEL = { DOWN_LEG: 'Leg', ON_THE_STUMPS: 'Stumps', OUTSIDE_OFFSTUMP: 'Off', WIDE_OUTSIDE_OFFSTUMP: 'Wide' };
+const PitchUsage = ({ payload }) => {
+  const cw = 50; const ch = 30; const x0 = 98; const y0 = 20;
+  const max = Math.max(...payload.grid.map((g) => g.pct), 1);
+  const cell = (line, length) => payload.grid.find((g) => g.line === line && g.length === length);
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 300 ${y0 + payload.lengths.length * ch + 4}`} role="img" aria-label={`Where ${payload.bowler} pitches the ball`} sx={{ width: '100%' }}>
+        {payload.lines.map((l, j) => (
+          <text key={l} x={x0 + j * cw + cw / 2} y="12" textAnchor="middle" style={{ ...svgText, fill: colors.textLo }}>{LINE_LABEL[l]}</text>
+        ))}
+        {payload.lengths.map((len, i) => (
+          <g key={len}>
+            <text x={x0 - 8} y={y0 + i * ch + ch / 2 + 4} textAnchor="end" style={{ fontFamily: fonts.body, fontSize: 12, fill: colors.textHi }}>{LENGTH_LABEL[len]}</text>
+            {payload.lines.map((l, j) => {
+              const c = cell(l, len);
+              const standout = c.usual_pct > 0 && c.pct >= 2 && c.pct / c.usual_pct >= 1.5;
+              return (
+                <g key={l}>
+                  <rect x={x0 + j * cw + 1} y={y0 + i * ch + 1} width={cw - 2} height={ch - 2} rx="5" fill={SERIES[0]} fillOpacity={0.08 + (0.8 * c.pct) / max}>
+                    <title>{`${LENGTH_LABEL[len]}, ${LINE_LABEL[l]}: ${c.pct}% of balls (usually ${c.usual_pct}%)`}</title>
+                  </rect>
+                  <text x={x0 + j * cw + cw / 2} y={y0 + i * ch + ch / 2 + 4} textAnchor="middle" style={{ ...svgText, fontSize: 11, fill: colors.textHi }}>{c.pct >= 1 ? `${Math.round(c.pct)}` : ''}</text>
+                  {standout && <circle cx={x0 + j * cw + cw - 7} cy={y0 + i * ch + 7} r="3" fill={colors.accent} />}
+                </g>
+              );
+            })}
+          </g>
+        ))}
+      </Box>
+      <Typography sx={{ fontSize: 12, color: colors.textLo }}>% of the bowler&apos;s balls · dot: 1.5× usual or more</Typography>
+    </Box>
+  );
+};
+
 export const VISUALS = {
   stat: Stat,
   par: Par,
@@ -544,6 +724,12 @@ export const VISUALS = {
   elo_lines: EloLines,
   last_meeting: LastMeeting,
   xis: Xis,
+  battles: Battles,
+  player_bars: PlayerBars,
+  form_strips: FormStrips,
+  suits_scatter: SuitsScatter,
+  milestones: Milestones,
+  pitch_usage: PitchUsage,
   phase_bars: ({ payload }) => <WinningPhases phases={payload.phases} bare />,
   results_split: ({ payload }) => <WinPercentagesPie data={payload} bare />,
   benchmarks: ({ payload }) => <ScoresBarChart data={payload} bare />,
@@ -581,7 +767,7 @@ export const InfoBody = ({ info }) => (
 );
 
 /** A manifest card (JSON from /match-preview/.../cards) as a StoryViewer card. Unknown visuals are dropped. */
-export const toStoryCard = (card, { isMobile }) => {
+export const toStoryCard = (card, { isMobile, teams }) => {
   const Visual = VISUALS[card.visual];
   if (!Visual) return null;
   return {
@@ -592,10 +778,14 @@ export const toStoryCard = (card, { isMobile }) => {
     smallSample: card.small_sample,
     queryUrl: card.query_url,
     info: card.info ? <InfoBody info={card.info} /> : null,
-    render: () => <Visual payload={card.payload} isMobile={isMobile} />,
+    render: () => <Visual payload={card.payload} isMobile={isMobile} teams={teams} />,
   };
 };
 
-export const toStoryChapters = (manifest, opts) => (manifest?.chapters || [])
-  .map((chapter) => ({ ...chapter, cards: chapter.cards.map((c) => toStoryCard(c, opts)).filter(Boolean) }))
-  .filter((chapter) => chapter.cards.length);
+export const toStoryChapters = (manifest, opts) => {
+  // The fixture's two sides, so player cards colour each player by side.
+  const teams = manifest?.fixture ? [manifest.fixture.team1, manifest.fixture.team2] : undefined;
+  return (manifest?.chapters || [])
+    .map((chapter) => ({ ...chapter, cards: chapter.cards.map((c) => toStoryCard(c, { ...opts, teams })).filter(Boolean) }))
+    .filter((chapter) => chapter.cards.length);
+};

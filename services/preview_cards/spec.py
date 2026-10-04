@@ -71,6 +71,9 @@ class CardSpec:
     formats: Tuple[str, ...] = ("T20", "ODI")
     sample: SampleRule = SampleRule()
     weight: float = 1.0  # default importance inside the chapter
+    # Thin samples sink within the chapter. Off for cards whose n counts rows (a list of players,
+    # one match), not evidence: those cards apply their own evidence rules.
+    scale_by_sample: bool = True
 
     def make(self, ctx: Any) -> Optional[Card]:
         if ctx.fmt not in self.formats:
@@ -79,6 +82,7 @@ class CardSpec:
         if card is None or card.n < self.sample.hide_below:
             return None
         card.small_sample = card.small_sample or card.n < self.sample.flag_below
-        # Thin samples sink within the chapter; distinctiveness is set by the builder.
-        card.relevance = round(self.weight * card.relevance * min(1.0, 0.4 + card.n / 50.0), 4)
+        # Distinctiveness is set by the builder; thin samples sink within the chapter.
+        scale = min(1.0, 0.4 + card.n / 50.0) if self.scale_by_sample else 1.0
+        card.relevance = round(self.weight * card.relevance * scale, 4)
         return card

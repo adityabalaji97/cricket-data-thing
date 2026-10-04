@@ -273,7 +273,7 @@ Module(
 | 4 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [x] 2026-10-04 (notes below) |
 | 5 | At a glance and the ground: A1–A2, B1–B8 | [x] 2026-10-04 (notes below; A2 and B7 dropped earlier) |
 | 6 | The teams: C1–C6 | [x] 2026-10-04 (notes below) |
-| 7 | The players: D1–D6 (incl. milestones service) | [ ] |
+| 7 | The players: D1–D6 (incl. milestones service) | [x] 2026-10-04 (notes below) |
 | 8 | Fantasy: F1–F4 | [ ] |
 | 9 | Outputs: Make a graphic = card core (new layouts), embeds, preview note from cards | [ ] |
 | 10 | Switch-over: story becomes the default, pills removed, phone/desktop sweep, goldens, performance budget | [ ] |
@@ -597,6 +597,29 @@ Found while building:
   Impact Player substitute; the info sheet says so).
 - Team colours come from utils/teamColors when both sides have one, they're readable on the dark card and far
   enough apart; otherwise the validated blue/orange pair.
+
+### Chunk 7 results (2026-10-04)
+- **Players** are each side's last XI (C6). Measures: batters on RAA per 100 (Impact averages −12 per 100 at the
+  death, so its signs read wrongly), bowlers on leverage-weighted RAA per 100; ODIs on strike rate and economy.
+- **D1 Key battles, evidence rule.** Expected = batter's RAA v everyone + bowler's RAA conceded to everyone; raw
+  edge = the pair's RAA minus that. A pass/fail test doesn't work: each fixture tests dozens of pairs, so a
+  1.5-standard-error bar lets several chance "battles" through. Measured instead
+  (analysis/preview/matchup_edges.py, 1,929 IPL pairs since 2018): real edges spread about 15 runs per 100, noise
+  about 32. Each edge is shrunk by n / (n + 120) and the card ranks and shows that likely edge (5+ to appear),
+  with the real scoreline beside it. Window since 2018, 18+ balls.
+- **D2** is two cards: death hitters (RAA per 100) and death bowlers (leverage-weighted RAA per 100, economy
+  alongside), last two seasons, any team. This also covers the death-bowling item moved from chunk 4.
+- **D3 Form strips**: each side's three busiest batters, last 10 innings in 12 months; 50+ drawn in white (the
+  accent lime is too close to CSK's yellow).
+- **D4 Suits this ground**: RAA per 100 here v elsewhere, same seasons, 60+ balls here and 120+ elsewhere. Without
+  a similar-ground model the card simply hides when fewer than three batters qualify.
+- **D5 Milestones**: services/milestones.py, careers from batting_stats / bowling_stats over every season,
+  counting legacy spellings (expand_name_group). Checked read-only against production (Chahar 96 IPL wickets,
+  Pandya 2,955 IPL runs).
+- **D6 How the key pace bowler bowls**: the XI's pace bowler with the most line-and-length balls (600+, four
+  years), share by cell against every pace bowler (baselines.json); a dot marks 1.5× usual or more.
+- Ranking: list cards (players, last meeting, XIs) are no longer scaled by `n`, which counted rows, not evidence.
+- Titles drop the possessive on team codes ("AUS death bowling").
 
 ### Chunks 5–8: Cards by chapter
 - One card = backend spec + renderer + ODI fallback + info sheet copy + empty state + test.
