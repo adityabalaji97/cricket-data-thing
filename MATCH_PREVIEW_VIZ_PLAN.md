@@ -274,7 +274,7 @@ Module(
 | 5 | At a glance and the ground: A1–A2, B1–B8 | [x] 2026-10-04 (notes below; A2 and B7 dropped earlier) |
 | 6 | The teams: C1–C6 | [x] 2026-10-04 (notes below) |
 | 7 | The players: D1–D6 (incl. milestones service) | [x] 2026-10-04 (notes below) |
-| 8 | Fantasy: F1–F4 | [ ] |
+| 8 | Fantasy: F1–F4 | [x] 2026-10-04 (notes below) |
 | 9 | Outputs: Make a graphic = card core (new layouts), embeds, preview note from cards | [ ] |
 | 10 | Switch-over: story becomes the default, pills removed, phone/desktop sweep, goldens, performance budget | [ ] |
 
@@ -620,6 +620,20 @@ Found while building:
   years), share by cell against every pace bowler (baselines.json); a dot marks 1.5× usual or more.
 - Ranking: list cards (players, last meeting, XIs) are no longer scaled by `n`, which counted rows, not evidence.
 - Titles drop the possessive on team codes ("AUS death bowling").
+
+### Chunk 8 results (2026-10-04)
+- **Projections** are the matchup model the classic preview and planner already use
+  (matchups.get_team_matchups_service) on each side's last XI, last two seasons: batting + bowling fantasy points
+  per match, no fielding. The uniform "confidence" figure is gone.
+- **F1 Projected points**: top 6 bars by side, each with its batting/bowling split (8 didn't fit the 4:5 card with
+  a split line per row).
+- **F2 Captaincy**: the two highest projections as tiles with a reason ("58 projected points (58 batting)").
+- **F3 Value** (IPL only): projected points per IPL credit. Players missing from the price file are left out:
+  get_player_credit's 7.0 default would rank them on an invented price.
+- **F4 Differentials** (IPL only): projections run 10–20 points below real hauls for almost everyone (capped balls,
+  some bonuses not projected), so comparing points read as "everyone underperforms", and rescaling produced
+  "89% above usual" for 54 v 50. The card compares ranks instead: projected rank among both XIs against the rank of
+  the player's usual IPL haul ("projected 6th of 20 here, usually 15th"), 3+ places to appear.
 
 ### Chunks 5–8: Cards by chapter
 - One card = backend spec + renderer + ODI fallback + info sheet copy + empty state + test.
