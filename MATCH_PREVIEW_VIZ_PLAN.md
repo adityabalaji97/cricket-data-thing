@@ -1,6 +1,7 @@
 # Match Preview: every visual where it earns its place (CARTA)
 
-Plan written 2026-10-04. Chunks are sized so one session (Claude Code or Codex) can take one.
+Plan written 2026-10-04, revised the same day with the decisions below. Chunks are sized so one
+session (Claude Code or Codex) can take one.
 Tick the tracker with the date when a chunk lands, as in `MOBILE_VIZ_SWEEP.md`.
 
 ## Goal
@@ -19,6 +20,62 @@ Every module must pass CARTA (`MOBILE_VIZ_SWEEP.md`):
 
 "Use every chart type" is a means, not a target: a type is used where it is the clearest answer
 to a question below, and the plan says explicitly where a type is *not* used and why.
+
+## Decisions (2026-10-04)
+
+| Topic | Decision |
+|---|---|
+| Audience | The average cricket viewer who is curious about the game's nuances. Plain words first; the jargon stays behind the info icon. |
+| Text on a card | A **title** (the takeaway, in plain words), and where it applies **one help line**: "Higher is better" / "Lower is better" / "Bars right of the line are above average". Everything else (definitions, method, intervals, full credits) goes behind an **info icon** that opens a sheet. |
+| Always visible (CARTA Complete/Accurate) | Inside the card: footer line 1 = sample + context + small-sample flag ("34 matches · IPL 2023–26 · small sample"); footer line 2 = "Hindsight · hindsightcricket.com · Data: Cricsheet, [feed], Primer method". Outside the shareable area: Open in query builder, Share. |
+| Navigation | **Story style, replacing the section pills.** Tap the right/left edge or swipe sideways for next/previous; progress segments at the top; no auto-advance. |
+| Card shape | Full phone screen, with title + chart + footer inside a centred **4:5 core**, so a screenshot crops cleanly to the 1080×1350 feed format the share images use. |
+| Grouping | **Chapters:** At a glance · The ground · The teams · The players · Fantasy, then one closing card (full preview, ask your own question). A floating logo button (bottom corner) opens the chapter index and the settings sheet. Top/bottom app bars auto-hide in the story. |
+| Filters | Sensible defaults (T20: 4 years; ODI: 8 years; IPL era-aware), changed in a settings sheet from the logo menu; the footer context line shows what's applied. |
+| Desktop | A **grid of the same cards** (2–3 per row), same info sheet and actions. |
+| Formats | Men's T20 and **ODI ship together** with the same questions and visuals. The Primer metrics (Impact, RAA, WAA, WPA) exist for men's T20 only, so every module declares an ODI fallback on plain stats (strike rate, economy, average, dot %, boundary %). |
+| Women's T20 | Skipped for now. |
+| Ordering | **Automatic** (no admin overrides): chapters in a fixed order, cards inside a chapter ranked by how distinctive and well-sampled they are for this fixture. |
+| Fantasy | On the preview, as its own chapter: projected points, captain/vice picks, value picks (IPL only, where credit prices exist), differentials. |
+| Scope | Match preview only. The story shell is built as a reusable component; profiles decide later. |
+
+### Does this fit CARTA? Yes, with these rules
+- **Relevant:** one card = one question, and the title answers it. That's the story format's
+  natural shape.
+- **Complete / Accurate:** the sample-and-context footer and small-sample flags stay on the card,
+  not behind the icon.
+- **Accessible:**
+  - Swiping is never the only way to move: there are edge tap zones, arrow keys on desktop,
+    and the chapter index.
+  - The middle of the card is reserved for chart taps (a bar opens its detail sheet), so it never
+    collides with next/previous.
+  - Text stays at 11px or more inside the 4:5 core, and the info and action targets are 32px or
+    more.
+  - The logo button never covers chart content.
+- **No horizontal scroll inside a card.** Tables and the batter × bowler matrix become ranked
+  lists of up to 8 rows that fit one screen, with the full detail in a bottom sheet.
+- **Timely:** only the current card and its neighbours load; one fetch per module, cached;
+  changing settings refetches.
+
+## Copy rules for the average viewer
+
+- **Titles state the finding in everyday words:** "Chasing sides win more here", "Spinners
+  go for fewer here than anywhere in the IPL". They don't describe the chart ("Runs by phase").
+- **Metric names on the card are plain:**
+
+  | Metric | Plain name on the card |
+  |---|---|
+  | Impact | runs added |
+  | RAA | runs saved vs an average bowler / runs above an average batter |
+  | WPA | win chances added |
+  | leverage | pressure |
+
+  The info sheet gives the real name, the definition and the Primer credit.
+- **Help line only when direction isn't obvious:** "Higher is better" for runs added; "Lower is
+  better" for economy; none for a scatter whose axes are labelled.
+- **Info sheet contents:** what the chart shows, how to read it, metric definitions, the sample
+  and the filters in full, intervals and tests where used, data credits, and the "Open in query
+  builder" link again.
 
 ---
 
@@ -82,10 +139,11 @@ preview (`MatchPreviewCard`) · Teams (`MatchHistory`, `PostTossSetup`, `Matchup
 
 ---
 
-## 2. The preview as a sequence of questions
+## 2. The preview as chapters of questions
 
-The screen reads top to bottom as a pre-match story. Each row is one module: the question it
-answers, the visual that answers it best, and the data behind it.
+Each row is one card: the question it answers, the visual that answers it best, and the data
+behind it. The Data column names the T20 metric; ODI cards use the plain-stat fallback (section
+3).
 
 Status key: **K** keep · **C** change · **N** new · **R** remove/fold.
 
@@ -127,12 +185,20 @@ Status key: **K** keep · **C** change · **N** new · **R** remove/fold.
 | D5 | Records in play | Ranked list: milestones within reach this match | new `services/milestones.py` | N |
 | D6 | How does the key bowler work? | Pitch map in the player's detail sheet | `LineLengthProfile` | N (in sheet, not on the page) |
 
-### E. Go deeper
+### F. Fantasy
 | # | Question | Visual | Data | Status |
 |---|---|---|---|---|
-| E1 | Read the full preview | Text with chart fences (same facts as the modules) | `MatchPreviewCard`, preview note draft | C |
-| E2 | Ask your own question | Query prompts, now built from the module queries | `ContextualQueryPrompts` | C |
-| E3 | Leaders tables | Behind "See full table" | Leaders | R (folded under D2) |
+| F1 | Who will score the most fantasy points? | Ranked bars, top 8 projected points across both sides, team colour per bar | `fantasy_planner` projections (matchup model), every format | N |
+| F2 | Who should be captain and vice-captain? | Two stat tiles, each with a one-line reason ("Averages 52 points vs this attack") | F1 projections + matchup edges | N |
+| F3 | Who's the best value? | Ranked bars: projected points per credit | IPL credit prices (`_load_player_prices`); **IPL only**, card hidden elsewhere | N |
+| F4 | Who could surprise? | Dumbbell: usual points vs projected points here, biggest gaps first | projections vs each player's average fantasy points | N |
+
+### Closing card (last card of the last chapter)
+| # | Question | Visual | Data | Status |
+|---|---|---|---|---|
+| E1 | Want the whole story in words? | Link card → the preview note (same facts as the cards) | `MatchPreviewCard` text / preview note draft | C (moves off the main flow) |
+| E2 | Ask your own question | Up to 4 one-tap query prompts built from this fixture's card queries | `ContextualQueryPrompts` | C |
+| E3 | Full leaders tables | "See full tables" opens a sheet (tables can scroll there, not on a card) | Leaders | R (folded) |
 
 ### Not used on the preview, on purpose
 - **Radar:** hard to read on phones and misleading with many axes. Replaced by percentile bars.
@@ -155,11 +221,16 @@ Module(
     visual="scatter",                      # one of the types in section 1
     data=QuerySpec(...) | ServiceSpec(...), # query-builder params, or a named service call
     sample=SampleRule(min_matches=15, below="flag" | "grey" | "fallback_similar_venues" | "hide"),
-    takeaway=callable(rows) -> str,         # generated from the numbers, answers the question
+    takeaway=callable(rows) -> str,         # plain-words title generated from the numbers
+    help_line="Higher is better" | None,   # the only other text on the card
+    info=InfoSpec(...),                     # sheet: how to read, definitions, sample, method, credits
+    odi=FallbackSpec(metric="strike_rate", help_line=...),  # plain-stat version (no Primer metrics)
+    fits=FitRule(max_rows=8, no_horizontal_scroll=True),
+    chapter="ground",
+    relevance=callable(rows, sample) -> float,  # automatic order inside the chapter
     empty="No first-innings totals at this ground in the window.",
     formats=("T20", "ODI"),
     outputs=("screen", "snapshot", "graphic", "note"),
-    weight=...,                             # default order; admin can override
 )
 ```
 
@@ -171,8 +242,12 @@ Module(
   say so in the title.
 - **Era-aware by default:** IPL modules use `impact_player_era=2023+` unless the module is about
   change over time.
-- **Format-aware:** ODI previews use ODI phases (`format_config`); modules declare which formats
-  they support.
+- **Format-aware:** ODI previews use ODI phases (`format_config`) and each module's plain-stat
+  fallback; the info sheet says the game-state metrics are T20-only.
+- **Automatic ordering:** chapter order is fixed; inside a chapter, cards are ranked by a
+  relevance score (how far this fixture departs from the norm, times a sample-strength factor).
+  Cards that fail their sample rule and have no fallback are left out of the story, not shown
+  empty.
 
 ---
 
@@ -180,12 +255,10 @@ Module(
 
 - **Screen:** the module renders on the preview.
 - **Snapshot / embed:** "Embed" freezes the module (static snapshot, as the hypothesis notes do).
-- **Graphic:** "Make a graphic" opens the 1080×1350 card for that module, using the existing
-  `img.mjs` layouts. Pitch map gets a new `pitch` layout.
+- **Graphic:** "Make a graphic" renders the card's 4:5 core at 1080×1350 with the existing
+  `img.mjs` layouts, so it matches a screenshot. Pitch map, form strip and donut get new layouts.
 - **Note:** the nightly preview draft (`services/note_drafts.py`) is built from the top-ranked
   modules' takeaways and snapshots, so the note and the screen never disagree.
-- **Admin:** `/admin` gets a per-fixture module panel to pin, hide and reorder modules (new
-  table `preview_module_overrides`), next to the Social queue.
 
 ---
 
@@ -194,16 +267,43 @@ Module(
 | # | Chunk | Status |
 |---|---|---|
 | 0 | Audit: CARTA scorecard and usage for every current module | [ ] |
-| 1 | Module contract and registry; wrap existing modules unchanged | [ ] |
-| 2 | Mockups gate: real fixtures, every proposed module | [ ] |
-| 3 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [ ] |
-| 4 | The ground: B1–B8 | [ ] |
-| 5 | The teams: C1–C4 | [ ] |
-| 6 | The players: D1–D6 (incl. milestones service) | [ ] |
-| 7 | At a glance and go deeper: A1–A2, E1–E3 | [ ] |
-| 8 | Outputs: per-module snapshot, graphic (incl. `pitch` layout), embed | [ ] |
-| 9 | Notes and admin: preview drafts from modules; per-fixture overrides | [ ] |
-| 10 | Sweep and removals: phone screenshots, goldens, performance budget | [ ] |
+| 1 | Story shell: card frame (4:5 core), chapters, navigation, auto-hiding chrome, logo menu, settings sheet, deep links, desktop grid | [ ] |
+| 2 | Module contract and registry; copy rules; ODI fallbacks; wrap existing modules as cards | [ ] |
+| 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [ ] |
+| 4 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [ ] |
+| 5 | At a glance and the ground: A1–A2, B1–B8 | [ ] |
+| 6 | The teams: C1–C6 | [ ] |
+| 7 | The players: D1–D6 (incl. milestones service) | [ ] |
+| 8 | Fantasy: F1–F4 | [ ] |
+| 9 | Outputs: Make a graphic = card core (new layouts), embeds, preview note from cards | [ ] |
+| 10 | Switch-over: story becomes the default, pills removed, phone/desktop sweep, goldens, performance budget | [ ] |
+
+### Story shell and card anatomy (applies to every chunk)
+
+```
+┌──────────────────────────────┐  progress segments (chapter)       ← outside the share crop
+│                              │  chapter name · fixture            ← outside the share crop
+│ ┌──────────────────────────┐ │
+│ │ Title (the takeaway)   ⓘ │ │  ┐
+│ │ Higher is better         │ │  │
+│ │                          │ │  │ 4:5 core: what a screenshot
+│ │        chart             │ │  │ or Make-a-graphic shares
+│ │                          │ │  │
+│ │ 34 matches · IPL 2023-26 │ │  │
+│ │ Hindsight · hindsight... │ │  ┘
+│ └──────────────────────────┘ │
+│  [Open in query builder] [Share]                                  ← outside the share crop
+│                         (logo)│  floating button: chapters + settings
+└──────────────────────────────┘
+tap left 20% = previous · tap right 20% = next · middle = chart taps · swipe sideways = next/previous
+```
+
+- **Deep links:** each card has its own URL (`/venue?...#ground-total-vs-result`), so a shared
+  link opens on that card.
+- **Same design as the share images:** the 4:5 core uses the `img.mjs` palette, fonts and
+  legibility floors, so "Make a graphic" for a card produces the same picture as a cropped
+  screenshot.
+- **Desktop:** the same card component in a grid; clicking a card opens it in the story viewer.
 
 ### Chunk 0: Audit (read-only)
 - Screenshot the current preview at 360/390/768 px (`scripts/dev/ui_sweep.mjs`, routes
@@ -216,60 +316,69 @@ Module(
 - **Output:** the audit table, plus a confirmed keep/change/remove list (section 2 is the
   proposal).
 
-### Chunk 1: Module contract and registry
-- `services/preview_modules/` (registry, `QuerySpec`/`ServiceSpec`, sample rules, takeaway
-  helpers); `GET /match-preview/modules` returns the ordered manifest and light data;
-  heavy modules fetch on expand.
-- `src/components/preview/`: `PreviewModule` shell (title from takeaway, sample chip, empty
-  state, "Open in query builder", Share menu), rendered inside the existing `CollapsibleSection`
-  and `VenueSectionTabs`.
-- Wrap today's modules as-is. **Acceptance:** goldens identical; screenshots unchanged.
+### Chunk 1: Story shell
+- `src/components/story/`: `StoryViewer` (chapters, progress segments, edge tap zones, sideways
+  swipe, arrow keys, no auto-advance), `StoryCard` (full-screen frame with the 4:5 core, title
+  row with info icon, help line, two-line footer, action strip), `LogoMenu` (floating button:
+  chapter index, settings sheet), `InfoSheet` (built on `ui/DetailSheet`).
+- Auto-hide the app's top and bottom bars inside the story; respect safe-area insets; the logo
+  button never covers the core.
+- Deep links per card; browser back leaves the story.
+- Desktop: `StoryGrid` renders the same cards 2–3 per row; a click opens the viewer at that card.
+- Behind a flag (`?story=1`) until chunk 10. **Acceptance:** phone screenshots at 360/390/768 px
+  show title + chart + footer inside the core with no overflow; keyboard-only navigation works;
+  tap zones don't trigger on chart taps.
 
-### Chunk 2: Mockups gate
-- Build mockups for every proposed module with real data, using the connector tools
-  (`preview_match`, `query_cricket_data`) for an upcoming IPL fixture, a T20I and an ODI. Use a
-  thin-sample ground to show fallbacks.
-- **You sign off before chunks 3–10.** Feedback is folded into this file.
+### Chunk 2: Module contract and registry
+- `services/preview_modules/` (registry, `QuerySpec`/`ServiceSpec`, sample rules, takeaway and
+  help-line helpers, ODI fallbacks, relevance score); `GET /match-preview/cards` returns the
+  ordered card manifest and light data; heavy cards fetch when they're within one card of view.
+- Copy rules as code: a plain-name map for metrics (runs added, runs saved, win chances added,
+  pressure) used by titles, help lines and info sheets.
+- Wrap today's modules as cards where they already fit one screen (the expect strip, H2H, forecast).
+  The rest are rebuilt in chunks 5–8. **Acceptance:** golden snapshots identical for the existing
+  endpoints.
 
-### Chunk 3: Correctness first
+### Chunk 3: Mockups gate
+- Build mockups of every card with real data, using the connector tools (`preview_match`,
+  `query_cricket_data`) for an upcoming IPL fixture, a T20I and an ODI. Include a thin-sample
+  ground to show the fallbacks.
+- **You sign off before chunks 4–10.** Feedback is folded into this file.
+
+### Chunk 4: Correctness first
 - Era-aware par and venue averages (IPL `impact_player_era`); show both eras where they differ
   materially.
 - Toss/chase: binomial interval, "within noise" label when the interval covers 50%.
-- Sample rules wired into every module; similar-venue fallback.
+- Sample rules wired into every card; similar-venue fallback.
 - Key Battles evidence rule: within-player RAA vs baseline, min balls, no handedness templates.
 - Death bowling leaders on leverage-weighted RAA, economy alongside.
 - **Acceptance:** golden diffs limited to the intended fields; new tests per rule.
 
-### Chunks 4–7: Modules
-- One module = backend spec + frontend renderer + phone layout + empty state + test.
-- Reuse the existing components named in section 1. New visual code only for: dumbbell and
-  stacked on the site (they exist as image layouts only), the worm line, and the pitch-map share
-  layout.
-- New backend: `services/milestones.py` (D5). Everything else is query-builder specs or
-  existing services.
+### Chunks 5–8: Cards by chapter
+- One card = backend spec + renderer + ODI fallback + info sheet copy + empty state + test.
+- Reuse the components named in section 1. New visual code only for: dumbbell and stacked on the
+  site (they exist only as image layouts today), the worm line, and fantasy bars with team colours.
+- New backend: `services/milestones.py` (D5); fantasy projections exposed per fixture for every
+  format (F1, F2, F4), credit prices for IPL (F3).
+- Tables and the matrix become lists of up to 8 rows with a detail sheet; nothing scrolls sideways
+  inside a card.
 
-### Chunk 8: Outputs
-- Static snapshot per module; Share menu (Embed, Make a graphic); `pitch` layout in `img.mjs`
-  plus legibility test (`tests/js/share_images.test.mjs`).
+### Chunk 9: Outputs
+- "Make a graphic" renders the card core at 1080×1350; new `img.mjs` layouts for pitch map, form
+  strip and donut, with legibility tests (`tests/js/share_images.test.mjs`).
+- Embeds use static snapshots of the card data.
+- The nightly preview note draft (`services/note_drafts.py`) is built from the top cards'
+  takeaways and snapshots.
 
-### Chunk 9: Notes and admin
-- `note_drafts.py` preview drafts built from module takeaways and snapshots.
-- Migration `016_preview_module_overrides.sql`; admin panel to pin, hide and reorder per fixture.
+### Chunk 10: Switch-over
+- The story becomes the default preview; section pills (`VenueSectionTabs`) are removed from the
+  preview; the pie, scores bar chart and radar are retired there; Leaders are folded under D2.
+- Phone screenshots at all three widths for T20 and ODI; desktop grid at 1280 px; goldens
+  re-baselined with your sign-off.
+- **Performance budget:** first card under 1.5 s warm; no module fetched twice; neighbours
+  preloaded only.
 
-### Chunk 10: Sweep and removals
-- Remove the pie, scores bar chart and radar from the preview; move Leaders behind D2.
-- Phone screenshots at all three widths for all three formats; golden re-baseline with sign-off.
-- **Performance budget:** first paint of the At a glance section under 1.5 s warm; no module
-  fetches twice; lazy below the fold.
+## 6. Open questions
 
----
-
-## 6. Open questions for you
-
-1. **Fantasy:** `fantasy_planner` data exists. Should a "fantasy picks" module appear on the
-   preview, or stay on its own page?
-2. **ODI parity:** ship ODI previews with the same modules at once, or T20 first?
-3. **Admin overrides:** worth a migration now, or rely on automatic ordering until usage data
-   says otherwise?
-4. **Women's T20:** no Primer metrics. Show the non-adjusted modules only, or hold the preview
-   for women's fixtures until metrics exist?
+None outstanding; see Decisions. The 2015+ feed credit on every card is still a placeholder
+(`analysis/hypotheses/credits.py`).
