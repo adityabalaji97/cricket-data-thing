@@ -436,4 +436,5 @@ const MatchHistory = ({ venue, team1, team2, venueResults, team1Results, team2Re
     </Box>
 );
 
+export { TeamSplitHeader, VenueRecentMatches, TeamFormCard };
 export default MatchHistory;

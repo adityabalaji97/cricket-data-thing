@@ -267,7 +267,7 @@ Module(
 | # | Chunk | Status |
 |---|---|---|
 | 0 | Audit: CARTA scorecard and usage for every current module | [x] 2026-10-04 |
-| 1 | Story shell: card frame (4:5 core), chapters, navigation, auto-hiding chrome, logo menu, settings sheet, deep links, desktop grid | [ ] |
+| 1 | Story shell: card frame (4:5 core), chapters, navigation, auto-hiding chrome, logo menu, settings sheet, deep links, desktop grid | [x] 2026-10-04 |
 | 2 | Module contract and registry; copy rules; ODI fallbacks; wrap existing modules as cards | [ ] |
 | 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [ ] |
 | 4 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [ ] |
@@ -388,6 +388,28 @@ R = Relevant, T = Timely, Ac = Accessible.
 - Behind a flag (`?story=1`) until chunk 10. **Acceptance:** phone screenshots at 360/390/768 px
   show title + chart + footer inside the core with no overflow; keyboard-only navigation works;
   tap zones don't trigger on chart taps.
+
+**Chunk 1 done (2026-10-04).**
+
+What was built:
+- `src/components/story/`:
+  - `StoryViewer`: chapters, progress segments, edge taps, sideways swipe, arrow keys,
+    neighbour-only mounting, per-card hash deep links, position tracked by card id;
+  - `StoryCard`: 4:5 core, info sheet, two-line footer, a dev-time `data-overflow` flag;
+  - `LogoMenu`: chapters, Preview settings, Classic page;
+  - `StoryGrid`: desktop;
+  - `StoryPreview`, plus `previewChapters` (7 existing modules as demo cards).
+- Wired into `VenueNotes` behind `?story=1`.
+- `ui_sweep.mjs` gains `story_*` routes and reports `storyOverflow`.
+- Tests: `src/components/story/__tests__/StoryViewer.test.jsx` (5).
+
+Sweep: no page overflow and no small text at 360, 390, 768 or 1280 px.
+
+**Carried into chunk 2:**
+1. The old "what total wins" chart overflows its card at 360px.
+2. Form chips are 26px tap targets.
+3. Wrapped components repeat their own inner titles ("Head to Head" under "MI v CSK: head to
+   head").
 
 ### Chunk 2: Module contract and registry
 - `services/preview_modules/` (registry, `QuerySpec`/`ServiceSpec`, sample rules, takeaway and

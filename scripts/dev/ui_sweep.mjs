@@ -55,6 +55,11 @@ const ROUTES = [
   ['scorecard', '/scorecard/1530204'],
   ['scorecard_t20', '/scorecard/1473438'],
   ['preview_odi', '/venue?venue=Kingsmead%2C%20Durban&team1=Australia&team2=South%20Africa&includeInternational=true&topTeams=10&autoload=true&fmt=mens-odi'],
+  // Story-style preview (MATCH_PREVIEW_VIZ_PLAN.md): one route per card, opened by its deep link.
+  ...['par', 'winning-phases', 'results', 'totals', 'recent-results', 'head-to-head', 'form'].map((card) => [
+    `story_${card.replace(/-/g, '_')}`,
+    `/venue?venue=Wankhede%20Stadium%2C%20Mumbai&team1=Mumbai%20Indians&team2=Chennai%20Super%20Kings&autoload=true&story=1#${card}`,
+  ]),
 ];
 const W = Number(process.env.WIDTH || 390);
 const H = Number(process.env.HEIGHT || 844);
@@ -208,7 +213,9 @@ for (const [name, path] of ROUTES.filter(([n]) => !ONLY || ONLY.includes(n))) {
       const r = svg.getBoundingClientRect(); if (r.width > vw + 1) wide.push({ w: Math.round(r.width), chart: where(svg) });
     }
     const uniq = (xs) => [...new Map(xs.map((x) => [JSON.stringify(x), x])).values()];
-    return { rotatedSvgText: rotated.length, rotatedSamples: uniq(rotated).slice(0, 20), svgTextUnder11px: small.length, svgSmallSamples: uniq(small).slice(0, 20), svgWiderThanViewport: wide.length, wideSamples: wide.slice(0, 10) };
+    // Story cards whose content does not fit the 4:5 core (StoryCard sets data-overflow).
+    const storyOverflow = [...document.querySelectorAll('[data-story-card][data-overflow="true"]')].map((el) => el.getAttribute('data-story-card'));
+    return { rotatedSvgText: rotated.length, rotatedSamples: uniq(rotated).slice(0, 20), svgTextUnder11px: small.length, svgSmallSamples: uniq(small).slice(0, 20), svgWiderThanViewport: wide.length, wideSamples: wide.slice(0, 10), storyOverflow };
   })()` });
   Object.assign(info, charts.result?.result?.value || { chartProbeError: charts.result?.exceptionDetails?.text });
   const shot = await s('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: W, height: h, scale: 1 } });
@@ -216,7 +223,7 @@ for (const [name, path] of ROUTES.filter(([n]) => !ONLY || ONLY.includes(n))) {
   report[name] = { ...info, failures: [...new Set(failures)].slice(0, 12) };
   listeners.splice(listeners.indexOf(onMsg), 1);
   await send('Target.closeTarget', { targetId });
-  console.log(name, JSON.stringify({ overflow: info.overflow, sw: info.sw, docH: info.docH, tiny: info.tinyTapTargets, small: info.textUnder11px, light: info.lightIslands, lowContrast: info.lowContrast, rotated: info.rotatedSvgText, svgSmall: info.svgTextUnder11px, svgWide: info.svgWiderThanViewport, fails: report[name].failures.length }));
+  console.log(name, JSON.stringify({ overflow: info.overflow, sw: info.sw, docH: info.docH, tiny: info.tinyTapTargets, small: info.textUnder11px, light: info.lightIslands, lowContrast: info.lowContrast, rotated: info.rotatedSvgText, svgSmall: info.svgTextUnder11px, svgWide: info.svgWiderThanViewport, storyOverflow: info.storyOverflow, fails: report[name].failures.length }));
 }
 writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 2));
 ws.close(); chrome.kill();

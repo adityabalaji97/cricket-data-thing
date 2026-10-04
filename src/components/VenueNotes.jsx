@@ -49,6 +49,8 @@ import BoundaryAnalysis from './BoundaryAnalysis';
 import ForesightCard from './ForesightCard';
 import EmptyState from './ui/EmptyState';
 import CollapsibleSection, { openSection } from './ui/CollapsibleSection';
+import StoryPreview from './story/StoryPreview';
+import buildPreviewChapters from './story/previewChapters';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -1296,9 +1298,24 @@ const VenueNotes = ({
         );
     }, [activeSectionId, activatedSections]);
 
+// Story-style preview (MATCH_PREVIEW_VIZ_PLAN.md), behind ?story=1 until the switch-over.
+const storyMode = new URLSearchParams(window.location.search).get('story') === '1';
+const storyChapters = useMemo(() => (storyMode && venueStats ? buildPreviewChapters({
+    venue,
+    startDate,
+    endDate,
+    venueStats,
+    matchHistory,
+    expectBlock,
+    team1: selectedTeam1?.abbreviated_name,
+    team2: selectedTeam2?.abbreviated_name,
+    charts: { WinPercentagesPie, ScoresBarChart },
+    isMobile,
+}) : []), [storyMode, venue, startDate, endDate, venueStats, matchHistory, expectBlock, selectedTeam1, selectedTeam2, isMobile]);
+
 if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
 
-return (
+const classicPage = (
     <Box sx={{ mx: { xs: -1, sm: 0 }, p: { xs: 0, sm: 2 } }}>
         <Box
             sx={{
@@ -1427,6 +1444,21 @@ return (
         )}
     </Box>
 );
+
+if (storyMode) {
+    const fixture = selectedTeam1 && selectedTeam2
+        ? `${selectedTeam1.abbreviated_name} v ${selectedTeam2.abbreviated_name} · ${venue.split(',')[0]}`
+        : venue;
+    return (
+        <StoryPreview
+            chapters={storyChapters}
+            fixtureLabel={fixture}
+            onSettings={onToggleFilters}
+            classicPage={classicPage}
+        />
+    );
+}
+return classicPage;
 };
 
 export default VenueNotes;

@@ -181,4 +181,5 @@ const ExpectStrip = ({ expect, team1, team2 }) => {
   );
 };
 
+export { WinningPhases };
 export default ExpectStrip;
