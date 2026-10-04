@@ -7,6 +7,7 @@ import StoryCard from './StoryCard';
 import LogoMenu from './LogoMenu';
 import { STORY_BOTTOM, STORY_TOP, useStoryCoreSize } from './storyLayout';
 import { colors, fonts } from '../../theme/hindsightDark';
+import { track } from '../../utils/analytics';
 
 const SWIPE_PX = 50;
 
@@ -58,6 +59,11 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
   }, [cards, index]);
 
   // Deep link: keep the hash on the card being shown.
+  // Card-level usage (MATCH_PREVIEW_VIZ_PLAN.md chunk 0 found none): which cards get read.
+  useEffect(() => {
+    if (current && !wanted.current) track('card_view', { card: current.id, chapter: chapter?.id });
+  }, [current, chapter]);
+
   useEffect(() => {
     if (current && !wanted.current) window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${current.id}`);
   }, [current]);
@@ -92,6 +98,7 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
   };
 
   const share = async () => {
+    track('card_share', { card: current.id });
     const url = `${window.location.origin}${window.location.pathname}${window.location.search}#${current.id}`;
     try {
       if (navigator.share) await navigator.share({ title: current.title, url });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Button } from '@mui/material';
+import { Box, Button, CircularProgress } from '@mui/material';
 import AutoStoriesOutlinedIcon from '@mui/icons-material/AutoStoriesOutlined';
 import StoryViewer from './StoryViewer';
 import StoryGrid from './StoryGrid';
@@ -11,12 +11,20 @@ import { colors } from '../../theme/hindsightDark';
  * a grid and a click opens the viewer at that card. "Preview settings" and "Classic page" close
  * the viewer, leaving the classic page with a button to reopen the story.
  */
-const StoryPreview = ({ chapters, fixtureLabel, onSettings, classicPage }) => {
+const StoryPreview = ({ chapters, fixtureLabel, onSettings, classicPage, loading = false }) => {
   const { isMobile } = useIsMobile();
   const [open, setOpen] = useState(isMobile);
   const [startCardId, setStartCardId] = useState(null);
   const [classic, setClassic] = useState(false);
 
+  if (loading && !chapters.length) {
+    return (
+      <Box role="status" aria-label="Loading the preview" sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress size={28} sx={{ color: colors.accent }} />
+      </Box>
+    );
+  }
+  // No cards (no fixture picked, or nothing to show): the classic page.
   if (!chapters.some((c) => c.cards.length)) return classicPage;
 
   const viewer = open && (

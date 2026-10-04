@@ -4,6 +4,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import DetailSheet from '../ui/DetailSheet';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { CARD_BRAND, CARD_CREDITS } from './storyLayout';
+import { track } from '../../utils/analytics';
 
 /**
  * One story card's shareable core (4:5): title (the takeaway) with an info button, at most one
@@ -14,6 +15,15 @@ import { CARD_BRAND, CARD_CREDITS } from './storyLayout';
  * The chart area never scrolls: content that does not fit is a bug in that card, so it is
  * flagged in development (data-overflow) for the UI sweep to catch.
  */
+// Events from a chart's own controls, or from sheets it opens (portals: React bubbles them through
+// this tree although they sit elsewhere in the DOM), stay with the chart. Otherwise a tap there
+// would also open the card (grid) or count as a swipe (story).
+const keepInChart = (e) => {
+  const fromPortal = !e.currentTarget.contains(e.target);
+  const fromControl = e.target.closest && e.target.closest('button, a, [role="button"], input, select');
+  if (fromPortal || fromControl) e.stopPropagation();
+};
+
 const StoryCard = ({ card, width, height }) => {
   const [infoOpen, setInfoOpen] = useState(false);
   const [overflow, setOverflow] = useState(false);
@@ -71,7 +81,7 @@ const StoryCard = ({ card, width, height }) => {
         {card.info && (
           <IconButton
             aria-label={`About this chart: ${card.title}`}
-            onClick={(e) => { e.stopPropagation(); setInfoOpen(true); }}
+            onClick={(e) => { e.stopPropagation(); setInfoOpen(true); track('card_info', { card: card.id }); }}
             data-story-noswipe
             sx={{ width: 36, height: 36, mt: -0.5, mr: -1, color: colors.textLo }}
           >
@@ -83,7 +93,13 @@ const StoryCard = ({ card, width, height }) => {
         <Typography sx={{ fontSize: 13, color: colors.textLo, mt: 0.5 }}>{card.help}</Typography>
       )}
 
-      <Box ref={chartRef} sx={{ flex: 1, minHeight: 0, mt: 1.25, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <Box
+        ref={chartRef}
+        onClick={keepInChart}
+        onPointerDown={keepInChart}
+        onPointerUp={keepInChart}
+        sx={{ flex: 1, minHeight: 0, mt: 1.25, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+      >
         {card.render()}
       </Box>
 

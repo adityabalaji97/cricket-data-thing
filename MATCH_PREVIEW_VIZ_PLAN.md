@@ -268,8 +268,8 @@ Module(
 |---|---|---|
 | 0 | Audit: CARTA scorecard and usage for every current module | [x] 2026-10-04 |
 | 1 | Story shell: card frame (4:5 core), chapters, navigation, auto-hiding chrome, logo menu, settings sheet, deep links, desktop grid | [x] 2026-10-04 |
-| 2 | Module contract and registry; copy rules; ODI fallbacks; wrap existing modules as cards | [ ] |
-| 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [ ] |
+| 2 | Module contract and registry; copy rules; ODI fallbacks; wrap existing modules as cards | [x] 2026-10-04 |
+| 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [x] 2026-10-04 signed off (decisions below) |
 | 4 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [ ] |
 | 5 | At a glance and the ground: A1–A2, B1–B8 | [ ] |
 | 6 | The teams: C1–C6 | [ ] |
@@ -421,11 +421,98 @@ Sweep: no page overflow and no small text at 360, 390, 768 or 1280 px.
   The rest are rebuilt in chunks 5–8. **Acceptance:** golden snapshots identical for the existing
   endpoints.
 
+**Chunk 2 done (2026-10-04).**
+
+Backend:
+- `services/preview_cards/`:
+  - `spec.py`: `CardSpec`, `Card`, `SampleRule`, `Info`, chapters;
+  - `copy.py`: plain names, help lines, ODI fallback helpers, span/plural;
+  - `context.py`: a lazy `PreviewContext` over the venue record, match history and match preview;
+  - `existing.py`: the 7 existing modules as cards, with titles generated from the numbers;
+  - `build_story()`: ranking, sample floors, one failing card never breaks the story.
+- `GET /match-preview/{venue}/{t1}/{t2}/cards`.
+
+Frontend:
+- `src/components/story/visuals.jsx`: a renderer per `visual`, plus the info-sheet body.
+- `src/hooks/useStoryCards.js`.
+- `bare` mode on the reused components (inner titles and frames hidden, 32px form chips, H2H
+  details in a sheet).
+- `WinPercentagesPie` and `ScoresBarChart` moved to `src/components/venue/VenueResultCharts.jsx`.
+- Events: `card_view`, `card_share`, `card_info`.
+
+Tests:
+- `tests/test_preview_cards.py` (8);
+- `StoryGrid.test.jsx` (chart controls and sheets don't open the card).
+
+Sweep at 360 and 390 px: all 7 cards fit, with no page overflow and no small text. The classic
+page is unchanged.
+
+**Carried into chunk 4:** the expect block (`/match-preview`) and the venue record count
+different matches under the same page filters (e.g. 21 vs 28 at Wankhede): the endpoint has no
+leagues filter, and `include_international` is defaulted differently. Cards in one story must
+count the same matches.
+
 ### Chunk 3: Mockups gate
 - Build mockups of every card with real data, using the connector tools (`preview_match`,
   `query_cricket_data`) for an upcoming IPL fixture, a T20I and an ODI. Include a thin-sample
   ground to show the fallbacks.
 - **You sign off before chunks 4–10.** Feedback is folded into this file.
+
+**Chunk 3 mockups (2026-10-04):** https://claude.ai/artifact/G9kSYFDrqSJH4cEEv7PNrf
+
+Contents:
+- 27 cards for MI v CSK at Wankhede, from the full-data copy, the live preview API and IPL
+  credit prices;
+- two ODI fallback cards (Kingsmead, plain stats, small-sample flag);
+- the thin-ground behaviour (Korogi);
+- six decisions for sign-off.
+
+Found while building:
+- The stored Foresight forecast (MI 66%) disagrees with the written preview's lean ("too
+  close to call").
+- The forecast's predicted second-innings score (99.5) isn't credible.
+
+### Sign-off decisions (2026-10-04)
+
+1. **Cards as drawn.** Title, help line, sample and credit lines as in the mockups.
+2. **Win %: keep the Foresight model's win probability; every other metric comes from the T20
+   Primer.**
+   - The stored forecast with 99.5 is the only row in `match_predictions` (MI v CSK, 23 April
+     2026). Its second-innings score model output isn't credible, and nothing has written a
+     prediction since.
+   - So the forecast card appears only when a prediction exists for this fixture (same teams,
+     dated within 7 days of the match). It shows win % only; predicted scores are never shown.
+   - Par comes from the Primer's `match_par` (nested shrinkage, e.g. 212 for Wankhede in
+     2026), not from the average winning total.
+   - The Primer has no team-strength pre-match win chance: its win probability is game-state
+     only, about 51% at the first ball.
+3. **Cap each chapter.** Swiping sideways moves through each chapter's **4 most distinctive
+   cards** (by relevance). The rest of the chapter sits below the current card: scroll down to
+   read them, each still a full 4:5 card. The progress segments count the featured cards; a
+   "More in this chapter (n)" cue sits under the action strip.
+4. **Pitch map and boundary-zone floors, from the data** (split-half reliability at
+   data-rich grounds, all men's T20 2015+):
+
+   | Card | Pattern stable (0.7) at | Ground differs from all grounds |
+   |---|---|---|
+   | Pitch map, pace, runs saved by cell | ~2,000 balls (0.73) | no: about 0 even at 6,000 balls |
+   | Bowler's pitch map: where he bowls vs an average pace bowler | ~600 balls (0.70; 0.89 at 2,000) | yes, it's the point |
+   | Bowler's runs saved by cell | never (about 0.1) | no |
+   | Boundary zones | ~200 boundaries (0.71) | weak: 0.22 at 400, 0.46 at 2,000 boundaries |
+
+   - **The ground pitch map (B7) is dropped.** What length works at a ground is what works
+     everywhere, so a ground card would present a general truth as a venue trait.
+   - **D6 becomes "How X bowls"**: where the bowler pitches it compared with an average pace
+     bowler, shown from 600 balls with line and length.
+   - **The boundary-zone card (B6) appears only where the ground differs from all grounds.**
+     That means 400+ zoned boundaries (all seasons, since a ground's shape is stable), a
+     chi-square p < 0.01 against the all-ground shares, and one zone at 1.25×+ its usual
+     share. That's about 15 grounds (e.g. the MCG and Perth: fine leg 1.5–1.7×).
+   - The title states the deviation ("Fine leg gets 1.7× its usual share of boundaries at the
+     MCG"). Wankhede doesn't qualify: midwicket takes 19.3% there against 19.5% everywhere.
+   - Scripts: `analysis/preview/` (pitch_zone_reliability.py, bowler_pitch_reliability.py, ground_zone_differences.py; run against hindsight_analysis).
+5. **Fantasy:** value picks (F3) and differentials (F4) for IPL fixtures only; projected points
+   and captaincy everywhere.
 
 ### Chunk 4: Correctness first
 - Era-aware par and venue averages (IPL `impact_player_era`); show both eras where they differ
