@@ -7,6 +7,7 @@ import DivergingBars from '../charts/DivergingBars';
 import { KIND_COLORS, SERIES } from '../../theme/chartDefaults';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { useStoryNav } from './StoryNav';
+import { getTeamColor, readableOnDark } from '../../utils/teamColors';
 
 /**
  * Renderers for the `visual` each card declares (services/preview_cards). A card's payload is
@@ -324,6 +325,209 @@ const Dismissals = ({ payload }) => {
   );
 };
 
+/**
+ * Colours for the two sides: their own colours when both are known, readable on the dark card and
+ * clearly apart; otherwise the validated blue/orange pair. Text never takes these colours.
+ */
+const hexDistance = (a, b) => {
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [x, y] = [rgb(a), rgb(b)];
+  return Math.sqrt(x.reduce((acc, v, i) => acc + (v - y[i]) ** 2, 0));
+};
+export const pairColors = (team1, team2) => {
+  const a = getTeamColor(team1); const b = getTeamColor(team2);
+  const ok = (c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+  if (ok(a) && ok(b)) {
+    const ra = readableOnDark(a); const rb = readableOnDark(b);
+    if (ok(ra) && ok(rb) && hexDistance(ra, rb) > 120) return [ra, rb];
+  }
+  return [SERIES[0], SERIES[1]];
+};
+const signed = (v, digits = 0) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(digits)}`;
+
+/** C1: each side against the competition average, per phase, bat and ball. */
+const Dumbbell = ({ payload }) => {
+  const [c1, c2] = pairColors(payload.team1, payload.team2);
+  const span = Math.max(10, Math.ceil(Math.max(...payload.rows.flatMap((r) => [Math.abs(r.team1), Math.abs(r.team2)])) / 5) * 5);
+  const W = 300; const left = 84; const right = 66; const rowH = 22;
+  const x = (v) => left + ((v + span) / (2 * span)) * (W - left - right);
+  const groups = ['Batting', 'Bowling'];
+  let y = 0;
+  const marks = [];
+  groups.forEach((g) => {
+    y += 14;
+    marks.push(<text key={`${g}-h`} x="0" y={y} style={{ ...svgText, fontSize: 11, fill: colors.textLo, letterSpacing: '0.08em' }}>{g.toUpperCase()}</text>);
+    payload.rows.filter((r) => r.group === g).forEach((r) => {
+      y += rowH;
+      const a = x(r.team1); const b = x(r.team2);
+      marks.push(
+        <g key={`${g}-${r.phase}`}>
+          <text x="0" y={y + 4} style={{ fontFamily: fonts.body, fontSize: 13, fill: colors.textHi }}>{PHASE_LABEL[r.phase].replace(' overs', '')}</text>
+          <line x1={Math.min(a, b)} x2={Math.max(a, b)} y1={y} y2={y} stroke={colors.borderStrong} strokeWidth="3" />
+          <circle cx={a} cy={y} r="7" fill={c1} stroke={colors.surface1} strokeWidth="2"><title>{`${payload.team1} ${g.toLowerCase()}, ${PHASE_LABEL[r.phase].toLowerCase()}: ${signed(r.team1, 1)} per 100 balls`}</title></circle>
+          <circle cx={b} cy={y} r="7" fill={c2} stroke={colors.surface1} strokeWidth="2"><title>{`${payload.team2} ${g.toLowerCase()}, ${PHASE_LABEL[r.phase].toLowerCase()}: ${signed(r.team2, 1)} per 100 balls`}</title></circle>
+          <text x={W} y={y + 4} textAnchor="end" style={{ ...svgText, fill: colors.textMed }}>{`${signed(r.team1)} · ${signed(r.team2)}`}</text>
+        </g>,
+      );
+    });
+    y += 4;
+  });
+  const H = y + 20;
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Runs per 100 balls against the ${payload.comparison} average, ${payload.team1} and ${payload.team2}`} sx={{ width: '100%' }}>
+        <line x1={x(0)} x2={x(0)} y1="22" y2={H - 18} stroke={colors.textFaint} />
+        {marks}
+        <text x={x(-span)} y={H - 2} style={{ ...svgText, fill: colors.textFaint }}>{signed(-span)}</text>
+        <text x={x(0)} y={H - 2} textAnchor="middle" style={{ ...svgText, fill: colors.textFaint }}>avg</text>
+        <text x={x(span)} y={H - 2} textAnchor="end" style={{ ...svgText, fill: colors.textFaint }}>{signed(span)}</text>
+      </Box>
+      <Legend items={[[payload.team1, c1], [payload.team2, c2]]} />
+    </Box>
+  );
+};
+
+/** C2: rank among the competition's sides, per phase; a full bar is first. */
+const RankBars = ({ payload }) => {
+  const [c1, c2] = pairColors(payload.team1, payload.team2);
+  const groups = ['batting', 'bowling'];
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.75 }}>
+      {groups.map((g) => (
+        <Box key={g}>
+          <Typography sx={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.08em', color: colors.textLo, textTransform: 'uppercase', mb: 0.5 }}>{g}</Typography>
+          {payload.rows.filter((r) => r.group === g).map((r) => {
+            const len = (rank) => Math.max(0.04, (r.of - rank + 1) / r.of);
+            return (
+              <Box key={r.phase} sx={{ display: 'grid', gridTemplateColumns: '70px 1fr 54px', gap: 1, alignItems: 'center', mb: 0.75 }}>
+                <Typography sx={{ fontSize: 13, color: colors.textHi }}>{PHASE_LABEL[r.phase].replace(' overs', '')}</Typography>
+                <Box component="svg" viewBox="0 0 200 20" role="img" aria-label={`${payload.team1} ${r.team1} of ${r.of}, ${payload.team2} ${r.team2} of ${r.of}`} sx={{ width: '100%', display: 'block' }}>
+                  <rect x="0" y="1" width={200 * len(r.team1)} height="7" rx="3.5" fill={c1}><title>{`${payload.team1}: ${r.team1} of ${r.of}`}</title></rect>
+                  <rect x="0" y="12" width={200 * len(r.team2)} height="7" rx="3.5" fill={c2}><title>{`${payload.team2}: ${r.team2} of ${r.of}`}</title></rect>
+                </Box>
+                <Typography sx={{ fontSize: 13, color: colors.textMed, fontFamily: fonts.mono, textAlign: 'right' }}>{`${r.team1} · ${r.team2}`}</Typography>
+              </Box>
+            );
+          })}
+        </Box>
+      ))}
+      <Legend items={[[payload.team1, c1], [payload.team2, c2]]} />
+      <Typography sx={{ fontSize: 13, color: colors.textLo }}>{`Rank of ${payload.rows[0]?.of} (1 = best)`}</Typography>
+    </Box>
+  );
+};
+
+/** C3: each side's Elo before every match over the last year. */
+const EloLines = ({ payload }) => {
+  const teams = payload.series.map((s) => s.team);
+  const cols = pairColors(teams[0], teams[1]);
+  const all = payload.series.flatMap((s) => s.points);
+  const t = (d) => new Date(d).getTime();
+  const t0 = Math.min(...all.map((p) => t(p.date))); const t1 = Math.max(...all.map((p) => t(p.date)));
+  const lo = Math.floor((Math.min(...all.map((p) => p.elo)) - 15) / 25) * 25;
+  const hi = Math.ceil((Math.max(...all.map((p) => p.elo)) + 15) / 25) * 25;
+  const W = 300; const H = 200; const left = 38; const right = 40; const top = 10; const bottom = 176;
+  const x = (d) => left + ((t(d) - t0) / Math.max(1, t1 - t0)) * (W - left - right);
+  const y = (v) => bottom - ((v - lo) / Math.max(1, hi - lo)) * (bottom - top);
+  const ticks = []; for (let v = lo; v <= hi; v += (hi - lo > 150 ? 50 : 25)) ticks.push(v);
+  const month = (d) => new Date(d).toLocaleString('en-GB', { month: 'short', year: '2-digit' });
+  // End labels: when the two ratings sit close, push the higher one up and the lower one down.
+  const ends = payload.series.map((s) => s.points[s.points.length - 1].elo);
+  const close = Math.abs(y(ends[0]) - y(ends[1])) < 14;
+  const labelNudge = (i) => (close ? (ends[i] >= ends[1 - i] ? -7 : 7) : 0);
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={payload.series.map((s) => `${s.team} ${s.points[s.points.length - 1].elo}`).join(', ')} sx={{ width: '100%' }}>
+        {ticks.map((v) => (
+          <g key={v}>
+            <line x1={left} x2={W - right} y1={y(v)} y2={y(v)} stroke={colors.border} />
+            <text x={left - 6} y={y(v) + 4} textAnchor="end" style={{ ...svgText, fill: colors.textFaint }}>{v}</text>
+          </g>
+        ))}
+        {payload.series.map((s, i) => {
+          const last = s.points[s.points.length - 1];
+          return (
+            <g key={s.team}>
+              <path d={s.points.map((p, k) => `${k ? 'L' : 'M'}${x(p.date)},${y(p.elo)}`).join(' ')} fill="none" stroke={cols[i]} strokeWidth="2" />
+              {s.points.map((p) => (
+                <circle key={p.date} cx={x(p.date)} cy={y(p.elo)} r="3" fill={cols[i]}><title>{`${s.team}, ${p.date}: ${p.elo}${p.won ? ' (won)' : ''}`}</title></circle>
+              ))}
+              <text x={W - right + 6} y={y(last.elo) + 4 + labelNudge(i)} style={{ ...svgText, fill: colors.textHi }}>{last.elo}</text>
+            </g>
+          );
+        })}
+        <text x={left} y={H - 4} style={{ ...svgText, fill: colors.textFaint }}>{month(t0)}</text>
+        <text x={W - right} y={H - 4} textAnchor="end" style={{ ...svgText, fill: colors.textFaint }}>{month(t1)}</text>
+      </Box>
+      <Legend items={teams.map((tm, i) => [tm, cols[i]])} />
+    </Box>
+  );
+};
+
+/** C4: team1's chance of winning after every ball of the last meeting, and both scores. */
+const LastMeeting = ({ payload }) => {
+  const [c1, c2] = pairColors(payload.team1, payload.team2);
+  const path = payload.path || [];
+  const W = 300; const H = 170; const left = 34; const right = 6; const top = 10; const bottom = 150;
+  const x = (i) => left + (i / Math.max(1, path.length - 1)) * (W - left - right);
+  const y = (wp) => bottom - wp * (bottom - top);
+  const brk = path.findIndex((p) => p.innings === 2);
+  const chaser = payload.innings[1]?.side;
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.5 }}>
+      {path.length > 1 && (
+        <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${payload.team1}'s chance of winning, ball by ball`} sx={{ width: '100%' }}>
+          {[0, 0.5, 1].map((v) => (
+            <g key={v}>
+              <line x1={left} x2={W - right} y1={y(v)} y2={y(v)} stroke={v === 0.5 ? colors.textFaint : colors.border} strokeDasharray={v === 0.5 ? '4 4' : undefined} />
+              <text x={left - 6} y={y(v) + 4} textAnchor="end" style={{ ...svgText, fill: colors.textFaint }}>{`${v * 100}%`}</text>
+            </g>
+          ))}
+          {brk > 0 && (
+            <g>
+              <line x1={x(brk)} x2={x(brk)} y1={top} y2={bottom} stroke={colors.textFaint} />
+              <text x={x(brk) + 4} y={top + 10} style={{ ...svgText, fontSize: 11, fill: colors.textLo }}>{`${chaser} chase`}</text>
+            </g>
+          )}
+          <path d={path.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.wp)}`).join(' ')} fill="none" stroke={c1} strokeWidth="2" />
+        </Box>
+      )}
+      <Box sx={{ display: 'grid', gap: 0.75 }}>
+        {payload.innings.map((inn) => (
+          <Box key={inn.innings} sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: inn.side === payload.team1 ? c1 : c2, flexShrink: 0 }} />
+            <Typography sx={{ fontSize: 15, color: colors.textHi, minWidth: 64 }}>{inn.side || '—'}</Typography>
+            <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 24, color: colors.textHi, fontVariantNumeric: 'tabular-nums' }}>
+              {`${inn.runs}/${inn.wickets}`}
+            </Typography>
+            <Typography sx={{ fontSize: 13, color: colors.textLo }}>{`${Math.floor(inn.balls / 6)}.${inn.balls % 6} overs`}</Typography>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+};
+
+/** C6: each side's last XI in batting order. */
+const Xis = ({ payload }) => (
+  <Box sx={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, alignContent: 'center' }}>
+    {payload.sides.map((s) => (
+      <Box key={s.team} sx={{ minWidth: 0 }}>
+        <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.08em', color: colors.accent, textTransform: 'uppercase' }}>{s.team}</Typography>
+        <Typography sx={{ fontSize: 12, color: colors.textLo, mb: 0.75 }} noWrap>
+          {`v ${s.opponent}, ${new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+        </Typography>
+        {s.players.map((p, i) => (
+          <Typography key={p} noWrap sx={{ fontSize: 14, lineHeight: 1.6, color: colors.textMed }}>
+            <Box component="span" sx={{ display: 'inline-block', width: 20, fontFamily: fonts.mono, fontSize: 11, color: colors.textFaint }}>{i + 1}</Box>
+            {p}
+          </Typography>
+        ))}
+      </Box>
+    ))}
+  </Box>
+);
+
 export const VISUALS = {
   stat: Stat,
   par: Par,
@@ -335,6 +539,11 @@ export const VISUALS = {
   pace_spin: PaceSpin,
   boundary_zones: BoundaryZones,
   dismissals: Dismissals,
+  dumbbell: Dumbbell,
+  rank_bars: RankBars,
+  elo_lines: EloLines,
+  last_meeting: LastMeeting,
+  xis: Xis,
   phase_bars: ({ payload }) => <WinningPhases phases={payload.phases} bare />,
   results_split: ({ payload }) => <WinPercentagesPie data={payload} bare />,
   benchmarks: ({ payload }) => <ScoresBarChart data={payload} bare />,

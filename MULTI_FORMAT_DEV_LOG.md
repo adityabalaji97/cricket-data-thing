@@ -22,7 +22,9 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > hypothesis-lab connector work (new dimension columns, raa_lw_per_100). Chunk 4 deployed (v480). Chunk 5 (branch
 > preview-chunk5): services/preview_cards/glance.py (A1 tiles) + ground.py (B1 scatter, B2 worm, B3 phases, B5 pace/spin
 > v the ground's main competition; B6 zones and B8 dismissals only where the ground differs, baselines.json).
-> Next: chunk 6 (the teams).
+> Chunk 5 deployed (v481). Chunk 6 (branch preview-chunk6): services/preview_cards/teams.py (C1 dumbbell + C2 ranks on
+> RAA/100 centred on the competition average, C3 Elo, C4 last meeting with Primer win probability, C6 XIs).
+> Next: chunk 7 (the players).
 >
 > **HYPOTHESIS LAB (2026-10-03), stacked branches lab/0-orient -> lab/1-connector -> lab/2-hypotheses ->
 > lab/3-notes, NOT deployed.** Orientation + data provenance: docs/notes-pipeline.md (the 2015+ CSV feed's

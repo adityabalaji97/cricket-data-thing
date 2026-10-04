@@ -206,6 +206,140 @@ class PreviewContext:
     def ground_dismissals(self) -> List[Dict[str, Any]]:
         return self.deliveries(["dismissal"], all_time=True)
 
+    # -- the two teams ---------------------------------------------------------------------------
+
+    @cached_property
+    def team_names(self) -> Dict[str, List[str]]:
+        """Every spelling of each side, keyed by the side's label (t1 / t2)."""
+        from services.teams import get_all_team_name_variations
+
+        return {self.t1: get_all_team_name_variations(self.team1) or [self.team1],
+                self.t2: get_all_team_name_variations(self.team2) or [self.team2]}
+
+    def side_of(self, team: Optional[str]) -> Optional[str]:
+        return next((label for label, names in self.team_names.items() if team in names), None)
+
+    @cached_property
+    def team_window(self) -> Dict[str, Any]:
+        """The team cards' sample: the fixture's competition over the last two seasons."""
+        from services.competition_normalizer import international_competitions
+
+        end = self.end or date.today()
+        start = date(end.year - 1, 1, 1)
+        comp = self.fixture_competition
+        if not comp:
+            return {}
+        if comp in international_competitions(self.fmt):
+            filters = {"include_international": True, "top_teams": self.top_teams}
+            label = "T20I" if self.fmt == "T20" else self.fmt
+        else:
+            filters = {"leagues": [comp]}
+            label = comp
+        return {"label": label, "start": start, "end": end,
+                "args": {"start_date": start, "end_date": end, "fmt": self.fmt, "gender": self.gender, **filters}}
+
+    def team_query_args(self, group_by: List[str], perspective: str) -> Dict[str, Any]:
+        return {**self.team_window["args"], "group_by": group_by, "metrics_perspective": perspective}
+
+    @cached_property
+    def team_phases(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Every side in the competition, by phase: batting and bowling (query builder)."""
+        from services.query_builder_v2 import run_deliveries_query
+
+        if not self.team_window:
+            return {"bat": [], "bowl": []}
+        return {
+            "bat": run_deliveries_query(self.db, **self.team_query_args(["batting_team", "phase"], "batting"), limit=1000)["data"],
+            "bowl": run_deliveries_query(self.db, **self.team_query_args(["bowling_team", "phase"], "bowling"), limit=1000)["data"],
+        }
+
+    @cached_property
+    def elo_series(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Each side's rating before every match in the fixture's competition over the last year."""
+        from services.competition_aliases import variants_for
+
+        comp = self.fixture_competition
+        if not comp:
+            return {}
+        end = self.end or date.today()
+        out = {}
+        for label, names in self.team_names.items():
+            rows = self.db.execute(text("""
+                SELECT date, team1, team2, team1_elo, team2_elo, winner FROM matches
+                WHERE (team1 = ANY(:names) OR team2 = ANY(:names)) AND competition = ANY(:comps)
+                  AND format = :fmt AND gender = :gender AND date <= :end AND date > :end - INTERVAL '365 days'
+                ORDER BY date
+            """), {"names": names, "comps": variants_for(comp) or [comp], "fmt": self.fmt, "gender": self.gender,
+                   "end": end}).mappings().all()
+            out[label] = [{"date": r["date"].isoformat(),
+                           "elo": r["team1_elo"] if r["team1"] in names else r["team2_elo"],
+                           "won": r["winner"] in names} for r in rows
+                          if (r["team1_elo"] if r["team1"] in names else r["team2_elo"]) is not None]
+        return out
+
+    @cached_property
+    def last_meeting(self) -> Optional[Dict[str, Any]]:
+        """The sides' latest meeting: who batted first, both totals, and the win-probability path."""
+        from services.team_innings import query_team_innings
+
+        a, b = self.team_names[self.t1], self.team_names[self.t2]
+        m = self.db.execute(text("""
+            SELECT id, date, venue, competition, winner FROM matches
+            WHERE ((team1 = ANY(:a) AND team2 = ANY(:b)) OR (team1 = ANY(:b) AND team2 = ANY(:a)))
+              AND format = :fmt AND gender = :gender AND (CAST(:end AS date) IS NULL OR date <= :end)
+            ORDER BY date DESC LIMIT 1
+        """), {"a": a, "b": b, "fmt": self.fmt, "gender": self.gender, "end": self.end}).mappings().first()
+        if not m:
+            return None
+        inns = query_team_innings(
+            self.db, venue=None, start_date=None, end_date=None, leagues=[], teams=[], batting_teams=[],
+            bowling_teams=[], innings=None, match_outcome=[], is_chase=None, toss_decision=[], day_or_night=None,
+            group_by=["innings", "batting_team"], include_international=False, top_teams=None, fmt=self.fmt,
+            gender=self.gender, match_ids=[m["id"]], dimension_filters=[], limit=10, offset=0, ball_level={},
+        )["data"]
+        innings = sorted(({"innings": int(r["innings"]), "side": self.side_of(r["batting_team"]),
+                           "runs": int(r["runs"]), "wickets": int(round(r["avg_wickets"] or 0)),
+                           "balls": int(r["balls"] or 0)} for r in inns), key=lambda r: r["innings"])
+        path = []
+        from services.preview_cards.copy import has_primer
+        if has_primer(self.fmt, self.gender):
+            rows = self.db.execute(text("""
+                SELECT dd.inns, dd.team_bat, bm.wp_after FROM delivery_details dd
+                JOIN ball_metrics bm ON bm.delivery_id = dd.id
+                WHERE dd.p_match = :m AND bm.wp_after IS NOT NULL ORDER BY dd.inns, dd.over, dd.ball, dd.id
+            """), {"m": m["id"]}).mappings().all()
+            # wp_after is the batting side's chance; turn it into team1's.
+            path = [{"innings": int(r["inns"]),
+                     "wp": round(float(r["wp_after"]) if r["team_bat"] in a else 1 - float(r["wp_after"]), 3)}
+                    for r in rows]
+        return {"id": str(m["id"]), "date": m["date"], "venue": m["venue"], "competition": m["competition"],
+                "winner": self.side_of(m["winner"]), "innings": innings, "path": path}
+
+    @cached_property
+    def last_xis(self) -> Dict[str, Dict[str, Any]]:
+        """Each side's XI from its latest match in this format, in batting order."""
+        out = {}
+        for label, names in self.team_names.items():
+            m = self.db.execute(text("""
+                SELECT id, date, team1, team2 FROM matches
+                WHERE (team1 = ANY(:names) OR team2 = ANY(:names)) AND format = :fmt AND gender = :gender
+                  AND (CAST(:end AS date) IS NULL OR date <= :end)
+                ORDER BY date DESC LIMIT 1
+            """), {"names": names, "fmt": self.fmt, "gender": self.gender, "end": self.end}).mappings().first()
+            if not m:
+                continue
+            players = self.db.execute(text("""
+                SELECT striker FROM batting_stats WHERE match_id = :m AND batting_team = ANY(:names)
+                ORDER BY batting_position NULLS LAST, id
+            """), {"m": m["id"], "names": names}).scalars().all()
+            bowlers = self.db.execute(text("""
+                SELECT bowler FROM bowling_stats WHERE match_id = :m AND bowling_team = ANY(:names) ORDER BY id
+            """), {"m": m["id"], "names": names}).scalars().all()
+            xi = list(dict.fromkeys([*players, *bowlers]))
+            opponent = m["team2"] if m["team1"] in names else m["team1"]
+            out[label] = {"date": m["date"], "opponent": opponent, "players": xi[:12]}
+        return out
+
     @cached_property
     def fixture_competition(self) -> Optional[str]:
         """The competition team1 last played in (canonical name): what this fixture most likely is."""

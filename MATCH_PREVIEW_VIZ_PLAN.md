@@ -272,7 +272,7 @@ Module(
 | 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [x] 2026-10-04 signed off (decisions below) |
 | 4 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [x] 2026-10-04 (notes below) |
 | 5 | At a glance and the ground: A1–A2, B1–B8 | [x] 2026-10-04 (notes below; A2 and B7 dropped earlier) |
-| 6 | The teams: C1–C6 | [ ] |
+| 6 | The teams: C1–C6 | [x] 2026-10-04 (notes below) |
 | 7 | The players: D1–D6 (incl. milestones service) | [ ] |
 | 8 | Fantasy: F1–F4 | [ ] |
 | 9 | Outputs: Make a graphic = card core (new layouts), embeds, preview note from cards | [ ] |
@@ -580,6 +580,23 @@ Found while building:
 - Fixed on the way: "1 of the last 1" copy; deep links to a card below the fold now scroll to it; the phase
   card's title and bars round the same way.
 - **Not yet:** a nightly warm-up of the comparison queries (first viewer after a data load pays 0.3–8s).
+
+### Chunk 6 results (2026-10-04)
+- **Measure for C1/C2.** The mockup used Impact per 100, which isn't centred by phase. RAA isn't centred within a
+  league either: it's measured against all men's T20, so every IPL side looked strong with the bat (+12 per 100 in
+  the powerplay) and weak with the ball (−12). C1 subtracts the competition's balls-weighted average, so 0 is an
+  average side in this competition and right is better with bat and ball alike. ODIs use plain runs per 100 balls.
+- **C1 Where it will be won** (dumbbell): both sides by phase, bat and ball, last two seasons of the fixture's
+  competition; the title names the biggest gap.
+- **C2 Phase strength** (rank bars, not radar): ranks among the competition's sides (60+ balls); the most extreme
+  rank names the card; hidden when fewer than 4 sides.
+- **C3 Rating**: Elo before every match in the last 12 months, both sides; "Evenly rated" under 15 points.
+- **C4 Last meeting**: the Primer's ball-by-ball win probability from team 1's side (men's T20), plus both
+  scores; the margin is worked out from the innings, because the 2026 feed leaves `outcome` empty.
+- **C6 Likely XIs**: each side's last match in batting order, then anyone who only bowled (a 12th name is an
+  Impact Player substitute; the info sheet says so).
+- Team colours come from utils/teamColors when both sides have one, they're readable on the dark card and far
+  enough apart; otherwise the validated blue/orange pair.
 
 ### Chunks 5–8: Cards by chapter
 - One card = backend spec + renderer + ODI fallback + info sheet copy + empty state + test.
