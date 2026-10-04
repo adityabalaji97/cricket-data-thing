@@ -269,7 +269,7 @@ Module(
 | 0 | Audit: CARTA scorecard and usage for every current module | [x] 2026-10-04 |
 | 1 | Story shell: card frame (4:5 core), chapters, navigation, auto-hiding chrome, logo menu, settings sheet, deep links, desktop grid | [x] 2026-10-04 |
 | 2 | Module contract and registry; copy rules; ODI fallbacks; wrap existing modules as cards | [x] 2026-10-04 |
-| 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [ ] |
+| 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [~] 2026-10-04 mockups published, awaiting sign-off |
 | 4 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [ ] |
 | 5 | At a glance and the ground: A1–A2, B1–B8 | [ ] |
 | 6 | The teams: C1–C6 | [ ] |
@@ -457,6 +457,20 @@ count the same matches.
   `query_cricket_data`) for an upcoming IPL fixture, a T20I and an ODI. Include a thin-sample
   ground to show the fallbacks.
 - **You sign off before chunks 4–10.** Feedback is folded into this file.
+
+**Chunk 3 mockups (2026-10-04):** https://claude.ai/artifact/G9kSYFDrqSJH4cEEv7PNrf
+
+Contents:
+- 27 cards for MI v CSK at Wankhede, from the full-data copy, the live preview API and IPL
+  credit prices;
+- two ODI fallback cards (Kingsmead, plain stats, small-sample flag);
+- the thin-ground behaviour (Korogi);
+- six decisions for sign-off.
+
+Found while building:
+- The stored Foresight forecast (MI 66%) disagrees with the written preview's lean ("too
+  close to call").
+- The forecast's predicted second-innings score (99.5) isn't credible.
 
 ### Chunk 4: Correctness first
 - Era-aware par and venue averages (IPL `impact_player_era`); show both eras where they differ
