@@ -509,6 +509,21 @@ Found while building:
    - The title states the deviation ("Fine leg gets 1.7× its usual share of boundaries at the
      MCG"). Wankhede doesn't qualify: midwicket takes 19.3% there against 19.5% everywhere.
    - Scripts: `analysis/preview/` (pitch_zone_reliability.py, bowler_pitch_reliability.py, ground_zone_differences.py; run against hindsight_analysis).
+   - **Re-run on the grounds the main leagues use** (IPL, BBL, SA20, T20 Blast, The Hundred, PSL,
+     CPL; 76 grounds since 2022-10-04; `analysis/preview/league_ground_floors.py`). The
+     conclusions hold:
+     - **Pitch map:** 39 of 76 grounds have 2,000+ pace balls with line and length (median
+       2,119). The pattern is stable at 2,000 (0.71), but ground versus all grounds is still
+       about 0.05. B7 stays dropped.
+     - **Boundary zones:** 62 of 76 grounds have 400+ zoned boundaries (all seasons; pattern
+       reliability 0.83). **10 qualify** under the difference rule: the MCG and Perth (fine leg
+       1.5–1.6×), Dharamsala and Chepauk (third man 1.3×), Sydney Showground, St Kitts, Port of
+       Spain and Sabina Park (long on 1.25–1.35×), Derby (point 1.3×) and Geelong (cover 1.3×).
+       Floor: 400 zoned boundaries plus the difference rule.
+     - **Bowler pitch map (D6):** 125 of the 251 pace bowlers with 120+ balls in these leagues
+       over the last two years have 600+ line-and-length balls in all men's T20 in the four-year
+       window (median 596). Floor: 600, across all men's T20 in the window. Counting within the
+       leagues only, just 22 qualify, so the count spans all competitions.
 5. **Fantasy:** value picks (F3) and differentials (F4) for IPL fixtures only; projected points
    and captaincy everywhere.
 
