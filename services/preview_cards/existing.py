@@ -184,7 +184,8 @@ def results_split(ctx) -> Optional[Card]:
         title=title, help="The band is the range the true chase rate probably sits in",
         sample=_venue_sample(ctx, d, "decided match"), n=d,
         payload={"chase_wins": chased, "decided": d, "lo": round(lo * 100), "hi": round(hi * 100),
-                 "within_noise": noise, "notes": notes},
+                 "within_noise": noise, "notes": notes,
+                 "toss": {"chose_chase": sum(1 for t in toss if t == "field"), "known": len(toss)}},
         info=Info(
             what="How often the side chasing has won here, and how sure we can be that it's a real edge.",
             how_to_read="The dot is the share of matches won by the chasing side. The band is the range the "
@@ -238,7 +239,11 @@ def recent_results(ctx) -> Optional[Card]:
     decided = [x for x in matches if x.get("winner") not in (None, "", "-")]
     chased = sum(1 for x in decided if not x.get("won_batting_first"))
     batted = len(decided) - chased
-    if not decided:
+    if m == 1:
+        only = matches[0]
+        title = ("The only match here had no result" if not decided else
+                 f"The only match here was won {'batting first' if only.get('won_batting_first') else 'chasing'}")
+    elif not decided:
         title = f"Recent results at {short_venue(ctx.venue)}"
     elif chased > batted:
         title = f"Chasing sides won {chased} of the last {m} here"
@@ -292,6 +297,7 @@ def form(ctx) -> Optional[Card]:
         return sum(1 for m in results[:5] if m.get("winner") in (code, team_full))
 
     w1, w2 = wins(r1, ctx.team1), wins(r2, ctx.team2)
+    played1, played2 = min(len(r1), 5), min(len(r2), 5)
     if w1 == w2:
         title = f"Both sides have won {w1} of their last 5"
     else:
@@ -300,7 +306,8 @@ def form(ctx) -> Optional[Card]:
     return Card(
         id="form", chapter="teams", visual="form",
         title=title, sample="Last 5 matches each · any opponent", n=min(len(r1), len(r2)) or max(len(r1), len(r2)),
-        payload={"team1": ctx.t1, "team2": ctx.t2, "team1_matches": r1[:5], "team2_matches": r2[:5]},
+        payload={"team1": ctx.t1, "team2": ctx.t2, "team1_matches": r1[:5], "team2_matches": r2[:5],
+                 "wins": [w1, w2], "played": [played1, played2]},
         info=Info(what="Each side's last five results against anyone; tap a result for the match."),
         relevance=1.0 + abs(w1 - w2) / 5,
     )
@@ -316,7 +323,6 @@ EXISTING = (
              sample=SampleRule(hide_below=GROUND_FLOOR)),
     CardSpec("results", "ground", "Does batting first or chasing win here?", results_split,
              sample=SampleRule(hide_below=GROUND_FLOOR), weight=1.2),
-    CardSpec("totals", "ground", "What total wins here?", benchmarks, sample=SampleRule(hide_below=GROUND_FLOOR)),
     CardSpec("recent-results", "ground", "What happened here lately?", recent_results, sample=SampleRule(flag_below=0)),
     CardSpec("head-to-head", "teams", "Who wins when these two meet?", head_to_head),
     CardSpec("form", "teams", "Who's in form?", form, sample=SampleRule(flag_below=0)),

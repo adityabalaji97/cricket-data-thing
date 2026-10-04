@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import StoryCard from './StoryCard';
+import StoryNav from './StoryNav';
 import { GRID_CARD_WIDTH } from './storyLayout';
 import { colors, fonts } from '../../theme/hindsightDark';
 
@@ -9,6 +10,7 @@ import { colors, fonts } from '../../theme/hindsightDark';
  * card (onOpen), so the reading and sharing experience matches the phone.
  */
 const StoryGrid = ({ chapters, onOpen }) => (
+  <StoryNav.Provider value={{ openCard: onOpen }}>
   <Box sx={{ display: 'grid', gap: 4, py: 2 }}>
     {chapters.map((chapter) => (
       <Box key={chapter.id} component="section" aria-label={chapter.title}>
@@ -34,6 +36,7 @@ const StoryGrid = ({ chapters, onOpen }) => (
       </Box>
     ))}
   </Box>
+  </StoryNav.Provider>
 );
 
 export default StoryGrid;

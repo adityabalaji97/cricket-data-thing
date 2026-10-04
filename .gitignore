@@ -80,6 +80,8 @@ data_exports/
 # ...but the multi-format regression goldens are source of truth and must be committed
 !scripts/goldens/endpoints.json
 !scripts/goldens/**/*.json
+# ...and the preview cards' all-grounds baselines (analysis/preview/build_baselines.py), read at import
+!services/preview_cards/baselines.json
 
 .vercel
 .env

@@ -6,6 +6,7 @@ import IosShareRoundedIcon from '@mui/icons-material/IosShareRounded';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import StoryCard from './StoryCard';
 import LogoMenu from './LogoMenu';
+import StoryNav from './StoryNav';
 import { STORY_BOTTOM, STORY_TOP, useStoryCoreSize } from './storyLayout';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { track } from '../../utils/analytics';
@@ -76,15 +77,28 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
   const chapter = chapters[current?.chapterIndex ?? 0];
   const extras = extrasOf(chapter);
 
-  // A new card starts at the top; a link to an extra card scrolls down to it.
+  // A new card starts at the top; a link to an extra card then scrolls down to it. Two effects:
+  // a deep link to an extra card can arrive without the current card changing.
   useEffect(() => {
-    const box = scrollRef.current;
-    if (!box) return;
-    const target = scrollTo && document.getElementById(`story-extra-${scrollTo}`);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [currentId]);
+  useEffect(() => {
+    if (!scrollTo) return;
+    const target = document.getElementById(`story-extra-${scrollTo}`);
     if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start' });
-    else box.scrollTop = 0;
     setScrollTo(null);
-  }, [currentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scrollTo, currentId]);
+
+  // A card's visual can open another card (the "At a glance" tiles).
+  const nav = useMemo(() => ({
+    openCard: (id) => {
+      wanted.current = null;
+      const target = resolve(id);
+      if (!target) return;
+      if (target !== id) setScrollTo(id);
+      setCurrentId(target);
+    },
+  }), [resolve]);
 
   const go = useCallback((delta) => {
     wanted.current = null;
@@ -143,6 +157,7 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
   if (!current) return null;
 
   return (
+    <StoryNav.Provider value={nav}>
     <Box
       ref={scrollRef}
       role="dialog"
@@ -186,7 +201,7 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
           ))}
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.75 }}>
-          <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.08em', color: colors.accent, textTransform: 'uppercase' }}>
+          <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.08em', color: colors.accent, textTransform: 'uppercase', whiteSpace: 'nowrap', flexShrink: 0, mr: 1 }}>
             {chapter.title}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
@@ -260,6 +275,7 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
         </>
       )}
     </Box>
+    </StoryNav.Provider>
   );
 };
 

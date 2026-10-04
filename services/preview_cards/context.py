@@ -20,7 +20,7 @@ from urllib.parse import urlencode
 WEB_URL = "https://hindsightcricket.com"
 
 #: Columns for the per-innings list (team_innings group_by); the rest come with every row.
-INNINGS_GROUP_BY = ["match_id", "innings", "year", "season", "batting_team", "full_length"]
+INNINGS_GROUP_BY = ["match_id", "innings", "year", "season", "competition", "batting_team", "full_length"]
 
 
 @dataclass
@@ -132,6 +132,79 @@ class PreviewContext:
         out = [GroundMatch(id=mid, year=int(inns[1]["year"]), first=inns[1], second=inns.get(2))
                for mid, inns in by_match.items() if 1 in inns]
         return sorted(out, key=lambda m: (m.year, m.id))
+
+    # -- ball-level profiles (query builder, so each card's Data link reproduces it) ------------
+
+    def deliveries(self, group_by: List[str], *, at_ground: bool = True, comparison: bool = False,
+                   all_time: bool = False) -> List[Dict[str, Any]]:
+        """
+        A query-builder query for this preview.
+
+        at_ground + comparison: the ground's matches in its main competition (comparison_scope).
+        comparison without the ground: every ground in that competition, the baseline.
+        all_time: every match at the ground in any competition and season (boundary zones and
+        dismissals, whose ground rule was set on all seasons).
+        """
+        from services.query_builder_v2 import run_deliveries_query
+
+        return run_deliveries_query(self.db, **self.query_args(group_by, at_ground=at_ground, comparison=comparison,
+                                                               all_time=all_time), limit=1000)["data"]
+
+    def query_args(self, group_by: List[str], *, at_ground: bool = True, comparison: bool = False,
+                   all_time: bool = False) -> Dict[str, Any]:
+        args: Dict[str, Any] = {"group_by": list(group_by), "fmt": self.fmt, "gender": self.gender}
+        if at_ground:
+            args["venue"] = self.venue
+        if all_time:
+            return args
+        args.update(start_date=self.start, end_date=self.end, day_or_night=self.day_or_night)
+        if comparison:
+            args.update(self.comparison_scope["filters"])
+        else:
+            args.update({k: v for k, v in self.scope.items() if v})
+        return args
+
+    @cached_property
+    def main_competition(self) -> Optional[str]:
+        """The competition most of the ground's matches in scope belong to (canonical name)."""
+        from collections import Counter
+
+        counts = Counter(m.first.get("competition") for m in self.ground_matches if m.first.get("competition"))
+        return counts.most_common(1)[0][0] if counts else None
+
+    @cached_property
+    def comparison_scope(self) -> Dict[str, Any]:
+        """
+        What the ground is compared with: every ground in its main competition, same window.
+        Like with like, and it reads plainly on a card ("v all IPL grounds").
+        """
+        from services.competition_normalizer import international_competitions
+
+        comp = self.main_competition
+        if not comp:
+            return {"label": None, "filters": {}}
+        if comp in international_competitions(self.fmt):
+            return {"label": "T20Is" if self.fmt == "T20" else f"{self.fmt}s",
+                    "filters": {"include_international": True, "top_teams": self.top_teams}}
+        return {"label": comp, "filters": {"leagues": [comp]}}
+
+    @cached_property
+    def over_profile(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Runs, balls and wickets by over and pace/spin: the ground and its competition."""
+        if not self.comparison_scope["label"]:
+            return {"ground": [], "all": []}
+        return {
+            "ground": self.deliveries(["over", "bowl_kind"], comparison=True),
+            "all": self.deliveries(["over", "bowl_kind"], at_ground=False, comparison=True),
+        }
+
+    @cached_property
+    def ground_zones(self) -> List[Dict[str, Any]]:
+        return self.deliveries(["wagon_zone"], all_time=True)
+
+    @cached_property
+    def ground_dismissals(self) -> List[Dict[str, Any]]:
+        return self.deliveries(["dismissal"], all_time=True)
 
     @cached_property
     def fixture_competition(self) -> Optional[str]:
@@ -249,11 +322,18 @@ class PreviewContext:
     def t2(self) -> str:
         return self.team2_short or self.team2
 
-    def query_url(self, **params: Any) -> str:
-        """A /query link reproducing a card, scoped to this preview's window and format."""
+    def query_url(self, *, args: Optional[Dict[str, Any]] = None, **params: Any) -> str:
+        """
+        A /query link reproducing a card. By default scoped like the ground cards (window, scope);
+        pass `args` (from query_args) for a card built from a different query.
+        """
         pairs = []
-        scope = {k: v for k, v in self.scope.items() if v}
-        base = {"venue": self.venue, "start_date": self.start, "end_date": self.end, **scope, **params}
+        if args is not None:
+            base = {k: v for k, v in args.items() if k not in ("fmt", "gender")}
+            base.update(params)
+        else:
+            scope = {k: v for k, v in self.scope.items() if v}
+            base = {"venue": self.venue, "start_date": self.start, "end_date": self.end, **scope, **params}
         for key, value in base.items():
             if value in (None, [], "", False):
                 continue

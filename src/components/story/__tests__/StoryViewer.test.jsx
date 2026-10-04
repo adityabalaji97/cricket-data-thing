@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import StoryViewer from '../StoryViewer';
+import { toStoryCard } from '../visuals';
 
 const card = (id) => ({ id, title: `Card ${id}`, sample: `${id} sample`, render: () => <div>{`chart ${id}`}</div> });
 const chapters = (ids) => [
@@ -68,6 +69,20 @@ describe('StoryViewer', () => {
     render(<StoryViewer chapters={big} fixtureLabel="x" />);
     expect(visibleTitle()).toBe('Card g1');
     expect(document.getElementById('story-extra-g6')).not.toBeNull();
+  });
+
+  it('opens a card from an At a glance tile', () => {
+    const glance = toStoryCard({
+      id: 'glance', title: 'Par about 212', sample: 's', visual: 'tiles',
+      payload: { tiles: [{ card: 't1', label: 'Head to head', value: '4–1', sub: 'CSK lead' }] },
+    }, { isMobile: true });
+    const story = [
+      { id: 'glance', title: 'At a glance', cards: [glance] },
+      { id: 't', title: 'The teams', cards: ['t0', 't1'].map(card) },
+    ];
+    render(<StoryViewer chapters={story} fixtureLabel="x" />);
+    fireEvent.click(screen.getByRole('button', { name: /Head to head: 4–1, CSK lead/ }));
+    expect(visibleTitle()).toBe('Card t1');
   });
 
   it('mounts only the current card and its neighbours', () => {

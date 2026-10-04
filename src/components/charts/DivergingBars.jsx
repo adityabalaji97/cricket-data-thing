@@ -11,7 +11,8 @@ import { DIVERGING, MIN_BALLS } from '../../theme/chartDefaults';
  * for every row, symmetric around zero, so bar lengths compare honestly.
  *
  * rows: [{ key, label, group?, value, sample? }]. `group` prints a heading row when it changes
- * (e.g. Powerplay / Middle / Death above "v pace" / "v spin").
+ * (e.g. Powerplay / Middle / Death above "v pace" / "v spin"). `span` fixes the scale (a value of
+ * `span` fills half the width), so small differences stay small; by default the largest value does.
  */
 const DivergingBars = ({
   rows,
@@ -20,10 +21,11 @@ const DivergingBars = ({
   minSample = MIN_BALLS,
   labelWidth = 72,
   ariaLabel,
+  span,
 }) => {
   const valid = rows.filter((r) => r.value != null && !Number.isNaN(Number(r.value)));
   if (!valid.length) return null;
-  const max = Math.max(...valid.map((r) => Math.abs(Number(r.value))), 1e-9);
+  const max = Math.max(span || 0, ...valid.map((r) => Math.abs(Number(r.value))), 1e-9);
   let lastGroup = null;
 
   return (
