@@ -72,8 +72,11 @@
         "chase_outcome": [],
         "control": null,
         "crease_combo": [],
+        "dimension_filters": [],
         "dismissal": [],
         "end_date": "2014-12-31",
+        "exclude_batters": [],
+        "exclude_bowlers": [],
         "group_by": [
           "phase"
         ],
@@ -82,8 +85,10 @@
         "leagues": [],
         "length": [],
         "line": [],
+        "match_ids": [],
         "match_outcome": [],
         "max_wickets": null,
+        "metrics_perspective": null,
         "min_wickets": null,
         "over_range": null,
         "players": [],

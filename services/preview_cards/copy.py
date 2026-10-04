@@ -54,7 +54,12 @@ _PLURALS = {"match": "matches", "innings": "innings", "six": "sixes"}
 
 
 def plural(n: int, word: str) -> str:
-    return f"{n} {word}" if n == 1 else f"{n} {_PLURALS.get(word, word + 's')}"
+    """'1 match', '3 matches', '2 decided matches': the last word of a phrase takes the plural."""
+    if n == 1:
+        return f"{n} {word}"
+    head, _, last = word.rpartition(" ")
+    many = _PLURALS.get(last, last + "s")
+    return f"{n} {head + ' ' if head else ''}{many}"
 
 
 def leader_line(team_a: str, a: int, team_b: str, b: int) -> Tuple[str, Optional[str]]:

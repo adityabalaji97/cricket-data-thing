@@ -270,7 +270,7 @@ Module(
 | 1 | Story shell: card frame (4:5 core), chapters, navigation, auto-hiding chrome, logo menu, settings sheet, deep links, desktop grid | [x] 2026-10-04 |
 | 2 | Module contract and registry; copy rules; ODI fallbacks; wrap existing modules as cards | [x] 2026-10-04 |
 | 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [x] 2026-10-04 signed off (decisions below) |
-| 4 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [ ] |
+| 4 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [x] 2026-10-04 (notes below) |
 | 5 | At a glance and the ground: A1–A2, B1–B8 | [ ] |
 | 6 | The teams: C1–C6 | [ ] |
 | 7 | The players: D1–D6 (incl. milestones service) | [ ] |
@@ -535,6 +535,28 @@ Found while building:
 - Key Battles evidence rule: within-player RAA vs baseline, min balls, no handedness templates.
 - Death bowling leaders on leverage-weighted RAA, economy alongside.
 - **Acceptance:** golden diffs limited to the intended fields; new tests per rule.
+
+### Chunk 4 results (2026-10-04)
+- **One match set.** Every ground card (results, totals, winning phases) counts `ctx.ground_matches`: one row per
+  innings at the ground from the query builder's team_innings mode. The scope lists the domestic competitions
+  played there plus top internationals. The classic venue record read "no leagues" as every domestic league, the
+  query builder as none, so the old Data links opened a different set from the card. The links now carry the
+  same scope.
+- **Par is the Primer's** (`match_par`): the fixture's competition at this ground, latest season, with par by
+  season drawn under the number. T20I par is set by country and season, so the title says "Par for a T20I in
+  India". ODIs (no Primer) use the average complete first innings; seasons with under 3 innings aren't drawn.
+- **Chase card** (B4, as drawn): 95% Wilson band, "Within noise" or "A real edge", plus the record over the last
+  two seasons and how often toss winners chose to chase. The results pie is gone from the story.
+- **Floors.** Ground records need 10 matches (results, totals) or 10 wins (winning phases). Par has no floor: the
+  Primer shrinks a thin ground toward its league and season, which is the similar-venue fallback for par.
+  Rain-shortened first innings are left out of totals and phases but still count as results.
+- **Copy.** "MI won their only meeting"; recent results count every match shown ("won 2 of the last 4"), no
+  "even split over the last 4" under a "Last 5" footer; plurals ("decided matches").
+- **Story viewer.** Swiping covers each chapter's 4 most relevant cards; the rest sit below the current card with
+  their own Data and Share ("More in this chapter (n)"). Cards are top-aligned.
+- **Moved to the chunk that builds the card:** Key Battles evidence rule (D1, chunk 7), death-bowling leaders on
+  leverage-weighted RAA (D2, chunk 7), similar-ground fallback for ground records (B1 dot strip, chunk 5). Fixing
+  them on the classic page now would mean doing them twice.
 
 ### Chunks 5–8: Cards by chapter
 - One card = backend spec + renderer + ODI fallback + info sheet copy + empty state + test.

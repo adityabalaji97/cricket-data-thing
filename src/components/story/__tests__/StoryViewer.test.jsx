@@ -46,6 +46,30 @@ describe('StoryViewer', () => {
     expect(visibleTitle()).toBe('Card c');
   });
 
+  it('swipes through 4 cards per chapter and puts the rest below the current card', () => {
+    const big = [
+      { id: 'g', title: 'The ground', cards: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'].map(card) },
+      { id: 't', title: 'The teams', cards: ['t1'].map(card) },
+    ];
+    render(<StoryViewer chapters={big} fixtureLabel="x" />);
+    expect(screen.getByText('More in this chapter (2)')).toBeInTheDocument();
+    expect(screen.getByText('chart g5')).toBeInTheDocument();
+    expect(screen.getByText('chart g6')).toBeInTheDocument();
+    ['g2', 'g3', 'g4', 't1'].forEach((next) => {
+      fireEvent.keyDown(window, { key: 'ArrowRight' });
+      expect(visibleTitle()).toBe(`Card ${next}`);
+    });
+    expect(screen.queryByText('More in this chapter (2)')).not.toBeInTheDocument();
+  });
+
+  it('opens a link to an extra card on its chapter', () => {
+    window.history.replaceState(null, '', '/venue?story=1#g6');
+    const big = [{ id: 'g', title: 'The ground', cards: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'].map(card) }];
+    render(<StoryViewer chapters={big} fixtureLabel="x" />);
+    expect(visibleTitle()).toBe('Card g1');
+    expect(document.getElementById('story-extra-g6')).not.toBeNull();
+  });
+
   it('mounts only the current card and its neighbours', () => {
     render(<StoryViewer chapters={chapters(['a', 'b', 'c', 'd'])} fixtureLabel="x" />);
     expect(screen.getByText('chart a')).toBeInTheDocument();

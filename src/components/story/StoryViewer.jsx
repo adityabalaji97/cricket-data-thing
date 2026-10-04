@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import { Box, Button, IconButton, Typography } from '@mui/material';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import IosShareRoundedIcon from '@mui/icons-material/IosShareRounded';
@@ -11,10 +12,16 @@ import { track } from '../../utils/analytics';
 
 const SWIPE_PX = 50;
 
-/** Flatten chapters into one ordered list of cards, remembering each card's chapter. */
+/** Cards per chapter in the sideways sequence; the rest of a chapter sits below, scrolling down. */
+export const FEATURED_PER_CHAPTER = 4;
+
+/** The sideways sequence: each chapter's featured cards (cards arrive ranked), in chapter order. */
 export const flattenChapters = (chapters) =>
   chapters.flatMap((chapter, chapterIndex) =>
-    chapter.cards.map((card, indexInChapter) => ({ ...card, chapterIndex, indexInChapter })));
+    chapter.cards.slice(0, FEATURED_PER_CHAPTER).map((card, indexInChapter) => ({ ...card, chapterIndex, indexInChapter })));
+
+/** Cards below the featured ones, by chapter index. */
+const extrasOf = (chapter) => (chapter?.cards || []).slice(FEATURED_PER_CHAPTER);
 
 const hashCardId = () => (window.location.hash || '').replace(/^#/, '') || null;
 
@@ -22,13 +29,27 @@ const hashCardId = () => (window.location.hash || '').replace(/^#/, '') || null;
  * Story-style preview: one card per screen, chapters with progress segments, tap the left/right
  * edge or swipe sideways to move, arrow keys on a keyboard, no auto-advance. The middle of the
  * card is left to the chart (its taps open detail sheets). Covers the app's own top and bottom
- * bars while open; the floating logo button opens the chapter index and settings.
+ * bars while open; the logo at the end of the action row opens the chapter index and settings.
  *
- * Only the current card and its neighbours are mounted (CARTA Timely). Each card has its own
- * URL hash, so a shared link opens on that card.
+ * Sideways runs through each chapter's FEATURED_PER_CHAPTER most distinctive cards; the rest of
+ * the chapter sits below the current card, each a full card, for whoever scrolls down.
+ *
+ * Only the current card, its neighbours and the current chapter's extra cards are mounted (CARTA
+ * Timely). Each card has its own URL hash, so a shared link opens on that card.
  */
 const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings, onClassic }) => {
   const cards = useMemo(() => flattenChapters(chapters), [chapters]);
+  // An extra card's link opens its chapter's first card and scrolls down to it.
+  const ownerOf = useMemo(() => {
+    const owners = {};
+    chapters.forEach((chapter) => {
+      extrasOf(chapter).forEach((extra) => { owners[extra.id] = chapter.cards[0]?.id; });
+    });
+    return owners;
+  }, [chapters]);
+  const resolve = useCallback((id) => (cards.some((c) => c.id === id) ? id : ownerOf[id] || null), [cards, ownerOf]);
+  const scrollRef = useRef(null);
+  const [scrollTo, setScrollTo] = useState(null);
   // The card asked for (deep link or grid click). Cards arrive as their data loads, so a card
   // that is not there yet is remembered and opened when it appears -- unless the reader has
   // already moved on.
@@ -36,13 +57,15 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
   // Position is tracked by card id, not index: cards arriving later can be inserted ahead of the
   // one on screen, and an index would then point at a different card.
   const wanted = useRef(startCardId || hashCardId());
-  const [currentId, setCurrentId] = useState(() => (cards.some((c) => c.id === wanted.current) ? wanted.current : null));
+  const [currentId, setCurrentId] = useState(() => resolve(wanted.current));
   useEffect(() => {
-    if (wanted.current && cards.some((c) => c.id === wanted.current)) {
-      setCurrentId(wanted.current);
+    const target = wanted.current && resolve(wanted.current);
+    if (target) {
+      if (target !== wanted.current) setScrollTo(wanted.current);
+      setCurrentId(target);
       wanted.current = null;
     }
-  }, [cards]);
+  }, [resolve]);
   const found = cards.findIndex((c) => c.id === currentId);
   const index = found >= 0 ? found : 0;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -51,6 +74,17 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
 
   const current = cards[index];
   const chapter = chapters[current?.chapterIndex ?? 0];
+  const extras = extrasOf(chapter);
+
+  // A new card starts at the top; a link to an extra card scrolls down to it.
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box) return;
+    const target = scrollTo && document.getElementById(`story-extra-${scrollTo}`);
+    if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start' });
+    else box.scrollTop = 0;
+    setScrollTo(null);
+  }, [currentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = useCallback((delta) => {
     wanted.current = null;
@@ -97,11 +131,11 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
     if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
   };
 
-  const share = async () => {
-    track('card_share', { card: current.id });
-    const url = `${window.location.origin}${window.location.pathname}${window.location.search}#${current.id}`;
+  const share = async (card) => {
+    track('card_share', { card: card.id });
+    const url = `${window.location.origin}${window.location.pathname}${window.location.search}#${card.id}`;
     try {
-      if (navigator.share) await navigator.share({ title: current.title, url });
+      if (navigator.share) await navigator.share({ title: card.title, url });
       else await navigator.clipboard.writeText(url);
     } catch (err) { /* dismissed */ }
   };
@@ -110,6 +144,7 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
 
   return (
     <Box
+      ref={scrollRef}
       role="dialog"
       aria-label={`Match preview: ${chapter.title}`}
       onPointerDown={onPointerDown}
@@ -122,7 +157,10 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        // Top-aligned: spare height on tall phones goes below the card, to the chapter's extras.
+        justifyContent: 'flex-start',
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
         pt: 'env(safe-area-inset-top, 0px)',
         pb: 'env(safe-area-inset-bottom, 0px)',
         touchAction: 'pan-y',
@@ -131,7 +169,7 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
     >
       {/* One progress bar for the whole story: a block per chapter (wider gaps between chapters),
           a segment per card. Outside the share crop. */}
-      <Box sx={{ width, height: STORY_TOP, pt: 1, flexShrink: 0 }}>
+      <Box sx={{ width, height: STORY_TOP, pt: 1, flexShrink: 0, position: 'sticky', top: 0, zIndex: 1, bgcolor: colors.bg }}>
         <Box sx={{ display: 'flex', gap: 1 }} aria-label={`Card ${index + 1} of ${cards.length}`}>
           {chapters.map((ch, ci) => (
             <Box key={ch.id} sx={{ flex: ch.cards.length, display: 'flex', gap: '2px' }}>
@@ -186,38 +224,64 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
       </Box>
 
       {/* One row, outside the share crop: Data and Share, then the logo (chapters, settings). */}
-      <Box data-story-noswipe sx={{ width, height: STORY_BOTTOM, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
-        {current.queryUrl && (
-          <Button
-            href={current.queryUrl}
-            startIcon={<TableChartOutlinedIcon />}
-            aria-label="See the data in the query builder"
-            sx={{ minHeight: 40, color: colors.textMed, textTransform: 'none', fontSize: 14 }}
-          >
-            Data
-          </Button>
-        )}
-        <Button onClick={share} startIcon={<IosShareRoundedIcon />} sx={{ minHeight: 40, color: colors.textMed, textTransform: 'none', fontSize: 14 }}>
-          Share
-        </Button>
-        <Box sx={{ ml: 'auto' }} />
-      <LogoMenu
-        open={menuOpen}
-        onOpen={() => setMenuOpen(true)}
-        onClose={() => setMenuOpen(false)}
-        chapters={chapters}
-        currentChapter={current.chapterIndex}
-        onJump={(chapterIndex) => {
-          wanted.current = null;
-          setCurrentId(cards.find((c) => c.chapterIndex === chapterIndex)?.id || null);
-          setMenuOpen(false);
-        }}
-        onSettings={onSettings ? () => { setMenuOpen(false); onSettings(); } : undefined}
-        onClassic={onClassic ? () => { setMenuOpen(false); onClassic(); } : undefined}
-      />
-      </Box>
+      <ActionRow card={current} width={width} onShare={share}>
+        <LogoMenu
+          open={menuOpen}
+          onOpen={() => setMenuOpen(true)}
+          onClose={() => setMenuOpen(false)}
+          chapters={chapters}
+          currentChapter={current.chapterIndex}
+          onJump={(chapterIndex) => {
+            wanted.current = null;
+            setCurrentId(cards.find((c) => c.chapterIndex === chapterIndex)?.id || null);
+            setMenuOpen(false);
+          }}
+          onSettings={onSettings ? () => { setMenuOpen(false); onSettings(); } : undefined}
+          onClassic={onClassic ? () => { setMenuOpen(false); onClassic(); } : undefined}
+        />
+      </ActionRow>
+
+      {extras.length > 0 && (
+        <>
+          <Box sx={{ width, display: 'flex', alignItems: 'center', gap: 0.5, color: colors.textLo, pb: 2 }}>
+            <KeyboardArrowDownRoundedIcon fontSize="small" />
+            <Typography sx={{ fontSize: 13, color: colors.textLo }}>
+              More in this chapter ({extras.length})
+            </Typography>
+          </Box>
+          {extras.map((card) => (
+            <Box key={card.id} id={`story-extra-${card.id}`} sx={{ width, flexShrink: 0, scrollMarginTop: `${STORY_TOP}px` }}>
+              <Box sx={{ width, height, position: 'relative' }}>
+                <StoryCard card={card} width={width} height={height} />
+              </Box>
+              <ActionRow card={card} width={width} onShare={share} />
+            </Box>
+          ))}
+        </>
+      )}
     </Box>
   );
 };
+
+/** Data and Share for a card, outside its share crop; `children` (the logo) sits at the end. */
+const ActionRow = ({ card, width, onShare, children }) => (
+  <Box data-story-noswipe sx={{ width, height: STORY_BOTTOM, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
+    {card.queryUrl && (
+      <Button
+        href={card.queryUrl}
+        startIcon={<TableChartOutlinedIcon />}
+        aria-label="See the data in the query builder"
+        sx={{ minHeight: 40, color: colors.textMed, textTransform: 'none', fontSize: 14 }}
+      >
+        Data
+      </Button>
+    )}
+    <Button onClick={() => onShare(card)} startIcon={<IosShareRoundedIcon />} sx={{ minHeight: 40, color: colors.textMed, textTransform: 'none', fontSize: 14 }}>
+      Share
+    </Button>
+    <Box sx={{ ml: 'auto' }} />
+    {children}
+  </Box>
+);
 
 export default StoryViewer;

@@ -78,7 +78,7 @@ class CardSpec:
         card = self.build(ctx)
         if card is None or card.n < self.sample.hide_below:
             return None
-        card.small_sample = card.n < self.sample.flag_below
+        card.small_sample = card.small_sample or card.n < self.sample.flag_below
         # Thin samples sink within the chapter; distinctiveness is set by the builder.
         card.relevance = round(self.weight * card.relevance * min(1.0, 0.4 + card.n / 50.0), 4)
         return card

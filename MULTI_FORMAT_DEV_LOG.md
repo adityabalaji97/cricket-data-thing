@@ -11,6 +11,17 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **MATCH PREVIEW STORY (2026-10-04), plan + tracker MATCH_PREVIEW_VIZ_PLAN.md.** PRs #40-#44 live (story behind
+> `?story=1`, card registry GET /match-preview/{venue}/{t1}/{t2}/cards, services/preview_cards, Foresight removed
+> from the UI). Chunk 4 (branch preview-chunk4): every ground card counts one match set, ctx.ground_matches (query
+> builder team_innings at the ground, scope = the domestic competitions played there + top internationals, and the
+> Data links carry that same scope); par = T20 Primer match_par for the fixture's competition and latest season
+> (T20I par is by country), ODI fallback = average complete first innings; chase card = Wilson 95% band +
+> "within noise"; ground records hidden under 10 matches; story viewer caps each chapter at 4 swipeable cards with
+> the rest scrolling below. Local goldens re-captured: 7 query-builder goldens only had additive keys from the
+> hypothesis-lab connector work (new dimension columns, raa_lw_per_100). Next: chunk 5 ("At a glance" tile grid,
+> ground cards B1-B8).
+>
 > **HYPOTHESIS LAB (2026-10-03), stacked branches lab/0-orient -> lab/1-connector -> lab/2-hypotheses ->
 > lab/3-notes, NOT deployed.** Orientation + data provenance: docs/notes-pipeline.md (the 2015+ CSV feed's
 > provider is not named in the repo). Phase 1: services/query_dimensions.py (bowler_over_number,
