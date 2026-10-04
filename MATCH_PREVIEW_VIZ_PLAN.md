@@ -266,7 +266,7 @@ Module(
 
 | # | Chunk | Status |
 |---|---|---|
-| 0 | Audit: CARTA scorecard and usage for every current module | [ ] |
+| 0 | Audit: CARTA scorecard and usage for every current module | [x] 2026-10-04 |
 | 1 | Story shell: card frame (4:5 core), chapters, navigation, auto-hiding chrome, logo menu, settings sheet, deep links, desktop grid | [ ] |
 | 2 | Module contract and registry; copy rules; ODI fallbacks; wrap existing modules as cards | [ ] |
 | 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [ ] |
@@ -315,6 +315,66 @@ tap left 20% = previous · tap right 20% = next · middle = chart taps · swipe 
   and era splits.
 - **Output:** the audit table, plus a confirmed keep/change/remove list (section 2 is the
   proposal).
+
+### Chunk 0 results (2026-10-04)
+
+**How it was audited:**
+- the live site, after the v478 deploy;
+- `ui_sweep.mjs` at 360, 390 and 768 px on Wankhede (IPL), Kingsmead (ODI) and Korogi (4 T20s,
+  the thin-data case);
+- `app_events` for the last 30 days;
+- claims re-checked on the full-data copy.
+
+**Automated checks.** No overflow, no low contrast, no rotated labels and no text under 11px at
+any width. Tap targets under 32px: 7 on phones (filter inputs at 28px, the Credits link) and
+81–86 at 768px (autocomplete Clear/Open buttons at 31px).
+
+**Usage.**
+- `/venue` had 415 views from 398 visitors in 30 days: about one view each, and **zero shares**.
+  For comparison, `/player` had 2,121 views and 14 graphics were made site-wide.
+- **No per-section events exist**, so module-level relevance can't be measured yet.
+  Chunk 2 adds `card_view`, `card_share` and `card_info` events.
+
+**Claims checked:**
+- "Chasing sides have won 29 of 49 matches at Wankhede." On the full data it's 32 of 59, 54%
+  (95% CI 42–66%, p = 0.60): **within noise, but stated as a venue trait.**
+- Wankhede's average first innings was 167 before 2023 (21 innings) and 193 since (38 innings).
+  The preview shows a blended **183, about 10 runs under the current era.**
+- Several bullets rest on tiny samples:
+  - "MI reached the average winning total in 0 of their last 2 innings" (n = 2);
+  - "SKY 41 off 12 vs Foulkes" (12 balls);
+  - Korogi's leaders, e.g. "Hasan Nawaz average 123" from 2 innings.
+
+  None are flagged.
+- The fantasy table shows "Confidence 90%" for every player, which tells the reader nothing.
+
+**Module scorecard.** ✓ = passes; ✗ = fails; ~ = partly. Columns: C = Complete, A = Accurate,
+R = Relevant, T = Timely, Ac = Accessible.
+
+| Current module | C | A | R | T | Ac | Notes | Becomes |
+|---|---|---|---|---|---|---|---|
+| What to expect (par + toss cards) | ~ | ✗ | ✓ | ✓ | ✗ | par mixes eras; toss card cut off in a sideways scroller | A1 |
+| How winning innings were built (stacked phase bars) | ✗ | ✓ | ✓ | ✓ | ✓ | good chart; no sample shown | **keep as B-card (stacked)**, add sample |
+| Summary: results split bar | ✓ | ✗ | ~ | ✓ | ✓ | no interval; shows 2–2 at Korogi as if meaningful | B4 (stat + interval) |
+| What total wins here (dot strip) | ✗ | ✗ | ✓ | ✓ | ✓ | no sample, era-mixed; still a clear visual | B1 (scatter), dot strip as thin-sample fallback |
+| Phase-wise strategy ("55-1" blocks) | ✗ | ~ | ✗ | ✓ | ~ | no units or takeaway; hard for a casual reader | B3 (diverging) |
+| Full preview (AI text) | ~ | ✗ | ~ | ✓ | ✓ | unqualified noise claims (above); long | closing card; facts pass sample rules |
+| Head to head | ✓ | ~ | ✓ | ✓ | ✓ | 5 matches; flag | C5 |
+| Recent at venue (list) | ✓ | ✓ | ✓ | ✓ | ✓ | fits a card already | **keep** (ground chapter) |
+| Form chips | ✓ | ✓ | ✓ | ✓ | ✓ | | C3 (with Elo line) |
+| Playing XIs and toss / Matchup matrix axes | — | — | — | — | ~ | controls, not charts | settings sheet |
+| Fantasy top picks (table) | ~ | ✗ | ✓ | ✓ | ✓ | uniform "90% confidence" | F1–F2 |
+| Key battles (diverging bars) | ✓ | ✗ | ✓ | ✓ | ✓ | 12-ball minimum; strike rate only | D1 (evidence rule) |
+| Boundaries (cards + table) | ~ | ✓ | ~ | ✓ | ✗ | table scrolls sideways (cut at "BO…"); "bpb" jargon | B5 (stacked, plain words) |
+| Leaders (tables) | ✓ | ✗ | ~ | ✓ | ✓ | no sample floor (avg 123 from 2 innings) | D2 lists + full tables in sheet |
+| Explore | ✓ | ✓ | ~ | ✓ | ✓ | | closing card |
+
+**Changes to section 2 from the audit:**
+- "How winning innings were built" and "Recent at venue" are kept as ground cards (they were
+  missing from the plan).
+- The dot strip stays as the thin-sample fallback for B1.
+- Fantasy and Key Battles are **changes**, not new: their components exist.
+- Sample floors are the most urgent fix (chunk 4). Era-aware par goes with them.
 
 ### Chunk 1: Story shell
 - `src/components/story/`: `StoryViewer` (chapters, progress segments, edge tap zones, sideways
