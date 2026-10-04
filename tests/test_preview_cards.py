@@ -32,8 +32,25 @@ def _ground(n_bat=15, n_chase=13, years=(2022, 2023, 2024, 2025, 2026)):
     return out
 
 
+def _profile(rpo_by_phase, innings=40, spin_share=(0.1, 0.6, 0.1)):
+    """An over x bowl_kind profile: `innings` innings, each phase at the given runs per over."""
+    rows = []
+    for over in range(20):
+        ph = 0 if over < 6 else 1 if over < 15 else 2
+        spin = round(innings * spin_share[ph])
+        for kind, inns in (("spin bowler", spin), ("pace bowler", innings - spin)):
+            if inns:
+                rows.append({"over": over, "bowl_kind": kind, "innings_count": inns, "balls": 6 * inns,
+                             "runs": rpo_by_phase[ph] * inns, "wickets": 0.3 * inns})
+    return rows
+
+
+def _zones(shares, n=1000):
+    return [{"wagon_zone": z, "fours": round(n * sh), "sixes": 0} for z, sh in shares.items()]
+
+
 def _ctx(ground=None, h2h=(1, 4, 0), fmt="T20", par_series=((2024, 189, 7), (2025, 180, 7), (2026, 212, 7)),
-         international=False):
+         international=False, here=(9, 8, 11), everywhere=(8.5, 8, 10), zones=None, outs=None):
     ctx = PreviewContext(db=None, venue="Wankhede Stadium, Mumbai", team1="Mumbai Indians", team2="Chennai Super Kings",
                          fmt=fmt, start=date(2022, 1, 1), end=date(2026, 10, 4), team1_short="MI", team2_short="CSK")
     history = {
@@ -53,6 +70,9 @@ def _ctx(ground=None, h2h=(1, 4, 0), fmt="T20", par_series=((2024, 189, 7), (202
         history=history, primer_par=primer if fmt == "T20" else None,
         ground_matches=_ground() if ground is None else ground,
         scope={"leagues": ["IPL"], "include_international": True, "top_teams": 20},
+        main_competition="IPL", comparison_scope={"label": "IPL", "filters": {"leagues": ["IPL"]}},
+        over_profile={"ground": _profile(here), "all": _profile(everywhere, innings=400)},
+        ground_zones=zones or [], ground_dismissals=outs or [],
     )
     return ctx
 
@@ -67,7 +87,8 @@ def test_titles_state_the_finding():
     assert cards["par"]["payload"]["caption"] == "Up from 189 in 2024."
     assert cards["results"]["title"] == "Batting first is no clear edge here: 15 of 28 won"
     assert cards["winning-phases"]["title"] == "Winning sides here cut loose at the death"
-    assert cards["totals"]["title"] == "190 has been defended here, and 212 chased"
+    assert cards["totals"]["title"] == "Nobody has posted 210 here since 2023"
+    assert cards["glance"]["title"] == "Par about 212, no clear edge for batting first"
     assert cards["head-to-head"]["title"] == "CSK lead 4–1 in their last 5 meetings"
     assert cards["form"]["title"] == "MI come in with 2 wins from their last 5"
     # A no-result counts towards neither side, and the title counts all the matches shown.
@@ -77,7 +98,7 @@ def test_titles_state_the_finding():
 def test_ground_cards_count_the_same_matches():
     cards = _cards(build_story(_ctx()))
     assert cards["results"]["payload"]["decided"] == 28
-    assert cards["totals"]["payload"]["total_matches"] == 28
+    assert len(cards["totals"]["payload"]["points"]) == 28
     assert cards["winning-phases"]["n"] == 28
     assert cards["results"]["sample"] == "28 decided matches at Wankhede Stadium · 2022–26"
 
@@ -87,8 +108,8 @@ def test_rain_shortened_and_no_result_matches():
                           _match(901, 2026, 120, 0, chase_won=False, no_result=True)]
     cards = _cards(build_story(_ctx(ground=ground)))
     assert cards["results"]["payload"]["decided"] == 29       # the rain-cut chase still has a winner
-    assert cards["totals"]["payload"]["lowest_total_defended"] == 190  # but a 90 in 8 overs is no benchmark
-    assert cards["totals"]["payload"]["total_matches"] == 29  # the no-result ran its full first innings
+    totals = [p["total"] for p in cards["totals"]["payload"]["points"]]
+    assert 90 not in totals and len(totals) == 28  # a 90 in 8 overs is no benchmark; the no-result has no result
 
 
 def test_chase_record_carries_its_likely_range():
@@ -162,3 +183,73 @@ def test_sample_rule_hides_below_floor():
     spec = CardSpec("x", "ground", "?", lambda ctx: Card("x", "ground", "stat", "t", "s", {}, 2, Info("w")),
                     sample=SampleRule(hide_below=3))
     assert spec.make(SimpleNamespace(fmt="T20")) is None
+
+
+def test_totals_falls_back_to_benchmarks_on_a_thinner_ground():
+    cards = _cards(build_story(_ctx(ground=_ground(n_bat=8, n_chase=7))))
+    assert cards["totals"]["visual"] == "benchmarks"
+    assert cards["totals"]["title"] == "190 has been defended here, and 206 chased"
+
+
+def test_ground_against_its_competition():
+    cards = _cards(build_story(_ctx()))
+    shape = cards["innings-shape"]
+    # +0.5 an over for 6 overs, level for 9, +1 for 5: 8 runs ahead after 20.
+    assert shape["title"] == "An innings here is about 8 runs ahead of the IPL by the 20th over"
+    assert shape["payload"]["here"][-1] - shape["payload"]["all"][-1] == 8
+    assert shape["sample"] == "40 innings at Wankhede Stadium v all IPL grounds · 2022–26"
+    assert cards["phases"]["title"] == "Runs come faster here in the death overs (+1.0 an over)"
+    assert cards["pace-spin"]["title"] == "Spin bowls 60% of the middle overs here, about the IPL norm"
+
+
+def test_innings_count_adds_pace_and_spin_rows():
+    # Same run rate everywhere, different pace/spin split: the worm must not move.
+    ctx = _ctx()
+    ctx.__dict__["over_profile"] = {"ground": _profile((8, 8, 8), spin_share=(0.5, 0.5, 0.5)),
+                                    "all": _profile((8, 8, 8), innings=400, spin_share=(0.1, 0.1, 0.1))}
+    shape = _cards(build_story(ctx))["innings-shape"]
+    assert shape["payload"]["here"] == shape["payload"]["all"]
+    assert shape["title"] == "An innings here tracks the IPL average, over by over"
+
+
+def test_boundary_zones_only_where_the_ground_differs():
+    from services.preview_cards.ground import BASELINES
+    usual = {int(z): sh for z, sh in BASELINES["boundary_zones"]["share"].items()}
+    assert "boundary-zones" not in _cards(build_story(_ctx(zones=_zones(usual))))
+    skewed = dict(usual)
+    skewed[1] += 0.05
+    skewed[6] -= 0.05
+    card = _cards(build_story(_ctx(zones=_zones(skewed))))["boundary-zones"]
+    assert card["title"] == "Fine leg gets 1.6× its usual share of boundaries here"
+    assert "Boundaries" in [t["label"] for t in _cards(build_story(_ctx(zones=_zones(skewed))))["glance"]["payload"]["tiles"]]
+
+
+def test_dismissals_need_a_real_gap_not_just_significance():
+    from services.preview_cards.ground import BASELINES
+    usual = BASELINES["dismissals"]["share"]
+
+    def outs(shares, n=4000):
+        raw = {"caught": "caught", "bowled": "bowled", "lbw": "leg before wicket", "other": "stumped"}
+        return [{"dismissal": raw[k], "wickets": round(n * v)} for k, v in shares.items()]
+
+    # "other" 3.2% -> 4.4%: significant on 4,000 wickets, 1.4x, but only 1.2 points: no card.
+    small = {**usual, "other": usual["other"] + 0.012, "caught": usual["caught"] - 0.012}
+    assert "dismissals" not in _cards(build_story(_ctx(outs=outs(small))))
+    big = {**usual, "lbw": usual["lbw"] + 0.05, "caught": usual["caught"] - 0.05}
+    card = _cards(build_story(_ctx(outs=outs(big))))["dismissals"]
+    assert card["title"] == "Batters are lbw 1.7× as often as usual here"
+
+
+def test_glance_tiles_come_from_the_cards():
+    cards = _cards(build_story(_ctx()))
+    tiles = {t["label"]: t for t in cards["glance"]["payload"]["tiles"]}
+    assert tiles["Par"]["value"] == "212" and tiles["Par"]["card"] == "par"
+    assert tiles["Chasing"]["value"] == "13/28" and tiles["Chasing"]["card"] == "results"
+    assert tiles["Head to head"]["value"] == "4–1" and tiles["Head to head"]["sub"] == "CSK lead"
+    assert tiles["MI form"]["value"] == "2/3"
+    assert len(tiles) <= 6
+    assert story_first(build_story(_ctx())) == "glance"
+
+
+def story_first(story):
+    return story["chapters"][0]["cards"][0]["id"]

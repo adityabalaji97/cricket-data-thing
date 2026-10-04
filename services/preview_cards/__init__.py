@@ -2,8 +2,8 @@
 Story-style match preview cards (MATCH_PREVIEW_VIZ_PLAN.md).
 
 build_story(ctx) runs every registered CardSpec, drops cards with no data or below their sample
-floor, ranks the rest inside each chapter (chapters keep a fixed order), and returns the JSON
-manifest the frontend renders. A card that fails to build is logged and left out; it never takes
+floor, adds the "At a glance" summary built from those cards, ranks the cards inside each chapter
+(chapters keep a fixed order), and returns the JSON manifest the frontend renders. A card that fails to build is logged and left out; it never takes
 the story down.
 """
 from __future__ import annotations
@@ -13,11 +13,13 @@ from typing import Any, Dict, List
 
 from services.preview_cards.context import PreviewContext
 from services.preview_cards.existing import EXISTING
+from services.preview_cards.glance import at_a_glance
+from services.preview_cards.ground import GROUND
 from services.preview_cards.spec import CHAPTERS, Card, CardSpec
 
 logger = logging.getLogger(__name__)
 
-REGISTRY: List[CardSpec] = [*EXISTING]
+REGISTRY: List[CardSpec] = [*EXISTING, *GROUND]
 
 
 def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[str, Any]:
@@ -30,6 +32,13 @@ def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[st
             continue
         if card is not None:
             cards.append(card)
+    try:
+        glance = at_a_glance(ctx, cards)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("preview card glance failed: %r", exc)
+        glance = None
+    if glance is not None:
+        cards.append(glance)
     chapters = []
     for chapter_id, title in CHAPTERS:
         chapter_cards = sorted((c for c in cards if c.chapter == chapter_id), key=lambda c: -c.relevance)

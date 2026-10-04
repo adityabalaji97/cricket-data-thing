@@ -19,8 +19,10 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > (T20I par is by country), ODI fallback = average complete first innings; chase card = Wilson 95% band +
 > "within noise"; ground records hidden under 10 matches; story viewer caps each chapter at 4 swipeable cards with
 > the rest scrolling below. Local goldens re-captured: 7 query-builder goldens only had additive keys from the
-> hypothesis-lab connector work (new dimension columns, raa_lw_per_100). Next: chunk 5 ("At a glance" tile grid,
-> ground cards B1-B8).
+> hypothesis-lab connector work (new dimension columns, raa_lw_per_100). Chunk 4 deployed (v480). Chunk 5 (branch
+> preview-chunk5): services/preview_cards/glance.py (A1 tiles) + ground.py (B1 scatter, B2 worm, B3 phases, B5 pace/spin
+> v the ground's main competition; B6 zones and B8 dismissals only where the ground differs, baselines.json).
+> Next: chunk 6 (the teams).
 >
 > **HYPOTHESIS LAB (2026-10-03), stacked branches lab/0-orient -> lab/1-connector -> lab/2-hypotheses ->
 > lab/3-notes, NOT deployed.** Orientation + data provenance: docs/notes-pipeline.md (the 2015+ CSV feed's

@@ -56,10 +56,13 @@ const ROUTES = [
   ['scorecard_t20', '/scorecard/1473438'],
   ['preview_odi', '/venue?venue=Kingsmead%2C%20Durban&team1=Australia&team2=South%20Africa&includeInternational=true&topTeams=10&autoload=true&fmt=mens-odi'],
   // Story-style preview (MATCH_PREVIEW_VIZ_PLAN.md): one route per card, opened by its deep link.
-  ...['par', 'winning-phases', 'results', 'totals', 'recent-results', 'head-to-head', 'form'].map((card) => [
+  ...['glance', 'par', 'winning-phases', 'results', 'totals', 'innings-shape', 'phases', 'pace-spin', 'recent-results', 'head-to-head', 'form'].map((card) => [
     `story_${card.replace(/-/g, '_')}`,
     `/venue?venue=Wankhede%20Stadium%2C%20Mumbai&team1=Mumbai%20Indians&team2=Chennai%20Super%20Kings&autoload=true&story=1#${card}`,
   ]),
+  // Cards that appear only where a ground differs from all grounds (boundary zones, dismissals).
+  ['story_boundary_zones', '/venue?venue=Melbourne%20Cricket%20Ground&team1=Melbourne%20Stars&team2=Melbourne%20Renegades&autoload=true&story=1#boundary-zones'],
+  ['story_dismissals', '/venue?venue=Providence%20Stadium%2C%20Guyana&team1=Guyana%20Amazon%20Warriors&team2=Trinbago%20Knight%20Riders&autoload=true&story=1#dismissals'],
 ];
 const W = Number(process.env.WIDTH || 390);
 const H = Number(process.env.HEIGHT || 844);

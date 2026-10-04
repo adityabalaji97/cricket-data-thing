@@ -271,7 +271,7 @@ Module(
 | 2 | Module contract and registry; copy rules; ODI fallbacks; wrap existing modules as cards | [x] 2026-10-04 |
 | 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [x] 2026-10-04 signed off (decisions below) |
 | 4 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [x] 2026-10-04 (notes below) |
-| 5 | At a glance and the ground: A1–A2, B1–B8 | [ ] |
+| 5 | At a glance and the ground: A1–A2, B1–B8 | [x] 2026-10-04 (notes below; A2 and B7 dropped earlier) |
 | 6 | The teams: C1–C6 | [ ] |
 | 7 | The players: D1–D6 (incl. milestones service) | [ ] |
 | 8 | Fantasy: F1–F4 | [ ] |
@@ -557,6 +557,29 @@ Found while building:
 - **Moved to the chunk that builds the card:** Key Battles evidence rule (D1, chunk 7), death-bowling leaders on
   leverage-weighted RAA (D2, chunk 7), similar-ground fallback for ground records (B1 dot strip, chunk 5). Fixing
   them on the classic page now would mean doing them twice.
+
+### Chunk 5 results (2026-10-04)
+- **A1 At a glance** is the first card: up to 6 tiles (par, chase record, head to head, each side's form, then a
+  ground quirk or the toss), built after every other card from those cards' payloads, so a tile can't disagree with
+  its card. Tapping a tile opens that card (StoryNav context; on desktop it opens the viewer there).
+- **B1 What wins** (`totals`): first innings by season, defended or chased, with a line near today's par; faded
+  before 2023 at IPL grounds (Impact Player), else before the last three seasons. Under 20 matches the
+  benchmark strip stays.
+- **B2 Innings shape** (worm), **B3 Phases** (diverging bars, fixed ±3 scale) and **B5 Pace and spin**: the ground
+  against every ground in its main competition, same window ("v all IPL grounds"), from one over × bowler-kind
+  query each side. Mixing T20Is into the comparison took 6–8s and blurred the comparison; one competition is
+  0.3–2.5s cold, cached after.
+- **B6 Boundary zones**: the ground rule from sign-off, plus a gap of at least 2.5 percentage points. All 10 league
+  grounds still qualify.
+- **B8 Dismissals**: checked before building (analysis/preview/ground_dismissal_differences.py). The mix does
+  differ by ground (split-half 0.74; 34 of 129 grounds pass the rule), but "7 in 10 wickets are catches" is true
+  everywhere (68%). So B8 follows the B6 rule and its title names the difference ("Batters are lbw 1.6× as
+  often as usual here" at Providence).
+- Both all-grounds baselines live in services/preview_cards/baselines.json (analysis/preview/build_baselines.py):
+  computing them takes ~11s and they barely move.
+- Fixed on the way: "1 of the last 1" copy; deep links to a card below the fold now scroll to it; the phase
+  card's title and bars round the same way.
+- **Not yet:** a nightly warm-up of the comparison queries (first viewer after a data load pays 0.3–8s).
 
 ### Chunks 5–8: Cards by chapter
 - One card = backend spec + renderer + ODI fallback + info sheet copy + empty state + test.
