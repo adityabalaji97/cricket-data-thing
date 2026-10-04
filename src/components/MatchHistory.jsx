@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { getTeamColor, readableOnDark } from '../utils/teamColors';
 import { colors as hsColors } from '../theme/hindsightDark';
+import DetailSheet from './ui/DetailSheet';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
@@ -145,7 +146,12 @@ const MatchCompactRow = ({ match, indexPrefix, isMobile }) => {
     );
 };
 
-const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
+// Card chrome, or none when the piece sits inside a story card that supplies its own title and frame.
+const Frame = ({ bare, isMobile, sx, children }) => (bare
+    ? <Box sx={{ height: '100%' }}>{children}</Box>
+    : <Card sx={{ p: isMobile ? 1.5 : 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none', ...sx }}>{children}</Card>);
+
+const TeamSplitHeader = ({ team1, team2, stats, isMobile, bare = false }) => {
     const [showDetails, setShowDetails] = useState(false);
     const team1Wins = stats?.team1_wins || 0;
     const team2Wins = stats?.team2_wins || 0;
@@ -162,10 +168,12 @@ const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
     };
 
     return (
-        <Card sx={{ p: isMobile ? 1.5 : 2, height: '100%', border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-            <Typography variant={isMobile ? 'subtitle1' : 'h6'} sx={{ fontWeight: 700 }}>
-                Head to Head
-            </Typography>
+        <Frame bare={bare} isMobile={isMobile} sx={{ height: '100%' }}>
+            {!bare && (
+                <Typography variant={isMobile ? 'subtitle1' : 'h6'} sx={{ fontWeight: 700 }}>
+                    Head to Head
+                </Typography>
+            )}
             <Box sx={{ mt: 1.2, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', textAlign: 'center', gap: 1 }}>
                 <Box>
                     <Typography sx={{ color: team1Color, fontWeight: 800, fontSize: isMobile ? '1.35rem' : '1.55rem' }}>
@@ -221,10 +229,20 @@ const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
                     disabled={recentH2H.length === 0}
                     sx={{ px: 0, textTransform: 'none', fontWeight: 700 }}
                 >
-                    {showDetails ? 'Hide H2H details' : `Show H2H details (${recentH2H.length})`}
+                    {showDetails && !bare ? 'Hide H2H details' : `Show H2H details (${recentH2H.length})`}
                 </Button>
             </Box>
-            <Collapse in={showDetails} timeout="auto" unmountOnExit>
+            {bare && (
+                // Inside a story card nothing may expand in place (it would not fit): a sheet instead.
+                <DetailSheet open={showDetails} onClose={() => setShowDetails(false)} title={`${team1} v ${team2}`} subtitle="Every meeting in the window">
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                        {recentH2H.map((match, index) => (
+                            <MatchCompactRow key={`h2h-sheet-${match?.id || match?.date || index}`} match={match} indexPrefix="h2h" isMobile />
+                        ))}
+                    </Box>
+                </DetailSheet>
+            )}
+            <Collapse in={showDetails && !bare} timeout="auto" unmountOnExit>
                 <Box sx={{ mt: 0.9, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                     {recentH2H.map((match, index) => (
                         <MatchCompactRow
@@ -243,15 +261,17 @@ const TeamSplitHeader = ({ team1, team2, stats, isMobile }) => {
                     </Typography>
                 </Box>
             )}
-        </Card>
+        </Frame>
     );
 };
 
-const VenueRecentMatches = ({ venue, matches, isMobile }) => (
-    <Card sx={{ p: isMobile ? 1.5 : 2, height: '100%', border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-        <Typography variant={isMobile ? 'subtitle1' : 'h6'} sx={{ fontWeight: 700, mb: 1.2 }}>
-            {`Recent at ${venue}`}
-        </Typography>
+const VenueRecentMatches = ({ venue, matches, isMobile, bare = false }) => (
+    <Frame bare={bare} isMobile={isMobile} sx={{ height: '100%' }}>
+        {!bare && (
+            <Typography variant={isMobile ? 'subtitle1' : 'h6'} sx={{ fontWeight: 700, mb: 1.2 }}>
+                {`Recent at ${venue}`}
+            </Typography>
+        )}
         {!matches?.length ? (
             <Typography variant="body2" color="text.secondary">
                 No recent matches found for this venue.
@@ -268,7 +288,7 @@ const VenueRecentMatches = ({ venue, matches, isMobile }) => (
                 ))}
             </Box>
         )}
-    </Card>
+    </Frame>
 );
 
 const FormTileDetails = ({ match, teamCode, result }) => (
@@ -288,10 +308,10 @@ const FormTileDetails = ({ match, teamCode, result }) => (
     </Box>
 );
 
-const TeamFormRow = ({ teamCode, matches, isMobile, onTileSelect }) => {
+const TeamFormRow = ({ teamCode, matches, isMobile, onTileSelect, bare = false }) => {
     const teamColor = getTeamColor(teamCode) || '#1d4ed8';
     // 32px on phones: these are tap targets (they open the match detail), not just glyphs.
-    const tileSize = isMobile ? 32 : 26;
+    const tileSize = isMobile || bare ? 32 : 26;
 
     const formTiles = useMemo(
         () => (matches || []).map((match) => ({
@@ -371,30 +391,34 @@ const TeamFormRow = ({ teamCode, matches, isMobile, onTileSelect }) => {
     );
 };
 
-const TeamFormCard = ({ team1, team2, team1Matches, team2Matches, isMobile }) => {
+const TeamFormCard = ({ team1, team2, team1Matches, team2Matches, isMobile, bare = false }) => {
     const [selectedMatch, setSelectedMatch] = useState(null);
 
     return (
         <>
-            <Card sx={{ p: isMobile ? 1.5 : 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-                <Typography variant={isMobile ? 'subtitle2' : 'h6'} sx={{ fontWeight: 700 }}>
-                    Form
-                </Typography>
-                <Box sx={{ mt: 1.1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Frame bare={bare} isMobile={isMobile}>
+                {!bare && (
+                    <Typography variant={isMobile ? 'subtitle2' : 'h6'} sx={{ fontWeight: 700 }}>
+                        Form
+                    </Typography>
+                )}
+                <Box sx={{ mt: bare ? 0 : 1.1, display: 'flex', flexDirection: 'column', gap: bare ? 2 : 1 }}>
                     <TeamFormRow
                         teamCode={team1}
                         matches={team1Matches || []}
                         isMobile={isMobile}
+                        bare={bare}
                         onTileSelect={setSelectedMatch}
                     />
                     <TeamFormRow
                         teamCode={team2}
                         matches={team2Matches || []}
                         isMobile={isMobile}
+                        bare={bare}
                         onTileSelect={setSelectedMatch}
                     />
                 </Box>
-            </Card>
+            </Frame>
 
             <Dialog open={Boolean(selectedMatch)} onClose={() => setSelectedMatch(null)} fullWidth maxWidth="xs">
                 <DialogTitle sx={{ fontWeight: 700 }}>

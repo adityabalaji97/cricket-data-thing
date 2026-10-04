@@ -37,16 +37,19 @@ const FormRow = ({ team, record }) => (
 const PHASE_KEYS = [['powerplay', 'Powerplay'], ['middle', 'Middle'], ['death', 'Death']];
 
 /** How winning innings were built here: runs per phase, batting first v chasing, on one scale. */
-const WinningPhases = ({ phases }) => {
+// bare: inside a story card, which supplies its own title and frame.
+const WinningPhases = ({ phases, bare = false }) => {
   const rows = [['Won batting first', phases?.batting_first], ['Won chasing', phases?.chasing]].filter(([, v]) => v);
   if (!rows.length) return null;
   const max = Math.max(...rows.map(([, v]) => v.total || 0), 1);
   return (
-    <Box sx={{ bgcolor: hs.surface1, border: `1px solid ${hs.border}`, borderRadius: 3, p: 1.75, display: 'grid', gap: 1.25 }}>
-      <Box>
-        <Typography sx={{ fontWeight: 700, fontSize: 15 }}>How winning innings were built</Typography>
-        <Typography sx={{ fontSize: 13, color: hs.textLo }}>Average runs per phase in matches the side won</Typography>
-      </Box>
+    <Box sx={bare ? { display: 'grid', gap: 1.25 } : { bgcolor: hs.surface1, border: `1px solid ${hs.border}`, borderRadius: 3, p: 1.75, display: 'grid', gap: 1.25 }}>
+      {!bare && (
+        <Box>
+          <Typography sx={{ fontWeight: 700, fontSize: 15 }}>How winning innings were built</Typography>
+          <Typography sx={{ fontSize: 13, color: hs.textLo }}>Average runs per phase in matches the side won</Typography>
+        </Box>
+      )}
       {rows.map(([label, v]) => (
         <Box key={label} sx={{ display: 'grid', gap: 0.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>

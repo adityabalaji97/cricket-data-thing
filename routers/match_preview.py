@@ -336,6 +336,33 @@ def _generate_narrative_with_llm(data_context: str, original_sections) -> tuple[
         return None, False
 
 
+@router.get("/{venue}/{team1_id}/{team2_id}/cards")
+def get_match_preview_cards(
+    venue: str,
+    team1_id: str,
+    team2_id: str,
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    include_international: bool = Query(True),
+    top_teams: int = Query(20, ge=1, le=50),
+    day_or_night: Optional[str] = Query(None, pattern="^(day|night)$"),
+    format: Literal["T20", "ODI"] = Query("T20", description="Cricket format (women's previews are not built yet)"),
+    team1_short: Optional[str] = Query(None, description="Short label for team 1 on the cards, e.g. MI"),
+    team2_short: Optional[str] = Query(None, description="Short label for team 2 on the cards"),
+    db: Session = Depends(get_session),
+):
+    """The story-style preview (MATCH_PREVIEW_VIZ_PLAN.md): chapters of cards, each with a
+    takeaway title, the sample on the card, an info sheet and the payload its visual draws."""
+    from services.preview_cards import PreviewContext, build_story
+
+    ctx = PreviewContext(
+        db=db, venue=venue, team1=team1_id, team2=team2_id, fmt=format, gender="male",
+        start=start_date, end=end_date, include_international=include_international, top_teams=top_teams,
+        day_or_night=day_or_night, team1_short=team1_short, team2_short=team2_short,
+    )
+    return build_story(ctx)
+
+
 @router.get("/{venue}/{team1_id}/{team2_id}")
 def get_match_preview(
     venue: str,

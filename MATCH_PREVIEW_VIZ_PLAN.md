@@ -268,7 +268,7 @@ Module(
 |---|---|---|
 | 0 | Audit: CARTA scorecard and usage for every current module | [x] 2026-10-04 |
 | 1 | Story shell: card frame (4:5 core), chapters, navigation, auto-hiding chrome, logo menu, settings sheet, deep links, desktop grid | [x] 2026-10-04 |
-| 2 | Module contract and registry; copy rules; ODI fallbacks; wrap existing modules as cards | [ ] |
+| 2 | Module contract and registry; copy rules; ODI fallbacks; wrap existing modules as cards | [x] 2026-10-04 |
 | 3 | Mockups gate: real IPL, T20I and ODI fixtures, every card | [ ] |
 | 4 | Correctness: era-aware par, toss/chase intervals, sample rules, similar-venue fallback | [ ] |
 | 5 | At a glance and the ground: A1–A2, B1–B8 | [ ] |
@@ -420,6 +420,37 @@ Sweep: no page overflow and no small text at 360, 390, 768 or 1280 px.
 - Wrap today's modules as cards where they already fit one screen (the expect strip, H2H, forecast).
   The rest are rebuilt in chunks 5–8. **Acceptance:** golden snapshots identical for the existing
   endpoints.
+
+**Chunk 2 done (2026-10-04).**
+
+Backend:
+- `services/preview_cards/`:
+  - `spec.py`: `CardSpec`, `Card`, `SampleRule`, `Info`, chapters;
+  - `copy.py`: plain names, help lines, ODI fallback helpers, span/plural;
+  - `context.py`: a lazy `PreviewContext` over the venue record, match history and match preview;
+  - `existing.py`: the 7 existing modules as cards, with titles generated from the numbers;
+  - `build_story()`: ranking, sample floors, one failing card never breaks the story.
+- `GET /match-preview/{venue}/{t1}/{t2}/cards`.
+
+Frontend:
+- `src/components/story/visuals.jsx`: a renderer per `visual`, plus the info-sheet body.
+- `src/hooks/useStoryCards.js`.
+- `bare` mode on the reused components (inner titles and frames hidden, 32px form chips, H2H
+  details in a sheet).
+- `WinPercentagesPie` and `ScoresBarChart` moved to `src/components/venue/VenueResultCharts.jsx`.
+- Events: `card_view`, `card_share`, `card_info`.
+
+Tests:
+- `tests/test_preview_cards.py` (8);
+- `StoryGrid.test.jsx` (chart controls and sheets don't open the card).
+
+Sweep at 360 and 390 px: all 7 cards fit, with no page overflow and no small text. The classic
+page is unchanged.
+
+**Carried into chunk 4:** the expect block (`/match-preview`) and the venue record count
+different matches under the same page filters (e.g. 21 vs 28 at Wankhede): the endpoint has no
+leagues filter, and `include_international` is defaulted differently. Cards in one story must
+count the same matches.
 
 ### Chunk 3: Mockups gate
 - Build mockups of every card with real data, using the connector tools (`preview_match`,
