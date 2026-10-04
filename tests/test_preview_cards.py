@@ -253,3 +253,77 @@ def test_glance_tiles_come_from_the_cards():
 
 def story_first(story):
     return story["chapters"][0]["cards"][0]["id"]
+
+
+# --- the teams (chunk 6) ------------------------------------------------------------------------
+
+TEAMS10 = ["Mumbai Indians", "Chennai Super Kings", *[f"Side {i}" for i in range(8)]]
+
+
+def _team_ctx(mi_bat=(10, 5, 0), csk_bat=(0, 0, 0), mi_bowl=(0, 0, 0), csk_bowl=(0, 0, -12),
+              elo=((1500, 1520, 1540), (1500, 1490, 1480)), meeting=None):
+    ctx = _ctx()
+    phases = ("powerplay", "middle", "death")
+
+    def rows(side_col, values_for):
+        out = []
+        for team in TEAMS10:
+            for k, ph in enumerate(phases):
+                out.append({side_col: team, "phase": ph, "balls": 600, "innings_count": 28,
+                            "raa_per_100": values_for(team, k), "runs": 800})
+        return out
+
+    def bat(team, k):
+        return {"Mumbai Indians": mi_bat, "Chennai Super Kings": csk_bat}.get(team, (2, 2, 2))[k] + 20
+    def bowl(team, k):
+        return {"Mumbai Indians": mi_bowl, "Chennai Super Kings": csk_bowl}.get(team, (0, 0, 0))[k] - 10
+
+    ctx.__dict__.update(
+        team_names={"MI": ["Mumbai Indians"], "CSK": ["Chennai Super Kings"]},
+        team_window={"label": "IPL", "start": date(2025, 1, 1), "end": date(2026, 10, 4),
+                     "args": {"leagues": ["IPL"], "start_date": date(2025, 1, 1), "end_date": date(2026, 10, 4),
+                              "fmt": "T20", "gender": "male"}},
+        team_phases={"bat": rows("batting_team", bat), "bowl": rows("bowling_team", bowl)},
+        fixture_competition="IPL",
+        elo_series={"MI": [{"date": f"2026-04-0{i + 1}", "elo": e, "won": True} for i, e in enumerate(elo[0])],
+                    "CSK": [{"date": f"2026-04-0{i + 1}", "elo": e, "won": False} for i, e in enumerate(elo[1])]},
+        last_meeting=meeting, last_xis={},
+    )
+    return ctx
+
+
+def test_where_won_is_centred_on_the_competition():
+    card = _cards(build_story(_team_ctx()))["where-won"]
+    # Raw RAA carries +20 batting / -10 bowling for every IPL side; centring removes it.
+    rows = {(r["group"], r["phase"]): r for r in card["payload"]["rows"]}
+    assert abs(rows[("Batting", "death")]["team1"] - rows[("Batting", "death")]["team2"]) < 1e-9
+    assert rows[("Bowling", "middle")]["team1"] > -2  # an average bowling side sits near 0, not -10
+    # CSK's death bowling is 12 worse than average and MI's is average: MI hold the edge.
+    assert card["title"] == "MI's death bowling is the biggest edge: 12 runs per 100 balls"
+
+
+def test_phase_strength_names_the_most_extreme_rank():
+    card = _cards(build_story(_team_ctx()))["phase-strength"]
+    # MI's powerplay batting (1st) and CSK's death bowling (10th) are equally extreme; the first wins.
+    assert card["title"] == "MI's powerplay batting ranks 1st of 10"
+
+
+def test_rating_titles():
+    assert _cards(build_story(_team_ctx()))["rating"]["title"] == "MI come in rated higher: 1540 to CSK's 1480"
+    even = _cards(build_story(_team_ctx(elo=((1500, 1500, 1460), (1500, 1500, 1465)))))["rating"]
+    assert even["title"] == "Evenly rated: MI 1460, CSK 1465"
+
+
+def test_last_meeting_titles():
+    def meeting(winner, first, second):
+        return {"id": "1", "date": date(2026, 5, 2), "venue": "MA Chidambaram Stadium, Chepauk", "competition": "IPL",
+                "winner": winner, "path": [],
+                "innings": [{"innings": 1, "side": first[0], "runs": first[1], "wickets": first[2], "balls": 120},
+                            {"innings": 2, "side": second[0], "runs": second[1], "wickets": second[2], "balls": 109}]}
+    chased = _cards(build_story(_team_ctx(meeting=meeting("CSK", ("MI", 159, 7), ("CSK", 160, 2)))))["last-meeting"]
+    assert chased["title"] == "Last time: CSK chased 160 with 8 wickets in hand"
+    assert chased["help"] is None  # no ball-by-ball path, no "chance of winning" line
+    defended = _cards(build_story(_team_ctx(meeting=meeting("MI", ("MI", 180, 6), ("CSK", 179, 9)))))["last-meeting"]
+    assert defended["title"] == "Last time: MI defended 180 and won by 1 run"
+    washout = _cards(build_story(_team_ctx(meeting=meeting(None, ("MI", 60, 1), ("CSK", 0, 0)))))["last-meeting"]
+    assert washout["title"] == "Last time: no result"
