@@ -475,17 +475,15 @@ Found while building:
 ### Sign-off decisions (2026-10-04)
 
 1. **Cards as drawn.** Title, help line, sample and credit lines as in the mockups.
-2. **Win %: keep the Foresight model's win probability; every other metric comes from the T20
-   Primer.**
-   - The stored forecast with 99.5 is the only row in `match_predictions` (MI v CSK, 23 April
-     2026). Its second-innings score model output isn't credible, and nothing has written a
-     prediction since.
-   - So the forecast card appears only when a prediction exists for this fixture (same teams,
-     dated within 7 days of the match). It shows win % only; predicted scores are never shown.
-   - Par comes from the Primer's `match_par` (nested shrinkage, e.g. 212 for Wankhede in
-     2026), not from the average winning total.
-   - The Primer has no team-strength pre-match win chance: its win probability is game-state
-     only, about 51% at the first ball.
+2. **No Foresight anywhere in the UI** (revised 2026-10-04). Every metric on the preview comes
+   from the T20 Primer.
+   - The Foresight section and `ForesightCard` are removed from the classic preview.
+   - The story has no forecast card (A2 dropped).
+   - Par comes from the Primer's `match_par` (nested shrinkage, e.g. 212 for Wankhede in 2026).
+   - Why: the only stored Foresight prediction (`match_predictions`, MI v CSK, 23 April 2026)
+     predicted a second innings of 99.5, and nothing has written one since.
+   - The IPL Predictions page is a separate championship ranking (Elo and player rankings, no
+     Foresight) and stays.
 3. **Cap each chapter.** Swiping sideways moves through each chapter's **4 most distinctive
    cards** (by relevance). The rest of the chapter sits below the current card: scroll down to
    read them, each still a full 4:5 card. The progress segments count the featured cards; a

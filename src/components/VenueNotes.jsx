@@ -46,7 +46,6 @@ import { getVenueContextualQueries } from '../utils/queryBuilderLinks';
 import VenueSectionTabs from './VenueSectionTabs';
 import VenueNotesDesktopNav from './VenueNotesDesktopNav';
 import BoundaryAnalysis from './BoundaryAnalysis';
-import ForesightCard from './ForesightCard';
 import EmptyState from './ui/EmptyState';
 import CollapsibleSection, { openSection } from './ui/CollapsibleSection';
 import { ScoresBarChart, WinPercentagesPie } from './venue/VenueResultCharts';
@@ -705,7 +704,7 @@ const VenueNotes = ({
   }) => {
 
     // The preview is one format's record. Post-toss XI analysis (impact subs, T20 fantasy
-    // scoring) and Foresight (IPL-trained models) are men's-T20-only, so other formats hide them.
+    // scoring) is men's-T20-only, so other formats hide it.
     const { pinnedFormatParams, active: activeFormat } = useFormat();
     // The venue page keeps its selections in state, so the address bar can be just /venue?fmt=...
     // Share a link that reopens this exact preview instead.
@@ -743,7 +742,6 @@ const VenueNotes = ({
     const [activatedSections, setActivatedSections] = useState(() => new Set(['expect', 'summary', 'preview', 'teams']));
     const [postTossSelection, setPostTossSelection] = useState(null);
     const sectionRefs = useRef({});
-    const foresightEnabled = activeSectionId === 'foresight' || activatedSections.has('foresight');
     const previewEnabled = activeSectionId === 'preview' || activatedSections.has('preview');
     const teamsEnabled = activeSectionId === 'teams' || activatedSections.has('teams');
     const boundariesEnabled = activeSectionId === 'boundaries' || activatedSections.has('boundaries');
@@ -993,27 +991,9 @@ const VenueNotes = ({
             ),
         });
 
-        // 9. ML FORESIGHT (last section, only when both teams selected; models are T20-only)
-        if (selectedTeam1 && selectedTeam2 && isT20Preview) {
-            groups.push({
-                id: 'foresight',
-                label: 'Foresight',
-                takeaway: 'Model forecast: win probability and predicted scores',
-                content: (
-                    <ForesightCard
-                        venue={venue}
-                        team1={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
-                        team2={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
-                        enabled={foresightEnabled}
-                        isMobile={isMobile}
-                    />
-                ),
-            });
-        }
-
         if (noVenueMatches) {
             // Sections built on the ground's own history have nothing to show.
-            const teamSections = new Set(['expect', 'summary', 'preview', 'teams', 'foresight']);
+            const teamSections = new Set(['expect', 'summary', 'preview', 'teams']);
             return groups.filter((group) => teamSections.has(group.id));
         }
         return groups;
@@ -1038,7 +1018,6 @@ const VenueNotes = ({
         leagues,
         includeInternational,
         topTeams,
-        foresightEnabled,
         previewEnabled,
         teamsEnabled,
         boundariesEnabled,
