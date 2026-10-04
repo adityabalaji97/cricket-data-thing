@@ -73,6 +73,9 @@ const DetailSheet = ({ open, onClose, title, subtitle, rows = [], footer, childr
         anchor="bottom"
         open={open}
         onClose={onClose}
+        // A sheet is modal: layer it as one. At the Drawer default (1200) it opened behind the
+        // story viewer (1250), so the story's logo menu and info sheets did nothing on phones.
+        sx={{ zIndex: (theme) => theme.zIndex.modal }}
         PaperProps={{
           sx: {
             bgcolor: colors.surface1,

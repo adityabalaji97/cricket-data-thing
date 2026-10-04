@@ -107,7 +107,6 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
   };
 
   if (!current) return null;
-  const firstOfChapter = cards.findIndex((c) => c.chapterIndex === current.chapterIndex);
 
   return (
     <Box
@@ -130,19 +129,22 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
         userSelect: 'none',
       }}
     >
-      {/* Progress segments for this chapter, and where we are. Outside the share crop. */}
+      {/* One progress bar for the whole story: a block per chapter (wider gaps between chapters),
+          a segment per card. Outside the share crop. */}
       <Box sx={{ width, height: STORY_TOP, pt: 1, flexShrink: 0 }}>
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
-          {chapter.cards.map((c, i) => (
-            <Box
-              key={c.id}
-              sx={{
-                flex: 1,
-                height: 3,
-                borderRadius: 2,
-                bgcolor: i <= current.indexInChapter ? colors.accent : colors.borderStrong,
-              }}
-            />
+        <Box sx={{ display: 'flex', gap: 1 }} aria-label={`Card ${index + 1} of ${cards.length}`}>
+          {chapters.map((ch, ci) => (
+            <Box key={ch.id} sx={{ flex: ch.cards.length, display: 'flex', gap: '2px' }}>
+              {ch.cards.map((c) => {
+                const at = cards.findIndex((x) => x.id === c.id);
+                return (
+                  <Box
+                    key={c.id}
+                    sx={{ flex: 1, height: 3, borderRadius: 2, bgcolor: at <= index ? colors.accent : colors.borderStrong }}
+                  />
+                );
+              })}
+            </Box>
           ))}
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.75 }}>
@@ -183,25 +185,22 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
         />
       </Box>
 
-      {/* Actions: outside the share crop. */}
-      <Box data-story-noswipe sx={{ width, height: STORY_BOTTOM, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 1, pr: 7 }}>
+      {/* One row, outside the share crop: Data and Share, then the logo (chapters, settings). */}
+      <Box data-story-noswipe sx={{ width, height: STORY_BOTTOM, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
         {current.queryUrl && (
           <Button
             href={current.queryUrl}
             startIcon={<TableChartOutlinedIcon />}
+            aria-label="See the data in the query builder"
             sx={{ minHeight: 40, color: colors.textMed, textTransform: 'none', fontSize: 14 }}
           >
-            Open in query builder
+            Data
           </Button>
         )}
         <Button onClick={share} startIcon={<IosShareRoundedIcon />} sx={{ minHeight: 40, color: colors.textMed, textTransform: 'none', fontSize: 14 }}>
           Share
         </Button>
-        <Typography sx={{ ml: 'auto', fontSize: 12, color: colors.textFaint, fontFamily: fonts.mono }}>
-          {index - firstOfChapter + 1}/{chapter.cards.length}
-        </Typography>
-      </Box>
-
+        <Box sx={{ ml: 'auto' }} />
       <LogoMenu
         open={menuOpen}
         onOpen={() => setMenuOpen(true)}
@@ -216,6 +215,7 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
         onSettings={onSettings ? () => { setMenuOpen(false); onSettings(); } : undefined}
         onClassic={onClassic ? () => { setMenuOpen(false); onClassic(); } : undefined}
       />
+      </Box>
     </Box>
   );
 };

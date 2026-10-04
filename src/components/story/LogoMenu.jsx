@@ -26,8 +26,8 @@ const Row = ({ onClick, active, icon, children }) => (
 );
 
 /**
- * The story's only persistent control: the logo in the bottom-right corner, clear of the card's
- * core. Opens the chapter index, the preview settings and the way back to the classic page.
+ * The story's menu: the logo at the end of the action row, under the card. Opens the chapter
+ * index, the preview settings and the way back to the classic page.
  */
 const LogoMenu = ({ open, onOpen, onClose, chapters, currentChapter, onJump, onSettings, onClassic }) => (
   <>
@@ -36,15 +36,12 @@ const LogoMenu = ({ open, onOpen, onClose, chapters, currentChapter, onJump, onS
       onClick={onOpen}
       data-story-noswipe
       sx={{
-        position: 'fixed',
-        right: 12,
-        bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
-        width: 48,
-        height: 48,
+        width: 44,
+        height: 44,
+        flexShrink: 0,
         borderRadius: '50%',
         bgcolor: colors.surface2,
         border: `1px solid ${colors.borderStrong}`,
-        zIndex: 1251,
       }}
     >
       <Box component="img" src="/cricket-icon.svg" alt="" sx={{ width: 26, height: 26 }} />
