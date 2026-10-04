@@ -105,7 +105,8 @@ def where_won(ctx) -> Optional[Card]:
     innings = min(_team_row(ctx, table["bat"][keys[0]], t)["innings"] for t in (ctx.t1, ctx.t2))
     return Card(
         id="where-won", chapter="teams", visual="dumbbell",
-        title=f"{leader}'s {PHASE_WORDS[big['phase']]} {big['group'].lower()} is the biggest edge: "
+        # "MI death bowling", not "MI's": a possessive on a short code ("AUS's") reads badly.
+        title=f"{leader} {PHASE_WORDS[big['phase']]} {big['group'].lower()} is the biggest edge: "
               f"{gap:.0f} runs per 100 balls",
         help=f"Further right is better: runs per 100 balls against the {comp} average",
         sample=f"Both sides · {comp} {_seasons(ctx)}", n=innings,
@@ -157,7 +158,7 @@ def phase_strength(ctx) -> Optional[Card]:
     comp = ctx.team_window["label"]
     return Card(
         id="phase-strength", chapter="teams", visual="rank_bars",
-        title=f"{team}'s {PHASE_WORDS[r['phase']]} {r['group']} ranks {_ordinal(r[key])} of {r['of']}",
+        title=f"{team} {PHASE_WORDS[r['phase']]} {r['group']} ranks {_ordinal(r[key])} of {r['of']}",
         help="Longer bar = higher in the league",
         sample=f"{plural(max(of_all), 'side')} · {comp} {_seasons(ctx)}", n=max(of_all),
         payload={"rows": rows, "team1": ctx.t1, "team2": ctx.t2},
@@ -270,6 +271,8 @@ TEAMS = (
     CardSpec("phase-strength", "teams", "How strong is each side in each phase?", phase_strength,
              sample=SampleRule(flag_below=0)),
     CardSpec("rating", "teams", "Who's stronger on current rating?", rating, sample=SampleRule(flag_below=0)),
-    CardSpec("last-meeting", "teams", "What happened last time?", last_meeting, sample=SampleRule(flag_below=0)),
-    CardSpec("xis", "teams", "Who's likely to play?", likely_xis, sample=SampleRule(flag_below=0)),
+    CardSpec("last-meeting", "teams", "What happened last time?", last_meeting, sample=SampleRule(flag_below=0),
+             scale_by_sample=False),
+    CardSpec("xis", "teams", "Who's likely to play?", likely_xis, sample=SampleRule(flag_below=0),
+             scale_by_sample=False),
 )

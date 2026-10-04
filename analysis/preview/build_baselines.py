@@ -1,7 +1,9 @@
 """
-All-grounds baselines for the boundary-zone (B6) and dismissal (B8) preview cards.
+All-grounds baselines for the boundary-zone (B6), dismissal (B8) and "How X bowls" (D6) preview
+cards.
 
-Both cards compare one ground with every men's T20 ground. That baseline takes ~11s to compute
+B6 and B8 compare one ground with every men's T20 ground; D6 compares one pace bowler's lines and
+lengths with every pace bowler's over the last four years (the window its 600-ball floor was set on). That baseline takes ~11s to compute
 from delivery_details and moves by tenths of a percent a year, so it is stored in
 services/preview_cards/baselines.json instead of being recomputed per request. Re-run after a
 large data load:
@@ -35,11 +37,22 @@ cur.execute("""
     GROUP BY 1
 """)
 kinds = dict(cur.fetchall())
-zn, kn = sum(zones.values()), sum(kinds.values())
+cur.execute("""
+    SELECT CASE WHEN line = 'WIDE_DOWN_LEG' THEN 'DOWN_LEG' ELSE line END, length, COUNT(*)
+    FROM delivery_details
+    WHERE format = 'T20' AND gender = 'male' AND bowl_kind = 'pace bowler'
+      AND line IS NOT NULL AND length IS NOT NULL
+      AND match_date >= to_char(CURRENT_DATE - INTERVAL '4 years', 'YYYY-MM-DD')
+    GROUP BY 1, 2
+""")
+cells = {f"{line}|{length}": c for line, length, c in cur.fetchall()}
+zn, kn, cn = sum(zones.values()), sum(kinds.values()), sum(cells.values())
 OUT.write_text(json.dumps({
     "built": date.today().isoformat(),
     "source": "men's T20, every ground, 2015+ (delivery_details)",
     "boundary_zones": {"n": zn, "share": {str(z): round(c / zn, 5) for z, c in sorted(zones.items())}},
     "dismissals": {"n": kn, "share": {k: round(c / kn, 5) for k, c in sorted(kinds.items())}},
+    "pace_line_length": {"n": cn, "window": "last 4 years",
+                         "share": {k: round(c / cn, 5) for k, c in sorted(cells.items())}},
 }, indent=2) + "\n")
 print(OUT.read_text())

@@ -24,7 +24,9 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > v the ground's main competition; B6 zones and B8 dismissals only where the ground differs, baselines.json).
 > Chunk 5 deployed (v481). Chunk 6 (branch preview-chunk6): services/preview_cards/teams.py (C1 dumbbell + C2 ranks on
 > RAA/100 centred on the competition average, C3 Elo, C4 last meeting with Primer win probability, C6 XIs).
-> Next: chunk 7 (the players).
+> Chunk 6 deployed (v482). Chunk 7 (branch preview-chunk7): services/preview_cards/players.py (D1 shrunk key battles,
+> D2 death hitters/bowlers, D3 form strips, D4 suits ground, D5 milestones via services/milestones.py, D6 pitch usage).
+> Next: chunk 8 (fantasy).
 >
 > **HYPOTHESIS LAB (2026-10-03), stacked branches lab/0-orient -> lab/1-connector -> lab/2-hypotheses ->
 > lab/3-notes, NOT deployed.** Orientation + data provenance: docs/notes-pipeline.md (the 2015+ CSV feed's

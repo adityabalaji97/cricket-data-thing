@@ -16,11 +16,12 @@ from services.preview_cards.existing import EXISTING
 from services.preview_cards.glance import at_a_glance
 from services.preview_cards.ground import GROUND
 from services.preview_cards.spec import CHAPTERS, Card, CardSpec
+from services.preview_cards.players import PLAYERS
 from services.preview_cards.teams import TEAMS
 
 logger = logging.getLogger(__name__)
 
-REGISTRY: List[CardSpec] = [*EXISTING, *GROUND, *TEAMS]
+REGISTRY: List[CardSpec] = [*EXISTING, *GROUND, *TEAMS, *PLAYERS]
 
 
 def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[str, Any]:

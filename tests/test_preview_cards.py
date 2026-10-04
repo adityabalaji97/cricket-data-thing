@@ -299,13 +299,13 @@ def test_where_won_is_centred_on_the_competition():
     assert abs(rows[("Batting", "death")]["team1"] - rows[("Batting", "death")]["team2"]) < 1e-9
     assert rows[("Bowling", "middle")]["team1"] > -2  # an average bowling side sits near 0, not -10
     # CSK's death bowling is 12 worse than average and MI's is average: MI hold the edge.
-    assert card["title"] == "MI's death bowling is the biggest edge: 12 runs per 100 balls"
+    assert card["title"] == "MI death bowling is the biggest edge: 12 runs per 100 balls"
 
 
 def test_phase_strength_names_the_most_extreme_rank():
     card = _cards(build_story(_team_ctx()))["phase-strength"]
     # MI's powerplay batting (1st) and CSK's death bowling (10th) are equally extreme; the first wins.
-    assert card["title"] == "MI's powerplay batting ranks 1st of 10"
+    assert card["title"] == "MI powerplay batting ranks 1st of 10"
 
 
 def test_rating_titles():
@@ -327,3 +327,69 @@ def test_last_meeting_titles():
     assert defended["title"] == "Last time: MI defended 180 and won by 1 run"
     washout = _cards(build_story(_team_ctx(meeting=meeting(None, ("MI", 60, 1), ("CSK", 0, 0)))))["last-meeting"]
     assert washout["title"] == "Last time: no result"
+
+
+# --- the players (chunk 7) ----------------------------------------------------------------------
+
+def _players_ctx(monkeypatch, responses):
+    """A context whose query-builder calls answer from `responses`, keyed by group_by."""
+    from services.preview_cards import players as P
+
+    def fake_run(ctx, args):
+        return responses.get(tuple(args["group_by"]), [])
+    monkeypatch.setattr(P, "_run", fake_run)
+    ctx = _team_ctx()
+    ctx.__dict__["last_xis"] = {
+        "MI": {"date": date(2026, 5, 1), "opponent": "RR", "players": ["SK Yadav", "JJ Bumrah", "HH Pandya"]},
+        "CSK": {"date": date(2026, 5, 1), "opponent": "GT", "players": ["N Ahmad", "S Samson", "K Ahmed"]},
+    }
+    return ctx
+
+
+def test_key_battles_shrink_small_samples_and_skip_teammates(monkeypatch):
+    from services.preview_cards import players as P
+    pairs = [
+        # 37 balls, raw edge +40 over expected: likely edge 40 * 37/157 = 9.4
+        {"batter": "SK Yadav", "bowler": "N Ahmad", "balls": 37, "runs": 61, "wickets": 1, "raa_per_100": 50.0},
+        # 20 balls, raw +20: likely 20 * 20/140 = 2.9, below the 5-run floor
+        {"batter": "HH Pandya", "bowler": "K Ahmed", "balls": 20, "runs": 30, "wickets": 0, "raa_per_100": 30.0},
+        # teammates are never a battle
+        {"batter": "SK Yadav", "bowler": "JJ Bumrah", "balls": 60, "runs": 20, "wickets": 4, "raa_per_100": -80.0},
+        # bowler ahead: raw -60 over 50 balls -> likely -17.6
+        {"batter": "S Samson", "bowler": "JJ Bumrah", "balls": 50, "runs": 40, "wickets": 3, "raa_per_100": -50.0},
+    ]
+    bat = [{"batter": n, "raa_per_100": 10.0} for n in ("SK Yadav", "HH Pandya", "S Samson")]
+    bowl = [{"bowler": n, "raa_per_100": 0.0} for n in ("N Ahmad", "K Ahmed", "JJ Bumrah")]
+    ctx = _players_ctx(monkeypatch, {("batter", "bowler"): pairs, ("batter",): bat, ("bowler",): bowl})
+    rows = P.battles(ctx)
+    assert [(r["batter"], r["bowler"], r["edge"]) for r in rows] == [("S Samson", "JJ Bumrah", -18), ("SK Yadav", "N Ahmad", 9)]
+    card = P.key_battles(ctx)
+    assert card.title == "JJ Bumrah has the edge on S Samson: 40 off 50, out 3 times"
+
+
+def test_milestones_bands_and_wording():
+    from services.milestones import within_reach
+    totals = {"DL Chahar": {"runs": 142, "sixes": 9, "wickets": 96, "matches": 103},
+              "HH Pandya": {"runs": 2955, "sixes": 160, "wickets": 70, "matches": 149},
+              "Far": {"runs": 2900, "sixes": 120, "wickets": 40, "matches": 80}}
+    found = within_reach(totals, {"DL Chahar": "CSK", "HH Pandya": "MI", "Far": "MI"}, "T20")
+    texts = [f"{m.player} {m.phrase('IPL')}" for m in found]
+    assert "DL Chahar is 4 wickets from 100 IPL wickets" in texts
+    assert "HH Pandya is 45 runs from 3,000 IPL runs" in texts
+    assert "HH Pandya would play a 150th IPL match" in texts
+    assert not any(t.startswith("Far") for t in texts)
+    assert all(" his " not in t and " her " not in t for t in texts)
+
+
+def test_how_they_bowl_needs_600_balls(monkeypatch):
+    from services.preview_cards import players as P
+    def grid(bowler, n, extra_cell="SHORT"):
+        rows = [{"bowler": bowler, "line": "OUTSIDE_OFFSTUMP", "length": "GOOD_LENGTH", "balls": n // 2},
+                {"bowler": bowler, "line": "ON_THE_STUMPS", "length": extra_cell, "balls": n - n // 2}]
+        return rows
+    thin = _players_ctx(monkeypatch, {("bowler", "line", "length"): grid("JJ Bumrah", 500)})
+    assert P.how_they_bowl(thin) is None
+    full = _players_ctx(monkeypatch, {("bowler", "line", "length"): grid("JJ Bumrah", 900, "YORKER")})
+    card = P.how_they_bowl(full)
+    assert card.title.startswith("JJ Bumrah bowls yorkers on the stumps")
+    assert card.payload["side"] == "MI"
