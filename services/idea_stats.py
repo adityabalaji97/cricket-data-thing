@@ -319,25 +319,13 @@ def race(db: Session, spec: Dict[str, Any], scope: Dict[str, Any]) -> Tuple[List
     # Career: the innings number (or ball) at which a running total first reached the target. Only
     # careers that start inside the data (debut_floor), so none is counted from the middle.
     batter = spec["subject"] == "batter"
-    floor, floor_label = debut_floor(db, scope, ball_by_ball=spec["unit"] == "balls")
+    floor, floor_label = debut_floor(db, scope, ball_by_ball=spec["unit"] == "balls" and not has_legacy_balls(scope))
     caveat = floor_label.strip(" ()").capitalize() + "."
     if spec["unit"] == "balls":
-        team_col = "dd.team_bat" if batter else "dd.team_bowl"
-        where, params = _where({**scope, "start": None, "end": None}, team_col, "dd.team_bowl" if batter else "dd.team_bat")
-        name = "COALESCE(am.canonical_name, dd.bat)" if batter else "COALESCE(am.canonical_name, dd.bowl)"
-        join = "LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key" if batter else "LEFT JOIN alias_map am ON LOWER(dd.bowl) = am.name_key"
-        amount = ("COALESCE(dd.batruns, 0)" if batter else
-                  "CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' AND LOWER(COALESCE(dd.dismissal, '')) = ANY(:wk) THEN 1 ELSE 0 END")
-        ball = ("COALESCE(dd.ballfaced, CASE WHEN COALESCE(dd.wide, 0) = 0 THEN 1 ELSE 0 END)" if batter else
-                "CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END")
+        body, params = ball_rows_sql(scope, batter)
         rows = [dict(r) for r in db.execute(text(f"""
             WITH {ALIAS_MAP_CTE},
-            b AS (
-                SELECT {name} AS name, {team_col} AS team, m.date, dd.p_match, dd.inns, dd.over, dd.ball,
-                       {amount} AS amount, {ball} AS faced
-                FROM delivery_details dd JOIN matches m ON m.id = dd.p_match {join}
-                WHERE {where}
-            ),
+            b AS ({body}),
             running AS (
                 SELECT *, SUM(amount) OVER w AS total, SUM(faced) OVER w AS balls, MIN(date) OVER (PARTITION BY name) AS debut
                 FROM b WINDOW w AS (PARTITION BY name ORDER BY date, p_match, inns, over, ball ROWS UNBOUNDED PRECEDING)
@@ -345,7 +333,7 @@ def race(db: Session, spec: Dict[str, Any], scope: Dict[str, Any]) -> Tuple[List
             SELECT DISTINCT ON (name) name, team, date, balls AS value, total AS final, debut
             FROM running WHERE total >= :target AND debut >= :floor
             ORDER BY name, date, p_match, inns, over, ball
-        """), {**params, "target": target, "floor": floor, "wk": list(BOWLER_WICKETS)}).mappings()]
+        """), {**params, "target": target, "floor": floor}).mappings()]
     else:
         team_col = "s.batting_team" if batter else "s.bowling_team"
         where, params = _where({**scope, "start": None, "end": None}, team_col, _opp(team_col))
@@ -376,6 +364,53 @@ def race(db: Session, spec: Dict[str, Any], scope: Dict[str, Any]) -> Tuple[List
 
 
 BOWLER_WICKETS = ("bowled", "caught", "lbw", "leg before wicket", "caught and bowled", "stumped", "hit wicket")
+
+#: delivery_details holds men's T20 from 2015; the legacy `deliveries` table has the seasons before (IPL from 2008).
+DETAILS_START = date(2015, 1, 1)
+
+
+def has_legacy_balls(scope: Dict[str, Any]) -> bool:
+    """Men's T20 careers can be counted ball by ball from before 2015 (legacy deliveries); ODIs can't."""
+    return scope.get("fmt") == "T20"
+
+
+def ball_rows_sql(scope: Dict[str, Any], batter: bool) -> Tuple[str, Dict[str, Any]]:
+    """Every ball of the scope as (name, team, date, p_match, inns, over, ball, amount, faced): delivery_details, plus
+    for men's T20 the legacy table's balls before 2015, so a career is counted from its first ball, not from 2015.
+    amount is runs off the bat (batter) or bowler wickets; faced is a ball faced (no wides) or a legal ball bowled.
+    Names go through alias_map (the caller's WITH must include ALIAS_MAP_CTE)."""
+    team_col = "dd.team_bat" if batter else "dd.team_bowl"
+    where, params = _where({**scope, "start": None, "end": None}, team_col, "dd.team_bowl" if batter else "dd.team_bat")
+    who = "dd.bat" if batter else "dd.bowl"
+    amount = ("COALESCE(dd.batruns, 0)" if batter else
+              "CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' AND LOWER(COALESCE(dd.dismissal, '')) = ANY(:wk) THEN 1 ELSE 0 END")
+    ball = ("COALESCE(dd.ballfaced, CASE WHEN COALESCE(dd.wide, 0) = 0 THEN 1 ELSE 0 END)" if batter else
+            "CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END")
+    sql = f"""
+        SELECT COALESCE(am.canonical_name, {who}) AS name, {team_col} AS team, m.date, dd.p_match::text AS p_match,
+               dd.inns, dd.over, dd.ball, {amount} AS amount, {ball} AS faced
+        FROM delivery_details dd JOIN matches m ON m.id = dd.p_match
+        LEFT JOIN alias_map am ON LOWER({who}) = am.name_key
+        WHERE {where}"""
+    params = {**params, "wk": list(BOWLER_WICKETS)}
+    if has_legacy_balls(scope):
+        lteam = "d.batting_team" if batter else "d.bowling_team"
+        lwhere, lparams = _where({**scope, "start": None, "end": None}, lteam, "d.bowling_team" if batter else "d.batting_team")
+        lwho = "d.batter" if batter else "d.bowler"
+        lamount = ("COALESCE(d.runs_off_bat, 0)" if batter else
+                   "CASE WHEN LOWER(COALESCE(d.wicket_type, '')) = ANY(:wk) THEN 1 ELSE 0 END")
+        lball = ("CASE WHEN COALESCE(d.wides, 0) = 0 THEN 1 ELSE 0 END" if batter else
+                 "CASE WHEN COALESCE(d.wides, 0) = 0 AND COALESCE(d.noballs, 0) = 0 THEN 1 ELSE 0 END")
+        sql += f"""
+        UNION ALL
+        SELECT COALESCE(am.canonical_name, {lwho}) AS name, {lteam} AS team, m.date, d.match_id::text AS p_match,
+               d.innings AS inns, d.over, d.ball, {lamount} AS amount, {lball} AS faced
+        FROM deliveries d JOIN matches m ON m.id = d.match_id
+        LEFT JOIN alias_map am ON LOWER({lwho}) = am.name_key
+        WHERE {lwhere} AND m.date < :details_start"""
+        params.update(lparams)
+        params["details_start"] = DETAILS_START
+    return sql, params
 
 
 def debut(db: Session, spec: Dict[str, Any], scope: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], str]:

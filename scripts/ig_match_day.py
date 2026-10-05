@@ -45,8 +45,9 @@ def main() -> int:
         return bool(db.execute(text("SELECT 1 FROM content_packs WHERE angle_key = :k"), {"k": f"ig:{key}"}).first())
 
     made = []
+    fixtures = fetch_upcoming_fixtures(20)
     if not args.no_previews:
-        for f in fetch_upcoming_fixtures(20):
+        for f in fixtures:
             if f.get("format") not in ("T20", "ODI") or (teams and not teams & {f["team1"], f["team2"]}):
                 continue
             day = date.fromisoformat(f["date"])
@@ -80,18 +81,24 @@ def main() -> int:
             if exists(key) and not args.force:
                 print(f"recap {key}: already queued")
                 continue
-            print(f"recap {m['team1']} v {m['team2']} on {m['date']} ({m['id']})")
+            # Your rule: a recap is news until the sides meet again (or for RECAP_DAYS after a one-off / series end).
+            post_by = ig_backlog.recap_post_by(m["date"], m["team1"], m["team2"], fixtures)
+            if post_by <= datetime.now(timezone.utc):
+                print(f"recap {key}: past its window ({post_by:%d %b %H:%M} UTC), not made")
+                continue
+            print(f"recap {m['team1']} v {m['team2']} on {m['date']} ({m['id']}), post by {post_by:%d %b %H:%M} UTC")
             if args.dry_run:
                 continue
-            post = ig_backlog.recap_pack(db, str(m["id"]))
+            post = ig_backlog.recap_pack(db, str(m["id"]))  # None until the match's ball-by-ball data is in
             if post:
+                post["post_by"] = post_by
                 made.append((post, post["day"]))
             else:
-                print("  not made: no recap for this match yet")
+                print("  not made: no ball-by-ball data for this match yet")
 
     for post, day in made:
         with engine.begin() as conn:
-            ig_backlog.upsert_pack(conn, post, day, source="ig-match-day")
+            ig_backlog.upsert_pack(conn, post, day, source="ig-match-day", post_by=post.get("post_by"))
         result = ig_slides.render(post["fact"]["carousel_id"], post["fact"]["slides"], args.base)
         print(f"queued {post['key']} for {day}; rendered {len(result['ok'])}/{post['fact']['slides']} slides"
               + (f", failed {result['failed']}" if result["failed"] else ""))
