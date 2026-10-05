@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import re
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
 from sqlalchemy import text
@@ -309,24 +309,26 @@ def _write(calendar: List[Dict[str, Any]], bench: List[Dict[str, Any]], prune: b
         """), {"keys": [f"ig:{post['key']}" for post, _ in rows]})
 
 
-def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "ig-backlog") -> None:
+def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "ig-backlog",
+                post_by: Optional[Any] = None) -> None:
     """One Instagram pack: {key, pillar, fact, snapshot_id, warnings} planned for `day` (None = bench)."""
     fact = post["fact"]
     caption = post.get("caption") or (_caption(fact) if fact.get("kind") != "note"
                                       else "\n".join([fact["title"], "", fact.get("finding") or "", "", fact["method"]]))
     conn.execute(text("""
         INSERT INTO content_packs (match_id, snapshot_id, angle_key, title, first_comment, subreddit, flair, facts,
-                                   rule_warnings, status, source, channel, planned_for, pillar, caption)
+                                   rule_warnings, status, source, channel, planned_for, pillar, caption, post_by)
         VALUES (NULL, :s, :k, :t, NULL, NULL, NULL, CAST(:f AS jsonb), CAST(:w AS jsonb), 'ready', :src,
-                'instagram', :d, :p, :c)
+                'instagram', :d, :p, :c, :pb)
         ON CONFLICT (angle_key) WHERE angle_key IS NOT NULL DO UPDATE SET
             snapshot_id = EXCLUDED.snapshot_id, title = EXCLUDED.title, facts = EXCLUDED.facts,
             rule_warnings = EXCLUDED.rule_warnings, pillar = EXCLUDED.pillar, caption = EXCLUDED.caption,
+            post_by = EXCLUDED.post_by,
             planned_for = CASE WHEN content_packs.status = 'ready' THEN EXCLUDED.planned_for
                                ELSE content_packs.planned_for END
     """), {"s": post["snapshot_id"], "k": f"ig:{post['key']}", "t": fact["title"],
            "f": json.dumps(fact, default=str), "w": json.dumps(post["warnings"]), "d": day,
-           "p": post["pillar"], "c": caption, "src": source})
+           "p": post["pillar"], "c": caption, "src": source, "pb": post_by})
 
 
 def preview_post(db: Session, venue: str, team1: str, team2: str, cards: Optional[List[str]], day: date, label: str,
@@ -418,3 +420,19 @@ def refresh(db: Session, keys: Iterable[str]) -> List[Dict[str, Any]]:
             upsert_pack(conn, post, row[0])
         out.append(post)
     return out
+
+
+#: A recap with no next meeting in sight (a one-off, or a series' last match) stays this long after the match.
+RECAP_DAYS = 3
+
+
+def recap_post_by(match_day: date, team1: str, team2: str, fixtures: List[Dict[str, Any]]) -> datetime:
+    """When a recap stops being news: the start of the sides' next meeting (from the fixture list), else the end of
+    RECAP_DAYS after the match. content_packs.expire() marks it expired after that."""
+    pair = {team1, team2}
+    starts = sorted(datetime.fromisoformat(f["start_utc"]) for f in fixtures
+                    if f.get("start_utc") and {f.get("team1"), f.get("team2")} == pair
+                    and datetime.fromisoformat(f["start_utc"]).date() > match_day)
+    if starts:
+        return starts[0]
+    return datetime.combine(match_day + timedelta(days=RECAP_DAYS), datetime.max.time(), tzinfo=timezone.utc)

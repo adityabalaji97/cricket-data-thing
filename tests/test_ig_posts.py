@@ -93,3 +93,17 @@ def test_match_day_helpers():
     # A race line runs from (0, 0) to the innings that reached the target, and no further.
     rows = [("A", 30, 400), ("A", 60, 1010), ("A", 90, 1100), ("B", 50, 990)]
     assert records._cut(rows, 1000) == {"A": [(0, 0), (30, 400), (60, 1010)], "B": [(0, 0), (50, 990)]}
+
+
+def test_recap_window_runs_to_the_next_meeting_or_three_days():
+    from datetime import date, datetime, timezone
+
+    from services.ig_backlog import RECAP_DAYS, recap_post_by
+
+    fixtures = [{"team1": "West Indies", "team2": "India", "start_utc": "2026-10-09T13:30:00+00:00"},
+                {"team1": "India", "team2": "Australia", "start_utc": "2026-10-08T13:30:00+00:00"}]
+    # Next meeting of the same sides (either way round), not the other fixture.
+    assert recap_post_by(date(2026, 10, 6), "India", "West Indies", fixtures) == datetime(2026, 10, 9, 13, 30, tzinfo=timezone.utc)
+    # No next meeting: the end of the third day after the match.
+    end = recap_post_by(date(2026, 10, 6), "India", "Pakistan", fixtures)
+    assert end.date() == date(2026, 10, 6 + RECAP_DAYS) and end.hour == 23

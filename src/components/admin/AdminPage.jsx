@@ -289,6 +289,12 @@ const IgPackCard = ({ pack, client, onChanged, toast }) => {
         <Chip size="small" label={PILLAR_LABELS[pack.pillar] || pack.pillar} sx={{ bgcolor: '#1d212b', color: C.mid }} />
         {slideUrls.length > 1 && <Typography sx={{ fontSize: 12, color: C.lo }}>{slideUrls.length} slides · swipe</Typography>}
       </Box>
+      {pack.post_by && (
+        // Recaps: news until the sides meet again (or 3 days after a one-off); then the queue drops them.
+        <Typography sx={{ fontSize: 12, color: new Date(pack.post_by) < new Date() ? C.red : C.amber, mb: 1 }}>
+          {deadlineText(pack.post_by)}
+        </Typography>
+      )}
       <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', scrollSnapType: 'x mandatory', pb: 0.5 }}>
         {slideUrls.map((u, i) => (
           <Box key={u} component="a" href={`${u}&download=1`} target="_blank" rel="noopener noreferrer"

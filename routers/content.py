@@ -24,6 +24,12 @@ def list_packs(status: str = "ready", channel: str = "reddit", limit: int = 60, 
     """One channel's packs. Instagram packs (services/ig_backlog.py) come in calendar order, the bench last."""
     if channel not in CHANNELS:
         raise HTTPException(status_code=400, detail=f"channel must be one of {CHANNELS}")
+    if channel == "instagram":
+        # Recaps stop being news at the sides' next meeting (services/ig_backlog.recap_post_by): expire them as soon as
+        # the queue is read, not at the next nightly run.
+        from services.content_packs import expire
+
+        expire(db)
     where = "WHERE p.channel = :channel" + ("" if status == "all" else " AND p.status = :status")
     order = ("p.planned_for ASC NULLS LAST, p.created_at" if channel == "instagram"
              else "(p.status = 'ready') DESC, p.post_by ASC NULLS LAST, p.created_at DESC")

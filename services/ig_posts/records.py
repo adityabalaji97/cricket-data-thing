@@ -35,28 +35,20 @@ def _qb_scope(scope: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _series_balls(db: Session, spec: Dict[str, Any], scope: Dict[str, Any], names: List[str]) -> Dict[str, List[Tuple[int, int]]]:
-    """Each name's running (balls, runs|wickets) at the end of every innings, from delivery_details (as race())."""
-    batter = spec["subject"] == "batter"
-    team_col = "dd.team_bat" if batter else "dd.team_bowl"
-    where, params = S._where({**scope, "start": None, "end": None}, team_col, "dd.team_bowl" if batter else "dd.team_bat")
-    name = "COALESCE(am.canonical_name, dd.bat)" if batter else "COALESCE(am.canonical_name, dd.bowl)"
-    join = "LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key" if batter else "LEFT JOIN alias_map am ON LOWER(dd.bowl) = am.name_key"
-    amount = ("COALESCE(dd.batruns, 0)" if batter else
-              "CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' AND LOWER(COALESCE(dd.dismissal, '')) = ANY(:wk) THEN 1 ELSE 0 END")
-    ball = ("COALESCE(dd.ballfaced, CASE WHEN COALESCE(dd.wide, 0) = 0 THEN 1 ELSE 0 END)" if batter else
-            "CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END")
+    """Each name's running (balls, runs|wickets) at the end of every innings: the same balls race() counts
+    (idea_stats.ball_rows_sql: delivery_details, plus pre-2015 men's T20 from the legacy table)."""
+    body, params = S.ball_rows_sql(scope, spec["subject"] == "batter")
     rows = db.execute(text(f"""
         WITH {ALIAS_MAP_CTE},
+        b AS ({body}),
         inns AS (
-            SELECT {name} AS name, m.date, dd.p_match, dd.inns, SUM({amount}) AS amount, SUM({ball}) AS faced
-            FROM delivery_details dd JOIN matches m ON m.id = dd.p_match {join}
-            WHERE {where} AND {name} = ANY(:names)
-            GROUP BY 1, 2, 3, 4
+            SELECT name, date, p_match, inns, SUM(amount) AS amount, SUM(faced) AS faced
+            FROM b WHERE name = ANY(:names) GROUP BY 1, 2, 3, 4
         )
         SELECT name, SUM(faced) OVER w AS x, SUM(amount) OVER w AS y
         FROM inns WINDOW w AS (PARTITION BY name ORDER BY date, p_match, inns ROWS UNBOUNDED PRECEDING)
         ORDER BY name, x
-    """), {**params, "names": names, "wk": list(S.BOWLER_WICKETS)}).all()
+    """), {**params, "names": names}).all()
     return _cut(rows, spec["target"])
 
 
@@ -100,7 +92,7 @@ def _race_card(db, spec, scope, unit: str, words: Dict[str, str]) -> Optional[Di
     rows, _ = S.race(db, {**spec, "unit": unit, "span": "career"}, scope)
     # Balls come from ball-by-ball data, which can start later than the scorecards innings are counted from: each
     # race says whose careers it covers.
-    caveat = S.debut_floor(db, scope, ball_by_ball=unit == "balls")[1].strip(" ()")
+    caveat = S.debut_floor(db, scope, ball_by_ball=unit == "balls" and not S.has_legacy_balls(scope))[1].strip(" ()")
     top = rows[:TOP]
     if len(top) < 2:
         return None
@@ -144,7 +136,7 @@ def build(db: Session, idea: str) -> Optional[Dict[str, Any]]:
         return None
     scope = S.parse_scope(idea, db, None)
     words = S.race_words({**spec, "unit": "balls"}, scope)
-    caveat = S.debut_floor(db, scope, ball_by_ball=True)[1].strip(" ()")
+    caveat = S.debut_floor(db, scope, ball_by_ball=not S.has_legacy_balls(scope))[1].strip(" ()")
     made = _race_card(db, spec, scope, "balls", words)
     if not made:
         return None
@@ -197,8 +189,9 @@ def build(db: Session, idea: str) -> Optional[Dict[str, Any]]:
         "rows": [{"name": t["name"], "short": short(t["name"]), "values": t["values"], "pct": t.get("pct", {}),
                   "leader": t.get("leader", [])} for t in table],
         "verdict": verdict,
-        "method": "Rates are over each career up to the day of the milestone. Shade: rank among these players "
-                  "(brighter is better). Ring: best of them.",
+        "method": "Rates are over each career up to the day of the milestone"
+                  + ("; RAA and WPA from 2015, when ball-by-ball win probability starts" if t20 else "")
+                  + ". Shade: rank among these players (brighter is better). Ring: best of them.",
     }, f"The fastest to {words['what']} · {caveat}")
     cards.append(score)
     hook = f"Who is the fastest to {words['what']}?"
