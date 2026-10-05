@@ -11,6 +11,14 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **INSTAGRAM v2 CHUNKS 2-4: DEBATE POSTS (2026-10-05).** services/ig_posts: angles.py (per-role metric catalogue, families),
+> context.py (one query-builder field per question + derived economy/wpa_per_100/...), planner.py (Jev scores angles per
+> question; rules: T20 needs RAA|Impact + WPA, <=2 per family, 4-6 angles; default order without Jev), questions.py
+> (templates x scopes; kept only if leaders differ; Jev fan-appeal score), cards.py (scatter_plus, metric_bars, zones,
+> scorecard with split verdict), post.py. Visuals in src/components/story/postVisuals.jsx. ig_backlog debate pillar = generator
+> (hand-written debate IDEAS removed); myth posts off (MYTH_POSTS) until they chart results JSON. build_ig_backlog renders.
+> Jev locally: TYPESAFE_API_KEY=$(heroku config:get TYPESAFE_API_KEY -a cricket-data-thing).
+>
 > **INSTAGRAM v2 CHUNK 1: SLIDES FROM THE APP'S COMPONENTS (2026-10-05).** /ig/:carouselId/:n (src/components/ig/IgSlide.jsx,
 > no site chrome) draws a slide at 432x540; card slides are the story's own StoryCard (exportMode) + VISUALS/POST_VISUALS
 > from the card JSON (ig_carousel.for_story_cards). scripts/render_ig_slides.mjs (scripts/lib/cdp.mjs, headless Chrome,
