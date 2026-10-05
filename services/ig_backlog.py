@@ -192,20 +192,27 @@ def _note_post(db: Session, item: Dict[str, Any]) -> Dict[str, Any]:
     finding = (note["dek"] or (note["body_md"] or "").strip().split("\n", 1)[0]).strip().strip("*_ ")
     fact = {"kind": "note", "subject": None, "title": note["title"], "finding": finding, "note_id": note["id"],
             "note_slug": note["slug"], "method": "Pre-registered test on Hindsight's ball-by-ball data; full write-up linked in bio."}
-    warnings = [] if note["status"] == "published" else [f"The note is still a {note['status']}: review and publish it before this goes out."]
-    return {"status": "resolved", "fact": fact, "snapshot": None, "warnings": warnings, "note_row": dict(note)}
+    if note["status"] != "published":
+        # An unpublished note's findings haven't been reviewed: they don't go out on Instagram first.
+        return {"status": "skipped", "note": f"note {note['id']} is a {note['status']}; publish it to use it"}
+    return {"status": "resolved", "fact": fact, "snapshot": None, "warnings": [], "note_row": dict(note)}
 
 
 def make(db: Session, item: Dict[str, Any], created_by: str = "ig-backlog") -> Dict[str, Any]:
     """Run one idea: {status, fact, snapshot, warnings}. Saves chart snapshots (callers stub that for a dry run)."""
     from services import content_ideas
 
-    from services import ig_carousel
+    from services import ig_captions, ig_carousel
 
     if item["pillar"] == "myth":
         result = _note_post(db, item)
         if result.get("status") == "resolved":
-            slides = ig_carousel.for_note(result.pop("note_row"))
+            note = result.pop("note_row")
+            slides = ig_carousel.for_note(note)
+            verdict = ig_carousel.note_sections(note.get("body_md") or "").get("verdict")
+            result["caption"] = ig_captions.build(
+                note["title"], f"Our verdict: {verdict}." if verdict else "", "myth",
+                "a test written down before the analysis ran, on ball-by-ball data.")
             carousel = ig_carousel.save(db, slides, result["fact"]["title"], {"ig": item["key"]}, created_by)
             result["fact"].update(carousel_id=carousel["id"], slides=len(slides))
             result["snapshot"] = carousel  # a text post: the carousel's first slide is its image
@@ -224,10 +231,13 @@ def make(db: Session, item: Dict[str, Any], created_by: str = "ig-backlog") -> D
     rank, total = numbers.get("rank"), numbers.get("total")
     if item.get("planned", {}).get("highlight") and rank and total and rank > max(10, total * 0.1):
         warnings.append(f"The highlighted subject ranks {rank} of {total}: not a standout.")
-    slides = ig_carousel.for_fact(fact, result["snapshot"]["id"], HOOKS.get(item["key"]) or item["idea"], _kicker(item))
+    hook = HOOKS.get(item["key"]) or item["idea"]
+    slides = ig_carousel.for_fact(fact, result["snapshot"]["id"], hook, _kicker(item))
     carousel = ig_carousel.save(db, slides, fact["title"], {"ig": item["key"]}, created_by)
     fact.update(carousel_id=carousel["id"], slides=len(slides))
-    return {**result, "warnings": warnings}
+    caption = ig_captions.build(hook, fact["title"], item["pillar"], fact.get("method"), _players_of(item, fact),
+                                _kicker(item))
+    return {**result, "warnings": warnings, "caption": caption}
 
 
 #: Debate priority: T20 and ODI alternate, so a T20 series isn't met with a month of ODI posts (and vice versa).
@@ -244,7 +254,8 @@ def schedule(made: List[Dict[str, Any]], start: date, days: int = DAYS) -> List[
     """Assign evergreen posts to the WEEK template from `start`; returns the calendar (one entry per day).
 
     Each slot takes the first unused post of its pillar (IDEAS order is the priority order) whose players haven't
-    appeared in the previous SPREAD - 1 scheduled posts; with none left that satisfies the rule, the slot stays open.
+    appeared in the previous SPREAD - 1 scheduled posts. With none left in its pillar (e.g. no published myth notes),
+    an evergreen slot takes the first eligible post of another evergreen pillar; with none at all it stays open.
     """
     rank = {k: i for i, k in enumerate(DEBATE_ORDER)}
     pools = {p: [m for m in made if m["pillar"] == p] for p in EVERGREEN}
@@ -256,7 +267,9 @@ def schedule(made: List[Dict[str, Any]], start: date, days: int = DAYS) -> List[
         entry = {"date": day, "pillar": pillar, "post": None}
         if pillar in EVERGREEN:
             blocked = {p for post in recent[-(SPREAD - 1):] for p in post["players"]}
-            pick = next((m for m in pools[pillar] if m["key"] not in used and not blocked & set(m["players"])), None)
+            ok = lambda m: m["key"] not in used and not blocked & set(m["players"])  # noqa: E731
+            pick = (next((m for m in pools[pillar] if ok(m)), None)
+                    or next((m for p in EVERGREEN if p != pillar for m in pools[p] if ok(m)), None))
             if pick:
                 used.add(pick["key"])
                 recent.append(pick)
@@ -280,21 +293,29 @@ def build(db: Session, start: date, days: int = DAYS, write: bool = False,
             continue
         made.append({"key": item["key"], "pillar": item["pillar"], "fact": result["fact"],
                      "snapshot_id": (result.get("snapshot") or {}).get("id"), "warnings": result.get("warnings") or [],
-                     "players": _players_of(item, result["fact"])})
+                     "players": _players_of(item, result["fact"]), "caption": result.get("caption")})
     calendar, bench = schedule(made, start, days)
     if write:
-        _write(calendar, bench)
+        _write(calendar, bench, prune=not keys)  # a partial (--only) run must not clear everything else
     return {"calendar": calendar, "bench": bench, "failed": failed}
 
 
-def _write(calendar: List[Dict[str, Any]], bench: List[Dict[str, Any]]) -> None:
-    """Upsert the posts (angle_key 'ig:<key>'). Posted or skipped packs keep their status and day."""
+def _write(calendar: List[Dict[str, Any]], bench: List[Dict[str, Any]], prune: bool = True) -> None:
+    """Upsert the posts (angle_key 'ig:<key>'). Posted or skipped packs keep their status and day. With prune, ready
+    backlog packs this run didn't make leave the queue."""
     from database import engine
 
     rows = [(e["post"], e["date"]) for e in calendar if e["post"]] + [(b, None) for b in bench]
     with engine.begin() as conn:
         for post, day in rows:
             upsert_pack(conn, post, day)
+        if not prune:
+            return
+        # Ready backlog packs this run no longer makes (an idea removed, a note unpublished) leave the queue.
+        conn.execute(text("""
+            UPDATE content_packs SET status = 'skipped', planned_for = NULL
+            WHERE channel = 'instagram' AND source = 'ig-backlog' AND status = 'ready' AND NOT (angle_key = ANY(:keys))
+        """), {"keys": [f"ig:{post['key']}" for post, _ in rows]})
 
 
 def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "ig-backlog") -> None:
@@ -321,7 +342,7 @@ def preview_post(db: Session, venue: str, team1: str, team2: str, cards: List[st
                  team1_short: Optional[str] = None, team2_short: Optional[str] = None, fmt: str = "T20") -> Dict[str, Any]:
     """A match-day post (pillar 'reactive'): the chosen cards of the fixture's preview story, frozen as preview_card
     snapshots (the same images the story shares), with a hook and an end slide around them."""
-    from services import ig_carousel
+    from services import ig_captions, ig_carousel
     from services.preview_cards import PreviewContext, context_params
     from services.snapshots import SnapshotError, create_snapshot
 
@@ -344,9 +365,11 @@ def preview_post(db: Session, venue: str, team1: str, team2: str, cards: List[st
     carousel = ig_carousel.save(db, slides, hook, {"preview": params, "cards": cards, "day": str(day)}, "ig-preview")
     fact = {"kind": "preview", "subject": None, "title": hook, "card_titles": titles, "fixture": params,
             "carousel_id": carousel["id"], "slides": len(slides)}
-    caption = "\n".join([f"{team1} v {team2} · {label}", "", *[f"• {t}" for t in titles], "",
-                         "Every card is from ball-by-ball data. The full preview story is on Hindsight (link in bio).",
-                         "", "Who are you backing?"])
+    short1, short2 = team1_short or team1, team2_short or team2
+    occasion = [ig_captions.tag(f"{short1}v{short2}")] + (["#TeamIndia"] if "India" in (team1, team2) else [])
+    caption = ig_captions.build(f"{team1} v {team2} · {label}", "", "reactive",
+                                "every card is from ball-by-ball data; the full preview story is free on Hindsight.",
+                                kicker=label, extra_tags=occasion, body=[f"• {t}" for t in titles])
     slug = re.sub(r"[^a-z0-9]+", "-", f"{team1}-{team2}-{day}".lower()).strip("-")
     return {"status": "resolved", "key": f"preview-{slug}", "pillar": "reactive", "fact": fact,
             "snapshot_id": carousel["id"], "warnings": warnings, "caption": caption, "players": []}
