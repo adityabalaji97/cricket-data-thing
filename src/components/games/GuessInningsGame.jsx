@@ -15,11 +15,11 @@ const HINTS = [
   { key: 'initials', icon: '🔤', label: 'Initials' },
 ];
 
-const RUN_COLORS = { 1: '#8b95a7', 2: '#5aa9e6', 3: '#a78bfa', 4: colors.accent, 6: '#f5a524' };
+export const RUN_COLORS = { 1: '#8b95a7', 2: '#5aa9e6', 3: '#a78bfa', 4: colors.accent, 6: '#f5a524' };
 
 // Wagon coordinates are centred on (150, 150). Only the direction is reliable across feeds, so
 // boundaries go to the rope and other shots are scaled by distance within the inner ring.
-const WagonWheel = ({ deliveries }) => {
+export const WagonWheel = ({ deliveries }) => {
   const size = 280;
   const c = size / 2;
   const rope = size * 0.46;
@@ -55,7 +55,7 @@ const WagonWheel = ({ deliveries }) => {
   );
 };
 
-const InningsClue = ({ puzzle }) => (
+export const InningsClue = ({ puzzle }) => (
   <Box sx={{ p: 2.25, borderRadius: 3, bgcolor: colors.surface1, border: `1px solid ${colors.border}` }}>
     <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, color: colors.textLo, letterSpacing: '0.08em', textTransform: 'uppercase', mb: 1 }}>
       {puzzle.season}

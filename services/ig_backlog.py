@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 #: One week of slots, Monday first. Evergreen pillars are filled ahead; 'play' and 'reactive' stay open.
 WEEK = ["debate", "reactive", "myth", "debate", "play", "reactive", "weird"]
 EVERGREEN = ("debate", "myth", "weird")
-#: Myth posts off until they carry charts of the hypothesis results, not just text.
-MYTH_POSTS = False
+#: Myth posts: published notes with a chart spec (services/ig_posts/myths.SPECS).
+MYTH_POSTS = True
 #: Debate posts from the generator: how many to make (the calendar takes what it needs, the rest is bench).
 DEBATE_POSTS = 14
 #: A player appears at most once in any SPREAD consecutive scheduled posts.
@@ -131,17 +131,20 @@ def make(db: Session, item: Dict[str, Any], created_by: str = "ig-backlog") -> D
     from services import ig_captions, ig_carousel
 
     if item["pillar"] == "myth":
+        from services.ig_posts import myths
+
         result = _note_post(db, item)
-        if result.get("status") == "resolved":
-            note = result.pop("note_row")
-            slides = ig_carousel.for_note(note)
-            verdict = ig_carousel.note_sections(note.get("body_md") or "").get("verdict")
-            result["caption"] = ig_captions.build(
-                note["title"], f"Our verdict: {verdict}." if verdict else "", "myth",
-                "a test written down before the analysis ran, on ball-by-ball data.")
-            carousel = ig_carousel.save(db, slides, result["fact"]["title"], {"ig": item["key"]}, created_by)
-            result["fact"].update(carousel_id=carousel["id"], slides=len(slides))
-            result["snapshot"] = carousel  # a text post: the carousel's first slide is its image
+        if result.get("status") != "resolved":
+            return result
+        note = result.pop("note_row")
+        built = myths.build(note)  # charts of the result (services/ig_posts/myths.SPECS); None without a spec
+        if not built:
+            return {"status": "skipped", "note": f"no chart spec for note {note['id']} yet"}
+        carousel = ig_carousel.save(db, built["slides"], built["title"], {"myth": built["slug"]}, created_by)
+        result["fact"].update(carousel_id=carousel["id"], slides=len(built["slides"]), verdict=built["verdict"], render=True)
+        result["snapshot"] = carousel
+        result["caption"] = ig_captions.build(note["title"], built["verdict"], "myth",
+                                              "a test written down before the analysis ran, on ball-by-ball data.")
         return result
     if item["pillar"] == "weird":
         record = _record_post(db, item, created_by)
@@ -245,9 +248,36 @@ def build(db: Session, start: date, days: int = DAYS, write: bool = False,
     if not keys or any(k.startswith("debate-") for k in keys):
         made += debate_posts(db, only=[k[len("debate-"):] for k in keys if k.startswith("debate-")] or None)
     calendar, bench = schedule(made, start, days)
+    if not keys:
+        for entry in calendar:  # play-along slots: an old Guess the Innings puzzle each (services/ig_posts/play.py)
+            if entry["pillar"] == "play" and not entry["post"]:
+                entry["post"] = play_post(db, entry["date"])
     if write:
         _write(calendar, bench, prune=not keys)  # a partial (--only) run must not clear everything else
     return {"calendar": calendar, "bench": bench, "failed": failed}
+
+
+def play_post(db: Session, day: date, created_by: str = "ig-play") -> Optional[Dict[str, Any]]:
+    """'Whose innings is this?' for the play-along slot on `day` (a puzzle from PUZZLE_LAG days earlier)."""
+    from services import ig_captions, ig_carousel
+    from services.ig_posts import play
+
+    try:
+        built = play.guess_innings_post(db, day)
+    except Exception:  # the game's pool can be empty on a thin local database: leave the slot open
+        logger.exception("play post for %s failed", day)
+        db.rollback()
+        return None
+    if not built:
+        return None
+    carousel = ig_carousel.save(db, built["slides"], built["title"], {"play": built["puzzle"]}, created_by)
+    fact = {"kind": "play", "subject": None, "title": built["title"], "answer": built["answer"], "puzzle": built["puzzle"],
+            "carousel_id": carousel["id"], "slides": len(built["slides"]), "render": True}
+    caption = ig_captions.build(built["hook"], "", "play",
+                                "the innings, then a clue on every swipe; the answer is on the last slide.",
+                                kicker=built["kicker"], extra_tags=["#cricketquiz"])
+    return {"key": f"play-{day}", "pillar": "play", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
+            "players": [built["answer"]], "caption": caption}
 
 
 def debate_posts(db: Session, only: Optional[List[str]] = None, limit: int = DEBATE_POSTS) -> List[Dict[str, Any]]:
@@ -282,6 +312,9 @@ def render_carousels(posts: List[Dict[str, Any]], base: Optional[str] = None) ->
     for post in posts:
         fact = post["fact"]
         if not fact.get("render"):
+            continue
+        if ig_slides.count(_db_session(), fact["carousel_id"]) >= fact["slides"]:
+            done += 1  # same slides, same carousel (snapshots are keyed by their slides): already rendered
             continue
         result = ig_slides.render(fact["carousel_id"], fact["slides"], *([base] if base else []))
         if result["failed"]:
@@ -436,3 +469,9 @@ def recap_post_by(match_day: date, team1: str, team2: str, fixtures: List[Dict[s
     if starts:
         return starts[0]
     return datetime.combine(match_day + timedelta(days=RECAP_DAYS), datetime.max.time(), tzinfo=timezone.utc)
+
+
+def _db_session():
+    from database import get_session
+
+    return next(get_session())

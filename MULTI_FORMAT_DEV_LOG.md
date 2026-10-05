@@ -11,6 +11,13 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **INSTAGRAM MYTHS, PLAY-ALONG, TREND RADAR (2026-10-06).** services/ig_posts/myths.py (published notes with a SPEC: claim,
+> bucket_bars from the results tables, forest of effects with CIs, verdict; h0 only so far), play.py ("Whose innings is
+> this?" from a 14-day-old Guess the Innings puzzle; the game's InningsClue as visual innings_wagon), trends.py +
+> scripts/trend_radar.py + .github/workflows/ig-trend-radar.yml (09:00 IST: Reddit/Cricinfo/Google News RSS -> players
+> named -> "Is X the most complete batter ...?" with X highlighted -> Jev appeal -> top 3 queued for today, post_by end of
+> tomorrow). render_carousels skips carousels already rendered.
+>
 > **INSTAGRAM RECORDS + MATCH DAY (2026-10-05).** services/ig_posts/records.py: career races as race_lines by balls AND by
 > innings (each with its own coverage caveat) + a milestone table (SR/econ, RAA, WPA up to the milestone date); weird
 > race ideas use it (ig_backlog._record_post). services/ig_posts/match.py: auto preview cards (PREVIEW_CARDS), recap post
