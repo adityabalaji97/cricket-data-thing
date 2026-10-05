@@ -203,6 +203,22 @@ def create_idea_graphic(body: IdeaGraphicRequest, request: Request, db: Session 
     }
 
 
+@router.get("/{snapshot_id}/slides/{n}.png")
+def slide_png(snapshot_id: str, n: int, db: Session = Depends(get_session)):
+    """A carousel slide rendered from the app's own components (services/ig_slides.py); 404 until rendered."""
+    from fastapi.responses import Response
+
+    from services import ig_slides
+
+    if not _ID.match(snapshot_id) or not 1 <= n <= 20:
+        raise HTTPException(status_code=404, detail="Slide not found")
+    png = ig_slides.load(db, snapshot_id, n)
+    if png is None:
+        raise HTTPException(status_code=404, detail="Slide not rendered")
+    # A re-render replaces the PNG, so cache for a day, not forever.
+    return Response(png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
 @router.get("/{snapshot_id}")
 def read(snapshot_id: str, db: Session = Depends(get_session)):
     if not _ID.match(snapshot_id):

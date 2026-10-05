@@ -24,7 +24,9 @@ const keepInChart = (e) => {
   if (fromPortal || fromControl) e.stopPropagation();
 };
 
-const StoryCard = ({ card, width, height }) => {
+// exportMode (Instagram slides, src/components/ig/IgSlide.jsx): the card fills the image, no info button; `corner`
+// (e.g. "2 / 7") takes the button's place.
+const StoryCard = ({ card, width, height, exportMode = false, corner = null }) => {
   const [infoOpen, setInfoOpen] = useState(false);
   const [overflow, setOverflow] = useState(false);
   const chartRef = useRef(null);
@@ -49,9 +51,9 @@ const StoryCard = ({ card, width, height }) => {
         height,
         display: 'flex',
         flexDirection: 'column',
-        bgcolor: colors.surface1,
-        border: `1px solid ${colors.border}`,
-        borderRadius: '20px',
+        bgcolor: exportMode ? colors.bg : colors.surface1,
+        border: exportMode ? 'none' : `1px solid ${colors.border}`,
+        borderRadius: exportMode ? 0 : '20px',
         px: 2,
         pt: 1.75,
         pb: 1.25,
@@ -78,7 +80,10 @@ const StoryCard = ({ card, width, height }) => {
         >
           {card.title}
         </Typography>
-        {card.info && (
+        {corner && (
+          <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5, whiteSpace: 'nowrap' }}>{corner}</Typography>
+        )}
+        {card.info && !exportMode && (
           <IconButton
             aria-label={`About this chart: ${card.title}`}
             onClick={(e) => { e.stopPropagation(); setInfoOpen(true); track('card_info', { card: card.id }); }}
@@ -115,7 +120,7 @@ const StoryCard = ({ card, width, height }) => {
         </Typography>
       </Box>
 
-      {card.info && (
+      {card.info && !exportMode && (
         // The sheet is a portal, but React still bubbles its events through this tree: stop them
         // here so a tap in the sheet never opens the card (grid) or counts as a swipe (story).
         <Box

@@ -10,7 +10,7 @@
 // Snapshots never change, so images are cached hard at the edge.
 import { ImageResponse } from '@vercel/og';
 import { readFileSync } from 'node:fs';
-import { getJSON } from './_lib/share.mjs';
+import { API_BASE, getJSON } from './_lib/share.mjs';
 
 // The site's own typefaces (SIL OFL, api/_lib/fonts/OFL.txt): Barlow for text, Barlow Semi
 // Condensed Bold for headlines. Satori's default font has no bold and no bullet glyphs.
@@ -513,6 +513,19 @@ const CARD_BODIES = {
 // shot type...) and any shot-family definition (services/content_ideas._footnote), else the source.
 const sourceLine = (snap, data) => `Data as of ${asOf(snap)} · ${data.footnote || data.source || 'ball-by-ball'}`;
 
+async function getPNG(path, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${API_BASE}${path}`, { signal: controller.signal });
+    return response.ok ? Buffer.from(await response.arrayBuffer()) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // --- Carousels (services/ig_carousel.py) ----------------------------------------------------------------------
 // An Instagram carousel is a list of slides, one image each (/img/{id}.png?slide=n): a hook, text, a verdict and an
 // end card are drawn here; a chart slide is another snapshot, drawn by renderSnapshot (the handler fetches it).
@@ -606,6 +619,19 @@ export default async function handler(req, res) {
     return;
   }
   const size = SIZES[sizeName] || SIZES.portrait;
+  if (snap.kind === 'carousel' && sizeName === 'portrait') {
+    // Slides rendered from the app's own components (scripts/render_ig_slides.mjs) win over drawing them here.
+    const n = Number(url.searchParams.get('slide') || 1);
+    const rendered = await getPNG(`/snapshots/${id}/slides/${n}.png`);
+    if (rendered) {
+      res.setHeader('Content-Type', 'image/png');
+      // A re-render replaces a slide under the same URL: cache for an hour, not for good.
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+      if (url.searchParams.get('download')) res.setHeader('Content-Disposition', `attachment; filename="hindsight-${id}-${n}.png"`);
+      res.end(rendered);
+      return;
+    }
+  }
   let tree;
   if (snap.kind === 'carousel') {
     const n = Number(url.searchParams.get('slide') || 1);
@@ -619,7 +645,8 @@ export default async function handler(req, res) {
   const image = new ImageResponse(tree, { width: size.width, height: size.height, fonts: FONTS });
   const png = Buffer.from(await image.arrayBuffer());
   res.setHeader('Content-Type', 'image/png');
-  res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=31536000, immutable');
+  res.setHeader('Cache-Control', snap.kind === 'carousel' ? 'public, max-age=3600, s-maxage=3600'
+    : 'public, max-age=86400, s-maxage=31536000, immutable');
   const slideSuffix = snap.kind === 'carousel' ? `-${url.searchParams.get('slide') || 1}` : '';
   if (url.searchParams.get('download')) res.setHeader('Content-Disposition', `attachment; filename="hindsight-${id}${slideSuffix}.png"`);
   res.end(png);

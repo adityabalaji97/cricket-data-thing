@@ -340,28 +340,30 @@ def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "
 
 def preview_post(db: Session, venue: str, team1: str, team2: str, cards: List[str], day: date, label: str,
                  team1_short: Optional[str] = None, team2_short: Optional[str] = None, fmt: str = "T20") -> Dict[str, Any]:
-    """A match-day post (pillar 'reactive'): the chosen cards of the fixture's preview story, frozen as preview_card
-    snapshots (the same images the story shares), with a hook and an end slide around them."""
+    """A match-day post (pillar 'reactive'): the chosen cards of the fixture's preview story, as the story's own card
+    JSON, so each slide is drawn by the same component as the card in the app (/ig/:id/:n renders it)."""
     from services import ig_captions, ig_carousel
-    from services.preview_cards import PreviewContext, context_params
-    from services.snapshots import SnapshotError, create_snapshot
+    from services.preview_cards import PreviewContext, build_story, context_params
 
     ctx = PreviewContext(db=db, venue=venue, team1=team1, team2=team2, fmt=fmt, gender="male",
                          team1_short=team1_short, team2_short=team2_short)
     params = context_params(ctx)
-    chart_ids, titles, warnings = [], [], []
-    for card in cards:
-        try:
-            snap = create_snapshot(db, "preview_card", {**params, "card": card}, created_by="ig-preview")
-        except SnapshotError as exc:  # a card this fixture doesn't have: leave it out, say so
-            warnings.append(f"Card '{card}' left out: {exc}")
+    story = build_story(ctx)
+    built = {c["id"]: c for chapter in story["chapters"] for c in chapter["cards"]}
+    chosen, titles, warnings = [], [], []
+    for card_id in cards:
+        card = built.get(card_id)
+        if not card:  # a card this fixture doesn't have: leave it out, say so
+            warnings.append(f"Card '{card_id}' isn't in this fixture's story.")
             continue
-        chart_ids.append(snap["id"])
-        titles.append(snap["title"])
-    if not chart_ids:
-        return {"status": "failed", "note": "None of the chosen cards could be built.", "warnings": warnings}
-    hook = f"{len(chart_ids)} things the data says before {team1} v {team2}"
-    slides = ig_carousel.for_preview(chart_ids, hook, label)
+        chosen.append(card)
+        titles.append(card["title"])
+    if not chosen:
+        return {"status": "failed", "note": "None of the chosen cards are in the story.", "warnings": warnings}
+    fixture = story.get("fixture") or {}
+    teams = [fixture.get("team1") or team1, fixture.get("team2") or team2]
+    hook = f"{len(chosen)} things the data says before {team1} v {team2}"
+    slides = ig_carousel.for_story_cards(chosen, teams, hook, label)
     carousel = ig_carousel.save(db, slides, hook, {"preview": params, "cards": cards, "day": str(day)}, "ig-preview")
     fact = {"kind": "preview", "subject": None, "title": hook, "card_titles": titles, "fixture": params,
             "carousel_id": carousel["id"], "slides": len(slides)}

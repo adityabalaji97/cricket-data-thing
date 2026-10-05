@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 700" role="img" aria-label="Hindsight">
+  <!-- A lowercase h whose stem is a cricket bat, with the ball as its full stop. -->
+  <path fill="#b6f24a" d="M 190 430 Q 230 328 330 328 Q 450 328 450 450 L 450 690 L 335 690 L 335 470 Q 335 432 292 432 Q 236 432 196 492 Z"/>
+  <path fill="#b6f24a" d="M 70 250 L 70 668 Q 70 690 92 690 L 178 690 Q 200 690 200 668 L 200 250 Q 200 232 182 226 L 158 218 L 112 218 L 88 226 Q 70 232 70 250 Z"/>
+  <path fill="#b6f24a" d="M 115 30 Q 115 20 125 20 L 145 20 Q 155 20 155 30 L 158 222 L 112 222 Z"/>
+  <g fill="#0a0c11"><rect x="110" y="50" width="50" height="9"/><rect x="110" y="85" width="50" height="9"/><rect x="110" y="120" width="50" height="9"/><rect x="110" y="155" width="50" height="9"/><rect x="110" y="190" width="50" height="9"/></g>
+  <rect x="132" y="270" width="6" height="380" rx="3" fill="#0a0c11" opacity="0.35"/>
+  <circle cx="528" cy="645" r="45" fill="#e5484d"/>
+</svg>

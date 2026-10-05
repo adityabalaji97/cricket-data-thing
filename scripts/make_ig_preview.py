@@ -3,10 +3,11 @@ A match-day Instagram post from a fixture's preview story (services/ig_backlog.p
 
     python scripts/make_ig_preview.py --venue "Ekana Cricket Stadium" --team1 India --team2 "West Indies" \
         --t1 IND --t2 WI --label "1st T20I · Lucknow" --date 2026-10-06 \
-        --cards par,head-to-head,key-battles,death-bowlers,suits-ground [--write]
+        --cards par,where-won,key-battles,death-bowlers,suits-ground [--write]
 
-Without --write it saves nothing (a read-only session; the cards are built but not stored) and prints the slides.
-Card ids are the story's (GET /match-preview/{venue}/{t1}/{t2}/cards lists them).
+Without --write it saves nothing (a read-only session) and prints the slides. With --write it queues the post and
+renders its slides from the app's own components (scripts/render_ig_slides.mjs) at --base, which must be a deployed
+site (or dev server) reading the same database. Card ids are the story's (GET /match-preview/{venue}/{t1}/{t2}/cards).
 """
 from __future__ import annotations
 
@@ -30,6 +31,8 @@ def main() -> int:
     parser.add_argument("--label", required=True, help='the line above the hook, e.g. "1st T20I · Lucknow"')
     parser.add_argument("--date", required=True, help="the day it goes out (YYYY-MM-DD)")
     parser.add_argument("--write", action="store_true")
+    parser.add_argument("--base", default="https://hindsightcricket.com", help="site that renders /ig/<id>/<n>")
+    parser.add_argument("--no-render", action="store_true", help="queue without rendering the slides")
     args = parser.parse_args()
 
     from services import ig_backlog
@@ -45,15 +48,15 @@ def main() -> int:
         if post["status"] == "resolved":
             with engine.begin() as conn:
                 ig_backlog.upsert_pack(conn, post, day, source="ig-preview")
+            if not args.no_render:
+                from services import ig_slides
+
+                rendered = ig_slides.render(post["snapshot_id"], post["fact"]["slides"], args.base)
+                print(f"rendered slides {rendered['ok']}" + (f", failed {rendered['failed']}" if rendered["failed"] else ""))
     else:
         import services.snapshots as snapshots
         from analysis.hypotheses.common import read_only_session
 
-        def fake_create(db, kind, params, created_by="web"):
-            data = snapshots._preview_card_data(db, snapshots._clean_preview_params(params))
-            return {"id": f"dry-{params['card']}", "kind": kind, "title": data.get("title"), "data": data}
-
-        snapshots.create_snapshot = fake_create
         snapshots.create_static_snapshot = lambda db, kind, data, title, key, created_by: {"id": "dry-carousel", "kind": kind,
                                                                                           "title": title, "data": data}
         with read_only_session() as db:

@@ -8,6 +8,7 @@ import { DIVERGING, KIND_COLORS, SERIES } from '../../theme/chartDefaults';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { useStoryNav } from './StoryNav';
 import { getTeamColor, readableOnDark } from '../../utils/teamColors';
+import { POST_VISUALS } from './postVisuals';
 
 /**
  * Renderers for the `visual` each card declares (services/preview_cards). A card's payload is
@@ -821,7 +822,8 @@ export const InfoBody = ({ info }) => (
 
 /** A manifest card (JSON from /match-preview/.../cards) as a StoryViewer card. Unknown visuals are dropped. */
 export const toStoryCard = (card, { isMobile, teams, params }) => {
-  const Visual = VISUALS[card.visual];
+  // POST_VISUALS: the Instagram post cards' visuals (services/ig_posts), kept in their own module.
+  const Visual = VISUALS[card.visual] || POST_VISUALS[card.visual];
   if (!Visual) return null;
   return {
     id: card.id,
