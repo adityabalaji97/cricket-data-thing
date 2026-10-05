@@ -11,6 +11,13 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **INSTAGRAM CHUNK 0: BACKLOG (2026-10-05), plan ~/.claude/plans/glittery-wiggling-muffin.md (chunks 0-7).** Migration 017
+> (content_packs.channel/planned_for/pillar/caption; prod applied). services/ig_backlog.py: curated IDEAS (debate = explicit
+> query plans, weird = idea_stats regex specs, myth = hypothesis notes 34-42), WEEK template (debate, reactive, myth, debate,
+> play, reactive, weird), 1-in-5 player spread; scripts/build_ig_backlog.py --start D [--write] (dry run is read-only). Admin
+> Social tab: Reddit / Instagram toggle (GET /admin/content/packs?channel=). Headlines: "ranks" for one subject; innings,
+> is_chase and top_teams (only with include_international) now named. Not yet written to prod: waits for the launch date.
+>
 > **PARTNERSHIP STANDS (2026-10-05), branch partnership-stands, migration 016 (applied local + prod, prod built:
 > 202,261 stands, 520 unpaired).** delivery_details.non_striker is wrong on ~45% of ODI wicket balls, so partnerships
 > now come from partnership_stands (balls between dismissals, pair = distinct strikers, else striker + modal

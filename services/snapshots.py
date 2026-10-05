@@ -156,6 +156,14 @@ def _filter_phrase(params: Dict[str, Any]) -> str:
         out += f" on the {_and(params['line'])} line"
     if params.get("dismissal"):
         out += f" ({_and(params['dismissal'])})"
+    # Which innings or matches: without these a chasing average reads as a career average.
+    if params.get("is_chase") in (True, "true", "True", 1):
+        out += " while chasing"
+    elif str(params.get("innings") or "") in ("1", "2"):
+        out += " batting first" if str(params["innings"]) == "1" else " batting second"
+    # top_teams only filters together with include_international (query_builder_v2); never claim it otherwise.
+    if params.get("top_teams") and params.get("include_international") in (True, "true", "True", 1):
+        out += f" in matches between the top {int(params['top_teams'])} teams"
     return out
 
 

@@ -727,7 +727,9 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any], created_by: st
     value = float(row[metric])
     parts = title_parts(params, coverage)
     name = _row_name(row, label_key).replace(" & ", " and ")
-    title = (f"{name} rank {ordinal(idx + 1)} of {total:,} {parts['scope']}{parts['filters']}{parts['minimum']}{parts['venue']}"
+    # One subject "ranks"; a pair ("Gill and Kohli") "rank".
+    verb = "rank" if " and " in name else "ranks"
+    title = (f"{name} {verb} {ordinal(idx + 1)} of {total:,} {parts['scope']}{parts['filters']}{parts['minimum']}{parts['venue']}"
              f"{parts['overs']} for {metric_label(metric)}{parts['window'].replace(',', '')}, {_value_phrase(metric, value)}")
     if time_rows and parts["who"]:
         # Rows are seasons / phases / zones of one player: "2026 rank 1st of 7 T20 years" read badly.
