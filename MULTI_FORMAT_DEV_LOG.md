@@ -11,6 +11,13 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **INSTAGRAM RECORDS + MATCH DAY (2026-10-05).** services/ig_posts/records.py: career races as race_lines by balls AND by
+> innings (each with its own coverage caveat) + a milestone table (SR/econ, RAA, WPA up to the milestone date); weird
+> race ideas use it (ig_backlog._record_post). services/ig_posts/match.py: auto preview cards (PREVIEW_CARDS), recap post
+> (WP swing via the story's last_meeting with end=match day, WPA/Impact/RAA bars; ODI: runs/wickets). scripts/ig_match_day.py
+> (nightly step, Node 22 + google-chrome) queues previews (next 2 days) and recaps (last 2 days) for --team India and
+> renders. build_ig_backlog.py --refresh KEY remakes queued posts keeping their day.
+>
 > **INSTAGRAM v2 CHUNKS 2-4: DEBATE POSTS (2026-10-05).** services/ig_posts: angles.py (per-role metric catalogue, families),
 > context.py (one query-builder field per question + derived economy/wpa_per_100/...), planner.py (Jev scores angles per
 > question; rules: T20 needs RAA|Impact + WPA, <=2 per family, 4-6 angles; default order without Jev), questions.py

@@ -165,6 +165,19 @@ jobs:
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
         run: python scripts/draft_notes.py --days 10
 
+      # Instagram match-day posts (scripts/ig_match_day.py): a preview for India's fixtures in the next 2 days and a
+      # "what decided it" post for matches just played, queued in the admin Instagram tab. Slides are screenshots of
+      # the live site's /ig/<id>/<n> in headless Chrome (scripts/render_ig_slides.mjs needs Node 22's WebSocket).
+      - name: Set up Node for the slide renderer
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instagram match-day posts
+        continue-on-error: true
+        env:
+          CHROME: google-chrome
+        run: python scripts/ig_match_day.py --team India
+
       # Usage tables (migration 004) keep 90 days of raw rows; weekly reports need no more.
       - name: Prune raw usage events
         if: always()

@@ -20,17 +20,27 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--start", required=True, help="first day of the calendar (YYYY-MM-DD)")
+    parser.add_argument("--start", default=date.today().isoformat(), help="first day of the calendar (YYYY-MM-DD)")
     parser.add_argument("--days", type=int, default=30)
     parser.add_argument("--write", action="store_true", help="save chart snapshots and queue the packs")
     parser.add_argument("--only", action="append", help="build only these idea keys (debate posts: debate-<question key>)")
     parser.add_argument("--base", default=None, help="site that renders /ig/<id>/<n> (default: hindsightcricket.com)")
     parser.add_argument("--no-render", action="store_true", help="queue without rendering the debate carousels")
+    parser.add_argument("--refresh", action="append", help="remake these queued posts in place (keeps their day)")
     args = parser.parse_args()
 
     from services import ig_backlog
 
     start = date.fromisoformat(args.start)
+    if args.refresh:
+        from database import get_session
+
+        db = next(get_session())
+        posts = ig_backlog.refresh(db, args.refresh)
+        rendered = ig_backlog.render_carousels(posts, args.base)
+        print(f"refreshed {[p['key'] for p in posts]}; rendered {rendered['rendered']}"
+              + (f"; failed: {rendered['failed']}" if rendered["failed"] else ""))
+        return 0
     if args.write:
         from database import get_session
 
