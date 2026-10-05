@@ -130,3 +130,14 @@ def test_myth_spec_builds_from_the_result_file():
     forest = next(s["card"] for s in built["slides"] if s.get("card", {}).get("visual") == "forest")
     assert forest["title"].startswith("1 of 5 tests finds")  # the pooled-spinners test is the clear one
     assert myths.build({"title": "Does one bad over break Varun Chakravarthy?", "status": "draft"}) is None
+
+
+def test_reel_is_optional_without_ffmpeg(monkeypatch, tmp_path):
+    import shutil
+
+    from services import ig_slides
+
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    assert ig_slides.make_reel("x", [tmp_path / "1.png", tmp_path / "2.png"]) is None  # the carousel is unaffected
+    total = ig_slides.REEL_HOOK + 3 * ig_slides.REEL_SLIDE + ig_slides.REEL_END
+    assert 10 < total < 60  # a five-slide post is a sensible Reel length

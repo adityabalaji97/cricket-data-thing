@@ -28,11 +28,16 @@ def main() -> int:
     parser.add_argument("--no-render", action="store_true", help="queue without rendering the debate carousels")
     parser.add_argument("--refresh", action="append", help="remake these queued posts in place (keeps their day)")
     parser.add_argument("--render-pending", action="store_true", help="render queued carousels missing slides, then stop")
+    parser.add_argument("--reels-pending", action="store_true", help="make reels for queued carousels without one, then stop")
     args = parser.parse_args()
 
     from services import ig_backlog
 
     start = date.fromisoformat(args.start)
+    if args.reels_pending:
+        r = ig_backlog.reels_pending()
+        print(f"reels made {r['made']}, still missing {r['missing']}")
+        return 0
     if args.render_pending:
         r = ig_backlog.render_pending(args.base)
         print(f"rendered {r['rendered']}" + (f"; failed: {r['failed']}" if r["failed"] else ""))

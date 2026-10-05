@@ -11,6 +11,12 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **INSTAGRAM BIO LINK + REELS (2026-10-06).** /links (src/components/ig/IgLinks.jsx): the bio page, every link tagged
+> utm_source=instagram&utm_medium=bio_link, recent posted carousels from GET /snapshots/ig/recent; usage report counts
+> instagram_visitors. /g/<carousel> shows every slide. Reels: migration 019 ig_reels (prod applied); ig_slides.make_reel
+> (ffmpeg: slides on 1080x1920, crossfades) runs after each render; GET /snapshots/{id}/reel.mp4; admin "Get reel /
+> Share reel"; build_ig_backlog --reels-pending for carousels rendered before. Workflows install ffmpeg if missing.
+>
 > **INSTAGRAM MYTHS, PLAY-ALONG, TREND RADAR (2026-10-06).** services/ig_posts/myths.py (published notes with a SPEC: claim,
 > bucket_bars from the results tables, forest of effects with CIs, verdict; h0 only so far), play.py ("Whose innings is
 > this?" from a 14-day-old Guess the Innings puzzle; the game's InningsClue as visual innings_wagon), trends.py +

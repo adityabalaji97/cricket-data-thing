@@ -48,8 +48,12 @@ const GraphicPage = () => {
       <Typography component="h1" sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 22, lineHeight: 1.2, color: hs.textHi }}>
         {snap.title}
       </Typography>
-      <Box component="img" src={imageUrl} alt={snap.title}
-        sx={{ width: '100%', aspectRatio: '4 / 5', display: 'block', borderRadius: 2, bgcolor: hs.surface2 }} />
+      {(snap.kind === 'carousel' ? (snap.data?.slides || []).map((_, i) => `${imageUrl}?slide=${i + 1}`) : [imageUrl]).map((src, i) => (
+        // A carousel (an Instagram post) shows every slide, top to bottom.
+        <Box key={src} component="img" src={src} alt={`${snap.title}${snap.kind === 'carousel' ? ` · slide ${i + 1}` : ''}`}
+          loading={i ? 'lazy' : 'eager'}
+          sx={{ width: '100%', aspectRatio: '4 / 5', display: 'block', borderRadius: 2, bgcolor: hs.surface2 }} />
+      ))}
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
         <Button variant="contained" sx={{ flex: 1, minHeight: 44, bgcolor: hs.accent, color: hs.bg, fontWeight: 700, '&:hover': { bgcolor: hs.accentHover } }}
           onClick={() => { track('share', { kind: 'graphic_page' }); shareImage(imageUrl, `hindsight-${snap.id}.png`, snap.title, `${snap.title} · hindsightcricket.com`); }}>
