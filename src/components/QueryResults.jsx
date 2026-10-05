@@ -59,6 +59,7 @@ import GraphicMaker from './GraphicMaker';
 import { PitchMapContainer, getPitchMapMode } from './PitchMap';
 import config from '../config';
 import { qbButtonSx, qbCardSx, qbColors, qbFonts, qbGhostButtonSx } from './queryBuilderTheme';
+import { DEFAULT_MIN_COVERAGE, TAGGED_METRICS, rankWithCoverage } from '../utils/coverage';
 
 const darkOutlineChipSx = {
   bgcolor: 'rgba(255,255,255,0.035)',
@@ -177,7 +178,12 @@ const PRIMER_METRIC_COLUMNS = new Set([
 ]);
 
 // Bookkeeping fields that ride along with the T20 Primer metrics; never table columns.
-const INTERNAL_COLUMNS = new Set(['is_summary', 'summary_level', 'metric_balls', 'metrics_perspective']);
+const INTERNAL_COLUMNS = new Set(['is_summary', 'summary_level', 'metric_balls', 'metrics_perspective', 'coverage_excluded']);
+// Tagged-ball counts (control_tagged...) feed the coverage % columns; the % is what people read.
+const isInternalColumn = (col) => INTERNAL_COLUMNS.has(col) || col.endsWith('_tagged');
+
+// Ranked by a tagged metric, rows whose balls are mostly untagged rank last, greyed: a 34%-tagged
+// stand can't top a 99.9%-tagged one (utils/coverage, services/coverage.py).
 
 // Columns worth offering: not a grouping key, not internal, and not empty in every row (the
 // Primer metrics are null outside men's T20, and an all-blank Impact column is just noise).
@@ -185,7 +191,7 @@ const offerableColumns = (rows, groupBy) => {
   if (!rows.length) return [];
   return Object.keys(rows[0]).filter((col) => (
     !groupBy.includes(col)
-    && !INTERNAL_COLUMNS.has(col)
+    && !isInternalColumn(col)
     && rows.some((row) => row[col] !== null && row[col] !== undefined)
   ));
 };
@@ -284,6 +290,9 @@ const QueryResults = ({
     key: null,
     direction: 'asc'
   });
+  const [minCoverage, setMinCoverage] = useState(DEFAULT_MIN_COVERAGE);
+  const coverageTag = TAGGED_METRICS[sortConfig.key] || null;
+  const coverageColumn = coverageTag ? `${coverageTag}_coverage_pct` : null;
   
   // Column filtering state
   const [columnFilters, setColumnFilters] = useState({});
@@ -533,8 +542,8 @@ const QueryResults = ({
   // Memoized sorted data
   const sortedData = useMemo(() => {
     if (!sortConfig.key || filteredData.length === 0) return filteredData;
-    
-    return [...filteredData].sort((a, b) => {
+
+    const sorted = [...filteredData].sort((a, b) => {
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
       
@@ -552,7 +561,9 @@ const QueryResults = ({
       if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [filteredData, sortConfig]);
+    // Under the floor: kept and shown, but ranked after every row that qualifies.
+    return rankWithCoverage(sorted, sortConfig.key, minCoverage);
+  }, [filteredData, sortConfig, minCoverage]);
   
   // Early return after all hooks
   if (!results || !results.data) {
@@ -837,6 +848,11 @@ const QueryResults = ({
       'percent_balls': '%Balls',
       'balls_per_dismissal': 'B/W',
       'control_percentage': 'Ctrl%',
+      'control_coverage_pct': 'Ctrl data%',
+      'shot_coverage_pct': 'Shot data%',
+      'line_coverage_pct': 'Line data%',
+      'length_coverage_pct': 'Length data%',
+      'wagon_zone_coverage_pct': 'Zone data%',
       'year': 'Year',
       'runs_conceded': 'Runs',
       'fours_conceded': 'Fours',
@@ -877,7 +893,12 @@ const QueryResults = ({
     const allColumns = Object.keys(displayData[0]);
     
     if (isGrouped) {
-      return [...getGroupingColumns(), ...selectedMetricColumns].filter(col => allColumns.includes(col));
+      const cols = [...getGroupingColumns(), ...selectedMetricColumns];
+      // Coverage sits beside a tagged metric being ranked, and beside any tag filter's counts.
+      const coverageCols = allColumns.filter((c) => c.endsWith('_coverage_pct')
+        && (c === coverageColumn || (c !== 'control_coverage_pct')));
+      coverageCols.forEach((c) => { if (!cols.includes(c)) cols.push(c); });
+      return cols.filter(col => allColumns.includes(col));
     }
 
     if (isMobile) {
@@ -1007,6 +1028,22 @@ const QueryResults = ({
                       variant="outlined"
                       size="small"
                       sx={{ ...darkOutlineChipSx, color: qbColors.purple, borderColor: 'rgba(201,156,240,0.45)' }}
+                    />
+                  )}
+
+                  {coverageTag && (
+                    // Ranked by a tagged metric: rows under this share of tagged balls rank last, greyed.
+                    <TextField
+                      id="qb-min-coverage"
+                      size="small"
+                      type="number"
+                      label={`Min ${coverageTag} data %`}
+                      value={minCoverage}
+                      onChange={(e) => setMinCoverage(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                      inputProps={{ min: 0, max: 100, step: 5, 'aria-describedby': 'qb-min-coverage-help' }}
+                      helperText={`${sortedData.filter((r) => r.coverage_excluded).length} not ranked`}
+                      FormHelperTextProps={{ id: 'qb-min-coverage-help' }}
+                      sx={{ width: 150 }}
                     />
                   )}
 
@@ -1301,10 +1338,21 @@ const QueryResults = ({
             </TableHead>
             <TableBody>
               {paginatedData.map((row, index) => (
+                <Tooltip
+                  key={index}
+                  disableHoverListener={!row.coverage_excluded}
+                  disableFocusListener={!row.coverage_excluded}
+                  disableTouchListener={!row.coverage_excluded}
+                  title={row.coverage_excluded
+                    ? `Not ranked: ${row[coverageColumn] ?? 0}% of these balls have ${coverageTag} data (minimum ${minCoverage}%).`
+                    : ''}
+                  placement="top"
+                >
                 <TableRow 
-                  key={index} 
                   hover={!row.is_summary}
+                  aria-disabled={row.coverage_excluded || undefined}
                   sx={{
+                    opacity: row.coverage_excluded ? 0.45 : 1,
                     backgroundColor: row.is_summary ? qbColors.surface2 : qbColors.surface1,
                     fontWeight: row.is_summary ? 'bold' : 'normal',
                     '&:hover .MuiTableCell-root': {
@@ -1348,6 +1396,7 @@ const QueryResults = ({
                     );
                   })}
                 </TableRow>
+                </Tooltip>
               ))}
             </TableBody>
           </Table>
@@ -1508,6 +1557,7 @@ const QueryResults = ({
           onClose={() => setGraphicOpen(false)}
           apiQueryString={apiQueryString}
           rows={sortedData.filter((row) => !row.is_summary)}
+          minCoverage={minCoverage}
           groupBy={groupBy || []}
           // A plain-English query already said what it is about: default to the parser's metric.
           defaultMetric={recommendedChart?.y_axis || sortConfig.key}

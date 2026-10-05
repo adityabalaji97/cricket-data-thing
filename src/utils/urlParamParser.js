@@ -95,6 +95,8 @@ export const parseUrlParams = (search) => {
   // Match filters and match-context dimension filters, name:op:value (e.g. bowler_over_number:gte:2)
   filters.match_ids = getArrayParam('match_ids');
   filters.exclude_batters = getArrayParam('exclude_batters');
+  filters.shot_family = getArrayParam('shot_family');
+  filters.partnership_players = getArrayParam('partnership_players');
   filters.exclude_bowlers = getArrayParam('exclude_bowlers');
   filters.dimension_filters = getArrayParam('dimension_filters');
   // Sign of Impact/RAA/WAA/WPA: 'bowling' or 'batting' (null = inferred by the API)

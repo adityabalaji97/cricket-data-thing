@@ -41,6 +41,8 @@ const ROUTES = [
   ['matchups', '/matchups'],
   ['query', '/query'],
   ['query_res', '/query?batters=V%20Kohli&group_by=bowl_kind&autoload=true'],
+  // Ranked by a tagged metric: sort by Ctrl% (ACTION) to see rows under the coverage floor greyed.
+  ['query_coverage', '/query?group_by=partnership&min_balls=300&fmt=mens-odi&autoload=true'],
   ['team', '/team?team=Mumbai%20Indians&autoload=true'],
   ['teamcomp', '/team-comparison'],
   ['teamcomp_full', '/team-comparison?teams=MI,CSK'],

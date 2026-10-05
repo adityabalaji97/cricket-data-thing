@@ -37,13 +37,15 @@ QUERY_PARAMS = {
     "max_balls", "min_runs", "max_runs", "min_wickets", "max_wickets", "include_international",
     "top_teams", "query_mode", "fmt", "gender", "having",
     "match_ids", "exclude_batters", "exclude_bowlers", "dimension_filters", "metrics_perspective",
+    "shot_family", "partnership_players",
 }
 PRESENTATION = {"sort_by", "sort_descending", "limit", "chart", "chart_metric", "scatter_x", "scatter_y",
-                "highlight", "title"}
+                "highlight", "title", "min_coverage"}
 LIST_PARAMS = {"leagues", "teams", "batting_teams", "bowling_teams", "players", "batters", "bowlers",
                "bowl_style", "bowl_kind", "crease_combo", "line", "length", "shot", "wagon_zone",
                "dismissal", "match_outcome", "chase_outcome", "toss_decision", "group_by", "having",
-               "match_ids", "exclude_batters", "exclude_bowlers", "dimension_filters"}
+               "match_ids", "exclude_batters", "exclude_bowlers", "dimension_filters", "shot_family",
+               "partnership_players"}
 
 
 class SnapshotError(ValueError):
@@ -138,6 +140,9 @@ def _and(values: List[str]) -> str:
 def _filter_phrase(params: Dict[str, Any]) -> str:
     """The filters that change what a chart means: " off pull and hook shots", " against spin"."""
     out = ""
+    if params.get("shot_family"):
+        from services.shot_families import FAMILIES
+        out += f" off {_and([FAMILIES[f.upper()][0].lower() for f in params['shot_family'] if f.upper() in FAMILIES])} shots"
     if params.get("shot"):
         out += f" off {_and(params['shot'])} shots"
     if params.get("bowl_kind"):
@@ -154,7 +159,7 @@ def _filter_phrase(params: Dict[str, Any]) -> str:
     return out
 
 
-def title_parts(params: Dict[str, Any]) -> Dict[str, str]:
+def title_parts(params: Dict[str, Any], coverage: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
     """Pieces of a chart headline: who, scope ("ODI partnerships"), venue, window, minimum."""
     who = (params.get("batters") or params.get("bowlers") or params.get("players") or params.get("teams")
            or params.get("batting_teams") or params.get("bowling_teams") or [])
@@ -184,16 +189,16 @@ def title_parts(params: Dict[str, Any]) -> Dict[str, str]:
         "scope": scope,
         "venue": f" at {params['venue']}" if params.get("venue") else "",
         "window": window,
-        "minimum": _minimum_phrase(params),
+        "minimum": _minimum_phrase(params, coverage),
     }
 
 
 _THRESHOLD_WORDS = {"gte": "{v}+", "gt": "over {v}", "lte": "{v} or less", "lt": "under {v}"}
 
 
-def _minimum_phrase(params: Dict[str, Any]) -> str:
-    """" (1,000+ balls, average 50+, strike rate 100+)": the sample bar and any metric thresholds, so
-    a ranking shows every condition it was built under."""
+def _minimum_phrase(params: Dict[str, Any], coverage: Optional[Dict[str, Any]] = None) -> str:
+    """" (1,000+ balls, average 50+, strike rate 100+, 90%+ control data)": the sample bar, any metric
+    thresholds and the tag-coverage floor, so a ranking shows every condition it was built under."""
     parts = [f"{params['min_balls']:,}+ balls"] if params.get("min_balls") else []
     for raw in params.get("having") or []:
         try:
@@ -203,6 +208,9 @@ def _minimum_phrase(params: Dict[str, Any]) -> str:
             continue
         shown = f"{number:g}"
         parts.append(f"{metric.replace('_', ' ')} {_THRESHOLD_WORDS.get(op, '{v}').format(v=shown)}")
+    if coverage:
+        from services.coverage import describe_floor
+        parts.append(describe_floor(coverage))
     return f" ({', '.join(parts)})" if parts else ""
 
 
@@ -252,6 +260,7 @@ def _query_data(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
             batters=query.get("batters"), bowlers=query.get("bowlers"), sort_by=sort_by,
             sort_descending=sort_descending, limit=limit, chart=view.get("chart") or "auto",
             chart_metric=view.get("chart_metric"), scatter_x=view.get("scatter_x"), scatter_y=view.get("scatter_y"),
+            min_coverage=float(view["min_coverage"]) if view.get("min_coverage") not in (None, "") else None,
         )
 
     structured = structure(view.get("sort_by"), view.get("sort_descending", True))

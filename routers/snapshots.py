@@ -66,6 +66,9 @@ class GraphicRequest(BaseModel):
     highlight: Optional[str] = None
     # {type: 'scatter', x_axis, y_axis} when the viewer's question named two metrics.
     chart: Optional[Dict[str, Any]] = None
+    # Ranked by a tagged metric (control %): rows with less tagged data than this rank last and are
+    # left out of "Nth of M" (services/coverage.py). 0 turns the floor off.
+    min_coverage: Optional[float] = None
 
 
 @router.post("/graphic")
@@ -89,9 +92,12 @@ def create_graphic(body: GraphicRequest, request: Request, db: Session = Depends
         for key in ("start_date", "end_date"):
             if params.get(key) is not None:
                 params[key] = str(params[key])
+        _default_to_shot_families(params)
         planned = {"params": params, "metric": body.metric,
                    "highlight": [body.highlight] if body.highlight else None,
                    "chart": body.chart if (body.chart or {}).get("type") == "scatter" else None}
+        if body.min_coverage is not None:
+            planned["min_coverage"] = max(0.0, min(100.0, float(body.min_coverage)))
         description = f"{body.metric.replace('_', ' ')} by {' and '.join(params['group_by'])}"
         result = attempt(db, description, planned, created_by="graphic")
     except SnapshotError as exc:
@@ -100,7 +106,23 @@ def create_graphic(body: GraphicRequest, request: Request, db: Session = Depends
         raise HTTPException(status_code=400, detail=result.get("note") or "Nothing to chart for this query.")
     fact = result["fact"]
     return {"options": fact.get("chart_options") or [], "picked_by": fact.get("chart_picked_by"),
-            "title": fact.get("title")}
+            "title": fact.get("title"), "warnings": fact.get("warnings") or []}
+
+
+def _default_to_shot_families(params: Dict[str, Any]) -> None:
+    """Graphics speak in shot families (services/shot_families.py): grouping by shot groups by family,
+    and a shot filter becomes the families of its shots, so an older-scheme pull counts as a pull."""
+    from services.shot_families import families_for_shots
+
+    group_by = params.get("group_by") or []
+    if "shot" in group_by:
+        params["group_by"] = ["shot_family" if g == "shot" else g for g in group_by]
+    shots = params.get("shot") or []
+    if shots:
+        fams = families_for_shots(shots)
+        if fams:
+            params["shot_family"] = list(dict.fromkeys([*(params.get("shot_family") or []), *fams]))
+            params.pop("shot", None)
 
 
 # Ideas cost a natural-language parse (OpenAI, under the monthly cap): a per-client daily allowance

@@ -12,6 +12,7 @@ from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import date
 from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
 from services.delivery_data_service import get_venue_aliases
+from services.shot_families import family_case_sql as shot_family_case_sql
 from services.competition_aliases import canonical_sql as competition_canonical_sql
 from services.player_aliases import (
     ALIAS_MAP_CTE,
@@ -520,6 +521,7 @@ def get_legacy_grouping_columns_map():
         "line": "NULL",
         "length": "NULL",
         "shot": "NULL",
+        "shot_family": "NULL",
         "control": "NULL",
         "wagon_zone": "NULL",
         "dismissal": "d.wicket_type",
@@ -531,12 +533,37 @@ def get_legacy_grouping_columns_map():
     }
 
 
+#: Columns the feed tags ball by ball (shot type, line, length, control, wagon zone). Coverage varies
+#: by match, competition and era, so a metric or filter built on a tag is only as complete as the
+#: share of balls that carry it: `<tag>_coverage_pct` on every grouped row (services docs:
+#: docs/query_builder_metrics.md). A tag counts as present when the column is set; wagon zone 0
+#: is "no direction recorded".
+TAG_COLUMNS = {"control": "control", "line": "line", "length": "length", "shot": "shot", "wagon_zone": "wagon_zone"}
+
+
+def _tagged_sql(tag: str, column: str) -> str:
+    if tag == "wagon_zone":
+        return f"({column} IS NOT NULL AND {column} <> 0)"
+    return f"({column} IS NOT NULL)"
+
+
+def _attach_coverage(row: Dict, tags) -> None:
+    """`<tag>_coverage_pct` from `<tag>_tagged` and the row's balls (rounded to 0.1)."""
+    balls = row.get("balls") or 0
+    for tag in tags:
+        tagged = row.get(f"{tag}_tagged")
+        if tagged is None:
+            continue
+        row[f"{tag}_coverage_pct"] = round(100.0 * tagged / balls, 1) if balls else None
+
+
 def build_legacy_where_clause(
     venue, start_date, end_date, leagues, teams, batting_teams, bowling_teams,
     players, batters, bowlers, bowl_style, bowl_kind, crease_combo, dismissal, innings, over_min, over_max,
     match_outcome, is_chase, chase_outcome, toss_decision,
     include_international, top_teams, group_by, base_params, db,
     day_or_night=None, match_ids=None, exclude_batters=None, exclude_bowlers=None,
+    partnership_players=None,
 ):
     """Build dynamic WHERE clause for legacy deliveries table."""
     conditions = ["1=1"]
@@ -619,6 +646,12 @@ def build_legacy_where_clause(
         batter_variants = get_all_player_variants(batters, db)
         conditions.append("d.batter = ANY(:batters)")
         params["batters"] = batter_variants
+
+    if partnership_players:
+        # Partnerships involving these players: every ball either of the pair faced.
+        pp_variants = get_all_player_variants(partnership_players, db)
+        conditions.append("(d.batter = ANY(:partnership_players) OR d.non_striker = ANY(:partnership_players))")
+        params["partnership_players"] = pp_variants
     
     if bowlers:
         bowler_variants = get_all_player_variants(bowlers, db)
@@ -1150,6 +1183,10 @@ def merge_grouped_results(
             existing = merged[key]
             for field in count_fields:
                 existing[field] = (existing.get(field) or 0) + (row.get(field) or 0)
+            # Tagged-ball counts add like balls; pre-2015 legacy rows carry no tags (0), which is
+            # exactly what lowers a merged row's coverage.
+            for field in {f for f in (*existing, *row) if f.endswith("_tagged")}:
+                existing[field] = (existing.get(field) or 0) + (row.get(field) or 0)
         else:
             merged[key] = row.copy()
     
@@ -1187,6 +1224,7 @@ def merge_grouped_results(
         row['boundary_percentage'] = round((boundaries * 100.0) / balls, 2) if balls > 0 else 0
         
         # control_percentage stays as-is from new data (will be None if only legacy)
+        _attach_coverage(row, [f[:-len("_tagged")] for f in list(row) if f.endswith("_tagged")])
     
     # Sort by balls descending
     result_list.sort(key=lambda x: x.get('balls', 0), reverse=True)
@@ -2109,6 +2147,8 @@ def query_deliveries_service(
     exclude_bowlers: Optional[List[str]] = None,
     dimension_filters: Optional[list] = None,
     metrics_perspective: Optional[str] = None,
+    partnership_players: Optional[List[str]] = None,
+    coverage_tags: Optional[List[str]] = None,
 ):
     """
     Main service function to query cricket delivery data with flexible filtering and grouping.
@@ -2380,6 +2420,7 @@ def query_deliveries_service(
                 match_ids=match_ids,
                 exclude_batters=exclude_batters,
                 exclude_bowlers=exclude_bowlers,
+                partnership_players=partnership_players,
             )
             
             if not group_by or len(group_by) == 0:
@@ -2422,6 +2463,7 @@ def query_deliveries_service(
                     metric_thresholds=None if merging else metric_thresholds,
                     dimension_filters=dimension_filters,
                     metrics_perspective=metrics_perspective,
+                    coverage_tags=coverage_tags,
                 )
                 new_results = result['data']
                 new_total_count = result['metadata']['total_groups']
@@ -2480,6 +2522,7 @@ def query_deliveries_service(
                 match_ids=match_ids,
                 exclude_batters=exclude_batters,
                 exclude_bowlers=exclude_bowlers,
+                partnership_players=partnership_players,
             )
             
             legacy_total_balls = get_legacy_total_balls(legacy_where_clause, legacy_params, db) or 0
@@ -2654,6 +2697,7 @@ def build_where_clause(
     include_international, top_teams, group_by, base_params, db=None,
     day_or_night=None, fmt="T20", gender="male",
     match_ids=None, exclude_batters=None, exclude_bowlers=None,
+    partnership_players=None,
 ):
     """Build dynamic WHERE clause for delivery_details table.
 
@@ -2760,6 +2804,14 @@ def build_where_clause(
         batter_variants = _expand_player_names(batters, db) if db else batters
         conditions.append("dd.bat = ANY(:batters)")
         params["batters"] = batter_variants
+
+    if partnership_players:
+        # Partnerships involving these players: every ball either of the pair faced, so a stand's
+        # row counts both batters. non_striker is stored mostly in the legacy short form ("V Kohli"),
+        # hence the alias expansion.
+        pp_variants = _expand_player_names(partnership_players, db) if db else partnership_players
+        conditions.append("(dd.bat = ANY(:partnership_players) OR dd.non_striker = ANY(:partnership_players))")
+        params["partnership_players"] = pp_variants
 
     if bowlers:
         bowler_variants = _expand_player_names(bowlers, db) if db else bowlers
@@ -3300,6 +3352,8 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
         "line": "dd.line",
         "length": "dd.length",
         "shot": "dd.shot",
+        # One name per shot across the feed's two tagging schemes (services/shot_families.py).
+        "shot_family": shot_family_case_sql("dd.shot"),
         "control": "dd.control",
         "wagon_zone": "dd.wagon_zone",
         "dismissal": "dd.dismissal",
@@ -3361,8 +3415,12 @@ def handle_grouped_query(
     metric_thresholds=None,
     dimension_filters=None,
     metrics_perspective=None,
+    coverage_tags=None,
 ):
     """Return aggregated cricket statistics grouped by specified columns.
+
+    coverage_tags: extra tags (TAG_COLUMNS) to count as `<tag>_tagged` / `<tag>_coverage_pct`;
+    control is always counted, since every row carries control_percentage.
 
     dimension_filters: parsed services.query_dimensions filters (name, op, values).
     metrics_perspective: 'bowling' / 'batting' pins the sign of the Primer metrics (and, for
@@ -3533,6 +3591,9 @@ def handle_grouped_query(
         sixes_expr = "SUM(s.sixes_through_ball)"
         control_num_expr = "SUM(s.controlled_through_ball)"
         control_den_expr = "SUM(s.control_balls_through_ball)"
+        # Running totals: coverage per ball position is not defined, so none is reported.
+        extra_tags = []
+        coverage_selects = "NULL::bigint AS control_tagged"
     else:
         # ball_metrics covers men's T20 only: skip the join elsewhere (an ODI query joined 1.4M
         # metric rows for nothing).
@@ -3553,8 +3614,19 @@ def handle_grouped_query(
         boundaries_expr = "SUM(CASE WHEN s.batruns IN (4, 6) THEN 1 ELSE 0 END)"
         fours_expr = "SUM(CASE WHEN s.batruns = 4 THEN 1 ELSE 0 END)"
         sixes_expr = "SUM(CASE WHEN s.batruns = 6 THEN 1 ELSE 0 END)"
-        control_num_expr = "SUM(CASE WHEN s.control_flag = 1 THEN 1 ELSE 0 END)"
-        control_den_expr = "SUM(CASE WHEN s.control_flag IS NOT NULL THEN 1 ELSE 0 END)"
+        # Control over the row's own balls: the same legal-ball rule as `balls` (a batter's balls
+        # exclude wides; a bowler's and a team's exclude no-balls too). Counting every tagged row put
+        # wides in the denominator: Gill's ODI control read 87.64% (3,183 of 3,632) against 87.98%
+        # (3,156 of 3,587) from group_by=control. docs/query_builder_metrics.md.
+        legal_s = sql_defs.delivery_details_defs(perspective, "s").legal_ball
+        control_num_expr = f"SUM(CASE WHEN {legal_s} AND s.control_flag = 1 THEN 1 ELSE 0 END)"
+        control_den_expr = f"SUM(CASE WHEN {legal_s} AND s.control_flag IS NOT NULL THEN 1 ELSE 0 END)"
+        extra_tags = [t for t in (coverage_tags or []) if t in TAG_COLUMNS and t != "control"]
+        stage2_extra_select += "".join(f", dd.{TAG_COLUMNS[t]} AS cov_{t}" for t in extra_tags)
+        coverage_selects = ",\n            ".join(
+            [f"{control_den_expr} AS control_tagged"]
+            + [f"SUM(CASE WHEN {legal_s} AND {_tagged_sql(t, 's.cov_' + t)} THEN 1 ELSE 0 END) AS {t}_tagged"
+               for t in extra_tags])
 
     # HAVING in the new pattern is a WHERE on the aggregated CTE; predicates
     # reference the aggregated column aliases (balls/runs/wickets) rather
@@ -3646,8 +3718,10 @@ def handle_grouped_query(
         inner_extra.append("SUM(CASE WHEN dd.batruns IN (4, 6) THEN 1 ELSE 0 END) as t_boundaries")
         outer_extra.append("SUM(t_boundaries)::bigint as t_boundaries")
     if "control" in extra_needs:
-        inner_extra.append("SUM(CASE WHEN dd.control = 1 THEN 1 ELSE 0 END) as t_ctrl_num")
-        inner_extra.append("SUM(CASE WHEN dd.control IS NOT NULL THEN 1 ELSE 0 END) as t_ctrl_den")
+        # Same legal-ball rule as the stage-2 control_percentage it filters on.
+        legal_dd = sql_defs.delivery_details_defs(perspective, "dd").legal_ball
+        inner_extra.append(f"SUM(CASE WHEN {legal_dd} AND dd.control = 1 THEN 1 ELSE 0 END) as t_ctrl_num")
+        inner_extra.append(f"SUM(CASE WHEN {legal_dd} AND dd.control IS NOT NULL THEN 1 ELSE 0 END) as t_ctrl_den")
         outer_extra.append("SUM(t_ctrl_num)::bigint as t_ctrl_num")
         outer_extra.append("SUM(t_ctrl_den)::bigint as t_ctrl_den")
     if "metrics" in extra_needs and metrics_enabled:
@@ -3752,7 +3826,8 @@ def handle_grouped_query(
             CASE WHEN {control_den_expr} > 0
                 THEN (CAST({control_num_expr} AS DECIMAL) * 100.0) / {control_den_expr}
                 ELSE NULL END as control_percentage,
-            {metric_selects}
+            {metric_selects},
+            {coverage_selects}
         FROM qualifying q
         JOIN stage2_source s ON {stage2_join_conditions}
         GROUP BY {final_group_by_carry}, q.balls, q.innings_count, q.runs, q.wickets,
@@ -3816,6 +3891,11 @@ def handle_grouped_query(
             "percent_balls": percent_balls,
             **_primer_metric_fields(row[n + 18:n + 24], innings_count, metrics_perspective, row[n + 24:n + 26]),
         })
+        mapping = row._mapping
+        for tag in ["control", *extra_tags]:
+            tagged = mapping.get(f"{tag}_tagged")
+            row_dict[f"{tag}_tagged"] = int(tagged) if tagged is not None else None
+        _attach_coverage(row_dict, ["control", *extra_tags])
         formatted_results.append(row_dict)
 
     # Empty Stage 2 means no rows passed HAVING (or LIMIT/OFFSET past the
@@ -4047,7 +4127,7 @@ GROUP_BY_COLUMNS = (
     "match_outcome", "chase_outcome", "toss_decision",
     "bat_hand", "striker_batter_type",
     "bowl_style", "bowl_kind", "crease_combo",
-    "line", "length", "shot", "control", "wagon_zone", "dismissal",
+    "line", "length", "shot", "shot_family", "control", "wagon_zone", "dismissal",
     "format",
     *query_dimensions.DIMENSION_NAMES,
 )
@@ -4137,12 +4217,33 @@ def _run_deliveries_query_uncached(
     exclude_bowlers: Optional[List[str]] = None,
     dimension_filters: Optional[List[str]] = None,
     metrics_perspective: Optional[str] = None,
+    shot_family: Optional[List[str]] = None,
+    partnership_players: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Validate and run a query-builder request. Raises QueryValidationError on bad bounds."""
+    """Validate and run a query-builder request. Raises QueryValidationError on bad bounds.
+
+    shot_family: shot families (services/shot_families.py), OR'd with `shot`.
+    partnership_players: partnerships involving these players -- every ball either batter faced.
+    With group_by=partnership, a `batters` filter is read this way too (it used to count only the
+    named batter's balls of each stand), and the response says so.
+    """
     validate_format_bounds(fmt, gender, over_min, over_max, innings)
     if metrics_perspective not in (None, "", "auto", "bowling", "batting"):
         raise QueryValidationError("metrics_perspective must be 'bowling' or 'batting' (or omitted to infer it).")
     metrics_perspective = metrics_perspective if metrics_perspective in ("bowling", "batting") else None
+    notes: List[str] = []
+    if shot_family:
+        from services.shot_families import UnknownShotFamily, describe, shots_for
+        try:
+            shot = list(dict.fromkeys([*(shot or []), *shots_for(shot_family)]))
+        except UnknownShotFamily as exc:
+            raise QueryValidationError(str(exc))
+        notes.append(f"Shot families: {describe(shot_family)}.")
+    partnership_players = list(partnership_players or [])
+    if "partnership" in (group_by or []) and batters and not partnership_players:
+        partnership_players, batters = list(batters), []
+        notes.append("Grouped by partnership, the batters filter means partnerships involving those players: "
+                      "both batters' balls are counted (use partnership_players to say so explicitly).")
     if query_mode == "team_innings":
         from services.team_innings import query_team_innings
         return query_team_innings(
@@ -4237,7 +4338,45 @@ def _run_deliveries_query_uncached(
         exclude_bowlers=exclude_bowlers or [],
         dimension_filters=parsed_dimension_filters,
         metrics_perspective=metrics_perspective,
+        partnership_players=partnership_players,
     )
+    if isinstance(result, dict) and query_mode == "delivery" and group_by and ball_aggregation != "cumulative":
+        tag_filters = [t for t, on in (("line", line), ("length", length), ("shot", shot),
+                                      ("control", control is not None), ("wagon_zone", wagon_zone)) if on]
+        if tag_filters and result.get("data"):
+            # A tag filter keeps only the balls that carry the tag, so a group's count is short by
+            # its untagged balls. Coverage has to come from the group's balls before that filter.
+            coverage = query_deliveries_service(
+                venue=venue, start_date=start_date, end_date=end_date, leagues=leagues or [], teams=teams or [],
+                batting_teams=batting_teams or [], bowling_teams=bowling_teams or [], players=players or [],
+                batters=batters or [], bowlers=bowlers or [], bat_hand=bat_hand, bowl_style=bowl_style or [],
+                bowl_kind=bowl_kind or [], crease_combo=crease_combo or [], line=[], length=[], shot=[],
+                control=None, wagon_zone=[], dismissal=dismissal or [], innings=innings, over_min=over_min,
+                over_max=over_max, match_outcome=match_outcome or [], is_chase=is_chase,
+                chase_outcome=chase_outcome or [], toss_decision=toss_decision or [], group_by=group_by,
+                show_summary_rows=False, min_balls=None, max_balls=None, min_runs=None, max_runs=None,
+                min_wickets=None, max_wickets=None, limit=100000, offset=0,
+                include_international=include_international, top_teams=top_teams, query_mode=query_mode, db=db,
+                ball_aggregation=ball_aggregation, day_or_night=day_or_night, fmt=fmt, gender=gender,
+                match_ids=match_ids or [], exclude_batters=exclude_batters or [],
+                exclude_bowlers=exclude_bowlers or [], dimension_filters=parsed_dimension_filters,
+                metrics_perspective=metrics_perspective, partnership_players=partnership_players,
+                coverage_tags=tag_filters,
+            )
+            by_key = {tuple(str(r.get(g)) for g in group_by): r for r in coverage.get("data") or []}
+            for row in result["data"]:
+                base = by_key.get(tuple(str(row.get(g)) for g in group_by)) or {}
+                for tag in tag_filters:
+                    row[f"{tag}_coverage_pct"] = base.get(f"{tag}_coverage_pct")
+            result.setdefault("metadata", {})["coverage"] = {
+                "tags": tag_filters,
+                "basis": "share of the group's balls with the tag, before the tag filters",
+            }
+    if isinstance(result, dict) and notes:
+        meta = result.setdefault("metadata", {})
+        meta["warnings"] = list(meta.get("warnings") or []) + notes
+    if isinstance(result, dict) and "partnership" in (group_by or []):
+        result.setdefault("metadata", {})["definitions"] = PARTNERSHIP_DEFINITIONS
     if metric_thresholds and query_mode == "delivery" and isinstance(result, dict):
         from services.metric_thresholds import describe
         result.setdefault("metadata", {})["metric_filters"] = describe(metric_thresholds)
@@ -4245,6 +4384,17 @@ def _run_deliveries_query_uncached(
         result.setdefault("metadata", {}).setdefault("warnings", [])
         result["metadata"]["warnings"] = list(result["metadata"]["warnings"] or []) + threshold_warnings
     return result
+
+
+#: What a partnership row counts (group_by=partnership): docs/query_builder_metrics.md.
+PARTNERSHIP_DEFINITIONS = {
+    "partnership": "The two batters at the crease, either way round (A & B is B & A).",
+    "runs": "Every run scored while the pair batted, extras included (wides, no-balls, byes, leg-byes).",
+    "balls": "Legal balls bowled to the pair (wides and no-balls excluded), whichever of them faced.",
+    "wickets": "Dismissals while the pair batted, run-outs included; retirements are not dismissals.",
+    "average": "Runs per dismissal: the partnership's runs divided by the times it ended in a dismissal.",
+    "control_percentage": "Controlled shots / balls with a control tag, over the pair's legal balls.",
+}
 
 
 def run_deliveries_query(db, **kwargs):

@@ -68,7 +68,7 @@ function frame(size, kicker, headline, body, source) {
     h('div', { fontFamily: DISPLAY, flexShrink: 0, fontSize: long ? Math.max(size.headline - 8, MIN_FONT.headline * (size.width / 1080)) : size.headline, fontWeight: 700, marginTop: 30, lineHeight: 1.08 }, headline || ''),
     body,
     h('div', { marginTop: 'auto', paddingTop: 24, justifyContent: 'space-between', alignItems: 'flex-end', gap: 20 },
-      h('div', { color: C.low, fontSize: size.small, maxWidth: '62%' }, source || 'Hindsight · ball-by-ball cricket data'),
+      h('div', { color: C.low, fontSize: size.small, maxWidth: '70%' }, source || 'Hindsight · ball-by-ball cricket data'),
       h('div', { color: C.lime, fontSize: size.small + 2, fontWeight: 600 }, 'hindsightcricket.com')));
 }
 
@@ -471,6 +471,10 @@ const CARD_BODIES = {
   win_prob: (s, d) => winProbBody(s, d), donut: donutBody, strips: stripsBody, grid: gridBody,
 };
 
+// Footer text next to "Data as of": a ranking's filters, how complete its tagged data is (shot control,
+// shot type...) and any shot-family definition (services/content_ideas._footnote), else the source.
+const sourceLine = (snap, data) => `Data as of ${asOf(snap)} · ${data.footnote || data.source || 'ball-by-ball'}`;
+
 export function renderSnapshot(snap, sizeName = 'portrait') {
   const size = SIZES[sizeName] || SIZES.portrait;
   const data = snap.data || {};
@@ -488,19 +492,19 @@ export function renderSnapshot(snap, sizeName = 'portrait') {
     return frame(size, kicker, data.recap?.headline || snap.title, recapBody(size, data), `${data.result || ''} · Impact & WPA by Hindsight`);
   }
   if (data.layout === 'list') {
-    return frame(size, data.kicker || '', data.title || snap.title, listBody(size, data), `Data as of ${asOf(snap)} · ${data.source || 'ball-by-ball'}`);
+    return frame(size, data.kicker || '', data.title || snap.title, listBody(size, data), sourceLine(snap, data));
   }
   const body = { line: lineBody, scatter: scatterBody, stat: statBody, diverging: divergingBody, dumbbell: dumbbellBody, stacked: stackedBody, field: fieldBody }[data.layout];
   if (body) {
     const fmtChip = (data.filter_chips || []).find((c) => /^(T20I?|ODI|Test|T20s?)$/i.test(c));
     const kick = data.kicker || [fmtChip, ...(data.group_by || []).map((g) => g.replace(/_/g, ' ') + (g.endsWith('s') ? '' : 's'))].filter(Boolean).join(' · ');
-    return frame(size, kick, data.title || snap.title, body(size, data), `Data as of ${asOf(snap)} · ${data.source || 'ball-by-ball'}`);
+    return frame(size, kick, data.title || snap.title, body(size, data), sourceLine(snap, data));
   }
   // "ODI · partnerships": the format chip, then what each bar is.
   const fmt = (data.filter_chips || []).find((c) => /^(T20I?|ODI|Test|T20s?)$/i.test(c));
   const kicker = data.kicker || [fmt, ...(data.group_by || []).map((g) => g.replace(/_/g, ' ') + (g.endsWith('s') ? '' : 's'))]
     .filter(Boolean).join(' · ');
-  return frame(size, kicker, data.title || snap.title, barsBody(size, data), `Data as of ${asOf(snap)} · ${data.source || 'ball-by-ball'}`);
+  return frame(size, kicker, data.title || snap.title, barsBody(size, data), sourceLine(snap, data));
 }
 
 export default async function handler(req, res) {

@@ -185,8 +185,15 @@ def _recent_matches_against(db: Session, team: str, fmt: str) -> List[str]:
 
 
 def _find(rows: List[Dict[str, Any]], label_key: str, names: List[str]) -> Optional[int]:
-    """Index of the first row whose label contains every highlight name's surname."""
-    surnames = [n.split()[-1].lower() for n in names if n]
+    """Index of the row the highlight names: an exact label first, else the first row whose label
+    contains every named player's surname. A partnership highlight ("Shubman Gill & Virat Kohli") is
+    two players; read as one name it matched only "Kohli", i.e. the first stand with Kohli in it."""
+    wanted = {str(n).strip().lower() for n in names if n}
+    for i, r in enumerate(rows):
+        if _row_name(r, label_key).strip().lower() in wanted:
+            return i
+    people = [p for n in names if n for p in re.split(r"\s+(?:&|and)\s+", str(n).strip()) if p]
+    surnames = [p.split()[-1].lower() for p in people]
     for i, r in enumerate(rows):
         label = _row_name(r, label_key).lower()
         if surnames and all(s in label for s in surnames):
@@ -585,7 +592,9 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any], created_by: st
         if isinstance(params.get(key), str):
             params[key] = date.fromisoformat(params[key])
     metric, highlight = planned.get("metric"), planned.get("highlight")
-    query_params = {**planned["params"], "limit": 20000}
+    from services.coverage import DEFAULT_MIN_COVERAGE, describe_floor
+    min_coverage = planned.get("min_coverage", DEFAULT_MIN_COVERAGE)
+    query_params = {**planned["params"], "limit": 20000, "min_coverage": min_coverage}
     if metric:
         query_params.update(sort_by=metric, sort_descending=not _ascending(metric, params["group_by"]))
     # The full ordering (through the query cache), to find the subject's true rank; only the
@@ -613,6 +622,12 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any], created_by: st
     rows = [r for r in rows if r.get(metric) is not None]
     if not rows:
         return {"status": "parked", "note": "No rows have a value for this metric yet."}
+    # Ranked by a tagged metric (control %): rows under the coverage floor are ranked after the rest
+    # (services/coverage.py) and are not part of "Nth of M" -- M counts only the rows that qualify.
+    coverage = full.get("coverage") if (full.get("coverage") or {}).get("tag") else None
+    if coverage:
+        excluded_rows = [r for r in rows if r.get("coverage_excluded")]
+        rows = [r for r in rows if not r.get("coverage_excluded")] + excluded_rows
 
     # "…in the first ODI v WI": a per-match question about a named opponent. The subject must come
     # from a recent match against that team, not from any match in history.
@@ -645,8 +660,18 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any], created_by: st
             when = f" Latest match loaded: {latest:%d %b %Y}." if latest else ""
             return {"status": "parked", "note": f"{' & '.join(highlight)} not in this query's results yet.{when}"}
     row, total = rows[idx], (int(full.get("total_rows") or len(rows)) - unrankable if unrankable else int(full.get("total_rows") or len(rows)))
+    if coverage:
+        total = coverage["included"]
+        if row.get("coverage_excluded"):
+            # Never publish a rank the data can't support: this row's tagged balls are too few.
+            pct = row.get(coverage["column"])
+            return {"status": "parked",
+                    "note": (f"{_row_name(row, label_key)} has {coverage['label']} data for only "
+                             f"{(pct if pct is not None else 0):g}% of balls, under the {coverage['min']:g}% minimum, "
+                             "so it can't be ranked by this metric. Lower the minimum coverage to include it.")}
+    warnings = _coverage_warnings(rows, idx, full.get("coverage_tags") or [], min_coverage, label_key)
     value = float(row[metric])
-    parts = title_parts(params)
+    parts = title_parts(params, coverage)
     name = _row_name(row, label_key).replace(" & ", " and ")
     title = (f"{name} rank {ordinal(idx + 1)} of {total:,} {parts['scope']}{parts['filters']}{parts['minimum']}{parts['venue']}"
              f"{parts['overs']} for {metric_label(metric)}{parts['window'].replace(',', '')}, {_value_phrase(metric, value)}")
@@ -667,6 +692,9 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any], created_by: st
                   "display": _value_text(metric, float(rows[i][metric])), "highlight": i == idx} for i in shown],
         "chart": {"type": "bar", "label_key": "label", "metric": metric},
         "hindsight_url": full.get("hindsight_url"), "total_rows": total, "source": "ball-by-ball",
+        # Next to "Data as of" on the image: what was filtered, how complete the tagged data is for
+        # the subject, and what a shot family contains.
+        "footnote": _footnote(params, row, name, coverage, full.get("coverage_tags") or [], full.get("filter_chips") or []),
     }
     # Chart forms (services/pack_charts): every form the data supports gets its own snapshot so the
     # admin page can switch; Jev (or the rule order) picks which one the pack leads with.
@@ -721,7 +749,46 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any], created_by: st
                   "from ball-by-ball data on Hindsight's query builder.",
         "chart_options": chart_options, "chart_picked_by": ranking["by"],
     }
+    fact["warnings"] = warnings
     return {"status": "resolved", "fact": fact, "snapshot": snap}
+
+
+def _tag_columns(row: Dict[str, Any], coverage: Optional[Dict[str, Any]], tags: List[str]) -> List[str]:
+    cols = [coverage["tag"]] if coverage else []
+    return cols + [t for t in tags if t not in cols]
+
+
+def _footnote(params, row, name, coverage, tags, chips) -> str:
+    """"ODI · 2001–2026 · control data: 99.9% of Gill and Kohli's balls (90% min) · Pull / hook = ..."."""
+    from services.coverage import TAG_LABELS
+    from services.shot_families import FAMILIES
+
+    parts = [c for c in chips if c and not str(c).startswith("All formats")][:3]
+    for tag in _tag_columns(row, coverage, tags):
+        pct = row.get(f"{tag}_coverage_pct")
+        if pct is not None:
+            floor = f" ({coverage['min']:g}% min)" if coverage and coverage["tag"] == tag else ""
+            parts.append(f"{TAG_LABELS.get(tag, tag)} data: {pct:g}% of {name}'s balls{floor}")
+    for fam in params.get("shot_family") or []:
+        label, shots = FAMILIES.get(str(fam).upper(), (None, ()))
+        if label:
+            parts.append(f"{label} = {', '.join(shots)}")
+    return " · ".join(parts)
+
+
+def _coverage_warnings(rows, idx, tags, min_coverage, label_key) -> List[str]:
+    """A tag filter (shot, line...) counts only tagged balls: say so when the subject, or anyone ranked
+    above it, has less tagged data than the floor."""
+    if not tags or not min_coverage:
+        return []
+    out = []
+    for i in range(idx + 1):
+        for tag in tags:
+            pct = rows[i].get(f"{tag}_coverage_pct")
+            if pct is not None and pct < min_coverage:
+                out.append(f"{_row_name(rows[i], label_key)} (rank {i + 1}) has {tag} data for only {pct:g}% of "
+                           f"balls, so their count may be short.")
+    return out
 
 
 def _pack_from_fact(db: Session, idea_id: int, result: Dict[str, Any]) -> Optional[int]:

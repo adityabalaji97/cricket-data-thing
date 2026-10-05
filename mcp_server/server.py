@@ -568,7 +568,7 @@ def structure_query_result(
     bowlers: Optional[List[str]] = None, sort_by: Optional[str] = None, sort_descending: bool = True,
     limit: int = 25, chart: str = "auto", chart_metric: Optional[str] = None,
     scatter_x: Optional[str] = None, scatter_y: Optional[str] = None, offset: int = 0,
-    paged_by_engine: bool = False,
+    paged_by_engine: bool = False, min_coverage: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Shape a query-builder result for display: ordered columns, chart spec, title, link.
 
@@ -608,6 +608,10 @@ def structure_query_result(
         ))
     elif group_by and (group_by[0] in _SEQUENTIAL_KEYS or group_by[0] == "phase" or group_by[0] in _BUCKET_ORDER):
         rows.sort(key=lambda r: _sequence_key(group_by[0], r.get(group_by[0])))
+    # Ranked by a tagged metric (control %): rows with too little tagged data rank last, out of the
+    # count (services/coverage.py). Default floor 90%; min_coverage=0 turns it off.
+    from services.coverage import DEFAULT_MIN_COVERAGE, rank_with_coverage
+    rows, coverage = rank_with_coverage(rows, sort_by, DEFAULT_MIN_COVERAGE if min_coverage is None else min_coverage)
     total_rows = meta.get("total_groups") or meta.get("total_rows") or len(rows)
     start = 0 if paged_by_engine else offset
     rows = rows[start:start + limit]
@@ -643,6 +647,9 @@ def structure_query_result(
         "note": " ".join(warnings) if warnings else None,
         "metrics_perspective": metrics_perspective,
         "metrics_perspective_label": perspective_label(metrics_perspective),
+        "coverage": coverage,
+        "coverage_tags": (meta.get("coverage") or {}).get("tags") or [],
+        "definitions": meta.get("definitions"),
     }
 
     return structured
@@ -702,7 +709,10 @@ def query_cricket_data(
     bowl_style: Annotated[List[str], Field(description="Values from get_query_options, e.g. ['LAO','SLA'] for left-arm spin.")] = [],
     line: Annotated[List[str], Field(description="Values from get_query_options.")] = [],
     length: Annotated[List[str], Field(description="Values from get_query_options.")] = [],
-    shot: Annotated[List[str], Field(description="Values from get_query_options.")] = [],
+    shot: Annotated[List[str], Field(description="Values from get_query_options. The feed changed shot labels around 2018 (e.g. PULL_HOOK_ON_BACK_FOOT before, PULL/HOOK after): for career questions use shot_family.")] = [],
+    shot_family: Annotated[List[str], Field(description="Shot families spanning both tagging schemes: PULL_HOOK, CUT, DRIVE, FLICK_GLANCE, SWEEP, REVERSE, RAMP_SCOOP, SLOG, WORK_PUSH, DEFENCE, LEAVE. Also a group_by column (shot_family).")] = [],
+    partnership_players: Annotated[List[str], Field(description="With group_by=['partnership']: partnerships involving these players, counting both batters' balls. A batters filter is read this way too when grouping by partnership.")] = [],
+    min_coverage: Annotated[Optional[float], Field(ge=0, le=100, description="When sort_by is a tagged metric (control_percentage): rows whose balls are less than this % tagged rank last and are flagged coverage_excluded. Default 90; 0 turns it off. Rows carry <tag>_coverage_pct.")] = None,
     control: Annotated[Optional[Literal[0, 1]], Field(description="1 = controlled shots, 0 = uncontrolled.")] = None,
     wagon_zone: Annotated[List[int], Field(description="Wagon-wheel zones 0-8.")] = [],
     dismissal: Annotated[List[str], Field(description="Dismissal types, e.g. ['caught','bowled','lbw'].")] = [],
@@ -736,7 +746,8 @@ def query_cricket_data(
         "end_date": end_date.isoformat() if end_date else None, "leagues": leagues, "teams": teams,
         "batting_teams": batting_teams, "bowling_teams": bowling_teams, "players": players,
         "batters": batters, "bowlers": bowlers, "bat_hand": bat_hand, "bowl_style": bowl_style,
-        "bowl_kind": bowl_kind, "line": line, "length": length, "shot": shot, "control": control,
+        "bowl_kind": bowl_kind, "line": line, "length": length, "shot": shot, "shot_family": shot_family,
+        "partnership_players": partnership_players, "control": control,
         "wagon_zone": wagon_zone, "dismissal": dismissal, "innings": innings, "over_min": over_min,
         "over_max": over_max, "match_outcome": match_outcome, "is_chase": is_chase,
         "chase_outcome": chase_outcome, "toss_decision": toss_decision, "min_balls": min_balls,
@@ -775,6 +786,7 @@ def query_cricket_data(
                 query_mode=query_mode, fmt=format, gender=gender, match_ids=match_ids,
                 exclude_batters=exclude_batters, exclude_bowlers=exclude_bowlers,
                 dimension_filters=dimension_filters, metrics_perspective=metrics_perspective,
+                shot_family=shot_family, partnership_players=partnership_players,
             )
             alias_map = _alias_map(db)
     except QueryValidationError as exc:
@@ -795,7 +807,7 @@ def query_cricket_data(
         result, params, group_by, query_mode=query_mode, format=format, gender=gender, batters=batters,
         bowlers=bowlers, sort_by=sort_by, sort_descending=sort_descending, limit=limit, chart=chart,
         chart_metric=chart_metric, scatter_x=scatter_x, scatter_y=scatter_y, offset=offset,
-        paged_by_engine=not sorting,
+        paged_by_engine=not sorting, min_coverage=min_coverage,
     )
     rows, columns, url, warnings = structured["rows"], structured["columns"], structured["hindsight_url"], structured["warnings"]
     total_rows, chart_spec = structured["total_rows"], structured["chart"]
