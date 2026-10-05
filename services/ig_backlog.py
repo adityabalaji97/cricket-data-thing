@@ -18,6 +18,7 @@ services/idea_stats (regular expressions), and myth posts point at their note.
 from __future__ import annotations
 
 import json
+import re
 import logging
 from datetime import date, timedelta
 from typing import Any, Dict, Iterable, List, Optional
@@ -121,6 +122,52 @@ IDEAS: List[Dict[str, Any]] = [
 ]
 
 
+#: Slide 1 of each carousel: the question the post answers, written by hand. A hook names no result (the chart
+#: does), so it can't disagree with the data; a leaderboard's hook names nobody, since its leader can change.
+HOOKS: Dict[str, str] = {
+    "odi-pair-three-ways": "Is Gill & Kohli the most complete ODI partnership ever?",
+    "odi-control-gill": "Who is the most in-control batter in ODI cricket?",
+    "odi-pull-sixes": "Who owns the pull shot in ODIs?",
+    "odi-death-hitters": "Who hits hardest at the end of an ODI innings?",
+    "odi-middle-overs-squeeze": "Which bowler strangles the middle overs in ODIs?",
+    "odi-death-bowlers": "Who is the best ODI death bowler of the last decade?",
+    "odi-chase-average": "Is anyone better at chasing than Virat Kohli?",
+    "odi-boundary-hitters": "Which ODI batter lives in boundaries?",
+    "t20-death-bumrah": "Is Bumrah really the best death bowler in T20 cricket?",
+    "ipl-economy": "Who is the hardest IPL bowler to score off?",
+    "ipl-death-hitters": "Who is the most destructive IPL finisher right now?",
+    "t20-powerplay-hitters": "Who scores fastest in the IPL powerplay?",
+    "t20-spin-hitters": "Who is the best player of spin in T20 cricket?",
+    "t20-pace-hitters": "Who takes pace bowling apart in T20 cricket?",
+    "t20-impact-batters": "Who actually wins IPL games with the bat?",
+    "t20-dot-bowlers": "Which IPL bowler gives batters nothing?",
+    "ipl-powerplay-bowlers": "Who is the best new-ball bowler in the IPL?",
+    "t20-control-hitters": "Can you hit hard and stay in control?",
+    "ipl-fastest-1000-balls": "Who got to 1,000 IPL runs in the fewest balls?",
+    "ipl-fastest-100-wickets": "Who is the fastest to 100 IPL wickets?",
+    "ipl-fastest-2000-balls": "Who got to 2,000 IPL runs in the fewest balls?",
+    "odi-costliest-debut": "What's the most expensive ODI debut this century?",
+    "odi-fastest-200-wickets": "Who is the fastest to 200 ODI wickets?",
+    "odi-fastest-5000": "Who is the fastest to 5,000 ODI runs?",
+    "odi-three-tons-innings": "How rare are three centuries in one ODI innings?",
+    "odi-four-tons-match": "How often does one ODI produce four centuries?",
+    "ipl-two-tons-innings": "Two centuries in one IPL innings: how often has it happened?",
+    "odi-two-fivefors-match": "Two five-wicket hauls in one ODI: how rare is it?",
+    "ipl-debut-runs": "What's the best IPL debut with the bat?",
+}
+
+
+def _kicker(item: Dict[str, Any]) -> str:
+    """The small line above the hook: the competition or format ("IPL", "ODI", "T20")."""
+    params = (item.get("planned") or {}).get("params") or {}
+    if params.get("leagues"):
+        return " · ".join(params["leagues"])
+    if params.get("fmt"):
+        return params["fmt"]
+    idea = item.get("idea") or ""
+    return next((k for k in ("IPL", "ODI", "T20I", "T20") if k in idea), "")
+
+
 def _players_of(item: Dict[str, Any], fact: Optional[Dict[str, Any]]) -> List[str]:
     names = list(item.get("players") or [])
     subject = (fact or {}).get("subject")
@@ -146,15 +193,23 @@ def _note_post(db: Session, item: Dict[str, Any]) -> Dict[str, Any]:
     fact = {"kind": "note", "subject": None, "title": note["title"], "finding": finding, "note_id": note["id"],
             "note_slug": note["slug"], "method": "Pre-registered test on Hindsight's ball-by-ball data; full write-up linked in bio."}
     warnings = [] if note["status"] == "published" else [f"The note is still a {note['status']}: review and publish it before this goes out."]
-    return {"status": "resolved", "fact": fact, "snapshot": None, "warnings": warnings}
+    return {"status": "resolved", "fact": fact, "snapshot": None, "warnings": warnings, "note_row": dict(note)}
 
 
 def make(db: Session, item: Dict[str, Any], created_by: str = "ig-backlog") -> Dict[str, Any]:
     """Run one idea: {status, fact, snapshot, warnings}. Saves chart snapshots (callers stub that for a dry run)."""
     from services import content_ideas
 
+    from services import ig_carousel
+
     if item["pillar"] == "myth":
-        return _note_post(db, item)
+        result = _note_post(db, item)
+        if result.get("status") == "resolved":
+            slides = ig_carousel.for_note(result.pop("note_row"))
+            carousel = ig_carousel.save(db, slides, result["fact"]["title"], {"ig": item["key"]}, created_by)
+            result["fact"].update(carousel_id=carousel["id"], slides=len(slides))
+            result["snapshot"] = carousel  # a text post: the carousel's first slide is its image
+        return result
     try:
         planned = item.get("planned") or content_ideas.plan(item["idea"], None, db)
         result = content_ideas.attempt(db, item["idea"], planned, created_by=created_by)
@@ -169,6 +224,9 @@ def make(db: Session, item: Dict[str, Any], created_by: str = "ig-backlog") -> D
     rank, total = numbers.get("rank"), numbers.get("total")
     if item.get("planned", {}).get("highlight") and rank and total and rank > max(10, total * 0.1):
         warnings.append(f"The highlighted subject ranks {rank} of {total}: not a standout.")
+    slides = ig_carousel.for_fact(fact, result["snapshot"]["id"], HOOKS.get(item["key"]) or item["idea"], _kicker(item))
+    carousel = ig_carousel.save(db, slides, fact["title"], {"ig": item["key"]}, created_by)
+    fact.update(carousel_id=carousel["id"], slides=len(slides))
     return {**result, "warnings": warnings}
 
 
@@ -224,18 +282,59 @@ def _write(calendar: List[Dict[str, Any]], bench: List[Dict[str, Any]]) -> None:
     rows = [(e["post"], e["date"]) for e in calendar if e["post"]] + [(b, None) for b in bench]
     with engine.begin() as conn:
         for post, day in rows:
-            fact = post["fact"]
-            conn.execute(text("""
-                INSERT INTO content_packs (match_id, snapshot_id, angle_key, title, first_comment, subreddit, flair, facts,
-                                           rule_warnings, status, source, channel, planned_for, pillar, caption)
-                VALUES (NULL, :s, :k, :t, NULL, NULL, NULL, CAST(:f AS jsonb), CAST(:w AS jsonb), 'ready', 'ig-backlog',
-                        'instagram', :d, :p, :c)
-                ON CONFLICT (angle_key) WHERE angle_key IS NOT NULL DO UPDATE SET
-                    snapshot_id = EXCLUDED.snapshot_id, title = EXCLUDED.title, facts = EXCLUDED.facts,
-                    rule_warnings = EXCLUDED.rule_warnings, pillar = EXCLUDED.pillar, caption = EXCLUDED.caption,
-                    planned_for = CASE WHEN content_packs.status = 'ready' THEN EXCLUDED.planned_for
-                                       ELSE content_packs.planned_for END
-            """), {"s": post["snapshot_id"], "k": f"ig:{post['key']}", "t": fact["title"],
-                   "f": json.dumps(fact, default=str), "w": json.dumps(post["warnings"]), "d": day,
-                   "p": post["pillar"], "c": _caption(fact) if fact.get("kind") != "note"
-                   else "\n".join([fact["title"], "", fact.get("finding") or "", "", fact["method"]])})
+            upsert_pack(conn, post, day)
+
+
+def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "ig-backlog") -> None:
+    """One Instagram pack: {key, pillar, fact, snapshot_id, warnings} planned for `day` (None = bench)."""
+    fact = post["fact"]
+    caption = post.get("caption") or (_caption(fact) if fact.get("kind") != "note"
+                                      else "\n".join([fact["title"], "", fact.get("finding") or "", "", fact["method"]]))
+    conn.execute(text("""
+        INSERT INTO content_packs (match_id, snapshot_id, angle_key, title, first_comment, subreddit, flair, facts,
+                                   rule_warnings, status, source, channel, planned_for, pillar, caption)
+        VALUES (NULL, :s, :k, :t, NULL, NULL, NULL, CAST(:f AS jsonb), CAST(:w AS jsonb), 'ready', :src,
+                'instagram', :d, :p, :c)
+        ON CONFLICT (angle_key) WHERE angle_key IS NOT NULL DO UPDATE SET
+            snapshot_id = EXCLUDED.snapshot_id, title = EXCLUDED.title, facts = EXCLUDED.facts,
+            rule_warnings = EXCLUDED.rule_warnings, pillar = EXCLUDED.pillar, caption = EXCLUDED.caption,
+            planned_for = CASE WHEN content_packs.status = 'ready' THEN EXCLUDED.planned_for
+                               ELSE content_packs.planned_for END
+    """), {"s": post["snapshot_id"], "k": f"ig:{post['key']}", "t": fact["title"],
+           "f": json.dumps(fact, default=str), "w": json.dumps(post["warnings"]), "d": day,
+           "p": post["pillar"], "c": caption, "src": source})
+
+
+def preview_post(db: Session, venue: str, team1: str, team2: str, cards: List[str], day: date, label: str,
+                 team1_short: Optional[str] = None, team2_short: Optional[str] = None, fmt: str = "T20") -> Dict[str, Any]:
+    """A match-day post (pillar 'reactive'): the chosen cards of the fixture's preview story, frozen as preview_card
+    snapshots (the same images the story shares), with a hook and an end slide around them."""
+    from services import ig_carousel
+    from services.preview_cards import PreviewContext, context_params
+    from services.snapshots import SnapshotError, create_snapshot
+
+    ctx = PreviewContext(db=db, venue=venue, team1=team1, team2=team2, fmt=fmt, gender="male",
+                         team1_short=team1_short, team2_short=team2_short)
+    params = context_params(ctx)
+    chart_ids, titles, warnings = [], [], []
+    for card in cards:
+        try:
+            snap = create_snapshot(db, "preview_card", {**params, "card": card}, created_by="ig-preview")
+        except SnapshotError as exc:  # a card this fixture doesn't have: leave it out, say so
+            warnings.append(f"Card '{card}' left out: {exc}")
+            continue
+        chart_ids.append(snap["id"])
+        titles.append(snap["title"])
+    if not chart_ids:
+        return {"status": "failed", "note": "None of the chosen cards could be built.", "warnings": warnings}
+    hook = f"{len(chart_ids)} things the data says before {team1} v {team2}"
+    slides = ig_carousel.for_preview(chart_ids, hook, label)
+    carousel = ig_carousel.save(db, slides, hook, {"preview": params, "cards": cards, "day": str(day)}, "ig-preview")
+    fact = {"kind": "preview", "subject": None, "title": hook, "card_titles": titles, "fixture": params,
+            "carousel_id": carousel["id"], "slides": len(slides)}
+    caption = "\n".join([f"{team1} v {team2} · {label}", "", *[f"• {t}" for t in titles], "",
+                         "Every card is from ball-by-ball data. The full preview story is on Hindsight (link in bio).",
+                         "", "Who are you backing?"])
+    slug = re.sub(r"[^a-z0-9]+", "-", f"{team1}-{team2}-{day}".lower()).strip("-")
+    return {"status": "resolved", "key": f"preview-{slug}", "pillar": "reactive", "fact": fact,
+            "snapshot_id": carousel["id"], "warnings": warnings, "caption": caption, "players": []}

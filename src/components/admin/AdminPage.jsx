@@ -3,7 +3,7 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { Box, Button, Chip, CircularProgress, Snackbar, TextField, Typography } from '@mui/material';
 import axios from 'axios';
 import config from '../../config';
-import { shareImage, siteOrigin } from '../ui/ChartExportButton';
+import { fetchImageFiles, shareFiles, shareImage, siteOrigin } from '../ui/ChartExportButton';
 import GraphicPromptList from '../GraphicPromptList';
 import { apiErrorText } from '../../utils/apiError';
 
@@ -249,17 +249,35 @@ const IdeaBox = ({ client, toast, onPackCreated }) => {
 
 const PILLAR_LABELS = { debate: 'Debate', myth: 'Myth-busting', weird: 'Weird & wonderful', play: 'Play along', reactive: 'Trending' };
 
-// An Instagram post from the planned calendar (services/ig_backlog.py): the day it is meant for, its pillar, the
-// image (or the note's finding, for a text post), and the caption to paste.
+// An Instagram post from the planned calendar (services/ig_backlog.py): the day it is meant for, its pillar, its
+// carousel slides (services/ig_carousel.py, one image each at /img/{id}.png?slide=n) and the caption to paste.
 const IgPackCard = ({ pack, client, onChanged, toast }) => {
   const facts = pack.facts || {};
-  const imageUrl = pack.snapshot_id ? `${siteOrigin()}/img/${pack.snapshot_id}.png` : null;
+  const carouselId = facts.carousel_id;
+  const slideUrls = carouselId
+    ? Array.from({ length: facts.slides || 1 }, (_, i) => `${siteOrigin()}/img/${carouselId}.png?slide=${i + 1}`)
+    : (pack.snapshot_id ? [`${siteOrigin()}/img/${pack.snapshot_id}.png`] : []);
+  // Sharing several files has to happen inside a tap (iOS), and fetching them first can outlast it: the first tap
+  // fetches the slides, the second opens the share sheet with all of them (Instagram makes them one carousel post).
+  const [files, setFiles] = useState(null);
+  const [preparing, setPreparing] = useState(false);
   const copy = async (text, what) => {
     try { await navigator.clipboard.writeText(text); toast(`${what} copied`); } catch { toast('Copy blocked'); }
   };
   const update = async (body, done) => {
     try { await client.patch(`/admin/content/packs/${pack.id}`, body); toast(done); onChanged(); }
     catch (err) { toast(apiErrorText(err, null) || 'Update failed'); }
+  };
+  const prepare = async () => {
+    setPreparing(true);
+    try {
+      setFiles(await fetchImageFiles(slideUrls, `hindsight-${carouselId || pack.snapshot_id}`));
+    } catch { toast('Could not load the slides'); }
+    setPreparing(false);
+  };
+  const share = async () => {
+    const shared = await shareFiles(files, pack.title);
+    if (shared === 'downloaded') toast(`${files.length} images downloaded`);
   };
   const day = pack.planned_for
     ? new Date(`${pack.planned_for}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
@@ -269,24 +287,26 @@ const IgPackCard = ({ pack, client, onChanged, toast }) => {
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
         <Typography sx={{ fontSize: 13, color: pack.planned_for ? C.hi : C.lo, fontWeight: 700 }}>{day}</Typography>
         <Chip size="small" label={PILLAR_LABELS[pack.pillar] || pack.pillar} sx={{ bgcolor: '#1d212b', color: C.mid }} />
+        {slideUrls.length > 1 && <Typography sx={{ fontSize: 12, color: C.lo }}>{slideUrls.length} slides · swipe</Typography>}
       </Box>
-      {imageUrl ? (
-        <Box component="img" src={imageUrl} alt={pack.title} loading="lazy"
-          sx={{ display: 'block', width: '100%', maxWidth: 420, aspectRatio: '4 / 5', borderRadius: 2, bgcolor: '#14171e', border: `1px solid ${C.line}` }} />
-      ) : (
-        <Box sx={{ p: 2, maxWidth: 420, borderRadius: 2, bgcolor: '#14171e', border: `1px solid ${C.line}` }}>
-          <Typography sx={{ fontSize: 18, fontWeight: 700, color: C.hi }}>{pack.title}</Typography>
-          {facts.finding && <Typography sx={{ fontSize: 14, color: C.mid, mt: 1 }}>{facts.finding}</Typography>}
-          <Typography sx={{ fontSize: 12, color: C.lo, mt: 1 }}>Text carousel: slides come with the carousel export.</Typography>
-        </Box>
-      )}
-      {imageUrl && (
+      <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', scrollSnapType: 'x mandatory', pb: 0.5 }}>
+        {slideUrls.map((u, i) => (
+          <Box key={u} component="a" href={`${u}&download=1`} target="_blank" rel="noopener noreferrer"
+            sx={{ flex: '0 0 auto', width: slideUrls.length > 1 ? '78%' : '100%', maxWidth: 360, scrollSnapAlign: 'start' }}>
+            <Box component="img" src={u} alt={`${pack.title} · slide ${i + 1}`} loading="lazy"
+              sx={{ display: 'block', width: '100%', aspectRatio: '4 / 5', borderRadius: 2, bgcolor: '#14171e', border: `1px solid ${C.line}` }} />
+          </Box>
+        ))}
+      </Box>
+      {slideUrls.length > 0 && (
         <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
-          <Button variant="contained" onClick={() => shareImage(imageUrl, `hindsight-${pack.snapshot_id}.png`, pack.title, pack.title)}
+          <Button variant="contained" onClick={files ? share : prepare} disabled={preparing}
             sx={{ bgcolor: C.lime, color: C.bg, fontWeight: 700, minHeight: 44, '&:hover': { bgcolor: '#a3dc3f' } }}>
-            Share image
+            {preparing ? 'Loading slides…' : files ? `Share ${files.length} slide${files.length > 1 ? 's' : ''}` : 'Get slides'}
           </Button>
-          <Button variant="outlined" href={`${imageUrl}?download=1`} sx={{ color: C.hi, borderColor: C.line, minHeight: 44 }}>Download</Button>
+          <Typography sx={{ fontSize: 12, color: C.lo, alignSelf: 'center' }}>
+            {files ? 'Opens the share sheet: pick Instagram' : 'Tap a slide to save just that one'}
+          </Typography>
         </Box>
       )}
       <CopyBlock label="Caption" text={pack.caption || pack.title} onCopy={copy} multiline />

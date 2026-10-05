@@ -11,6 +11,12 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **INSTAGRAM CHUNK 1: CAROUSELS (2026-10-05).** Snapshot kind 'carousel' (static; services/ig_carousel.py): slides hook /
+> chart (another snapshot) / text / verdict / end, drawn by api/img.mjs at /img/{id}.png?slide=n. Backlog posts get
+> facts.carousel_id + slides (hand-written HOOKS in ig_backlog, no results in hooks); myth = hook, claim, verdict, end
+> (note charts are analysis charts, left on the site); match-day = scripts/make_ig_preview.py (preview-story cards frozen as
+> preview_card snapshots). Admin IG card: slide strip, "Get slides" then "Share N slides" (iOS needs the share in a tap).
+>
 > **INSTAGRAM CHUNK 0: BACKLOG (2026-10-05), plan ~/.claude/plans/glittery-wiggling-muffin.md (chunks 0-7).** Migration 017
 > (content_packs.channel/planned_for/pillar/caption; prod applied). services/ig_backlog.py: curated IDEAS (debate = explicit
 > query plans, weird = idea_stats regex specs, myth = hypothesis notes 34-42), WEEK template (debate, reactive, myth, debate,

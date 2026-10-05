@@ -412,7 +412,7 @@ def create_snapshot(db: Session, kind: str, params: Dict[str, Any], created_by: 
     return dict(row)
 
 
-STATIC_KINDS = ("ranking",)
+STATIC_KINDS = ("ranking", "carousel")  # carousel: services/ig_carousel.py
 
 
 def create_static_snapshot(db: Session, kind: str, data: Dict[str, Any], title: str, key: Dict[str, Any],
