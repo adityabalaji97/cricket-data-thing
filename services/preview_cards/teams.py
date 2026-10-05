@@ -255,7 +255,7 @@ def likely_xis(ctx) -> Optional[Card]:
     sides = [{"team": t, "date": xis[t]["date"].isoformat(), "opponent": xis[t]["opponent"],
               "players": xis[t]["players"]} for t in (ctx.t1, ctx.t2)]
     return Card(
-        id="xis", chapter="teams", visual="xis",
+        id="xis", chapter="lineups", visual="xis",
         title="Likely XIs, from their last matches", help=None,
         sample=f"Each side's last {ctx.fmt} match · batting order", n=11,
         payload={"sides": sides},
@@ -273,6 +273,6 @@ TEAMS = (
     CardSpec("rating", "teams", "Who's stronger on current rating?", rating, sample=SampleRule(flag_below=0)),
     CardSpec("last-meeting", "teams", "What happened last time?", last_meeting, sample=SampleRule(flag_below=0),
              scale_by_sample=False),
-    CardSpec("xis", "teams", "Who's likely to play?", likely_xis, sample=SampleRule(flag_below=0),
+    CardSpec("xis", "lineups", "Who's likely to play?", likely_xis, sample=SampleRule(flag_below=0),
              scale_by_sample=False),
 )

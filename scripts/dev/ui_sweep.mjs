@@ -4,6 +4,7 @@
 //   BASE=http://localhost:3000 node scripts/dev/ui_sweep.mjs out  # local dev server
 //   WIDTH=1440 HEIGHT=900 node scripts/dev/ui_sweep.mjs out       # desktop
 //   ONLY=player,venue_empty node scripts/dev/ui_sweep.mjs out     # subset of routes
+//   ACTION="...js..." ONLY=story_xis node scripts/dev/ui_sweep.mjs out  # act before the screenshot
 //   LOAD_MS=40000 SETTLE_MS=20000 ...                              # slow API (local against prod DB)
 //   WIDTH=360 ... / WIDTH=768 HEIGHT=1024 ...                      # small phone / portrait tablet
 //   EXPAND=0 ...                                                   # leave collapsed sections shut
@@ -120,6 +121,12 @@ for (const [name, path] of ROUTES.filter(([n]) => !ONLY || ONLY.includes(n))) {
   if (process.env.EXPAND !== '0') {
     await s('Runtime.evaluate', { expression: `document.querySelectorAll('section > div > button[aria-expanded="false"]').forEach((b) => b.click())` });
     await sleep(Number(process.env.EXPAND_MS || 6000));
+  }
+  // ACTION: a JS expression run before the screenshot, e.g. scroll a story to a panel or open its
+  // logo menu: ACTION="document.getElementById('story-extra-matchup-matrix').scrollIntoView()"
+  if (process.env.ACTION) {
+    await s('Runtime.evaluate', { expression: process.env.ACTION });
+    await sleep(Number(process.env.ACTION_MS || 5000));
   }
   const probe = await s('Runtime.evaluate', { returnByValue: true, expression: `(() => {
     const vw = window.innerWidth, sw = document.documentElement.scrollWidth;

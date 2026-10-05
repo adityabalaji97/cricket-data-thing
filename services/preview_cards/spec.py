@@ -20,6 +20,9 @@ CHAPTERS: Tuple[Tuple[str, str], ...] = (
     ("ground", "The ground"),
     ("teams", "The teams"),
     ("players", "The players"),
+    # The likely XIs lead it; the site appends the post-toss XI / toss setup and the full
+    # batter-v-bowler matrix as live panels (they need the reader's own picks).
+    ("lineups", "Line-ups & match-ups"),
     ("fantasy", "Fantasy"),
     ("more", "Dig deeper"),
 )

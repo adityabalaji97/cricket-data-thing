@@ -667,6 +667,21 @@ Found while building:
   things the story doesn't (post-toss XIs and toss setup, the full matchup matrix, the written preview), so it
   stays as the fallback until you decide to retire it.
 
+### After switch-over: chapters as the swipe (2026-10-05, from phone feedback)
+- **Swipe = chapter.** Sideways moves between the 7 chapters only; each chapter's other cards scroll vertically
+  below its lead card (FEATURED_PER_CHAPTER = 1). The progress bar has one segment per chapter. Fixes the bar
+  lighting up unseen segments: cards below the fold weren't in the swipe sequence, so their position was -1 and
+  always counted as seen.
+- **Line-ups & match-ups chapter.** The likely XIs lead it; the classic page's post-toss XI / toss setup and the full
+  batter-v-bowler matrix follow as live panels (shared state, so an applied XI feeds the matrix; mounted only in
+  that chapter). The matrix panel is matrix-only: its old fantasy table ("90% confidence") and SR-based key battles
+  would contradict the story's own cards.
+- **Logo.** A tap drops the story beneath the app's own top and bottom bars and opens the chapter menu just above
+  the bottom bar, so every page is a tap away; tapping the dimmed story or the logo returns.
+- **Nightly warm-up.** scripts/warm_previews.py (refresh-delivery-details workflow, after the cache is cleared)
+  builds the stories for fixtures in the next 36 hours, as the home page's links and a direct visit open them; the
+  endpoint treats an end date of today or yesterday as "now" so the UTC job and IST viewers share one cache key.
+
 ### Chunks 5–8: Cards by chapter
 - One card = backend spec + renderer + ODI fallback + info sheet copy + empty state + test.
 - Reuse the components named in section 1. New visual code only for: dumbbell and stacked on the
