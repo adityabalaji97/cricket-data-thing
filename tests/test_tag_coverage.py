@@ -200,3 +200,30 @@ def test_odi_without_a_start_date_reads_from_the_first_match():
         assert routing["new_date_range"][0] < date(2000, 1, 1)
     t20 = analyze_query_requirements(None, None, [], {}, fmt="T20", gender="male")
     assert t20["use_legacy"]  # men's T20 still reaches the pre-2015 table
+
+
+def test_scatter_also_metric_must_hold_for_the_headline(monkeypatch):
+    import services.snapshots as snapshots
+    from services import content_ideas
+
+    def row(name, avg, sr, ctrl):
+        return {"partnership": name, "average": avg, "strike_rate": sr, "control_percentage": ctrl,
+                "control_coverage_pct": 99.0, "coverage_excluded": False}
+    rows = [row("A & B", 75.1, 116.6, 80.1), row("Gill & Kohli", 53.7, 104.5, 88.2), row("C & D", 40.0, 90.0, 89.0)]
+    rows += [row(f"E{i} & F{i}", 30.0 + i, 80.0 + i, 85.0) for i in range(10)]
+    structured = {"rows": rows, "total_rows": len(rows), "filter_chips": ["ODI"],
+                  "coverage": {"tag": "control", "label": "control", "column": "control_coverage_pct", "min": 90.0,
+                               "included": 13, "excluded": 0}}
+    monkeypatch.setattr(snapshots, "_query_data", lambda db, params: structured)
+    stored = {}
+    monkeypatch.setattr(snapshots, "create_static_snapshot",
+                        lambda db, kind, data, title, key, created_by: stored.setdefault(key["form"], {"id": key["form"], "data": data}))
+    plan = {"params": {"fmt": "ODI", "group_by": ["partnership"], "min_balls": 1000}, "metric": "control_percentage",
+            "highlight": ["Gill & Kohli"],
+            "chart": {"type": "scatter", "x_axis": "strike_rate", "y_axis": "average", "also": ["control_percentage"]}}
+    content_ideas.attempt(None, "t", plan)
+    data = stored["scatter"]["data"]
+    assert data["title"].startswith("None of 12 ODI partnerships beats Gill and Kohli on average, strike rate and control %")
+    marked = [p for p in data["points"] if p.get("mark")]
+    assert [(p["label"], p["also"]) for p in marked] == [("A & B", [80.1])]  # ahead on both axes, keyed with control
+    assert data["key_caption"] == "Ahead on average and strike rate, behind on control %:"

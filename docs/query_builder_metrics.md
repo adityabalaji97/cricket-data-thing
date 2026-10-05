@@ -163,3 +163,6 @@ the batter perspective (runs off the bat). Grouped by partnership, a `batters` f
 * **A scatter** (`chart: {type: scatter, x_axis, y_axis}`) plots every qualifying row, up to 400.
   It numbers the rows that beat the subject on both axes and lists them under the chart. The title
   counts them ("5 of 153 ODI partnerships beat … on both average and strike rate").
+* **`chart.also`** (e.g. `["control_percentage"]`) adds metrics the headline must hold on too. Rows
+  ahead on both axes stay numbered, with their `also` values in the key. For example: "None of 173
+  ODI partnerships beats Gill and Kohli on average, strike rate and control % together".

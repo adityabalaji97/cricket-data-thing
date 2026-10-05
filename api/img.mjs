@@ -149,12 +149,24 @@ function lineBody(size, data) {
 }
 
 // Two metrics across many rows: the subject in lime and named, the field in grey, medians dashed.
+// Lines a headline wraps to at feed sizes (about 34 display characters a line), for layouts that
+// give the room of a fourth headline line back from the chart.
+function headlineLines(text, perLine = 34) {
+  let lines = 1, len = 0;
+  for (const word of String(text || '').split(/\s+/).filter(Boolean)) {
+    if (len && len + 1 + word.length > perLine) { lines += 1; len = word.length; } else len += (len ? 1 : 0) + word.length;
+  }
+  return lines;
+}
+
 function scatterBody(size, data) {
   const pts = (data.points || []).filter((p) => typeof p.x === 'number' && typeof p.y === 'number');
   const width = size.width - 120;
   // The key under the chart (rows that beat the subject, two to a line) takes its room from the chart.
   const keyLines = Math.ceil(pts.filter((p) => p.mark).length / 2);
   const height = chartHeight(size) - keyLines * (size.small + 10) - (data.conditions ? size.small + 10 : 0)
+    - (data.key_caption ? size.small + 10 : 0)
+    - Math.max(0, headlineLines(data.title) - 3) * Math.round((size.headline - 8) * 1.08)
     - (pts.some((p) => p.highlight) ? size.small + 14 : 0) + (size.height > size.width ? 30 : 100);
   const pad = 22;
   const ext = (vals) => { const a = Math.min(...vals); const b = Math.max(...vals); const m = (b - a) * 0.06 || 1; return [a - m, b + m]; };
@@ -166,6 +178,12 @@ function scatterBody(size, data) {
   const mx = median(pts.map((p) => p.x));
   const my = median(pts.map((p) => p.y));
   const subject = pts.filter((p) => p.highlight);
+  // Extra metrics the headline also compares on (content_ideas `also`): in the subject line and the key.
+  const alsoMetrics = data.also_metrics || [];
+  const alsoText = (m, i, p) => {
+    const label = (data.also_labels?.[i] || m).toLowerCase();
+    return `${formatValue(m, p.also?.[i])} ${/%$/.test(label) && /percentage/.test(m) ? label.replace(/\s*%$/, '') : label}`;
+  };
   // Rows that beat the subject on both axes (content_ideas._scatter_form): numbered white dots, keyed below.
   const marked = pts.filter((p) => p.mark).sort((a, b) => a.mark - b.mark);
   const many = pts.length > 80;
@@ -194,9 +212,12 @@ function scatterBody(size, data) {
     h('div', { justifyContent: 'space-between', fontSize: size.small, color: C.mid },
       h('div', {}, `${formatValue(data.x_metric, x0)}`), h('div', {}, `${xl} →`), h('div', {}, `${formatValue(data.x_metric, x1)}`)),
     subject.map((p) => h('div', { fontSize: size.small + 4, color: C.lime, fontWeight: 600 },
-      `${p.label}: ${formatValue(data.y_metric, p.y)} ${yl.toLowerCase()}, ${formatValue(data.x_metric, p.x)} ${xl.toLowerCase()}`)),
+      `${p.label}: ${[`${formatValue(data.y_metric, p.y)} ${yl.toLowerCase()}`, `${formatValue(data.x_metric, p.x)} ${xl.toLowerCase()}`,
+        ...alsoMetrics.map((m, i) => alsoText(m, i, p))].join(', ')}`)),
+    data.key_caption && marked.length ? h('div', { fontSize: size.small, color: C.mid }, data.key_caption) : null,
     marked.length ? h('div', { flexWrap: 'wrap', columnGap: 24, rowGap: 4, fontSize: size.small, color: C.text },
-      marked.map((p) => h('div', { width: '48%' }, `${p.mark}. ${short(p.label)} ${formatValue(data.y_metric, p.y)} · ${formatValue(data.x_metric, p.x)}`))) : null);
+      marked.map((p) => h('div', { width: '48%' }, `${p.mark}. ${short(p.label)} ${[formatValue(data.y_metric, p.y), formatValue(data.x_metric, p.x),
+        ...alsoMetrics.map((m, i) => formatValue(m, p.also?.[i]))].join(' · ')}`))) : null);
 }
 
 // One number: the headline value, its rank, and the next few for context.
