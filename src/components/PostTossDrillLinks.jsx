@@ -19,6 +19,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import config from '../config';
+import { apiErrorText } from '../utils/apiError';
 
 const PostTossDrillLinks = ({ links, venue, battingFirstTeam, battingSecondTeam, isMobile }) => {
   const [summaries, setSummaries] = useState({});
@@ -67,7 +68,7 @@ const PostTossDrillLinks = ({ links, venue, battingFirstTeam, battingSecondTeam,
         setBatchError('Failed to generate summaries');
       }
     } catch (err) {
-      setBatchError(err.response?.data?.detail || err.message || 'Failed to generate summaries');
+      setBatchError(apiErrorText(err, null) || err.message || 'Failed to generate summaries');
     } finally {
       setBatchLoading(false);
     }

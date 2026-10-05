@@ -8,6 +8,7 @@ import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import axios from 'axios';
 import config from '../../config';
 import { track } from '../../utils/analytics';
+import { apiErrorText } from '../../utils/apiError';
 
 /**
  * "Image & embed": freezes what the viewer is looking at as a chart snapshot (POST /snapshots)
@@ -84,7 +85,7 @@ const ChartExportButton = ({ request, label = 'Image & embed', sx, disabled }) =
       setSnap(data);
       track('snapshot_create', { kind: data.kind });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not create the chart. Try again in a moment.');
+      setError(apiErrorText(err, null) || 'Could not create the chart. Try again in a moment.');
     }
   };
 

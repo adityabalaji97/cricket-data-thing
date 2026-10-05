@@ -105,6 +105,8 @@ def test_hindsight_url_carries_large_limit_only():
 
     assert "limit=" not in _hindsight_url({}, ["batter"], "T20", "male", limit=50)
     assert "limit=5000" in _hindsight_url({}, ["batter"], "T20", "male", limit=5000)
+    # Graphics pull 20,000 rows; the query page's API takes at most 10,000 (a 422 blanked the page).
+    assert "limit=10000" in _hindsight_url({}, ["batter"], "T20", "male", limit=20000)
 
 
 def test_rows_as_csv_round_trips():

@@ -103,7 +103,8 @@ export const parseUrlParams = (search) => {
   filters.metrics_perspective = getSingleParam('metrics_perspective');
   
   // Pagination
-  filters.limit = getIntParam('limit', 1000);
+  // The API caps limit at 10,000; older share links asked for more, and a 422 there blanked the page.
+  filters.limit = Math.min(getIntParam('limit', 1000) || 1000, 10000);
   filters.offset = getIntParam('offset', 0);
   
   // International matches
