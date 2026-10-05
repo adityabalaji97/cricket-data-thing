@@ -47,7 +47,7 @@
       "dest": "/api/img.mjs?id=$1"
     },
     {
-      "src": "/embed/(q|wp|recap)/([A-Za-z0-9]{6,16})",
+      "src": "/embed/(q|wp|recap|card)/([A-Za-z0-9]{6,16})",
       "dest": "/api/embed.mjs?kind=$1&id=$2"
     },
     {

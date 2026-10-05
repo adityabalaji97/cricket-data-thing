@@ -6,6 +6,7 @@ import IosShareRoundedIcon from '@mui/icons-material/IosShareRounded';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import StoryCard from './StoryCard';
 import LogoMenu from './LogoMenu';
+import ChartExportButton from '../ui/ChartExportButton';
 import StoryNav from './StoryNav';
 import { STORY_BOTTOM, STORY_TOP, useStoryCoreSize } from './storyLayout';
 import { colors, fonts } from '../../theme/hindsightDark';
@@ -295,6 +296,14 @@ const ActionRow = ({ card, width, onShare, children }) => (
     <Button onClick={() => onShare(card)} startIcon={<IosShareRoundedIcon />} sx={{ minHeight: 40, color: colors.textMed, textTransform: 'none', fontSize: 14 }}>
       Share
     </Button>
+    {card.graphic && (
+      // The card as a 1080x1350 image (and embed), frozen server-side: api/img.mjs.
+      <ChartExportButton
+        request={card.graphic}
+        label="Image"
+        sx={{ minHeight: 40, border: 0, color: colors.textMed, textTransform: 'none', fontSize: 14, '&:hover': { border: 0 } }}
+      />
+    )}
     <Box sx={{ ml: 'auto' }} />
     {children}
   </Box>

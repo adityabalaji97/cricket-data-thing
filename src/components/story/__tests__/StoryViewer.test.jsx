@@ -1,6 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
+// axios ships ES modules Jest doesn't transform; the viewer only posts through it on a tap.
+jest.mock('axios', () => ({ post: jest.fn(), get: jest.fn() }));
+
 import StoryViewer from '../StoryViewer';
 import { toStoryCard } from '../visuals';
 

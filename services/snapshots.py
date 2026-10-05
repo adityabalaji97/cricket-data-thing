@@ -13,6 +13,7 @@ on the same data is one snapshot.
 """
 import hashlib
 import json
+import re
 import secrets
 import string
 from datetime import date
@@ -23,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from services.query_cache import data_version, normalize
 
-KINDS = ("query", "win_prob", "recap")
+KINDS = ("query", "win_prob", "recap", "preview_card")
 _ALPHABET = string.ascii_letters + string.digits
 
 # Query-builder parameters a snapshot may carry (run_deliveries_query's signature), and the
@@ -304,12 +305,51 @@ def _recap_data(db: Session, match_id: str) -> Dict[str, Any]:
     return {**_match_meta(scorecard), "recap": recap}
 
 
+def _clean_preview_params(params: Dict[str, Any]) -> Dict[str, Any]:
+    """A story's own parameters (services.preview_cards.context_params) plus the card id."""
+    from services.preview_cards import PARAM_KEYS
+
+    card = str(params.get("card") or "")
+    if not re.fullmatch(r"[a-z][a-z-]{1,40}", card):
+        raise SnapshotError("card must be a card id, e.g. 'par'")
+    clean = {k: params.get(k) for k in PARAM_KEYS if params.get(k) not in (None, "")}
+    clean["card"] = card
+    return clean
+
+
+def _preview_card_data(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Rebuild one story card server-side and freeze it in its share-image form."""
+    from urllib.parse import urlencode
+
+    from services.preview_cards import build_card, context_from_params, context_params
+    from services.preview_cards.snapshot import card_image_data
+
+    try:
+        ctx = context_from_params(db, params)
+    except (ValueError, TypeError) as exc:
+        raise SnapshotError(str(exc))
+    built = build_card(ctx, params["card"])
+    if not built:
+        raise SnapshotError("That card isn't available for this fixture.")
+    card, chapter_title = built
+    fixture = {"venue": ctx.venue, "team1": ctx.t1, "team2": ctx.t2}
+    query = {"venue": ctx.venue, "team1": ctx.team1, "team2": ctx.team2, "autoload": "true", "story": "1"}
+    url = f"https://hindsightcricket.com/venue?{urlencode(query)}#{card['id']}"
+    data = card_image_data(card, fixture, chapter_title, url)
+    if not data:
+        raise SnapshotError("This card has no graphic yet.")
+    data["fixture"] = context_params(ctx)
+    return data
+
+
 def create_snapshot(db: Session, kind: str, params: Dict[str, Any], created_by: Optional[str] = None) -> Dict[str, Any]:
     """Create (or return the existing identical) snapshot; returns {id, kind, title, data}."""
     if kind not in KINDS:
         raise SnapshotError(f"kind must be one of {KINDS}")
     if kind == "query":
         params = _clean_query_params(params)
+    elif kind == "preview_card":
+        params = _clean_preview_params(params)
     else:
         if not params.get("match_id"):
             raise SnapshotError("match_id is required")
@@ -331,6 +371,9 @@ def create_snapshot(db: Session, kind: str, params: Dict[str, Any], created_by: 
     elif kind == "win_prob":
         data = _win_prob_data(db, params["match_id"])
         title = f"Win probability · {data.get('result') or ''}".strip(" ·")
+    elif kind == "preview_card":
+        data = _preview_card_data(db, params)
+        title = data["title"]
     else:
         data = _recap_data(db, params["match_id"])
         title = data["recap"].get("headline")

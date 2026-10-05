@@ -49,8 +49,8 @@ export const shareImage = async (imageUrl, fileName, title, text) => {
   }
 };
 
-const EMBED_PATH = { query: 'q', win_prob: 'wp', recap: 'recap' };
-const EMBED_HEIGHT = { query: 520, win_prob: 400, recap: 420 };
+const EMBED_PATH = { query: 'q', win_prob: 'wp', recap: 'recap', preview_card: 'card' };
+const EMBED_HEIGHT = { query: 520, win_prob: 400, recap: 420, preview_card: 760 };
 const SIZES = [
   { key: 'portrait', label: '4:5', hint: 'Reddit, Instagram, X' },
   { key: 'square', label: '1:1', hint: 'WhatsApp, Instagram' },

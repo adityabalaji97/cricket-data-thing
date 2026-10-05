@@ -47,7 +47,9 @@ function recapChart(d) {
 export function chartHtml(chart, siteUrl) {
   if (!chart) return '';
   const d = chart.data || {};
-  const body = chart.kind === 'win_prob' ? winProbChart(d) : chart.kind === 'recap' ? recapChart(d) : queryChart(d);
+  // A preview card's chart is its share image; crawlers and no-JS readers get that.
+  const body = chart.kind === 'preview_card' ? `<img src="${esc(`${siteUrl}/img/${chart.id}.png`)}" alt="${esc(d.title || chart.title || '')}" width="1080" height="1350">`
+    : chart.kind === 'win_prob' ? winProbChart(d) : chart.kind === 'recap' ? recapChart(d) : queryChart(d);
   const live = d.hindsight_url || (d.match_id ? `${siteUrl}/scorecard/${encodeURIComponent(d.match_id)}` : null);
   return `<figure><figcaption>${esc(chart.title || d.title || 'Chart')}${d.subtitle ? ` (${esc(d.subtitle)})` : ''}</figcaption>${body}${
     live ? `<p><a href="${esc(live)}">Open the live chart</a></p>` : ''}</figure>`;

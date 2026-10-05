@@ -797,7 +797,7 @@ export const InfoBody = ({ info }) => (
 );
 
 /** A manifest card (JSON from /match-preview/.../cards) as a StoryViewer card. Unknown visuals are dropped. */
-export const toStoryCard = (card, { isMobile, teams }) => {
+export const toStoryCard = (card, { isMobile, teams, params }) => {
   const Visual = VISUALS[card.visual];
   if (!Visual) return null;
   return {
@@ -809,13 +809,16 @@ export const toStoryCard = (card, { isMobile, teams }) => {
     queryUrl: card.query_url,
     info: card.info ? <InfoBody info={card.info} /> : null,
     render: () => <Visual payload={card.payload} isMobile={isMobile} teams={teams} />,
+    // The share image and embed are rebuilt server-side from the story's own parameters.
+    graphic: params ? { kind: 'preview_card', params: { ...params, card: card.id } } : null,
   };
 };
 
 export const toStoryChapters = (manifest, opts) => {
   // The fixture's two sides, so player cards colour each player by side.
   const teams = manifest?.fixture ? [manifest.fixture.team1, manifest.fixture.team2] : undefined;
+  const params = manifest?.fixture?.params;
   return (manifest?.chapters || [])
-    .map((chapter) => ({ ...chapter, cards: chapter.cards.map((c) => toStoryCard(c, { ...opts, teams })).filter(Boolean) }))
+    .map((chapter) => ({ ...chapter, cards: chapter.cards.map((c) => toStoryCard(c, { ...opts, teams, params })).filter(Boolean) }))
     .filter((chapter) => chapter.cards.length);
 };

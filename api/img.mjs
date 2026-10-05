@@ -403,6 +403,74 @@ function chipsFor(data) {
     .slice(0, 3);
 }
 
+// ---- Preview story cards (services/preview_cards/snapshot.py) ----------------------------------
+
+// How batters get out: a donut of up to four kinds, each with its usual share beside it.
+function donutBody(size, data) {
+  const slices = (data.slices || []).slice(0, 4);
+  const total = slices.reduce((t, s) => t + (s.value || 0), 0) || 1;
+  const S = Math.min(chartHeight(size), 460);
+  const cx = S / 2; const cy = S / 2; const R = S * 0.46; const r0 = S * 0.28;
+  let a = -Math.PI / 2;
+  const children = slices.map((s, i) => {
+    const a1 = a + (2 * Math.PI * (s.value || 0)) / total;
+    const big = a1 - a > Math.PI ? 1 : 0;
+    const d = `M${cx + R * Math.cos(a)},${cy + R * Math.sin(a)} A${R},${R} 0 ${big} 1 ${cx + R * Math.cos(a1)},${cy + R * Math.sin(a1)} `
+      + `L${cx + r0 * Math.cos(a1)},${cy + r0 * Math.sin(a1)} A${r0},${r0} 0 ${big} 0 ${cx + r0 * Math.cos(a)},${cy + r0 * Math.sin(a)} Z`;
+    a = a1;
+    return { type: 'path', props: { d, fill: STACK_COLORS[i % STACK_COLORS.length], stroke: C.bg, strokeWidth: 4 } };
+  });
+  return h('div', { marginTop: 40, gap: 40, alignItems: 'center' },
+    { type: 'svg', props: { width: S, height: S, viewBox: `0 0 ${S} ${S}`, children } },
+    h('div', { flexDirection: 'column', gap: 26, flex: 1 },
+      slices.map((s, i) => h('div', { flexDirection: 'column', gap: 4 },
+        h('div', { alignItems: 'center', gap: 12, fontSize: size.label, color: C.text },
+          h('div', { width: 22, height: 22, borderRadius: 5, background: STACK_COLORS[i % STACK_COLORS.length] }), s.label),
+        h('div', { fontSize: size.small, color: C.mid }, `${s.pct}% · usually ${s.usual}%`)))));
+}
+
+// Form strips: each batter's last ten scores as bars, 50+ in lime.
+function stripsBody(size, data) {
+  const strips = (data.strips || []).slice(0, 6);
+  const barH = Math.max(60, Math.floor((chartHeight(size) - strips.length * 12) / Math.max(1, strips.length)) - size.small);
+  return h('div', { flexDirection: 'column', marginTop: 34, gap: 14 },
+    strips.map((s) => h('div', { alignItems: 'flex-end', gap: 20 },
+      h('div', { width: 300, fontSize: size.small + 2, color: C.text, flexShrink: 0 }, s.name),
+      h('div', { flex: 1, height: barH, alignItems: 'flex-end', gap: 8 },
+        (s.runs || []).slice(-10).map((r) => h('div', { flex: 1, height: Math.max(4, Math.min(barH, (barH * r) / 100)),
+          borderRadius: 4, background: r >= 50 ? C.lime : C.bar }))))),
+    h('div', { fontSize: size.small, color: C.mid, marginTop: 6 }, 'Last 10 innings, oldest first · lime: 50 or more'));
+}
+
+// Where a bowler pitches it: share of balls by line and length; lime marks 1.5x an average pace bowler.
+const LINE_SHORT = { DOWN_LEG: 'Leg', ON_THE_STUMPS: 'Stumps', OUTSIDE_OFFSTUMP: 'Off', WIDE_OUTSIDE_OFFSTUMP: 'Wide' };
+const LENGTH_SHORT = { FULL_TOSS: 'Full toss', YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good', SHORT_OF_A_GOOD_LENGTH: 'Back of length', SHORT: 'Short' };
+function gridBody(size, data) {
+  const lines = data.lines || []; const lengths = data.lengths || [];
+  const max = Math.max(...(data.cells || []).map((c) => c.pct), 1);
+  const cell = (l, len) => (data.cells || []).find((c) => c.line === l && c.length === len) || { pct: 0, usual: 0 };
+  const rowH = Math.min(96, Math.floor((chartHeight(size) - 60) / Math.max(1, lengths.length)));
+  return h('div', { flexDirection: 'column', marginTop: 30, gap: 8 },
+    h('div', { gap: 8, paddingLeft: 250 }, lines.map((l) => h('div', { flex: 1, justifyContent: 'center', fontSize: size.small, color: C.mid }, LINE_SHORT[l] || l))),
+    lengths.map((len) => h('div', { gap: 8, alignItems: 'center' },
+      h('div', { width: 242, fontSize: size.small + 2, color: C.text, justifyContent: 'flex-end', paddingRight: 8 }, LENGTH_SHORT[len] || len),
+      lines.map((l) => {
+        const c = cell(l, len);
+        const standout = c.usual > 0 && c.pct >= 2 && c.pct / c.usual >= 1.5;
+        return h('div', { flex: 1, height: rowH, borderRadius: 10, background: `rgba(57,135,229,${(0.08 + (0.8 * c.pct) / max).toFixed(2)})`,
+          alignItems: 'center', justifyContent: 'center', fontSize: size.small, fontWeight: 600,
+          color: C.text, border: standout ? `4px solid ${C.lime}` : '4px solid transparent' }, c.pct >= 1 ? `${Math.round(c.pct)}%` : '');
+      }))),
+    h('div', { fontSize: size.small, color: C.mid, marginTop: 6 }, 'Share of balls · lime border: 1.5× an average pace bowler'));
+}
+
+const CARD_BODIES = {
+  line: (s, d) => lineBody(s, d), scatter: (s, d) => scatterBody(s, d), stat: (s, d) => statBody(s, d),
+  diverging: (s, d) => divergingBody(s, d), dumbbell: (s, d) => dumbbellBody(s, d), stacked: (s, d) => stackedBody(s, d),
+  field: (s, d) => fieldBody(s, d), list: (s, d) => listBody(s, d), bars: (s, d) => barsBody(s, d),
+  win_prob: (s, d) => winProbBody(s, d), donut: donutBody, strips: stripsBody, grid: gridBody,
+};
+
 export function renderSnapshot(snap, sizeName = 'portrait') {
   const size = SIZES[sizeName] || SIZES.portrait;
   const data = snap.data || {};
@@ -410,6 +478,10 @@ export function renderSnapshot(snap, sizeName = 'portrait') {
     const kicker = [data.competition, data.date].filter(Boolean).join(' · ');
     return frame(size, kicker, snap.title?.startsWith('Win probability') ? data.result : snap.title, winProbBody(size, data),
       'Win probability by ball · Hindsight');
+  }
+  if (snap.kind === 'preview_card') {
+    const body = (CARD_BODIES[data.layout] || CARD_BODIES.list)(size, data);
+    return frame(size, data.kicker || '', data.title || snap.title, body, `${data.source || ''} · Data as of ${asOf(snap)}`);
   }
   if (snap.kind === 'recap') {
     const kicker = [data.competition, data.date].filter(Boolean).join(' · ');

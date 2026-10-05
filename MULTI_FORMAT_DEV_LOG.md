@@ -27,7 +27,10 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > Chunk 6 deployed (v482). Chunk 7 (branch preview-chunk7): services/preview_cards/players.py (D1 shrunk key battles,
 > D2 death hitters/bowlers, D3 form strips, D4 suits ground, D5 milestones via services/milestones.py, D6 pitch usage).
 > Chunk 7 deployed (v483). Chunk 8 (branch preview-chunk8): services/preview_cards/fantasy.py (F1 projected points,
-> F2 captaincy, F3 value per credit and F4 rank differentials, IPL only). Next: chunk 9 (outputs).
+> F2 captaincy, F3 value per credit and F4 rank differentials, IPL only). Chunk 8 deployed (v484). Chunk 9 (branch
+> preview-chunk9): snapshot kind preview_card (services/preview_cards/snapshot.py, build_card), img.mjs donut/strips/grid,
+> /embed/card/:id, story Image button, preview notes built from story cards (note_drafts.story_sections).
+> Next: chunk 10 (switch-over + performance budget).
 >
 > **HYPOTHESIS LAB (2026-10-03), stacked branches lab/0-orient -> lab/1-connector -> lab/2-hypotheses ->
 > lab/3-notes, NOT deployed.** Orientation + data provenance: docs/notes-pipeline.md (the 2015+ CSV feed's
