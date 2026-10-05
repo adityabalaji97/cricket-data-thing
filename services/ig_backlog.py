@@ -339,9 +339,10 @@ def _write(calendar: List[Dict[str, Any]], bench: List[Dict[str, Any]], prune: b
             upsert_pack(conn, post, day)
         if not prune:
             return
-        # Ready backlog packs this run no longer makes (an idea removed, a note unpublished) leave the queue.
+        # Ready backlog packs this run no longer makes (an idea removed, a note unpublished) leave the queue as
+        # 'expired' ('skipped' is the admin's own call): a later run that makes them again brings them back.
         conn.execute(text("""
-            UPDATE content_packs SET status = 'skipped', planned_for = NULL
+            UPDATE content_packs SET status = 'expired', planned_for = NULL
             WHERE channel = 'instagram' AND source = 'ig-backlog' AND status = 'ready' AND NOT (angle_key = ANY(:keys))
         """), {"keys": [f"ig:{post['key']}" for post, _ in rows]})
 
@@ -361,8 +362,11 @@ def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "
             snapshot_id = EXCLUDED.snapshot_id, title = EXCLUDED.title, facts = EXCLUDED.facts,
             rule_warnings = EXCLUDED.rule_warnings, pillar = EXCLUDED.pillar, caption = EXCLUDED.caption,
             post_by = EXCLUDED.post_by,
-            planned_for = CASE WHEN content_packs.status = 'ready' THEN EXCLUDED.planned_for
-                               ELSE content_packs.planned_for END
+            planned_for = CASE WHEN content_packs.status IN ('ready', 'expired') THEN EXCLUDED.planned_for
+                               ELSE content_packs.planned_for END,
+            -- A backlog post the queue retired comes back when a run makes it again; posted and skipped stay.
+            status = CASE WHEN content_packs.status = 'expired' AND content_packs.source = 'ig-backlog'
+                          THEN 'ready' ELSE content_packs.status END
     """), {"s": post["snapshot_id"], "k": f"ig:{post['key']}", "t": fact["title"],
            "f": json.dumps(fact, default=str), "w": json.dumps(post["warnings"]), "d": day,
            "p": post["pillar"], "c": caption, "src": source, "pb": post_by})

@@ -30,8 +30,10 @@ def main() -> int:
 
     db = next(get_session())
     entries = trends.rank(trends.candidates(db, top=args.top * 2))
-    today = datetime.now(timezone.utc).date()
-    post_by = datetime.combine(today + timedelta(days=1), time.max, tzinfo=timezone.utc)
+    # The queue's days are India's (the audience, and when the posts go out), not UTC's.
+    ist = timezone(timedelta(hours=5, minutes=30))
+    today = datetime.now(ist).date()
+    post_by = datetime.combine(today + timedelta(days=1), time.max, tzinfo=ist)
     queued = 0
     for e in entries[: args.top]:
         q = e["question"]
