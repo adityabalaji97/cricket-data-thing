@@ -58,3 +58,17 @@ def test_clip_keeps_whole_sentences():
     text = "First sentence here. Second sentence is longer than the rest of it. Third."
     assert ig_carousel.clip(text, 30) == "First sentence here."
     assert ig_carousel.clip("short", 30) == "short"
+
+
+def test_captions_have_hook_answer_prompt_and_few_tags():
+    from services import ig_captions
+
+    cap = ig_captions.build("Who owns the pull shot in ODIs?", "Rohit Sharma ranks 1st of 1,593 ODI batters.", "debate",
+                            "Ranked by sixes among 1,593 ODI batters.", ["Rohit Sharma"], "ODI")
+    parts = cap.split("\n\n")
+    assert parts[0] == "Who owns the pull shot in ODIs?" and parts[1].startswith("Rohit Sharma ranks 1st")
+    assert "Agree, or is someone missing?" in parts
+    tags = parts[-1].split("\n")[-1].split()
+    assert tags[:2] == ["#RohitSharma", "#ODI"] and len(tags) <= ig_captions.MAX_TAGS
+    assert ig_captions.hashtags([], "1st T20I · Lucknow", ["#INDvWI", "#TeamIndia"]) == [
+        "#INDvWI", "#TeamIndia", "#T20I", "#cricket", "#cricketstats"]

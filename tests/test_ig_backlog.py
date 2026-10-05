@@ -41,3 +41,10 @@ def test_headlines_say_which_innings_and_matches():
     assert _filter_phrase({"top_teams": 10, "include_international": True}) == " in matches between the top 10 teams"
     # top_teams does nothing without include_international (query_builder_v2), so the headline must not claim it.
     assert _filter_phrase({"top_teams": 10}) == ""
+
+
+def test_an_empty_pillar_borrows_from_another():
+    made = [_post(f"d{i}", "debate", [f"B{i}"]) for i in range(6)] + [_post(f"w{i}", "weird", [f"W{i}"]) for i in range(3)]
+    calendar, _ = ig_backlog.schedule(made, date(2026, 10, 12), days=7)  # Mon..Sun, no myth posts at all
+    wednesday = calendar[2]
+    assert wednesday["pillar"] == "myth" and wednesday["post"] is not None
