@@ -66,6 +66,7 @@ const getDefaultFilters = () => ({
   line: [],
   length: [],
   shot: [],
+  shot_family: [],
   control: null,
   wagon_zone: [],
   dismissal: [],
@@ -142,11 +143,12 @@ const buildRefinedQuery = (baseQuery, suggestion) => {
 const ACTIVE_FILTER_KEYS = [
   'venue', 'start_date', 'end_date', 'leagues', 'teams', 'batting_teams', 'bowling_teams',
   'players', 'batters', 'bowlers', 'bat_hand', 'bowl_style', 'bowl_kind',
-  'line', 'length', 'shot', 'control', 'wagon_zone', 'dismissal',
+  'line', 'length', 'shot', 'shot_family', 'control', 'wagon_zone', 'dismissal',
   'innings', 'over_min', 'over_max',
   'match_outcome', 'is_chase', 'chase_outcome', 'toss_decision',
   'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets', 'having',
-  'match_ids', 'exclude_batters', 'exclude_bowlers', 'dimension_filters', 'metrics_perspective'
+  'match_ids', 'exclude_batters', 'exclude_bowlers', 'dimension_filters', 'metrics_perspective',
+  'partnership_players'
 ];
 
 const getActiveFilterCount = (filters, groupBy) => {
@@ -454,7 +456,7 @@ const QueryBuilder = ({ isMobile }) => {
     const filterKeys = [
       'venue', 'start_date', 'end_date', 'leagues', 'teams', 'batting_teams', 'bowling_teams',
       'players', 'batters', 'bowlers', 'bat_hand', 'bowl_style', 'bowl_kind',
-      'line', 'length', 'shot', 'control', 'wagon_zone',
+      'line', 'length', 'shot', 'shot_family', 'control', 'wagon_zone', 'partnership_players',
       'innings', 'over_min', 'over_max',
       'match_outcome', 'is_chase', 'chase_outcome', 'toss_decision',
       'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets', 'having'

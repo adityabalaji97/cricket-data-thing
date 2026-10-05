@@ -26,11 +26,11 @@ const fmt = (v) => (Number.isInteger(v) ? String(v) : Number(v).toFixed(Math.abs
  * as the admin idea packs, from the query the viewer already ran (no LLM). The server re-runs the
  * query from its query string, so the numbers in a graphic are always real.
  */
-const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMetric, scatter }) => {
+const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMetric, scatter, minCoverage }) => {
   const { isMobile } = useIsMobile();
   const metrics = useMemo(() => {
     const first = rows?.[0] || {};
-    return Object.keys(first).filter((k) => !groupBy.includes(k) && !SKIP.has(k) && typeof first[k] === 'number');
+    return Object.keys(first).filter((k) => !groupBy.includes(k) && !SKIP.has(k) && !k.endsWith('_tagged') && typeof first[k] === 'number');
   }, [rows, groupBy]);
   const labelKey = groupBy.find((g) => !['match_id', 'innings'].includes(g)) || groupBy[0];
   const [metric, setMetric] = useState(metrics.includes(defaultMetric) ? defaultMetric : (metrics.includes('runs') ? 'runs' : metrics[0] || ''));
@@ -57,10 +57,12 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
     try {
       const { data } = await axios.post(`${config.API_URL}/snapshots/graphic`, {
         query_string: apiQueryString, metric, highlight: highlight || null,
+        // The table's coverage floor (services/coverage.py): the graphic ranks among the same rows.
+        ...(minCoverage !== undefined ? { min_coverage: minCoverage } : {}),
         // Two metrics in the question (parser's scatter): offer a scatter of them.
         chart: scatter && scatter.x_axis && scatter.y_axis ? { type: 'scatter', x_axis: scatter.x_axis, y_axis: scatter.y_axis } : null,
       });
-      setState({ loading: false, error: null, options: data.options || [], pickedBy: data.picked_by });
+      setState({ loading: false, error: null, options: data.options || [], pickedBy: data.picked_by, warnings: data.warnings || [] });
       track('graphic_made', { metric, forms: (data.options || []).map((o) => o.form).join(','), highlight: Boolean(highlight) });
     } catch (err) {
       setState({ loading: false, error: err.response?.data?.detail || 'Could not make a graphic for this result.', options: [], pickedBy: null });
@@ -122,6 +124,12 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
           {state.loading ? <CircularProgress size={20} color="inherit" /> : 'Make graphic'}
         </Button>
         {state.error && <Alert severity="warning">{state.error}</Alert>}
+        {(state.warnings || []).length > 0 && (
+          // Coverage: a tag filter counts only tagged balls, so a short-tagged leader may be short.
+          <Alert severity="warning">
+            Check before sharing: {state.warnings.join(' ')}
+          </Alert>
+        )}
 
         {state.options.length > 0 && <GraphicOptions options={state.options} source="query" />}
       </Box>

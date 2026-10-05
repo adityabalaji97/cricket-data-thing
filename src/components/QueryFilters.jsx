@@ -314,10 +314,38 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
               ))
             }
             renderInput={(params) => (
-              <TextField {...params} label="Batters" size="small" />
+              <TextField
+                {...params}
+                label="Batters"
+                size="small"
+                helperText={(groupBy || []).includes('partnership') && (filters.batters || []).length
+                  ? "Grouped by partnership: counts every stand involving these players, both batters' balls"
+                  : undefined}
+              />
             )}
           />
         </Grid>
+
+        {(groupBy || []).includes('partnership') && (
+          <Grid item xs={12} sm={6}>
+            {/* Every ball either batter faced, so a stand's row is the whole stand
+                (a batters filter alone used to count only the named batter's balls). */}
+            <Autocomplete
+              multiple
+              value={filters.partnership_players || []}
+              onChange={(e, value) => handleFilterChange('partnership_players', value)}
+              options={availableColumns?.batters || []}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} />
+                ))
+              }
+              renderInput={(params) => (
+                <TextField {...params} label="Partnerships involving" size="small" />
+              )}
+            />
+          </Grid>
+        )}
         
         <Grid item xs={12} sm={6}>
           <Autocomplete
@@ -600,6 +628,36 @@ const QueryFilters = ({ filters, setFilters, groupBy, setGroupBy, availableColum
             />
             <CoverageWarning coverage={availableColumns?.shot_coverage} columnName="Shot" />
           </Box>
+        </Grid>
+
+        <Grid item xs={12} sm={4} md={3} style={sectionStyle('delivery')}>
+          {/* Families count a shot under both of the feed's tagging schemes: an older
+              PULL_HOOK_ON_BACK_FOOT is a pull, which a PULL filter alone misses. */}
+          <Autocomplete
+            multiple
+            value={filters.shot_family || []}
+            onChange={(e, value) => handleFilterChange('shot_family', value)}
+            options={availableColumns?.shot_family_options || []}
+            getOptionLabel={(option) => availableColumns?.shot_family_definitions?.[option]?.label || option}
+            renderOption={(props, option) => (
+              <li {...props} key={option}>
+                <Box>
+                  <Typography sx={{ fontSize: 14 }}>{availableColumns?.shot_family_definitions?.[option]?.label || option}</Typography>
+                  <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
+                    {(availableColumns?.shot_family_definitions?.[option]?.shots || []).join(', ')}
+                  </Typography>
+                </Box>
+              </li>
+            )}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip variant="outlined" label={availableColumns?.shot_family_definitions?.[option]?.label || option} size="small" {...getTagProps({ index })} />
+              ))
+            }
+            renderInput={(params) => (
+              <TextField {...params} label="Shot family" size="small" helperText="Every label for a shot, old and new tagging" />
+            )}
+          />
         </Grid>
         
         <Grid item xs={12} sm={4} md={3} style={sectionStyle('delivery')}>

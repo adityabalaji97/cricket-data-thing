@@ -11,6 +11,7 @@ from typing import List, Optional, Literal
 from datetime import date
 from database import get_session
 from services.query_builder_v2 import GROUP_BY_COLUMNS, QueryValidationError, run_deliveries_query
+from services.shot_families import FAMILIES as SHOT_FAMILIES
 from services.query_dimensions import DIMENSION_NAMES as _DIMENSION_NAMES
 from services.team_innings import FILTERS as _TEAM_INNINGS_FILTERS, GROUP_BY as _TEAM_INNINGS_GROUP_BY
 try:
@@ -115,6 +116,9 @@ def query_deliveries(
     line: List[str] = Query(default=[], description="Filter by line (ON_THE_STUMPS, OUTSIDE_OFFSTUMP, DOWN_LEG, etc.)"),
     length: List[str] = Query(default=[], description="Filter by length (GOOD_LENGTH, YORKER, FULL, SHORT, etc.)"),
     shot: List[str] = Query(default=[], description="Filter by shot type (COVER_DRIVE, FLICK, PULL, DEFENDED, etc.)"),
+    shot_family: List[str] = Query(default=[], description="Filter by shot family across both tagging schemes "
+                                   "(PULL_HOOK, CUT, DRIVE, FLICK_GLANCE, SWEEP, REVERSE, RAMP_SCOOP, SLOG, WORK_PUSH, "
+                                   "DEFENCE, LEAVE); OR'd with shot"),
     control: Optional[int] = Query(default=None, ge=0, le=1, description="Filter by shot control (0=uncontrolled, 1=controlled)"),
     wagon_zone: List[int] = Query(default=[], description="Filter by wagon wheel zone (0-8)"),
     dismissal: List[str] = Query(default=[], description="Filter by dismissal type (caught, bowled, lbw, etc.)"),
@@ -133,6 +137,8 @@ def query_deliveries(
     match_ids: List[str] = Query(default=[], description="Only these matches (ESPNcricinfo match ids)"),
     exclude_batters: List[str] = Query(default=[], description="Drop balls faced by these batters (any spelling)"),
     exclude_bowlers: List[str] = Query(default=[], description="Drop balls bowled by these bowlers (any spelling)"),
+    partnership_players: List[str] = Query(default=[], description="Partnerships involving these players: every ball "
+                                           "either batter faced (with group_by=partnership)"),
     dimension_filters: List[str] = Query(
         default=[],
         description="Filters on match-context dimensions, name:op:value (op eq|ne|gt|gte|lt|lte|in, 'in' values "
@@ -241,6 +247,8 @@ def query_deliveries(
         match_ids = preprocess_list_param(match_ids)
         exclude_batters = preprocess_list_param(exclude_batters)
         exclude_bowlers = preprocess_list_param(exclude_bowlers)
+        shot_family = preprocess_list_param(shot_family)
+        partnership_players = preprocess_list_param(partnership_players)
         
         # Handle wagon_zone separately since it's List[int]
         wagon_zone = preprocess_int_list_param(wagon_zone)
@@ -301,6 +309,8 @@ def query_deliveries(
             exclude_bowlers=exclude_bowlers,
             dimension_filters=[f for f in dimension_filters if f and f.strip()],
             metrics_perspective=metrics_perspective,
+            shot_family=shot_family,
+            partnership_players=partnership_players,
         )
         return result
     except QueryValidationError as e:
@@ -449,6 +459,9 @@ def get_available_columns(
             
             "shot_options": get_values("shot"),
             "shot_coverage": get_coverage("shot"),
+            # One name per shot across both tagging schemes (services/shot_families.py).
+            "shot_family_options": list(SHOT_FAMILIES),
+            "shot_family_definitions": {k: {"label": v[0], "shots": list(v[1])} for k, v in SHOT_FAMILIES.items()},
             
             "control_options": [0, 1],
             "control_coverage": get_coverage("control"),

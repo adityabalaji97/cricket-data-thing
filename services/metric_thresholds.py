@@ -14,7 +14,8 @@ SELECT and _primer_metric_fields):
     balls_per_dismissal  balls / wickets                   (no value when wickets = 0)
     dot_percentage       dots * 100 / balls
     boundary_percentage  boundaries * 100 / balls
-    control_percentage   controlled / judged shots * 100   (no value without control data)
+    control_percentage   controlled / control-tagged balls * 100, over the row's own legal balls
+                         (a batter's exclude wides) -- no value without control data
     impact, raa, waa, wpa                      signed totals over balls with metrics
     impact_per_100, raa_per_100, waa_per_100   total * 100 / metric balls
     impact_per_innings                         impact / innings

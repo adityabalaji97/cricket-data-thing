@@ -9332,6 +9332,7 @@
       "line",
       "length",
       "shot",
+      "shot_family",
       "control",
       "wagon_zone",
       "dismissal",
@@ -9387,6 +9388,117 @@
       "bowling_stats"
     ],
     "shot_coverage": 48.2,
+    "shot_family_definitions": {
+      "CUT": {
+        "label": "Cut",
+        "shots": [
+          "CUT_SHOT",
+          "CUT_SHOT_ON_BACK_FOOT",
+          "CUT_SHOT_ON_FRONT_FOOT",
+          "LATE_CUT",
+          "UPPER_CUT"
+        ]
+      },
+      "DEFENCE": {
+        "label": "Defence",
+        "shots": [
+          "DEFENDED",
+          "FORWARD_DEFENCE",
+          "BACK_DEFENCE"
+        ]
+      },
+      "DRIVE": {
+        "label": "Drive",
+        "shots": [
+          "COVER_DRIVE",
+          "SQUARE_DRIVE",
+          "STRAIGHT_DRIVE",
+          "ON_DRIVE",
+          "OFF_SIDE_DRIVE_ON_BACK_FOOT",
+          "OFF_SIDE_DRIVE_ON_FRONT_FOOT",
+          "ON_SIDE_DRIVE_ON_BACK_FOOT",
+          "ON_SIDE_DRIVE_ON_FRONT_FOOT",
+          "VERTICAL_FORWARD_ATTACK"
+        ]
+      },
+      "FLICK_GLANCE": {
+        "label": "Flick / glance",
+        "shots": [
+          "FLICK",
+          "LEG_GLANCE"
+        ]
+      },
+      "LEAVE": {
+        "label": "Leave / no shot",
+        "shots": [
+          "LEFT_ALONE",
+          "NO_SHOT",
+          "PADDED_AWAY"
+        ]
+      },
+      "PULL_HOOK": {
+        "label": "Pull / hook",
+        "shots": [
+          "PULL",
+          "HOOK",
+          "PULL_HOOK_ON_BACK_FOOT",
+          "PULL_HOOK_ON_FRONT_FOOT"
+        ]
+      },
+      "RAMP_SCOOP": {
+        "label": "Ramp / scoop",
+        "shots": [
+          "RAMP",
+          "PADDLE_AWAY"
+        ]
+      },
+      "REVERSE": {
+        "label": "Reverse sweep / scoop",
+        "shots": [
+          "REVERSE_SWEEP",
+          "REVERSE_SCOOP",
+          "REVERSE_PULL"
+        ]
+      },
+      "SLOG": {
+        "label": "Slog",
+        "shots": [
+          "SLOG_SHOT"
+        ]
+      },
+      "SWEEP": {
+        "label": "Sweep",
+        "shots": [
+          "SWEEP",
+          "SWEEP_SHOT",
+          "SLOG_SWEEP",
+          "PADDLE_SWEEP"
+        ]
+      },
+      "WORK_PUSH": {
+        "label": "Push / dab / steer",
+        "shots": [
+          "PUSH",
+          "PUSH_SHOT",
+          "DAB",
+          "STEERED",
+          "DROP_AND_RUN"
+        ]
+      }
+    },
+    "shot_family_options": [
+      "PULL_HOOK",
+      "CUT",
+      "DRIVE",
+      "FLICK_GLANCE",
+      "SWEEP",
+      "REVERSE",
+      "RAMP_SCOOP",
+      "SLOG",
+      "WORK_PUSH",
+      "DEFENCE",
+      "LEAVE"
+    ],
     "shot_options": [
       "BACK_DEFENCE",
       "CUT_SHOT_ON_BACK_FOOT",

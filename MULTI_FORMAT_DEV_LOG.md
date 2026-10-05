@@ -11,6 +11,15 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **QUERY BUILDER COVERAGE & TAXONOMY (2026-10-05), branch qb-coverage, docs/query_builder_metrics.md.**
+> control_percentage now over the row's legal balls (wides out; was 87.64 v 87.98 for Gill ODI); every grouped row
+> carries control_tagged / control_coverage_pct, and tag filters add <tag>_coverage_pct from a second pass without them;
+> services/coverage.py ranks rows under min_coverage (default 90) last for tagged metrics (snapshots, graphics,
+> connector; table greys them, src/utils/coverage.js); services/shot_families.py (shot_family filter + group_by,
+> graphics default to families); partnership_players filter, and group_by=partnership reads a batters filter that way;
+> graphics: denominator = qualifying rows, footer = filters + coverage + family definition, subject under the floor
+> is refused. LOGIC_VERSION 2026-10-05a. 6 local goldens re-captured (control % values + additive fields).
+>
 > **MATCH PREVIEW STORY (2026-10-04), plan + tracker MATCH_PREVIEW_VIZ_PLAN.md.** PRs #40-#44 live (story behind
 > `?story=1`, card registry GET /match-preview/{venue}/{t1}/{t2}/cards, services/preview_cards, Foresight removed
 > from the UI). Chunk 4 (branch preview-chunk4): every ground card counts one match set, ctx.ground_matches (query
