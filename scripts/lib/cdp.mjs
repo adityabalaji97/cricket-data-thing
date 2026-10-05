@@ -15,13 +15,15 @@ export async function openBrowser({ port = 9335 } = {}) {
   const chrome = spawn(process.env.CHROME || DEFAULT_CHROME, [
     '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-sandbox',
     `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, 'about:blank',
-  ], { stdio: 'ignore' });
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = '';
+  chrome.stderr.on('data', (d) => { stderr = (stderr + d).slice(-2000); });
   let wsUrl;
-  for (let i = 0; i < 60 && !wsUrl; i++) {
+  for (let i = 0; i < 120 && !wsUrl; i++) { // up to 30 s: a cold start with a fresh profile can be slow
     await sleep(250);
     try { wsUrl = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl; } catch { /* starting */ }
   }
-  if (!wsUrl) { chrome.kill(); throw new Error('Chrome did not start'); }
+  if (!wsUrl) { chrome.kill(); throw new Error(`Chrome did not start: ${stderr.trim().slice(-600)}`); }
   const ws = new WebSocket(wsUrl);
   await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
   let id = 0;
