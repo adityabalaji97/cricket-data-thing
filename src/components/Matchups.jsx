@@ -624,6 +624,9 @@ const Matchups = ({
     postTossDelta = {},
     postTossRaw = null,
     postTossPlayerDrillLinks = {},
+    // The story preview's matrix panel: just the matrix. Its fantasy and key-battle cards cover the
+    // rest with the evidence rules this component's older versions don't apply.
+    matrixOnly = false,
 }) => {
     // Matchups are one format's record: an ODI preview must not show T20 batter-vs-bowler numbers.
     const { pinnedFormatParams } = useFormat();
@@ -1143,7 +1146,7 @@ const Matchups = ({
             )}
 
             {/* Fantasy Analysis from server (T20 scoring, so T20 only) */}
-            {showFantasy && <FantasyAnalysisCard
+            {showFantasy && !matrixOnly && <FantasyAnalysisCard
                 fantasyData={matchupData?.fantasy_analysis}
                 isMobile={isMobile}
                 formFlagsByPlayer={formFlagsByPlayer}
@@ -1152,19 +1155,19 @@ const Matchups = ({
                 postTossPlayerLinks={postTossPlayerLinks}
             />}
 
-            {postTossMode === 'off' && matchupData && (
+            {postTossMode === 'off' && matchupData && !matrixOnly && (
                 <KeyBattles
                     sides={keyBattleSides}
                 />
             )}
 
-            {postTossMode === 'off' && isMobile && !showMatrices && (
+            {postTossMode === 'off' && isMobile && !showMatrices && !matrixOnly && (
                 <Button variant="outlined" onClick={() => setShowMatrices(true)} sx={{ mb: 3, minHeight: 40 }}>
                     View full matrix
                 </Button>
             )}
 
-            {postTossMode === 'off' && (!isMobile || showMatrices) && (
+            {postTossMode === 'off' && (!isMobile || showMatrices || matrixOnly) && (
                 <>
                     {/* Team 1 vs Team 2 Matchups */}
                     <MatchupMatrix

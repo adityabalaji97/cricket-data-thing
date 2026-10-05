@@ -25,9 +25,10 @@ import {
 } from '../../navItems';
 import { useFormat } from '../../context/FormatContext';
 import { colors, fonts } from '../../theme/hindsightDark';
+import { MOBILE_NAV_HEIGHT } from './navMetrics';
 
 /** Height of the bar itself; the safe-area inset is added on top of this. */
-export const MOBILE_NAV_HEIGHT = 60;
+export { MOBILE_NAV_HEIGHT };
 
 /** Spacer for page content so the fixed bar never covers the last row of a page. */
 export const MobileNavSpacer = () => (

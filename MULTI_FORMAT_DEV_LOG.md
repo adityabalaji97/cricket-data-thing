@@ -32,8 +32,9 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > /embed/card/:id, story Image button, preview notes built from story cards (note_drafts.story_sections).
 > Chunk 9 deployed (v485). Chunk 10 (branch preview-chunk10): story is the default /venue preview (?story=0 = classic),
 > closing card (closing.py), story cached per data load (STORY_VERSION), useStoryCards shares identical requests,
-> classic written preview fetched only when the classic page is shown. Plan complete; classic page retirement is the
-> open decision.
+> classic written preview fetched only when the classic page is shown (deployed v486). Follow-up branch preview-chapters:
+> swipe = chapter (FEATURED_PER_CHAPTER 1), Line-ups & match-ups chapter with post-toss + matrix panels, logo shows
+> the app bars, scripts/warm_previews.py nightly. Classic page retirement still open.
 >
 > **HYPOTHESIS LAB (2026-10-03), stacked branches lab/0-orient -> lab/1-connector -> lab/2-hypotheses ->
 > lab/3-notes, NOT deployed.** Orientation + data provenance: docs/notes-pipeline.md (the 2015+ CSV feed's

@@ -14,8 +14,11 @@ import { track } from '../../utils/analytics';
 
 const SWIPE_PX = 50;
 
-/** Cards per chapter in the sideways sequence; the rest of a chapter sits below, scrolling down. */
-export const FEATURED_PER_CHAPTER = 4;
+/**
+ * Cards per chapter in the sideways sequence: one. Swiping moves between chapters (seven at
+ * most); every other card in a chapter, and its live panels, scroll vertically below its lead.
+ */
+export const FEATURED_PER_CHAPTER = 1;
 
 /** The sideways sequence: each chapter's featured cards (cards arrive ranked), in chapter order. */
 export const flattenChapters = (chapters) =>
@@ -168,7 +171,9 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
       sx={{
         position: 'fixed',
         inset: 0,
-        zIndex: 1250, // above the app bars (1100), below sheets (1300)
+        // Above the app bars (1100) while reading; beneath them while the logo menu is open, so the
+        // app's own navigation is there to use. Sheets (1300) are always on top.
+        zIndex: menuOpen ? 1090 : 1250,
         bgcolor: colors.bg,
         display: 'flex',
         flexDirection: 'column',
@@ -183,22 +188,14 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
         userSelect: 'none',
       }}
     >
-      {/* One progress bar for the whole story: a block per chapter (wider gaps between chapters),
-          a segment per card. Outside the share crop. */}
+      {/* Progress: one segment per chapter, lit up to the chapter on screen. Outside the share crop. */}
       <Box sx={{ width, height: STORY_TOP, pt: 1, flexShrink: 0, position: 'sticky', top: 0, zIndex: 1, bgcolor: colors.bg }}>
-        <Box sx={{ display: 'flex', gap: 1 }} aria-label={`Card ${index + 1} of ${cards.length}`}>
+        <Box sx={{ display: 'flex', gap: 0.75 }} aria-label={`Chapter ${current.chapterIndex + 1} of ${chapters.length}`}>
           {chapters.map((ch, ci) => (
-            <Box key={ch.id} sx={{ flex: ch.cards.length, display: 'flex', gap: '2px' }}>
-              {ch.cards.map((c) => {
-                const at = cards.findIndex((x) => x.id === c.id);
-                return (
-                  <Box
-                    key={c.id}
-                    sx={{ flex: 1, height: 3, borderRadius: 2, bgcolor: at <= index ? colors.accent : colors.borderStrong }}
-                  />
-                );
-              })}
-            </Box>
+            <Box
+              key={ch.id}
+              sx={{ flex: 1, height: 3, borderRadius: 2, bgcolor: ci <= current.chapterIndex ? colors.accent : colors.borderStrong }}
+            />
           ))}
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.75 }}>
@@ -262,17 +259,27 @@ const StoryViewer = ({ chapters, fixtureLabel, startCardId, onClose, onSettings,
           <Box sx={{ width, display: 'flex', alignItems: 'center', gap: 0.5, color: colors.textLo, pb: 2 }}>
             <KeyboardArrowDownRoundedIcon fontSize="small" />
             <Typography sx={{ fontSize: 13, color: colors.textLo }}>
-              More in this chapter ({extras.length})
+              {`Scroll for ${extras.length} more`}
             </Typography>
           </Box>
-          {extras.map((card) => (
+          {extras.map((card) => (card.panel ? (
+            // A live panel (post-toss XIs, the matchup matrix): its own height, its own controls.
+            <Box key={card.id} id={`story-extra-${card.id}`} data-story-noswipe
+              sx={{ width, flexShrink: 0, mb: 3, scrollMarginTop: `${STORY_TOP}px`, bgcolor: colors.surface1,
+                border: `1px solid ${colors.border}`, borderRadius: '20px', p: 1.5 }}>
+              <Typography component="h2" sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 22, lineHeight: 1.15, color: colors.textHi, mb: 1 }}>
+                {card.title}
+              </Typography>
+              {card.render()}
+            </Box>
+          ) : (
             <Box key={card.id} id={`story-extra-${card.id}`} sx={{ width, flexShrink: 0, scrollMarginTop: `${STORY_TOP}px` }}>
               <Box sx={{ width, height, position: 'relative' }}>
                 <StoryCard card={card} width={width} height={height} />
               </Box>
               <ActionRow card={card} width={width} onShare={share} />
             </Box>
-          ))}
+          )))}
         </>
       )}
     </Box>

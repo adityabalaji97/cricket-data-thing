@@ -132,6 +132,13 @@ jobs:
         continue-on-error: true
         run: python scripts/warm_rankings.py
 
+      # Match-preview stories are cached in query_cache too, so the step above just made every one
+      # stale; the first viewer of a fixture waited for ~30 queries (up to ~7 s). Rebuild the stories
+      # for fixtures in the next 36 hours, as the home page's links and a direct visit open them.
+      - name: Warm match-preview stories
+        continue-on-error: true
+        run: python scripts/warm_previews.py --hours 36
+
       # Reddit/X-ready content packs for newly loaded matches (services/content_packs.py): record
       # and career-best stats plus the win-probability series, queued in /admin for a human to
       # post. Jev ranks share-worthiness when the TYPESAFE_API_KEY secret is set; without it the

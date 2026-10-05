@@ -353,8 +353,15 @@ def get_match_preview_cards(
 ):
     """The story-style preview (MATCH_PREVIEW_VIZ_PLAN.md): chapters of cards, each with a
     takeaway title, the sample on the card, an info sheet and the payload its visual draws."""
+    from datetime import date as _date, timedelta
+
     from services.preview_cards import STORY_VERSION, PreviewContext, build_story, context_params
     from services.query_cache import cached_run
+
+    # "Up to today" in any time zone is "up to now": the site sends the viewer's local date, the
+    # nightly warm-up (scripts/warm_previews.py) runs on UTC, and both must share one cached story.
+    if end_date and end_date >= _date.today() - timedelta(days=1):
+        end_date = None
 
     ctx = PreviewContext(
         db=db, venue=venue, team1=team1_id, team2=team2_id, fmt=format, gender="male",

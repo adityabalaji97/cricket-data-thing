@@ -18,7 +18,16 @@ const StoryGrid = ({ chapters, onOpen }) => (
           {chapter.title}
         </Typography>
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: `repeat(auto-fill, minmax(${GRID_CARD_WIDTH}px, 1fr))`, justifyItems: 'center' }}>
-          {chapter.cards.map((card) => (
+          {chapter.cards.map((card) => (card.panel ? (
+            // A live panel (post-toss XIs, the matchup matrix) spans the row at its own height.
+            <Box key={card.id} component="section" aria-label={card.title}
+              sx={{ gridColumn: '1 / -1', width: '100%', bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '20px', p: 2 }}>
+              <Typography component="h2" sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 22, color: colors.textHi, mb: 1 }}>
+                {card.title}
+              </Typography>
+              {card.render()}
+            </Box>
+          ) : (
             // A div with button semantics, not a <button>: the card holds its own info button.
             <Box
               key={card.id}
@@ -31,7 +40,7 @@ const StoryGrid = ({ chapters, onOpen }) => (
             >
               <StoryCard card={card} width={GRID_CARD_WIDTH} height={Math.round(GRID_CARD_WIDTH * 1.25)} />
             </Box>
-          ))}
+          )))}
         </Box>
       </Box>
     ))}

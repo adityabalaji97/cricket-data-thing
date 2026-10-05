@@ -1144,6 +1144,65 @@ const VenueNotes = ({
         );
     }, [activeSectionId, activatedSections]);
 
+// The story's "Line-ups & match-ups" chapter: after the likely XIs (a card from the API), the two
+// live tools the classic page had, as panels -- the post-toss XI / toss setup and the full
+// batter-v-bowler matrix. They share the classic page's state, so an applied XI feeds the matrix,
+// and they only mount (and fetch) when the reader reaches that chapter.
+const storyPanels = useMemo(() => {
+    if (!selectedTeam1 || !selectedTeam2) return [];
+    const panels = [];
+    if (isT20Preview) {
+        panels.push({
+            id: 'toss-setup',
+            panel: true,
+            title: 'Post-toss XIs and toss',
+            render: () => (
+                <PostTossSetup
+                    venue={venue}
+                    team1Identifier={selectedTeam1.full_name || selectedTeam1.abbreviated_name}
+                    team2Identifier={selectedTeam2.full_name || selectedTeam2.abbreviated_name}
+                    dayNightFilter={dayNightFilter}
+                    isMobile={isMobile}
+                    onApplyResult={handlePostTossApply}
+                    espnEventId={espnEventId}
+                />
+            ),
+        });
+    }
+    panels.push({
+        id: 'matchup-matrix',
+        panel: true,
+        title: 'Every batter v bowler match-up',
+        render: () => (
+            <Matchups
+                team1={selectedTeam1.full_name}
+                team2={selectedTeam2.full_name}
+                venue={venue}
+                startDate={startDate}
+                endDate={endDate}
+                team1_players={postTossSelection?.team1Xi || []}
+                team2_players={postTossSelection?.team2Xi || []}
+                postTossXpoints={postTossSelection?.xpointsPostToss || {}}
+                postTossDelta={postTossSelection?.xpointsDelta || {}}
+                postTossRaw={postTossSelection?.raw || null}
+                postTossPlayerDrillLinks={postTossSelection?.playerDrillLinks || {}}
+                dayNightFilter={dayNightFilter}
+                enabled
+                matrixOnly
+                isMobile={isMobile}
+            />
+        ),
+    });
+    return panels;
+}, [selectedTeam1, selectedTeam2, isT20Preview, venue, dayNightFilter, isMobile, handlePostTossApply, espnEventId,
+    startDate, endDate, postTossSelection]);
+const storyChaptersWithPanels = useMemo(
+    () => storyChapters.map((chapter) => (chapter.id === 'lineups' && storyPanels.length
+        ? { ...chapter, cards: [...chapter.cards, ...storyPanels] }
+        : chapter)),
+    [storyChapters, storyPanels],
+);
+
 if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
 
 const classicPage = (
@@ -1282,7 +1341,7 @@ if (storyMode) {
         : venue;
     return (
         <StoryPreview
-            chapters={storyChapters}
+            chapters={storyChaptersWithPanels}
             loading={storyState.loading}
             fixtureLabel={fixture}
             onSettings={onToggleFilters}

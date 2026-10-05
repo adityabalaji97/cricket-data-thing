@@ -21,8 +21,9 @@ beforeEach(() => {
 });
 
 describe('StoryViewer', () => {
-  it('moves with arrow keys and edge buttons, and keeps the hash on the current card', () => {
-    render(<StoryViewer chapters={chapters(['a', 'b', 'c'])} fixtureLabel="MI v CSK" />);
+  it('moves between chapters with arrow keys and edge buttons, and keeps the hash on the lead card', () => {
+    const three = ['a', 'b', 'c'].map((id) => ({ id: `ch-${id}`, title: id, cards: [card(id)] }));
+    render(<StoryViewer chapters={three} fixtureLabel="MI v CSK" />);
     expect(visibleTitle()).toBe('Card a');
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     expect(visibleTitle()).toBe('Card b');
@@ -50,20 +51,30 @@ describe('StoryViewer', () => {
     expect(visibleTitle()).toBe('Card c');
   });
 
-  it('swipes through 4 cards per chapter and puts the rest below the current card', () => {
+  it('swipes between chapters and scrolls the rest of each chapter below its lead card', () => {
     const big = [
-      { id: 'g', title: 'The ground', cards: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'].map(card) },
-      { id: 't', title: 'The teams', cards: ['t1'].map(card) },
+      { id: 'g', title: 'The ground', cards: ['g1', 'g2', 'g3'].map(card) },
+      { id: 't', title: 'The teams', cards: ['t1', 't2'].map(card) },
+      { id: 'p', title: 'The players', cards: ['p1'].map(card) },
     ];
     render(<StoryViewer chapters={big} fixtureLabel="x" />);
-    expect(screen.getByText('More in this chapter (2)')).toBeInTheDocument();
-    expect(screen.getByText('chart g5')).toBeInTheDocument();
-    expect(screen.getByText('chart g6')).toBeInTheDocument();
-    ['g2', 'g3', 'g4', 't1'].forEach((next) => {
-      fireEvent.keyDown(window, { key: 'ArrowRight' });
-      expect(visibleTitle()).toBe(`Card ${next}`);
-    });
-    expect(screen.queryByText('More in this chapter (2)')).not.toBeInTheDocument();
+    expect(screen.getByText('Scroll for 2 more')).toBeInTheDocument();
+    expect(screen.getByText('chart g3')).toBeInTheDocument();
+    // One progress segment per chapter.
+    expect(screen.getByLabelText('Chapter 1 of 3')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(visibleTitle()).toBe('Card t1');
+    expect(screen.getByLabelText('Chapter 2 of 3')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(visibleTitle()).toBe('Card p1');
+    expect(screen.queryByText(/Scroll for/)).not.toBeInTheDocument();
+  });
+
+  it('renders a live panel at its own height below the chapter lead', () => {
+    const panel = { id: 'matrix', panel: true, title: 'Every batter v bowler match-up', render: () => <div>matrix body</div> };
+    render(<StoryViewer chapters={[{ id: 'l', title: 'Line-ups', cards: [card('x1'), panel] }]} fixtureLabel="x" />);
+    expect(screen.getByText('matrix body')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Every batter v bowler match-up' })).toBeInTheDocument();
   });
 
   it('opens a link to an extra card on its chapter', () => {
@@ -85,14 +96,18 @@ describe('StoryViewer', () => {
     ];
     render(<StoryViewer chapters={story} fixtureLabel="x" />);
     fireEvent.click(screen.getByRole('button', { name: /Head to head: 4–1, CSK lead/ }));
-    expect(visibleTitle()).toBe('Card t1');
+    // t1 sits below the teams chapter's lead: the viewer opens that chapter and scrolls to it.
+    expect(visibleTitle()).toBe('Card t0');
+    expect(document.getElementById('story-extra-t1')).not.toBeNull();
   });
 
-  it('mounts only the current card and its neighbours', () => {
+  it('mounts the current chapter and the neighbouring chapter leads only', () => {
+    // Chapter one is a, b; chapter two is c, d.
     render(<StoryViewer chapters={chapters(['a', 'b', 'c', 'd'])} fixtureLabel="x" />);
     expect(screen.getByText('chart a')).toBeInTheDocument();
-    expect(screen.getByText('chart b')).toBeInTheDocument();
-    expect(screen.queryByText('chart c')).not.toBeInTheDocument();
+    expect(screen.getByText('chart b')).toBeInTheDocument(); // below the lead, same chapter
+    expect(screen.getByText('chart c')).toBeInTheDocument(); // next chapter's lead, preloaded
+    expect(screen.queryByText('chart d')).not.toBeInTheDocument();
   });
 
   it('keeps the sample line on the card and flags small samples', () => {
