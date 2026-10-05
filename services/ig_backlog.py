@@ -230,13 +230,25 @@ def make(db: Session, item: Dict[str, Any], created_by: str = "ig-backlog") -> D
     return {**result, "warnings": warnings}
 
 
+#: Debate priority: T20 and ODI alternate, so a T20 series isn't met with a month of ODI posts (and vice versa).
+#: Keys not listed keep their IDEAS order after these.
+DEBATE_ORDER = [
+    "odi-pair-three-ways", "t20-spin-hitters", "odi-pull-sixes", "ipl-powerplay-bowlers", "odi-death-hitters",
+    "ipl-death-hitters", "odi-control-gill", "t20-death-bumrah", "odi-middle-overs-squeeze", "t20-control-hitters",
+    "odi-chase-average", "ipl-economy", "odi-death-bowlers", "t20-pace-hitters", "odi-boundary-hitters",
+    "t20-dot-bowlers", "t20-powerplay-hitters", "t20-impact-batters",
+]
+
+
 def schedule(made: List[Dict[str, Any]], start: date, days: int = DAYS) -> List[Dict[str, Any]]:
     """Assign evergreen posts to the WEEK template from `start`; returns the calendar (one entry per day).
 
     Each slot takes the first unused post of its pillar (IDEAS order is the priority order) whose players haven't
     appeared in the previous SPREAD - 1 scheduled posts; with none left that satisfies the rule, the slot stays open.
     """
+    rank = {k: i for i, k in enumerate(DEBATE_ORDER)}
     pools = {p: [m for m in made if m["pillar"] == p] for p in EVERGREEN}
+    pools["debate"].sort(key=lambda m: rank.get(m["key"], len(rank)))  # stable: unlisted keys keep IDEAS order
     used, recent, calendar = set(), [], []
     for d in range(days):
         day = start + timedelta(days=d)
