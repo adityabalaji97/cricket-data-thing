@@ -50,6 +50,33 @@ export const shareImage = async (imageUrl, fileName, title, text) => {
   }
 };
 
+// Several images in one share (an Instagram carousel). Fetch first, then share from a later tap: iOS only lets a
+// share start inside a tap, and fetching a handful of slides can take longer than it allows.
+export const fetchImageFiles = async (urls, baseName) => Promise.all(urls.map(async (u, i) => {
+  const blob = await (await fetch(u)).blob();
+  return new File([blob], `${baseName}-${i + 1}.png`, { type: 'image/png' });
+}));
+
+/** Share files (true), fall back to downloading them ('downloaded'), or false if the viewer cancelled. */
+export const shareFiles = async (files, title) => {
+  try {
+    if (navigator.canShare && navigator.canShare({ files })) {
+      await navigator.share({ files, title: title || 'Hindsight' });
+      return true;
+    }
+  } catch (err) {
+    if (err?.name === 'AbortError') return false;
+  }
+  files.forEach((file) => {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(file);
+    link.download = file.name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+  });
+  return 'downloaded';
+};
+
 const EMBED_PATH = { query: 'q', win_prob: 'wp', recap: 'recap', preview_card: 'card' };
 const EMBED_HEIGHT = { query: 520, win_prob: 400, recap: 420, preview_card: 760 };
 const SIZES = [

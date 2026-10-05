@@ -513,9 +513,59 @@ const CARD_BODIES = {
 // shot type...) and any shot-family definition (services/content_ideas._footnote), else the source.
 const sourceLine = (snap, data) => `Data as of ${asOf(snap)} · ${data.footnote || data.source || 'ball-by-ball'}`;
 
+// --- Carousels (services/ig_carousel.py) ----------------------------------------------------------------------
+// An Instagram carousel is a list of slides, one image each (/img/{id}.png?slide=n): a hook, text, a verdict and an
+// end card are drawn here; a chart slide is another snapshot, drawn by renderSnapshot (the handler fetches it).
+const VERDICT_COLOR = { supported: C.lime, 'not supported': C.red, partly: '#f0b429', inconclusive: C.mid };
+
+function slideFrame(size, n, total, body) {
+  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: 60, fontFamily: 'Barlow' },
+    h('div', { justifyContent: 'space-between', alignItems: 'center' },
+      h('div', { color: C.lime, fontSize: size.small + 2, letterSpacing: 5, fontWeight: 600 }, 'HINDSIGHT'),
+      h('div', { color: C.low, fontSize: size.small }, `${n} / ${total}`)),
+    body,
+    h('div', { marginTop: 'auto', paddingTop: 24, justifyContent: 'space-between', alignItems: 'flex-end' },
+      h('div', { color: C.mid, fontSize: size.small + 2, fontWeight: 600 }, n < total ? 'Swipe →' : ''),
+      // The end slide's body is the address already.
+      h('div', { color: C.lime, fontSize: size.small + 2, fontWeight: 600 }, n < total ? 'hindsightcricket.com' : '')));
+}
+
+const paragraphs = (size, text, color = C.text, fontSize = size.label) => String(text || '').split(/\n+/).filter(Boolean).map((p) =>
+  h('div', { fontSize, lineHeight: 1.35, color }, p));
+
+const SLIDE_BODIES = {
+  hook: (size, s) => h('div', { flexDirection: 'column', flex: 1, justifyContent: 'center', gap: 28 },
+    s.kicker ? h('div', { fontSize: size.small + 4, color: C.lime, fontWeight: 600, letterSpacing: 2 }, s.kicker.toUpperCase()) : null,
+    h('div', { fontFamily: DISPLAY, fontWeight: 700, fontSize: Math.round(size.headline * 1.3), lineHeight: 1.04 }, s.text || ''),
+    s.sub ? h('div', { fontSize: size.label, color: C.mid, lineHeight: 1.3 }, s.sub) : null),
+  text: (size, s) => h('div', { flexDirection: 'column', flex: 1, justifyContent: 'center', gap: 30 },
+    h('div', { fontSize: size.small + 4, color: C.lime, fontWeight: 600, letterSpacing: 3 }, String(s.heading || '').toUpperCase()),
+    ...paragraphs(size, s.body, C.text, Math.round(size.label * 1.2))),
+  verdict: (size, s) => h('div', { flexDirection: 'column', flex: 1, justifyContent: 'center', gap: 24 },
+    h('div', { fontSize: size.small + 2, color: C.mid, fontWeight: 600, letterSpacing: 3 }, 'VERDICT'),
+    h('div', { fontFamily: DISPLAY, fontWeight: 700, fontSize: Math.round(size.headline * 1.6), lineHeight: 1,
+      color: VERDICT_COLOR[String(s.verdict || '').toLowerCase()] || C.text }, s.verdict || ''),
+    ...paragraphs(size, s.body, C.mid)),
+  end: (size, s) => h('div', { flexDirection: 'column', flex: 1, justifyContent: 'center', gap: 26 },
+    h('div', { fontSize: size.small + 2, color: C.mid, fontWeight: 600, letterSpacing: 3 }, String(s.heading || 'RUN IT YOURSELF').toUpperCase()),
+    h('div', { fontFamily: DISPLAY, fontWeight: 700, fontSize: Math.round(size.headline * 1.1), color: C.lime, lineHeight: 1.05 }, 'hindsightcricket.com'),
+    ...paragraphs(size, s.body, C.mid)),
+};
+
+/** One carousel slide (1-based). Chart slides need `child`, the snapshot they point at. */
+export function renderCarouselSlide(snap, n, sizeName = 'portrait', child = null) {
+  const size = SIZES[sizeName] || SIZES.portrait;
+  const slides = snap.data?.slides || [];
+  const i = Math.min(Math.max(1, n || 1), Math.max(1, slides.length));
+  const slide = slides[i - 1] || { type: 'hook', text: snap.title };
+  if (slide.type === 'chart') return child ? renderSnapshot(child, sizeName) : slideFrame(size, i, slides.length, SLIDE_BODIES.hook(size, { text: snap.title }));
+  return slideFrame(size, i, slides.length, (SLIDE_BODIES[slide.type] || SLIDE_BODIES.text)(size, slide));
+}
+
 export function renderSnapshot(snap, sizeName = 'portrait') {
   const size = SIZES[sizeName] || SIZES.portrait;
   const data = snap.data || {};
+  if (snap.kind === 'carousel') return renderCarouselSlide(snap, 1, sizeName);
   if (snap.kind === 'win_prob') {
     const kicker = [data.competition, data.date].filter(Boolean).join(' · ');
     return frame(size, kicker, snap.title?.startsWith('Win probability') ? data.result : snap.title, winProbBody(size, data),
@@ -556,10 +606,21 @@ export default async function handler(req, res) {
     return;
   }
   const size = SIZES[sizeName] || SIZES.portrait;
-  const image = new ImageResponse(renderSnapshot(snap, sizeName), { width: size.width, height: size.height, fonts: FONTS });
+  let tree;
+  if (snap.kind === 'carousel') {
+    const n = Number(url.searchParams.get('slide') || 1);
+    const slide = (snap.data?.slides || [])[n - 1];
+    const child = slide?.type === 'chart' && /^[A-Za-z0-9]{6,16}$/.test(slide.snapshot_id || '')
+      ? await getJSON(`/snapshots/${slide.snapshot_id}`, 15000) : null;
+    tree = renderCarouselSlide(snap, n, sizeName, child);
+  } else {
+    tree = renderSnapshot(snap, sizeName);
+  }
+  const image = new ImageResponse(tree, { width: size.width, height: size.height, fonts: FONTS });
   const png = Buffer.from(await image.arrayBuffer());
   res.setHeader('Content-Type', 'image/png');
   res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=31536000, immutable');
-  if (url.searchParams.get('download')) res.setHeader('Content-Disposition', `attachment; filename="hindsight-${id}.png"`);
+  const slideSuffix = snap.kind === 'carousel' ? `-${url.searchParams.get('slide') || 1}` : '';
+  if (url.searchParams.get('download')) res.setHeader('Content-Disposition', `attachment; filename="hindsight-${id}${slideSuffix}.png"`);
   res.end(png);
 }

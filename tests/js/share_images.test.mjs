@@ -35,3 +35,21 @@ for (const kind of Object.keys(fixtures)) {
     });
   }
 }
+
+// Carousel slides drawn here (hook, text, verdict, end); chart slides are other snapshots, covered above.
+test('carousel slides: all text at least the footer minimum', async () => {
+  const { renderCarouselSlide } = await import('../../api/img.mjs');
+  const snap = { kind: 'carousel', title: 'T', data: { slides: [
+    { type: 'hook', kicker: '1st T20I · Lucknow', text: '5 things the data says before India v West Indies', sub: 'Swipe through' },
+    { type: 'text', heading: 'The claim', body: 'A common claim is that he cannot recover from an expensive first over.' },
+    { type: 'verdict', verdict: 'Partly', body: 'a. first over: Inconclusive\nb. other end: Not supported' },
+    { type: 'end', heading: 'Run it yourself', body: 'Every number here comes from ball-by-ball data.' },
+  ] } };
+  for (const sizeName of ['portrait', 'square']) {
+    for (let n = 1; n <= 4; n++) {
+      const sizes = textSizes(renderCarouselSlide(snap, n, sizeName), undefined);
+      assert.ok(sizes.length >= 3, `slide ${n} rendered no text`);
+      for (const { text, size } of sizes) assert.ok(size >= MIN_FONT.footer, `slide ${n} @ ${sizeName}: "${text}" is ${size}px`);
+    }
+  }
+});
