@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 MAX_RESULT_BYTES = 1_000_000
 # Bump whenever query-builder semantics change (see module docstring). Format: date + letter.
-LOGIC_VERSION = "2026-10-05b"  # b: partnerships from partnership_stands (feed non_striker wrong at wickets); a: control % over legal balls, <tag>_coverage_pct, shot_family, partnership_players; 2026-10-03b: BBL/CPL season names
+LOGIC_VERSION = "2026-10-05c"  # c: no 2005 floor for ODI / cross-format without start_date; b: partnerships from partnership_stands (feed non_striker wrong at wickets); a: control % over legal balls, <tag>_coverage_pct, shot_family, partnership_players; 2026-10-03b: BBL/CPL season names
 _VERSION_TTL_SECONDS = 300
 _version_cache: Dict[str, Any] = {"value": None, "at": 0.0}
 

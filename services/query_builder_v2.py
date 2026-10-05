@@ -316,10 +316,15 @@ def analyze_query_requirements(
     from services.analytics_common import ALL_FORMATS, table_routing
 
     routing = table_routing(fmt, gender, start_date=start_date, end_date=end_date)
+    # The 2005 floor above is a men's T20 assumption (the legacy table starts there). ODI
+    # ball-by-ball goes back to 2000, so delivery_details gets no floor: with no start_date an
+    # ODI query read from 2005 and dropped every 2000-04 match (as delivery_data_service did).
+    details_start = start_date or date(1971, 1, 1)
+
     if not routing['legacy']:
         result['use_legacy'] = False
         result['use_new'] = True
-        result['new_date_range'] = (query_start, query_end)
+        result['new_date_range'] = (details_start, query_end)
         return result
 
     if (fmt or "").upper() == ALL_FORMATS:
@@ -328,7 +333,7 @@ def analyze_query_requirements(
         # full requested window and let the legacy table supply only the pre-2015 men's T20
         # tail it uniquely holds. The two do not overlap, so nothing is double counted.
         result['use_new'] = True
-        result['new_date_range'] = (query_start, query_end)
+        result['new_date_range'] = (details_start, query_end)
         if query_start < DELIVERY_DETAILS_START_DATE and not advanced_used:
             result['use_legacy'] = True
             result['legacy_date_range'] = (query_start, min(query_end, date(2014, 12, 31)))
@@ -2481,7 +2486,9 @@ def query_deliveries_service(
                     )
                 new_total_innings = result.get("metadata", {}).get("total_innings_in_query", new_total_innings)
             
-            data_sources.append(f"delivery_details ({new_start.year}-{new_end.year})")
+            # An open start (no floor, see analyze_query_requirements) is "every match up to".
+            span = f"{new_start.year}-{new_end.year}" if new_start.year > 1971 else f"all to {new_end.year}"
+            data_sources.append(f"delivery_details ({span})")
         
         # =====================================================================
         # QUERY LEGACY TABLE (deliveries) - Pre-2015

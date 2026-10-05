@@ -199,7 +199,7 @@
       "ball_aggregation": "snapshot",
       "data_source": "delivery_details",
       "data_sources": [
-        "delivery_details (2005-2026)"
+        "delivery_details (all to 2026)"
       ],
       "filters_applied": {
         "bat_hand": null,

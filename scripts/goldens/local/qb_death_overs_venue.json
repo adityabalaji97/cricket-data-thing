@@ -103,7 +103,7 @@
       "ball_aggregation": "snapshot",
       "data_source": "delivery_details+deliveries",
       "data_sources": [
-        "delivery_details (2005-2026)",
+        "delivery_details (all to 2026)",
         "deliveries (2005-2014)"
       ],
       "filters_applied": {
