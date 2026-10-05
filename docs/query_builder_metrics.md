@@ -62,11 +62,7 @@ sort chip changes the floor; 0 turns it off.
 
 Example (ODI partnerships, 1,000+ balls, by control %): MacLeod & Berrington (93.4%, but only 34.2%
 of balls tagged) and Milind Kumar & Mukkamalla (90.4%, 58.4% tagged) used to top it. With the floor,
-155 of 211 partnerships qualify:
-
-1. Rayudu & Kohli 89.02%
-2. Mathews & Sangakkara 88.63%
-3. Gill & Kohli 88.59%
+155 of 211 partnerships qualified (before stands, below, which changed the order).
 
 ## Shot families
 
@@ -114,6 +110,34 @@ perspective:
 
 `metadata.definitions` carries these on every partnership result.
 
+### Who was at the crease: `partnership_stands`
+
+`delivery_details.non_striker` is unreliable around wickets. On 45% of ODI wicket balls the feed
+names the incoming batter as non-striker on the dismissal ball, or the dismissed one just after. A
+stand's closing wicket was then credited to a pair that never batted together. Rohit & Gill read 22
+dismissals; they had 46.
+
+Strikers are reliable, so the pair comes from them (migration 016,
+`scripts/build_partnership_stands.py`):
+
+* **A stand** is the balls between two dismissals. Any `out = 'true'` ends one, retirements
+  included.
+* **Its batters** are the distinct strikers in the stand.
+* **When only one batter faced,** the partner is the most common non-striker in the stand.
+* **If that still leaves no pair** (0.3% of stands), the ball falls back to the feed's
+  striker/non-striker.
+
+`group_by=partnership`, `group_by=non_striker` and `partnership_players` read the stand. Pre-2015
+T20 rows (legacy table) still use the feed. The nightly refresh builds stands for new matches.
+`--full` rebuilds the lot in about 20 s; run it after renaming players through the alias scripts.
+
+With stands, the ODI control ranking (1,000+ balls, 90%+ control data, since 2005, 154
+partnerships) is led by Mathews & Sangakkara 88.78%. Gill & Kohli are 6th at 88.22%: 1,232 balls,
+24 dismissals, average 53.7, strike rate 104.5.
+
+**Date range:** without a `start_date`, the query builder reads from 2005-01-01, so ODIs from
+2000–04 are left out. Pass `start_date` explicitly for an all-time ODI question.
+
 **Partnerships involving a player:** `partnership_players=[...]` keeps every ball either batter of a
 stand faced. A `batters` filter used to count only the named batter's balls of each stand, and in
 the batter perspective (runs off the bat). Grouped by partnership, a `batters` filter is now read as
@@ -133,3 +157,6 @@ the batter perspective (runs off the bat). Grouped by partnership, a `batters` f
 * **It refuses to rank a subject below the coverage floor**, with a message saying so.
 * **It warns, in the picker,** when a tag filter's leader, or anyone above the subject, has less
   tagged data than the floor.
+* **A scatter** (`chart: {type: scatter, x_axis, y_axis}`) plots every qualifying row, up to 400.
+  It numbers the rows that beat the subject on both axes and lists them under the chart. The title
+  counts them ("5 of 153 ODI partnerships beat … on both average and strike rate").

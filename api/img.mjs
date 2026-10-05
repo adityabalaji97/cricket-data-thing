@@ -152,7 +152,10 @@ function lineBody(size, data) {
 function scatterBody(size, data) {
   const pts = (data.points || []).filter((p) => typeof p.x === 'number' && typeof p.y === 'number');
   const width = size.width - 120;
-  const height = chartHeight(size);
+  // The key under the chart (rows that beat the subject, two to a line) takes its room from the chart.
+  const keyLines = Math.ceil(pts.filter((p) => p.mark).length / 2);
+  const height = chartHeight(size) - keyLines * (size.small + 10) - (data.conditions ? size.small + 10 : 0)
+    - (pts.some((p) => p.highlight) ? size.small + 14 : 0) + (size.height > size.width ? 30 : 100);
   const pad = 22;
   const ext = (vals) => { const a = Math.min(...vals); const b = Math.max(...vals); const m = (b - a) * 0.06 || 1; return [a - m, b + m]; };
   const [x0, x1] = ext(pts.map((p) => p.x));
@@ -163,23 +166,37 @@ function scatterBody(size, data) {
   const mx = median(pts.map((p) => p.x));
   const my = median(pts.map((p) => p.y));
   const subject = pts.filter((p) => p.highlight);
+  // Rows that beat the subject on both axes (content_ideas._scatter_form): numbered white dots, keyed below.
+  const marked = pts.filter((p) => p.mark).sort((a, b) => a.mark - b.mark);
+  const many = pts.length > 80;
   const children = [
     { type: 'rect', props: { x: 0, y: 0, width, height, fill: C.surface } },
     { type: 'line', props: { x1: sx(mx), y1: 0, x2: sx(mx), y2: height, stroke: 'rgba(255,255,255,0.18)', strokeDasharray: '10 10', strokeWidth: 3 } },
     { type: 'line', props: { x1: 0, y1: sy(my), x2: width, y2: sy(my), stroke: 'rgba(255,255,255,0.18)', strokeDasharray: '10 10', strokeWidth: 3 } },
-    ...pts.filter((p) => !p.highlight).map((p) => ({ type: 'circle', props: { cx: sx(p.x), cy: sy(p.y), r: 10, fill: C.bar } })),
+    ...pts.filter((p) => !p.highlight && !p.mark).map((p) => ({ type: 'circle', props: { cx: sx(p.x), cy: sy(p.y), r: many ? 7 : 10, fill: C.bar } })),
+    ...marked.map((p) => ({ type: 'circle', props: { cx: sx(p.x), cy: sy(p.y), r: 19, fill: C.text, stroke: C.bg, strokeWidth: 3 } })),
     ...subject.map((p) => ({ type: 'circle', props: { cx: sx(p.x), cy: sy(p.y), r: 16, fill: C.lime, stroke: C.bg, strokeWidth: 4 } })),
   ];
+  const numbers = marked.map((p) => h('div', {
+    position: 'absolute', left: sx(p.x) - 19, top: sy(p.y) - 19, width: 38, height: 38, justifyContent: 'center',
+    alignItems: 'center', fontSize: 26, fontWeight: 600, color: C.bg }, String(p.mark)));
   const xl = data.x_label || metricLabel(data.x_metric);
   const yl = data.y_label || metricLabel(data.y_metric);
-  return h('div', { flexDirection: 'column', marginTop: 30, gap: 14 },
+  // Surnames, keeping particles: "AB de Villiers" -> "de Villiers".
+  const surname = (n) => { const w = n.split(' '); const i = w.length >= 3 && /^(de|du|van|von|der|ul|al)$/i.test(w[w.length - 2]) ? w.length - 2 : w.length - 1; return w.slice(i).join(' '); };
+  const short = (label) => String(label).split(' & ').map(surname).join(' & ');
+  return h('div', { flexDirection: 'column', marginTop: 20, gap: 10 },
+    data.conditions ? h('div', { fontSize: size.small, color: C.mid }, data.conditions) : null,
     h('div', { justifyContent: 'space-between', fontSize: size.small, color: C.mid },
       h('div', {}, `↑ ${yl}`), h('div', {}, `${pts.length} ${data.unit || 'players'} · dashes = median`)),
-    { type: 'svg', props: { width, height, viewBox: `0 0 ${width} ${height}`, children } },
+    h('div', { position: 'relative', width, height },
+      { type: 'svg', props: { width, height, viewBox: `0 0 ${width} ${height}`, children } }, numbers),
     h('div', { justifyContent: 'space-between', fontSize: size.small, color: C.mid },
       h('div', {}, `${formatValue(data.x_metric, x0)}`), h('div', {}, `${xl} →`), h('div', {}, `${formatValue(data.x_metric, x1)}`)),
-    subject.map((p) => h('div', { fontSize: size.label, color: C.lime, fontWeight: 600 },
-      `${p.label}: ${formatValue(data.y_metric, p.y)} ${yl.toLowerCase()}, ${formatValue(data.x_metric, p.x)} ${xl.toLowerCase()}`)));
+    subject.map((p) => h('div', { fontSize: size.small + 4, color: C.lime, fontWeight: 600 },
+      `${p.label}: ${formatValue(data.y_metric, p.y)} ${yl.toLowerCase()}, ${formatValue(data.x_metric, p.x)} ${xl.toLowerCase()}`)),
+    marked.length ? h('div', { flexWrap: 'wrap', columnGap: 24, rowGap: 4, fontSize: size.small, color: C.text },
+      marked.map((p) => h('div', { width: '48%' }, `${p.mark}. ${short(p.label)} ${formatValue(data.y_metric, p.y)} · ${formatValue(data.x_metric, p.x)}`))) : null);
 }
 
 // One number: the headline value, its rank, and the next few for context.

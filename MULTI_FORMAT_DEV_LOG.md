@@ -11,6 +11,15 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **PARTNERSHIP STANDS (2026-10-05), branch partnership-stands, migration 016 (applied local + prod, prod built:
+> 202,261 stands, 520 unpaired).** delivery_details.non_striker is wrong on ~45% of ODI wicket balls, so partnerships
+> now come from partnership_stands (balls between dismissals, pair = distinct strikers, else striker + modal
+> non-striker); query_builder_v2 PARTNERSHIP_STANDS_JOIN feeds group_by partnership/non_striker and
+> partnership_players (feed fallback for unpaired stands and legacy T20). Nightly step after the alias refresh;
+> `scripts/build_partnership_stands.py --full` after alias renames. Graphic scatter now plots all rows (<=400),
+> numbers the rows beating the subject on both axes. LOGIC_VERSION 2026-10-05b. Known, unchanged: no start_date =>
+> 2005-01-01, which drops 2000-04 ODIs.
+>
 > **QUERY BUILDER COVERAGE & TAXONOMY (2026-10-05), branch qb-coverage, docs/query_builder_metrics.md.**
 > control_percentage now over the row's legal balls (wides out; was 87.64 v 87.98 for Gill ODI); every grouped row
 > carries control_tagged / control_coverage_pct, and tag filters add <tag>_coverage_pct from a second pass without them;

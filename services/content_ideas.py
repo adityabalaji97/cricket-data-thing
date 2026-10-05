@@ -416,7 +416,8 @@ def _poss_team(name: str) -> str:
 
 
 def _form_base(data: Dict[str, Any], **extra) -> Dict[str, Any]:
-    keep = ("kicker", "subtitle", "filter_chips", "group_by", "hindsight_url", "total_rows", "source", "metric_label")
+    keep = ("kicker", "subtitle", "filter_chips", "group_by", "hindsight_url", "total_rows", "source", "metric_label",
+            "footnote")
     return {**{k: data[k] for k in keep if k in data}, **extra}
 
 
@@ -433,22 +434,55 @@ def _line_form(rows, label_key, metric, idx, data, parts):
     return _form_base(data, layout="line", title=title, metric=metric, points=points), title
 
 
+SCATTER_MAX_POINTS = 400
+#: Scatter axes where a lower value is the better one ("beats" means lower).
+LOWER_BETTER_AXES = {"economy", "bowling_average", "bowling_strike_rate", "dot_percentage_conceded"}
+
+
 def _scatter_form(rows, label_key, axes, idx, data, name, total, parts):
-    """Two metrics across the field (top 40 by the ranking metric, plus the subject)."""
+    """Two metrics across the whole qualifying field, with the subject and every row that beats it on
+    both. `rows` holds only rankable rows (coverage-excluded ones already removed by the caller)."""
     x, y = axes
-    take = list(range(min(40, len(rows))))
+    take = list(range(min(SCATTER_MAX_POINTS, len(rows))))
     if idx is not None and idx not in take:
         take.append(idx)
-    points = [{"label": _row_name(rows[i], label_key), "x": float(rows[i][x]), "y": float(rows[i][y]),
-               "highlight": i == idx} for i in take if rows[i].get(x) is not None and rows[i].get(y) is not None]
     subj = rows[idx] if idx is not None else None
+
+    def beats(r, axis):
+        a, b = float(r[axis]), float(subj[axis])
+        return a < b if axis in LOWER_BETTER_AXES else a > b
+
+    points, dominators = [], 0
+    for i in take:
+        r = rows[i]
+        if r.get(x) is None or r.get(y) is None:
+            continue
+        point = {"label": _row_name(r, label_key), "x": float(r[x]), "y": float(r[y]), "highlight": i == idx}
+        if subj is not None and i != idx and subj.get(x) is not None and subj.get(y) is not None \
+                and beats(r, x) and beats(r, y):
+            point["dominates"] = True
+            dominators += 1
+        points.append(point)
+    shown = len(points)
+    # The headline carries the finding; the conditions go on the line under it (`conditions`).
+    conditions = " · ".join(filter(None, [parts["minimum"].strip(" ()").replace(", ", " · "),
+                                          parts["window"].strip(", ")]))
     if subj is not None:
-        title = (f"{name}: {metric_label(y).lower()} {_value_text(y, float(subj[y]))} at "
-                 f"{metric_label(x).lower()} {_value_text(x, float(subj[x]))} among {total:,} {parts['scope']}{parts['window']}")
+        who = f"{shown - 1:,} {parts['scope']}"
+        if dominators:
+            title = (f"{dominators} of {who} beat {name} on both {metric_label(y).lower()} "
+                     f"and {metric_label(x).lower()}")
+        else:
+            title = f"None of {who} beats {name} on both {metric_label(y).lower()} and {metric_label(x).lower()}"
     else:
-        title = f"{metric_label(y)} v {metric_label(x)}: {parts['scope']}{parts['window']}"
+        title = f"{metric_label(y)} v {metric_label(x)}: {parts['scope']}"
+    # The better-on-both rows, best by the y axis first, numbered on the chart.
+    order = sorted((p for p in points if p.get("dominates")), key=lambda p: -p["y"] if y not in LOWER_BETTER_AXES else p["y"])
+    for n, p in enumerate(order, 1):
+        p["mark"] = n
     unit = (data.get("group_by") or ["players"])[0].replace("_", " ") + "s"
-    return _form_base(data, layout="scatter", title=title, x_metric=x, y_metric=y, points=points, unit=unit), title
+    return _form_base(data, layout="scatter", title=title, x_metric=x, y_metric=y, points=points, unit=unit,
+                      x_label=metric_label(x), y_label=metric_label(y), conditions=conditions), title
 
 
 def _stat_form(rows, label_key, metric, idx, total, data, name, parts, title):
@@ -713,7 +747,9 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any], created_by: st
     if "line" in forms:
         form_data["line"] = _line_form(rows, label_key, metric, idx, data, parts)
     if "scatter" in forms:
-        form_data["scatter"] = _scatter_form(rows, label_key, axes, idx, data, name, total, parts)
+        field = [r for r in rows if not r.get("coverage_excluded")] if coverage else rows
+        form_data["scatter"] = _scatter_form(field, label_key, axes, field.index(rows[idx]) if rows[idx] in field else None,
+                                             data, name, total, parts)
     if "stat" in forms:
         form_data["stat"] = _stat_form(rows, label_key, metric, idx, total, data, name, parts, title)
     if "diverging" in forms:

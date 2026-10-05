@@ -114,6 +114,12 @@ jobs:
           print("player alias views refreshed")
           PY
 
+      # Partnership stands (migration 016) for matches loaded above: the pair at the crease, rebuilt
+      # from the striker sequence because the feed's non_striker is unreliable around wickets. After
+      # the alias refresh (names are canonical); a rename via the alias scripts needs --full.
+      - name: Build partnership stands for new matches
+        run: python scripts/build_partnership_stands.py
+
       # New data: bump the data version so every cached query result (query_cache, migration
       # 009) is stale from now on, and drop results cached against older versions.
       - name: Invalidate the query cache
