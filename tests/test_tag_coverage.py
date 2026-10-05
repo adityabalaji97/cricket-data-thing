@@ -119,7 +119,7 @@ def test_odi_pull_hook_sixes_count_both_schemes():
     narrow = {r["batter"]: r["sixes"] for r in _q(shot=["PULL", "HOOK"], group_by=["batter"])["data"]}
     assert all(sixes.get(b, 0) >= n for b, n in narrow.items())  # a family never loses a shot
     if FULL_DATA:
-        assert (sixes["Rohit Sharma"], sixes["AB de Villiers"], sixes["Eoin Morgan"], sixes["Chris Gayle"]) == (170, 69, 57, 57)
+        assert (sixes["Rohit Sharma"], sixes["AB de Villiers"], sixes["Eoin Morgan"], sixes["Chris Gayle"]) == (170, 69, 57, 70)  # Gayle 57 before 2000-04 ODIs were read
 
 
 def test_partnership_with_a_batters_filter_counts_both_batters():
@@ -188,3 +188,15 @@ def test_a_stand_owns_its_wicket_ball_whatever_the_feed_says():
     rows = _q(partnership_players=[a], group_by=["partnership"], start_date=date(2005, 1, 1))["data"]
     row = next(r for r in rows if r["partnership"] == f"{a} & {b}")
     assert (row["balls"], row["wickets"]) == (expected[0], expected[1])
+
+
+def test_odi_without_a_start_date_reads_from_the_first_match():
+    """No start_date means all of it: the 2005 floor (the men's T20 legacy table's start) used to
+    clip ODIs, which go back to 2000."""
+    from services.query_builder_v2 import analyze_query_requirements
+
+    for fmt in ("ODI", "ALL"):
+        routing = analyze_query_requirements(None, None, [], {}, fmt=fmt, gender="male")
+        assert routing["new_date_range"][0] < date(2000, 1, 1)
+    t20 = analyze_query_requirements(None, None, [], {}, fmt="T20", gender="male")
+    assert t20["use_legacy"]  # men's T20 still reaches the pre-2015 table

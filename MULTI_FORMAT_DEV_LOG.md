@@ -17,8 +17,9 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > non-striker); query_builder_v2 PARTNERSHIP_STANDS_JOIN feeds group_by partnership/non_striker and
 > partnership_players (feed fallback for unpaired stands and legacy T20). Nightly step after the alias refresh;
 > `scripts/build_partnership_stands.py --full` after alias renames. Graphic scatter now plots all rows (<=400),
-> numbers the rows beating the subject on both axes. LOGIC_VERSION 2026-10-05b. Known, unchanged: no start_date =>
-> 2005-01-01, which drops 2000-04 ODIs.
+> numbers the rows beating the subject on both axes. LOGIC_VERSION 2026-10-05b. Deployed v489.
+> Follow-up (LOGIC_VERSION c): no start_date no longer floors delivery_details at 2005 (ODIs from 2000 now in);
+> data_sources reads "delivery_details (all to YYYY)"; 2 local goldens re-captured for that label only.
 >
 > **QUERY BUILDER COVERAGE & TAXONOMY (2026-10-05), branch qb-coverage, docs/query_builder_metrics.md.**
 > control_percentage now over the row's legal balls (wides out; was 87.64 v 87.98 for Gill ODI); every grouped row

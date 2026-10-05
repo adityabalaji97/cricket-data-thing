@@ -95,7 +95,8 @@ label (`SWEEP`), the family is that wide one, so a family means the same thing i
 * `shot_family` is a filter (OR'd with `shot`) and a `group_by` column.
 * "Make a graphic" groups by family instead of shot, and turns a shot filter into its families, with
   the definition in the footer.
-* With families, ODI pull and hook sixes give Rohit 170, de Villiers 69, Morgan 57 and Gayle 57.
+* With families, ODI pull and hook sixes give Rohit 170, Afridi 72, Gayle 70 and de Villiers 69 (all-time; the
+  first card, read from 2005, had Gayle 57 and no Afridi).
 
 ## Partnerships
 
@@ -135,8 +136,10 @@ With stands, the ODI control ranking (1,000+ balls, 90%+ control data, since 200
 partnerships) is led by Mathews & Sangakkara 88.78%. Gill & Kohli are 6th at 88.22%: 1,232 balls,
 24 dismissals, average 53.7, strike rate 104.5.
 
-**Date range:** without a `start_date`, the query builder reads from 2005-01-01, so ODIs from
-2000–04 are left out. Pass `start_date` explicitly for an all-time ODI question.
+**Date range:** until 2026-10-05 (LOGIC_VERSION c), a query with no `start_date` read from
+2005-01-01, the men's T20 legacy table's start. That left out every ODI from 2000–04. Now
+`delivery_details` has no floor, so ODI and cross-format queries read from the first match. All-time,
+174 ODI partnerships qualify, and the same five beat Gill & Kohli on both axes.
 
 **Partnerships involving a player:** `partnership_players=[...]` keeps every ball either batter of a
 stand faced. A `batters` filter used to count only the named batter's balls of each stand, and in
