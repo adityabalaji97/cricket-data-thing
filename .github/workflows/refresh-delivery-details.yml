@@ -172,6 +172,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: ffmpeg for Instagram Reels
+        run: which ffmpeg || (sudo apt-get update -q && sudo apt-get install -y -q ffmpeg)
       - name: Instagram match-day posts
         continue-on-error: true
         env:

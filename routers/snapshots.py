@@ -203,6 +203,33 @@ def create_idea_graphic(body: IdeaGraphicRequest, request: Request, db: Session 
     }
 
 
+@router.get("/ig/recent")
+def ig_recent(limit: int = 12, db: Session = Depends(get_session)):
+    """Instagram posts already published (content packs marked posted), newest first, for the /links bio page.
+    Only what is public on Instagram anyway: the carousel, its title and when it was planned."""
+    rows = db.execute(text("""
+        SELECT facts->>'carousel_id' AS id, title, pillar, planned_for, (facts->>'slides')::int AS slides
+        FROM content_packs
+        WHERE channel = 'instagram' AND status = 'posted' AND facts->>'carousel_id' IS NOT NULL
+        ORDER BY planned_for DESC NULLS LAST, id DESC LIMIT :n
+    """), {"n": max(1, min(limit, 24))}).mappings().all()
+    return {"posts": [dict(r) for r in rows]}
+
+
+@router.get("/{snapshot_id}/reel.mp4")
+def reel_mp4(snapshot_id: str, db: Session = Depends(get_session)):
+    """A carousel as a 9:16 video (services/ig_slides.make_reel); 404 until made."""
+    from fastapi.responses import Response
+
+    from services import ig_slides
+
+    mp4 = ig_slides.load_reel(db, snapshot_id) if _ID.match(snapshot_id) else None
+    if mp4 is None:
+        raise HTTPException(status_code=404, detail="Reel not made")
+    return Response(mp4, media_type="video/mp4", headers={"Cache-Control": "public, max-age=3600",
+                                                          "Content-Disposition": f'inline; filename="hindsight-{snapshot_id}.mp4"'})
+
+
 @router.get("/{snapshot_id}/slides/{n}.png")
 def slide_png(snapshot_id: str, n: int, db: Session = Depends(get_session)):
     """A carousel slide rendered from the app's own components (services/ig_slides.py); 404 until rendered."""

@@ -489,3 +489,18 @@ def render_pending(base: Optional[str] = None) -> Dict[str, Any]:
             WHERE channel = 'instagram' AND status = 'ready' AND facts->>'render' = 'true'
         """)).all()
     return render_carousels([{"key": k, "fact": f} for k, f in rows], base)
+
+
+def reels_pending() -> Dict[str, Any]:
+    """A reel for every ready Instagram carousel that has its slides but no reel yet."""
+    from database import engine
+    from services import ig_slides
+
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT p.facts->>'carousel_id', (p.facts->>'slides')::int FROM content_packs p
+            WHERE p.channel = 'instagram' AND p.status = 'ready' AND p.facts->>'carousel_id' IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM ig_reels r WHERE r.carousel_id = p.facts->>'carousel_id')
+        """)).all()
+    made = [cid for cid, n in rows if n and ig_slides.reel_from_stored(cid, n)]
+    return {"made": len(made), "missing": len(rows) - len(made)}

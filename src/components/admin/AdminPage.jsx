@@ -279,6 +279,15 @@ const IgPackCard = ({ pack, client, onChanged, toast }) => {
     const shared = await shareFiles(files, pack.title);
     if (shared === 'downloaded') toast(`${files.length} images downloaded`);
   };
+  // The same post as a 9:16 Reel (services/ig_slides.make_reel): fetch on the first tap, share on the second.
+  const [reel, setReel] = useState(null);
+  const getReel = async () => {
+    try {
+      const res = await fetch(`${config.API_URL}/snapshots/${carouselId}/reel.mp4`);
+      if (!res.ok) { toast('No reel for this post yet'); return; }
+      setReel(new File([await res.blob()], `hindsight-${carouselId}.mp4`, { type: 'video/mp4' }));
+    } catch { toast('Could not load the reel'); }
+  };
   const day = pack.planned_for
     ? new Date(`${pack.planned_for}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
     : 'Bench (fills an open day)';
@@ -310,6 +319,12 @@ const IgPackCard = ({ pack, client, onChanged, toast }) => {
             sx={{ bgcolor: C.lime, color: C.bg, fontWeight: 700, minHeight: 44, '&:hover': { bgcolor: '#a3dc3f' } }}>
             {preparing ? 'Loading slides…' : files ? `Share ${files.length} slide${files.length > 1 ? 's' : ''}` : 'Get slides'}
           </Button>
+          {carouselId && (
+            <Button variant="outlined" onClick={reel ? () => shareFiles([reel], pack.title) : getReel}
+              sx={{ color: C.hi, borderColor: C.line, minHeight: 44 }}>
+              {reel ? 'Share reel' : 'Get reel'}
+            </Button>
+          )}
           <Typography sx={{ fontSize: 12, color: C.lo, alignSelf: 'center' }}>
             {files ? 'Opens the share sheet: pick Instagram' : 'Tap a slide to save just that one'}
           </Typography>

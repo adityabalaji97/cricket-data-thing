@@ -50,6 +50,7 @@ import { apiErrorText } from './utils/apiError';
 // Admin queue: loaded only when visited, so it adds nothing to the public bundle.
 const AdminPage = React.lazy(() => import('./components/admin/AdminPage'));
 const IgSlide = React.lazy(() => import('./components/ig/IgSlide'));
+const IgLinks = React.lazy(() => import('./components/ig/IgLinks'));
 const NotesList = React.lazy(() => import('./components/notes/NotesList'));
 const NotePage = React.lazy(() => import('./components/notes/NotePage'));
 const GraphicPage = React.lazy(() => import('./components/GraphicPage'));
@@ -731,6 +732,7 @@ const AppContent = () => {
         <Route path="/notes" element={<React.Suspense fallback={null}><NotesList /></React.Suspense>} />
         <Route path="/notes/:slug" element={<React.Suspense fallback={null}><NotePage /></React.Suspense>} />
         <Route path="/g/:id" element={<React.Suspense fallback={null}><GraphicPage /></React.Suspense>} />
+        <Route path="/links" element={<React.Suspense fallback={null}><IgLinks /></React.Suspense>} />
         <Route path="/graphics" element={<React.Suspense fallback={null}><GraphicsLanding /></React.Suspense>} />
         <Route path="/venue" element={
           <Box sx={{ my: { xs: 1.5, md: 3 }, bgcolor: 'background.default', color: 'text.primary' }}>
