@@ -143,6 +143,10 @@ def make(db: Session, item: Dict[str, Any], created_by: str = "ig-backlog") -> D
             result["fact"].update(carousel_id=carousel["id"], slides=len(slides))
             result["snapshot"] = carousel  # a text post: the carousel's first slide is its image
         return result
+    if item["pillar"] == "weird":
+        record = _record_post(db, item, created_by)
+        if record:
+            return record
     try:
         planned = item.get("planned") or content_ideas.plan(item["idea"], None, db)
         result = content_ideas.attempt(db, item["idea"], planned, created_by=created_by)
@@ -164,6 +168,33 @@ def make(db: Session, item: Dict[str, Any], created_by: str = "ig-backlog") -> D
     caption = ig_captions.build(hook, fact["title"], item["pillar"], fact.get("method"), _players_of(item, fact),
                                 _kicker(item))
     return {**result, "warnings": warnings, "caption": caption}
+
+
+def _record_post(db: Session, item: Dict[str, Any], created_by: str) -> Optional[Dict[str, Any]]:
+    """A career race ("fastest to 1,000 IPL runs") as a carousel drawn by the app (services/ig_posts/records.py):
+    the race by balls, by innings, and how they got there. None for other record ideas (they keep the ranking form)."""
+    from services import ig_captions, ig_carousel
+    from services.ig_posts import records
+
+    try:
+        built = records.build(db, item["idea"])
+    except Exception:  # a race the data can't build: fall back to the ranking form
+        logger.exception("record post %s failed", item["key"])
+        db.rollback()
+        return None
+    if not built:
+        return None
+    slides = ([{"type": "hook", "text": built["hook"], "kicker": built["kicker"], "sub": "By balls, by innings, and how they got there"}]
+              + [{"type": "card", "card": c, "teams": None} for c in built["cards"]]
+              + [{"type": "end", "heading": "Run it yourself",
+                  "body": "Every number comes from ball-by-ball data. Ask your own question on the query builder: it's free."}])
+    carousel = ig_carousel.save(db, slides, built["title"], {"record": item["key"]}, created_by)
+    fact = {"kind": "record", "subject": None, "title": built["title"], "verdict": built["verdict"],
+            "carousel_id": carousel["id"], "slides": len(slides), "render": True}
+    caption = ig_captions.build(built["hook"], built["verdict"], "weird",
+                                "careers counted from the first ball-by-ball season; rates over each career up to the milestone.",
+                                built["players"], built["kicker"])
+    return {"status": "resolved", "fact": fact, "snapshot": carousel, "warnings": [], "caption": caption}
 
 
 def schedule(made: List[Dict[str, Any]], start: date, days: int = DAYS) -> List[Dict[str, Any]]:
@@ -298,7 +329,7 @@ def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "
            "p": post["pillar"], "c": caption, "src": source})
 
 
-def preview_post(db: Session, venue: str, team1: str, team2: str, cards: List[str], day: date, label: str,
+def preview_post(db: Session, venue: str, team1: str, team2: str, cards: Optional[List[str]], day: date, label: str,
                  team1_short: Optional[str] = None, team2_short: Optional[str] = None, fmt: str = "T20") -> Dict[str, Any]:
     """A match-day post (pillar 'reactive'): the chosen cards of the fixture's preview story, as the story's own card
     JSON, so each slide is drawn by the same component as the card in the app (/ig/:id/:n renders it)."""
@@ -310,6 +341,10 @@ def preview_post(db: Session, venue: str, team1: str, team2: str, cards: List[st
     params = context_params(ctx)
     story = build_story(ctx)
     built = {c["id"]: c for chapter in story["chapters"] for c in chapter["cards"]}
+    if not cards:  # the story's best single-image cards (services/ig_posts/match.PREVIEW_CARDS)
+        from services.ig_posts.match import pick_preview_cards
+
+        cards = pick_preview_cards(story)
     chosen, titles, warnings = [], [], []
     for card_id in cards:
         card = built.get(card_id)
@@ -335,3 +370,51 @@ def preview_post(db: Session, venue: str, team1: str, team2: str, cards: List[st
     slug = re.sub(r"[^a-z0-9]+", "-", f"{team1}-{team2}-{day}".lower()).strip("-")
     return {"status": "resolved", "key": f"preview-{slug}", "pillar": "reactive", "fact": fact,
             "snapshot_id": carousel["id"], "warnings": warnings, "caption": caption, "players": []}
+
+
+def recap_pack(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
+    """The post-match carousel for a played match (services/ig_posts/match.recap_post), as a pack for the day after."""
+    from services import ig_captions, ig_carousel
+    from services.ig_posts.match import recap_post
+
+    built = recap_post(db, match_id)
+    if not built:
+        return None
+    slides = ([{"type": "hook", "text": built["hook"], "kicker": built["kicker"], "sub": "The swing, and who swung it"}]
+              + [{"type": "card", "card": c, "teams": built["teams"]} for c in built["cards"]]
+              + [{"type": "end", "heading": "The full scorecard",
+                  "body": "Ball-by-ball win probability, Impact and every innings: free on Hindsight."}])
+    carousel = ig_carousel.save(db, slides, built["title"], {"recap": str(match_id)}, "ig-recap")
+    fact = {"kind": "recap", "subject": None, "title": built["title"], "verdict": built["verdict"], "match_id": str(match_id),
+            "carousel_id": carousel["id"], "slides": len(slides), "render": True}
+    a, b = built["teams"]
+    occasion = [ig_captions.tag(f"{a}v{b}")] + (["#TeamIndia"] if "India" in (a, b) or "IND" in (a, b) else [])
+    primer = any(c["id"] in ("wpa", "impact") for c in built["cards"])
+    caption = ig_captions.build(built["hook"], built["verdict"], "reactive",
+                                "win probability, Impact and runs saved are computed ball by ball (T20 Primer method)."
+                                if primer else "from the ball-by-ball scorecard.",
+                                built["players"], built["kicker"], occasion)
+    return {"key": f"recap-{match_id}", "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"],
+            "warnings": [], "caption": caption, "players": built["players"], "day": built["day"] + timedelta(days=1)}
+
+
+def refresh(db: Session, keys: Iterable[str]) -> List[Dict[str, Any]]:
+    """Remake these backlog posts in place: same pack, same planned day (a partial build() would reschedule them)."""
+    from database import engine
+
+    out = []
+    for key in keys:
+        item = next((i for i in IDEAS if i["key"] == key), None)
+        row = db.execute(text("SELECT planned_for FROM content_packs WHERE angle_key = :k"), {"k": f"ig:{key}"}).first()
+        if not item or not row:
+            continue
+        result = make(db, item)
+        if result.get("status") != "resolved":
+            continue
+        post = {"key": key, "pillar": item["pillar"], "fact": result["fact"],
+                "snapshot_id": (result.get("snapshot") or {}).get("id"), "warnings": result.get("warnings") or [],
+                "players": _players_of(item, result["fact"]), "caption": result.get("caption")}
+        with engine.begin() as conn:
+            upsert_pack(conn, post, row[0])
+        out.append(post)
+    return out
