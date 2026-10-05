@@ -229,6 +229,8 @@ CONVERTERS: Dict[str, Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
     "rank_bars": _ranks, "elo_lines": _elo, "last_meeting": _last_meeting, "xis": _xis, "battles": _battles,
     "player_bars": _player_bars, "form_strips": _strips, "suits_scatter": _suits, "milestones": _milestones,
     "pitch_usage": _pitch, "captaincy": _captaincy,
+    "links": lambda p, f: {"layout": "list", "rows": [{"label": l["label"], "sub": "", "details": ["hindsightcricket.com/query"]}
+                                                      for l in p["links"]]},
 }
 
 

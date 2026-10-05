@@ -276,7 +276,7 @@ Module(
 | 7 | The players: D1–D6 (incl. milestones service) | [x] 2026-10-04 (notes below) |
 | 8 | Fantasy: F1–F4 | [x] 2026-10-04 (notes below) |
 | 9 | Outputs: Make a graphic = card core (new layouts), embeds, preview note from cards | [x] 2026-10-05 (notes below) |
-| 10 | Switch-over: story becomes the default, pills removed, phone/desktop sweep, goldens, performance budget | [ ] |
+| 10 | Switch-over: story becomes the default, pills removed, phone/desktop sweep, goldens, performance budget | [x] 2026-10-05 (notes below; classic page kept, see there) |
 
 ### Story shell and card anatomy (applies to every chunk)
 
@@ -649,6 +649,23 @@ Found while building:
 - **Note.** The nightly preview draft is now the story: one section per chapter, the featured cards' takeaways with
   their samples as bullets, the "At a glance" title as headline, the ground chapter's top card embedded. The note
   and the screen can't disagree.
+
+### Chunk 10 results (2026-10-05)
+- **The story is the default preview.** /venue opens it; ?story=0 (or "Classic page" in the logo menu) opens the
+  classic page.
+- **Closing card** (E2, never built in chunks 5-8): "Ask your own question", up to four one-tap query links, one
+  per chapter first, each labelled with the question its card answered. A "Dig deeper" chapter ends the story.
+- **Performance budget.**
+  - The finished story is cached per data load (query_cache, keyed with STORY_VERSION), so a repeat view is one
+    lookup instead of ~30 queries (was 1.4s warm, 1.7-4.2s cold on production).
+  - Nothing fetched twice: identical story requests share one response in useStoryCards (one request per page
+    load, down from four), and the classic page's written preview is only fetched once the classic page is shown.
+  - Neighbours only: the viewer mounts the current card and its neighbours (since chunk 1).
+- **Sweep:** default /venue at 360, 390, 768 and 1280 px for an IPL and an ODI fixture: no overflow, 0 fails;
+  glance tiles compacted on phones. Goldens unchanged (19/19), so no re-baseline needed.
+- **Not done, by choice:** the classic page keeps its pills, pie, scores bar chart and radar. It still holds
+  things the story doesn't (post-toss XIs and toss setup, the full matchup matrix, the written preview), so it
+  stays as the fallback until you decide to retire it.
 
 ### Chunks 5–8: Cards by chapter
 - One card = backend spec + renderer + ODI fallback + info sheet copy + empty state + test.

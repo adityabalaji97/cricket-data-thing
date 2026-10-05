@@ -123,7 +123,7 @@ const Tiles = ({ payload }) => {
           aria-label={`${t.label}: ${t.value}, ${t.sub}. Open the card`}
           sx={{
             textAlign: 'left', border: `1px solid ${colors.border}`, borderRadius: '14px', bgcolor: colors.surface2,
-            color: 'inherit', px: 1.25, py: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.25, overflow: 'hidden',
+            color: 'inherit', px: 1.25, py: { xs: 0.5, sm: 1 }, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.25, overflow: 'hidden',
             cursor: openCard ? 'pointer' : 'default', font: 'inherit', minHeight: 0,
             '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
           }}
@@ -131,10 +131,10 @@ const Tiles = ({ payload }) => {
           <Typography noWrap sx={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textLo }}>
             {t.label}
           </Typography>
-          <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 30, lineHeight: 1.05, color: colors.textHi, fontVariantNumeric: 'tabular-nums' }}>
+          <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: { xs: 26, sm: 30 }, lineHeight: 1.05, color: colors.textHi, fontVariantNumeric: 'tabular-nums' }}>
             {t.value}
           </Typography>
-          <Typography noWrap sx={{ fontSize: 13, color: colors.textMed, lineHeight: 1.25 }}>{t.sub}</Typography>
+          <Typography noWrap sx={{ fontSize: { xs: 12, sm: 13 }, color: colors.textMed, lineHeight: 1.25 }}>{t.sub}</Typography>
         </Box>
       ))}
     </Box>
@@ -737,6 +737,28 @@ const Captaincy = ({ payload, teams }) => {
   );
 };
 
+/** E2: one-tap links to the query behind a card. */
+const Links = ({ payload }) => (
+  <Box sx={{ flex: 1, display: 'grid', gap: 1.25, alignContent: 'center' }}>
+    {payload.links.map((l) => (
+      <Box
+        key={l.card}
+        component="a"
+        href={l.url}
+        data-story-noswipe
+        sx={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, p: 2, minHeight: 56,
+          borderRadius: '14px', border: `1px solid ${colors.border}`, bgcolor: colors.surface2, color: colors.textHi,
+          textDecoration: 'none', fontSize: 16, '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
+        }}
+      >
+        <span>{l.label}</span>
+        <Box component="span" aria-hidden sx={{ color: colors.accent, fontFamily: fonts.mono }}>→</Box>
+      </Box>
+    ))}
+  </Box>
+);
+
 export const VISUALS = {
   stat: Stat,
   par: Par,
@@ -760,6 +782,7 @@ export const VISUALS = {
   milestones: Milestones,
   pitch_usage: PitchUsage,
   captaincy: Captaincy,
+  links: Links,
   phase_bars: ({ payload }) => <WinningPhases phases={payload.phases} bare />,
   results_split: ({ payload }) => <WinPercentagesPie data={payload} bare />,
   benchmarks: ({ payload }) => <ScoresBarChart data={payload} bare />,

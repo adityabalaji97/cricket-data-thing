@@ -32,6 +32,7 @@ const ROUTES = [
   ['search', '/search'],
   ['venue_empty', '/venue?venue=Korogi%20Sports%20Park%2C%20Nisshin&team1=AFG&team2=NEP&includeInternational=true&topTeams=20&autoload=true'],
   ['venue_full', '/venue?venue=Wankhede%20Stadium%2C%20Mumbai&team1=Mumbai%20Indians&team2=Chennai%20Super%20Kings&autoload=true'],
+  ['venue_classic', '/venue?venue=Wankhede%20Stadium%2C%20Mumbai&team1=Mumbai%20Indians&team2=Chennai%20Super%20Kings&autoload=true&story=0'],
   ['player', '/player?name=V%20Kohli&autoload=true'],
   ['player_bowling', '/player?name=JJ%20Bumrah&tab=bowling&autoload=true'],
   ['comparison', '/comparison'],
