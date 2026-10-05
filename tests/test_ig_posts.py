@@ -107,3 +107,26 @@ def test_recap_window_runs_to_the_next_meeting_or_three_days():
     # No next meeting: the end of the third day after the match.
     end = recap_post_by(date(2026, 10, 6), "India", "Pakistan", fixtures)
     assert end.date() == date(2026, 10, 6 + RECAP_DAYS) and end.hour == 23
+
+
+def test_trend_mentions_need_a_full_name_or_a_unique_surname():
+    from services.ig_posts import trends
+
+    players = {"Shreyas Iyer": {}, "Ishan Kishan": {}, "Abhishek Sharma": {}, "Rohit Sharma": {}, "Tilak Varma": {}}
+    titles = [{"source": "Cricinfo", "title": "Kishan and Bumrah ride roughshod"},
+              {"source": "Reddit", "title": "Sharma smashes another fifty"},          # two Sharmas: nobody
+              {"source": "News", "title": "Shreyas Iyer 'ecstatic' after win"},
+              {"source": "News", "title": "Varma backed for No. 3"}]
+    named = trends.mentions(titles, players)
+    assert set(named) == {"Ishan Kishan", "Shreyas Iyer", "Tilak Varma"}
+
+
+def test_myth_spec_builds_from_the_result_file():
+    from services.ig_posts import myths
+
+    built = myths.build({"title": "Does one bad over break Varun Chakravarthy?", "status": "published"})
+    kinds = [s["type"] for s in built["slides"]]
+    assert kinds[:2] == ["hook", "text"] and kinds[-2:] == ["verdict", "end"] and kinds.count("card") >= 3
+    forest = next(s["card"] for s in built["slides"] if s.get("card", {}).get("visual") == "forest")
+    assert forest["title"].startswith("1 of 5 tests finds")  # the pooled-spinners test is the clear one
+    assert myths.build({"title": "Does one bad over break Varun Chakravarthy?", "status": "draft"}) is None

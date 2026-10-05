@@ -315,6 +315,14 @@ const IgPackCard = ({ pack, client, onChanged, toast }) => {
           </Typography>
         </Box>
       )}
+      {facts.trending && (facts.headlines || []).length > 0 && (
+        <Box sx={{ mt: 1.5 }}>
+          <Typography sx={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: C.lo }}>In the news this morning</Typography>
+          {facts.headlines.slice(0, 3).map((h) => (
+            <Typography key={h.title} sx={{ fontSize: 12, color: C.mid, mt: 0.25 }}>{h.source}: {h.title}</Typography>
+          ))}
+        </Box>
+      )}
       {facts.kind === 'debate' && (
         // Why this post: the measures Jev chose for the question (0-4), and how much it thinks fans would argue.
         <Typography sx={{ fontSize: 12, color: C.lo, mt: 1.5, lineHeight: 1.5 }}>

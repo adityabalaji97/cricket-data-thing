@@ -1,0 +1,32 @@
+name: Instagram trend radar
+
+# Each morning: the players in this morning's cricket headlines (Reddit, Cricinfo, Google News) as 'Trending today'
+# debate posts in the admin Instagram queue (scripts/trend_radar.py). Slides are screenshots of the live site's
+# /ig/<id>/<n> in headless Chrome. Queued only: nothing is posted.
+on:
+  schedule:
+    - cron: "30 3 * * *"   # 09:00 IST, after the morning news (GitHub may start it late)
+  workflow_dispatch:
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+      CHROME: google-chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Queue trending posts
+        run: python scripts/trend_radar.py --top 3

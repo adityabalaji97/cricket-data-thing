@@ -3,6 +3,7 @@ import { Box, Typography } from '@mui/material';
 import { SERIES } from '../../theme/chartDefaults';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { getTeamColor, readableOnDark } from '../../utils/teamColors';
+import { InningsClue } from '../games/GuessInningsGame';
 
 /**
  * Visuals for Instagram post cards (services/ig_posts): one question answered from several angles. Same contract as
@@ -297,13 +298,14 @@ const Forest = ({ payload }) => {
         <line x1={sx(0)} x2={sx(0)} y1="0" y2={H - 24} stroke={colors.textFaint} strokeDasharray="3 3" />
         {payload.effects.map((e, i) => {
           const y = i * rowH + 30;
-          const c = callColour(e.call);
+          // A test is coloured by whether its interval leaves out "no effect" (clear), else by its verdict word.
+          const c = e.clear === true ? colors.accent : e.clear === false ? colors.textLo : callColour(e.call);
           return (
             <g key={e.label}>
               <text x={L} y={y - 12} style={{ fontFamily: fonts.body, fontSize: 12, fill: colors.textHi }}>{e.label}</text>
               <line x1={sx(e.lo)} x2={sx(e.hi)} y1={y} y2={y} stroke={c} strokeWidth="2.5" strokeLinecap="round" />
               <circle cx={sx(e.estimate)} cy={y} r="5" fill={c} />
-              <text x={W - R} y={y - 12} textAnchor="end" style={{ ...mono, fill: c }}>{e.call || ''}</text>
+
             </g>
           );
         })}
@@ -312,7 +314,7 @@ const Forest = ({ payload }) => {
         <text x={W - R} y={H - 6} textAnchor="end" style={{ ...mono, fill: colors.textFaint }}>{fmt(span, 'signed1')}</text>
       </Box>
       <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
-        {`Dot: the estimate (${payload.unit}). Line: 95% confidence interval; crossing "no effect" means the data can't tell.`}
+        {`Dot: the estimate (${payload.unit}); line: its 95% interval. Lime: a clear effect. Grey: the line crosses "no effect", so the data can't tell.`}
       </Typography>
     </Box>
   );
@@ -341,7 +343,8 @@ const BucketBars = ({ payload }) => {
               {b.lo != null && (
                 <line x1={x + w / 2} x2={x + w / 2} y1={sy(b.lo)} y2={sy(b.hi)} stroke={colors.textHi} strokeWidth="1.5" />
               )}
-              <text x={x + w / 2} y={(b.value >= 0 ? top : top + h) + (b.value >= 0 ? -6 : 14)} textAnchor="middle" style={{ ...mono, fill: colors.textHi }}>
+              {/* Positive values sit above their bar; negative ones just above the zero line, clear of the bucket labels. */}
+              <text x={x + w / 2} y={b.value >= 0 ? top - 6 : sy(0) - 6} textAnchor="middle" style={{ ...mono, fill: colors.textHi }}>
                 {fmt(b.value, payload.metric.format)}
               </text>
               <text x={x + w / 2} y={B + 16} textAnchor="middle" style={{ fontFamily: fonts.body, fontSize: 12, fill: colors.textMed }}>{b.label}</text>
@@ -386,7 +389,19 @@ const PairDumbbell = ({ payload }) => {
   );
 };
 
+/**
+ * "Whose innings is this?": the Guess the Innings game's own clue card and wagon wheel.
+ * payload: the game's puzzle question (runs, balls, strike_rate, fours, sixes, bat_hand, season, deliveries[{x, y, runs}])
+ */
+const InningsWagon = ({ payload }) => (
+  // The game's clue card already holds its wheel and run legend; zoomed a little so the whole card fits a 4:5 slide.
+  <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', zoom: 0.84 }}>
+    <InningsClue puzzle={payload} />
+  </Box>
+);
+
 export const POST_VISUALS = {
+  innings_wagon: InningsWagon,
   scorecard: Scorecard,
   scatter_plus: ScatterPlus,
   metric_bars: MetricBars,

@@ -34,7 +34,8 @@ def build(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if b:
             data_cards.append(b)
     ranked = ctx.composite(chosen)
-    top = ranked[0]["name"] if ranked else None
+    # Where the highlighted player scores (a trending post), else the overall leader.
+    top = ctx.subject if ctx.subject and ctx.find(ctx.subject) else (ranked[0]["name"] if ranked else None)
     if top and q.role == "batter":
         z_card = C.zones(ctx, top, q.scope_label)
         if z_card:
