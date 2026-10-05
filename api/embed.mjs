@@ -1,5 +1,5 @@
 /**
- * Embeddable charts: /embed/{q|wp|recap}/:snapshotId -> self-contained HTML for an iframe.
+ * Embeddable charts: /embed/{q|wp|recap|card}/:snapshotId -> self-contained HTML for an iframe.
  *
  * A snapshot (services/snapshots.py) is frozen data, so an embed never re-runs a query per
  * viewer and the page is cached hard at the edge. No React bundle: it loads fast on any site.
@@ -7,6 +7,7 @@
  *   q      the connector's chart/table widget (mcp_server/widget.html) in its static mode
  *   wp     win-probability path, as inline SVG (the scorecard's Impact card, minus the app)
  *   recap  "how it was won": headline and bullets
+ *   card   a match-preview story card: its share image (frozen on the day it was made) and title
  *
  * Every embed posts {type:'hindsight:resize', height} to its parent so the host can size the
  * frame, links back with utm_source=embed, and logs one embed_view event with the host site.
@@ -16,7 +17,7 @@ import { getJSON, SITE_URL } from './_lib/share.mjs';
 
 const WIDGET = readFileSync(new URL('../mcp_server/widget.html', import.meta.url), 'utf8');
 const ID = /^[A-Za-z0-9]{6,16}$/;
-const KIND_FOR = { q: 'query', wp: 'win_prob', recap: 'recap' };
+const KIND_FOR = { q: 'query', wp: 'win_prob', recap: 'recap', card: 'preview_card' };
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // JSON inside a <script>: escape "<" so a value can never close the tag.
@@ -143,7 +144,16 @@ function queryHtml(snap) {
     .replace('</body>', `${runtime(snap, 'q', { resize: false })}</body>`);
 }
 
-const RENDER = { q: queryHtml, wp: winProbHtml, recap: recapHtml };
+// A preview card: the same 1080x1350 image the Graphic button shares, so an embed matches it exactly.
+function cardHtml(snap) {
+  const d = snap.data || {};
+  const body = `<div class="kicker">${esc(d.kicker || 'Match preview')}</div>
+<img src="${esc(`${SITE_URL}/img/${snap.id}.png`)}" alt="${esc(d.title || snap.title)}" width="1080" height="1350"
+  style="display:block;width:100%;height:auto;border-radius:10px;margin-top:8px">`;
+  return page(snap, 'card', d.title || snap.title, body, d.hindsight_url || '/venue');
+}
+
+const RENDER = { q: queryHtml, wp: winProbHtml, recap: recapHtml, card: cardHtml };
 
 export default async function handler(req, res) {
   const url = new URL(req.url, 'http://local');

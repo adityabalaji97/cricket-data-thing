@@ -5,9 +5,9 @@
   "title": "Most controlled ODI partnerships since 2019 (1,000+ balls)",
   "data": {
    "title": "Most controlled ODI partnerships since 2019 (1,000+ balls)",
-   "subtitle": "8 of 48 rows \u00b7 ranked by control_percentage",
+   "subtitle": "8 of 48 rows · ranked by control_percentage",
    "filter_chips": [
-    "2019-01-01 \u2192 today",
+    "2019-01-01 → today",
     "ODI"
    ],
    "group_by": [
@@ -293,7 +293,7 @@
  "win_prob": {
   "id": "i1CGtHQYG",
   "kind": "win_prob",
-  "title": "Win probability \u00b7 Chennai Super Kings won by 8 wickets",
+  "title": "Win probability · Chennai Super Kings won by 8 wickets",
   "data": {
    "match_id": "1529287",
    "date": "2026-05-02",
@@ -660,7 +660,7 @@
   "data": {
    "layout": "list",
    "title": "Australia's 3 centuries v South Africa (Aug 2025) make it one of 5 ODI innings with 3+ centuries since 2000",
-   "kicker": "ODI \u00b7 innings",
+   "kicker": "ODI · innings",
    "subtitle": "Every ODI innings with 3+ centuries, latest first",
    "filter_chips": [
     "ODI",
@@ -764,7 +764,7 @@
    "metric_label": "Impact per 100 balls",
    "filter_chips": [
     "T20",
-    "2020-01-01 \u2192 today"
+    "2020-01-01 → today"
    ],
    "group_by": [
     "year"
@@ -896,7 +896,7 @@
    "rank_text": "1st of 4 ODI batters (1,000+ balls, average 50+, strike rate 100+)",
    "filter_chips": [
     "ODI",
-    "2019-01-01 \u2192 now"
+    "2019-01-01 → now"
    ],
    "group_by": [
     "batter"
@@ -932,7 +932,7 @@
    "metric_label": "Impact per 100 balls",
    "filter_chips": [
     "T20",
-    "2024-01-01 \u2192 now"
+    "2024-01-01 → now"
    ],
    "group_by": [
     "phase"
@@ -988,7 +988,7 @@
    ],
    "filter_chips": [
     "IPL",
-    "2024-01-01 \u2192 now"
+    "2024-01-01 → now"
    ],
    "group_by": [
     "batter",
@@ -1041,7 +1041,7 @@
    ],
    "filter_chips": [
     "IPL",
-    "2024-01-01 \u2192 now"
+    "2024-01-01 → now"
    ],
    "group_by": [
     "batter",
@@ -1109,7 +1109,7 @@
    "metric_label": "Runs",
    "filter_chips": [
     "T20",
-    "2024-01-01 \u2192 now"
+    "2024-01-01 → now"
    ],
    "group_by": [
     "wagon_zone"
@@ -1154,6 +1154,714 @@
      "zone": 8,
      "label": "Behind",
      "value": 128
+    }
+   ]
+  }
+ },
+ "preview_form_strips": {
+  "id": "cardfx",
+  "kind": "preview_card",
+  "title": "Matthew Short arrives in form: 2 fifties in the last 10 innings",
+  "created_at": "2026-10-05T00:00:00Z",
+  "data": {
+   "layout": "strips",
+   "strips": [
+    {
+     "name": "Ryan Rickelton",
+     "runs": [
+      37,
+      83,
+      2,
+      48,
+      6,
+      12,
+      5,
+      35,
+      6,
+      25
+     ]
+    },
+    {
+     "name": "Tilak Varma",
+     "runs": [
+      20,
+      3,
+      19,
+      55,
+      13,
+      24,
+      3,
+      11,
+      53,
+      6
+     ]
+    },
+    {
+     "name": "Suryakumar Yadav",
+     "runs": [
+      33,
+      0,
+      15,
+      35,
+      5,
+      21,
+      12,
+      0,
+      15,
+      60
+     ]
+    },
+    {
+     "name": "Dewald Brevis",
+     "runs": [
+      34,
+      41,
+      0,
+      21,
+      2,
+      10,
+      25,
+      44,
+      8,
+      22
+     ]
+    },
+    {
+     "name": "Matthew Short",
+     "runs": [
+      10,
+      34,
+      39,
+      21,
+      19,
+      43,
+      43,
+      94,
+      121,
+      20
+     ]
+    },
+    {
+     "name": "Sanju Samson",
+     "runs": [
+      11,
+      87,
+      28,
+      20,
+      27,
+      0,
+      5,
+      0,
+      1,
+      27
+     ]
+    }
+   ],
+   "title": "Matthew Short arrives in form: 2 fifties in the last 10 innings",
+   "kicker": "MI v CSK · Wankhede Stadium · The players",
+   "source": "Each side's 3 busiest batters · any men's T20 · last 12 months",
+   "card_id": "form-strips",
+   "hindsight_url": "https://hindsightcricket.com/venue?story=1"
+  }
+ },
+ "preview_how_they_bowl": {
+  "id": "cardfx",
+  "kind": "preview_card",
+  "title": "Hardik Pandya bowls short balls outside off 1.7× as often as an average pace bowler",
+  "created_at": "2026-10-05T00:00:00Z",
+  "data": {
+   "layout": "grid",
+   "lines": [
+    "DOWN_LEG",
+    "ON_THE_STUMPS",
+    "OUTSIDE_OFFSTUMP",
+    "WIDE_OUTSIDE_OFFSTUMP"
+   ],
+   "lengths": [
+    "FULL_TOSS",
+    "YORKER",
+    "FULL",
+    "GOOD_LENGTH",
+    "SHORT_OF_A_GOOD_LENGTH",
+    "SHORT"
+   ],
+   "cells": [
+    {
+     "line": "DOWN_LEG",
+     "length": "FULL_TOSS",
+     "pct": 0.1,
+     "usual": 0.5
+    },
+    {
+     "line": "DOWN_LEG",
+     "length": "YORKER",
+     "pct": 0.5,
+     "usual": 0.4
+    },
+    {
+     "line": "DOWN_LEG",
+     "length": "FULL",
+     "pct": 1.0,
+     "usual": 1.4
+    },
+    {
+     "line": "DOWN_LEG",
+     "length": "GOOD_LENGTH",
+     "pct": 1.8,
+     "usual": 2.4
+    },
+    {
+     "line": "DOWN_LEG",
+     "length": "SHORT_OF_A_GOOD_LENGTH",
+     "pct": 3.1,
+     "usual": 2.7
+    },
+    {
+     "line": "DOWN_LEG",
+     "length": "SHORT",
+     "pct": 3.1,
+     "usual": 1.5
+    },
+    {
+     "line": "ON_THE_STUMPS",
+     "length": "FULL_TOSS",
+     "pct": 1.8,
+     "usual": 1.7
+    },
+    {
+     "line": "ON_THE_STUMPS",
+     "length": "YORKER",
+     "pct": 1.2,
+     "usual": 1.5
+    },
+    {
+     "line": "ON_THE_STUMPS",
+     "length": "FULL",
+     "pct": 4.4,
+     "usual": 7.2
+    },
+    {
+     "line": "ON_THE_STUMPS",
+     "length": "GOOD_LENGTH",
+     "pct": 7.9,
+     "usual": 11.6
+    },
+    {
+     "line": "ON_THE_STUMPS",
+     "length": "SHORT_OF_A_GOOD_LENGTH",
+     "pct": 9.4,
+     "usual": 8.5
+    },
+    {
+     "line": "ON_THE_STUMPS",
+     "length": "SHORT",
+     "pct": 3.1,
+     "usual": 2.4
+    },
+    {
+     "line": "OUTSIDE_OFFSTUMP",
+     "length": "FULL_TOSS",
+     "pct": 1.6,
+     "usual": 1.6
+    },
+    {
+     "line": "OUTSIDE_OFFSTUMP",
+     "length": "YORKER",
+     "pct": 1.0,
+     "usual": 1.1
+    },
+    {
+     "line": "OUTSIDE_OFFSTUMP",
+     "length": "FULL",
+     "pct": 8.2,
+     "usual": 9.1
+    },
+    {
+     "line": "OUTSIDE_OFFSTUMP",
+     "length": "GOOD_LENGTH",
+     "pct": 18.0,
+     "usual": 17.3
+    },
+    {
+     "line": "OUTSIDE_OFFSTUMP",
+     "length": "SHORT_OF_A_GOOD_LENGTH",
+     "pct": 17.4,
+     "usual": 16.1
+    },
+    {
+     "line": "OUTSIDE_OFFSTUMP",
+     "length": "SHORT",
+     "pct": 8.3,
+     "usual": 4.8
+    },
+    {
+     "line": "WIDE_OUTSIDE_OFFSTUMP",
+     "length": "FULL_TOSS",
+     "pct": 0.2,
+     "usual": 0.6
+    },
+    {
+     "line": "WIDE_OUTSIDE_OFFSTUMP",
+     "length": "YORKER",
+     "pct": 0.4,
+     "usual": 0.5
+    },
+    {
+     "line": "WIDE_OUTSIDE_OFFSTUMP",
+     "length": "FULL",
+     "pct": 1.6,
+     "usual": 2.3
+    },
+    {
+     "line": "WIDE_OUTSIDE_OFFSTUMP",
+     "length": "GOOD_LENGTH",
+     "pct": 2.3,
+     "usual": 1.9
+    },
+    {
+     "line": "WIDE_OUTSIDE_OFFSTUMP",
+     "length": "SHORT_OF_A_GOOD_LENGTH",
+     "pct": 2.2,
+     "usual": 2.0
+    },
+    {
+     "line": "WIDE_OUTSIDE_OFFSTUMP",
+     "length": "SHORT",
+     "pct": 1.0,
+     "usual": 0.7
+    }
+   ],
+   "title": "Hardik Pandya bowls short balls outside off 1.7× as often as an average pace bowler",
+   "kicker": "MI v CSK · Wankhede Stadium · The players",
+   "source": "1,366 balls with line and length · all men's T20 since 2022",
+   "card_id": "how-they-bowl",
+   "hindsight_url": "https://hindsightcricket.com/venue?story=1"
+  }
+ },
+ "preview_results": {
+  "id": "cardfx",
+  "kind": "preview_card",
+  "title": "Batting first is no clear edge here: 15 of 28 won",
+  "created_at": "2026-10-05T00:00:00Z",
+  "data": {
+   "layout": "stat",
+   "metric_label": "Chases won",
+   "value_display": "13/28",
+   "subject": "46% · likely range 30–64%",
+   "rank_text": "Within noise: could easily be luck · Since 2025: chasing sides won 10 of 21.",
+   "title": "Batting first is no clear edge here: 15 of 28 won",
+   "kicker": "MI v CSK · Wankhede Stadium · The ground",
+   "source": "28 decided matches at Wankhede Stadium · 2022–26",
+   "card_id": "results",
+   "hindsight_url": "https://hindsightcricket.com/venue?story=1"
+  }
+ },
+ "preview_par": {
+  "id": "cardfx",
+  "kind": "preview_card",
+  "title": "Par here is about 212",
+  "created_at": "2026-10-05T00:00:00Z",
+  "data": {
+   "layout": "line",
+   "metric_label": "Par, season by season",
+   "points": [
+    {
+     "x": "2024",
+     "y": 189,
+     "display": "189",
+     "highlight": false
+    },
+    {
+     "x": "2025",
+     "y": 180,
+     "display": "180",
+     "highlight": false
+    },
+    {
+     "x": "2026",
+     "y": 212,
+     "display": "212",
+     "highlight": true
+    }
+   ],
+   "title": "Par here is about 212",
+   "kicker": "MI v CSK · Wankhede Stadium · At a glance",
+   "source": "IPL 2026 at Wankhede Stadium · T20 Primer par",
+   "card_id": "par",
+   "hindsight_url": "https://hindsightcricket.com/venue?story=1"
+  }
+ },
+ "preview_glance": {
+  "id": "cardfx",
+  "kind": "preview_card",
+  "title": "Par about 212, no clear edge for batting first",
+  "created_at": "2026-10-05T00:00:00Z",
+  "data": {
+   "layout": "list",
+   "rows": [
+    {
+     "label": "Par",
+     "sub": "",
+     "details": [
+      "212 · Up from 189 in 2024."
+     ]
+    },
+    {
+     "label": "Chasing",
+     "sub": "",
+     "details": [
+      "13/28 · within noise"
+     ]
+    },
+    {
+     "label": "Head to head",
+     "sub": "",
+     "details": [
+      "4–1 · CSK lead"
+     ]
+    },
+    {
+     "label": "MI form",
+     "sub": "",
+     "details": [
+      "2/5 · wins, last 5"
+     ]
+    },
+    {
+     "label": "CSK form",
+     "sub": "",
+     "details": [
+      "2/5 · wins, last 5"
+     ]
+    },
+    {
+     "label": "Toss winners",
+     "sub": "",
+     "details": [
+      "93% · chose to chase"
+     ]
+    }
+   ],
+   "title": "Par about 212, no clear edge for batting first",
+   "kicker": "MI v CSK · Wankhede Stadium · At a glance",
+   "source": "MI v CSK at Wankhede Stadium · 2022–26",
+   "card_id": "glance",
+   "hindsight_url": "https://hindsightcricket.com/venue?story=1"
+  }
+ },
+ "preview_last_meeting": {
+  "id": "cardfx",
+  "kind": "preview_card",
+  "title": "Last time: CSK chased 160 with 8 wickets in hand",
+  "created_at": "2026-10-05T00:00:00Z",
+  "data": {
+   "layout": "win_prob",
+   "scores": [
+    {
+     "team": "MI",
+     "runs": 159,
+     "wickets": 7,
+     "overs": "20.0"
+    },
+    {
+     "team": "CSK",
+     "runs": 160,
+     "wickets": 2,
+     "overs": "18.1"
+    }
+   ],
+   "teams": [
+    {
+     "name": "MI"
+    },
+    {
+     "name": "CSK"
+    }
+   ],
+   "primer": {
+    "win_probability": {
+     "points": [
+      0.5,
+      0.492,
+      0.492,
+      0.484,
+      0.476,
+      0.468,
+      0.46,
+      0.348,
+      0.341,
+      0.366,
+      0.359,
+      0.352,
+      0.345,
+      0.386,
+      0.427,
+      0.42,
+      0.42,
+      0.429,
+      0.429,
+      0.47,
+      0.47,
+      0.462,
+      0.454,
+      0.455,
+      0.446,
+      0.438,
+      0.478,
+      0.47,
+      0.51,
+      0.548,
+      0.54,
+      0.577,
+      0.576,
+      0.583,
+      0.575,
+      0.574,
+      0.573,
+      0.572,
+      0.564,
+      0.482,
+      0.506,
+      0.499,
+      0.491,
+      0.514,
+      0.514,
+      0.506,
+      0.505,
+      0.505,
+      0.504,
+      0.496,
+      0.519,
+      0.51,
+      0.509,
+      0.508,
+      0.507,
+      0.529,
+      0.566,
+      0.564,
+      0.555,
+      0.554,
+      0.574,
+      0.595,
+      0.593,
+      0.532,
+      0.532,
+      0.523,
+      0.514,
+      0.513,
+      0.528,
+      0.519,
+      0.525,
+      0.515,
+      0.506,
+      0.504,
+      0.502,
+      0.5,
+      0.441,
+      0.44,
+      0.439,
+      0.438,
+      0.429,
+      0.419,
+      0.409,
+      0.407,
+      0.43,
+      0.419,
+      0.417,
+      0.406,
+      0.403,
+      0.4,
+      0.397,
+      0.394,
+      0.382,
+      0.378,
+      0.374,
+      0.361,
+      0.365,
+      0.36,
+      0.355,
+      0.39,
+      0.358,
+      0.353,
+      0.373,
+      0.337,
+      0.327,
+      0.323,
+      0.319,
+      0.315,
+      0.303,
+      0.298,
+      0.285,
+      0.272,
+      0.273,
+      0.267,
+      0.282,
+      0.289,
+      0.274,
+      0.255,
+      0.285,
+      0.277,
+      0.268,
+      0.267,
+      0.273,
+      0.272,
+      0.279,
+      0.255,
+      0.254,
+      0.26,
+      0.259,
+      0.258,
+      0.265,
+      0.241,
+      0.334,
+      0.306,
+      0.295,
+      0.302,
+      0.293,
+      0.3,
+      0.272,
+      0.228,
+      0.218,
+      0.224,
+      0.199,
+      0.205,
+      0.211,
+      0.209,
+      0.17,
+      0.147,
+      0.146,
+      0.144,
+      0.149,
+      0.116,
+      0.121,
+      0.091,
+      0.09,
+      0.14,
+      0.145,
+      0.151,
+      0.148,
+      0.154,
+      0.129,
+      0.127,
+      0.125,
+      0.13,
+      0.128,
+      0.126,
+      0.117,
+      0.115,
+      0.12,
+      0.085,
+      0.09,
+      0.082,
+      0.081,
+      0.085,
+      0.084,
+      0.082,
+      0.081,
+      0.079,
+      0.073,
+      0.072,
+      0.071,
+      0.07,
+      0.068,
+      0.073,
+      0.078,
+      0.077,
+      0.076,
+      0.075,
+      0.068,
+      0.042,
+      0.041,
+      0.04,
+      0.039,
+      0.038,
+      0.042,
+      0.037,
+      0.036,
+      0.035,
+      0.035,
+      0.034,
+      0.033,
+      0.033,
+      0.032,
+      0.036,
+      0.036,
+      0.035,
+      0.022,
+      0.022,
+      0.013,
+      0.015,
+      0.017,
+      0.014,
+      0.017,
+      0.016,
+      0.016,
+      0.015,
+      0.013,
+      0.006,
+      0.006,
+      0.005,
+      0.007,
+      0.002,
+      0.003,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "team": "MI",
+     "innings_break": 121,
+     "wickets": []
+    }
+   },
+   "title": "Last time: CSK chased 160 with 8 wickets in hand",
+   "kicker": "MI v CSK · Wankhede Stadium · The teams",
+   "source": "IPL · MA Chidambaram Stadium · 2 May 2026",
+   "card_id": "last-meeting",
+   "hindsight_url": "https://hindsightcricket.com/venue?story=1"
+  }
+ },
+ "preview_dismissals": {
+  "id": "cardfx",
+  "kind": "preview_card",
+  "title": "Batters are lbw 1.6× as often as usual here",
+  "created_at": "2026-10-05T00:00:00Z",
+  "data": {
+   "layout": "donut",
+   "title": "Batters are lbw 1.6× as often as usual here",
+   "kicker": "GAW v TKR · Providence Stadium · The ground",
+   "source": "699 bowler wickets at Providence Stadium · every season",
+   "slices": [
+    {
+     "label": "Caught",
+     "value": 384,
+     "pct": 55,
+     "usual": 68
+    },
+    {
+     "label": "Bowled",
+     "value": 196,
+     "pct": 28,
+     "usual": 21
+    },
+    {
+     "label": "LBW",
+     "value": 84,
+     "pct": 12,
+     "usual": 8
+    },
+    {
+     "label": "Stumped and other",
+     "value": 35,
+     "pct": 5,
+     "usual": 3
     }
    ]
   }

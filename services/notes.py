@@ -34,7 +34,7 @@ CHART_FENCE = re.compile(r"^```hindsight[ \t]*\n[ \t]*chart:[ \t]*([A-Za-z0-9]{6
 SNAPSHOT_ID = re.compile(r"^[A-Za-z0-9]{6,16}$")
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 # Which /embed/* renderer shows a snapshot kind.
-EMBED_KIND = {"query": "q", "ranking": "q", "win_prob": "wp", "recap": "recap"}
+EMBED_KIND = {"query": "q", "ranking": "q", "win_prob": "wp", "recap": "recap", "preview_card": "card"}
 SITE_HOSTS = {"hindsightcricket.com", "www.hindsightcricket.com", "hindsight2020.vercel.app", "localhost", "127.0.0.1"}
 
 
@@ -109,7 +109,7 @@ def snapshot_request_from_url(url: str, kind: Optional[str] = None) -> Dict[str,
         raise NoteError("That isn't a Hindsight link.")
     path = parts.path.rstrip("/") or "/"
 
-    embed = re.match(r"^/(?:embed/(?:q|wp|recap)/([A-Za-z0-9]{6,16})|img/([A-Za-z0-9]{6,16})\.png)$", path)
+    embed = re.match(r"^/(?:embed/(?:q|wp|recap|card)/([A-Za-z0-9]{6,16})|img/([A-Za-z0-9]{6,16})\.png)$", path)
     if embed:
         return {"existing": embed.group(1) or embed.group(2)}
 

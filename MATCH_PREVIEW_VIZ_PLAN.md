@@ -275,7 +275,7 @@ Module(
 | 6 | The teams: C1–C6 | [x] 2026-10-04 (notes below) |
 | 7 | The players: D1–D6 (incl. milestones service) | [x] 2026-10-04 (notes below) |
 | 8 | Fantasy: F1–F4 | [x] 2026-10-04 (notes below) |
-| 9 | Outputs: Make a graphic = card core (new layouts), embeds, preview note from cards | [ ] |
+| 9 | Outputs: Make a graphic = card core (new layouts), embeds, preview note from cards | [x] 2026-10-05 (notes below) |
 | 10 | Switch-over: story becomes the default, pills removed, phone/desktop sweep, goldens, performance budget | [ ] |
 
 ### Story shell and card anatomy (applies to every chunk)
@@ -634,6 +634,21 @@ Found while building:
   some bonuses not projected), so comparing points read as "everyone underperforms", and rescaling produced
   "89% above usual" for 54 v 50. The card compares ranks instead: projected rank among both XIs against the rank of
   the player's usual IPL haul ("projected 6th of 20 here, usually 15th"), 3+ places to appear.
+
+### Chunk 9 results (2026-10-05)
+- **Image.** Every card has an "Image" action (the existing Image & embed dialog: 4:5 / 1:1 / link sizes,
+  share, download, embed code). It creates a snapshot of kind `preview_card` whose params are the story's own
+  (`fixture.params` in the manifest) plus the card id; the server rebuilds that one card (`build_card`) and freezes
+  it with services/preview_cards/snapshot.py. The public endpoint never takes chart data from the browser.
+- **Layouts.** All 27 cards map onto api/img.mjs: existing layouts (bars, stat, line, scatter, diverging,
+  dumbbell, stacked, field, list, win probability) plus three new ones: donut (dismissals), strips (form) and
+  grid (pitch map). The totals scatter becomes a stat ("8/11 times 210+ was defended") because the scatter
+  layout lists every highlighted point. Legibility tests cover the new layouts (tests/js/share_images.test.mjs).
+- **Embeds.** /embed/card/:id shows the frozen image with a link back to the story; notes embed it too
+  (EMBED_KIND preview_card -> card, and the no-JS note HTML uses the image).
+- **Note.** The nightly preview draft is now the story: one section per chapter, the featured cards' takeaways with
+  their samples as bullets, the "At a glance" title as headline, the ground chapter's top card embedded. The note
+  and the screen can't disagree.
 
 ### Chunks 5–8: Cards by chapter
 - One card = backend spec + renderer + ODI fallback + info sheet copy + empty state + test.

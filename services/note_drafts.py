@@ -220,78 +220,74 @@ def compose_preview(fixture: Dict[str, Any], sections: List[Dict[str, Any]], hea
     parts = [f"{t1} play {t2} at {fixture['venue']}, {_when(fixture['start_utc'])}."]
     for section in sections:
         parts.append(f"## {section['title']}\n\n" + "\n".join(f"- {b}" for b in section["bullets"]))
-        if section.get("id") == "venue_profile" and chart:
+        if section.get("id") in ("venue_profile", "ground") and chart:
             parts.append(chart["lead"])
             parts.append(chart_fence(chart["id"]))
-    if chart and not any(s.get("id") == "venue_profile" for s in sections):
+    if chart and not any(s.get("id") in ("venue_profile", "ground") for s in sections):
         parts += [chart["lead"], chart_fence(chart["id"])]
-    parts.append(f"[Open the full preview, with batter-v-bowler matchups]({preview_url(fixture)})")
+    parts.append(f"[Open the full preview, card by card]({preview_url(fixture)}&story=1)")
     return {"title": title, "dek": dek, "body_md": "\n\n".join(parts) + "\n"}
 
 
-def _preview_facts(db: Session, fixture: Dict[str, Any]) -> Dict[str, Any]:
+PREVIEW_BULLETS_PER_CHAPTER = 4  # the story's featured cards per chapter (StoryViewer)
+
+
+def story_sections(story: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    The note's sections from the story preview (services/preview_cards): one per chapter, each
+    featured card's takeaway as a bullet with its sample, so the note says exactly what the
+    cards say. The "At a glance" title is the headline.
+    """
+    sections, glance = [], None
+    for chapter in story.get("chapters") or []:
+        cards = chapter.get("cards") or []
+        if chapter["id"] == "glance":
+            glance = next((c for c in cards if c["id"] == "glance"), None)
+            cards = [c for c in cards if c["id"] != "glance"]
+        bullets = [f"{c['title']} ({c['sample']})." for c in cards[:PREVIEW_BULLETS_PER_CHAPTER]]
+        if bullets:
+            sections.append({"id": chapter["id"], "title": chapter["title"], "bullets": bullets,
+                             "cards": [c["id"] for c in cards[:PREVIEW_BULLETS_PER_CHAPTER]]})
+    headline = glance["title"] if glance else (sections[0]["bullets"][0].split(" (")[0] if sections else None)
+    return {"sections": sections, "headline": headline,
+            "facts": [b for s in sections for b in s["bullets"]]}
+
+
+def _preview_story(db: Session, fixture: Dict[str, Any]):
     from mcp_server.server import _default_window
-    from routers.match_preview import _inject_form_flags
-    from services import typed_preview
-    from services.match_preview import gather_preview_context
+    from services.preview_cards import PreviewContext, build_story
 
-    fmt = fixture["format"]
-    start, end = _default_window(fmt)
-    context = gather_preview_context(
-        venue=fixture["venue"], team1_identifier=fixture["team1"], team2_identifier=fixture["team2"], db=db,
-        start_date=start, end_date=end, include_international=True, top_teams=20, day_or_night=None,
-        fmt=fmt, gender="male",
-    )
-    try:
-        _inject_form_flags(context, db)
-    except Exception as exc:  # optional enrichment, as on the site
-        logger.warning("form flags failed for preview: %r", exc)
-    facts = typed_preview.build_candidate_facts(context)
-    curated = None
-    try:
-        curated = typed_preview.curate(context, facts)
-    except Exception as exc:
-        logger.warning("Jev curation failed; keeping fact order: %r", exc)
-    if not curated:
-        # Without Jev every fact is "relevant"; sections keep the order code wrote them in.
-        for f in facts:
-            f.setdefault("score", None)
-            if not f["fixed"]:
-                f["score"] = typed_preview.KEEP_THRESHOLD
-        curated = typed_preview.assemble(facts)
-        curated["headline"] = None   # no ranking, so no claim that one fact leads
-    return {"start": start, "facts": facts, **curated}
+    start, end = _default_window(fixture["format"])
+    ctx = PreviewContext(db=db, venue=fixture["venue"], team1=fixture["team1"], team2=fixture["team2"],
+                         fmt=fixture["format"], start=start, end=end, include_international=True, top_teams=20)
+    return ctx, build_story(ctx)
 
 
-def _venue_chart(db: Session, fixture: Dict[str, Any], start: date) -> Optional[Dict[str, Any]]:
-    """The venue's leading batters (Impact for men's T20, runs for ODIs) as a query snapshot."""
+def _story_chart(db: Session, story: Dict[str, Any], sections: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The ground chapter's top card, frozen as its share image (snapshot kind preview_card)."""
     from services.snapshots import SnapshotError, create_snapshot
 
-    fmt = fixture["format"]
-    base = {"venue": fixture["venue"], "fmt": fmt, "gender": "male", "start_date": start.isoformat(),
-            "group_by": ["batter"], "min_balls": VENUE_CHART_MIN_BALLS[fmt], "limit": 8}
-    for metric in (["impact", "runs"] if fmt == "T20" else ["runs"]):
-        try:
-            snap = create_snapshot(db, "query", {**base, "sort_by": metric}, created_by="draft_notes")
-        except SnapshotError as exc:
-            logger.info("no venue chart: %s", exc)
-            return None
-        rows = (snap.get("data") or {}).get("rows") or []
-        if len([r for r in rows if isinstance(r.get(metric), (int, float))]) >= 3:
-            label = "Impact" if metric == "impact" else "runs"
-            return {"id": snap["id"], "lead": f"The leading batters at {_ground(fixture['venue'])} since {start.year}, by {label}:"}
-    return None
+    ground = next((s for s in sections if s["id"] == "ground"), None)
+    if not ground:
+        return None
+    try:
+        snap = create_snapshot(db, "preview_card", {**story["fixture"]["params"], "card": ground["cards"][0]},
+                               created_by="draft_notes")
+    except SnapshotError as exc:
+        logger.info("no preview chart: %s", exc)
+        return None
+    return {"id": snap["id"], "lead": "The ground's standout card:"}
 
 
 def draft_preview(db: Session, fixture: Dict[str, Any], dry_run: bool = False) -> Optional[Dict[str, Any]]:
-    built = _preview_facts(db, fixture)
-    scored = [f for f in built["facts"] if not f["fixed"]]
-    if len(scored) < MIN_PREVIEW_FACTS:
-        logger.info("preview too thin (%s facts): %s v %s", len(scored), fixture["team1"], fixture["team2"])
+    _, story = _preview_story(db, fixture)
+    built = story_sections(story)
+    if len(built["facts"]) < MIN_PREVIEW_FACTS:
+        logger.info("preview too thin (%s cards): %s v %s", len(built["facts"]), fixture["team1"], fixture["team2"])
         return None
-    chart = None if dry_run else _venue_chart(db, fixture, built["start"])
-    known = [{"facts": [f["text"] for f in built["facts"]]}]
-    draft = compose_preview(fixture, built["sections"], built.get("headline"), known, chart)
+    chart = None if dry_run else _story_chart(db, story, built["sections"])
+    known = [{"facts": built["facts"]}]
+    draft = compose_preview(fixture, built["sections"], built["headline"], known, chart)
     if dry_run:
         return draft
     return _save(db, draft, kind="preview", match_id=str(fixture["match_id"]))

@@ -13,7 +13,7 @@ export const embedOrigin = siteOrigin;
 
 export const NoteChart = ({ id, chart }) => {
   const ref = useRef(null);
-  const [height, setHeight] = useState(chart?.embed === 'recap' ? 260 : 380);
+  const [height, setHeight] = useState(chart?.embed === 'recap' ? 260 : chart?.embed === 'card' ? 720 : 380);
   const origin = embedOrigin();
 
   useEffect(() => {
