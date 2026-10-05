@@ -59,6 +59,11 @@ def main() -> int:
         print(f"    queued for today, rendered {len(result['ok'])}/{len(built['slides'])}"
               + (f", failed {result['failed']}" if result["failed"] else ""))
         queued += 1
+    if queued:
+        # A render that failed (a slow browser start) gets one more go before the run ends.
+        retry = ig_backlog.render_pending(args.base)
+        if retry["failed"]:
+            print(f"still unrendered: {retry['failed']}")
     print("dry run: nothing saved" if args.dry_run else f"{queued} trending posts queued")
     return 0
 

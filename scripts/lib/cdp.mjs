@@ -19,7 +19,7 @@ export async function openBrowser({ port = 9335 } = {}) {
   let stderr = '';
   chrome.stderr.on('data', (d) => { stderr = (stderr + d).slice(-2000); });
   let wsUrl;
-  for (let i = 0; i < 120 && !wsUrl; i++) { // up to 30 s: a cold start with a fresh profile can be slow
+  for (let i = 0; i < 240 && !wsUrl; i++) { // up to 60 s: a cold start (fresh profile, CI runner) can be slow
     await sleep(250);
     try { wsUrl = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl; } catch { /* starting */ }
   }

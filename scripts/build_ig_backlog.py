@@ -27,11 +27,16 @@ def main() -> int:
     parser.add_argument("--base", default=None, help="site that renders /ig/<id>/<n> (default: hindsightcricket.com)")
     parser.add_argument("--no-render", action="store_true", help="queue without rendering the debate carousels")
     parser.add_argument("--refresh", action="append", help="remake these queued posts in place (keeps their day)")
+    parser.add_argument("--render-pending", action="store_true", help="render queued carousels missing slides, then stop")
     args = parser.parse_args()
 
     from services import ig_backlog
 
     start = date.fromisoformat(args.start)
+    if args.render_pending:
+        r = ig_backlog.render_pending(args.base)
+        print(f"rendered {r['rendered']}" + (f"; failed: {r['failed']}" if r["failed"] else ""))
+        return 0
     if args.refresh:
         from database import get_session
 
