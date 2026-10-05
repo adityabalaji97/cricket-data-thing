@@ -11,7 +11,7 @@ import { colors } from '../../theme/hindsightDark';
  * a grid and a click opens the viewer at that card. "Preview settings" and "Classic page" close
  * the viewer, leaving the classic page with a button to reopen the story.
  */
-const StoryPreview = ({ chapters, fixtureLabel, onSettings, classicPage, loading = false }) => {
+const StoryPreview = ({ chapters, fixtureLabel, onSettings, onClassic, classicPage, loading = false }) => {
   const { isMobile } = useIsMobile();
   const [open, setOpen] = useState(isMobile);
   const [startCardId, setStartCardId] = useState(null);
@@ -33,8 +33,8 @@ const StoryPreview = ({ chapters, fixtureLabel, onSettings, classicPage, loading
       fixtureLabel={fixtureLabel}
       startCardId={startCardId}
       onClose={isMobile ? undefined : () => setOpen(false)}
-      onSettings={onSettings ? () => { setOpen(false); setClassic(true); onSettings(); } : undefined}
-      onClassic={() => { setOpen(false); setClassic(true); }}
+      onSettings={onSettings ? () => { setOpen(false); setClassic(true); if (onClassic) onClassic(); onSettings(); } : undefined}
+      onClassic={() => { setOpen(false); setClassic(true); if (onClassic) onClassic(); }}
     />
   );
 

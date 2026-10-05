@@ -12,6 +12,7 @@ import logging
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
+from services.preview_cards.closing import closing_card
 from services.preview_cards.context import PreviewContext
 from services.preview_cards.existing import EXISTING
 from services.preview_cards.fantasy import FANTASY
@@ -24,6 +25,10 @@ from services.preview_cards.teams import TEAMS
 logger = logging.getLogger(__name__)
 
 REGISTRY: List[CardSpec] = [*EXISTING, *GROUND, *TEAMS, *PLAYERS, *FANTASY]
+
+# Part of the cached story's key (routers/match_preview.py): bump when any card's logic or copy
+# changes, so a deploy never serves stories built by older code. Data loads expire it on their own.
+STORY_VERSION = "2026-10-05b"
 
 
 def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[str, Any]:
@@ -43,6 +48,9 @@ def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[st
         glance = None
     if glance is not None:
         cards.append(glance)
+    closing = closing_card(cards, {spec.id: spec.question for spec in (registry or REGISTRY)})
+    if closing is not None:
+        cards.append(closing)
     chapters = []
     for chapter_id, title in CHAPTERS:
         chapter_cards = sorted((c for c in cards if c.chapter == chapter_id), key=lambda c: -c.relevance)
@@ -93,7 +101,7 @@ def context_from_params(db, params: Dict[str, Any]) -> PreviewContext:
 def build_card(ctx: PreviewContext, card_id: str) -> Optional[Tuple[Dict[str, Any], str]]:
     """One card (its JSON) and its chapter title, building only what it needs."""
     titles = dict(CHAPTERS)
-    if card_id == "glance":  # the summary is made from every other card
+    if card_id in ("glance", "ask"):  # summary cards are made from every other card
         story = build_story(ctx)
         for chapter in story["chapters"]:
             for card in chapter["cards"]:
@@ -107,4 +115,4 @@ def build_card(ctx: PreviewContext, card_id: str) -> Optional[Tuple[Dict[str, An
     return (card.to_json(), titles[card.chapter]) if card else None
 
 
-__all__ = ["PreviewContext", "build_story", "build_card", "context_from_params", "context_params", "REGISTRY"]
+__all__ = ["PreviewContext", "STORY_VERSION", "build_story", "build_card", "context_from_params", "context_params", "REGISTRY"]

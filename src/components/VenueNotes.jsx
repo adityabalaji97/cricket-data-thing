@@ -770,6 +770,34 @@ const VenueNotes = ({
         && venue !== 'All Venues'
         && (venueStats.total_matches || 0) === 0;
 
+    // The story-style preview (MATCH_PREVIEW_VIZ_PLAN.md) is the default; ?story=0 opens the classic page.
+    const storyMode = new URLSearchParams(window.location.search).get('story') !== '0';
+    // One request for every card (services/preview_cards), with the page's own filters.
+    const storyState = useStoryCards({
+        venue,
+        team1: selectedTeam1?.full_name || selectedTeam1?.abbreviated_name,
+        team2: selectedTeam2?.full_name || selectedTeam2?.abbreviated_name,
+        team1Short: selectedTeam1?.abbreviated_name,
+        team2Short: selectedTeam2?.abbreviated_name,
+        startDate,
+        endDate,
+        includeInternational: Boolean(includeInternational),
+        topTeams: topTeams || 20,
+        dayNightFilter,
+        enabled: storyMode && Boolean(selectedTeam1 && selectedTeam2),
+    });
+    const storyChapters = useMemo(
+        () => toStoryChapters(storyState.data, { isMobile }),
+        [storyState.data, isMobile],
+    );
+
+    // The classic page loads its own data (the written preview is the heaviest) only once it is
+    // shown: opened from the story's menu, asked for with ?story=0, or because the story is empty.
+    const [classicActive, setClassicActive] = useState(false);
+    const storyEmpty = storyMode && !storyState.loading && Boolean(storyState.data)
+        && !storyChapters.some((c) => c.cards.length);
+    const classicShown = !storyMode || classicActive || storyEmpty || Boolean(storyState.error);
+
     // One preview request feeds both the "What to expect" strip and the (folded) written preview.
     const previewState = useMatchPreview({
         venue,
@@ -782,7 +810,7 @@ const VenueNotes = ({
         includeInternational: Boolean(includeInternational),
         topTeams: topTeams || 20,
         dayNightFilter,
-        enabled: Boolean(selectedTeam1 && selectedTeam2),
+        enabled: classicShown && Boolean(selectedTeam1 && selectedTeam2),
     });
     const expectBlock = previewState.data?.expect || null;
 
@@ -1116,27 +1144,6 @@ const VenueNotes = ({
         );
     }, [activeSectionId, activatedSections]);
 
-// Story-style preview (MATCH_PREVIEW_VIZ_PLAN.md), behind ?story=1 until the switch-over.
-const storyMode = new URLSearchParams(window.location.search).get('story') === '1';
-// One request for every card (services/preview_cards), with the page's own filters.
-const storyState = useStoryCards({
-    venue,
-    team1: selectedTeam1?.full_name || selectedTeam1?.abbreviated_name,
-    team2: selectedTeam2?.full_name || selectedTeam2?.abbreviated_name,
-    team1Short: selectedTeam1?.abbreviated_name,
-    team2Short: selectedTeam2?.abbreviated_name,
-    startDate,
-    endDate,
-    includeInternational: Boolean(includeInternational),
-    topTeams: topTeams || 20,
-    dayNightFilter,
-    enabled: storyMode && Boolean(selectedTeam1 && selectedTeam2),
-});
-const storyChapters = useMemo(
-    () => toStoryChapters(storyState.data, { isMobile }),
-    [storyState.data, isMobile],
-);
-
 if (!venueStats) return <Alert severity="info">Please select a venue</Alert>;
 
 const classicPage = (
@@ -1279,6 +1286,7 @@ if (storyMode) {
             loading={storyState.loading}
             fixtureLabel={fixture}
             onSettings={onToggleFilters}
+            onClassic={() => setClassicActive(true)}
             classicPage={classicPage}
         />
     );

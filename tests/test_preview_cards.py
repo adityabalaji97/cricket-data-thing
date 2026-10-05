@@ -149,7 +149,7 @@ def test_only_meeting_copy():
 
 def test_chapters_keep_their_order_and_cards_rank_inside():
     story = build_story(_ctx())
-    assert [c["id"] for c in story["chapters"]] == ["glance", "ground", "teams"]
+    assert [c["id"] for c in story["chapters"]] == ["glance", "ground", "teams", "more"]
     ground = [c["relevance"] for c in story["chapters"][1]["cards"]]
     assert ground == sorted(ground, reverse=True)
 
@@ -424,3 +424,14 @@ def test_value_and_differentials_are_ipl_only(monkeypatch):
     assert cards["differentials"]["title"] == "P6 could surprise: projected 7th of 10 here, usually 10th"
     other = _cards(build_story(_fantasy_ctx(competition="Big Bash League")))
     assert "value-picks" not in other and "differentials" not in other and "projected-points" in other
+
+
+
+def test_closing_card_links_one_card_per_chapter_first():
+    story = build_story(_ctx())
+    closing = story["chapters"][-1]["cards"][0]
+    assert closing["id"] == "ask" and closing["title"] == "Ask your own question"
+    links = closing["payload"]["links"]
+    assert 2 <= len(links) <= 4
+    assert all(l["url"].startswith("https://hindsightcricket.com/query?") for l in links)
+    assert links[0]["label"].endswith("?")  # the card's own question

@@ -21,6 +21,7 @@ CHAPTERS: Tuple[Tuple[str, str], ...] = (
     ("teams", "The teams"),
     ("players", "The players"),
     ("fantasy", "Fantasy"),
+    ("more", "Dig deeper"),
 )
 
 SMALL_SAMPLE = 15  # flagged on the card under this many matches / innings

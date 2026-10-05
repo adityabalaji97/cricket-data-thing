@@ -353,14 +353,18 @@ def get_match_preview_cards(
 ):
     """The story-style preview (MATCH_PREVIEW_VIZ_PLAN.md): chapters of cards, each with a
     takeaway title, the sample on the card, an info sheet and the payload its visual draws."""
-    from services.preview_cards import PreviewContext, build_story
+    from services.preview_cards import STORY_VERSION, PreviewContext, build_story, context_params
+    from services.query_cache import cached_run
 
     ctx = PreviewContext(
         db=db, venue=venue, team1=team1_id, team2=team2_id, fmt=format, gender="male",
         start=start_date, end=end_date, include_international=include_international, top_teams=top_teams,
         day_or_night=day_or_night, team1_short=team1_short, team2_short=team2_short,
     )
-    return build_story(ctx)
+    # A story is ~30 queries; the finished story is cached per data load (query_cache), so a repeat
+    # view is one lookup. STORY_VERSION keeps a deploy from serving stories built by older code.
+    key = {"endpoint": "preview_story", "story_version": STORY_VERSION, **context_params(ctx)}
+    return cached_run(db, key, lambda: build_story(ctx))
 
 
 @router.get("/{venue}/{team1_id}/{team2_id}")
