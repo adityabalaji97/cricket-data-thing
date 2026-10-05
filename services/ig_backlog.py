@@ -308,12 +308,16 @@ def render_carousels(posts: List[Dict[str, Any]], base: Optional[str] = None) ->
     """Render the slides of every post drawn by the app (fact.render) through /ig/<id>/<n> (services/ig_slides)."""
     from services import ig_slides
 
+    from database import engine
+
     done, failed = 0, []
+    with engine.connect() as conn:  # one connection for the "already rendered?" checks
+        have = dict(conn.execute(text("SELECT carousel_id, COUNT(*) FROM ig_slide_images GROUP BY 1")).all())
     for post in posts:
         fact = post["fact"]
         if not fact.get("render"):
             continue
-        if ig_slides.count(_db_session(), fact["carousel_id"]) >= fact["slides"]:
+        if have.get(fact["carousel_id"], 0) >= fact["slides"]:
             done += 1  # same slides, same carousel (snapshots are keyed by their slides): already rendered
             continue
         result = ig_slides.render(fact["carousel_id"], fact["slides"], *([base] if base else []))
@@ -471,7 +475,13 @@ def recap_post_by(match_day: date, team1: str, team2: str, fixtures: List[Dict[s
     return datetime.combine(match_day + timedelta(days=RECAP_DAYS), datetime.max.time(), tzinfo=timezone.utc)
 
 
-def _db_session():
-    from database import get_session
+def render_pending(base: Optional[str] = None) -> Dict[str, Any]:
+    """Render every ready Instagram pack whose carousel is missing slides (a failed or interrupted render)."""
+    from database import engine
 
-    return next(get_session())
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT angle_key, facts FROM content_packs
+            WHERE channel = 'instagram' AND status = 'ready' AND facts->>'render' = 'true'
+        """)).all()
+    return render_carousels([{"key": k, "fact": f} for k, f in rows], base)
