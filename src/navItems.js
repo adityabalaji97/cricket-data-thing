@@ -75,6 +75,8 @@ const UNLISTED_TITLES = [
   { match: (path) => path.startsWith('/notes/'), title: 'Notes' },
   { match: (path) => path === '/admin/notes', title: 'Notes queue' },
   { match: (path) => path === '/admin', title: 'Social queue' },
+  { match: (path) => path === '/links', title: 'Hindsight links' },
+  { match: (path) => path.startsWith('/g/'), title: 'Graphic' },
 ];
 
 /** Tab index for a path, or `false` where no tab should appear selected. */
