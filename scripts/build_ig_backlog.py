@@ -23,7 +23,9 @@ def main() -> int:
     parser.add_argument("--start", required=True, help="first day of the calendar (YYYY-MM-DD)")
     parser.add_argument("--days", type=int, default=30)
     parser.add_argument("--write", action="store_true", help="save chart snapshots and queue the packs")
-    parser.add_argument("--only", action="append", help="build only these idea keys")
+    parser.add_argument("--only", action="append", help="build only these idea keys (debate posts: debate-<question key>)")
+    parser.add_argument("--base", default=None, help="site that renders /ig/<id>/<n> (default: hindsightcricket.com)")
+    parser.add_argument("--no-render", action="store_true", help="queue without rendering the debate carousels")
     args = parser.parse_args()
 
     from services import ig_backlog
@@ -34,6 +36,10 @@ def main() -> int:
 
         db = next(get_session())
         result = ig_backlog.build(db, start, args.days, write=True, only=args.only)
+        if not args.no_render:
+            posts = [e["post"] for e in result["calendar"] if e["post"]] + result["bench"]
+            rendered = ig_backlog.render_carousels(posts, args.base)
+            print(f"rendered {rendered['rendered']} carousels" + (f"; failed: {rendered['failed']}" if rendered["failed"] else ""))
     else:
         import services.snapshots as snapshots
         from analysis.hypotheses.common import read_only_session

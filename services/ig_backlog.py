@@ -31,6 +31,10 @@ logger = logging.getLogger(__name__)
 #: One week of slots, Monday first. Evergreen pillars are filled ahead; 'play' and 'reactive' stay open.
 WEEK = ["debate", "reactive", "myth", "debate", "play", "reactive", "weird"]
 EVERGREEN = ("debate", "myth", "weird")
+#: Myth posts off until they carry charts of the hypothesis results, not just text.
+MYTH_POSTS = False
+#: Debate posts from the generator: how many to make (the calendar takes what it needs, the rest is bench).
+DEBATE_POSTS = 14
 #: A player appears at most once in any SPREAD consecutive scheduled posts.
 SPREAD = 5
 DAYS = 30
@@ -43,68 +47,7 @@ def _q(**params) -> Dict[str, Any]:
 #: Curated evergreen ideas. `players` drives the spread rule for ideas whose subject is fixed; a leaderboard's
 #: subject (its leader) is only known after the query runs, and is added then.
 IDEAS: List[Dict[str, Any]] = [
-    # --- debate: ODI ---------------------------------------------------------------------------------------
-    {"key": "odi-pair-three-ways", "pillar": "debate", "players": ["Shubman Gill", "Virat Kohli"],
-     "idea": "No ODI partnership beats Gill and Kohli on average, strike rate and control together",
-     "planned": {"params": _q(fmt="ODI", group_by=["partnership"], min_balls=1000), "metric": "control_percentage",
-                 "highlight": ["Shubman Gill & Virat Kohli"],
-                 "chart": {"type": "scatter", "x_axis": "strike_rate", "y_axis": "average", "also": ["control_percentage"]}}},
-    {"key": "odi-control-gill", "pillar": "debate", "players": ["Shubman Gill"],
-     "idea": "Most controlled ODI batters with a 40+ average and 90+ strike rate",
-     "planned": {"params": _q(fmt="ODI", group_by=["batter"], min_balls=1000, having=["average:gte:40", "strike_rate:gte:90"]),
-                 "metric": "control_percentage", "highlight": ["Shubman Gill"]}},
-    {"key": "odi-pull-sixes", "pillar": "debate", "players": ["Rohit Sharma"],
-     "idea": "Most ODI sixes off the pull and hook",
-     "planned": {"params": _q(fmt="ODI", group_by=["batter"], shot_family=["PULL_HOOK"]), "metric": "sixes",
-                 "highlight": ["Rohit Sharma"]}},
-    {"key": "odi-death-hitters", "pillar": "debate", "idea": "Fastest scorers in ODI death overs since 2015",
-     "planned": {"params": _q(fmt="ODI", group_by=["batter"], over_min=40, over_max=49, min_balls=400,
-                              start_date="2015-01-01", top_teams=10, include_international=True), "metric": "strike_rate"}},
-    {"key": "odi-middle-overs-squeeze", "pillar": "debate", "idea": "Most economical ODI bowlers in the middle overs since 2019",
-     "planned": {"params": _q(fmt="ODI", group_by=["bowler"], over_min=10, over_max=39, min_balls=1500,
-                              start_date="2019-01-01", top_teams=10, include_international=True), "metric": "economy"}},
-    {"key": "odi-death-bowlers", "pillar": "debate", "idea": "Most economical ODI death bowlers since 2015",
-     "planned": {"params": _q(fmt="ODI", group_by=["bowler"], over_min=40, over_max=49, min_balls=300,
-                              start_date="2015-01-01", top_teams=10, include_international=True), "metric": "economy"}},
-    {"key": "odi-chase-average", "pillar": "debate", "players": ["Virat Kohli"],
-     "idea": "Best ODI batting average while chasing",
-     "planned": {"params": _q(fmt="ODI", group_by=["batter"], is_chase=True, min_balls=3000), "metric": "average",
-                 "highlight": ["Virat Kohli"]}},
-    {"key": "odi-boundary-hitters", "pillar": "debate", "idea": "Highest boundary % among ODI batters since 2019",
-     "planned": {"params": _q(fmt="ODI", group_by=["batter"], min_balls=1500, start_date="2019-01-01", top_teams=10, include_international=True),
-                 "metric": "boundary_percentage"}},
-    # --- debate: T20 / leagues --------------------------------------------------------------------------------
-    {"key": "t20-death-bumrah", "pillar": "debate", "players": ["Jasprit Bumrah"],
-     "idea": "Most economical T20 death bowlers since 2020",
-     "planned": {"params": _q(fmt="T20", group_by=["bowler"], over_min=15, over_max=19, min_balls=600,
-                              start_date="2020-01-01"), "metric": "economy", "highlight": ["Jasprit Bumrah"]}},
-    {"key": "ipl-economy", "pillar": "debate", "idea": "Most economical IPL bowlers since 2020",
-     "planned": {"params": _q(fmt="T20", leagues=["IPL"], group_by=["bowler"], min_balls=1200, start_date="2020-01-01"),
-                 "metric": "economy"}},
-    {"key": "ipl-death-hitters", "pillar": "debate", "idea": "Fastest scorers in IPL death overs since 2023",
-     "planned": {"params": _q(fmt="T20", leagues=["IPL"], group_by=["batter"], over_min=15, over_max=19,
-                              min_balls=200, start_date="2023-01-01"), "metric": "strike_rate"}},
-    {"key": "t20-powerplay-hitters", "pillar": "debate", "idea": "Fastest IPL powerplay scorers since 2023",
-     "planned": {"params": _q(fmt="T20", leagues=["IPL"], group_by=["batter"], over_min=0, over_max=5, min_balls=300,
-                              start_date="2023-01-01"), "metric": "strike_rate"}},
-    {"key": "t20-spin-hitters", "pillar": "debate", "idea": "Best T20 hitters of spin since 2023",
-     "planned": {"params": _q(fmt="T20", group_by=["batter"], bowl_kind=["spin bowler"], min_balls=500,
-                              start_date="2023-01-01"), "metric": "strike_rate"}},
-    {"key": "t20-pace-hitters", "pillar": "debate", "idea": "Best T20 hitters of pace since 2023",
-     "planned": {"params": _q(fmt="T20", group_by=["batter"], bowl_kind=["pace bowler"], min_balls=800,
-                              start_date="2023-01-01"), "metric": "strike_rate"}},
-    {"key": "t20-impact-batters", "pillar": "debate", "idea": "Most impactful IPL batters per 100 balls since 2024",
-     "planned": {"params": _q(fmt="T20", leagues=["IPL"], group_by=["batter"], min_balls=500, start_date="2024-01-01"),
-                 "metric": "impact_per_100"}},
-    {"key": "t20-dot-bowlers", "pillar": "debate", "idea": "Highest dot-ball % among IPL bowlers since 2022",
-     "planned": {"params": _q(fmt="T20", leagues=["IPL"], group_by=["bowler"], min_balls=1000, start_date="2022-01-01"),
-                 "metric": "dot_percentage"}},
-    {"key": "ipl-powerplay-bowlers", "pillar": "debate", "idea": "Most economical IPL powerplay bowlers since 2022",
-     "planned": {"params": _q(fmt="T20", leagues=["IPL"], group_by=["bowler"], over_min=0, over_max=5, min_balls=480,
-                              start_date="2022-01-01"), "metric": "economy"}},
-    {"key": "t20-control-hitters", "pillar": "debate", "idea": "Strike rate v control % for IPL batters since 2024",
-     "planned": {"params": _q(fmt="T20", leagues=["IPL"], group_by=["batter"], min_balls=600, start_date="2024-01-01"),
-                 "metric": "strike_rate", "chart": {"type": "scatter", "x_axis": "control_percentage", "y_axis": "strike_rate"}}},
+    # Debate posts come from the question generator (services/ig_posts): many metrics, Jev-chosen, contested only.
     # --- weird: records, parsed by services/idea_stats (no language model) ----------------------------------
     {"key": "ipl-fastest-1000-balls", "pillar": "weird", "idea": "Fastest to 1000 IPL runs in balls"},
     {"key": "ipl-fastest-100-wickets", "pillar": "weird", "idea": "Fastest to 100 wickets in IPL"},
@@ -118,6 +61,7 @@ IDEAS: List[Dict[str, Any]] = [
     {"key": "odi-two-fivefors-match", "pillar": "weird", "idea": "2 five-wicket hauls in an ODI match"},
     {"key": "ipl-debut-runs", "pillar": "weird", "idea": "Most runs on IPL debut"},
     # --- myth: hypothesis-lab notes ----------------------------------------------------------------------------
+    # Myth posts wait for charts of the hypothesis results (a text-only carousel says too little); see MYTH_POSTS.
     *[{"key": f"myth-note-{n}", "pillar": "myth", "note_id": n} for n in (34, 35, 36, 37, 38, 39, 40, 41, 42)],
 ]
 
@@ -125,24 +69,6 @@ IDEAS: List[Dict[str, Any]] = [
 #: Slide 1 of each carousel: the question the post answers, written by hand. A hook names no result (the chart
 #: does), so it can't disagree with the data; a leaderboard's hook names nobody, since its leader can change.
 HOOKS: Dict[str, str] = {
-    "odi-pair-three-ways": "Is Gill & Kohli the most complete ODI partnership ever?",
-    "odi-control-gill": "Who is the most in-control batter in ODI cricket?",
-    "odi-pull-sixes": "Who owns the pull shot in ODIs?",
-    "odi-death-hitters": "Who hits hardest at the end of an ODI innings?",
-    "odi-middle-overs-squeeze": "Which bowler strangles the middle overs in ODIs?",
-    "odi-death-bowlers": "Who is the best ODI death bowler of the last decade?",
-    "odi-chase-average": "Is anyone better at chasing than Virat Kohli?",
-    "odi-boundary-hitters": "Which ODI batter lives in boundaries?",
-    "t20-death-bumrah": "Is Bumrah really the best death bowler in T20 cricket?",
-    "ipl-economy": "Who is the hardest IPL bowler to score off?",
-    "ipl-death-hitters": "Who is the most destructive IPL finisher right now?",
-    "t20-powerplay-hitters": "Who scores fastest in the IPL powerplay?",
-    "t20-spin-hitters": "Who is the best player of spin in T20 cricket?",
-    "t20-pace-hitters": "Who takes pace bowling apart in T20 cricket?",
-    "t20-impact-batters": "Who actually wins IPL games with the bat?",
-    "t20-dot-bowlers": "Which IPL bowler gives batters nothing?",
-    "ipl-powerplay-bowlers": "Who is the best new-ball bowler in the IPL?",
-    "t20-control-hitters": "Can you hit hard and stay in control?",
     "ipl-fastest-1000-balls": "Who got to 1,000 IPL runs in the fewest balls?",
     "ipl-fastest-100-wickets": "Who is the fastest to 100 IPL wickets?",
     "ipl-fastest-2000-balls": "Who got to 2,000 IPL runs in the fewest balls?",
@@ -240,16 +166,6 @@ def make(db: Session, item: Dict[str, Any], created_by: str = "ig-backlog") -> D
     return {**result, "warnings": warnings, "caption": caption}
 
 
-#: Debate priority: T20 and ODI alternate, so a T20 series isn't met with a month of ODI posts (and vice versa).
-#: Keys not listed keep their IDEAS order after these.
-DEBATE_ORDER = [
-    "odi-pair-three-ways", "t20-spin-hitters", "odi-pull-sixes", "ipl-powerplay-bowlers", "odi-death-hitters",
-    "ipl-death-hitters", "odi-control-gill", "t20-death-bumrah", "odi-middle-overs-squeeze", "t20-control-hitters",
-    "odi-chase-average", "ipl-economy", "odi-death-bowlers", "t20-pace-hitters", "odi-boundary-hitters",
-    "t20-dot-bowlers", "t20-powerplay-hitters", "t20-impact-batters",
-]
-
-
 def schedule(made: List[Dict[str, Any]], start: date, days: int = DAYS) -> List[Dict[str, Any]]:
     """Assign evergreen posts to the WEEK template from `start`; returns the calendar (one entry per day).
 
@@ -257,9 +173,8 @@ def schedule(made: List[Dict[str, Any]], start: date, days: int = DAYS) -> List[
     appeared in the previous SPREAD - 1 scheduled posts. With none left in its pillar (e.g. no published myth notes),
     an evergreen slot takes the first eligible post of another evergreen pillar; with none at all it stays open.
     """
-    rank = {k: i for i, k in enumerate(DEBATE_ORDER)}
+    # Pools keep their order: weird and myth in IDEAS order, debates as the generator ranked them (fan appeal).
     pools = {p: [m for m in made if m["pillar"] == p] for p in EVERGREEN}
-    pools["debate"].sort(key=lambda m: rank.get(m["key"], len(rank)))  # stable: unlisted keys keep IDEAS order
     used, recent, calendar = set(), [], []
     for d in range(days):
         day = start + timedelta(days=d)
@@ -287,6 +202,8 @@ def build(db: Session, start: date, days: int = DAYS, write: bool = False,
     for item in IDEAS:
         if keys and item["key"] not in keys:
             continue
+        if item["pillar"] == "myth" and not MYTH_POSTS:
+            continue
         result = make(db, item)
         if result.get("status") != "resolved":
             failed.append({"key": item["key"], "status": result.get("status"), "note": result.get("note")})
@@ -294,10 +211,53 @@ def build(db: Session, start: date, days: int = DAYS, write: bool = False,
         made.append({"key": item["key"], "pillar": item["pillar"], "fact": result["fact"],
                      "snapshot_id": (result.get("snapshot") or {}).get("id"), "warnings": result.get("warnings") or [],
                      "players": _players_of(item, result["fact"]), "caption": result.get("caption")})
+    if not keys or any(k.startswith("debate-") for k in keys):
+        made += debate_posts(db, only=[k[len("debate-"):] for k in keys if k.startswith("debate-")] or None)
     calendar, bench = schedule(made, start, days)
     if write:
         _write(calendar, bench, prune=not keys)  # a partial (--only) run must not clear everything else
     return {"calendar": calendar, "bench": bench, "failed": failed}
+
+
+def debate_posts(db: Session, only: Optional[List[str]] = None, limit: int = DEBATE_POSTS) -> List[Dict[str, Any]]:
+    """The generator's best contested questions as carousels (services/ig_posts): hook, Jev-chosen angles drawn by the
+    app's own visuals, a split-verdict scorecard. Slides render after the pack is written (render_carousels)."""
+    from services import ig_captions, ig_carousel
+    from services.ig_posts import post as P, questions as Q
+
+    out = []
+    for entry in Q.generate(db, limit=limit, only=only, log=lambda m: logger.info(m)):
+        q, built = entry["question"], P.build(entry)
+        if not built:
+            continue
+        carousel = ig_carousel.save(db, built["slides"], q.text, {"debate": q.key}, "ig-debate")
+        plan = entry["plan"]
+        fact = {"kind": "debate", "subject": None, "title": q.text, "verdict": built["verdict"], "question": q.key,
+                "leaders": built["leaders"], "angles": [a.id for a in plan["angles"]], "angle_scores": plan["scores"],
+                "angles_by": plan["by"], "appeal": entry["appeal"], "appeal_by": entry["appeal_by"],
+                "method": built["method"], "carousel_id": carousel["id"], "slides": len(built["slides"]),
+                "render": True}
+        caption = ig_captions.build(q.text, built["verdict"], "debate", built["method"], built["players"], q.kicker)
+        out.append({"key": f"debate-{q.key}", "pillar": "debate", "fact": fact, "snapshot_id": carousel["id"],
+                    "warnings": [], "players": built["players"], "caption": caption})
+    return out
+
+
+def render_carousels(posts: List[Dict[str, Any]], base: Optional[str] = None) -> Dict[str, Any]:
+    """Render the slides of every post drawn by the app (fact.render) through /ig/<id>/<n> (services/ig_slides)."""
+    from services import ig_slides
+
+    done, failed = 0, []
+    for post in posts:
+        fact = post["fact"]
+        if not fact.get("render"):
+            continue
+        result = ig_slides.render(fact["carousel_id"], fact["slides"], *([base] if base else []))
+        if result["failed"]:
+            failed.append({"key": post["key"], "failed": result["failed"]})
+        else:
+            done += 1
+    return {"rendered": done, "failed": failed}
 
 
 def _write(calendar: List[Dict[str, Any]], bench: List[Dict[str, Any]], prune: bool = True) -> None:

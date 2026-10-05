@@ -309,6 +309,14 @@ const IgPackCard = ({ pack, client, onChanged, toast }) => {
           </Typography>
         </Box>
       )}
+      {facts.kind === 'debate' && (
+        // Why this post: the measures Jev chose for the question (0-4), and how much it thinks fans would argue.
+        <Typography sx={{ fontSize: 12, color: C.lo, mt: 1.5, lineHeight: 1.5 }}>
+          {facts.angles_by === 'jev' ? 'Measures chosen by Jev: ' : 'Default measures: '}
+          {(facts.angles || []).map((a) => (facts.angle_scores?.[a] != null ? `${a} ${facts.angle_scores[a]}` : a)).join(' · ')}
+          {facts.appeal != null && ` · fan appeal ${Number(facts.appeal).toFixed(1)}/4${facts.appeal_by === 'jev' ? ' (Jev)' : ''}`}
+        </Typography>
+      )}
       <CopyBlock label="Caption" text={pack.caption || pack.title} onCopy={copy} multiline />
       {(pack.rule_warnings || []).map((w) => (
         <Typography key={w} sx={{ fontSize: 12, color: C.amber, mt: 0.5 }}>⚠ {w}</Typography>
