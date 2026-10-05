@@ -41,9 +41,13 @@ def render(carousel_id: str, slide_count: int, base: str = SITE) -> Dict[str, li
     from database import engine
 
     with tempfile.TemporaryDirectory() as out:
-        proc = subprocess.run(["node", str(ROOT / "scripts" / "render_ig_slides.mjs"), carousel_id, str(slide_count), out,
-                               "--base", base], capture_output=True, text=True, timeout=60 + 30 * slide_count, cwd=ROOT)
-        lines = [l for l in proc.stdout.splitlines() if l.startswith("{")]
+        for attempt in range(2):  # a browser that fails to start gets one more go
+            proc = subprocess.run(["node", str(ROOT / "scripts" / "render_ig_slides.mjs"), carousel_id, str(slide_count),
+                                   out, "--base", base], capture_output=True, text=True, timeout=90 + 30 * slide_count,
+                                  cwd=ROOT)
+            lines = [l for l in proc.stdout.splitlines() if l.startswith("{")]
+            if proc.returncode == 0 and lines:
+                break
         if proc.returncode != 0 or not lines:
             return {"ok": [], "failed": [{"reason": (proc.stderr or proc.stdout)[-500:]}]}
         result = json.loads(lines[-1])
