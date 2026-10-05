@@ -1865,5 +1865,593 @@
     }
    ]
   }
+ },
+ "scatter_marked": {
+  "kind": "ranking",
+  "title": "5 of 153 ODI partnerships beat Shubman Gill and Virat Kohli on both average and strike rate",
+  "data": {
+   "kicker": "ODI · partnerships",
+   "subtitle": "212 of 212 rows · ranked by control %",
+   "filter_chips": [
+    "2005-01-01 → today",
+    "ODI"
+   ],
+   "group_by": [
+    "partnership"
+   ],
+   "hindsight_url": "https://hindsightcricket.com/query?min_balls=1000&start_date=2005-01-01&group_by=partnership&limit=20000&fmt=mens-odi",
+   "total_rows": 154,
+   "source": "ball-by-ball",
+   "metric_label": "control %",
+   "footnote": "2005-01-01 → today · ODI · control data: 99.9% of Shubman Gill and Virat Kohli's balls (90% min)",
+   "layout": "scatter",
+   "title": "5 of 153 ODI partnerships beat Shubman Gill and Virat Kohli on both average and strike rate",
+   "x_metric": "strike_rate",
+   "y_metric": "average",
+   "points": [
+    {
+     "label": "Shubman Gill & Virat Kohli",
+     "x": 104.55,
+     "y": 53.67,
+     "highlight": true
+    },
+    {
+     "label": "AB de Villiers & Hashim Amla",
+     "x": 108.81,
+     "y": 72.35,
+     "highlight": false,
+     "dominates": true,
+     "mark": 2
+    },
+    {
+     "label": "Suresh Raina & Virat Kohli",
+     "x": 105.52,
+     "y": 58.89,
+     "highlight": false,
+     "dominates": true,
+     "mark": 5
+    },
+    {
+     "label": "Rohit Sharma & Shubman Gill",
+     "x": 112.94,
+     "y": 66.59,
+     "highlight": false,
+     "dominates": true,
+     "mark": 3
+    },
+    {
+     "label": "David Warner & Travis Head",
+     "x": 116.64,
+     "y": 75.1,
+     "highlight": false,
+     "dominates": true,
+     "mark": 1
+    },
+    {
+     "label": "Jason Roy & Jonny Bairstow",
+     "x": 114.77,
+     "y": 62.67,
+     "highlight": false,
+     "dominates": true,
+     "mark": 4
+    },
+    {
+     "label": "Angelo Mathews & Kumar Sangakkara",
+     "x": 80.67,
+     "y": 37.14,
+     "highlight": false
+    },
+    {
+     "label": "Michael Clarke & Ricky Ponting",
+     "x": 82.44,
+     "y": 51.27,
+     "highlight": false
+    },
+    {
+     "label": "Rohit Sharma & Suresh Raina",
+     "x": 95.62,
+     "y": 44.54,
+     "highlight": false
+    },
+    {
+     "label": "Michael Clarke & Michael Hussey",
+     "x": 84.99,
+     "y": 49.15,
+     "highlight": false
+    },
+    {
+     "label": "Ambati Rayudu & Virat Kohli",
+     "x": 92.39,
+     "y": 59.29,
+     "highlight": false
+    },
+    {
+     "label": "Shoaib Malik & Younis Khan",
+     "x": 80.35,
+     "y": 39.83,
+     "highlight": false
+    },
+    {
+     "label": "Faf du Plessis & Jean-Paul Duminy",
+     "x": 92.59,
+     "y": 41.03,
+     "highlight": false
+    },
+    {
+     "label": "Salman Butt & Shoaib Malik",
+     "x": 81.73,
+     "y": 49.47,
+     "highlight": false
+    },
+    {
+     "label": "Mohammad Yousuf & Shoaib Malik",
+     "x": 84.7,
+     "y": 46.0,
+     "highlight": false
+    },
+    {
+     "label": "Owais Shah & Paul Collingwood",
+     "x": 83.08,
+     "y": 42.1,
+     "highlight": false
+    },
+    {
+     "label": "Ahmed Shehzad & Mohammad Hafeez",
+     "x": 78.51,
+     "y": 40.27,
+     "highlight": false
+    },
+    {
+     "label": "Martin Guptill & Tom Latham",
+     "x": 95.03,
+     "y": 52.44,
+     "highlight": false
+    },
+    {
+     "label": "Babar Azam & Shoaib Malik",
+     "x": 96.08,
+     "y": 57.71,
+     "highlight": false
+    },
+    {
+     "label": "Babar Azam & Imam-ul-Haq",
+     "x": 89.46,
+     "y": 59.21,
+     "highlight": false
+    },
+    {
+     "label": "Ajinkya Rahane & Rohit Sharma",
+     "x": 82.79,
+     "y": 45.6,
+     "highlight": false
+    },
+    {
+     "label": "KL Rahul & Virat Kohli",
+     "x": 93.75,
+     "y": 49.06,
+     "highlight": false
+    },
+    {
+     "label": "Angelo Mathews & Mahela Jayawardene",
+     "x": 82.01,
+     "y": 37.56,
+     "highlight": false
+    },
+    {
+     "label": "Mohammad Yousuf & Younis Khan",
+     "x": 77.6,
+     "y": 42.35,
+     "highlight": false
+    },
+    {
+     "label": "Matthew Hayden & Ricky Ponting",
+     "x": 87.41,
+     "y": 55.78,
+     "highlight": false
+    },
+    {
+     "label": "Shreyas Iyer & Virat Kohli",
+     "x": 99.57,
+     "y": 56.18,
+     "highlight": false
+    },
+    {
+     "label": "Kumar Sangakkara & Mahela Jayawardene",
+     "x": 82.73,
+     "y": 43.3,
+     "highlight": false
+    },
+    {
+     "label": "Ajinkya Rahane & Virat Kohli",
+     "x": 90.32,
+     "y": 55.39,
+     "highlight": false
+    },
+    {
+     "label": "Mitchell Marsh & Steven Smith",
+     "x": 102.27,
+     "y": 49.18,
+     "highlight": false
+    },
+    {
+     "label": "Marnus Labuschagne & Steven Smith",
+     "x": 85.64,
+     "y": 48.57,
+     "highlight": false
+    },
+    {
+     "label": "Kumar Sangakkara & Marvan Atapattu",
+     "x": 71.62,
+     "y": 43.62,
+     "highlight": false
+    },
+    {
+     "label": "AB de Villiers & Graeme Smith",
+     "x": 95.31,
+     "y": 58.69,
+     "highlight": false
+    },
+    {
+     "label": "Inzamam-ul-Haq & Mohammad Yousuf",
+     "x": 82.12,
+     "y": 45.52,
+     "highlight": false
+    },
+    {
+     "label": "George Bailey & Steven Smith",
+     "x": 87.24,
+     "y": 40.13,
+     "highlight": false
+    },
+    {
+     "label": "AB de Villiers & Faf du Plessis",
+     "x": 97.98,
+     "y": 42.49,
+     "highlight": false
+    },
+    {
+     "label": "Kane Williamson & Ross Taylor",
+     "x": 83.83,
+     "y": 56.1,
+     "highlight": false
+    },
+    {
+     "label": "Babar Azam & Mohammad Rizwan",
+     "x": 85.76,
+     "y": 53.09,
+     "highlight": false
+    },
+    {
+     "label": "Ricky Ponting & Shane Watson",
+     "x": 100.46,
+     "y": 56.55,
+     "highlight": false
+    },
+    {
+     "label": "Angelo Mathews & Dinesh Chandimal",
+     "x": 83.99,
+     "y": 37.26,
+     "highlight": false
+    },
+    {
+     "label": "Rahul Dravid & Yuvraj Singh",
+     "x": 75.05,
+     "y": 39.89,
+     "highlight": false
+    },
+    {
+     "label": "Kumar Sangakkara & Lahiru Thirimanne",
+     "x": 90.3,
+     "y": 53.73,
+     "highlight": false
+    },
+    {
+     "label": "Rohit Sharma & Virat Kohli",
+     "x": 97.21,
+     "y": 55.88,
+     "highlight": false
+    },
+    {
+     "label": "Gautam Gambhir & Virat Kohli",
+     "x": 87.74,
+     "y": 52.74,
+     "highlight": false
+    },
+    {
+     "label": "Graeme Smith & Jacques Kallis",
+     "x": 86.09,
+     "y": 35.9,
+     "highlight": false
+    },
+    {
+     "label": "Daryl Mitchell & Tom Latham",
+     "x": 88.12,
+     "y": 40.54,
+     "highlight": false
+    },
+    {
+     "label": "AB de Villiers & Jacques Kallis",
+     "x": 85.38,
+     "y": 46.56,
+     "highlight": false
+    },
+    {
+     "label": "Salman Butt & Younis Khan",
+     "x": 86.83,
+     "y": 32.5,
+     "highlight": false
+    },
+    {
+     "label": "David Warner & Steven Smith",
+     "x": 92.52,
+     "y": 45.51,
+     "highlight": false
+    },
+    {
+     "label": "AB de Villiers & Jean-Paul Duminy",
+     "x": 97.85,
+     "y": 57.41,
+     "highlight": false
+    },
+    {
+     "label": "Eoin Morgan & Joe Root",
+     "x": 91.11,
+     "y": 48.1,
+     "highlight": false
+    },
+    {
+     "label": "Faf du Plessis & Hashim Amla",
+     "x": 88.99,
+     "y": 64.92,
+     "highlight": false
+    },
+    {
+     "label": "MS Dhoni & Rohit Sharma",
+     "x": 96.57,
+     "y": 49.7,
+     "highlight": false
+    },
+    {
+     "label": "Dwayne Bravo & Shivnarine Chanderpaul",
+     "x": 78.89,
+     "y": 35.64,
+     "highlight": false
+    },
+    {
+     "label": "Ibrahim Zadran & Rahmat Shah",
+     "x": 79.74,
+     "y": 49.38,
+     "highlight": false
+    },
+    {
+     "label": "Suresh Raina & Yuvraj Singh",
+     "x": 92.02,
+     "y": 39.93,
+     "highlight": false
+    },
+    {
+     "label": "Faf du Plessis & Quinton de Kock",
+     "x": 98.56,
+     "y": 49.45,
+     "highlight": false
+    },
+    {
+     "label": "Mohammad Hafeez & Nasir Jamshed",
+     "x": 81.49,
+     "y": 44.78,
+     "highlight": false
+    },
+    {
+     "label": "Mushfiqur Rahim & Tamim Iqbal",
+     "x": 87.56,
+     "y": 41.77,
+     "highlight": false
+    },
+    {
+     "label": "Marlon Samuels & Shivnarine Chanderpaul",
+     "x": 82.3,
+     "y": 54.62,
+     "highlight": false
+    },
+    {
+     "label": "Kane Williamson & Martin Guptill",
+     "x": 84.49,
+     "y": 40.49,
+     "highlight": false
+    },
+    {
+     "label": "Ramnaresh Sarwan & Shivnarine Chanderpaul",
+     "x": 76.39,
+     "y": 54.06,
+     "highlight": false
+    },
+    {
+     "label": "Ian Bell & Jonathan Trott",
+     "x": 82.93,
+     "y": 52.08,
+     "highlight": false
+    },
+    {
+     "label": "Dinesh Chandimal & Kumar Sangakkara",
+     "x": 78.5,
+     "y": 33.97,
+     "highlight": false
+    },
+    {
+     "label": "Martin Guptill & Ross Taylor",
+     "x": 87.11,
+     "y": 48.49,
+     "highlight": false
+    },
+    {
+     "label": "Virat Kohli & Yuvraj Singh",
+     "x": 92.72,
+     "y": 48.29,
+     "highlight": false
+    },
+    {
+     "label": "Cameron White & Michael Clarke",
+     "x": 79.96,
+     "y": 38.7,
+     "highlight": false
+    },
+    {
+     "label": "Shikhar Dhawan & Virat Kohli",
+     "x": 95.75,
+     "y": 58.1,
+     "highlight": false
+    },
+    {
+     "label": "Michael Clarke & Shane Watson",
+     "x": 83.56,
+     "y": 55.19,
+     "highlight": false
+    },
+    {
+     "label": "Alex Hales & Joe Root",
+     "x": 99.52,
+     "y": 58.41,
+     "highlight": false
+    },
+    {
+     "label": "Kumar Sangakkara & Tillakaratne Dilshan",
+     "x": 91.07,
+     "y": 53.02,
+     "highlight": false
+    },
+    {
+     "label": "Ross Taylor & Scott Styris",
+     "x": 84.4,
+     "y": 38.92,
+     "highlight": false
+    },
+    {
+     "label": "AB de Villiers & David Miller",
+     "x": 100.07,
+     "y": 44.0,
+     "highlight": false
+    },
+    {
+     "label": "David Miller & Jean-Paul Duminy",
+     "x": 102.08,
+     "y": 43.24,
+     "highlight": false
+    },
+    {
+     "label": "Ian Bell & Kevin Pietersen",
+     "x": 82.5,
+     "y": 46.84,
+     "highlight": false
+    },
+    {
+     "label": "Mushfiqur Rahim & Shakib Al Hasan",
+     "x": 86.99,
+     "y": 39.59,
+     "highlight": false
+    },
+    {
+     "label": "Herschelle Gibbs & Jacques Kallis",
+     "x": 86.81,
+     "y": 47.9,
+     "highlight": false
+    },
+    {
+     "label": "Mahela Jayawardene & Sanath Jayasuriya",
+     "x": 91.63,
+     "y": 47.05,
+     "highlight": false
+    },
+    {
+     "label": "MS Dhoni & Suresh Raina",
+     "x": 98.41,
+     "y": 55.17,
+     "highlight": false
+    },
+    {
+     "label": "Brad Haddin & Michael Clarke",
+     "x": 85.5,
+     "y": 51.95,
+     "highlight": false
+    },
+    {
+     "label": "Misbah-ul-Haq & Umar Akmal",
+     "x": 81.73,
+     "y": 45.54,
+     "highlight": false
+    },
+    {
+     "label": "MS Dhoni & Virat Kohli",
+     "x": 89.19,
+     "y": 44.98,
+     "highlight": false
+    },
+    {
+     "label": "Kevin Pietersen & Paul Collingwood",
+     "x": 84.8,
+     "y": 38.03,
+     "highlight": false
+    },
+    {
+     "label": "Adam Gilchrist & Simon Katich",
+     "x": 96.93,
+     "y": 64.5,
+     "highlight": false
+    },
+    {
+     "label": "Kane Williamson & Tom Latham",
+     "x": 87.51,
+     "y": 44.69,
+     "highlight": false
+    },
+    {
+     "label": "Gautam Gambhir & MS Dhoni",
+     "x": 90.39,
+     "y": 79.38,
+     "highlight": false
+    },
+    {
+     "label": "Hashim Amla & Quinton de Kock",
+     "x": 89.36,
+     "y": 47.23,
+     "highlight": false
+    },
+    {
+     "label": "KL Rahul & Rohit Sharma",
+     "x": 92.75,
+     "y": 89.5,
+     "highlight": false
+    },
+    {
+     "label": "Joe Root & Jos Buttler",
+     "x": 110.08,
+     "y": 36.9,
+     "highlight": false
+    },
+    {
+     "label": "Chamu Chibhabha & Vusi Sibanda",
+     "x": 68.76,
+     "y": 35.65,
+     "highlight": false
+    },
+    {
+     "label": "Mohammad Rizwan & Salman Agha",
+     "x": 96.75,
+     "y": 61.31,
+     "highlight": false
+    },
+    {
+     "label": "Evin Lewis & Shai Hope",
+     "x": 77.7,
+     "y": 47.59,
+     "highlight": false
+    }
+   ],
+   "unit": "partnerships",
+   "x_label": "strike rate",
+   "y_label": "average",
+   "conditions": "1,000+ balls · 90%+ control data · since 2005"
+  },
+  "created_at": "2026-10-05T00:00:00Z",
+  "id": "fixture-scatter-marked"
  }
 }

@@ -8,6 +8,7 @@ a full copy they also assert the production numbers from the Oct 2026 audit:
     HINDSIGHT_FULL_DATA=1 DATABASE_URL=... pytest tests/test_tag_coverage.py
 """
 import os
+from datetime import date
 
 import pytest
 
@@ -138,3 +139,52 @@ def test_partnership_with_a_batters_filter_counts_both_batters():
     assert any("partnerships involving" in w for w in filtered["metadata"]["warnings"])
     assert {r["partnership"]: r["balls"] for r in filtered["data"]} == {r["partnership"]: r["balls"] for r in explicit["data"]}
     assert "runs" in explicit["metadata"]["definitions"]
+
+
+def test_a_stand_owns_its_wicket_ball_whatever_the_feed_says():
+    """The feed often names the wrong non-striker on a wicket ball (migration 016); the stand's pair,
+    from the striker sequence, gets the ball and the wicket."""
+    from database import SessionLocal
+    from sqlalchemy import text
+
+    from services.metrics.sql_defs import NON_DISMISSALS, _sql_list
+
+    db = SessionLocal()
+    try:
+        if not db.execute(text("SELECT to_regclass('partnership_stands')")).scalar():
+            pytest.skip("migration 016 not applied")
+        # The pair with the most wicket balls whose feed non_striker is outside the stand, among pairs
+        # whose names never appear in an unpaired stand (those balls fall back to the feed's pair).
+        within = ("dd.p_match = ps.p_match AND dd.inns = ps.inns AND (dd.over, dd.ball) BETWEEN "
+                  "(ps.first_over, ps.first_ball) AND (ps.last_over, ps.last_ball)")
+        pair = db.execute(text(f"""
+            WITH unpaired AS (
+                SELECT DISTINCT COALESCE(pa.alias_name, dd.bat) AS name
+                FROM partnership_stands ps JOIN delivery_details dd ON {within}
+                LEFT JOIN player_alias_unambiguous pa ON pa.player_name = dd.bat
+                WHERE ps.batter_a IS NULL)
+            SELECT ps.batter_a, ps.batter_b
+            FROM partnership_stands ps
+            JOIN delivery_details dd ON {within}
+            LEFT JOIN player_alias_unambiguous pn ON pn.player_name = dd.non_striker
+            WHERE dd.format = 'ODI' AND dd.gender = 'male' AND dd.match_date >= '2005-01-01'
+              AND LOWER(dd.out) = 'true' AND ps.batter_a IS NOT NULL
+              AND COALESCE(pn.alias_name, dd.non_striker) NOT IN (ps.batter_a, ps.batter_b)
+              AND ps.batter_a NOT IN (SELECT name FROM unpaired) AND ps.batter_b NOT IN (SELECT name FROM unpaired)
+            GROUP BY 1, 2 ORDER BY COUNT(*) DESC, 1, 2 LIMIT 1""")).first()
+        if not pair:
+            pytest.skip("no ODI wicket ball with a misnamed non-striker in this database")
+        a, b = pair
+        expected = db.execute(text(f"""
+            SELECT SUM(CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN LOWER(dd.out) = 'true'
+                             AND LOWER(COALESCE(dd.dismissal, '')) NOT IN ({_sql_list(NON_DISMISSALS)}) THEN 1 ELSE 0 END)
+            FROM partnership_stands ps JOIN delivery_details dd ON {within}
+            WHERE ps.batter_a = :a AND ps.batter_b = :b
+              AND dd.format = 'ODI' AND dd.gender = 'male' AND dd.match_date >= '2005-01-01'"""),
+            {"a": a, "b": b}).first()
+    finally:
+        db.close()
+    rows = _q(partnership_players=[a], group_by=["partnership"], start_date=date(2005, 1, 1))["data"]
+    row = next(r for r in rows if r["partnership"] == f"{a} & {b}")
+    assert (row["balls"], row["wickets"]) == (expected[0], expected[1])

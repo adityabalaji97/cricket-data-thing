@@ -533,6 +533,12 @@ def get_legacy_grouping_columns_map():
     }
 
 
+#: The stand a delivery_details ball belongs to (migration 016, scripts/build_partnership_stands.py).
+PARTNERSHIP_STANDS_JOIN = (
+    "LEFT JOIN partnership_stands ps ON ps.p_match = dd.p_match AND ps.inns = dd.inns "
+    "AND (dd.over, dd.ball) BETWEEN (ps.first_over, ps.first_ball) AND (ps.last_over, ps.last_ball) "
+)
+
 #: Columns the feed tags ball by ball (shot type, line, length, control, wagon zone). Coverage varies
 #: by match, competition and era, so a metric or filter built on a tag is only as complete as the
 #: share of balls that carry it: `<tag>_coverage_pct` on every grouped row (services docs:
@@ -2806,11 +2812,22 @@ def build_where_clause(
         params["batters"] = batter_variants
 
     if partnership_players:
-        # Partnerships involving these players: every ball either of the pair faced, so a stand's
-        # row counts both batters. non_striker is stored mostly in the legacy short form ("V Kohli"),
-        # hence the alias expansion.
+        # Partnerships involving these players: every ball of a stand either of them was in, so a
+        # stand's row counts both batters. The stand comes from partnership_stands (migration 016;
+        # the feed's non_striker is wrong around wickets); the per-ball pair is the fallback for the
+        # few stands that can't be paired. Alias expansion covers every stored spelling.
         pp_variants = _expand_player_names(partnership_players, db) if db else partnership_players
-        conditions.append("(dd.bat = ANY(:partnership_players) OR dd.non_striker = ANY(:partnership_players))")
+        # First narrow to matches where one of them had a stand (or a stand couldn't be paired), so the
+        # per-ball stand lookup below runs over hundreds of matches, not every ball of the format.
+        conditions.append(
+            "dd.p_match IN (SELECT pss.p_match FROM partnership_stands pss WHERE pss.batter_a = ANY(:partnership_players) "
+            "OR pss.batter_b = ANY(:partnership_players) OR pss.batter_a IS NULL)")
+        conditions.append(
+            "COALESCE((SELECT psf.batter_a = ANY(:partnership_players) OR psf.batter_b = ANY(:partnership_players) "
+            "FROM partnership_stands psf WHERE psf.p_match = dd.p_match AND psf.inns = dd.inns "
+            "AND (dd.over, dd.ball) BETWEEN (psf.first_over, psf.first_ball) AND (psf.last_over, psf.last_ball) "
+            "AND psf.batter_a IS NOT NULL LIMIT 1), "
+            "dd.bat = ANY(:partnership_players) OR dd.non_striker = ANY(:partnership_players))")
         params["partnership_players"] = pp_variants
 
     if bowlers:
@@ -3305,16 +3322,26 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
         # ("V Kohli") while dd.bat is canonical. Use player_aliases to project
         # to canonical, so non_striker / partnership groupings collapse the
         # name variants. pa_ns/pa_bat joins are added by handle_grouped_query.
-        "non_striker": "COALESCE(pa_ns.alias_name, dd.non_striker)",
+        #
+        # The feed's non_striker is wrong around wickets (it names the incoming batter on the dismissal
+        # ball), so both come from the stand the ball belongs to (ps: partnership_stands, migration
+        # 016, joined by handle_grouped_query): the partner is the stand's other batter. The per-ball
+        # value is only the fallback for the ~1% of stands that can't be paired.
+        "non_striker": (
+            "COALESCE(CASE WHEN ps.batter_a = COALESCE(pa_bat.alias_name, dd.bat) THEN ps.batter_b "
+            "WHEN ps.batter_b = COALESCE(pa_bat.alias_name, dd.bat) THEN ps.batter_a END, "
+            "pa_ns.alias_name, dd.non_striker)"
+        ),
         # Bidirectional pair: (Kohli, ABD) and (ABD, Kohli) collapse to one row.
         "partnership": (
+            "COALESCE(ps.batter_a || ' & ' || ps.batter_b, "
             "(LEAST("
             "COALESCE(pa_bat.alias_name, dd.bat, ''), "
             "COALESCE(pa_ns.alias_name, dd.non_striker, '')"
             ") || ' & ' || GREATEST("
             "COALESCE(pa_bat.alias_name, dd.bat, ''), "
             "COALESCE(pa_ns.alias_name, dd.non_striker, '')"
-            "))"
+            ")))"
         ),
         # Wired by the bat_pos CTE in handle_grouped_query.
         "batting_position": "bp.pos",
@@ -3501,6 +3528,8 @@ def handle_grouped_query(
         pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = dd.bat "
     if needs_partner_canon:
         pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = dd.non_striker "
+        # The stand each ball belongs to (migration 016), for partnership / non_striker.
+        pa_join += PARTNERSHIP_STANDS_JOIN
     if "bowler" in group_by:
         pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bowl ON pa_bowl.player_name = dd.bowl "
 
@@ -4015,6 +4044,7 @@ def generate_summary_data(where_clause, params, group_by, ball_defs, db, total_b
                 summary_pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = dd.bat "
             if summary_needs_partner_canon:
                 summary_pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = dd.non_striker "
+                summary_pa_join += PARTNERSHIP_STANDS_JOIN
             if "bowler" in summary_group_by:
                 summary_pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bowl ON pa_bowl.player_name = dd.bowl "
 
