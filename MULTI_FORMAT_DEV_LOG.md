@@ -11,6 +11,13 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **INSTAGRAM v2 CHUNK 1: SLIDES FROM THE APP'S COMPONENTS (2026-10-05).** /ig/:carouselId/:n (src/components/ig/IgSlide.jsx,
+> no site chrome) draws a slide at 432x540; card slides are the story's own StoryCard (exportMode) + VISUALS/POST_VISUALS
+> from the card JSON (ig_carousel.for_story_cards). scripts/render_ig_slides.mjs (scripts/lib/cdp.mjs, headless Chrome,
+> 2.5x) screenshots 1080x1350; migration 018 ig_slide_images (prod applied); GET /snapshots/{id}/slides/{n}.png; img.mjs
+> serves stored slides first (carousels cache 1h). make_ig_preview.py --write renders against --base (deployed site).
+> Brand: public/brand/hindsight-mark.svg (bat-h + ball) and two avatars. Plan v2: ~/.claude/plans/glittery-wiggling-muffin.md.
+>
 > **INSTAGRAM CHUNK 1: CAROUSELS (2026-10-05).** Snapshot kind 'carousel' (static; services/ig_carousel.py): slides hook /
 > chart (another snapshot) / text / verdict / end, drawn by api/img.mjs at /img/{id}.png?slide=n. Backlog posts get
 > facts.carousel_id + slides (hand-written HOOKS in ig_backlog, no results in hooks); myth = hook, claim, verdict, end

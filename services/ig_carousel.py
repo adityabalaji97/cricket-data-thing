@@ -7,7 +7,7 @@ and a paragraph or two), verdict (a hypothesis-lab verdict) and end (where to ru
 
     for_fact(fact, chart_id, hook)        a debate or record post: hook, the chart, how it was measured, end
     for_note(note, hook)                  a myth post from a hypothesis-lab note: hook, claim, verdict, end
-    for_preview(db, params, cards, hook)  a match-day post: hook, the chosen preview-story cards, end
+    for_story_cards(cards, teams, ...)    a match-day post: hook, the preview story's own cards (drawn by the app), end
 
 Text comes from the fact or note it summarises, never written here, so the numbers on a slide are the ones the data
 produced. Hooks are written by hand (services/ig_backlog.IDEAS) and carry no numbers.
@@ -112,6 +112,16 @@ def for_preview(chart_ids: List[str], hook: str, kicker: str, sub: str = "") -> 
     """Hook, the chosen preview cards (already frozen as preview_card snapshots), end."""
     return ([{"type": "hook", "text": hook, "kicker": kicker, "sub": sub or "Swipe through before the toss"}]
             + [{"type": "chart", "snapshot_id": cid} for cid in chart_ids]
+            + [{"type": "end", "heading": "The full preview", "body": "Every card in the match preview story, "
+                                                                     "free on Hindsight."}])
+
+
+def for_story_cards(cards: List[Dict[str, Any]], teams: List[str], hook: str, kicker: str,
+                    sub: str = "") -> List[Dict[str, Any]]:
+    """Hook, the chosen cards as the app draws them (each card's own JSON, rendered by /ig/:id/:n through the story's
+    StoryCard and VISUALS, team colours from `teams`), end."""
+    return ([{"type": "hook", "text": hook, "kicker": kicker, "sub": sub or "Swipe through before the toss"}]
+            + [{"type": "card", "card": card, "teams": teams} for card in cards]
             + [{"type": "end", "heading": "The full preview", "body": "Every card in the match preview story, "
                                                                      "free on Hindsight."}])
 

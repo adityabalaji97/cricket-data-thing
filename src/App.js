@@ -49,6 +49,7 @@ import { apiErrorText } from './utils/apiError';
 
 // Admin queue: loaded only when visited, so it adds nothing to the public bundle.
 const AdminPage = React.lazy(() => import('./components/admin/AdminPage'));
+const IgSlide = React.lazy(() => import('./components/ig/IgSlide'));
 const NotesList = React.lazy(() => import('./components/notes/NotesList'));
 const NotePage = React.lazy(() => import('./components/notes/NotePage'));
 const GraphicPage = React.lazy(() => import('./components/GraphicPage'));
@@ -529,6 +530,15 @@ const AppContent = () => {
   };
 
   const showBottomNav = isCompactNav && !location.pathname.startsWith('/wrapped');
+
+  // Instagram slides (src/components/ig/IgSlide.jsx): the slide alone, no site chrome, for the renderer to screenshot.
+  if (location.pathname.startsWith('/ig/')) {
+    return (
+      <React.Suspense fallback={null}>
+        <Routes><Route path="/ig/:carouselId/:n" element={<IgSlide />} /></Routes>
+      </React.Suspense>
+    );
+  }
 
   if (location.pathname === '/') {
     return (

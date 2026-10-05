@@ -72,3 +72,11 @@ def test_captions_have_hook_answer_prompt_and_few_tags():
     assert tags[:2] == ["#RohitSharma", "#ODI"] and len(tags) <= ig_captions.MAX_TAGS
     assert ig_captions.hashtags([], "1st T20I · Lucknow", ["#INDvWI", "#TeamIndia"]) == [
         "#INDvWI", "#TeamIndia", "#T20I", "#cricket", "#cricketstats"]
+
+
+def test_story_card_slides_carry_the_cards_own_json():
+    card = {"id": "par", "visual": "par", "title": "Par is about 185", "payload": {"value": 185}, "sample": "T20Is"}
+    slides = ig_carousel.for_story_cards([card], ["IND", "WI"], "1 thing", "1st T20I")
+    assert [s["type"] for s in slides] == ["hook", "card", "end"]
+    # The slide is drawn by the app's own StoryCard from this JSON (src/components/ig/IgSlide.jsx), team colours too.
+    assert slides[1]["card"] is card and slides[1]["teams"] == ["IND", "WI"]
