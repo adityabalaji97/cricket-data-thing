@@ -570,21 +570,28 @@ const PlayerBars = ({ payload, teams }) => {
   const sides = [...new Set(rows.map((r) => r.side))];
   const [t1, t2] = teams || sides;
   return (
-    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.75 }}>
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: payload.extra === 'detail' ? 0.4 : 0.75 }}>
       {rows.map((r) => (
         <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: '112px 1fr 44px', gap: 1, alignItems: 'center' }}>
-          <Typography noWrap sx={{ fontSize: 13, color: colors.textHi }}>{r.name}</Typography>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography noWrap sx={{ fontSize: 13, color: colors.textHi }}>{r.name}</Typography>
+            {payload.extra === 'detail' && r.detail && (
+              <Typography noWrap sx={{ fontSize: 11, lineHeight: 1.3, color: colors.textLo }}>{r.detail}</Typography>
+            )}
+          </Box>
           <Box sx={{ position: 'relative', height: 14 }}>
             <Box sx={{ position: 'absolute', left: 0, top: 2, height: 10, borderRadius: '0 4px 4px 0', width: `${Math.max(3, (100 * Math.max(0, r.value)) / max)}%`, bgcolor: sideColor(r.side, t1, t2), opacity: r.value > 0 ? 1 : 0.35 }} />
           </Box>
           <Typography sx={{ fontSize: 13, color: colors.textMed, fontFamily: fonts.mono, textAlign: 'right' }}>
-            {payload.signed ? signed(r.value) : r.value}
+            {`${payload.signed ? signed(r.value, payload.decimals || 0) : r.value.toFixed(payload.decimals || 0)}${payload.unit || ''}`}
           </Typography>
         </Box>
       ))}
-      <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
-        {rows.map((r) => `${surname(r.name)} ${payload.extra === 'sr' ? `SR ${r.sr}` : `${r.econ} an over`}`).join(' · ')}
-      </Typography>
+      {payload.extra !== 'detail' && (
+        <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
+          {rows.map((r) => `${surname(r.name)} ${payload.extra === 'sr' ? `SR ${r.sr}` : `${r.econ} an over`}`).join(' · ')}
+        </Typography>
+      )}
       <Legend items={[[t1, sideColor(t1, t1, t2)], [t2, sideColor(t2, t1, t2)]].filter(([t]) => t)} />
     </Box>
   );
@@ -708,6 +715,28 @@ const PitchUsage = ({ payload }) => {
   );
 };
 
+/** F2: captain and vice-captain as two tiles. */
+const Captaincy = ({ payload, teams }) => {
+  const [t1, t2] = teams || [];
+  return (
+    <Box sx={{ flex: 1, display: 'grid', gap: 1.5, alignContent: 'center' }}>
+      {payload.picks.map((p) => (
+        <Box key={p.role} sx={{ border: `1px solid ${colors.border}`, borderRadius: '14px', bgcolor: colors.surface2, p: 2, display: 'grid', gap: 0.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textLo }}>{p.role}</Typography>
+            <Typography sx={{ fontFamily: fonts.mono, fontSize: 13, color: colors.textMed }}>{`${p.multiplier} points`}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: sideColor(p.side, t1, t2), flexShrink: 0 }} />
+            <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 28, lineHeight: 1.1, color: colors.textHi }}>{p.name}</Typography>
+          </Box>
+          <Typography sx={{ fontSize: 14, color: colors.textMed }}>{`${p.side} · ${p.reason}`}</Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
 export const VISUALS = {
   stat: Stat,
   par: Par,
@@ -730,6 +759,7 @@ export const VISUALS = {
   suits_scatter: SuitsScatter,
   milestones: Milestones,
   pitch_usage: PitchUsage,
+  captaincy: Captaincy,
   phase_bars: ({ payload }) => <WinningPhases phases={payload.phases} bare />,
   results_split: ({ payload }) => <WinPercentagesPie data={payload} bare />,
   benchmarks: ({ payload }) => <ScoresBarChart data={payload} bare />,

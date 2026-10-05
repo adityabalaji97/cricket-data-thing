@@ -26,7 +26,8 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 > RAA/100 centred on the competition average, C3 Elo, C4 last meeting with Primer win probability, C6 XIs).
 > Chunk 6 deployed (v482). Chunk 7 (branch preview-chunk7): services/preview_cards/players.py (D1 shrunk key battles,
 > D2 death hitters/bowlers, D3 form strips, D4 suits ground, D5 milestones via services/milestones.py, D6 pitch usage).
-> Next: chunk 8 (fantasy).
+> Chunk 7 deployed (v483). Chunk 8 (branch preview-chunk8): services/preview_cards/fantasy.py (F1 projected points,
+> F2 captaincy, F3 value per credit and F4 rank differentials, IPL only). Next: chunk 9 (outputs).
 >
 > **HYPOTHESIS LAB (2026-10-03), stacked branches lab/0-orient -> lab/1-connector -> lab/2-hypotheses ->
 > lab/3-notes, NOT deployed.** Orientation + data provenance: docs/notes-pipeline.md (the 2015+ CSV feed's

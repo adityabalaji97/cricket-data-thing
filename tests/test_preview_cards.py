@@ -393,3 +393,34 @@ def test_how_they_bowl_needs_600_balls(monkeypatch):
     card = P.how_they_bowl(full)
     assert card.title.startswith("JJ Bumrah bowls yorkers on the stumps")
     assert card.payload["side"] == "MI"
+
+
+# --- fantasy (chunk 8) --------------------------------------------------------------------------
+
+def _fantasy_ctx(competition="IPL"):
+    ctx = _team_ctx()
+    proj = [{"name": f"P{i}", "side": "MI" if i % 2 else "CSK", "role": "batsman", "points": 60.0 - 4 * i,
+             "batting": 60.0 - 4 * i, "bowling": 0.0} for i in range(10)]
+    usual = {f"P{i}": 60.0 - 4 * i for i in range(10)}
+    usual["P8"] = 90.0  # usually the best, projected 9th
+    usual["P9"] = 5.0   # usually last ... projected last too
+    usual["P6"] = 2.0   # usually last, projected 7th: a surprise
+    ctx.__dict__.update(fixture_competition=competition, _fantasy={"projections": proj, "usual": usual})
+    return ctx
+
+
+def test_fantasy_projection_and_captaincy():
+    cards = _cards(build_story(_fantasy_ctx()))
+    assert cards["projected-points"]["title"] == "P0 projects the most points: 60"
+    assert cards["captaincy"]["title"] == "P0 for captain, P1 for vice-captain"
+    assert cards["captaincy"]["payload"]["picks"][0]["reason"] == "60 projected points (60 batting)"
+
+
+def test_value_and_differentials_are_ipl_only(monkeypatch):
+    from services.preview_cards import fantasy as F
+    monkeypatch.setattr(F, "_credit", lambda name: None if name == "P0" else 10.0 - int(name[1:]) * 0.5)
+    cards = _cards(build_story(_fantasy_ctx()))
+    assert "P0" not in [r["name"] for r in cards["value-picks"]["payload"]["rows"]]  # no listed price, left out
+    assert cards["differentials"]["title"] == "P6 could surprise: projected 7th of 10 here, usually 10th"
+    other = _cards(build_story(_fantasy_ctx(competition="Big Bash League")))
+    assert "value-picks" not in other and "differentials" not in other and "projected-points" in other
