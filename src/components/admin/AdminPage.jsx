@@ -247,7 +247,66 @@ const IdeaBox = ({ client, toast, onPackCreated }) => {
   );
 };
 
+const PILLAR_LABELS = { debate: 'Debate', myth: 'Myth-busting', weird: 'Weird & wonderful', play: 'Play along', reactive: 'Trending' };
+
+// An Instagram post from the planned calendar (services/ig_backlog.py): the day it is meant for, its pillar, the
+// image (or the note's finding, for a text post), and the caption to paste.
+const IgPackCard = ({ pack, client, onChanged, toast }) => {
+  const facts = pack.facts || {};
+  const imageUrl = pack.snapshot_id ? `${siteOrigin()}/img/${pack.snapshot_id}.png` : null;
+  const copy = async (text, what) => {
+    try { await navigator.clipboard.writeText(text); toast(`${what} copied`); } catch { toast('Copy blocked'); }
+  };
+  const update = async (body, done) => {
+    try { await client.patch(`/admin/content/packs/${pack.id}`, body); toast(done); onChanged(); }
+    catch (err) { toast(apiErrorText(err, null) || 'Update failed'); }
+  };
+  const day = pack.planned_for
+    ? new Date(`${pack.planned_for}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+    : 'Bench (fills an open day)';
+  return (
+    <Box sx={{ bgcolor: C.card, border: `1px solid ${C.line}`, borderRadius: 3, p: 2, mb: 2 }}>
+      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
+        <Typography sx={{ fontSize: 13, color: pack.planned_for ? C.hi : C.lo, fontWeight: 700 }}>{day}</Typography>
+        <Chip size="small" label={PILLAR_LABELS[pack.pillar] || pack.pillar} sx={{ bgcolor: '#1d212b', color: C.mid }} />
+      </Box>
+      {imageUrl ? (
+        <Box component="img" src={imageUrl} alt={pack.title} loading="lazy"
+          sx={{ display: 'block', width: '100%', maxWidth: 420, aspectRatio: '4 / 5', borderRadius: 2, bgcolor: '#14171e', border: `1px solid ${C.line}` }} />
+      ) : (
+        <Box sx={{ p: 2, maxWidth: 420, borderRadius: 2, bgcolor: '#14171e', border: `1px solid ${C.line}` }}>
+          <Typography sx={{ fontSize: 18, fontWeight: 700, color: C.hi }}>{pack.title}</Typography>
+          {facts.finding && <Typography sx={{ fontSize: 14, color: C.mid, mt: 1 }}>{facts.finding}</Typography>}
+          <Typography sx={{ fontSize: 12, color: C.lo, mt: 1 }}>Text carousel: slides come with the carousel export.</Typography>
+        </Box>
+      )}
+      {imageUrl && (
+        <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+          <Button variant="contained" onClick={() => shareImage(imageUrl, `hindsight-${pack.snapshot_id}.png`, pack.title, pack.title)}
+            sx={{ bgcolor: C.lime, color: C.bg, fontWeight: 700, minHeight: 44, '&:hover': { bgcolor: '#a3dc3f' } }}>
+            Share image
+          </Button>
+          <Button variant="outlined" href={`${imageUrl}?download=1`} sx={{ color: C.hi, borderColor: C.line, minHeight: 44 }}>Download</Button>
+        </Box>
+      )}
+      <CopyBlock label="Caption" text={pack.caption || pack.title} onCopy={copy} multiline />
+      {(pack.rule_warnings || []).map((w) => (
+        <Typography key={w} sx={{ fontSize: 12, color: C.amber, mt: 0.5 }}>⚠ {w}</Typography>
+      ))}
+      {pack.status === 'ready' ? (
+        <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+          <Button variant="outlined" onClick={() => update({ status: 'posted' }, 'Marked posted')} sx={{ color: C.hi, borderColor: C.line, minHeight: 40, flex: 1 }}>Mark posted</Button>
+          <Button variant="outlined" onClick={() => update({ status: 'skipped' }, 'Skipped')} sx={{ color: C.lo, borderColor: C.line, minHeight: 40, flex: 1 }}>Skip</Button>
+        </Box>
+      ) : (
+        <Typography sx={{ mt: 1.5, fontSize: 12, color: C.lo }}>{pack.status}</Typography>
+      )}
+    </Box>
+  );
+};
+
 const SocialTab = ({ client, toast, onAuthFail }) => {
+  const [channel, setChannel] = useState('reddit');
   const [status, setStatus] = useState('ready');
   const [packs, setPacks] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -255,14 +314,14 @@ const SocialTab = ({ client, toast, onAuthFail }) => {
   const load = useCallback(async () => {
     setPacks(null);
     try {
-      const { data } = await client.get('/admin/content/packs', { params: { status } });
+      const { data } = await client.get('/admin/content/packs', { params: { status, channel } });
       setPacks(data.packs);
     } catch (err) {
       if (err.response?.status === 403 || err.response?.status === 404) onAuthFail();
       else toast('Could not load packs');
       setPacks([]);
     }
-  }, [client, status, toast, onAuthFail]);
+  }, [client, status, channel, toast, onAuthFail]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -278,23 +337,35 @@ const SocialTab = ({ client, toast, onAuthFail }) => {
 
   return (
     <>
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5 }}>
+        {[['reddit', 'Reddit / X'], ['instagram', 'Instagram']].map(([c, label]) => (
+          <Chip key={c} label={label} onClick={() => setChannel(c)} variant={channel === c ? 'filled' : 'outlined'}
+            sx={{ fontWeight: 700, color: channel === c ? C.bg : C.mid, bgcolor: channel === c ? C.hi : 'transparent', borderColor: C.line }} />
+        ))}
+      </Box>
       <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
         {STATUSES.map((s) => (
           <Chip key={s} label={s} onClick={() => setStatus(s)}
             sx={{ textTransform: 'capitalize', bgcolor: status === s ? C.lime : '#1d212b', color: status === s ? C.bg : C.mid, fontWeight: 600 }} />
         ))}
-        <Button size="small" onClick={scan} disabled={scanning} sx={{ ml: 'auto', color: C.lime }}>
-          {scanning ? 'Scanning…' : 'Scan new matches'}
-        </Button>
+        {channel === 'reddit' && (
+          <Button size="small" onClick={scan} disabled={scanning} sx={{ ml: 'auto', color: C.lime }}>
+            {scanning ? 'Scanning…' : 'Scan new matches'}
+          </Button>
+        )}
       </Box>
-      {status === 'ready' && <IdeaBox client={client} toast={toast} onPackCreated={load} />}
+      {status === 'ready' && channel === 'reddit' && <IdeaBox client={client} toast={toast} onPackCreated={load} />}
       {packs === null && <CircularProgress size={22} sx={{ color: C.lime }} />}
       {packs && packs.length === 0 && (
         <Typography sx={{ color: C.lo, py: 4 }}>
-          {status === 'ready' ? 'No packs waiting. New ones arrive after the nightly load.' : `No ${status} packs.`}
+          {status !== 'ready' ? `No ${status} packs.`
+            : channel === 'instagram' ? 'No Instagram posts lined up. Run scripts/build_ig_backlog.py --write.'
+              : 'No packs waiting. New ones arrive after the nightly load.'}
         </Typography>
       )}
-      {(packs || []).map((p) => <PackCard key={p.id} pack={p} client={client} onChanged={load} toast={toast} />)}
+      {(packs || []).map((p) => (channel === 'instagram'
+        ? <IgPackCard key={p.id} pack={p} client={client} onChanged={load} toast={toast} />
+        : <PackCard key={p.id} pack={p} client={client} onChanged={load} toast={toast} />))}
     </>
   );
 };

@@ -16,20 +16,29 @@ router = APIRouter(prefix="/admin/content", tags=["admin"], dependencies=[Depend
 STATUSES = ("ready", "posted", "skipped", "expired")
 
 
+CHANNELS = ("reddit", "instagram")
+
+
 @router.get("/packs")
-def list_packs(status: str = "ready", limit: int = 60, db: Session = Depends(get_session)):
-    where = "" if status == "all" else "WHERE p.status = :status"
+def list_packs(status: str = "ready", channel: str = "reddit", limit: int = 60, db: Session = Depends(get_session)):
+    """One channel's packs. Instagram packs (services/ig_backlog.py) come in calendar order, the bench last."""
+    if channel not in CHANNELS:
+        raise HTTPException(status_code=400, detail=f"channel must be one of {CHANNELS}")
+    where = "WHERE p.channel = :channel" + ("" if status == "all" else " AND p.status = :status")
+    order = ("p.planned_for ASC NULLS LAST, p.created_at" if channel == "instagram"
+             else "(p.status = 'ready') DESC, p.post_by ASC NULLS LAST, p.created_at DESC")
     rows = db.execute(text(f"""
         SELECT p.id, p.match_id, p.snapshot_id, p.title, p.first_comment, p.subreddit, p.flair, p.facts,
                p.rule_warnings, p.status, p.post_by, p.posted_url, p.source, p.created_at,
+               p.channel, p.planned_for, p.pillar, p.caption,
                m.date AS match_date, m.team1, m.team2, m.competition, m.data_source, s.kind AS snapshot_kind
         FROM content_packs p
         LEFT JOIN matches m ON m.id = p.match_id
         LEFT JOIN chart_snapshots s ON s.id = p.snapshot_id
         {where}
-        ORDER BY (p.status = 'ready') DESC, p.post_by ASC NULLS LAST, p.created_at DESC
+        ORDER BY {order}
         LIMIT :limit
-    """), {"status": status, "limit": min(limit, 200)}).mappings()
+    """), {"status": status, "channel": channel, "limit": min(limit, 200)}).mappings()
     return {"packs": [dict(r) for r in rows]}
 
 
