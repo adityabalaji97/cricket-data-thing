@@ -60,6 +60,7 @@ import { PitchMapContainer, getPitchMapMode } from './PitchMap';
 import config from '../config';
 import { qbButtonSx, qbCardSx, qbColors, qbFonts, qbGhostButtonSx } from './queryBuilderTheme';
 import { DEFAULT_MIN_COVERAGE, TAGGED_METRICS, rankWithCoverage } from '../utils/coverage';
+import { apiErrorText } from '../utils/apiError';
 
 const darkOutlineChipSx = {
   bgcolor: 'rgba(255,255,255,0.035)',
@@ -727,7 +728,7 @@ const QueryResults = ({
         setSummaryError(response.data.error || 'Failed to generate summary');
       }
     } catch (err) {
-      setSummaryError(err.response?.data?.detail || err.message || 'Failed to generate summary');
+      setSummaryError(apiErrorText(err, null) || err.message || 'Failed to generate summary');
     } finally {
       setSummaryLoading(false);
     }

@@ -11,6 +11,7 @@ import config from '../config';
 import { AlertBanner, VisualizationCard } from './ui';
 import { colors, spacing, typography } from '../theme/designSystem';
 import { colors as hs, fonts } from '../theme/hindsightDark';
+import { apiErrorText } from '../utils/apiError';
 
 const ROLE_LABELS = {
   batter: 'Batter',
@@ -137,7 +138,7 @@ const PlayerDoppelgangers = ({
       } catch (err) {
         if (!cancelled) {
           setData(null);
-          setError(err.response?.data?.detail || 'Failed to fetch doppelgänger results');
+          setError(apiErrorText(err, null) || 'Failed to fetch doppelgänger results');
         }
       } finally {
         if (!cancelled) {

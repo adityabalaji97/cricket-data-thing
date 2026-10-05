@@ -9,6 +9,7 @@ import useIsMobile from '../hooks/useIsMobile';
 import { track } from '../utils/analytics';
 import GraphicOptions from './GraphicOptions';
 import { qbButtonSx, qbColors, qbFonts } from './queryBuilderTheme';
+import { apiErrorText } from '../utils/apiError';
 
 
 const SKIP = new Set(['percent_balls', 'innings_count', 'metric_balls']);
@@ -65,7 +66,7 @@ const GraphicMaker = ({ open, onClose, apiQueryString, rows, groupBy, defaultMet
       setState({ loading: false, error: null, options: data.options || [], pickedBy: data.picked_by, warnings: data.warnings || [] });
       track('graphic_made', { metric, forms: (data.options || []).map((o) => o.form).join(','), highlight: Boolean(highlight) });
     } catch (err) {
-      setState({ loading: false, error: err.response?.data?.detail || 'Could not make a graphic for this result.', options: [], pickedBy: null });
+      setState({ loading: false, error: apiErrorText(err, null) || 'Could not make a graphic for this result.', options: [], pickedBy: null });
     }
   };
 

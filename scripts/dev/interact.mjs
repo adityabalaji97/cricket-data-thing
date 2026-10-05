@@ -6,7 +6,7 @@
 //   {"nav": url} {"wait": ms} {"shot": name} {"eval": js, "label": text}
 //   {"click": css} {"text": exact button/link text}  -- clicks the first visible match
 //   {"setDate": {"sel": css, "value": v}}             -- sets an input via React's value setter
-// Prints one line per click/eval/setDate result. WIDTH/HEIGHT override the 390x844 viewport.
+// Prints one line per click/eval/setDate result, and page exceptions (ERRORS=1 adds console.error). WIDTH/HEIGHT override the 390x844 viewport.
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
@@ -38,6 +38,14 @@ const pending = new Map();
 ws.onmessage = (m) => {
   const msg = JSON.parse(m.data);
   if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
+  // Page errors: uncaught exceptions, and console.error with ERRORS=1.
+  if (msg.method === 'Runtime.exceptionThrown') {
+    const d = msg.params.exceptionDetails;
+    console.log(`page exception: ${d.exception?.description || d.text}`.slice(0, 1500));
+  }
+  if (process.env.ERRORS && msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
+    console.log(`console.error: ${msg.params.args.map((a) => a.value ?? a.description ?? '').join(' ')}`.slice(0, 1500));
+  }
 };
 const send = (method, params = {}, sessionId) => new Promise((res) => {
   const i = ++id; pending.set(i, res); ws.send(JSON.stringify({ id: i, method, params, sessionId }));

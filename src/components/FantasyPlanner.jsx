@@ -24,6 +24,7 @@ import axios from 'axios';
 import config from '../config';
 import CondensedName from './common/CondensedName';
 import { getTeamAbbr } from '../utils/teamAbbreviations';
+import { apiErrorText } from '../utils/apiError';
 
 const TEAM_COLORS = {
     CSK: '#eff542', MI: '#42a7f5', RCB: '#f54242', RR: '#FF2AA8',
@@ -504,7 +505,7 @@ const FantasyPlanner = ({ isMobile }) => {
         }
 
         if (lastError) {
-            setError(lastError.response?.data?.detail || 'Failed to fetch recommendations');
+            setError(apiErrorText(lastError, null) || 'Failed to fetch recommendations');
             throw lastError;
         }
         return null;

@@ -5,6 +5,7 @@ import axios from 'axios';
 import { spacing } from '../theme/designSystem';
 import config from '../config';
 import { AlertBanner } from './ui';
+import { apiErrorText } from '../utils/apiError';
 
 const PlayerDNASummary = ({ 
   playerName, 
@@ -59,7 +60,7 @@ const PlayerDNASummary = ({
         }
       } catch (err) {
         console.error('Error fetching summary:', err);
-        setError(err.response?.data?.detail || 'Failed to fetch player summary');
+        setError(apiErrorText(err, null) || 'Failed to fetch player summary');
       } finally {
         setLoading(false);
       }

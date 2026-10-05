@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import config from '../../config';
 import './matchScorecard.css';
+import { apiErrorText } from '../../utils/apiError';
 
 const SCREEN_OPTIONS = [
   { key: 'summary', label: 'Summary' },
@@ -89,7 +90,7 @@ const MatchScorecardPage = () => {
         if (!cancelled) setData(response.data);
       } catch (err) {
         if (!cancelled) {
-          setError(err.response?.data?.detail || err.message || 'Failed to load scorecard');
+          setError(apiErrorText(err, null) || err.message || 'Failed to load scorecard');
         }
       } finally {
         if (!cancelled) setLoading(false);

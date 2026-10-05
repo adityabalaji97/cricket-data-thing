@@ -28,6 +28,7 @@ import config from '../config';
 import { qbButtonSx, qbCardSx, qbColors, qbFonts, qbGhostButtonSx } from './queryBuilderTheme';
 import { useFormat } from '../context/FormatContext';
 import FormatSwitcher from './FormatSwitcher';
+import { apiErrorText } from '../utils/apiError';
 
 const getDefaultFilters = () => ({
   // Basic filters
@@ -314,7 +315,7 @@ const QueryBuilder = ({ isMobile }) => {
 
     } catch (error) {
       console.error('Error executing query from URL:', error);
-      setError(error.response?.data?.detail || 'Failed to execute query');
+      setError(apiErrorText(error, 'Failed to execute query'));
     } finally {
       setLoading(false);
       setIsAutoExecuting(false);
@@ -350,7 +351,7 @@ const QueryBuilder = ({ isMobile }) => {
       
     } catch (error) {
       console.error('Error executing query:', error);
-      setError(error.response?.data?.detail || 'Failed to execute query');
+      setError(apiErrorText(error, 'Failed to execute query'));
     } finally {
       setLoading(false);
     }

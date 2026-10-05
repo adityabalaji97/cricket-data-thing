@@ -7,6 +7,7 @@ import GraphicOptions from './GraphicOptions';
 import GraphicPromptList from './GraphicPromptList';
 import { track } from '../utils/analytics';
 import { colors as hs, fonts } from '../theme/hindsightDark';
+import { apiErrorText } from '../utils/apiError';
 
 const FORMATS = [['', 'Auto'], ['T20', 'T20'], ['ODI', 'ODI']];
 
@@ -41,7 +42,7 @@ const GraphicsLanding = () => {
       track('graphic_made', { source: 'idea', forms: (data.options || []).map((o) => o.form).join(',') });
     } catch (err) {
       setState({ loading: false, result: null,
-        error: err.response?.data?.detail || 'Could not make that one. Try rewording it, or build it in the query builder.' });
+        error: apiErrorText(err, null) || 'Could not make that one. Try rewording it, or build it in the query builder.' });
     }
   };
 

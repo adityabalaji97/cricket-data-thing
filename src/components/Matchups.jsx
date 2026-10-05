@@ -41,6 +41,7 @@ import { getFormBorderColor } from '../utils/playerNameUtils';
 import CondensedName from './common/CondensedName';
 import PostTossDrillLinks from './PostTossDrillLinks';
 import { useFormat } from '../context/FormatContext';
+import { apiErrorText } from '../utils/apiError';
 
 const getPlayerFormFlag = (formFlagsByPlayer = {}, playerName = '') => (
     formFlagsByPlayer[playerName] || formFlagsByPlayer[normalizeAnalyticsName(playerName)] || null
@@ -788,7 +789,7 @@ const Matchups = ({
                 setMatchupData(matchupsResponse.data);
             } catch (error) {
                 console.error('Error fetching matchups:', error);
-                setError(error.response?.data?.detail || 'Error fetching matchups');
+                setError(apiErrorText(error, 'Error fetching matchups'));
             } finally {
                 setLoading(false);
             }
@@ -905,7 +906,7 @@ const Matchups = ({
             } catch (fetchError) {
                 if (cancelled) return;
                 console.error('Error fetching post-toss matchup matrices:', fetchError);
-                setPostTossMatrixError(fetchError?.response?.data?.detail || fetchError?.message || 'Failed to load post-toss matchups');
+                setPostTossMatrixError(apiErrorText(fetchError, null) || fetchError?.message || 'Failed to load post-toss matchups');
                 setPostTossMatrixData({ firstInnings: null, secondInnings: null });
                 setPostTossMatrixMeta({ usedAllTimeFallback: false, startDate: null, endDate: null });
             } finally {

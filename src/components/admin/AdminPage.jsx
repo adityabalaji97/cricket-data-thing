@@ -5,6 +5,7 @@ import axios from 'axios';
 import config from '../../config';
 import { shareImage, siteOrigin } from '../ui/ChartExportButton';
 import GraphicPromptList from '../GraphicPromptList';
+import { apiErrorText } from '../../utils/apiError';
 
 /**
  * /admin: the phone-first admin queue. "Social" lists content packs (services/content_packs.py):
@@ -59,7 +60,7 @@ const PackCard = ({ pack, client, onChanged, toast }) => {
     try {
       const { data } = await client.post(`/admin/content/packs/${pack.id}/note`);
       navigate(`/admin/notes?open=${data.id}`);
-    } catch (err) { toast(err.response?.data?.detail || 'Could not make a note'); }
+    } catch (err) { toast(apiErrorText(err, null) || 'Could not make a note'); }
   };
   const facts = pack.facts || {};
   const imageUrl = `${siteOrigin()}/img/${pack.snapshot_id}.png`;
@@ -69,7 +70,7 @@ const PackCard = ({ pack, client, onChanged, toast }) => {
   };
   const update = async (body, done) => {
     try { await client.patch(`/admin/content/packs/${pack.id}`, body); toast(done); onChanged(); }
-    catch (err) { toast(err.response?.data?.detail || 'Update failed'); }
+    catch (err) { toast(apiErrorText(err, null) || 'Update failed'); }
   };
 
   return (

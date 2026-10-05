@@ -45,6 +45,7 @@ import { getPageTitleForPath } from './navItems';
 import ExploreMenu, { ExploreButton } from './components/nav/ExploreMenu';
 import { MensT20Scope, useFormat } from './context/FormatContext';
 import { trackPageView } from './utils/analytics';
+import { apiErrorText } from './utils/apiError';
 
 // Admin queue: loaded only when visited, so it adds nothing to the public bundle.
 const AdminPage = React.lazy(() => import('./components/admin/AdminPage'));
@@ -488,7 +489,7 @@ const AppContent = () => {
       } catch (error) {
         if (error.name === 'AbortError' || error.name === 'CanceledError') return;
         console.error('Global error fetching data:', error);
-        setError(error.response?.data?.detail || 'Failed to load data. Please check the console for details.');
+        setError(apiErrorText(error, 'Failed to load data. Please check the console for details.'));
       } finally {
         setLoading(false);
       }

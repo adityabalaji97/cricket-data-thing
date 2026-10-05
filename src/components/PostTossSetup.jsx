@@ -20,6 +20,7 @@ import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
 import config from '../config';
 import CondensedName from './common/CondensedName';
 import { getTeamAbbr } from '../utils/teamAbbreviations';
+import { apiErrorText } from '../utils/apiError';
 
 const uniqueNames = (names = []) => {
   const seen = new Set();
@@ -262,7 +263,7 @@ const PostTossSetup = ({
       setEditorOpen(false);
     } catch (err) {
       console.error('Post-toss apply failed', err);
-      const message = err?.response?.data?.detail || 'Failed to apply post-toss analysis.';
+      const message = apiErrorText(err, null) || 'Failed to apply post-toss analysis.';
       setApplyError(message);
     } finally {
       setApplyLoading(false);

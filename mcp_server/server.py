@@ -333,8 +333,8 @@ def _hindsight_url(params: Dict[str, Any], group_by: List[str], fmt: str, gender
         else:
             pairs.append((key, str(value)))
     pairs.extend(("group_by", g) for g in group_by)
-    if limit and limit > 1000:
-        pairs.append(("limit", str(limit)))
+    if limit and limit > 1000:  # the query page's API caps limit at 10,000 (callers may pull more)
+        pairs.append(("limit", str(min(limit, 10000))))
     if offset:
         pairs.append(("offset", str(offset)))
     pairs.append(("fmt", _format_slug(fmt, gender)))

@@ -22,6 +22,7 @@ import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL, DEFAULT_SEARCH_PARAMS } from './searchConfig';
+import { apiErrorText } from '../../utils/apiError';
 
 // Helper to build query builder URL for a player
 const buildQueryBuilderUrl = (playerName, type, startDate, endDate) => {
@@ -86,7 +87,7 @@ const DNASummary = ({ playerName, playerType, color, startDate, endDate }) => {
         }
       } catch (err) {
         console.error('DNA fetch error:', err);
-        setError(err.response?.data?.detail || err.response?.data?.error || 'Failed to load DNA summary');
+        setError(apiErrorText(err, null) || err.response?.data?.error || 'Failed to load DNA summary');
       } finally {
         setLoading(false);
       }
@@ -187,7 +188,7 @@ const PlayerSearchResult = ({ playerName, startDate, endDate }) => {
         const response = await axios.get(url);
         setProfile(response.data);
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to load player profile');
+        setError(apiErrorText(err, null) || 'Failed to load player profile');
       } finally {
         setLoading(false);
       }

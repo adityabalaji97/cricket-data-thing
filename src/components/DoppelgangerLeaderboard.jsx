@@ -34,6 +34,7 @@ import {
 } from 'recharts';
 import config from '../config';
 import CompetitionFilter from './CompetitionFilter';
+import { apiErrorText } from '../utils/apiError';
 
 const TODAY = new Date().toISOString().split('T')[0];
 const DEFAULT_START = `${new Date().getFullYear() - 1}-01-01`;
@@ -253,7 +254,7 @@ const DoppelgangerLeaderboard = () => {
       const res = await axios.get(`${config.API_URL}/search/doppelgangers/leaderboard?${params.toString()}`);
       setData(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load doppelganger leaderboard');
+      setError(apiErrorText(err, null) || 'Failed to load doppelganger leaderboard');
       setData(null);
     } finally {
       setLoading(false);
