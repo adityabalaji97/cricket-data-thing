@@ -38,7 +38,8 @@ def build_usage_report(db: Session, weeks: int = 8) -> Dict[str, Any]:
                COUNT(DISTINCT props->>'host') FILTER (WHERE event = 'embed_view' AND COALESCE(props->>'host', '') NOT IN ('', :own)) AS embed_hosts,
                COUNT(DISTINCT anon_id) FILTER (WHERE event = 'page_view' AND path LIKE '%utm_source=embed%') AS embed_visitors,
                COUNT(DISTINCT anon_id) FILTER (WHERE event = 'page_view' AND path LIKE '%utm_campaign=pack-%') AS pack_visitors,
-               COUNT(DISTINCT anon_id) FILTER (WHERE event = 'page_view' AND path LIKE '%utm_source=instagram%') AS instagram_visitors
+               COUNT(DISTINCT anon_id) FILTER (WHERE event = 'page_view' AND path LIKE '%utm_source=instagram%') AS instagram_visitors,
+               COUNT(DISTINCT anon_id) FILTER (WHERE event = 'page_view' AND path LIKE '%utm_source=youtube%') AS youtube_visitors
         FROM app_events WHERE ts >= date_trunc('week', now()) - (:since)::interval
         GROUP BY 1 ORDER BY 1 DESC
     """)
