@@ -171,3 +171,33 @@ def pack_to_note(pack_id: int, db: Session = Depends(get_session)):
         return note_from_pack(db, pack_id)
     except NoteError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/plan")
+def instagram_plan(start: Optional[str] = None, db: Session = Depends(get_session)):
+    """This week's Instagram plan (services/ig_plan.py): each day's posts with a time, plus today's comment kit."""
+    from datetime import date, datetime, timedelta, timezone
+
+    from services import ig_plan
+
+    day = date.fromisoformat(start) if start else datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
+    return {"week": ig_plan.week(db, day), "comment_kit": ig_plan.comment_kit(db, day)}
+
+
+# The morning digest, read by a scheduled routine that emails it: its own read-only token (IG_DIGEST_TOKEN), so the
+# admin token never leaves Heroku.
+digest_router = APIRouter(prefix="/digest", tags=["digest"])
+
+
+@digest_router.get("/instagram")
+def instagram_digest(token: str = "", db: Session = Depends(get_session)):
+    import hmac
+    import os
+    from datetime import datetime, timedelta, timezone
+
+    from services import ig_plan
+
+    expected = os.environ.get("IG_DIGEST_TOKEN") or ""
+    if not expected or not hmac.compare_digest(token, expected):
+        raise HTTPException(status_code=404, detail="Not found")
+    return ig_plan.digest(db, datetime.now(timezone(timedelta(hours=5, minutes=30))).date())
