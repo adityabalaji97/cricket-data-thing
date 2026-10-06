@@ -11,6 +11,9 @@ on:
 jobs:
   radar:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     timeout-minutes: 30
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -32,3 +35,16 @@ jobs:
           pip install -r requirements.txt
       - name: Queue trending posts
         run: python scripts/trend_radar.py --top 3
+      # The day's plan as a GitHub issue (closing yesterday's): it lands in the owner's email and GitHub app.
+      - name: Morning digest issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/ig_digest.py > digest.md 2> digest.err || { cat digest.err; exit 1; }
+          title=$(grep '^TITLE: ' digest.err | tail -1 | sed 's/^TITLE: //')
+          gh label create ig-digest --color b6f24a --description "Instagram morning plan" 2>/dev/null || true
+          for n in $(gh issue list --label ig-digest --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Superseded by today's plan." >/dev/null
+          done
+          gh issue create --title "$title" --label ig-digest --body-file digest.md
