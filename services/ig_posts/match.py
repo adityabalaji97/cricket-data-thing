@@ -2,7 +2,8 @@
 Match-day posts: a preview before each match of a series, a "what decided it" post after.
 
   preview  the fixture's own preview-story cards (services/ig_backlog.preview_post), chosen here when not given:
-           the first PREVIEW_CARDS the story has, in that order (the visuals that read best as single images)
+           each chapter's lead card, the one the site's story shows when you swipe (StoryViewer's
+           FEATURED_PER_CHAPTER), in chapter order; "Dig deeper" (the links card) is left out
   recap    the match's win-probability swing (the story's last-meeting card, with the story's end set to the match
            day so the last meeting is this match), who swung it (WPA), who added and saved the most runs
            (Impact for batters, RAA for bowlers): all from ball_metrics through the query builder
@@ -19,10 +20,8 @@ from sqlalchemy.orm import Session
 
 from services.ig_posts.cards import card, fmt, short
 
-#: Preview cards in the order they read best as a carousel (team colours, one clear point each).
-PREVIEW_CARDS = ["par", "where-won", "key-battles", "death-bowlers", "death-hitters", "suits-ground", "phase-strength",
-                 "form-strips", "pace-spin"]
-PREVIEW_COUNT = 5
+#: Chapters left out of the preview carousel: "Dig deeper" is a card of links, not a picture.
+SKIP_CHAPTERS = ("more",)
 SERIES_DAYS = 30
 FORMAT_WORD = {"T20": "T20I", "ODI": "ODI"}
 
@@ -43,9 +42,9 @@ def series_label(db: Session, team1: str, team2: str, fmt: str, day: date, venue
     return f"{ordinal(n + 1)} {FORMAT_WORD.get(fmt, fmt)} · {place}"
 
 
-def pick_preview_cards(story: Dict[str, Any], count: int = PREVIEW_COUNT) -> List[str]:
-    have = {c["id"] for ch in story["chapters"] for c in ch["cards"]}
-    return [c for c in PREVIEW_CARDS if c in have][:count]
+def chapter_leads(story: Dict[str, Any], skip=SKIP_CHAPTERS) -> List[str]:
+    """Each chapter's first card (chapters arrive with their cards ranked), in chapter order."""
+    return [ch["cards"][0]["id"] for ch in story["chapters"] if ch["cards"] and ch.get("id") not in skip]
 
 
 def _players(db: Session, match_id: str, fmt: str, role: str) -> List[Dict[str, Any]]:

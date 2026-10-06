@@ -88,8 +88,12 @@ def test_match_day_helpers():
 
     assert [match.ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22)] == ["1st", "2nd", "3rd", "4th", "11th", "12th",
                                                                          "13th", "21st", "22nd"]
-    story = {"chapters": [{"cards": [{"id": "h2h"}, {"id": "key-battles"}, {"id": "par"}, {"id": "xis"}]}]}
-    assert match.pick_preview_cards(story) == ["par", "key-battles"]  # in PREVIEW_CARDS order, others left out
+    story = {"chapters": [{"id": "glance", "cards": [{"id": "glance"}]},
+                          {"id": "ground", "cards": [{"id": "par"}, {"id": "where-won"}]},
+                          {"id": "teams", "cards": []},
+                          {"id": "players", "cards": [{"id": "key-battles"}, {"id": "death-hitters"}]},
+                          {"id": "more", "cards": [{"id": "ask"}]}]}
+    assert match.chapter_leads(story) == ["glance", "par", "key-battles"]  # leads in order; no empty chapter, no links
     # A race line runs from (0, 0) to the innings that reached the target, and no further.
     rows = [("A", 30, 400), ("A", 60, 1010), ("A", 90, 1100), ("B", 50, 990)]
     assert records._cut(rows, 1000) == {"A": [(0, 0), (30, 400), (60, 1010)], "B": [(0, 0), (50, 990)]}
