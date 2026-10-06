@@ -125,18 +125,31 @@ def youtube_copy(fact: Dict[str, Any], caption: str, search_title: Optional[str]
     return {"title": f"{title} #shorts", "description": f"{body.strip()}\n\nFull data, free: hindsightcricket.com\n\n{' '.join(tags)}"}
 
 
+def x_copy(db: Session, carousel_id: str, caption: str) -> List[Dict[str, Any]]:
+    """The carousel as an X thread (services/ig_x.py), one tweet per slide; chart slides take their chart's title."""
+    from services.ig_x import x_thread
+
+    snap = db.execute(text("SELECT data FROM chart_snapshots WHERE id = :i"), {"i": carousel_id}).scalar()
+    slides = (snap or {}).get("slides", [])
+    chart_ids = [s["snapshot_id"] for s in slides if s.get("type") == "chart" and s.get("snapshot_id")]
+    titles = dict(db.execute(text("SELECT id, title FROM chart_snapshots WHERE id = ANY(:ids)"),
+                             {"ids": chart_ids}).all()) if chart_ids else {}
+    return x_thread(slides, caption, titles)
+
+
 def extras_pending(db: Session) -> Dict[str, int]:
-    """Draft notes for debate and record posts without one; YouTube copy for every post without it."""
+    """Draft notes for debate and record posts without one; YouTube copy and an X thread for every post without them."""
     from database import engine
     from services.notes import bot_author_id, create_note
 
     rows = db.execute(text("""
         SELECT id, title, caption, facts FROM content_packs
         WHERE channel = 'instagram' AND status IN ('ready', 'posted') AND facts->>'carousel_id' IS NOT NULL
-          AND (facts->'youtube' IS NULL OR (facts->>'kind' IN ('debate', 'record') AND facts->>'note_id' IS NULL
+          AND (facts->'youtube' IS NULL OR facts->'x' IS NULL
+               OR (facts->>'kind' IN ('debate', 'record') AND facts->>'note_id' IS NULL
                                             AND COALESCE(facts->>'trending', 'false') <> 'true'))
     """)).mappings().all()
-    made = {"notes": 0, "youtube": 0}
+    made = {"notes": 0, "youtube": 0, "x": 0}
     for r in rows:
         fact = _with_question(dict(r["facts"] or {}))
         title = note_title(fact)
@@ -156,6 +169,9 @@ def extras_pending(db: Session) -> Dict[str, int]:
         if not fact.get("youtube"):
             fact["youtube"] = youtube_copy(fact, r["caption"] or "", title)
             made["youtube"] += 1
+        if not fact.get("x"):
+            fact["x"] = x_copy(db, fact["carousel_id"], r["caption"] or "")
+            made["x"] += 1
         with engine.begin() as conn:
             conn.execute(text("UPDATE content_packs SET facts = CAST(:f AS jsonb) WHERE id = :i"),
                          {"f": json.dumps(fact, default=str), "i": r["id"]})

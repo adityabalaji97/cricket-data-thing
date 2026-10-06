@@ -12,7 +12,7 @@ import { siteOrigin } from '../ui/ChartExportButton';
  * usage report can count visitors per platform. Recent posts are the carousels marked posted in the admin queue
  * (GET /snapshots/ig/recent).
  */
-const SOURCES = ['instagram', 'youtube'];
+const SOURCES = ['instagram', 'youtube', 'x'];
 const CHANNELS = [
   ['Instagram', 'https://www.instagram.com/hindsightcricket'],
   ['YouTube', 'https://www.youtube.com/@hindsightcricket'],
