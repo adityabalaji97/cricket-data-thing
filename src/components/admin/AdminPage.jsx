@@ -3,8 +3,9 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { Box, Button, Chip, CircularProgress, Snackbar, TextField, Typography } from '@mui/material';
 import axios from 'axios';
 import config from '../../config';
-import { fetchImageFiles, shareFiles, shareImage, siteOrigin } from '../ui/ChartExportButton';
+import { shareImage, siteOrigin } from '../ui/ChartExportButton';
 import GraphicPromptList from '../GraphicPromptList';
+import IgPlanner from './IgPlanner';
 import { apiErrorText } from '../../utils/apiError';
 
 /**
@@ -247,191 +248,14 @@ const IdeaBox = ({ client, toast, onPackCreated }) => {
   );
 };
 
-const PILLAR_LABELS = { debate: 'Debate', myth: 'Myth-busting', weird: 'Weird & wonderful', play: 'Play along', reactive: 'Trending' };
-
-// An Instagram post from the planned calendar (services/ig_backlog.py): the day it is meant for, its pillar, its
-// carousel slides (services/ig_carousel.py, one image each at /img/{id}.png?slide=n) and the caption to paste.
-const IgPackCard = ({ pack, client, onChanged, toast }) => {
-  const facts = pack.facts || {};
-  const carouselId = facts.carousel_id;
-  const slideUrls = carouselId
-    ? Array.from({ length: facts.slides || 1 }, (_, i) => `${siteOrigin()}/img/${carouselId}.png?slide=${i + 1}`)
-    : (pack.snapshot_id ? [`${siteOrigin()}/img/${pack.snapshot_id}.png`] : []);
-  // Sharing several files has to happen inside a tap (iOS), and fetching them first can outlast it: the first tap
-  // fetches the slides, the second opens the share sheet with all of them (Instagram makes them one carousel post).
-  const [files, setFiles] = useState(null);
-  const [preparing, setPreparing] = useState(false);
-  const copy = async (text, what) => {
-    try { await navigator.clipboard.writeText(text); toast(`${what} copied`); } catch { toast('Copy blocked'); }
-  };
-  const update = async (body, done) => {
-    try { await client.patch(`/admin/content/packs/${pack.id}`, body); toast(done); onChanged(); }
-    catch (err) { toast(apiErrorText(err, null) || 'Update failed'); }
-  };
-  const prepare = async () => {
-    setPreparing(true);
-    try {
-      setFiles(await fetchImageFiles(slideUrls, `hindsight-${carouselId || pack.snapshot_id}`));
-    } catch { toast('Could not load the slides'); }
-    setPreparing(false);
-  };
-  const share = async () => {
-    const shared = await shareFiles(files, pack.title);
-    if (shared === 'downloaded') toast(`${files.length} images downloaded`);
-  };
-  // The same post as a 9:16 Reel (services/ig_slides.make_reel): fetch on the first tap, share on the second.
-  const [reel, setReel] = useState(null);
-  const getReel = async () => {
-    try {
-      const res = await fetch(`${config.API_URL}/snapshots/${carouselId}/reel.mp4`);
-      if (!res.ok) { toast('No reel for this post yet'); return; }
-      setReel(new File([await res.blob()], `hindsight-${carouselId}.mp4`, { type: 'video/mp4' }));
-    } catch { toast('Could not load the reel'); }
-  };
-  const day = pack.planned_for
-    ? new Date(`${pack.planned_for}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
-    : 'Bench (fills an open day)';
-  return (
-    <Box sx={{ bgcolor: C.card, border: `1px solid ${C.line}`, borderRadius: 3, p: 2, mb: 2 }}>
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
-        <Typography sx={{ fontSize: 13, color: pack.planned_for ? C.hi : C.lo, fontWeight: 700 }}>{day}</Typography>
-        <Chip size="small" label={PILLAR_LABELS[pack.pillar] || pack.pillar} sx={{ bgcolor: '#1d212b', color: C.mid }} />
-        {slideUrls.length > 1 && <Typography sx={{ fontSize: 12, color: C.lo }}>{slideUrls.length} slides · swipe</Typography>}
-      </Box>
-      {pack.post_by && (
-        // Recaps: news until the sides meet again (or 3 days after a one-off); then the queue drops them.
-        <Typography sx={{ fontSize: 12, color: new Date(pack.post_by) < new Date() ? C.red : C.amber, mb: 1 }}>
-          {deadlineText(pack.post_by)}
-        </Typography>
-      )}
-      <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', scrollSnapType: 'x mandatory', pb: 0.5 }}>
-        {slideUrls.map((u, i) => (
-          <Box key={u} component="a" href={`${u}&download=1`} target="_blank" rel="noopener noreferrer"
-            sx={{ flex: '0 0 auto', width: slideUrls.length > 1 ? '78%' : '100%', maxWidth: 360, scrollSnapAlign: 'start' }}>
-            <Box component="img" src={u} alt={`${pack.title} · slide ${i + 1}`} loading="lazy"
-              sx={{ display: 'block', width: '100%', aspectRatio: '4 / 5', borderRadius: 2, bgcolor: '#14171e', border: `1px solid ${C.line}` }} />
-          </Box>
-        ))}
-      </Box>
-      {slideUrls.length > 0 && (
-        <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
-          <Button variant="contained" onClick={files ? share : prepare} disabled={preparing}
-            sx={{ bgcolor: C.lime, color: C.bg, fontWeight: 700, minHeight: 44, '&:hover': { bgcolor: '#a3dc3f' } }}>
-            {preparing ? 'Loading slides…' : files ? `Share ${files.length} slide${files.length > 1 ? 's' : ''}` : 'Get slides'}
-          </Button>
-          {carouselId && (
-            <Button variant="outlined" onClick={reel ? () => shareFiles([reel], pack.title) : getReel}
-              sx={{ color: C.hi, borderColor: C.line, minHeight: 44 }}>
-              {reel ? 'Share reel' : 'Get reel'}
-            </Button>
-          )}
-          <Typography sx={{ fontSize: 12, color: C.lo, alignSelf: 'center' }}>
-            {files ? 'Opens the share sheet: pick Instagram' : 'Tap a slide to save just that one'}
-          </Typography>
-        </Box>
-      )}
-      {facts.trending && (facts.headlines || []).length > 0 && (
-        <Box sx={{ mt: 1.5 }}>
-          <Typography sx={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: C.lo }}>In the news this morning</Typography>
-          {facts.headlines.slice(0, 3).map((h) => (
-            <Typography key={h.title} sx={{ fontSize: 12, color: C.mid, mt: 0.25 }}>{h.source}: {h.title}</Typography>
-          ))}
-        </Box>
-      )}
-      {facts.kind === 'debate' && (
-        // Why this post: the measures Jev chose for the question (0-4), and how much it thinks fans would argue.
-        <Typography sx={{ fontSize: 12, color: C.lo, mt: 1.5, lineHeight: 1.5 }}>
-          {facts.angles_by === 'jev' ? 'Measures chosen by Jev: ' : 'Default measures: '}
-          {(facts.angles || []).map((a) => (facts.angle_scores?.[a] != null ? `${a} ${facts.angle_scores[a]}` : a)).join(' · ')}
-          {facts.appeal != null && ` · fan appeal ${Number(facts.appeal).toFixed(1)}/4${facts.appeal_by === 'jev' ? ' (Jev)' : ''}`}
-        </Typography>
-      )}
-      <CopyBlock label="Caption" text={pack.caption || pack.title} onCopy={copy} multiline />
-      {facts.youtube && (
-        // The same post as a YouTube Short: the Reel's video ("Get reel"), with a search-phrased title.
-        <>
-          <CopyBlock label="YouTube Short · title" text={facts.youtube.title} onCopy={copy} />
-          <CopyBlock label="YouTube Short · description" text={facts.youtube.description} onCopy={copy} multiline />
-        </>
-      )}
-      {facts.note_id && (
-        <Typography sx={{ fontSize: 13, mt: 1.5 }}>
-          <Box component={RouterLink} to={`/admin/notes?open=${facts.note_id}`} sx={{ color: C.lime }}>
-            Its note for Google search (draft): review and publish
-          </Box>
-        </Typography>
-      )}
-      {(pack.rule_warnings || []).map((w) => (
-        <Typography key={w} sx={{ fontSize: 12, color: C.amber, mt: 0.5 }}>⚠ {w}</Typography>
-      ))}
-      {pack.status === 'ready' ? (
-        <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-          <Button variant="outlined" onClick={() => update({ status: 'posted' }, 'Marked posted')} sx={{ color: C.hi, borderColor: C.line, minHeight: 40, flex: 1 }}>Mark posted</Button>
-          <Button variant="outlined" onClick={() => update({ status: 'skipped' }, 'Skipped')} sx={{ color: C.lo, borderColor: C.line, minHeight: 40, flex: 1 }}>Skip</Button>
-        </Box>
-      ) : (
-        <Typography sx={{ mt: 1.5, fontSize: 12, color: C.lo }}>{pack.status}</Typography>
-      )}
-    </Box>
-  );
-};
-
-// The week at a glance (services/ig_plan.py): each day's post and when to post it, and today's comment kit. The same
-// plan is emailed each morning by the digest routine (GET /digest/instagram).
-const STATUS_COLOR = { posted: C.lime, skipped: C.lo, ready: C.amber };
-const WeekPlan = ({ client, toast }) => {
-  const [plan, setPlan] = useState(null);
-  useEffect(() => {
-    client.get('/admin/content/plan').then(({ data }) => setPlan(data)).catch(() => setPlan({ week: [], comment_kit: [] }));
-  }, [client]);
-  const copy = async (text) => {
-    try { await navigator.clipboard.writeText(text); toast('Copied'); } catch { toast('Copy blocked'); }
-  };
-  if (!plan) return <CircularProgress size={18} sx={{ color: C.lime, mb: 2 }} />;
-  return (
-    <Box sx={{ bgcolor: C.card, border: `1px solid ${C.line}`, borderRadius: 3, p: 2, mb: 2 }}>
-      <Typography sx={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: C.lo, mb: 1 }}>This week</Typography>
-      {plan.week.map((d) => (
-        <Box key={d.date} sx={{ display: 'grid', gridTemplateColumns: '64px 1fr', gap: 1, py: 0.5, borderTop: `1px solid ${C.line}` }}>
-          <Typography sx={{ fontSize: 13, color: C.hi, fontWeight: 600 }}>
-            {new Date(`${d.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })}
-          </Typography>
-          <Box>
-            {d.posts.length === 0 && <Typography sx={{ fontSize: 13, color: C.lo }}>Open: a trending or bench post</Typography>}
-            {d.posts.map((p) => (
-              <Typography key={p.id} sx={{ fontSize: 13, color: C.mid, lineHeight: 1.4 }}>
-                <Box component="span" sx={{ color: STATUS_COLOR[p.status] || C.mid, fontWeight: 600 }}>{p.status === 'posted' ? '✓ ' : ''}{p.time}</Box>
-                {' · '}{p.title}
-              </Typography>
-            ))}
-          </Box>
-        </Box>
-      ))}
-      {plan.comment_kit.length > 0 && (
-        <>
-          <Typography sx={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: C.lo, mt: 2, mb: 0.5 }}>
-            Comment kit · a stat under big accounts' posts, no links
-          </Typography>
-          {plan.comment_kit.map((k) => (
-            <Box key={k} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5 }}>
-              <Typography sx={{ flex: 1, fontSize: 13, color: C.hi, lineHeight: 1.4 }}>{k}</Typography>
-              <Button size="small" onClick={() => copy(k)} sx={{ color: C.lime, minWidth: 0, fontWeight: 700 }}>Copy</Button>
-            </Box>
-          ))}
-        </>
-      )}
-    </Box>
-  );
-};
-
 const SocialTab = ({ client, toast, onAuthFail }) => {
-  const [channel, setChannel] = useState('reddit');
+  const [channel, setChannel] = useState('instagram');
   const [status, setStatus] = useState('ready');
   const [packs, setPacks] = useState(null);
   const [scanning, setScanning] = useState(false);
 
+  // Refreshes keep the list on screen (no spinner, no jump to the top); only a new channel or status starts empty.
   const load = useCallback(async () => {
-    setPacks(null);
     try {
       const { data } = await client.get('/admin/content/packs', { params: { status, channel } });
       setPacks(data.packs);
@@ -442,7 +266,7 @@ const SocialTab = ({ client, toast, onAuthFail }) => {
     }
   }, [client, status, channel, toast, onAuthFail]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPacks(null); load(); }, [load]);
 
   const scan = async () => {
     setScanning(true);
@@ -457,11 +281,13 @@ const SocialTab = ({ client, toast, onAuthFail }) => {
   return (
     <>
       <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5 }}>
-        {[['reddit', 'Reddit / X'], ['instagram', 'Instagram']].map(([c, label]) => (
+        {[['instagram', 'Daily posts'], ['reddit', 'Reddit']].map(([c, label]) => (
           <Chip key={c} label={label} onClick={() => setChannel(c)} variant={channel === c ? 'filled' : 'outlined'}
             sx={{ fontWeight: 700, color: channel === c ? C.bg : C.mid, bgcolor: channel === c ? C.hi : 'transparent', borderColor: C.line }} />
         ))}
       </Box>
+      {channel === 'instagram' ? <IgPlanner client={client} toast={toast} onAuthFail={onAuthFail} /> : (
+      <>
       <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
         {STATUSES.map((s) => (
           <Chip key={s} label={s} onClick={() => setStatus(s)}
@@ -473,19 +299,17 @@ const SocialTab = ({ client, toast, onAuthFail }) => {
           </Button>
         )}
       </Box>
-      {status === 'ready' && channel === 'reddit' && <IdeaBox client={client} toast={toast} onPackCreated={load} />}
-      {status === 'ready' && channel === 'instagram' && <WeekPlan client={client} toast={toast} />}
+      {status === 'ready' && <IdeaBox client={client} toast={toast} onPackCreated={load} />}
       {packs === null && <CircularProgress size={22} sx={{ color: C.lime }} />}
       {packs && packs.length === 0 && (
         <Typography sx={{ color: C.lo, py: 4 }}>
           {status !== 'ready' ? `No ${status} packs.`
-            : channel === 'instagram' ? 'No Instagram posts lined up. Run scripts/build_ig_backlog.py --write.'
-              : 'No packs waiting. New ones arrive after the nightly load.'}
+            : 'No packs waiting. New ones arrive after the nightly load.'}
         </Typography>
       )}
-      {(packs || []).map((p) => (channel === 'instagram'
-        ? <IgPackCard key={p.id} pack={p} client={client} onChanged={load} toast={toast} />
-        : <PackCard key={p.id} pack={p} client={client} onChanged={load} toast={toast} />))}
+      {(packs || []).map((p) => <PackCard key={p.id} pack={p} client={client} onChanged={load} toast={toast} />)}
+      </>
+      )}
     </>
   );
 };

@@ -36,7 +36,7 @@ def list_packs(status: str = "ready", channel: str = "reddit", limit: int = 60, 
     rows = db.execute(text(f"""
         SELECT p.id, p.match_id, p.snapshot_id, p.title, p.first_comment, p.subreddit, p.flair, p.facts,
                p.rule_warnings, p.status, p.post_by, p.posted_url, p.source, p.created_at,
-               p.channel, p.planned_for, p.pillar, p.caption,
+               p.channel, p.planned_for, p.pillar, p.caption, p.angle_key,
                m.date AS match_date, m.team1, m.team2, m.competition, m.data_source, s.kind AS snapshot_kind
         FROM content_packs p
         LEFT JOIN matches m ON m.id = p.match_id
@@ -45,7 +45,15 @@ def list_packs(status: str = "ready", channel: str = "reddit", limit: int = 60, 
         ORDER BY {order}
         LIMIT :limit
     """), {"status": status, "channel": channel, "limit": min(limit, 200)}).mappings()
-    return {"packs": [dict(r) for r in rows]}
+    packs = [dict(r) for r in rows]
+    if channel == "instagram":
+        # The admin's day list: what kind of post each is and when to post it (services/ig_plan.py).
+        from services.ig_plan import TIMES, _kind
+
+        for p in packs:
+            p["kind"] = _kind(p)
+            p["time"] = TIMES.get(p["kind"], "1 pm")
+    return {"packs": packs}
 
 
 class PackUpdate(BaseModel):
@@ -54,6 +62,11 @@ class PackUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=300)
     # Switch the pack's image to another chart form it was built with (facts.chart_options).
     snapshot_id: Optional[str] = Field(default=None, max_length=32)
+    # Instagram posts: where it has gone out so far (facts.posted_on), ticked per platform in the admin.
+    posted_on: Optional[List[str]] = None
+
+
+PLATFORMS = ("instagram", "youtube", "x")
 
 
 @router.patch("/packs/{pack_id}")
@@ -90,6 +103,12 @@ def update_pack(pack_id: int, body: PackUpdate, db: Session = Depends(get_sessio
             _errors, warnings = content_rules.check_title(option["title"], known, facts.get("subject"))
             sets += ["title = :title", "rule_warnings = CAST(:w AS jsonb)"]
             params.update(title=option["title"], w=json.dumps(_errors + warnings))
+    if body.posted_on is not None:
+        unknown = set(body.posted_on) - set(PLATFORMS)
+        if unknown:
+            raise HTTPException(status_code=400, detail=f"posted_on takes {', '.join(PLATFORMS)}")
+        sets.append("facts = jsonb_set(COALESCE(facts, '{}'::jsonb), '{posted_on}', CAST(:po AS jsonb))")
+        params["po"] = json.dumps([p for p in PLATFORMS if p in body.posted_on])
     if not sets:
         return {"ok": True}
     from database import engine

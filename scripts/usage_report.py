@@ -36,6 +36,7 @@ NOTES_COLUMNS = [
     ("embed_views", "embed views"), ("embed_hosts", "embed sites"), ("embed_visitors", "from embeds"),
     ("packs_posted", "packs posted"), ("pack_visitors", "from packs"), ("instagram_visitors", "from Instagram"),
     ("youtube_visitors", "from YouTube"),
+    ("x_visitors", "from X"),
 ]
 
 
