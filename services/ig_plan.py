@@ -77,6 +77,7 @@ def week(db: Session, start: date, days: int = 7) -> List[Dict[str, Any]]:
 NEEDS_CHART = re.compile(r"^(\d+ of \d+|None of|Only \d+|Other |How they|Nobody )", re.I)
 #: "hits 20% of boundaries to midwicket (field: 20%)": no different from anyone, not worth a comment.
 SAME_AS_FIELD = re.compile(r"(\d+)% of .*\(field: \1%\)")
+RANK_NOTE = re.compile(r" \([^()]*: #\d+\)")
 SCOPE = re.compile(r"\b(IPL|ODIs?|T20Is?|T20|BBL|PSL|SA20|since|20\d\d)\b")
 
 
@@ -97,6 +98,7 @@ def _card_titles(db: Session, carousel_ids: List[str]) -> List[str]:
             # Only a real scope ("IPL since 2023"), not a sample note ("503 boundaries with a direction").
             if not SCOPE.search(scope) or scope[:1].isdigit():
                 scope = ""
+            t = RANK_NOTE.sub("", t)  # "(Kishan: #26)" only means something on its own post
             line = f"{t} · {scope}" if scope and scope.lower() not in t.lower() else t
             if line not in titles:
                 titles.append(line)
