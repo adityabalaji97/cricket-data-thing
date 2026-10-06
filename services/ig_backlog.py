@@ -379,17 +379,17 @@ def preview_post(db: Session, venue: str, team1: str, team2: str, cards: Optiona
     """A match-day post (pillar 'reactive'): the chosen cards of the fixture's preview story, as the story's own card
     JSON, so each slide is drawn by the same component as the card in the app (/ig/:id/:n renders it)."""
     from services import ig_captions, ig_carousel
-    from services.preview_cards import PreviewContext, build_story, context_params
+    from services.preview_cards import PreviewContext, cached_story, context_params
 
     ctx = PreviewContext(db=db, venue=venue, team1=team1, team2=team2, fmt=fmt, gender="male",
                          team1_short=team1_short, team2_short=team2_short)
     params = context_params(ctx)
-    story = build_story(ctx)
+    story = cached_story(db, ctx)  # the story the site shows for this fixture
     built = {c["id"]: c for chapter in story["chapters"] for c in chapter["cards"]}
-    if not cards:  # the story's best single-image cards (services/ig_posts/match.PREVIEW_CARDS)
-        from services.ig_posts.match import pick_preview_cards
+    if not cards:  # each chapter's lead card, as the site's story swipes through them
+        from services.ig_posts.match import chapter_leads
 
-        cards = pick_preview_cards(story)
+        cards = chapter_leads(story)
     chosen, titles, warnings = [], [], []
     for card_id in cards:
         card = built.get(card_id)

@@ -69,6 +69,17 @@ PARAM_KEYS = ("venue", "team1", "team2", "team1_short", "team2_short", "format",
               "include_international", "top_teams", "day_or_night")
 
 
+def cached_story(db, ctx: PreviewContext) -> Dict[str, Any]:
+    """The story as the site serves it (GET /match-preview-cards): a story is ~30 queries, so the finished story is cached
+    per data load (query_cache) and a repeat view is one lookup. STORY_VERSION keeps a deploy from serving stories built
+    by older code. The Instagram preview (services/ig_backlog.preview_post) reads it here too, so its slides are the
+    story the site shows."""
+    from services.query_cache import cached_run
+
+    key = {"endpoint": "preview_story", "story_version": STORY_VERSION, **context_params(ctx)}
+    return cached_run(db, key, lambda: build_story(ctx))
+
+
 def context_params(ctx: PreviewContext) -> Dict[str, Any]:
     return {"venue": ctx.venue, "team1": ctx.team1, "team2": ctx.team2, "team1_short": ctx.team1_short,
             "team2_short": ctx.team2_short, "format": ctx.fmt,
@@ -115,4 +126,4 @@ def build_card(ctx: PreviewContext, card_id: str) -> Optional[Tuple[Dict[str, An
     return (card.to_json(), titles[card.chapter]) if card else None
 
 
-__all__ = ["PreviewContext", "STORY_VERSION", "build_story", "build_card", "context_from_params", "context_params", "REGISTRY"]
+__all__ = ["PreviewContext", "STORY_VERSION", "build_story", "cached_story", "build_card", "context_from_params", "context_params", "REGISTRY"]
