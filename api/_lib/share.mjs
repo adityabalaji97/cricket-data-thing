@@ -8,6 +8,15 @@
 export const API_BASE = process.env.HINDSIGHT_API_BASE || 'https://cricket-data-thing-672dfbacf476.herokuapp.com';
 export const SITE_URL = (process.env.SITE_URL || 'https://hindsightcricket.com').replace(/\/$/, '');
 export const SITE_NAME = 'Hindsight';
+// The brand's own channels: schema.org sameAs, so search engines tie them to the site.
+export const SOCIAL_PROFILES = [
+  'https://www.instagram.com/hindsightcricket',
+  'https://www.youtube.com/@hindsightcricket',
+];
+export const ORGANIZATION = {
+  '@context': 'https://schema.org', '@type': 'Organization', name: SITE_NAME, url: SITE_URL,
+  logo: `${SITE_URL}/brand/instagram-avatar-bat-h.png`, sameAs: SOCIAL_PROFILES,
+};
 export const DEFAULT_TITLE = 'Hindsight - T20 cricket analytics';
 export const DEFAULT_DESCRIPTION =
   'Ball-by-ball T20 and ODI analytics: Impact, win probability, matchups, match previews and a query builder you can ask in plain English.';
@@ -165,7 +174,7 @@ async function noteSummary(slug) {
       datePublished: note.published_at,
       dateModified: note.updated_at || note.published_at,
       author,
-      publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+      publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL, sameAs: SOCIAL_PROFILES },
       mainEntityOfPage: `${SITE_URL}/notes/${note.slug}`,
       ...(image ? { image: [image] } : {}),
     },

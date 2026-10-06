@@ -3,7 +3,7 @@
 // so people keep getting the static app with no extra hop. The body is the same SPA shell, except
 // on notes, where the article (and each chart's numbers as a table) is rendered into #root so
 // crawlers index the words without running JavaScript.
-import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, SITE_URL, summarize } from './_lib/share.mjs';
+import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, ORGANIZATION, SITE_URL, summarize } from './_lib/share.mjs';
 import { noteArticleHtml, notesIndexHtml } from './_lib/note_html.mjs';
 
 let cachedShell = null;
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     url: `${SITE_URL}${pagePath}`,
     image: summary?.image || `${SITE_URL}/_og?path=${encodeURIComponent(pagePath)}`,
     ogType: summary?.ogType,
-    jsonLd: summary?.jsonLd,
+    jsonLd: summary?.jsonLd || (path === '/' ? ORGANIZATION : null),
     article: summary?.ogType === 'article' ? summary : null,
   });
 
