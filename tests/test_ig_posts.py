@@ -141,3 +141,13 @@ def test_reel_is_optional_without_ffmpeg(monkeypatch, tmp_path):
     assert ig_slides.make_reel("x", [tmp_path / "1.png", tmp_path / "2.png"]) is None  # the carousel is unaffected
     total = ig_slides.REEL_HOOK + 3 * ig_slides.REEL_SLIDE + ig_slides.REEL_END
     assert 10 < total < 60  # a five-slide post is a sensible Reel length
+
+
+def test_comment_kit_drops_lines_that_need_their_chart():
+    from services import ig_plan
+
+    assert ig_plan.NEEDS_CHART.match("1 of 5 tests finds a clear effect")
+    assert ig_plan.NEEDS_CHART.match("Only 2 of 93 beat Kohli on both strike rate and average")
+    assert not ig_plan.NEEDS_CHART.match("Jasprit Bumrah saves the most at the death: +33 runs per 100 balls")
+    assert ig_plan.SAME_AS_FIELD.search("Kohli hits 20% of boundaries to midwicket (field: 20%)")
+    assert not ig_plan.SAME_AS_FIELD.search("Iyer hits 27% of boundaries to midwicket (field: 18%)")

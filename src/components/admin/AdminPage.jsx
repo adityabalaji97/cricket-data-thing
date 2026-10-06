@@ -362,6 +362,54 @@ const IgPackCard = ({ pack, client, onChanged, toast }) => {
   );
 };
 
+// The week at a glance (services/ig_plan.py): each day's post and when to post it, and today's comment kit. The same
+// plan is emailed each morning by the digest routine (GET /digest/instagram).
+const STATUS_COLOR = { posted: C.lime, skipped: C.lo, ready: C.amber };
+const WeekPlan = ({ client, toast }) => {
+  const [plan, setPlan] = useState(null);
+  useEffect(() => {
+    client.get('/admin/content/plan').then(({ data }) => setPlan(data)).catch(() => setPlan({ week: [], comment_kit: [] }));
+  }, [client]);
+  const copy = async (text) => {
+    try { await navigator.clipboard.writeText(text); toast('Copied'); } catch { toast('Copy blocked'); }
+  };
+  if (!plan) return <CircularProgress size={18} sx={{ color: C.lime, mb: 2 }} />;
+  return (
+    <Box sx={{ bgcolor: C.card, border: `1px solid ${C.line}`, borderRadius: 3, p: 2, mb: 2 }}>
+      <Typography sx={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: C.lo, mb: 1 }}>This week</Typography>
+      {plan.week.map((d) => (
+        <Box key={d.date} sx={{ display: 'grid', gridTemplateColumns: '64px 1fr', gap: 1, py: 0.5, borderTop: `1px solid ${C.line}` }}>
+          <Typography sx={{ fontSize: 13, color: C.hi, fontWeight: 600 }}>
+            {new Date(`${d.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })}
+          </Typography>
+          <Box>
+            {d.posts.length === 0 && <Typography sx={{ fontSize: 13, color: C.lo }}>Open: a trending or bench post</Typography>}
+            {d.posts.map((p) => (
+              <Typography key={p.id} sx={{ fontSize: 13, color: C.mid, lineHeight: 1.4 }}>
+                <Box component="span" sx={{ color: STATUS_COLOR[p.status] || C.mid, fontWeight: 600 }}>{p.status === 'posted' ? '✓ ' : ''}{p.time}</Box>
+                {' · '}{p.title}
+              </Typography>
+            ))}
+          </Box>
+        </Box>
+      ))}
+      {plan.comment_kit.length > 0 && (
+        <>
+          <Typography sx={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: C.lo, mt: 2, mb: 0.5 }}>
+            Comment kit · a stat under big accounts' posts, no links
+          </Typography>
+          {plan.comment_kit.map((k) => (
+            <Box key={k} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5 }}>
+              <Typography sx={{ flex: 1, fontSize: 13, color: C.hi, lineHeight: 1.4 }}>{k}</Typography>
+              <Button size="small" onClick={() => copy(k)} sx={{ color: C.lime, minWidth: 0, fontWeight: 700 }}>Copy</Button>
+            </Box>
+          ))}
+        </>
+      )}
+    </Box>
+  );
+};
+
 const SocialTab = ({ client, toast, onAuthFail }) => {
   const [channel, setChannel] = useState('reddit');
   const [status, setStatus] = useState('ready');
@@ -412,6 +460,7 @@ const SocialTab = ({ client, toast, onAuthFail }) => {
         )}
       </Box>
       {status === 'ready' && channel === 'reddit' && <IdeaBox client={client} toast={toast} onPackCreated={load} />}
+      {status === 'ready' && channel === 'instagram' && <WeekPlan client={client} toast={toast} />}
       {packs === null && <CircularProgress size={22} sx={{ color: C.lime }} />}
       {packs && packs.length === 0 && (
         <Typography sx={{ color: C.lo, py: 4 }}>
