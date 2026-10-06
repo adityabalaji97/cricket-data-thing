@@ -150,9 +150,33 @@ def draft_recap(db: Session, match: Dict[str, Any], dry_run: bool = False) -> Op
         except SnapshotError as exc:
             logger.info("no win-probability chart for %s: %s", match_id, exc)
     draft = compose_recap(match, result, recap, packs, win_prob_id or ("WINPROB" if primer and dry_run else None))
+    if draft:
+        draft = search_titled(db, draft, match["team1"], match["team2"], match.get("format") or "T20",
+                              match.get("date"), "recap")
     if not draft or dry_run:
         return draft
     return _save(db, draft, kind="recap", match_id=match_id)
+
+
+def search_titled(db: Session, draft: Dict[str, Any], team1: str, team2: str, fmt: str, day: Any,
+                  kind: str) -> Dict[str, Any]:
+    """International matches get the title people search ("India vs West Indies 2nd T20 2026 preview: ..."),
+    keeping the drafted headline after the colon. The match number counts the sides' meetings in the 30 days before
+    (a series). League matches keep their title: people search them by nickname ("csk vs mi"), not yet mapped."""
+    from models import INTERNATIONAL_TEAMS_RANKED
+    from services.search_titles import match_title
+
+    if not day or team1 not in INTERNATIONAL_TEAMS_RANKED or team2 not in INTERNATIONAL_TEAMS_RANKED:
+        return draft
+    day = date.fromisoformat(str(day)[:10]) if not isinstance(day, date) else day
+    n = db.execute(text("""
+        SELECT COUNT(*) FROM matches
+        WHERE ((team1 = :a AND team2 = :b) OR (team1 = :b AND team2 = :a)) AND format = :fmt AND gender = 'male'
+          AND date >= :since AND date < :day
+    """), {"a": team1, "b": team2, "fmt": fmt, "since": day - timedelta(days=30), "day": day}).scalar() or 0
+    old = draft["title"]
+    tail = old.split(": ", 1)[1] if ": " in old else ""
+    return {**draft, "title": match_title(team1, team2, fmt, n + 1, day.year, kind, tail)}
 
 
 # ------------------------------------------------------------------------------------- previews
@@ -288,6 +312,8 @@ def draft_preview(db: Session, fixture: Dict[str, Any], dry_run: bool = False) -
     chart = None if dry_run else _story_chart(db, story, built["sections"])
     known = [{"facts": built["facts"]}]
     draft = compose_preview(fixture, built["sections"], built["headline"], known, chart)
+    draft = search_titled(db, draft, fixture["team1"], fixture["team2"], fixture["format"],
+                          datetime.fromisoformat(fixture["start_utc"]).astimezone(IST).date(), "preview")
     if dry_run:
         return draft
     return _save(db, draft, kind="preview", match_id=str(fixture["match_id"]))

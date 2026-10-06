@@ -11,6 +11,12 @@ Plan: [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md) · Working dir: `/Users/adity
 
 > ### START HERE (2026-09-24) — U1 + Phase 0 live
 >
+> **SEARCH TITLES, NOTES FROM POSTS, YOUTUBE (2026-10-06).** services/search_titles.py (Google autocomplete, best-effort; a
+> year only when the data is that year), note_drafts.search_titled (international preview/recap notes: "India vs West
+> Indies 2nd T20 2026 preview: ..."), services/ig_notes.py (debate/record posts -> draft analysis notes with slide images +
+> markdown tables; YouTube Short title/description in facts.youtube; extras_pending hooked into build_ig_backlog,
+> ig_match_day, trend_radar; --extras-pending). Admin card: YouTube copy + note link. Digest lists notes to publish.
+>
 > **INSTAGRAM BIO LINK + REELS (2026-10-06).** /links (src/components/ig/IgLinks.jsx): the bio page, every link tagged
 > utm_source=instagram&utm_medium=bio_link, recent posted carousels from GET /snapshots/ig/recent; usage report counts
 > instagram_visitors. /g/<carousel> shows every slide. Reels: migration 019 ig_reels (prod applied); ig_slides.make_reel

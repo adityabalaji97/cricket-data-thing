@@ -151,3 +151,31 @@ def test_comment_kit_drops_lines_that_need_their_chart():
     assert not ig_plan.NEEDS_CHART.match("Jasprit Bumrah saves the most at the death: +33 runs per 100 balls")
     assert ig_plan.SAME_AS_FIELD.search("Kohli hits 20% of boundaries to midwicket (field: 20%)")
     assert not ig_plan.SAME_AS_FIELD.search("Iyer hits 27% of boundaries to midwicket (field: 18%)")
+
+
+def test_search_titles_use_searched_wording_and_honest_years(monkeypatch):
+    from services import search_titles as T
+
+    fake = {"india vs west indies 2nd t20": ("india vs west indies 2nd t20 tickets", "india vs west indies 2nd t20",
+                                             "india vs west indies 2nd t20 2026", "india vs west indies 2nd t20 live score"),
+            "best finisher in ipl": ("best finisher in ipl", "best finisher in ipl 2026", "best finisher in ipl history")}
+    monkeypatch.setattr(T, "suggestions", lambda seed: fake.get(seed.lower(), ()))
+    assert T.match_title("India", "West Indies", "T20", 2, 2026, "preview", "par about 185") == \
+        "India vs West Indies 2nd T20 2026 preview: Par about 185"
+    # Data since 2023 never gets "2026" in its title, even though people search it.
+    assert T.debate_title("finisher", "IPL", "since 2023", ["Impact", "strike rate"]) == \
+        "Best finisher in IPL since 2023: Impact and strike rate compared"
+    assert T.best_phrase("india vs west indies 2nd t20", years=[2026]) == "india vs west indies 2nd t20"  # no tickets
+    assert T.best_phrase("india vs west indies 2nd t20", years=[2026], prefer=["2026"]) == "india vs west indies 2nd t20 2026"
+
+
+def test_note_tables_and_youtube_copy():
+    from services import ig_notes
+
+    card = {"visual": "metric_bars", "title": "X leads", "payload": {"metric": {"label": "strike rate", "format": "dec1"},
+            "rows": [{"name": "A B", "value": 150.0}, {"name": "C D", "value": 140.0}]}}
+    assert ig_notes.card_table(card).splitlines()[:3] == ["| # | Player | Strike rate |", "|---|---|---|", "| 1 | A B | 150.0 |"]
+    yt = ig_notes.youtube_copy({"kicker": "IPL"}, "Who?\n\nAnswer.\n\nFree ball-by-ball cricket stats: link in bio.\n.\n#a #b",
+                               "Best finisher in IPL since 2023: Impact compared")
+    assert yt["title"].endswith("#shorts") and len(yt["title"]) <= 100
+    assert "link in bio" not in yt["description"] and yt["description"].endswith("#cricket #IPL #shorts")

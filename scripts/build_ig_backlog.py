@@ -29,11 +29,18 @@ def main() -> int:
     parser.add_argument("--refresh", action="append", help="remake these queued posts in place (keeps their day)")
     parser.add_argument("--render-pending", action="store_true", help="render queued carousels missing slides, then stop")
     parser.add_argument("--reels-pending", action="store_true", help="make reels for queued carousels without one, then stop")
+    parser.add_argument("--extras-pending", action="store_true", help="draft notes + YouTube copy for posts lacking them")
     args = parser.parse_args()
 
     from services import ig_backlog
 
     start = date.fromisoformat(args.start)
+    if args.extras_pending:
+        from database import get_session
+        from services import ig_notes
+
+        print(f"notes and YouTube copy: {ig_notes.extras_pending(next(get_session()))}")
+        return 0
     if args.reels_pending:
         r = ig_backlog.reels_pending()
         print(f"reels made {r['made']}, still missing {r['missing']}")
@@ -56,6 +63,9 @@ def main() -> int:
 
         db = next(get_session())
         result = ig_backlog.build(db, start, args.days, write=True, only=args.only)
+        from services import ig_notes
+
+        print(f"notes and YouTube copy: {ig_notes.extras_pending(db)}")
         if not args.no_render:
             posts = [e["post"] for e in result["calendar"] if e["post"]] + result["bench"]
             rendered = ig_backlog.render_carousels(posts, args.base)

@@ -66,6 +66,10 @@ def main() -> int:
         retry = ig_backlog.render_pending(args.base)
         if retry["failed"]:
             print(f"still unrendered: {retry['failed']}")
+    if queued:
+        from services import ig_notes
+
+        print(f"YouTube copy: {ig_notes.extras_pending(db)}")
     print("dry run: nothing saved" if args.dry_run else f"{queued} trending posts queued")
     return 0
 

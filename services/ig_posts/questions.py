@@ -44,6 +44,7 @@ class Question:
     priority: int = 2    # template priority (0..4), the fallback for Jev's appeal score
     subject: Optional[str] = None
     tags: List[str] = field(default_factory=list)
+    noun: str = ""       # "finisher", "player of spin": how search titles name the role (services/search_titles)
 
 
 # Scopes: (key, hook phrase, sample label, kicker, fmt, params). T20Is and ODIs keep to matches between the top 10
@@ -100,11 +101,11 @@ def candidates() -> List[Question]:
                     out.append(Question(
                         key=f"{skey}-{role}-{key}", text=text, role=role, fmt=fmt, params={**sparams, **filters},
                         min_balls=mins[skey], scope_label=f"{slabel} · {mins[skey]:,}+ balls", kicker=kicker,
-                        priority=prio + (1 if skey == "ipl23" else 0)))
+                        priority=prio + (1 if skey == "ipl23" else 0), noun=noun))
     for key, label, kicker, fmt, params, mb, prio in PAIR_SCOPES:
         out.append(Question(key=key, text=f"What is the most complete {kicker if kicker != 'ODIs' else 'ODI'} partnership?",
                             role="partnership", fmt=fmt, params=params, min_balls=mb,
-                            scope_label=f"{label} · {mb:,}+ balls together", kicker=kicker, priority=prio))
+                            scope_label=f"{label} · {mb:,}+ balls together", kicker=kicker, priority=prio, noun="partnership"))
     return out
 
 

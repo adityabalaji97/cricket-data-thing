@@ -193,6 +193,7 @@ def _record_post(db: Session, item: Dict[str, Any], created_by: str) -> Optional
                   "body": "Every number comes from ball-by-ball data. Ask your own question on the query builder: it's free."}])
     carousel = ig_carousel.save(db, slides, built["title"], {"record": item["key"]}, created_by)
     fact = {"kind": "record", "subject": None, "title": built["title"], "verdict": built["verdict"],
+            "hook": built["hook"], "kicker": built["kicker"],
             "carousel_id": carousel["id"], "slides": len(slides), "render": True}
     caption = ig_captions.build(built["hook"], built["verdict"], "weird",
                                 "careers counted from the first ball-by-ball season; rates over each career up to the milestone.",
@@ -294,6 +295,7 @@ def debate_posts(db: Session, only: Optional[List[str]] = None, limit: int = DEB
         carousel = ig_carousel.save(db, built["slides"], q.text, {"debate": q.key}, "ig-debate")
         plan = entry["plan"]
         fact = {"kind": "debate", "subject": None, "title": q.text, "verdict": built["verdict"], "question": q.key,
+                "noun": q.noun, "kicker": q.kicker, "scope_label": q.scope_label,
                 "leaders": built["leaders"], "angles": [a.id for a in plan["angles"]], "angle_scores": plan["scores"],
                 "angles_by": plan["by"], "appeal": entry["appeal"], "appeal_by": entry["appeal_by"],
                 "method": built["method"], "carousel_id": carousel["id"], "slides": len(built["slides"]),
