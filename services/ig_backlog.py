@@ -378,10 +378,14 @@ def preview_post(db: Session, venue: str, team1: str, team2: str, cards: Optiona
                  team1_short: Optional[str] = None, team2_short: Optional[str] = None, fmt: str = "T20") -> Dict[str, Any]:
     """A match-day post (pillar 'reactive'): the chosen cards of the fixture's preview story, as the story's own card
     JSON, so each slide is drawn by the same component as the card in the app (/ig/:id/:n renders it)."""
+    from mcp_server.server import _default_window
     from services import ig_captions, ig_carousel
     from services.preview_cards import PreviewContext, cached_story, context_params
 
-    ctx = PreviewContext(db=db, venue=venue, team1=team1, team2=team2, fmt=fmt, gender="male",
+    # The site's history window (4 years for T20s, 8 for ODIs): without it every baseline ran back to 2008, and a
+    # ground slower than today's IPL read as faster than the all-time average.
+    start, _ = _default_window(fmt)
+    ctx = PreviewContext(db=db, venue=venue, team1=team1, team2=team2, fmt=fmt, gender="male", start=start,
                          team1_short=team1_short, team2_short=team2_short)
     params = context_params(ctx)
     story = cached_story(db, ctx)  # the story the site shows for this fixture
