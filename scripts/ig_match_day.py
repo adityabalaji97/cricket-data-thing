@@ -102,6 +102,10 @@ def main() -> int:
         result = ig_slides.render(post["fact"]["carousel_id"], post["fact"]["slides"], args.base)
         print(f"queued {post['key']} for {day}; rendered {len(result['ok'])}/{post['fact']['slides']} slides"
               + (f", failed {result['failed']}" if result["failed"] else ""))
+    if made:
+        from services import ig_notes
+
+        print(f"notes and YouTube copy: {ig_notes.extras_pending(db)}")
     print("dry run: nothing saved" if args.dry_run else f"{len(made)} posts queued")
     return 0
 

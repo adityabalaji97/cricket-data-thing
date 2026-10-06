@@ -67,7 +67,8 @@ def week(db: Session, start: date, days: int = 7) -> List[Dict[str, Any]]:
             "date": day.isoformat(),
             "posts": [{"id": r["id"], "kind": _kind(r), "title": r["title"], "status": r["status"],
                        "time": TIMES.get(_kind(r), "1 pm"), "slides": (r["facts"] or {}).get("slides"),
-                       "carousel_id": (r["facts"] or {}).get("carousel_id")} for r in picked],
+                       "carousel_id": (r["facts"] or {}).get("carousel_id"),
+                       "note_id": (r["facts"] or {}).get("note_id")} for r in picked],
             "trending_extra": max(0, len(trends) - (1 if trends and trends[0] in picked else 0)),
         })
     return out

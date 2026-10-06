@@ -30,6 +30,16 @@ def main() -> int:
         out.append(f"🏏 **Match today:** {matches[day]}. Nothing new after 6 pm IST.\n")
     out.append("### Post today")
     out += [f"- [ ] **{p['time']}** · {p['title']} ({p['slides']} slides)" for p in today] or ["- Nothing new to post today."]
+    notes = [p for p in today if p.get("note_id")]
+    if notes:
+        # The post's note: publish it the same day so Google finds the page while people search the topic.
+        out += [f"- [ ] Publish its note for Google: https://hindsightcricket.com/admin/notes?open={p['note_id']}" for p in notes]
+    drafts = db.execute(__import__("sqlalchemy").text(
+        "SELECT id, title FROM notes WHERE status = 'draft' AND kind IN ('preview', 'recap') AND created_at >= now() - interval '2 days' "
+        "ORDER BY id DESC LIMIT 4")).all()
+    if drafts:
+        out.append("\n### Match notes to publish (Google search)")
+        out += [f"- [ ] {t}: https://hindsightcricket.com/admin/notes?open={i}" for i, t in drafts]
     out.append("\nOpen the queue: https://hindsightcricket.com/admin (Social → Instagram)")
     if d["comment_kit"]:
         out.append("\n### Comment kit\nTen minutes on big cricket accounts' posts: one stat, no links.\n")

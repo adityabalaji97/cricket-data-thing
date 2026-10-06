@@ -347,6 +347,20 @@ const IgPackCard = ({ pack, client, onChanged, toast }) => {
         </Typography>
       )}
       <CopyBlock label="Caption" text={pack.caption || pack.title} onCopy={copy} multiline />
+      {facts.youtube && (
+        // The same post as a YouTube Short: the Reel's video ("Get reel"), with a search-phrased title.
+        <>
+          <CopyBlock label="YouTube Short · title" text={facts.youtube.title} onCopy={copy} />
+          <CopyBlock label="YouTube Short · description" text={facts.youtube.description} onCopy={copy} multiline />
+        </>
+      )}
+      {facts.note_id && (
+        <Typography sx={{ fontSize: 13, mt: 1.5 }}>
+          <Box component={RouterLink} to={`/admin/notes?open=${facts.note_id}`} sx={{ color: C.lime }}>
+            Its note for Google search (draft): review and publish
+          </Box>
+        </Typography>
+      )}
       {(pack.rule_warnings || []).map((w) => (
         <Typography key={w} sx={{ fontSize: 12, color: C.amber, mt: 0.5 }}>⚠ {w}</Typography>
       ))}
