@@ -393,6 +393,66 @@ const PairDumbbell = ({ payload }) => {
  * "Whose innings is this?": the Guess the Innings game's own clue card and wagon wheel.
  * payload: the game's puzzle question (runs, balls, strike_rate, fours, sixes, bat_hand, season, deliveries[{x, y, runs}])
  */
+/**
+ * One innings of the match page's Impact scorecard (services/ig_posts/match.innings_scorecards): batting in order with
+ * runs (balls), strike rate and Impact (* = not out), then the bowling as the match page shows it: figures, wickets,
+ * Impact. Impact is green when it helped the player's side, red when it hurt; no Impact column when the match has none.
+ * payload: {batting_team, bowling_team, accent, bowl_accent, has_impact,
+ *           batting:[{name, runs, balls, sr, impact, not_out}], bowling:[{name, figures, wickets, impact}]}
+ */
+const InningsScorecard = ({ payload }) => {
+  const { batting, bowling, has_impact: hasImpact } = payload;
+  // A full innings is up to 11 batters and 8 bowlers: rows tighten as they add up, so the card never scrolls.
+  const dense = batting.length + bowling.length > 14;
+  const fs = dense ? 11.5 : 12.5;
+  const impactCell = (v) => (
+    <Typography sx={{ ...mono, fontSize: fs - 0.5, lineHeight: 1.3, textAlign: 'right', color: v == null ? colors.textLo : v >= 0 ? colors.accent : colors.red }}>
+      {v == null ? '' : fmt(v, 'signed1')}
+    </Typography>
+  );
+  const batCols = hasImpact ? '1fr 64px 36px 46px' : '1fr 64px 36px';
+  const bowlCols = hasImpact ? '1fr 64px 36px 46px' : '1fr 64px 36px';
+  const head = (labels, cols, color) => (
+    <Box sx={{ display: 'grid', gridTemplateColumns: cols, gap: '6px', pb: '3px', borderBottom: `1px solid ${colors.border}` }}>
+      {labels.map((l, i) => (
+        <Typography key={l} sx={{ fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase', color: i === 0 ? color : colors.textLo,
+          textAlign: i === 0 ? 'left' : 'right', fontWeight: i === 0 ? 700 : 400 }}>{l}</Typography>
+      ))}
+    </Box>
+  );
+  const row = { display: 'grid', gap: '6px', alignItems: 'baseline', py: dense ? 0 : '1.5px' };
+  const name = { fontSize: fs, lineHeight: 1.3, color: colors.textHi, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+  const num = { ...mono, fontSize: fs - 0.5, lineHeight: 1.3, color: colors.textMed, textAlign: 'right' };
+  const batColour = payload.accent || colors.accent;
+  const bowlColour = payload.bowl_accent || colors.textMed;
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: dense ? 0.75 : 1 }}>
+      <Box>
+        {head([`${payload.batting_team} batting${payload.overs ? ` · ${payload.overs} ov` : ''}`, 'R (B)', 'SR', ...(hasImpact ? ['Impact'] : [])], batCols, batColour)}
+        {batting.map((r) => (
+          <Box key={r.name} sx={{ ...row, gridTemplateColumns: batCols }}>
+            <Typography sx={name}>{r.name}{r.not_out ? '*' : ''}</Typography>
+            <Typography sx={{ ...num, color: colors.textHi }}>{r.runs} ({r.balls})</Typography>
+            <Typography sx={num}>{r.sr != null ? Math.round(r.sr) : ''}</Typography>
+            {hasImpact && impactCell(r.impact)}
+          </Box>
+        ))}
+      </Box>
+      <Box>
+        {head([`${payload.bowling_team} bowling`, 'O-M-R', 'W', ...(hasImpact ? ['Impact'] : [])], bowlCols, bowlColour)}
+        {bowling.map((r) => (
+          <Box key={r.name} sx={{ ...row, gridTemplateColumns: bowlCols }}>
+            <Typography sx={name}>{r.name}</Typography>
+            <Typography sx={num}>{r.figures}</Typography>
+            <Typography sx={{ ...num, color: colors.textHi }}>{r.wickets}</Typography>
+            {hasImpact && impactCell(r.impact)}
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+};
+
 const InningsWagon = ({ payload }) => (
   // The game's clue card already holds its wheel and run legend; zoomed a little so the whole card fits a 4:5 slide.
   <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', zoom: 0.84 }}>
@@ -401,6 +461,7 @@ const InningsWagon = ({ payload }) => (
 );
 
 export const POST_VISUALS = {
+  innings_scorecard: InningsScorecard,
   innings_wagon: InningsWagon,
   scorecard: Scorecard,
   scatter_plus: ScatterPlus,
