@@ -6,7 +6,9 @@ Match-day posts: a preview before each match of a series, a "what decided it" po
            FEATURED_PER_CHAPTER), in chapter order; "Dig deeper" (the links card) is left out
   recap    the match's win-probability swing (the story's last-meeting card, with the story's end set to the match
            day so the last meeting is this match), who swung it (WPA), who added and saved the most runs
-           (Impact for batters, RAA for bowlers): all from ball_metrics through the query builder
+           (Impact for batters, RAA for bowlers): all from ball_metrics through the query builder; then the Impact
+           scorecard, one slide per innings (batting in order: runs (balls), strike rate, Impact; bowling as on the
+           match page: figures, wickets, Impact), from the scorecard service the match page uses
 
 Labels like "2nd T20I · Ekana Cricket Stadium" count the sides' meetings in the past SERIES_DAYS.
 """
@@ -58,6 +60,33 @@ def _players(db: Session, match_id: str, fmt: str, role: str) -> List[Dict[str, 
     return [{"name": r[role], "team": r.get(team_col), "balls": r.get("balls"), "runs": r.get("runs"),
              "wickets": r.get("wickets"), "wpa": r.get("wpa"), "impact": r.get("impact"), "raa": r.get("raa"),
              "role": role} for r in rows if r.get(role)]
+
+
+def innings_scorecards(db: Session, match_id: str, sample: str) -> List[Dict[str, Any]]:
+    """One card per innings: the match page's full scorecard (services/match_scorecard.py), batting with strike rate."""
+    from services.match_scorecard import get_match_scorecard_service
+
+    sc = get_match_scorecard_service(match_id=str(match_id), min_balls=6, db=db)
+    accents = {t["name"]: t.get("accent") for t in (sc.get("match") or {}).get("teams") or []}
+    cards = []
+    for inn in sc.get("innings") or []:
+        s = inn["score"]
+        batting = [{"name": r["name"], "runs": r["runs"], "balls": r["balls"], "sr": r.get("strike_rate"),
+                    "impact": r.get("impact"), "not_out": bool(r.get("not_out"))} for r in inn["batting"]]
+        bowling = [{"name": r["name"], "figures": r["figures"], "wickets": r["wickets"], "impact": r.get("impact")}
+                   for r in inn["bowling"]]
+        has_impact = any(r["impact"] is not None for r in batting + bowling)
+        total = f"{s['runs']} all out" if s["wickets"] == 10 else f"{s['runs']}/{s['wickets']}"
+        title = f"{inn['batting_team']} {total}"
+        lead = max((r for r in batting if r["impact"] is not None), key=lambda r: r["impact"], default=None)
+        if lead and lead["impact"] > 0:
+            title += f": {short(lead['name'])}'s {lead['runs']} led, {fmt(lead['impact'], 'signed1')} Impact"
+        payload = {"batting_team": inn["batting_team"], "bowling_team": inn["bowling_team"], "overs": s["overs"],
+                   "accent": accents.get(inn["batting_team"]), "bowl_accent": accents.get(inn["bowling_team"]),
+                   "batting": batting, "bowling": bowling, "has_impact": has_impact}
+        cards.append(card(f"scorecard-{inn['innings']}", "innings_scorecard", title, payload, sample,
+                          "Impact: runs added batting, or saved bowling" if has_impact else ""))
+    return cards
 
 
 def _bars(cid: str, rows: List[Dict[str, Any]], value_key: str, label: str, fmt_: str, title: str, sample: str,
@@ -127,6 +156,7 @@ def recap_post(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
             cards[-1]["payload"]["metric"]["signed"] = False
     if len(cards) < 2:
         return None
+    cards += innings_scorecards(db, m["id"], sample)
     t1, t2 = ctx.t1, ctx.t2
     verdict = cards[0]["title"] + (f". {cards[1]['title']}." if len(cards) > 1 else ".")
     names = [c["payload"]["rows"][0]["name"] for c in cards[1:] if c["visual"] == "metric_bars"]

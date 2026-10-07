@@ -183,3 +183,30 @@ def test_note_tables_and_youtube_copy():
                                "Best finisher in IPL since 2023: Impact compared")
     assert yt["title"].endswith("#shorts") and len(yt["title"]) <= 100
     assert "link in bio" not in yt["description"] and yt["description"].endswith("#cricket #IPL #shorts")
+
+
+def test_innings_scorecards_one_card_per_innings_batting_with_strike_rate(monkeypatch):
+    import services.match_scorecard as msc
+    from services.ig_posts import match
+
+    bat = lambda n, r, b, imp, no=False: {"name": n, "runs": r, "balls": b, "strike_rate": round(100 * r / b), "impact": imp,  # noqa: E731
+                                          "not_out": no, "fours": 0, "sixes": 0}
+    sc = {"match": {"teams": [{"name": "India", "accent": "#5b8def"}, {"name": "West Indies", "accent": "#f0b429"}]},
+          "innings": [{"innings": 1, "batting_team": "West Indies", "bowling_team": "India",
+                       "score": {"runs": 171, "wickets": 10, "overs": "19.1"},
+                       "batting": [bat("Shai Hope", 52, 37, 3.6), bat("Sherfane Rutherford", 56, 34, 25.5)],
+                       "bowling": [{"name": "Axar Patel", "figures": "3.1-0-26", "wickets": 2, "impact": 21.2}]},
+                      {"innings": 2, "batting_team": "India", "bowling_team": "West Indies",
+                       "score": {"runs": 172, "wickets": 2, "overs": "14.4"},
+                       "batting": [bat("Shreyas Iyer", 102, 43, 55.0, True)],
+                       "bowling": [{"name": "Akeal Hosein", "figures": "4.0-0-37", "wickets": 1, "impact": 2.3}]}]}
+    monkeypatch.setattr(msc, "get_match_scorecard_service", lambda match_id, min_balls, db: sc)
+    cards = match.innings_scorecards(None, "1", "1st T20I")
+    assert [c["id"] for c in cards] == ["scorecard-1", "scorecard-2"]
+    assert cards[0]["title"] == "West Indies 171 all out: Rutherford's 56 led, +25.5 Impact"
+    assert cards[1]["title"].startswith("India 172/2: Iyer's 102 led")
+    p = cards[0]["payload"]
+    assert [r["name"] for r in p["batting"]] == ["Shai Hope", "Sherfane Rutherford"]  # batting order kept
+    assert p["batting"][0] == {"name": "Shai Hope", "runs": 52, "balls": 37, "sr": 141, "impact": 3.6, "not_out": False}
+    assert p["bowling"][0] == {"name": "Axar Patel", "figures": "3.1-0-26", "wickets": 2, "impact": 21.2}
+    assert p["has_impact"] and p["accent"] == "#f0b429" and cards[1]["payload"]["batting"][0]["not_out"]
