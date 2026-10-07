@@ -394,6 +394,48 @@ const PairDumbbell = ({ payload }) => {
  * payload: the game's puzzle question (runs, balls, strike_rate, fours, sixes, bat_hand, season, deliveries[{x, y, runs}])
  */
 /**
+ * "The deeper cut" (services/ig_posts/deep_cut.py): the player against the average player, split by split. Two bars a
+ * row, the player's in the accent colour (brighter on the split the sentence is about), the field's in grey; a field of
+ * 0 (runs above average) is drawn as the zero line only.
+ * payload: {metric:{label, format, signed}, series:[player, field], rows:[{label, subject, field, highlight?}]}
+ */
+const DeepCompare = ({ payload }) => {
+  const { metric, rows, series } = payload;
+  const signed = metric.signed;
+  const vals = rows.flatMap((r) => [r.subject, r.field ?? 0, 0]);
+  const lo = Math.min(...vals); const hi = Math.max(...vals);
+  const span = hi - lo || 1;
+  const pos = (v) => ((v - lo) / span) * 100; // % across the bar track
+  const zero = pos(0);
+  const bar = (v, color, h) => (
+    <Box sx={{ position: 'relative', height: h }}>
+      <Box sx={{ position: 'absolute', top: 0, bottom: 0, borderRadius: '3px', bgcolor: color,
+        left: `${Math.min(zero, pos(v))}%`, width: `${Math.max(0.8, Math.abs(pos(v) - zero))}%` }} />
+    </Box>
+  );
+  const showField = !signed || rows.some((r) => r.field);
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: rows.length > 3 ? 1 : 1.5 }}>
+      {rows.map((r) => (
+        <Box key={r.label}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.5 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: r.highlight ? 700 : 500, color: r.highlight ? colors.textHi : colors.textMed }}>{r.label}</Typography>
+            <Typography sx={{ ...mono, fontSize: 13, color: r.highlight ? colors.accent : colors.textHi }}>
+              {fmt(r.subject, metric.format)}
+              {showField && <Box component="span" sx={{ color: colors.textLo }}>{`  v ${fmt(r.field, metric.format)}`}</Box>}
+            </Typography>
+          </Box>
+          {bar(r.subject, r.highlight ? colors.accent : 'rgba(182,242,74,.45)', 12)}
+          {showField && <Box sx={{ mt: '3px' }}>{bar(r.field ?? 0, colors.borderStrong, 6)}</Box>}
+        </Box>
+      ))}
+      <Legend items={showField ? [[series[0], colors.accent], [series[1], colors.borderStrong]] : [[series[0], colors.accent]]} />
+      <Typography sx={{ fontSize: 12, color: colors.textLo, mt: -0.5 }}>{metric.label}</Typography>
+    </Box>
+  );
+};
+
+/**
  * One innings of the match page's Impact scorecard (services/ig_posts/match.innings_scorecards): batting in order with
  * runs (balls), strike rate and Impact (* = not out), then the bowling as the match page shows it: figures, wickets,
  * Impact. Impact is green when it helped the player's side, red when it hurt; no Impact column when the match has none.
@@ -461,6 +503,7 @@ const InningsWagon = ({ payload }) => (
 );
 
 export const POST_VISUALS = {
+  deep_compare: DeepCompare,
   innings_scorecard: InningsScorecard,
   innings_wagon: InningsWagon,
   scorecard: Scorecard,

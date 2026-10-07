@@ -828,6 +828,7 @@ export const toStoryCard = (card, { isMobile, teams, params }) => {
   return {
     id: card.id,
     title: card.title,
+    kicker: card.kicker, // a recurring series above the title ("The deeper cut", services/ig_posts/deep_cut.py)
     help: card.help,
     sample: card.sample,
     smallSample: card.small_sample,
