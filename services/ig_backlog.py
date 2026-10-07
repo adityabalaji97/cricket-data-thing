@@ -254,6 +254,13 @@ def build(db: Session, start: date, days: int = DAYS, write: bool = False,
             if entry["pillar"] == "play" and not entry["post"]:
                 entry["post"] = play_post(db, entry["date"])
     if write:
+        recent: List[str] = []
+        used: set = set()
+        for post in [e["post"] for e in calendar if e["post"]] + bench:  # in calendar order, for the variety rules
+            got = add_deep_cut(db, post, None, recent, used)
+            if got:
+                recent.append(got["probe"])
+                used.add((got["subject"], got["probe"]))
         _write(calendar, bench, prune=not keys)  # a partial (--only) run must not clear everything else
     return {"calendar": calendar, "bench": bench, "failed": failed}
 
@@ -349,12 +356,76 @@ def _write(calendar: List[Dict[str, Any]], bench: List[Dict[str, Any]], prune: b
         """), {"keys": [f"ig:{post['key']}" for post, _ in rows]})
 
 
+DEEP_CUT_SLIDE = 3  # where "The deeper cut" goes in a carousel (1-based)
+
+
+def caption_of(post: Dict[str, Any]) -> str:
+    """The post's caption, or the one made from its fact when it has none."""
+    fact = post["fact"]
+    return post.get("caption") or (_caption(fact) if fact.get("kind") != "note"
+                                   else "\n".join([fact["title"], "", fact.get("finding") or "", "", fact["method"]]))
+
+
+REPEAT_DAYS = 14  # a player's stat of one kind isn't repeated within this many days
+
+
+def add_deep_cut(db: Session, post: Dict[str, Any], day: Optional[date],
+                 recent: Optional[List[str]] = None, used: Optional[set] = None) -> Optional[Dict[str, Any]]:
+    """"The deeper cut" (services/ig_posts/deep_cut.py) into a post before it is queued: slide 3, after the hook and
+    the post's lead chart, so it's seen before people stop swiping (a play-along keeps it after the answer, since it's
+    about the answer player); a new carousel, the caption line. Probes the previous three posts used are avoided (`recent`, in a batch whose
+    earlier posts aren't queued yet; else read from the queue). A post that already has one, or for which nothing
+    clears the gates, is left as it is. A player's stat of one kind already in the queue within REPEAT_DAYS (`used`,
+    in a batch; else read from the queue) isn't repeated. Returns the deep cut, or None."""
+    from services import ig_captions, ig_carousel
+    from services.ig_posts import deep_cut
+
+    fact = post.get("fact") or {}
+    cid = fact.get("carousel_id")
+    if not cid or fact.get("deep_cut"):
+        return None
+    snap = db.execute(text("SELECT data FROM chart_snapshots WHERE id = :i"), {"i": cid}).scalar() or {}
+    slides = list(snap.get("slides") or [])
+    if not slides or any((s.get("card") or {}).get("kicker") == deep_cut.KICKER for s in slides):
+        return None
+    avoid = recent[-3:] if recent is not None else [r[0] for r in db.execute(text("""
+        SELECT facts->'deep_cut'->>'probe' FROM content_packs
+        WHERE channel = 'instagram' AND facts->'deep_cut' IS NOT NULL AND angle_key <> :k
+          AND (CAST(:d AS date) IS NULL OR planned_for <= :d)
+        ORDER BY planned_for DESC NULLS LAST, id DESC LIMIT 3
+    """), {"k": f"ig:{post['key']}", "d": day}).all()]
+    if used is None:
+        used = {(r[0], r[1]) for r in db.execute(text("""
+            SELECT facts->'deep_cut'->>'subject', facts->'deep_cut'->>'probe' FROM content_packs
+            WHERE channel = 'instagram' AND facts->'deep_cut' IS NOT NULL AND angle_key <> :k
+              AND (planned_for IS NULL OR CAST(:d AS date) IS NULL OR ABS(planned_for - CAST(:d AS date)) <= :n)
+        """), {"k": f"ig:{post['key']}", "d": day, "n": REPEAT_DAYS}).all()}
+    try:
+        got = deep_cut.choose(db, fact, avoid, used)
+    except Exception:  # pragma: no cover - a post never fails for want of a deeper cut
+        logger.exception("deep cut for %s failed", post.get("key"))
+        db.rollback()
+        return None
+    if not got:
+        return None
+    before_end = len(slides) - 1 if slides[-1].get("type") == "end" else len(slides)
+    at = before_end if fact.get("kind") == "play" else min(DEEP_CUT_SLIDE - 1, before_end)
+    slides.insert(at, {"type": "card", "card": got["card"], "teams": None})
+    carousel = ig_carousel.save(db, slides, snap.get("title") or fact.get("title") or "", {"deep_cut_of": cid},
+                                "ig-deep-cut")
+    # render: the slide is drawn by the app (/ig/:id/:n), so the carousel is rendered and served from its images.
+    fact.update(carousel_id=carousel["id"], slides=len(slides), deep_cut=got["deep_cut"], render=True)
+    if post.get("snapshot_id") == cid:
+        post["snapshot_id"] = carousel["id"]
+    post["caption"] = ig_captions.with_deep_cut(caption_of(post), got["deep_cut"]["sentence"])
+    return got["deep_cut"]
+
+
 def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "ig-backlog",
                 post_by: Optional[Any] = None) -> None:
     """One Instagram pack: {key, pillar, fact, snapshot_id, warnings} planned for `day` (None = bench)."""
     fact = post["fact"]
-    caption = post.get("caption") or (_caption(fact) if fact.get("kind") != "note"
-                                      else "\n".join([fact["title"], "", fact.get("finding") or "", "", fact["method"]]))
+    caption = caption_of(post)
     conn.execute(text("""
         INSERT INTO content_packs (match_id, snapshot_id, angle_key, title, first_comment, subreddit, flair, facts,
                                    rule_warnings, status, source, channel, planned_for, pillar, caption, post_by)
@@ -463,6 +534,7 @@ def refresh(db: Session, keys: Iterable[str]) -> List[Dict[str, Any]]:
         post = {"key": key, "pillar": item["pillar"], "fact": result["fact"],
                 "snapshot_id": (result.get("snapshot") or {}).get("id"), "warnings": result.get("warnings") or [],
                 "players": _players_of(item, result["fact"]), "caption": result.get("caption")}
+        add_deep_cut(db, post, row[0])
         with engine.begin() as conn:
             upsert_pack(conn, post, row[0])
         out.append(post)

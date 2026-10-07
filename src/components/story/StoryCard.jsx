@@ -61,6 +61,12 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
         overflow: 'hidden',
       }}
     >
+      {card.kicker && (
+        <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
+          color: colors.accent, mb: 0.5 }}>
+          {card.kicker}
+        </Typography>
+      )}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
         <Typography
           component="h2"

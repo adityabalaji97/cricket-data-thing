@@ -55,10 +55,11 @@ def main() -> int:
                 "warnings": [], "players": [q.subject],
                 "caption": ig_captions.build(q.text, built["verdict"], "debate", built["method"],
                                              [q.subject, *built["players"]], q.kicker)}
+        ig_backlog.add_deep_cut(db, post, today)
         with engine.begin() as conn:
             ig_backlog.upsert_pack(conn, post, today, source="ig-trend", post_by=post_by)
-        result = ig_slides.render(carousel["id"], len(built["slides"]), args.base)
-        print(f"    queued for today, rendered {len(result['ok'])}/{len(built['slides'])}"
+        result = ig_slides.render(post["fact"]["carousel_id"], post["fact"]["slides"], args.base)
+        print(f"    queued for today, rendered {len(result['ok'])}/{post['fact']['slides']}"
               + (f", failed {result['failed']}" if result["failed"] else ""))
         queued += 1
     if queued:

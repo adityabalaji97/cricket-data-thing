@@ -97,6 +97,7 @@ def main() -> int:
                 print("  not made: no ball-by-ball data for this match yet")
 
     for post, day in made:
+        ig_backlog.add_deep_cut(db, post, day)
         with engine.begin() as conn:
             ig_backlog.upsert_pack(conn, post, day, source="ig-match-day", post_by=post.get("post_by"))
         result = ig_slides.render(post["fact"]["carousel_id"], post["fact"]["slides"], args.base)

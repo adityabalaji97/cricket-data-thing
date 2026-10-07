@@ -55,6 +55,14 @@ def _one_line(text: str, limit: int = 220) -> str:
     return text if len(text) <= limit else text[: limit - 1].rsplit(" ", 1)[0] + "…"
 
 
+def with_deep_cut(caption: str, sentence: str) -> str:
+    """The caption with "The deeper cut" line (services/ig_posts/deep_cut.py) just above the link line."""
+    line = f"The deeper cut: {sentence}"
+    if not caption or line in caption:
+        return caption
+    return caption.replace(LINK_LINE, f"{line}\n\n{LINK_LINE}", 1) if LINK_LINE in caption else f"{caption}\n\n{line}"
+
+
 def build(hook: str, answer: str, pillar: str, method: Optional[str] = None, players: Iterable[str] = (),
           kicker: str = "", extra_tags: Iterable[str] = (), body: Iterable[str] = ()) -> str:
     """A caption: hook, answer (or body lines), method, a question, the link line, hashtags."""

@@ -46,6 +46,7 @@ def main() -> int:
         db = next(get_session())
         post = ig_backlog.preview_post(db, **kwargs)
         if post["status"] == "resolved":
+            ig_backlog.add_deep_cut(db, post, day)
             with engine.begin() as conn:
                 ig_backlog.upsert_pack(conn, post, day, source="ig-preview")
             if not args.no_render:

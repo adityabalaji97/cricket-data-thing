@@ -50,7 +50,8 @@ def slide_text(slide: Dict[str, Any], chart_titles: Dict[str, str]) -> str:
         return f"{kicker}: {slide.get('text')}" if kicker else str(slide.get("text") or "")
     if kind == "card":
         card = slide.get("card") or {}
-        return str(card.get("title") or "")
+        title = str(card.get("title") or "")
+        return f"{card['kicker']}: {title}" if card.get("kicker") else title
     if kind == "chart":
         return chart_titles.get(slide.get("snapshot_id") or "", "")
     if kind == "verdict":
