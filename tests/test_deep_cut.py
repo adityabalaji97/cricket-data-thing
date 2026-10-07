@@ -29,6 +29,7 @@ def test_false_shots_needs_tagged_balls():
     rows = [{"control": 1, "bowl_kind": "spin bowler", "balls": 180}, {"control": 0, "bowl_kind": "spin bowler", "balls": 20}]
     c = D.false_shots("Shreyas Iyer", "batter", rows, field, "s")
     assert c and c.sentence == "Shreyas Iyer is in control of 90% of balls against spin. The average batter: 76%."
+    assert c.metric["label"] == "% of balls in control" and c.rows[0]["subject"] == 90  # chart matches the sentence
     untagged = rows + [{"control": None, "bowl_kind": "spin bowler", "balls": 100}]  # a third untagged: below the floor
     assert D.false_shots("Shreyas Iyer", "batter", untagged, field, "s") is None
 

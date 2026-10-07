@@ -164,13 +164,17 @@ def false_shots(name, role, rows, field_rows, scope_label):
                     f"The average batter: {f:.0%}.")
     else:
         sentence = f"{nm} is in control of {1 - s:.0%} of balls against {word}. The average batter: {1 - f:.0%}."
+    # The chart says what the sentence says: "beaten or mistimes" shows the miss rate, "in control" the control rate.
+    worse = s > f
     out_rows = []
     for k, w in (("pace bowler", "v pace"), ("spin bowler", "v spin")):
         sk, _t, _ = rate([r for r in rows if r.get("bowl_kind") == k])
         fk, _t2, _ = rate([r for r in field_rows if r.get("bowl_kind") == k])
         if sk is not None and fk is not None:
-            out_rows.append({"label": w, "subject": 100 * sk, "field": 100 * fk, "highlight": k == kind})
-    return Candidate("false-shots", name, sentence, dev * _conf(t, 80), {"label": "% of balls not controlled", "format": "pct0"},
+            out_rows.append({"label": w, "subject": 100 * (sk if worse else 1 - sk), "field": 100 * (fk if worse else 1 - fk),
+                             "highlight": k == kind})
+    label = "% of balls beaten or mistimed" if worse else "% of balls in control"
+    return Candidate("false-shots", name, sentence, dev * _conf(t, 80), {"label": label, "format": "pct0"},
                      out_rows, f"{nm} · {scope_label} · {int(t):,} tracked balls against {word}", (nm, "Average batter"))
 
 
