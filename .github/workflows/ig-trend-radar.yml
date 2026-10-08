@@ -5,7 +5,10 @@ name: Instagram trend radar
 # /ig/<id>/<n> in headless Chrome. Queued only: nothing is posted.
 on:
   schedule:
-    - cron: "30 3 * * *"   # 09:00 IST, after the morning news (GitHub may start it late)
+    # GitHub starts scheduled runs late (by ~7 hours on 6-7 Oct 2026), most of all on the hour. 02:47 IST so the
+    # posts are queued by morning even when late; 09:00 IST as a backup that does nothing if the first one ran.
+    - cron: "17 21 * * *"
+    - cron: "30 3 * * *"
   workflow_dispatch:
 
 jobs:
@@ -34,10 +37,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Queue trending posts
-        run: python scripts/trend_radar.py --top 3
+        id: radar
+        run: python scripts/trend_radar.py --top 3 ${{ github.event_name == 'schedule' && '--once-a-day' || '' }}
       # The day's plan as a GitHub issue (closing yesterday's): it lands in the owner's email and GitHub app.
       - name: Morning digest issue
-        if: always()
+        if: ${{ always() && steps.radar.outputs.skipped != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

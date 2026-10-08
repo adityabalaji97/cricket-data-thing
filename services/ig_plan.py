@@ -23,8 +23,8 @@ from sqlalchemy.orm import Session
 
 #: When to post, by kind of post (IST, Indian evenings and lunch breaks are the busy times).
 TIMES = {"preview": "2 pm", "recap": "12 pm", "trend": "6 pm", "debate": "1 pm", "myth": "1 pm", "play": "10 am",
-         "weird": "12 pm", "record": "12 pm"}
-ORDER = {"play": 0, "recap": 1, "weird": 2, "record": 2, "debate": 3, "myth": 3, "preview": 4, "trend": 5}
+         "weird": "12 pm", "record": "12 pm", "spotlight": "6 pm"}
+ORDER = {"play": 0, "recap": 1, "weird": 2, "record": 2, "debate": 3, "myth": 3, "preview": 4, "trend": 5, "spotlight": 5}
 
 
 def _kind(row: Dict[str, Any]) -> str:
@@ -35,6 +35,8 @@ def _kind(row: Dict[str, Any]) -> str:
         return "preview"
     if key.startswith("ig:recap-"):
         return "recap"
+    if key.startswith("ig:spotlight-"):
+        return "spotlight"
     return row["pillar"] or "debate"
 
 

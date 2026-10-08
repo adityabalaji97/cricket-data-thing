@@ -508,7 +508,9 @@ def subjects_for(db, fact: Dict[str, Any]) -> Tuple[List[Tuple[Optional[str], st
     fmt = "ODI" if re.search(r"\bODIs?\b", f"{title} {fact.get('kicker') or ''}") else "T20"
     people: List[Tuple[Optional[str], str]] = []
     scope, label = scope_for(fmt)
-    if kind == "debate":
+    if fact.get("subject_role") and fact.get("subject"):  # a spotlight (services/ig_posts/spotlight.py): one player
+        people = [(fact["subject_role"], fact["subject"])]
+    elif kind == "debate":
         role = {"batters": "batter", "bowlers": "bowler"}.get((re.search(r"\d+ (batters|bowlers|partnerships)",
                                                                        fact.get("method") or "") or [None, None])[1])
         if role:

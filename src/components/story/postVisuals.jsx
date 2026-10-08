@@ -20,7 +20,8 @@ const mono = { fontFamily: fonts.mono, fontSize: 12 };
 export const fmt = (value, kind = 'dec1') => {
   if (value === null || value === undefined || Number.isNaN(value)) return '–';
   const v = Number(value);
-  const sign = (s) => (v > 0 ? '+' : v < 0 ? '−' : '') + s;
+  // No sign on a value that rounds to zero ("0.0", not "−0.0").
+  const sign = (s) => (Number(s) === 0 ? '' : v > 0 ? '+' : v < 0 ? '−' : '') + s;
   switch (kind) {
     case 'int': return Math.round(v).toLocaleString('en-US');
     case 'pct1': return `${v.toFixed(1)}%`;
