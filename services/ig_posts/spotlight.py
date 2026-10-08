@@ -45,6 +45,7 @@ SPECS: Dict[str, Dict[str, Any]] = {
         "key": "spotlight-bhuvneshwar-kumar-2026-10",
         # His recall rests on this season with the new ball: the deeper cut looks there.
         "deep_cut_scope": {"since": 2026, "over_max": 5, "label": "T20 powerplays in 2026"},
+        "deep_cut_exclude": ["phase-value"],  # slides 4-7 already show runs saved by phase
     },
 }
 

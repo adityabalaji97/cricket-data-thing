@@ -147,3 +147,13 @@ def test_conversion_finds_a_bowler_who_turns_false_shots_into_wickets():
     assert c.sample.endswith("42 wickets from 231 balls the batter didn't control")
     few = [{"control": 0, "balls": 40, "wickets": 10}, {"control": 1, "balls": 300, "wickets": 0}]
     assert D.conversion("A", "bowler", few, field, "s") is None  # too few beaten balls
+
+
+def test_a_post_can_exclude_probes_its_slides_already_show(monkeypatch):
+    a = D.Candidate("phase-value", "A", "a", 1.0, {"label": "x", "format": "int"}, [], "s")
+    b = D.Candidate("conversion", "A", "b", 0.3, {"label": "x", "format": "int"}, [], "s")
+    monkeypatch.setattr(D, "subjects_for", lambda db, fact: ([("bowler", "A", "A")], {}, "s"))
+    monkeypatch.setattr(D, "candidates", lambda *args, **kw: [a, b])
+    monkeypatch.setattr(D, "rank", lambda cands: (cands, "surprise"))
+    got = D.choose(None, {"subject": "A", "deep_cut_exclude": ["phase-value"]})
+    assert got["deep_cut"]["probe"] == "conversion"
