@@ -20,6 +20,7 @@ Probes (role):
     hand            bowler   economy to left- and right-handers
     first-over      bowler   economy for the rest of the spell after a first over of 10+, against one of 0-6
     wicket-length   bowler   share of wickets by length
+    conversion      bowler   balls per wicket among balls the batter didn't control (turning false shots into wickets)
 """
 from __future__ import annotations
 
@@ -346,6 +347,36 @@ def wicket_length(name, role, rows, field_rows, scope_label):
                      f"{nm} · {scope_label} · {int(w):,} wickets", (nm, "Average bowler"))
 
 
+def conversion(name, role, rows, field_rows, scope_label):
+    """How often a false shot becomes a wicket: balls per wicket among balls the batter didn't control."""
+    def read(rs):
+        beaten = [r for r in rs if r.get("control") == 0]
+        tagged = _sum([r for r in rs if r.get("control") is not None], "balls")
+        b, w = _sum(beaten, "balls"), _sum(beaten, "wickets")
+        return b, w, tagged, _sum(rs, "balls")
+    b, w, tagged, total = read(rows)
+    fb, fw, _ft, _ = read(field_rows)
+    if w < 12 or b < 60 or not fw or tagged < COVERAGE * total:
+        return None
+    s_bpw, f_bpw = b / w, fb / fw
+    if _rel(f_bpw, s_bpw) < 0.2:  # at least a fifth fewer (or more) balls per wicket than the field
+        return None
+    nm = name
+    if s_bpw < f_bpw:
+        sentence = (f"When {nm} beats the bat, a wicket follows every {s_bpw:.1f} balls. "
+                    f"The average bowler: every {f_bpw:.1f}.")
+    else:
+        sentence = (f"{nm} beats the bat, but needs {s_bpw:.1f} of those balls for a wicket. "
+                    f"The average bowler: {f_bpw:.1f}.")
+    out_rows = [{"label": "Balls per wicket, batter beaten", "subject": s_bpw, "field": f_bpw, "highlight": True},
+                {"label": "Share of balls beating the bat", "subject": 100 * b / tagged if tagged else 0,
+                 "field": 100 * fb / _ft if _ft else 0}]
+    return Candidate("conversion", name, sentence, _rel(f_bpw, s_bpw) * _conf(w, 12),
+                     {"label": "lower balls per wicket is better", "format": "dec1"}, out_rows,
+                     f"{nm} · {scope_label} · {int(w)} wickets from {int(b):,} balls the batter didn't control",
+                     (nm, "Average bowler"))
+
+
 PROBES: Tuple[Probe, ...] = (
     Probe("slow-start", ("batter",), ("batter_balls_faced_bucket",), slow_start),
     Probe("false-shots", ("batter",), ("control", "bowl_kind"), false_shots),
@@ -356,6 +387,7 @@ PROBES: Tuple[Probe, ...] = (
     Probe("hand", ("bowler",), ("bat_hand",), hand),
     Probe("first-over", ("bowler",), ("bowler_first_over_runs_bucket",), first_over, ("bowler_over_number:gte:2",)),
     Probe("wicket-length", ("bowler",), ("length",), wicket_length),
+    Probe("conversion", ("bowler",), ("control",), conversion),
 )
 
 
@@ -549,6 +581,12 @@ def subjects_for(db, fact: Dict[str, Any]) -> Tuple[List[Tuple[Optional[str], st
         hit = name_in(db, title)
         if hit:
             people = [("bowler" if "wicket" in title.lower() else ("batter" if kind == "record" else None), hit[0])]
+    custom = fact.get("deep_cut_scope")  # a spotlight's own window, e.g. this season's powerplays
+    if custom:
+        scope, label = scope_for(fmt, custom.get("since"))
+        if custom.get("over_max") is not None:
+            scope["over_max"] = custom["over_max"]
+        label = custom.get("label") or label
     out = []
     for role, n in people:
         hit = resolve(db, n) or (n, n)

@@ -136,3 +136,14 @@ def test_first_over_needs_a_clear_story():
     assert D.first_over("Matheesha Pathirana", "bowler", rows(9.0, 8.7), field, "s") is None  # no story
     c = D.first_over("Piyush Chawla", "bowler", rows(7.6, 8.5), field, "s")
     assert c and c.probe == "first-over"  # recovers
+
+
+def test_conversion_finds_a_bowler_who_turns_false_shots_into_wickets():
+    rows = [{"control": 0, "balls": 231, "wickets": 42}, {"control": 1, "balls": 600, "wickets": 0}]
+    field = [{"control": 0, "balls": 36000, "wickets": 5200}, {"control": 1, "balls": 90000, "wickets": 400}]
+    c = D.conversion("Bhuvneshwar Kumar", "bowler", rows, field, "T20s since 2023")
+    assert c and c.sentence == ("When Bhuvneshwar Kumar beats the bat, a wicket follows every 5.5 balls. "
+                                "The average bowler: every 6.9.")
+    assert c.sample.endswith("42 wickets from 231 balls the batter didn't control")
+    few = [{"control": 0, "balls": 40, "wickets": 10}, {"control": 1, "balls": 300, "wickets": 0}]
+    assert D.conversion("A", "bowler", few, field, "s") is None  # too few beaten balls
