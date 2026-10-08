@@ -77,8 +77,9 @@ def main() -> int:
     fact = {"kind": "spotlight", "subject": spec["player"], "subject_role": spec["role"], "title": built["title"],
             "verdict": built["verdict"], "kicker": spec["kicker"], "carousel_id": carousel["id"],
             "slides": len(built["slides"]), "render": True}
-    if spec.get("deep_cut_scope"):
-        fact["deep_cut_scope"] = spec["deep_cut_scope"]
+    for k in ("deep_cut_scope", "deep_cut_exclude"):
+        if spec.get(k):
+            fact[k] = spec[k]
     caption = ig_captions.build(built["title"], built["verdict"], "debate",
                                 "Impact and runs saved are computed ball by ball (T20 Primer method), on every T20 each bowler played.",
                                 [spec["player"]], spec["kicker"], spec.get("tags", []))

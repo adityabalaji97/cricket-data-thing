@@ -633,7 +633,9 @@ def choose(db, fact: Dict[str, Any], avoid: Iterable[str] = (), used: Iterable[T
     cands = found(people[:1]) if fact.get("subject") or fact.get("kind") in ("record", "note", "play", "idea") else []
     cands = cands or found(people[:3])
     used = set(used)
-    cands = [c for c in cands if (c.subject, c.probe) not in used]
+    # A post whose own slides already show a probe's measure (a spotlight's phase tables) leaves it out.
+    exclude = set(fact.get("deep_cut_exclude") or [])
+    cands = [c for c in cands if (c.subject, c.probe) not in used and c.probe not in exclude]
     if not cands:
         return None
     on_topic(fact, cands)
