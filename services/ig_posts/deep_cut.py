@@ -120,7 +120,7 @@ def _lower(bucket: Any) -> Optional[int]:
 
 # ---------------------------------------------------------------- probes
 
-def slow_start(name, role, rows, field_rows, scope_label):
+def slow_start(name, role, rows, field_rows, scope_label, peer="bowler"):
     def split(rs):
         early = [r for r in rs if _lower(r.get("batter_balls_faced_bucket")) == 1]
         mid = [r for r in rs if _lower(r.get("batter_balls_faced_bucket")) == 10]
@@ -143,7 +143,7 @@ def slow_start(name, role, rows, field_rows, scope_label):
                      f"{nm} · {scope_label} · {int(_sum(rows, 'balls')):,} balls", (nm, "Average batter"))
 
 
-def false_shots(name, role, rows, field_rows, scope_label):
+def false_shots(name, role, rows, field_rows, scope_label, peer="bowler"):
     def rate(rs):
         tagged = [r for r in rs if r.get("control") is not None]
         t = _sum(tagged, "balls")
@@ -180,7 +180,7 @@ def false_shots(name, role, rows, field_rows, scope_label):
                      out_rows, f"{nm} · {scope_label} · {int(t):,} tracked balls against {word}", (nm, "Average batter"))
 
 
-def zones(name, role, rows, field_rows, scope_label):
+def zones(name, role, rows, field_rows, scope_label, peer="bowler"):
     def shares(rs):
         hit = [r for r in rs if r.get("wagon_zone") in ZONES]
         runs = _sum(hit, "runs")
@@ -203,7 +203,7 @@ def zones(name, role, rows, field_rows, scope_label):
                      f"{nm} · {scope_label} · {int(runs):,} runs off the bat", (nm, "Average batter"))
 
 
-def length(name, role, rows, field_rows, scope_label):
+def length(name, role, rows, field_rows, scope_label, peer="bowler"):
     by, fby = _by(rows, "length"), _by(field_rows, "length")
     tagged = _sum([r for r in rows if r.get("length") is not None], "balls")
     if tagged < COVERAGE * _sum(rows, "balls"):
@@ -228,7 +228,7 @@ def length(name, role, rows, field_rows, scope_label):
                      f"{nm} · {scope_label} · {int(tagged):,} tracked balls", (nm, "Average batter"))
 
 
-def style(name, role, rows, field_rows, scope_label):
+def style(name, role, rows, field_rows, scope_label, peer="bowler"):
     by, fby = _by(rows, "bowl_style"), _by(field_rows, "bowl_style")
     best = None
     for key, word in STYLES.items():
@@ -253,7 +253,7 @@ def style(name, role, rows, field_rows, scope_label):
                      f"{nm} · {scope_label} · {int(b):,} balls against {word}", (nm, "Average batter"))
 
 
-def phase_value(name, role, rows, field_rows, scope_label):
+def phase_value(name, role, rows, field_rows, scope_label, peer="bowler"):
     by = _by(rows, "phase")
     need = 120 if role == "bowler" else 100
     best = None
@@ -285,7 +285,7 @@ def phase_value(name, role, rows, field_rows, scope_label):
                      (nm, "Average"), {"signed": True})
 
 
-def hand(name, role, rows, field_rows, scope_label):
+def hand(name, role, rows, field_rows, scope_label, peer="bowler"):
     by, fby = _by(rows, "bat_hand"), _by(field_rows, "bat_hand")
     l, r = by.get("LHB", []), by.get("RHB", [])
     if _sum(l, "balls") < 60 or _sum(r, "balls") < 60 or not _econ(fby.get("LHB", [])) or not _econ(fby.get("RHB", [])):
@@ -296,15 +296,15 @@ def hand(name, role, rows, field_rows, scope_label):
         return None
     nm = name  # in full: "Patel" could be Axar or Harshal
     sentence = (f"{nm} goes for {_econ(l):.1f} an over to left-handers and {_econ(r):.1f} to right-handers. "
-                f"The average bowler: {_econ(fby['LHB']):.1f} and {_econ(fby['RHB']):.1f}.")
+                f"The average {peer}: {_econ(fby['LHB']):.1f} and {_econ(fby['RHB']):.1f}.")
     out_rows = [{"label": "v left-handers", "subject": _econ(l), "field": _econ(fby["LHB"]), "highlight": s_ratio > f_ratio},
                 {"label": "v right-handers", "subject": _econ(r), "field": _econ(fby["RHB"]), "highlight": s_ratio < f_ratio}]
     return Candidate("hand", name, sentence, _rel(s_ratio, f_ratio) * _conf(min(_sum(l, "balls"), _sum(r, "balls")), 60),
                      {"label": "runs an over", "format": "dec1"}, out_rows,
-                     f"{nm} · {scope_label} · {int(_sum(rows, 'balls')):,} balls", (nm, "Average bowler"))
+                     f"{nm} · {scope_label} · {int(_sum(rows, 'balls')):,} balls", (nm, f"Average {peer}"))
 
 
-def first_over(name, role, rows, field_rows, scope_label):
+def first_over(name, role, rows, field_rows, scope_label, peer="bowler"):
     by, fby = _by(rows, "bowler_first_over_runs_bucket"), _by(field_rows, "bowler_first_over_runs_bucket")
     bad, good = by.get("10+", []), by.get("0-6", [])
     if _sum(bad, "balls") < 36 or _sum(good, "balls") < 36 or not _econ(fby.get("10+", [])) or not _econ(fby.get("0-6", [])):
@@ -318,16 +318,16 @@ def first_over(name, role, rows, field_rows, scope_label):
         return None
     nm = name  # in full: "Patel" could be Axar or Harshal
     sentence = (f"After a first over of 10 or more, {nm}'s other overs go for {_econ(bad):.1f}, against "
-                f"{_econ(good):.1f} after a tidy one. The average bowler: {_econ(fby['10+']):.1f} against {_econ(fby['0-6']):.1f}.")
+                f"{_econ(good):.1f} after a tidy one. The average {peer}: {_econ(fby['10+']):.1f} against {_econ(fby['0-6']):.1f}.")
     out_rows = [{"label": "After a 10+ first over", "subject": _econ(bad), "field": _econ(fby["10+"]), "highlight": True},
                 {"label": "After a 0-6 first over", "subject": _econ(good), "field": _econ(fby["0-6"])}]
     return Candidate("first-over", name, sentence, (abs(s_diff - f_diff) / 2) * _conf(_sum(bad, "balls"), 36),
                      {"label": "runs an over, overs 2 onwards", "format": "dec1"}, out_rows,
                      f"{nm} · {scope_label} · {int(_sum(bad, 'balls')):,} balls after an expensive first over",
-                     (nm, "Average bowler"))
+                     (nm, f"Average {peer}"))
 
 
-def wicket_length(name, role, rows, field_rows, scope_label):
+def wicket_length(name, role, rows, field_rows, scope_label, peer="bowler"):
     def shares(rs):
         w = _sum([r for r in rs if r.get("length") is not None], "wickets")
         return ({k: _sum(g, "wickets") / w for k, g in _by(rs, "length").items() if k is not None} if w else {}), w
@@ -340,15 +340,15 @@ def wicket_length(name, role, rows, field_rows, scope_label):
         return None
     word = dict(LENGTHS)[key]
     nm = name  # in full: "Patel" could be Axar or Harshal
-    sentence = f"{s[key]:.0%} of {nm}'s wickets come from {_balls(key, word)}. The average bowler: {f[key]:.0%}."
+    sentence = f"{s[key]:.0%} of {nm}'s wickets come from {_balls(key, word)}. The average {peer}: {f[key]:.0%}."
     out_rows = [{"label": wd.capitalize().replace("-", " "), "subject": 100 * s.get(k, 0), "field": 100 * f.get(k, 0), "highlight": k == key}
                 for k, wd in LENGTHS if s.get(k) or f.get(k, 0) >= 0.1]
     return Candidate("wicket-length", name, sentence, (s[key] / f[key] - 1) * _conf(w, 15),
                      {"label": "% of wickets", "format": "pct0"}, out_rows,
-                     f"{nm} · {scope_label} · {int(w):,} wickets", (nm, "Average bowler"))
+                     f"{nm} · {scope_label} · {int(w):,} wickets", (nm, f"Average {peer}"))
 
 
-def conversion(name, role, rows, field_rows, scope_label):
+def conversion(name, role, rows, field_rows, scope_label, peer="bowler"):
     """How often a false shot becomes a wicket: balls per wicket among balls the batter didn't control."""
     def read(rs):
         beaten = [r for r in rs if r.get("control") == 0]
@@ -365,9 +365,9 @@ def conversion(name, role, rows, field_rows, scope_label):
     nm = name
     # "False shots", not "beats the bat": not in control also covers edges and mis-hits.
     if s_bpw < f_bpw:
-        sentence = f"{nm} takes a wicket for every {s_bpw:.1f} false shots. The average bowler needs {f_bpw:.1f}."
+        sentence = f"{nm} takes a wicket for every {s_bpw:.1f} false shots. The average {peer} needs {f_bpw:.1f}."
     else:
-        sentence = f"{nm} draws false shots but needs {s_bpw:.1f} of them for a wicket. The average bowler needs {f_bpw:.1f}."
+        sentence = f"{nm} draws false shots but needs {s_bpw:.1f} of them for a wicket. The average {peer} needs {f_bpw:.1f}."
     # One unit on the chart: balls per wicket when the bat is beaten, and over every ball.
     all_w, f_all_w = _sum(rows, "wickets"), _sum(field_rows, "wickets")
     out_rows = [{"label": "False shots per wicket", "subject": s_bpw, "field": f_bpw, "highlight": True}]
@@ -376,7 +376,7 @@ def conversion(name, role, rows, field_rows, scope_label):
     return Candidate("conversion", name, sentence, _rel(f_bpw, s_bpw) * _conf(w, 12),
                      {"label": "fewer is better · false shot: a ball the batter didn't control", "format": "dec1"}, out_rows,
                      f"{nm} · {scope_label} · {int(w)} wickets from {int(b):,} false shots",
-                     (nm, "Average bowler"))
+                     (nm, f"Average {peer}"))
 
 
 PROBES: Tuple[Probe, ...] = (
@@ -399,10 +399,27 @@ PROBES: Tuple[Probe, ...] = (
 _FIELD: Dict[Tuple, List[Dict[str, Any]]] = {}  # field rows by (probe, role, scope): the same for every player
 
 
-def _query(db, probe: Probe, role: str, scope: Dict[str, Any], name: Optional[str]) -> List[Dict[str, Any]]:
+#: A bowler is compared with bowlers of their own kind: a spinner pitches fuller than a pacer whatever their skill.
+PEERS = {"spin bowler": "spinner", "pace bowler": "pace bowler"}
+
+
+def bowler_kind(db, name: str, scope: Dict[str, Any]) -> Optional[str]:
+    """'spin bowler' or 'pace bowler': what most of their balls in the scope were."""
+    from services.query_builder_v2 import run_deliveries_query
+
+    rows = run_deliveries_query(db, **{**scope, "bowlers": [name], "group_by": ["bowl_kind"], "limit": 10,
+                                       "metrics_perspective": "bowling"}).get("data") or []
+    rows = [r for r in rows if r.get("bowl_kind") in PEERS]
+    return max(rows, key=lambda r: r.get("balls") or 0)["bowl_kind"] if rows else None
+
+
+def _query(db, probe: Probe, role: str, scope: Dict[str, Any], name: Optional[str],
+           kind: Optional[str] = None) -> List[Dict[str, Any]]:
     from services.query_builder_v2 import run_deliveries_query
 
     args = {**scope, "group_by": list(probe.group_by), "limit": 500}
+    if kind and not name:  # the field: bowlers of the same kind only
+        args["bowl_kind"] = [kind]
     if probe.dimension_filters:
         args["dimension_filters"] = list(probe.dimension_filters)
     if role == "bowler":
@@ -422,6 +439,8 @@ def candidates(db, role: str, name: str, scope: Dict[str, Any], scope_label: str
     """Every probe's finding for this player in this scope, most surprising first. `name` is the data's name (for the
     queries), `display` the one people know (for the sentences)."""
     found = []
+    kind = bowler_kind(db, name, scope) if role == "bowler" else None
+    peer = PEERS.get(kind, "bowler")
     for probe in probes:
         if role not in probe.roles or (probe.t20_only and scope.get("fmt", "T20") != "T20"):
             continue
@@ -429,10 +448,10 @@ def candidates(db, role: str, name: str, scope: Dict[str, Any], scope_label: str
             rows = _query(db, probe, role, scope, name)
             if not rows:
                 continue
-            key = (probe.id, role, repr(sorted(scope.items())))
+            key = (probe.id, role, kind, repr(sorted(scope.items())))
             if key not in _FIELD:
-                _FIELD[key] = _query(db, probe, role, scope, None) if probe.needs_field else []
-            c = probe.read(display or name, role, rows, _FIELD[key], scope_label)
+                _FIELD[key] = _query(db, probe, role, scope, None, kind) if probe.needs_field else []
+            c = probe.read(display or name, role, rows, _FIELD[key], scope_label, peer=peer)
         except Exception:  # pragma: no cover - one probe never stops the others
             import logging
 

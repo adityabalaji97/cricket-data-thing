@@ -162,3 +162,23 @@ def test_a_post_can_exclude_probes_its_slides_already_show(monkeypatch):
 
 def test_conversion_is_retired_from_posts():
     assert "conversion" not in {p.id for p in D.PROBES}
+
+
+def test_bowlers_are_compared_with_their_own_kind(monkeypatch):
+    calls = []
+
+    def q(db, **args):
+        calls.append(args)
+        if args["group_by"] == ["bowl_kind"]:
+            return {"data": [{"bowl_kind": "spin bowler", "balls": 900}, {"bowl_kind": "pace bowler", "balls": 6}]}
+        if args.get("bowlers"):
+            return {"data": [{"length": "FULL", "wickets": 11, "balls": 300}, {"length": "GOOD_LENGTH", "wickets": 20, "balls": 600}]}
+        return {"data": [{"length": "FULL", "wickets": 200, "balls": 30000}, {"length": "GOOD_LENGTH", "wickets": 800, "balls": 90000}]}
+    import services.query_builder_v2 as qb
+    monkeypatch.setattr(qb, "run_deliveries_query", q)
+    D._FIELD.clear()
+    probe = [p for p in D.PROBES if p.id == "wicket-length"]
+    cands = D.candidates(None, "bowler", "M Theekshana", {"fmt": "ODI"}, "ODIs", probes=probe, display="Maheesh Theekshana")
+    field_calls = [c for c in calls if c["group_by"] == ["length"] and not c.get("bowlers")]
+    assert field_calls and field_calls[0]["bowl_kind"] == ["spin bowler"]  # the field is spinners only
+    assert cands and "The average spinner: 20%." in cands[0].sentence and cands[0].series[1] == "Average spinner"
