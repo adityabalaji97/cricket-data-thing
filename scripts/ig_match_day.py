@@ -15,8 +15,12 @@ import argparse
 import os
 import sys
 from datetime import date, datetime, timedelta, timezone
+from typing import Dict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+MIN_PREVIEW_CARDS = 4  # a top-N preview needs this many chapters with data (associates can be thin)
 
 
 def main() -> int:
@@ -28,6 +32,8 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="remake posts that already exist")
     parser.add_argument("--no-previews", action="store_true")
     parser.add_argument("--no-recaps", action="store_true")
+    parser.add_argument("--top-teams", type=int, default=0,
+                        help="also preview internationals between two of the top N sides (recaps stay --team only)")
     args = parser.parse_args()
 
     from sqlalchemy import text
@@ -46,27 +52,62 @@ def main() -> int:
 
     made = []
     fixtures = fetch_upcoming_fixtures(20)
+    from models import INTERNATIONAL_TEAMS_RANKED
+
+    from services.fixture_scraper import _ESPN_TEAM_NAME_ALIASES
+
+    rank = {t: i + 1 for i, t in enumerate(INTERNATIONAL_TEAMS_RANKED[: args.top_teams])}
+    for espn, ours_name in _ESPN_TEAM_NAME_ALIASES.items():  # "United Arab Emirates" is "UAE" in the rankings
+        if ours_name in rank:
+            rank[espn] = rank[ours_name]
+    ist = timezone(timedelta(hours=5, minutes=30))
+
+    def ours(f) -> bool:  # a --team fixture: always a feed post, as before
+        return bool(teams & {f["team1"], f["team2"]}) or not (teams or rank)
+
+    def top(f) -> bool:
+        return f["team1"] in rank and f["team2"] in rank
+    # Of the other top-N games on a day, the biggest (lowest combined ranking) goes in the feed; the rest are optional.
+    feed_pick: Dict[str, str] = {}
+    for f in sorted((f for f in fixtures if top(f) and not ours(f)), key=lambda f: rank[f["team1"]] + rank[f["team2"]]):
+        feed_pick.setdefault(f["date"], f.get("match_id") or f"{f['team1']}-{f['team2']}")
     if not args.no_previews:
         for f in fixtures:
-            if f.get("format") not in ("T20", "ODI") or (teams and not teams & {f["team1"], f["team2"]}):
+            if f.get("format") not in ("T20", "ODI") or not (ours(f) or top(f)):
                 continue
             day = date.fromisoformat(f["date"])
             if not today <= day <= today + timedelta(days=args.days):
                 continue
+            optional = not ours(f) and feed_pick.get(f["date"]) != (f.get("match_id") or f"{f['team1']}-{f['team2']}")
             key = f"preview-{f['team1']}-{f['team2']}-{day}".lower().replace(" ", "-")
             if exists(key) and not args.force:
                 print(f"preview {key}: already queued")
                 continue
             label = series_label(db, f["team1"], f["team2"], f["format"], day, f["venue"])
-            print(f"preview {f['team1']} v {f['team2']} on {day} at {f['venue']}: {label}")
+            # Out three hours before the start, or at 2 pm IST if that's earlier (an NZ evening start is 1:30 pm IST).
+            post_time = None
+            if f.get("start_utc"):
+                start = datetime.fromisoformat(str(f["start_utc"]).replace("Z", "+00:00")).astimezone(ist)
+                out_at = start - timedelta(hours=3)
+                if out_at.hour < 14:
+                    post_time = out_at.strftime("%-I:%M %p").lower().replace(":00", "")
+            print(f"preview {f['team1']} v {f['team2']} on {day} at {f['venue']}: {label}"
+                  + (" (optional)" if optional else "") + (f", out at {post_time}" if post_time else ""))
             if args.dry_run:
                 continue
             post = ig_backlog.preview_post(db, f["venue"], f["team1"], f["team2"], None, day, label,
                                            f.get("team1_abbr"), f.get("team2_abbr"), f["format"])
-            if post["status"] == "resolved":
-                made.append((post, day))
-            else:
+            if post["status"] != "resolved":
                 print(f"  not made: {post.get('note')}")
+                continue
+            if not ours(f) and len(post["fact"].get("card_titles") or []) < MIN_PREVIEW_CARDS:
+                print(f"  not made: only {len(post['fact'].get('card_titles') or [])} chapters have data")
+                continue
+            if optional:
+                post["fact"]["optional"] = True
+            if post_time:
+                post["fact"]["post_time"] = post_time
+            made.append((post, day))
 
     if not args.no_recaps:
         rows = db.execute(text("""

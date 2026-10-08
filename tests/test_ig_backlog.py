@@ -48,3 +48,25 @@ def test_an_empty_pillar_borrows_from_another():
     calendar, _ = ig_backlog.schedule(made, date(2026, 10, 12), days=7)  # Mon..Sun, no myth posts at all
     wednesday = calendar[2]
     assert wednesday["pillar"] == "myth" and wednesday["post"] is not None
+
+
+def test_reorder_leads_with_the_format_on_and_alternates_between_series(monkeypatch):
+    from datetime import date
+
+    from services import ig_backlog, ig_season
+
+    rows = [
+        {"id": 1, "angle_key": "ig:debate-odiwc-batter-all", "pillar": "debate", "planned_for": date(2026, 10, 12), "facts": {}, "kind": "debate"},
+        {"id": 2, "angle_key": "ig:debate-ipl23-batter-death", "pillar": "debate", "planned_for": date(2026, 10, 14), "facts": {}, "kind": "debate"},
+        {"id": 3, "angle_key": "ig:odi-fastest-5000", "pillar": "weird", "planned_for": date(2026, 10, 18), "facts": {}, "kind": "weird"},
+        {"id": 4, "angle_key": "ig:ipl-fastest-1000-balls", "pillar": "weird", "planned_for": date(2026, 10, 19), "facts": {}, "kind": "weird"},
+    ]
+    monkeypatch.setattr(ig_backlog, "_rows", lambda db, where, params: [dict(r) for r in rows])
+    monkeypatch.setattr(ig_season, "major_series", lambda db, day: [])
+    moves = {k: new for k, _old, new in ig_backlog.reorder(None, date(2026, 10, 9), 30, dry_run=True)}
+    # T20 week (India v WI): both T20 posts take 12 and 14 Oct, format before pillar. 18 Oct has no series, so the
+    # formats take turns (ODI after T20): the ODI record, its pillar. 19 Oct gets what's left.
+    assert moves["ig:debate-ipl23-batter-death"] == date(2026, 10, 12)
+    assert moves["ig:ipl-fastest-1000-balls"] == date(2026, 10, 14)
+    assert "ig:odi-fastest-5000" not in moves  # already on 18 Oct
+    assert moves["ig:debate-odiwc-batter-all"] == date(2026, 10, 19)

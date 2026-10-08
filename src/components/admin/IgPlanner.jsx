@@ -186,7 +186,10 @@ const XTab = ({ pack, copy, toast }) => {
   );
 };
 
-const PostDetail = ({ pack, onUpdate, copy, toast }) => {
+// Kinds that are still true next week: they can sit on the bench and fill any open day (services/ig_backlog.BENCHABLE).
+const BENCHABLE = ['debate', 'trend', 'myth', 'weird', 'record', 'note'];
+
+const PostDetail = ({ pack, onUpdate, copy, toast, openDays = [] }) => {
   const [tab, setTab] = useState('instagram');
   const facts = pack.facts || {};
   const postedOn = facts.posted_on || [];
@@ -223,20 +226,38 @@ const PostDetail = ({ pack, onUpdate, copy, toast }) => {
             const status = p === 'instagram' ? (next.includes('instagram') ? 'posted' : 'ready') : undefined;
             onUpdate(pack, { posted_on: next, ...(status && status !== pack.status ? { status } : {}) });
           }} />
+          {pack.status === 'ready' && pack.planned_for && BENCHABLE.includes(pack.kind) && (
+            <Button size="small" onClick={() => onUpdate(pack, { bench: true })} sx={{ color: C.lo, ml: 'auto' }}>Move to bench</Button>
+          )}
           {pack.status === 'ready' && (
-            <Button size="small" onClick={() => onUpdate(pack, { status: 'skipped' })} sx={{ color: C.lo, ml: 'auto' }}>Skip</Button>
+            <Button size="small" onClick={() => onUpdate(pack, { status: 'skipped' })}
+              sx={{ color: C.lo, ml: pack.planned_for && BENCHABLE.includes(pack.kind) ? 0 : 'auto' }}>Skip</Button>
           )}
           {pack.status === 'skipped' && (
             <Button size="small" onClick={() => onUpdate(pack, { status: 'ready' })} sx={{ color: C.lo, ml: 'auto' }}>Un-skip</Button>
           )}
         </Box>
+        {!pack.planned_for && pack.status === 'ready' && (
+          // From the bench onto a day with nothing planned yet.
+          <Box sx={{ mt: 1.25 }}>
+            <SectionLabel sx={{ mb: 0.75 }}>Use on an open day</SectionLabel>
+            {openDays.length === 0 ? <Typography sx={{ fontSize: 12, color: C.lo }}>No open day this week.</Typography> : (
+              <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                {openDays.map((d) => (
+                  <Chip key={d} label={dayLabel(d)} size="small" onClick={() => onUpdate(pack, { planned_for: d })}
+                    sx={{ fontWeight: 700, bgcolor: '#1d212b', color: C.lime }} />
+                ))}
+              </Box>
+            )}
+          </Box>
+        )}
       </Box>
     </Box>
   );
 };
 
 /** One post's line in a day: time, kind, topic and its ticks; tap to open. */
-const PostRow = ({ pack, time, open, onToggle, onUpdate, copy, toast }) => {
+const PostRow = ({ pack, time, open, onToggle, onUpdate, copy, toast, openDays }) => {
   const postedOn = (pack.facts || {}).posted_on || (pack.status === 'posted' ? ['instagram'] : []);
   const dim = pack.status === 'skipped' || pack.status === 'expired';
   return (
@@ -247,7 +268,7 @@ const PostRow = ({ pack, time, open, onToggle, onUpdate, copy, toast }) => {
         <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ fontSize: 12, color: C.lo }}>
             <Box component="span" sx={{ color: pack.status === 'posted' ? C.lime : C.amber, fontWeight: 700 }}>{time || '—'}</Box>
-            {' · '}{KIND_LABELS[pack.kind] || pack.kind}{dim ? ` · ${pack.status}` : ''}
+            {' · '}{KIND_LABELS[pack.kind] || pack.kind}{pack.format ? ` · ${pack.format}` : ''}{dim ? ` · ${pack.status}` : ''}
           </Typography>
           <Typography sx={{ fontSize: 14, fontWeight: 600, color: dim ? C.lo : C.hi, lineHeight: 1.35, mt: 0.25,
             textDecoration: dim ? 'line-through' : 'none' }}>
@@ -259,19 +280,34 @@ const PostRow = ({ pack, time, open, onToggle, onUpdate, copy, toast }) => {
           <ExpandMoreRoundedIcon sx={{ color: C.lo, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
         </Box>
       </Box>
-      {open && <PostDetail pack={{ ...pack, facts: { ...(pack.facts || {}), posted_on: postedOn } }} onUpdate={onUpdate} copy={copy} toast={toast} />}
+      {open && <PostDetail pack={{ ...pack, facts: { ...(pack.facts || {}), posted_on: postedOn } }} onUpdate={onUpdate} copy={copy} toast={toast} openDays={openDays} />}
     </Box>
   );
 };
 
-const Day = ({ label, isToday, posts, empty, openId, setOpenId, ...rest }) => (
+const Day = ({ label, isToday, posts, empty, focus, extras = [], openId, setOpenId, ...rest }) => (
   <Box sx={{ bgcolor: C.card, border: `1px solid ${isToday ? 'rgba(182,242,74,.35)' : C.line}`, borderRadius: 3, px: 1.75, pt: 1.25, pb: 0.5, mb: 1.25 }}>
-    <Typography sx={{ fontSize: 13, fontWeight: 700, color: isToday ? C.lime : C.hi, pb: 0.75 }}>{isToday ? `Today · ${label}` : label}</Typography>
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1, pb: 0.75 }}>
+      <Typography sx={{ fontSize: 13, fontWeight: 700, color: isToday ? C.lime : C.hi }}>{isToday ? `Today · ${label}` : label}</Typography>
+      {focus && <Typography noWrap sx={{ fontSize: 11, color: C.lo, minWidth: 0 }}>{focus.format} first · {focus.label}</Typography>}
+    </Box>
     {posts.length === 0 && <Typography sx={{ fontSize: 13, color: C.lo, pb: 1 }}>{empty || 'Open: a trending or bench post'}</Typography>}
     {posts.map(({ pack, time }) => (
       <PostRow key={pack.id} pack={pack} time={time} open={openId === pack.id}
         onToggle={() => setOpenId(openId === pack.id ? null : pack.id)} {...rest} />
     ))}
+    {extras.length > 0 && (
+      // Made but not planned: a top-20 preview beyond the day's one. One tap puts it in the feed.
+      <Box sx={{ borderTop: `1px solid ${C.line}`, py: 1 }}>
+        <SectionLabel sx={{ mb: 0.5 }}>Also made · optional</SectionLabel>
+        {extras.map(({ pack }) => (
+          <Box key={pack.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.25 }}>
+            <Typography sx={{ flex: 1, fontSize: 13, color: C.mid, lineHeight: 1.35 }}>{pack.title}</Typography>
+            <Button size="small" onClick={() => rest.onUpdate(pack, { optional: false })} sx={{ color: C.lime, fontWeight: 700, minWidth: 0 }}>Add to feed</Button>
+          </Box>
+        ))}
+      </Box>
+    )}
   </Box>
 );
 
@@ -325,11 +361,17 @@ const IgPlanner = ({ client, toast, onAuthFail }) => {
     setPacks((list) => list.map((p) => (p.id === pack.id ? after : p)));
     try {
       await client.patch(`/admin/content/packs/${pack.id}`, body);
+      // A new day, the bench, or into the feed: which day shows the post is the plan's call, so read it again
+      // (quietly: the list stays on screen).
+      if (body.planned_for || body.bench || body.optional === false) {
+        load();
+        toast(body.bench ? 'Moved to the bench' : body.planned_for ? `On ${dayLabel(body.planned_for)}` : 'In the feed');
+      }
     } catch (err) {
       setPacks((list) => list.map((p) => (p.id === pack.id ? before : p)));
       toast(apiErrorText(err, null) || 'Update failed');
     }
-  }, [client, toast]);
+  }, [client, toast, load]);
 
   const view = useMemo(() => {
     if (!packs || !plan) return null;
@@ -337,8 +379,12 @@ const IgPlanner = ({ client, toast, onAuthFail }) => {
     const today = todayIso();
     const weekDays = plan.week.map((d) => ({
       date: d.date,
+      focus: d.focus,
       posts: d.posts.map((p) => ({ pack: byId[p.id], time: p.time })).filter((x) => x.pack),
+      extras: (d.extras || []).map((p) => ({ pack: byId[p.id] })).filter((x) => x.pack),
     }));
+    // Days from tomorrow with nothing planned (or only skipped posts): where a bench post can go.
+    const openDays = weekDays.filter((d) => d.date > today && !d.posts.some((x) => x.pack.status !== 'skipped')).map((d) => d.date);
     const inWeek = new Set(weekDays.map((d) => d.date));
     const lastWeekDay = weekDays.length ? weekDays[weekDays.length - 1].date : today;
     const later = {};
@@ -349,11 +395,11 @@ const IgPlanner = ({ client, toast, onAuthFail }) => {
       else if (p.planned_for < today && p.status === 'posted') (earlier[p.planned_for] ||= []).push({ pack: p, time: p.time });
     });
     const bench = packs.filter((p) => !p.planned_for && p.status === 'ready');
-    return { today, weekDays, later, earlier, bench };
+    return { today, weekDays, later, earlier, bench, openDays };
   }, [packs, plan]);
 
   if (!view) return <CircularProgress size={22} sx={{ color: C.lime }} />;
-  const dayProps = { openId, setOpenId, onUpdate, copy, toast };
+  const dayProps = { openId, setOpenId, onUpdate, copy, toast, openDays: view.openDays };
   const groups = (obj, sort) => Object.keys(obj).sort(sort).map((d) => (
     <Day key={d} label={dayLabel(d)} posts={obj[d]} {...dayProps} />
   ));
@@ -374,7 +420,8 @@ const IgPlanner = ({ client, toast, onAuthFail }) => {
         <Fold title="Earlier" count={Object.values(view.earlier).flat().length}>{groups(view.earlier, (a, b) => b.localeCompare(a))}</Fold>
       )}
       {view.weekDays.map((d) => (
-        <Day key={d.date} label={dayLabel(d.date)} isToday={d.date === view.today} posts={d.posts} {...dayProps} />
+        <Day key={d.date} label={dayLabel(d.date)} isToday={d.date === view.today} posts={d.posts} focus={d.focus}
+          extras={d.extras} {...dayProps} />
       ))}
       {Object.keys(view.later).length > 0 && (
         <Fold title="Later" count={Object.values(view.later).flat().length}>{groups(view.later)}</Fold>
