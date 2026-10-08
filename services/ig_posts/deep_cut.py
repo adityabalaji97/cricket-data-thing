@@ -499,16 +499,18 @@ LEAGUES = ("IPL", "BBL", "PSL", "CPL", "SA20", "The Hundred", "T20 Blast", "ILT2
 YEARS_BACK = 3
 
 
-def scope_for(fmt: str = "T20", since: Optional[int] = None, league: Optional[str] = None) -> Tuple[Dict[str, Any], str]:
+def scope_for(fmt: str = "T20", since: Optional[int] = None, league: Optional[str] = None,
+              since_date=None, since_label: Optional[str] = None) -> Tuple[Dict[str, Any], str]:
     """A probe scope and its label. Without a league, every match of the format: leagues=[] with
     include_international=True would be internationals only."""
     from datetime import date
 
     year = since or date.today().year - YEARS_BACK
-    scope = {"fmt": fmt, "gender": "male", "start_date": date(year, 1, 1), "leagues": [league] if league else [],
+    start = since_date or date(year, 1, 1)
+    scope = {"fmt": fmt, "gender": "male", "start_date": start, "leagues": [league] if league else [],
              "include_international": False}
     what = league or ("ODIs" if fmt == "ODI" else "T20s")
-    return scope, f"{what} since {year}"
+    return scope, f"{what} since {since_label or year}"
 
 
 def resolve(db, name: str) -> Optional[Tuple[str, str]]:
@@ -550,9 +552,15 @@ def subjects_for(db, fact: Dict[str, Any]) -> Tuple[List[Tuple[Optional[str], st
                                                                        fact.get("method") or "") or [None, None])[1])
         if role:
             people = [(role, n) for n in [fact.get("subject"), *(fact.get("leaders") or [])] if n]
-        since = re.search(r"since (\d{4})", f"{fact.get('method') or ''} {title}")
+        text_ = f"{fact.get('method') or ''} {title}"
+        since = re.search(r"since (\d{4})", text_)
         league = fact.get("kicker") if fact.get("kicker") in LEAGUES else None
-        scope, label = scope_for(fmt, int(since.group(1)) if since else None, league)
+        if "since the 2023 World Cup" in text_:  # ODI debates: the cycle since the 2023 World Cup final
+            from datetime import date as _date
+
+            scope, label = scope_for(fmt, league=league, since_date=_date(2023, 11, 20), since_label="the 2023 World Cup")
+        else:
+            scope, label = scope_for(fmt, int(since.group(1)) if since else None, league)
     elif kind == "idea" and fact.get("subject"):
         numbers = fact.get("numbers") or {}
         people = [("bowler" if {"economy", "wickets"} & set(numbers) else "batter", fact["subject"])]

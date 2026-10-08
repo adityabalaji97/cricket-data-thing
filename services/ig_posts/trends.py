@@ -104,16 +104,18 @@ def mentions(titles: List[Dict[str, str]], players: Dict[str, Dict[str, Any]]) -
     return out
 
 
-def best_scope(db: Session, name: str, role: str) -> Optional[Dict[str, Any]]:
-    """The question scope where the player has most balls and qualifies for the field."""
+def best_scope(db: Session, name: str, role: str, only: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """The question scope where the player has most balls and qualifies for the field (`only`: that scope key)."""
     from services.ig_posts.context import QuestionContext
     from services.ig_posts.questions import ODI_SCOPES, T20_SCOPES
 
     best = None
     # Lower than the debate posts' minimums: a player in the news only needs enough balls to stand in the field.
     mins = {"ipl23": 400 if role == "batter" else 240, "t20i23": 250 if role == "batter" else 180,
-            "odi19": 800 if role == "batter" else 600}
+            "odiwc": 500 if role == "batter" else 400}
     for skey, hook, label, kicker, fmt, params in (*T20_SCOPES, *ODI_SCOPES):
+        if only and skey != only:
+            continue
         ctx = QuestionContext(db=db, role=role, fmt=fmt, params=params, min_balls=mins[skey], subject=name)
         row = ctx.find(name)
         if row and (not best or row["balls"] > best["balls"]):
@@ -124,10 +126,6 @@ def best_scope(db: Session, name: str, role: str) -> Optional[Dict[str, Any]]:
 
 def candidates(db: Session, top: int = 6, log=print) -> List[Dict[str, Any]]:
     """generate()-style entries for the most-mentioned players, each with the headlines that named them."""
-    from services.ig_posts import angles as A
-    from services.ig_posts.planner import plan
-    from services.ig_posts.questions import Question, contested
-
     titles = headlines(log)
     players = active_players(db)
     named = mentions(titles, players)
@@ -136,26 +134,37 @@ def candidates(db: Session, top: int = 6, log=print) -> List[Dict[str, Any]]:
     log(f"  {len(titles)} headlines, {len(named)} players named")
     out = []
     for name, hs in ranked[: top * 2]:
-        role = players[name]["role"]  # what they mostly do (balls faced v bowled since 2023)
-        other = "bowler" if role == "batter" else "batter"
-        scope = best_scope(db, name, role) or best_scope(db, name, other)
-        if not scope:
-            log(f"  {name}: not in any post scope")
-            continue
-        r = scope["ctx"].role
-        noun = "batter" if r == "batter" else "bowler"
-        text_ = f"Is {name} the most complete {noun} {scope['hook']}?"
-        q = Question(key=f"trend-{re.sub(r'[^a-z0-9]+', '-', name.lower())}", text=text_, role=r, fmt=scope["fmt"],
-                     params=scope["params"], min_balls=scope["min_balls"],
-                     scope_label=f"{scope['label']} · {scope['min_balls']:,}+ balls", kicker=scope["kicker"], subject=name)
-        ctx = scope["ctx"]
-        p = plan(ctx, q.text, A.available(r, q.fmt, q.params.get("leagues") or ()))
-        if len(p["angles"]) < 4:
-            continue
-        out.append({"question": q, "ctx": ctx, "plan": p, "contest": contested(ctx, p["angles"]), "headlines": hs[:3]})
+        e = entry_for(db, name, players[name]["role"], hs, log=log)
+        if e:
+            out.append(e)
         if len(out) >= top:
             break
     return out
+
+
+def entry_for(db: Session, name: str, role: str, hs: List[Dict[str, Any]], scope_key: Optional[str] = None,
+              log=print) -> Optional[Dict[str, Any]]:
+    """One player's trending question as a generate()-style entry, in their best scope (or `scope_key`'s)."""
+    from services.ig_posts import angles as A
+    from services.ig_posts.planner import plan
+    from services.ig_posts.questions import Question, contested
+
+    other = "bowler" if role == "batter" else "batter"
+    scope = best_scope(db, name, role, scope_key) or best_scope(db, name, other, scope_key)
+    if not scope:
+        log(f"  {name}: not in any post scope")
+        return None
+    r = scope["ctx"].role
+    noun = "batter" if r == "batter" else "bowler"
+    text_ = f"Is {name} the most complete {noun} {scope['hook']}?"
+    q = Question(key=f"trend-{re.sub(r'[^a-z0-9]+', '-', name.lower())}", text=text_, role=r, fmt=scope["fmt"],
+                 params=scope["params"], min_balls=scope["min_balls"],
+                 scope_label=f"{scope['label']} · {scope['min_balls']:,}+ balls", kicker=scope["kicker"], subject=name)
+    ctx = scope["ctx"]
+    p = plan(ctx, q.text, A.available(r, q.fmt, q.params.get("leagues") or ()))
+    if len(p["angles"]) < 4:
+        return None
+    return {"question": q, "ctx": ctx, "plan": p, "contest": contested(ctx, p["angles"]), "headlines": hs[:3]}
 
 
 def rank(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

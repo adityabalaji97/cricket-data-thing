@@ -54,35 +54,37 @@ T20_SCOPES = [
     ("t20i23", "in T20Is since 2023", "T20Is between the top 10 since 2023", "T20Is", "T20",
      {"include_international": True, "top_teams": 10, "start_date": "2023-01-01"}),
 ]
+# ODIs since the 2023 World Cup (the final was 19 Nov 2023): the cycle that leads to the 2027 World Cup.
+ODI_SINCE = "2023-11-20"
 ODI_SCOPES = [
-    ("odi19", "in ODIs since 2019", "ODIs between the top 10 since 2019", "ODIs", "ODI",
-     {"include_international": True, "top_teams": 10, "start_date": "2019-01-01"}),
+    ("odiwc", "in ODIs since the 2023 World Cup", "ODIs between the top 10 since the 2023 World Cup", "ODIs", "ODI",
+     {"include_international": True, "top_teams": 10, "start_date": ODI_SINCE}),
 ]
 
 # Situations: (key, noun for the question, filters, min balls by scope key, priority, roles)
 BATTER_SITUATIONS = [
-    ("spin", "player of spin", {"bowl_kind": ["spin bowler"]}, {"ipl23": 250, "t20i23": 150, "odi19": 500}, 4),
-    ("pace", "player of pace", {"bowl_kind": ["pace bowler"]}, {"ipl23": 400, "t20i23": 250, "odi19": 800}, 3),
+    ("spin", "player of spin", {"bowl_kind": ["spin bowler"]}, {"ipl23": 250, "t20i23": 150, "odiwc": 300}, 4),
+    ("pace", "player of pace", {"bowl_kind": ["pace bowler"]}, {"ipl23": 400, "t20i23": 250, "odiwc": 500}, 3),
     ("pp", "powerplay batter", {"over_min": 0, "over_max": 5}, {"ipl23": 250, "t20i23": 150}, 3),
-    ("odi_pp", "new-ball batter", {"over_min": 0, "over_max": 9}, {"odi19": 400}, 3),
+    ("odi_pp", "new-ball batter", {"over_min": 0, "over_max": 9}, {"odiwc": 250}, 3),
     ("death", "finisher", {"over_min": 15, "over_max": 19}, {"ipl23": 120, "t20i23": 80}, 4),
-    ("odi_death", "finisher", {"over_min": 40, "over_max": 49}, {"odi19": 250}, 3),
+    ("odi_death", "finisher", {"over_min": 40, "over_max": 49}, {"odiwc": 120}, 3),
     ("middle", "middle-overs batter", {"over_min": 6, "over_max": 14}, {"ipl23": 300, "t20i23": 200}, 2),
-    ("chase", "chaser", {"is_chase": True}, {"ipl23": 400, "t20i23": 250, "odi19": 1000}, 4),
-    ("all", "batter", {}, {"ipl23": 700, "t20i23": 400, "odi19": 1500}, 3),
+    ("chase", "chaser", {"is_chase": True}, {"ipl23": 400, "t20i23": 250, "odiwc": 400}, 4),
+    ("all", "batter", {}, {"ipl23": 700, "t20i23": 400, "odiwc": 800}, 3),
 ]
 BOWLER_SITUATIONS = [
     ("pp", "new-ball bowler", {"over_min": 0, "over_max": 5}, {"ipl23": 240, "t20i23": 150}, 4),
-    ("odi_pp", "new-ball bowler", {"over_min": 0, "over_max": 9}, {"odi19": 400}, 3),
+    ("odi_pp", "new-ball bowler", {"over_min": 0, "over_max": 9}, {"odiwc": 250}, 3),
     ("death", "death bowler", {"over_min": 15, "over_max": 19}, {"ipl23": 180, "t20i23": 120}, 4),
-    ("odi_death", "death bowler", {"over_min": 40, "over_max": 49}, {"odi19": 240}, 3),
+    ("odi_death", "death bowler", {"over_min": 40, "over_max": 49}, {"odiwc": 120}, 3),
     ("middle", "middle-overs bowler", {"over_min": 6, "over_max": 14}, {"ipl23": 300, "t20i23": 200}, 2),
-    ("spinner", "spinner", {"bowl_kind": ["spin bowler"]}, {"ipl23": 400, "t20i23": 300, "odi19": 1200}, 3),
-    ("quick", "fast bowler", {"bowl_kind": ["pace bowler"]}, {"ipl23": 400, "t20i23": 300, "odi19": 1200}, 3),
+    ("spinner", "spinner", {"bowl_kind": ["spin bowler"]}, {"ipl23": 400, "t20i23": 300, "odiwc": 600}, 3),
+    ("quick", "fast bowler", {"bowl_kind": ["pace bowler"]}, {"ipl23": 400, "t20i23": 300, "odiwc": 600}, 3),
 ]
 PAIR_SCOPES = [
-    ("odi_pair", "ODI partnerships since 2015 (top 10)", "ODIs", "ODI",
-     {"include_international": True, "top_teams": 10, "start_date": "2015-01-01"}, 1000, 4),
+    ("odi_pair", "ODI partnerships since the 2023 World Cup (top 10)", "ODIs", "ODI",
+     {"include_international": True, "top_teams": 10, "start_date": ODI_SINCE}, 400, 4),
     ("ipl_pair", "IPL partnerships since 2022", "IPL", "T20", {"leagues": ["IPL"], "start_date": "2022-01-01"}, 300, 3),
 ]
 

@@ -51,11 +51,16 @@ def _rows(db: Session, start: date, end: date) -> List[Dict[str, Any]]:
 
 def week(db: Session, start: date, days: int = 7) -> List[Dict[str, Any]]:
     """[{date, posts: [{id, kind, title, status, time, slides, reel}], trending_extra: n}] for each day."""
+    from services import ig_season
+
     rows = _rows(db, start, start + timedelta(days=days - 1))
     out = []
     for d in range(days):
         day = start + timedelta(days=d)
         todays = [r for r in rows if r["planned_for"] == day]
+        # Optional posts (a top-20 preview beyond the day's one) are made but not planned: listed as extras.
+        extras = [r for r in todays if (r["facts"] or {}).get("optional") and r["status"] == "ready"]
+        todays = [r for r in todays if r not in extras]
         main = [r for r in todays if _kind(r) != "trend"]
         trends = sorted((r for r in todays if _kind(r) == "trend"),
                         key=lambda r: -float((r["facts"] or {}).get("appeal") or 0))
@@ -65,10 +70,14 @@ def week(db: Session, start: date, days: int = 7) -> List[Dict[str, Any]]:
         free = trends[:1] if not [r for r in main if r["status"] != "skipped"] else []
         picked = main + pinned + [r for r in free if r not in pinned]
         picked.sort(key=lambda r: ORDER.get(_kind(r), 3))
+        on = ig_season.focus(day, ig_season.major_series(db, day))
         out.append({
             "date": day.isoformat(),
+            "focus": {"format": on[0], "label": on[1]} if on else None,
+            "extras": [{"id": r["id"], "kind": _kind(r), "title": r["title"]} for r in extras],
             "posts": [{"id": r["id"], "kind": _kind(r), "title": r["title"], "status": r["status"],
-                       "time": TIMES.get(_kind(r), "1 pm"), "slides": (r["facts"] or {}).get("slides"),
+                       "format": ig_season.post_format(r["facts"] or {}, r["angle_key"]),
+                       "time": (r["facts"] or {}).get("post_time") or TIMES.get(_kind(r), "1 pm"), "slides": (r["facts"] or {}).get("slides"),
                        "carousel_id": (r["facts"] or {}).get("carousel_id"),
                        "note_id": (r["facts"] or {}).get("note_id")} for r in picked],
             "trending_extra": max(0, len(trends) - (1 if trends and trends[0] in picked else 0)),

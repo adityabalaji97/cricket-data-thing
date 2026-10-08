@@ -21,7 +21,7 @@ import json
 import re
 import logging
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -262,6 +262,8 @@ def build(db: Session, start: date, days: int = DAYS, write: bool = False,
                 recent.append(got["probe"])
                 used.add((got["subject"], got["probe"]))
         _write(calendar, bench, prune=not keys)  # a partial (--only) run must not clear everything else
+        # The format that's on goes first (services/ig_season.py); from tomorrow, as today's posts may be out.
+        reorder(db, max(start, date.today() + timedelta(days=1)), days)
     return {"calendar": calendar, "bench": bench, "failed": failed}
 
 
@@ -555,6 +557,103 @@ def recap_post_by(match_day: date, team1: str, team2: str, fixtures: List[Dict[s
     if starts:
         return starts[0]
     return datetime.combine(match_day + timedelta(days=RECAP_DAYS), datetime.max.time(), tzinfo=timezone.utc)
+
+
+#: Kinds that are still true next week: an unposted one goes to the bench, and these are what reorder moves.
+BENCHABLE = ("debate", "trend", "myth", "weird", "record", "note")
+MOVABLE = ("debate", "myth", "weird", "record", "note")
+
+
+def _rows(db: Session, where: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    from services.ig_plan import _kind
+
+    rows = [dict(r) for r in db.execute(text(f"""
+        SELECT id, angle_key, source, pillar, title, status, planned_for, post_by, facts, created_at FROM content_packs
+        WHERE channel = 'instagram' AND {where} ORDER BY planned_for NULLS LAST, id
+    """), params).mappings()]
+    for r in rows:
+        r["kind"] = _kind(r)
+    return rows
+
+
+def bench_unposted(db: Session, today: date, dry_run: bool = False) -> List[str]:
+    """Evergreen posts whose day passed unposted (ready, or expired by their deadline) go to the bench: no day, no
+    deadline, ready to fill an open day. Previews, recaps, spotlights and play-alongs belong to their day and stay
+    where they are. Of two posts with the same title (the radar asked the same question twice), the newest goes."""
+    from database import engine
+
+    rows = [r for r in _rows(db, "status IN ('ready', 'expired') AND planned_for < :d", {"d": today})
+            if r["kind"] in BENCHABLE]
+    on_bench = {r["title"] for r in _rows(db, "status = 'ready' AND planned_for IS NULL", {})}
+    newest: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        if r["title"] not in on_bench and (r["title"] not in newest or r["id"] > newest[r["title"]]["id"]):
+            newest[r["title"]] = r
+    moved = [r for r in newest.values()]
+    keep = {r["id"] for r in moved}
+    stale = [r["id"] for r in rows if r["id"] not in keep and r["status"] == "ready"]  # older copies, or already benched
+    if (moved or stale) and not dry_run:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE content_packs SET planned_for = NULL, status = 'ready', post_by = NULL WHERE id = ANY(:ids)
+            """), {"ids": [r["id"] for r in moved]})
+            conn.execute(text("UPDATE content_packs SET status = 'expired' WHERE id = ANY(:ids)"), {"ids": stale})
+    return [r["angle_key"] for r in moved]
+
+
+def _people(fact: Dict[str, Any]) -> set:
+    names = set(fact.get("leaders") or [])
+    if fact.get("subject"):
+        names.add(fact["subject"])
+    return names
+
+
+def reorder(db: Session, start: date, days: int = DAYS, dry_run: bool = False) -> List[Tuple[str, Optional[date], date]]:
+    """Re-date the ready evergreen posts in the window so each day leads with the format that's on (services/ig_season:
+    India's series, else another major series), and the formats take turns when nothing is. Posts swap days among
+    themselves: the same days stay filled, each keeps a post of its pillar where one fits, and a player isn't on two
+    posts within SPREAD days. Match-day posts, trends, spotlights, play-alongs and posted ones never move."""
+    from database import engine
+    from services import ig_season
+
+    end = start + timedelta(days=days - 1)
+    rows = [r for r in _rows(db, "status = 'ready' AND planned_for BETWEEN :a AND :b", {"a": start, "b": end})
+            if r["kind"] in MOVABLE]
+    slots = [(r["planned_for"], r["pillar"]) for r in rows]
+    pool = list(rows)
+    for r in pool:
+        r["format"] = ig_season.post_format(r["facts"] or {}, r["angle_key"])
+    majors_cache: Dict[date, list] = {}
+    recent: List[set] = []
+    last_fmt: Optional[str] = None
+    moves = []
+    for day, pillar in sorted(slots, key=lambda s: s[0]):
+        majors = majors_cache.setdefault(day, ig_season.major_series(db, day))
+        on = ig_season.focus(day, majors)
+        want = on[0] if on else ("T20" if last_fmt == "ODI" else "ODI" if last_fmt == "T20" else None)
+        blocked = set().union(*recent[-(SPREAD - 1):]) if recent else set()
+
+        def ok(r):
+            return not (_people(r["facts"] or {}) & blocked)
+        tiers = [lambda r: r["pillar"] == pillar and r["format"] == want and ok(r),
+                 lambda r: r["format"] == want and ok(r),
+                 lambda r: r["pillar"] == pillar and r["format"] is None and ok(r),
+                 lambda r: r["pillar"] == pillar and ok(r),
+                 lambda r: ok(r),
+                 lambda r: True]
+        pick = next(r for tier in tiers for r in pool if tier(r))
+        pool.remove(pick)
+        recent.append(_people(pick["facts"] or {}))
+        last_fmt = pick["format"] or last_fmt
+        if pick["planned_for"] != day:
+            moves.append((pick["angle_key"], pick["planned_for"], day))
+            pick["new_day"] = day
+    if moves and not dry_run:
+        by_key = {r["angle_key"]: r for r in rows}
+        with engine.begin() as conn:
+            for key, _old, day in moves:
+                conn.execute(text("UPDATE content_packs SET planned_for = :d WHERE id = :i"), {"d": day, "i": by_key[key]["id"]})
+    return moves
 
 
 def render_pending(base: Optional[str] = None) -> Dict[str, Any]:
