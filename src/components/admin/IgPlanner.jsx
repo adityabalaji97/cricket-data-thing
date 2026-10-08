@@ -16,7 +16,7 @@ import { fetchImageFiles, shareFiles, siteOrigin } from '../ui/ChartExportButton
  * post); the posts themselves from GET /admin/content/packs?status=all.
  */
 export const C = { bg: '#0a0c11', card: '#12151c', line: 'rgba(255,255,255,.08)', hi: '#f3f4f6', mid: '#c3c8d0', lo: '#9aa1ac', lime: '#b6f24a', red: '#e5484d', amber: '#f0b429' };
-const KIND_LABELS = { preview: 'Preview', recap: 'Recap', trend: 'Trending', debate: 'Debate', myth: 'Myth', play: 'Play along', weird: 'Weird', record: 'Record' };
+const KIND_LABELS = { preview: 'Preview', recap: 'Recap', trend: 'Trending', debate: 'Debate', myth: 'Myth', play: 'Play along', weird: 'Weird', record: 'Record', spotlight: 'Spotlight' };
 const PLATFORMS = [['instagram', 'IG'], ['youtube', 'YT'], ['x', 'X']];
 const TABS = [['instagram', 'Instagram'], ['video', 'Reel · YouTube'], ['x', 'X thread']];
 

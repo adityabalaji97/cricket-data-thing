@@ -38,7 +38,7 @@ def fmt(value: Optional[float], kind: str) -> str:
     if value is None:
         return "–"
     v = float(value)
-    sign = lambda s: ("+" if v > 0 else "−" if v < 0 else "") + s  # noqa: E731
+    sign = lambda s: ("" if float(s) == 0 else "+" if v > 0 else "−" if v < 0 else "") + s  # noqa: E731
     return {
         "int": f"{round(v):,}", "pct1": f"{v:.1f}%", "pct0": f"{round(v)}%", "dec2": f"{v:.2f}",
         "signed0": sign(f"{abs(v):.0f}"), "signed1": sign(f"{abs(v):.1f}"), "signed2": sign(f"{abs(v):.2f}"),

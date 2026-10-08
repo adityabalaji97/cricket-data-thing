@@ -22,6 +22,8 @@ def main() -> int:
     parser.add_argument("--top", type=int, default=3, help="how many trending posts to queue")
     parser.add_argument("--base", default="https://hindsightcricket.com")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--once-a-day", action="store_true",
+                        help="do nothing if today's trending posts are already queued (the scheduled backup run)")
     args = parser.parse_args()
 
     from database import engine, get_session
@@ -29,10 +31,23 @@ def main() -> int:
     from services.ig_posts import post as P, trends
 
     db = next(get_session())
-    entries = trends.rank(trends.candidates(db, top=args.top * 2))
     # The queue's days are India's (the audience, and when the posts go out), not UTC's.
     ist = timezone(timedelta(hours=5, minutes=30))
     today = datetime.now(ist).date()
+    if args.once_a_day:
+        from sqlalchemy import text
+
+        ran = db.execute(text("""
+            SELECT COUNT(*) FROM content_packs
+            WHERE source = 'ig-trend' AND (created_at AT TIME ZONE 'Asia/Kolkata')::date = :d
+        """), {"d": today}).scalar()
+        if ran:
+            print(f"already ran today ({ran} trending posts queued for {today}): nothing to do")
+            if os.environ.get("GITHUB_OUTPUT"):
+                with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+                    fh.write("skipped=true\n")
+            return 0
+    entries = trends.rank(trends.candidates(db, top=args.top * 2))
     post_by = datetime.combine(today + timedelta(days=1), time.max, tzinfo=ist)
     queued = 0
     for e in entries[: args.top]:
