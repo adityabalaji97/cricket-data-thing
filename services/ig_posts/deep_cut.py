@@ -389,8 +389,9 @@ PROBES: Tuple[Probe, ...] = (
     Probe("hand", ("bowler",), ("bat_hand",), hand),
     Probe("first-over", ("bowler",), ("bowler_first_over_runs_bucket",), first_over, ("bowler_over_number:gte:2",)),
     Probe("wicket-length", ("bowler",), ("length",), wicket_length),
-    Probe("conversion", ("bowler",), ("control",), conversion),
 )
+# Retired: false shots per wicket. It mostly measures luck (whether an edge carries, whether it's held) and swings
+# from year to year, so it says little about the bowler. Kept for analysis; not offered to posts.
 
 
 # ---------------------------------------------------------------- running them

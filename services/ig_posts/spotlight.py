@@ -43,9 +43,6 @@ SPECS: Dict[str, Dict[str, Any]] = {
         "sub": "Impact and runs saved, phase by phase, year by year",
         "tags": ["#INDvNZ", "#TeamIndia", "#Bhuvi"],
         "key": "spotlight-bhuvneshwar-kumar-2026-10",
-        # His recall rests on this season with the new ball: the deeper cut looks there.
-        "deep_cut_scope": {"since": 2026, "over_max": 5, "label": "T20 powerplays in 2026"},
-        "deep_cut_exclude": ["phase-value"],  # slides 4-7 already show runs saved by phase
     },
 }
 
@@ -246,12 +243,71 @@ def grounds_card(db, spec) -> Optional[Dict[str, Any]]:
                 f"The series grounds for {spec['bowl_kind'].replace(' bowler', '')} with the new ball")
 
 
+ACCURACY_MIN_BALLS = 200  # tracked powerplay balls for a row (and 8 rows leave room for the definition line)
+
+
+def accuracy_card(db, spec, bowlers: List[str]) -> Optional[Dict[str, Any]]:
+    """The new ball, ball by ball: how often each pacer lands it on a good length, drops it short, and draws a false shot
+    (a ball the batter didn't control), powerplays since the first year. Accuracy is a skill that holds from year to
+    year; how many false shots become wickets mostly doesn't, so it isn't here."""
+    from datetime import date as _date
+
+    p = spec["player"]
+    common = all_t20s(bowlers=bowlers, over_max=5, start_date=_date(spec["years"][0], 1, 1))
+    lengths = _q(db, **common, group_by=["bowler", "length"])
+    control = _q(db, **common, group_by=["bowler", "control"])
+    table: Dict[str, Dict[str, Optional[float]]] = {}
+    tracked: Dict[str, int] = {}
+    for b in bowlers:
+        lr = [r for r in lengths if r["bowler"] == b and r.get("length")]
+        cr = [r for r in control if r["bowler"] == b and r.get("control") is not None]
+        lt, ct = sum(r["balls"] for r in lr), sum(r["balls"] for r in cr)
+        if lt < ACCURACY_MIN_BALLS or ct < ACCURACY_MIN_BALLS:
+            continue
+        tracked[b] = lt
+        table[b] = {
+            "Good length": 100 * sum(r["balls"] for r in lr if r["length"] == "GOOD_LENGTH") / lt,
+            "Short": 100 * sum(r["balls"] for r in lr if r["length"] == "SHORT") / lt,
+            "False shots": 100 * sum(r["balls"] for r in cr if r["control"] == 0) / ct,
+        }
+    if p not in table or len(table) < 4:
+        return None
+    order = sorted(table, key=lambda b: -table[b]["Good length"])
+    cols = ["Good length", "Short", "False shots"]
+    payload = heat(table, cols, p, order)
+    # Short: fewer is better, so its shading and ring run the other way.
+    flipped = _pct({b: -table[b]["Short"] for b in order})
+    best_short = min(order, key=lambda b: table[b]["Short"])
+    for r in payload["rows"]:
+        r["pct"]["Short"] = flipped[r["name"]]
+        r["leader"] = [c for c in r["leader"] if c != "Short"] + (["Short"] if r["name"] == best_short else [])
+    for m in payload["metrics"]:
+        m["format"] = "pct0"
+    me = table[p]
+    more_false = [short_name(b) for b in order if table[b]["False shots"] > me["False shots"] + 2]
+    first = order[0] == p
+    title = (f"{short_name(p)} lands {me['Good length']:.0f}% of his new balls on a good length"
+             + (", more than any India pacer" if first else ""))
+    named = more_false[:3]
+    who = ", ".join(named[:-1]) + f" and {named[-1]}" if len(named) > 1 else "".join(named)
+    help_ = (f"Accuracy, not menace: {who} draw{'s' if len(named) == 1 else ''} more false shots" if named
+             else "Accuracy and menace: no India pacer draws more false shots")
+    payload["method"] = "False shot: a ball the batter didn't control (a miss, an edge, a mis-hit). Ring: best."
+    out = card("accuracy", "scorecard", title, payload,
+               f"India's pacers, powerplays in every T20 since {spec['years'][0]} · {tracked[p]:,} of {short_name(p)}'s balls tracked",
+               help_)
+    out["kicker"] = "The deeper cut"
+    return out
+
+
 def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     p = spec["player"]
     bowlers = [p] + peers(db, spec)
     data = phase_years(db, bowlers, min(spec["arc_from"], spec["years"][0]))
+    deep = accuracy_card(db, spec, bowlers) if spec["role"] == "bowler" else None
     cards = [c for c in (
         arc_card(spec, data),
+        deep,  # slide 3: the post's own deeper cut, so the generic one isn't added
         peer_card(spec, data, bowlers, "powerplay", "impact"),
         peer_card(spec, data, bowlers, "death", "impact"),
         peer_card(spec, data, bowlers, "powerplay", "raa"),
@@ -265,5 +321,7 @@ def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
               + [{"type": "card", "card": c, "teams": None} for c in cards]
               + [{"type": "end", "heading": "Every number, free",
                   "body": "Impact, runs saved and every phase of every bowler: hindsightcricket.com"}])
-    verdict = cards[0]["title"] + ". " + (cards[1]["title"] + "." if len(cards) > 1 else "")
-    return {"slides": slides, "cards": cards, "title": spec["hook"], "verdict": verdict, "players": bowlers}
+    told = [c for c in cards if c is not deep]  # the deeper cut has its own caption line
+    verdict = told[0]["title"] + ". " + (told[1]["title"] + "." if len(told) > 1 else "")
+    return {"slides": slides, "cards": cards, "title": spec["hook"], "verdict": verdict, "players": bowlers,
+            "deep_cut": {"probe": "accuracy", "subject": p, "sentence": deep["title"], "by": "spotlight"} if deep else None}

@@ -56,3 +56,27 @@ def test_spotlight_can_set_the_deeper_cut_window(monkeypatch):
             "deep_cut_scope": {"since": 2026, "over_max": 5, "label": "T20 powerplays in 2026"}}
     _people, scope, label = deep_cut.subjects_for(None, fact)
     assert scope["over_max"] == 5 and scope["start_date"].year == 2026 and label == "T20 powerplays in 2026"
+
+
+def test_accuracy_card_ranks_good_length_and_flips_short(monkeypatch):
+    def q(db, **args):
+        if args["group_by"] == ["bowler", "length"]:
+            rows = []
+            for b, good, short, other in (("Bhuvneshwar Kumar", 408, 14, 376), ("Mohammed Siraj", 426, 78, 486),
+                                          ("Harshit Rana", 145, 54, 221), ("Arshdeep Singh", 614, 135, 767)):
+                rows += [{"bowler": b, "length": "GOOD_LENGTH", "balls": good}, {"bowler": b, "length": "SHORT", "balls": short},
+                         {"bowler": b, "length": "FULL", "balls": other}]
+            return rows
+        rows = []
+        for b, false, ok in (("Bhuvneshwar Kumar", 231, 565), ("Mohammed Siraj", 328, 659), ("Harshit Rana", 157, 263),
+                             ("Arshdeep Singh", 457, 1056)):
+            rows += [{"bowler": b, "control": 0, "balls": false}, {"bowler": b, "control": 1, "balls": ok}]
+        return rows
+    monkeypatch.setattr(S, "_q", q)
+    spec = {"player": "Bhuvneshwar Kumar", "years": [2023]}
+    c = S.accuracy_card(None, spec, ["Bhuvneshwar Kumar", "Mohammed Siraj", "Harshit Rana", "Arshdeep Singh"])
+    assert c["kicker"] == "The deeper cut"
+    assert c["title"] == "Bhuvneshwar lands 51% of his new balls on a good length, more than any India pacer"
+    rows = {r["name"]: r for r in c["payload"]["rows"]}
+    assert rows["Bhuvneshwar Kumar"]["pct"]["Short"] == 100 and "Short" in rows["Bhuvneshwar Kumar"]["leader"]
+    assert c["help"].startswith("Accuracy, not menace: ") and "Rana" in c["help"]
