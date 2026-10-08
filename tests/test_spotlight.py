@@ -46,3 +46,13 @@ def test_spotlight_deeper_cut_is_about_the_player(monkeypatch):
     people, _scope, label = deep_cut.subjects_for(None, {"kind": "spotlight", "subject": "Bhuvneshwar Kumar",
                                                          "subject_role": "bowler", "title": "x"})
     assert people == [("bowler", "B Kumar", "Bhuvneshwar Kumar")] and label.startswith("T20s since")
+
+
+def test_spotlight_can_set_the_deeper_cut_window(monkeypatch):
+    from services.ig_posts import deep_cut
+
+    monkeypatch.setattr(deep_cut, "resolve", lambda db, n: ("B Kumar", "Bhuvneshwar Kumar"))
+    fact = {"kind": "spotlight", "subject": "Bhuvneshwar Kumar", "subject_role": "bowler", "title": "x",
+            "deep_cut_scope": {"since": 2026, "over_max": 5, "label": "T20 powerplays in 2026"}}
+    _people, scope, label = deep_cut.subjects_for(None, fact)
+    assert scope["over_max"] == 5 and scope["start_date"].year == 2026 and label == "T20 powerplays in 2026"
