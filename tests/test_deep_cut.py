@@ -145,6 +145,8 @@ def test_conversion_finds_a_bowler_who_turns_false_shots_into_wickets():
     assert c and c.sentence == ("When Bhuvneshwar Kumar beats the bat, a wicket follows every 5.5 balls. "
                                 "The average bowler: every 6.9.")
     assert c.sample.endswith("42 wickets from 231 balls the batter didn't control")
+    assert [r["label"] for r in c.rows] == ["When the bat is beaten", "Every ball"]  # one unit: balls per wicket
+    assert round(c.rows[1]["subject"], 1) == round(831 / 42, 1)
     few = [{"control": 0, "balls": 40, "wickets": 10}, {"control": 1, "balls": 300, "wickets": 0}]
     assert D.conversion("A", "bowler", few, field, "s") is None  # too few beaten balls
 

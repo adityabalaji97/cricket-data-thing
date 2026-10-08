@@ -368,11 +368,13 @@ def conversion(name, role, rows, field_rows, scope_label):
     else:
         sentence = (f"{nm} beats the bat, but needs {s_bpw:.1f} of those balls for a wicket. "
                     f"The average bowler: {f_bpw:.1f}.")
-    out_rows = [{"label": "Balls per wicket, batter beaten", "subject": s_bpw, "field": f_bpw, "highlight": True},
-                {"label": "Share of balls beating the bat", "subject": 100 * b / tagged if tagged else 0,
-                 "field": 100 * fb / _ft if _ft else 0}]
+    # One unit on the chart: balls per wicket when the bat is beaten, and over every ball.
+    all_w, f_all_w = _sum(rows, "wickets"), _sum(field_rows, "wickets")
+    out_rows = [{"label": "When the bat is beaten", "subject": s_bpw, "field": f_bpw, "highlight": True}]
+    if all_w and f_all_w:
+        out_rows.append({"label": "Every ball", "subject": total / all_w, "field": _sum(field_rows, "balls") / f_all_w})
     return Candidate("conversion", name, sentence, _rel(f_bpw, s_bpw) * _conf(w, 12),
-                     {"label": "lower balls per wicket is better", "format": "dec1"}, out_rows,
+                     {"label": "balls per wicket (fewer is better)", "format": "dec1"}, out_rows,
                      f"{nm} · {scope_label} · {int(w)} wickets from {int(b):,} balls the batter didn't control",
                      (nm, "Average bowler"))
 
