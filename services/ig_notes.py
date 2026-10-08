@@ -106,7 +106,7 @@ def note_title(fact: Dict[str, Any]) -> Optional[str]:
         m = re.search(r"got to (.+?) in [\d,]+ (?:balls|innings)", fact.get("title") or "")
         fact = {**fact, "hook": f"Who is the fastest to {m.group(1)}?"} if m else fact
     if fact.get("kind") == "debate" and fact.get("noun"):
-        since = re.search(r"since \d{4}", fact.get("scope_label") or "")
+        since = re.search(r"since (?:the \d{4} World Cup|\d{4})", fact.get("scope_label") or "")
         measures = [MEASURE_WORDS.get(a, a) for a in (fact.get("angles") or [])][:3]
         return T.debate_title(fact["noun"], fact.get("kicker") or "", since.group(0) if since else "", measures)
     if fact.get("kind") == "record":

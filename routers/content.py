@@ -1,5 +1,6 @@
 """Admin "Social" queue: content packs (services/content_packs.py). All routes need the admin token."""
 import json
+from datetime import date
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -49,10 +50,12 @@ def list_packs(status: str = "ready", channel: str = "reddit", limit: int = 60, 
     if channel == "instagram":
         # The admin's day list: what kind of post each is and when to post it (services/ig_plan.py).
         from services.ig_plan import TIMES, _kind
+        from services.ig_season import post_format
 
         for p in packs:
             p["kind"] = _kind(p)
-            p["time"] = TIMES.get(p["kind"], "1 pm")
+            p["time"] = (p["facts"] or {}).get("post_time") or TIMES.get(p["kind"], "1 pm")
+            p["format"] = post_format(p["facts"] or {}, p["angle_key"])
     return {"packs": packs}
 
 
@@ -64,6 +67,11 @@ class PackUpdate(BaseModel):
     snapshot_id: Optional[str] = Field(default=None, max_length=32)
     # Instagram posts: where it has gone out so far (facts.posted_on), ticked per platform in the admin.
     posted_on: Optional[List[str]] = None
+    # Instagram posts: put on a day (from the bench), or back on the bench (bench=true: no day, no deadline).
+    planned_for: Optional[date] = None
+    bench: Optional[bool] = None
+    # An optional preview (facts.optional, a top-20 game beyond the day's one): false puts it in the feed.
+    optional: Optional[bool] = None
 
 
 PLATFORMS = ("instagram", "youtube", "x")
@@ -75,6 +83,7 @@ def update_pack(pack_id: int, body: PackUpdate, db: Session = Depends(get_sessio
     if not pack:
         raise HTTPException(status_code=404, detail="Pack not found")
     sets, params = [], {"id": pack_id}
+    fact_sets = []  # (facts key, bind name)
     if body.status is not None:
         if body.status not in STATUSES:
             raise HTTPException(status_code=400, detail=f"status must be one of {STATUSES}")
@@ -107,8 +116,21 @@ def update_pack(pack_id: int, body: PackUpdate, db: Session = Depends(get_sessio
         unknown = set(body.posted_on) - set(PLATFORMS)
         if unknown:
             raise HTTPException(status_code=400, detail=f"posted_on takes {', '.join(PLATFORMS)}")
-        sets.append("facts = jsonb_set(COALESCE(facts, '{}'::jsonb), '{posted_on}', CAST(:po AS jsonb))")
+        fact_sets.append(("posted_on", "po"))
         params["po"] = json.dumps([p for p in PLATFORMS if p in body.posted_on])
+    if body.bench:
+        sets += ["planned_for = NULL", "post_by = NULL"]
+    elif body.planned_for is not None:
+        sets.append("planned_for = :day")
+        params["day"] = body.planned_for
+    if body.optional is not None:
+        fact_sets.append(("optional", "opt"))
+        params["opt"] = json.dumps(bool(body.optional))
+    if fact_sets:  # one assignment to facts, however many keys change
+        expr = "COALESCE(facts, '{}'::jsonb)"
+        for key, param in fact_sets:
+            expr = f"jsonb_set({expr}, '{{{key}}}', CAST(:{param} AS jsonb))"
+        sets.append(f"facts = {expr}")
     if not sets:
         return {"ok": True}
     from database import engine

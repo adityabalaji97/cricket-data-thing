@@ -30,11 +30,30 @@ def main() -> int:
     parser.add_argument("--render-pending", action="store_true", help="render queued carousels missing slides, then stop")
     parser.add_argument("--reels-pending", action="store_true", help="make reels for queued carousels without one, then stop")
     parser.add_argument("--extras-pending", action="store_true", help="draft notes + YouTube copy for posts lacking them")
+    parser.add_argument("--bench-unposted", action="store_true", help="unposted evergreen posts from past days to the bench")
+    parser.add_argument("--reorder", action="store_true", help="re-date queued evergreen posts by the format that's on")
+    parser.add_argument("--dry-run", action="store_true", help="with --bench-unposted / --reorder: say, don't move")
     args = parser.parse_args()
 
     from services import ig_backlog
 
     start = date.fromisoformat(args.start)
+    if args.bench_unposted or args.reorder:
+        from datetime import datetime, timedelta as _td, timezone
+
+        from database import get_session
+
+        db = next(get_session())
+        today = datetime.now(timezone(_td(hours=5, minutes=30))).date()  # the queue's days are India's
+        if args.bench_unposted:
+            moved = ig_backlog.bench_unposted(db, today, dry_run=args.dry_run)
+            print(f"to the bench: {moved or 'none'}")
+        if args.reorder:
+            # From tomorrow: today's posts may already be out.
+            for key, old, new in ig_backlog.reorder(db, today + _td(days=1), args.days, dry_run=args.dry_run):
+                print(f"  {key}: {old} -> {new}")
+        print("dry run: nothing moved" if args.dry_run else "done")
+        return 0
     if args.extras_pending:
         from database import get_session
         from services import ig_notes

@@ -174,11 +174,21 @@ jobs:
           node-version: '22'
       - name: ffmpeg for Instagram Reels
         run: which ffmpeg || (sudo apt-get update -q && sudo apt-get install -y -q ffmpeg)
+      # Previews for India's fixtures and for internationals between two top-20 sides (one extra in the feed a day,
+      # the rest optional); recaps stay India's. Jev ranks each post's deeper cut.
       - name: Instagram match-day posts
         continue-on-error: true
         env:
           CHROME: google-chrome
-        run: python scripts/ig_match_day.py --team India
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: python scripts/ig_match_day.py --team India --top-teams 20
+      # Unposted evergreen posts from past days to the bench; then the next 30 days lead with the format that's on
+      # (services/ig_season.py); then Reels for anything rendered without one.
+      - name: Instagram queue upkeep
+        continue-on-error: true
+        run: |
+          python scripts/build_ig_backlog.py --bench-unposted --reorder
+          python scripts/build_ig_backlog.py --reels-pending
 
       # Usage tables (migration 004) keep 90 days of raw rows; weekly reports need no more.
       - name: Prune raw usage events
