@@ -20,7 +20,8 @@ Probes (role):
     hand            bowler   economy to left- and right-handers
     first-over      bowler   economy for the rest of the spell after a first over of 10+, against one of 0-6
     wicket-length   bowler   share of wickets by length
-    conversion      bowler   balls per wicket among balls the batter didn't control (turning false shots into wickets)
+    conversion      bowler   false shots per wicket: balls the batter didn't control (a miss, an edge, a mis-hit; the tracking's
+                             "not in control", which nearly every dismissal is) per wicket
 """
 from __future__ import annotations
 
@@ -362,20 +363,19 @@ def conversion(name, role, rows, field_rows, scope_label):
     if _rel(f_bpw, s_bpw) < 0.2:  # at least a fifth fewer (or more) balls per wicket than the field
         return None
     nm = name
+    # "False shots", not "beats the bat": not in control also covers edges and mis-hits.
     if s_bpw < f_bpw:
-        sentence = (f"When {nm} beats the bat, a wicket follows every {s_bpw:.1f} balls. "
-                    f"The average bowler: every {f_bpw:.1f}.")
+        sentence = f"{nm} takes a wicket for every {s_bpw:.1f} false shots. The average bowler needs {f_bpw:.1f}."
     else:
-        sentence = (f"{nm} beats the bat, but needs {s_bpw:.1f} of those balls for a wicket. "
-                    f"The average bowler: {f_bpw:.1f}.")
+        sentence = f"{nm} draws false shots but needs {s_bpw:.1f} of them for a wicket. The average bowler needs {f_bpw:.1f}."
     # One unit on the chart: balls per wicket when the bat is beaten, and over every ball.
     all_w, f_all_w = _sum(rows, "wickets"), _sum(field_rows, "wickets")
-    out_rows = [{"label": "When the bat is beaten", "subject": s_bpw, "field": f_bpw, "highlight": True}]
+    out_rows = [{"label": "False shots per wicket", "subject": s_bpw, "field": f_bpw, "highlight": True}]
     if all_w and f_all_w:
-        out_rows.append({"label": "Every ball", "subject": total / all_w, "field": _sum(field_rows, "balls") / f_all_w})
+        out_rows.append({"label": "Balls per wicket", "subject": total / all_w, "field": _sum(field_rows, "balls") / f_all_w})
     return Candidate("conversion", name, sentence, _rel(f_bpw, s_bpw) * _conf(w, 12),
-                     {"label": "balls per wicket (fewer is better)", "format": "dec1"}, out_rows,
-                     f"{nm} · {scope_label} · {int(w)} wickets from {int(b):,} balls the batter didn't control",
+                     {"label": "fewer is better · false shot: a ball the batter didn't control", "format": "dec1"}, out_rows,
+                     f"{nm} · {scope_label} · {int(w)} wickets from {int(b):,} false shots",
                      (nm, "Average bowler"))
 
 
