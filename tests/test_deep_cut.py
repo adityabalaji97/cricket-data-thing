@@ -158,3 +158,7 @@ def test_a_post_can_exclude_probes_its_slides_already_show(monkeypatch):
     monkeypatch.setattr(D, "rank", lambda cands: (cands, "surprise"))
     got = D.choose(None, {"subject": "A", "deep_cut_exclude": ["phase-value"]})
     assert got["deep_cut"]["probe"] == "conversion"
+
+
+def test_conversion_is_retired_from_posts():
+    assert "conversion" not in {p.id for p in D.PROBES}

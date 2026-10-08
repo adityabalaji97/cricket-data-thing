@@ -85,7 +85,12 @@ def main() -> int:
                                 [spec["player"]], spec["kicker"], spec.get("tags", []))
     post = {"key": spec["key"], "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
             "caption": caption, "players": [spec["player"]]}
-    got = ig_backlog.add_deep_cut(db, post, day)
+    if built.get("deep_cut"):  # the spotlight's own (slide 3): the generic one is skipped
+        fact["deep_cut"] = built["deep_cut"]
+        post["caption"] = ig_captions.with_deep_cut(post["caption"], built["deep_cut"]["sentence"])
+        got = built["deep_cut"]
+    else:
+        got = ig_backlog.add_deep_cut(db, post, day)
     print(f"\ndeeper cut: {got['sentence'] if got else 'none'} (by {got['by'] if got else '-'})")
     with engine.begin() as conn:
         ig_backlog.upsert_pack(conn, post, day, source="ig-spotlight")
