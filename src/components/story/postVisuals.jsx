@@ -252,34 +252,62 @@ const MetricBars = ({ payload }) => {
  * Cumulative runs or wickets against balls (or innings) for the fastest few to a milestone, the milestone dashed.
  * payload: {unit:'balls'|'innings', target, measure, series:[{name, points:[[x, y]], reached_at, highlight}]}
  */
+// Surnames shared by many players read as full names ("Zaheer Khan", not "Khan").
+const SHARED_SURNAMES = /^(Khan|Singh|Kumar|Sharma|Yadav|Patel|Ahmed|Ali|Hasan|Rahman|Malik|Iqbal|Hussain|Shah)$/;
+const raceName = (name) => {
+  const s = surname(name);
+  return SHARED_SURNAMES.test(s) ? name : s;
+};
+
 const RaceLines = ({ payload }) => {
-  const W = 300; const H = 220; const L = 8; const R = 64; const T = 12; const B = 190;
-  const maxX = Math.max(...payload.series.flatMap((s) => s.points.map((p) => p[0])), 1);
-  const maxY = Math.max(payload.target, ...payload.series.flatMap((s) => s.points.map((p) => p[1])));
-  const sx = (v) => L + (v / maxX) * (W - L - R);
-  const sy = (v) => B - (v / maxY) * (B - T);
-  const palette = [colors.accent, SERIES[0], SERIES[1], SERIES[2], '#7c8aa5'];
+  // The finish line, not the race: a dot where each reached the target (the fastest first), a dashed line at the
+  // fastest, and a bar for how much longer the others took. The running totals overlapped into one tangle; the
+  // answer is the finishing order and the gaps, so that's what's drawn. Dots on a range axis (not bars from zero):
+  // the gaps are a fifth of the totals, which bars from zero would hide.
+  const rows = [...payload.series].sort((a, b) => a.reached_at - b.reached_at);
+  const anyMarked = rows.some((r) => r.highlight);
+  const best = rows[0].reached_at;
+  const worst = rows[rows.length - 1].reached_at;
+  const pad = Math.max((worst - best) * 0.12, 1);
+  const lo = best - pad; const hi = worst + pad;
+  const W = 300; const rowH = 42; const T = 22; const L = 104; const R = 56;
+  const H = T + rows.length * rowH + 8;
+  const sx = (v) => L + ((v - lo) / (hi - lo)) * (W - L - R);
+  const n = (v) => Math.round(v).toLocaleString('en-US');
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Race to ${payload.target} ${payload.measure}`} sx={{ width: '100%' }}>
-        <line x1={L} x2={W - R} y1={sy(payload.target)} y2={sy(payload.target)} stroke={colors.textFaint} strokeDasharray="4 4" />
-        <text x={L} y={sy(payload.target) - 5} style={{ ...mono, fill: colors.textLo }}>{`${payload.target.toLocaleString('en-US')} ${payload.measure}`}</text>
-        {payload.series.map((s, i) => {
-          const d = s.points.map((p, k) => `${k ? 'L' : 'M'}${sx(p[0]).toFixed(1)},${sy(p[1]).toFixed(1)}`).join(' ');
-          const last = s.points[s.points.length - 1];
-          const c = palette[i % palette.length];
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img"
+        aria-label={`${payload.unit} to ${payload.target} ${payload.measure}: ${rows.map((r) => `${r.name} ${r.reached_at}`).join(', ')}`}
+        sx={{ width: '100%' }}>
+        <line x1={sx(best)} x2={sx(best)} y1={T - 8} y2={H - 6} stroke={colors.textFaint} strokeDasharray="3 4" />
+        <text x={sx(best)} y={T - 11} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>fastest</text>
+        {rows.map((r, i) => {
+          const y = T + i * rowH + rowH / 2;
+          const mine = anyMarked ? r.highlight : r.reached_at === best;  // no subject marked: the record holder(s)
+          const ink = mine ? colors.accent : colors.textHi;
           return (
-            <g key={s.name}>
-              <path d={d} fill="none" stroke={c} strokeWidth={i === 0 ? 2.5 : 1.6} strokeOpacity={i === 0 ? 1 : 0.85} />
-              <circle cx={sx(s.reached_at)} cy={sy(payload.target)} r="3.5" fill={c} />
-              <text x={sx(last[0]) + 5} y={sy(last[1]) + 4} style={{ fontFamily: fonts.body, fontSize: 11, fill: c }}>
-                {`${surname(s.name)} ${s.reached_at}`}
+            <g key={r.name}>
+              <text x={0} y={y + 5} style={{ fontFamily: fonts.body, fontSize: 14, fontWeight: mine ? 700 : 400, fill: mine ? colors.accent : colors.textHi }}>
+                {raceName(r.name)}
+              </text>
+              <line x1={L} x2={W - R} y1={y} y2={y} stroke={colors.border} strokeWidth="1" />
+              {r.reached_at > best && (
+                <rect x={sx(best)} y={y - 3} width={Math.max(1, sx(r.reached_at) - sx(best))} height="6" rx="3"
+                  fill={mine ? 'rgba(182,242,74,.35)' : 'rgba(255,255,255,.14)'} />
+              )}
+              <circle cx={sx(r.reached_at)} cy={y} r={mine ? 6 : 5} fill={mine ? colors.accent : '#8a96ad'}
+                stroke={colors.bg} strokeWidth="2" />
+              <text x={W} y={y + 5} textAnchor="end" style={{ ...mono, fontSize: 13, fill: ink }}>
+                {i === 0 ? n(r.reached_at) : r.reached_at === best ? 'level' : `+${n(r.reached_at - best)}`}
               </text>
             </g>
           );
         })}
-        <text x={(L + W - R) / 2} y={H - 4} textAnchor="middle" style={{ ...mono, fill: colors.textLo }}>{`${payload.unit} →`}</text>
       </Box>
+      <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
+        {`${payload.unit === 'innings' ? 'Innings' : 'Balls'} to ${payload.target.toLocaleString('en-US')} ${payload.measure}. `}
+        {`The fastest took ${n(best)}; the others, how many more.`}
+      </Typography>
     </Box>
   );
 };

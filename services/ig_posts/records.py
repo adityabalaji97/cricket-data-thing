@@ -1,7 +1,7 @@
 """
 Record posts ("fastest to 1,000 IPL runs"): the race by balls and by innings, then what each got there with.
 
-    1. race_lines by balls: cumulative runs (or wickets) against balls for the five fastest, the milestone dashed
+    1. race_lines by balls: the five fastest to the milestone, drawn as a finish line (balls taken, and the gaps)
     2. race_lines by innings: the same race counted in innings; the leader often changes, which is the talking point
     3. scorecard: balls and innings to the milestone, plus strike rate (or economy) and, in men's T20, RAA and WPA per
        100 balls over their career up to the milestone; a split verdict ("fewest balls: X; fewest innings: Y")
@@ -106,7 +106,7 @@ def _race_card(db, spec, scope, unit: str, words: Dict[str, str]) -> Optional[Di
                "series": [{"name": r["name"], "points": series.get(r["name"], []), "reached_at": r["value"]} for r in top
                           if series.get(r["name"])]}
     return card(f"race-{unit}", "race_lines", title, payload,
-                f"{len(rows)} reached {words['what']} · {caveat}", f"Running total, the {TOP} fastest by {unit}"), rows
+                f"{len(rows)} reached {words['what']} · {caveat}", f"The {TOP} fastest, and how many more {unit} the others needed"), rows
 
 
 def _at_milestone(db, spec, scope, names_dates: List[Tuple[str, date]]) -> Dict[str, Dict[str, Any]]:
