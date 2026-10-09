@@ -81,7 +81,7 @@ def main() -> int:
         if spec.get(k):
             fact[k] = spec[k]
     caption = ig_captions.build(built["title"], built["verdict"], "debate",
-                                "Impact and runs saved are computed ball by ball (T20 Primer method), on every T20 each bowler played.",
+                                spec.get("method") or "Impact and runs saved are computed ball by ball (T20 Primer method), on every T20 each bowler played.",
                                 [spec["player"]], spec["kicker"], spec.get("tags", []))
     post = {"key": spec["key"], "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
             "caption": caption, "players": [spec["player"]]}

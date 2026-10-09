@@ -44,6 +44,27 @@ SPECS: Dict[str, Dict[str, Any]] = {
         "tags": ["#INDvNZ", "#TeamIndia", "#Bhuvi"],
         "key": "spotlight-bhuvneshwar-kumar-2026-10",
     },
+    "shami-odi": {
+        "type": "case_odi", "player": "Mohammad Shami", "role": "bowler", "bowl_kind": "pace bowler", "team": "India",
+        "since": date(2019, 1, 1), "peers_since": date(2023, 1, 1), "last_game": date(2025, 3, 9), "own_from": date(2025, 1, 1),
+        "own_label": "his 7 ODIs in 2025", "series_start": date(2026, 11, 4),
+        "venues": [("Eden Park", ["Eden Park, Auckland"]),
+                   ("Wellington", ["Westpac Stadium, Wellington", "Sky Stadium, Wellington", "WestpacTrust Stadium, Wellington"]),
+                   ("Seddon Park", ["Seddon Park, Hamilton"]),
+                   ("Bay Oval", ["Bay Oval, Mount Maunganui"])],
+        "hook": "Mohammad Shami last bowled for India in the Champions Trophy final. Should he be in the ODI squad for New Zealand?",
+        "kicker": "India in New Zealand ODIs", "sub": "The case, phase by phase, and the doubts",
+        "tags": ["#Shami", "#TeamIndia", "#INDvNZ", "#ODI"],
+        "method": ("wickets, averages and economy from every ODI ball by ball (overs 1-10, 11-40, 41-50); his Vijay "
+                   "Hazare Trophy figures are ESPNcricinfo's."),
+        "key": "spotlight-mohammad-shami-odi-2026-10",
+        # Not in Cricsheet: Vijay Hazare 2025-26 totals read from ESPNcricinfo's most-wickets page (the user's
+        # screenshot, 9 Oct 2026: 7 mat, 362 balls, 8 mdns, 368 runs, 15 wkts).
+        "external": {"heading": "From elsewhere · Vijay Hazare Trophy 2025-26",
+                     "lines": ["15 wickets in 7 matches for Bengal", "Economy 6.10 · average 24.5 · 8 maidens",
+                               "A wicket every 24 balls"],
+                     "source": "ESPNcricinfo", "confirmed": True},
+    },
 }
 
 
@@ -301,6 +322,10 @@ def accuracy_card(db, spec, bowlers: List[str]) -> Optional[Dict[str, Any]]:
 
 
 def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if spec.get("type") == "case_odi":  # an ODI case (services/ig_posts/case_odi.py)
+        from services.ig_posts import case_odi
+
+        return case_odi.build(db, spec)
     p = spec["player"]
     bowlers = [p] + peers(db, spec)
     data = phase_years(db, bowlers, min(spec["arc_from"], spec["years"][0]))
