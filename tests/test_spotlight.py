@@ -80,3 +80,33 @@ def test_accuracy_card_ranks_good_length_and_flips_short(monkeypatch):
     rows = {r["name"]: r for r in c["payload"]["rows"]}
     assert rows["Bhuvneshwar Kumar"]["pct"]["Short"] == 100 and "Short" in rows["Bhuvneshwar Kumar"]["leader"]
     assert c["help"].startswith("Accuracy, not menace: ") and "Rana" in c["help"]
+
+
+def test_case_odi_external_figures_must_be_confirmed():
+    import pytest
+    from services.ig_posts import case_odi
+
+    spec = {"external": {"heading": "From elsewhere", "lines": ["15 wickets"], "source": "ESPNcricinfo", "confirmed": False}}
+    with pytest.raises(ValueError):
+        case_odi.external_slide(spec)
+    spec["external"]["confirmed"] = True
+    assert case_odi.external_slide(spec)["body"].endswith("Source: ESPNcricinfo (not Hindsight data)")
+
+
+def test_case_odi_phase_card_flips_shading_and_claims_only_what_it_leads():
+    from datetime import date
+
+    from services.ig_posts import case_odi
+
+    spec = {"player": "Mohammad Shami", "since": date(2019, 1, 1)}
+    def cell(bpw):
+        return {"bpw": bpw, "econ": 6.0, "balls": 300, "wickets": 20}
+    phases = {"Mohammad Shami": {"New ball": cell(39), "Middle": cell(23), "Death": cell(14)},
+              "Harshit Rana": {"New ball": cell(39), "Middle": cell(22), "Death": {"bpw": None, "econ": None}},
+              "Jasprit Bumrah": {"New ball": cell(47), "Middle": cell(39), "Death": cell(21)},
+              "Arshdeep Singh": {"New ball": cell(26), "Middle": cell(49), "Death": cell(30)}}
+    c = case_odi.phase_card(spec, phases, list(phases), "bpw")
+    assert c["title"] == "No India pacer takes ODI wickets at the death as often as Shami"  # Rana leads the middle
+    rows = {r["name"]: r for r in c["payload"]["rows"]}
+    assert rows["Mohammad Shami"]["pct"]["Death"] == 100 and "Death" in rows["Mohammad Shami"]["leader"]
+    assert rows["Arshdeep Singh"]["leader"] == ["New ball"]

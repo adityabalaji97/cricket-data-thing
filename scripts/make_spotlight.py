@@ -64,7 +64,7 @@ def main() -> int:
         return 0
 
     from database import engine, get_session
-    from services import ig_backlog, ig_captions, ig_carousel, ig_notes, ig_slides
+    from services import ig_backlog, ig_notes, ig_slides
 
     db = next(get_session())
     built = spotlight.build(db, spec)
@@ -73,24 +73,9 @@ def main() -> int:
         return 1
     show(built)
     day = date.fromisoformat(args.date)
-    carousel = ig_carousel.save(db, built["slides"], built["title"], {"spotlight": spec["key"]}, "ig-spotlight")
-    fact = {"kind": "spotlight", "subject": spec["player"], "subject_role": spec["role"], "title": built["title"],
-            "verdict": built["verdict"], "kicker": spec["kicker"], "carousel_id": carousel["id"],
-            "slides": len(built["slides"]), "render": True}
-    for k in ("deep_cut_scope", "deep_cut_exclude"):
-        if spec.get(k):
-            fact[k] = spec[k]
-    caption = ig_captions.build(built["title"], built["verdict"], "debate",
-                                "Impact and runs saved are computed ball by ball (T20 Primer method), on every T20 each bowler played.",
-                                [spec["player"]], spec["kicker"], spec.get("tags", []))
-    post = {"key": spec["key"], "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
-            "caption": caption, "players": [spec["player"]]}
-    if built.get("deep_cut"):  # the spotlight's own (slide 3): the generic one is skipped
-        fact["deep_cut"] = built["deep_cut"]
-        post["caption"] = ig_captions.with_deep_cut(post["caption"], built["deep_cut"]["sentence"])
-        got = built["deep_cut"]
-    else:
-        got = ig_backlog.add_deep_cut(db, post, day)
+    post = spotlight.make_post(db, spec, built)
+    got = post["fact"].get("deep_cut") or ig_backlog.add_deep_cut(db, post, day)
+    fact = post["fact"]
     print(f"\ndeeper cut: {got['sentence'] if got else 'none'} (by {got['by'] if got else '-'})")
     with engine.begin() as conn:
         ig_backlog.upsert_pack(conn, post, day, source="ig-spotlight")
