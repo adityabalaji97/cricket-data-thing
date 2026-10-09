@@ -189,6 +189,14 @@ jobs:
         run: |
           python scripts/build_ig_backlog.py --bench-unposted --reorder
           python scripts/build_ig_backlog.py --reels-pending
+      # Today's posts rebuilt with the data just loaded; a post whose numbers moved is rebuilt in place (slides, Reel,
+      # X and YouTube copy), and admin shows what changed (services/ig_check.py). Posted posts are never touched.
+      - name: Morning check of today's posts
+        continue-on-error: true
+        env:
+          CHROME: google-chrome
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: python scripts/ig_check_today.py
 
       # Usage tables (migration 004) keep 90 days of raw rows; weekly reports need no more.
       - name: Prune raw usage events

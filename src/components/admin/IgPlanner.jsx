@@ -186,6 +186,10 @@ const XTab = ({ pack, copy, toast }) => {
   );
 };
 
+// The morning check (services/ig_check.py): today's posts rebuilt with this morning's data.
+const CHECK_LABEL = { ok: '✓ checked', rebuilt: '⟳ updated', changed: '⚠ changed', failed: '⚠ check failed' };
+const CHECK_COLOR = { ok: C.lime, rebuilt: C.amber, changed: C.amber, failed: C.red };
+
 // Kinds that are still true next week: they can sit on the bench and fill any open day (services/ig_backlog.BENCHABLE).
 const BENCHABLE = ['debate', 'trend', 'myth', 'weird', 'record', 'note'];
 
@@ -217,6 +221,23 @@ const PostDetail = ({ pack, onUpdate, copy, toast, openDays = [] }) => {
         </Typography>
       )}
       {(pack.rule_warnings || []).map((w) => <Typography key={w} sx={{ fontSize: 12, color: C.amber, mt: 0.5 }}>⚠ {w}</Typography>)}
+      {facts.check && (
+        // What this morning's data changed (the post was rebuilt with it) or that nothing did.
+        <Box sx={{ mt: 1.5 }}>
+          <SectionLabel sx={{ mb: 0.5 }}>
+            Morning check · {new Date(facts.check.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+          </SectionLabel>
+          {facts.check.status === 'ok' && <Typography sx={{ fontSize: 13, color: C.mid }}>Numbers unchanged with this morning's data.</Typography>}
+          {facts.check.status === 'failed' && <Typography sx={{ fontSize: 13, color: C.red }}>The check couldn't rebuild this post: {facts.check.error}</Typography>}
+          {(facts.check.diffs || []).map((d) => (
+            <Typography key={`${d.slide}-${d.was}`} sx={{ fontSize: 12, color: C.mid, lineHeight: 1.4, mt: 0.5 }}>
+              {d.slide ? `Slide ${d.slide}: ` : ''}<Box component="span" sx={{ color: C.lo, textDecoration: 'line-through' }}>{d.was}</Box>
+              {' → '}<Box component="span" sx={{ color: C.hi }}>{d.now}</Box>
+            </Typography>
+          ))}
+          {facts.check.status === 'rebuilt' && <Typography sx={{ fontSize: 12, color: C.lo, mt: 0.5 }}>Rebuilt with the new numbers: slides, Reel and copy are current.</Typography>}
+        </Box>
+      )}
       <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${C.line}` }}>
         <SectionLabel sx={{ mb: 0.75 }}>Posted on · tap to tick</SectionLabel>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -269,6 +290,11 @@ const PostRow = ({ pack, time, open, onToggle, onUpdate, copy, toast, openDays }
           <Typography sx={{ fontSize: 12, color: C.lo }}>
             <Box component="span" sx={{ color: pack.status === 'posted' ? C.lime : C.amber, fontWeight: 700 }}>{time || '—'}</Box>
             {' · '}{KIND_LABELS[pack.kind] || pack.kind}{pack.format ? ` · ${pack.format}` : ''}{dim ? ` · ${pack.status}` : ''}
+            {CHECK_LABEL[(pack.facts || {}).check?.status] && (
+              <Box component="span" sx={{ color: CHECK_COLOR[pack.facts.check.status], fontWeight: 700 }}>
+                {' · '}{CHECK_LABEL[pack.facts.check.status]}
+              </Box>
+            )}
           </Typography>
           <Typography sx={{ fontSize: 14, fontWeight: 600, color: dim ? C.lo : C.hi, lineHeight: 1.35, mt: 0.25,
             textDecoration: dim ? 'line-through' : 'none' }}>

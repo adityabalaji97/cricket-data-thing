@@ -293,26 +293,55 @@ def play_post(db: Session, day: date, created_by: str = "ig-play") -> Optional[D
 def debate_posts(db: Session, only: Optional[List[str]] = None, limit: int = DEBATE_POSTS) -> List[Dict[str, Any]]:
     """The generator's best contested questions as carousels (services/ig_posts): hook, Jev-chosen angles drawn by the
     app's own visuals, a split-verdict scorecard. Slides render after the pack is written (render_carousels)."""
-    from services import ig_captions, ig_carousel
-    from services.ig_posts import post as P, questions as Q
+    from services.ig_posts import questions as Q
 
     out = []
     for entry in Q.generate(db, limit=limit, only=only, log=lambda m: logger.info(m)):
-        q, built = entry["question"], P.build(entry)
-        if not built:
-            continue
-        carousel = ig_carousel.save(db, built["slides"], q.text, {"debate": q.key}, "ig-debate")
-        plan = entry["plan"]
-        fact = {"kind": "debate", "subject": None, "title": q.text, "verdict": built["verdict"], "question": q.key,
-                "noun": q.noun, "kicker": q.kicker, "scope_label": q.scope_label,
-                "leaders": built["leaders"], "angles": [a.id for a in plan["angles"]], "angle_scores": plan["scores"],
-                "angles_by": plan["by"], "appeal": entry["appeal"], "appeal_by": entry["appeal_by"],
-                "method": built["method"], "carousel_id": carousel["id"], "slides": len(built["slides"]),
-                "render": True}
-        caption = ig_captions.build(q.text, built["verdict"], "debate", built["method"], built["players"], q.kicker)
-        out.append({"key": f"debate-{q.key}", "pillar": "debate", "fact": fact, "snapshot_id": carousel["id"],
-                    "warnings": [], "players": built["players"], "caption": caption})
+        post = debate_post(db, entry)
+        if post:
+            out.append(post)
     return out
+
+
+def debate_post(db: Session, entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """One generator entry as a queueable debate post (carousel saved)."""
+    from services import ig_captions, ig_carousel
+    from services.ig_posts import post as P
+
+    q, built = entry["question"], P.build(entry)
+    if not built:
+        return None
+    carousel = ig_carousel.save(db, built["slides"], q.text, {"debate": q.key}, "ig-debate")
+    plan = entry["plan"]
+    fact = {"kind": "debate", "subject": None, "title": q.text, "verdict": built["verdict"], "question": q.key,
+            "noun": q.noun, "kicker": q.kicker, "scope_label": q.scope_label,
+            "leaders": built["leaders"], "angles": [a.id for a in plan["angles"]], "angle_scores": plan["scores"],
+            "angles_by": plan["by"], "appeal": entry["appeal"], "appeal_by": entry["appeal_by"],
+            "method": built["method"], "carousel_id": carousel["id"], "slides": len(built["slides"]),
+            "render": True}
+    caption = ig_captions.build(q.text, built["verdict"], "debate", built["method"], built["players"], q.kicker)
+    return {"key": f"debate-{q.key}", "pillar": "debate", "fact": fact, "snapshot_id": carousel["id"],
+            "warnings": [], "players": built["players"], "caption": caption}
+
+
+def trend_post(db: Session, entry: Dict[str, Any], key: str, headlines: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """A trending question (services/ig_posts/trends) as a queueable post (carousel saved)."""
+    from services import ig_captions, ig_carousel
+    from services.ig_posts import post as P
+
+    q, built = entry["question"], P.build(entry)
+    if not built:
+        return None
+    carousel = ig_carousel.save(db, built["slides"], q.text, {"trend": q.key, "post": key}, "ig-trend")
+    plan = entry["plan"]
+    fact = {"kind": "debate", "trending": True, "subject": q.subject, "title": q.text, "verdict": built["verdict"],
+            "headlines": headlines, "leaders": built["leaders"], "angles": [a.id for a in plan["angles"]],
+            "angle_scores": plan["scores"], "angles_by": plan["by"], "appeal": entry.get("appeal"),
+            "appeal_by": entry.get("appeal_by"), "method": built["method"], "carousel_id": carousel["id"],
+            "slides": len(built["slides"]), "render": True}
+    return {"key": key, "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
+            "players": [q.subject], "caption": ig_captions.build(q.text, built["verdict"], "debate", built["method"],
+                                                                [q.subject, *built["players"]], q.kicker)}
 
 
 def render_carousels(posts: List[Dict[str, Any]], base: Optional[str] = None) -> Dict[str, Any]:

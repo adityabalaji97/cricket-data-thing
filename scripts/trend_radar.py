@@ -27,8 +27,8 @@ def main() -> int:
     args = parser.parse_args()
 
     from database import engine, get_session
-    from services import ig_backlog, ig_captions, ig_carousel, ig_slides
-    from services.ig_posts import post as P, trends
+    from services import ig_backlog, ig_slides
+    from services.ig_posts import trends
 
     db = next(get_session())
     # The queue's days are India's (the audience, and when the posts go out), not UTC's.
@@ -56,20 +56,10 @@ def main() -> int:
         print(f"[{e['appeal']:.1f} {e['appeal_by']}] {q.text}\n    in the news: {news}")
         if args.dry_run:
             continue
-        built = P.build(e)
-        if not built:
+        post = ig_backlog.trend_post(db, e, f"{q.key}-{today}", e["headlines"])
+        if not post:
             print("    not made: too few cards")
             continue
-        carousel = ig_carousel.save(db, built["slides"], q.text, {"trend": q.key, "day": str(today)}, "ig-trend")
-        plan = e["plan"]
-        fact = {"kind": "debate", "trending": True, "subject": q.subject, "title": q.text, "verdict": built["verdict"],
-                "headlines": e["headlines"], "leaders": built["leaders"], "angles": [a.id for a in plan["angles"]],
-                "angle_scores": plan["scores"], "angles_by": plan["by"], "appeal": e["appeal"], "appeal_by": e["appeal_by"],
-                "method": built["method"], "carousel_id": carousel["id"], "slides": len(built["slides"]), "render": True}
-        post = {"key": f"{q.key}-{today}", "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"],
-                "warnings": [], "players": [q.subject],
-                "caption": ig_captions.build(q.text, built["verdict"], "debate", built["method"],
-                                             [q.subject, *built["players"]], q.kicker)}
         ig_backlog.add_deep_cut(db, post, today)
         with engine.begin() as conn:
             ig_backlog.upsert_pack(conn, post, today, source="ig-trend", post_by=post_by)

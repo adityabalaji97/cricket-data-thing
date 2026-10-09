@@ -350,3 +350,30 @@ def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     verdict = told[0]["title"] + ". " + (told[1]["title"] + "." if len(told) > 1 else "")
     return {"slides": slides, "cards": cards, "title": spec["hook"], "verdict": verdict, "players": bowlers,
             "deep_cut": {"probe": "accuracy", "subject": p, "sentence": deep["title"], "by": "spotlight"} if deep else None}
+
+
+def make_post(db, spec: Dict[str, Any], built: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    """The queueable post for a spec: carousel saved, fact, caption (with the spec's own deeper cut when it has one; the
+    generic one is added by the caller, ig_backlog.add_deep_cut, otherwise). None when the data can't make the post."""
+    from services import ig_captions, ig_carousel
+
+    built = built or build(db, spec)
+    if not built:
+        return None
+    carousel = ig_carousel.save(db, built["slides"], built["title"], {"spotlight": spec["key"]}, "ig-spotlight")
+    fact = {"kind": "spotlight", "subject": spec["player"], "subject_role": spec["role"], "title": built["title"],
+            "verdict": built["verdict"], "kicker": spec["kicker"], "carousel_id": carousel["id"],
+            "slides": len(built["slides"]), "render": True, "spec": next(k for k, v in SPECS.items() if v is spec)}
+    for k in ("deep_cut_scope", "deep_cut_exclude"):
+        if spec.get(k):
+            fact[k] = spec[k]
+    caption = ig_captions.build(built["title"], built["verdict"], "debate",
+                                spec.get("method") or "Impact and runs saved are computed ball by ball (T20 Primer method), "
+                                                      "on every T20 each bowler played.",
+                                [spec["player"]], spec["kicker"], spec.get("tags", []))
+    post = {"key": spec["key"], "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
+            "caption": caption, "players": [spec["player"]]}
+    if built.get("deep_cut"):  # the spotlight's own (slide 3)
+        fact["deep_cut"] = built["deep_cut"]
+        post["caption"] = ig_captions.with_deep_cut(caption, built["deep_cut"]["sentence"])
+    return post
