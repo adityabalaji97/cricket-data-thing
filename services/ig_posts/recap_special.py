@@ -11,8 +11,8 @@ None when the match doesn't clear its bar:
   execution      the deeper cut: how often each attack landed a good length or yorker, against the T20I norm for the
                  same bowler type and phase
   expected       the deeper cut: what each attack's balls usually cost (expected runs) against what they went for
-  wp_line        the loser's win probability through the chase, the overs that moved it most annotated with the batters
-                 and what those balls usually cost (the over, not the bowler: the post doesn't blame bowlers)
+  wp_line        the loser's win probability through the chase, the overs that moved it most annotated with the bowler,
+                 the batters and what those balls usually cost (so the runs read against the balls, not as blame)
   conditions     the deeper cut: both innings and both bowler types against expected (a spin gap is a possible dew
                  sign, said as such), the ground's previous highest; it always says what can't be measured
   death_pace     a top-TOP finish (overs 16-20) in a successful chase, framed as batting
@@ -32,6 +32,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from services.ig_posts.cards import card, short
+from services.ig_posts.spotlight import short_name  # "Kuldeep", not "Yadav" (a surname two of them share)
 
 TOP = 10            # a record card needs a top-10 place (or a record against the loser / in the country)
 SHOW = 8            # rows on a record chart
@@ -441,7 +442,7 @@ def wp_line(x: Match) -> Optional[Dict[str, Any]]:
         points.append({"wp": round(wp, 1), "label": f"{b['over']}.{max(1, legal - 6 * b['over'])}",
                        "score": f"{b['inns_runs']}/{b['inns_wkts']}", "over": b["over"]})
         o = overs.setdefault(b["over"], {"over": b["over"], "from": prev, "runs": 0, "x": 0.0, "bat": defaultdict(int),
-                                         "i0": len(points) - 1})
+                                         "bowl": b["bowl"], "i0": len(points) - 1})
         o["to"], o["i1"] = wp, len(points) - 1
         o["runs"] += b["score"] or 0
         o["x"] += b["x_runs"] or 0
@@ -457,11 +458,14 @@ def wp_line(x: Match) -> Optional[Dict[str, Any]]:
     drops.sort(key=lambda o: o["over"])
     bands = []
     for o in drops:
-        hitters = [short(n) for n, r in sorted(o["bat"].items(), key=lambda kv: -kv[1]) if r > 0][:2]
+        hitters = [short_name(n) for n, r in sorted(o["bat"].items(), key=lambda kv: -kv[1]) if r > 0][:2]
         who = " & ".join(hitters) or "the batters"
-        usual = f" off balls that usually go for {round(o['x'])}" if x.base else ""
+        usual = f", usually {round(o['x'])}" if x.base else ""
+        bowler = short_name(o["bowl"]) if o["bowl"] else None
         bands.append({"i0": o["i0"], "i1": o["i1"], "over": o["over"] + 1, "from": round(o["from"]), "to": round(o["to"]),
-                      "text": f"Over {o['over'] + 1}: {who} hit {o['runs']}{usual}"})
+                      "bowler": bowler,
+                      "text": f"Over {o['over'] + 1}: {who} hit {o['runs']} runs{usual}" if not bowler else
+                              f"Over {o['over'] + 1}: {bowler} to {who}, {o['runs']} runs{usual}"})
     first = drops[0] if drops else None
     if first:
         before = round(first["from"])
@@ -473,8 +477,8 @@ def wp_line(x: Match) -> Optional[Dict[str, Any]]:
     c = card("wp-line", "win_prob_line", title, {
         "team": x.loser, "start": round(start, 1), "points": points, "bands": bands,
         "label": f"{x.loser}'s chance of winning",
-    }, x.sample, f"{x.loser}'s win probability, ball by ball (T20 Primer method). Shaded: the overs that moved it most,"
-                 " and who did it.")
+    }, x.sample, f"{poss(x.loser)} win probability, ball by ball (T20 Primer method). Shaded: the overs that moved it"
+                 " most." + (" Usually: what the same balls cost in T20Is." if x.base else ""))
     c["facts"] = {"peak": round(peak, 1), "biggest": round(biggest, 1), "swings": [(b["over"], b["from"], b["to"]) for b in bands]}
     return c
 

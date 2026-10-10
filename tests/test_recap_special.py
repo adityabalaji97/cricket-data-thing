@@ -68,7 +68,8 @@ def test_win_probability_is_the_losers_and_the_swing_overs_are_annotated():
     assert c["payload"]["points"][0]["wp"] == 79.5  # 100 - the chasers' 20.5
     (band,) = c["payload"]["bands"]
     assert band["over"] == 3 and band["from"] - band["to"] == 60
-    assert band["text"].startswith("Over 3: Hitter hit 36")
+    assert band["text"] == "Over 3: D to Hitter, 36 runs"  # no baseline here, so no "usually"
+    assert band["bowler"] == "D"
 
 
 def test_win_probability_quiet_without_a_big_swing_or_a_favourite():
