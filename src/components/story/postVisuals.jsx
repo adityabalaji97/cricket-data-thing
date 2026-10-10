@@ -215,7 +215,8 @@ const ScatterPlus = ({ payload }) => {
 
 /**
  * One metric, ranked; the subject in lime, others in their team colour (or slate). Signed metrics draw from zero.
- * payload: {metric:{label, format, signed}, rows:[{name, value, team?, highlight?, detail?}]}
+ * payload: {metric:{label, format, signed}, rows:[{name, value, team?, highlight?, detail?}], label_width?}
+ * (label_width: px for the name column when the detail lines are long; 110 by default)
  */
 const MetricBars = ({ payload }) => {
   const { rows, metric } = payload;
@@ -227,7 +228,7 @@ const MetricBars = ({ payload }) => {
         const width = (100 * Math.abs(r.value)) / max / (signed ? 2 : 1);
         const color = r.highlight ? colors.accent : teamColour(r.team, '#5b6b85');
         return (
-          <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: '110px 1fr 58px', gap: 1, alignItems: 'center' }}>
+          <Box key={`${r.name}-${r.detail || ''}`} sx={{ display: 'grid', gridTemplateColumns: `${payload.label_width || 110}px 1fr 58px`, gap: 1, alignItems: 'center' }}>
             <Box sx={{ minWidth: 0 }}>
               <Typography noWrap sx={{ fontSize: 13, color: r.highlight ? colors.accent : colors.textHi, fontWeight: r.highlight ? 600 : 400 }}>{r.name}</Typography>
               {r.detail && <Typography noWrap sx={{ fontSize: 11, color: colors.textLo, lineHeight: 1.25 }}>{r.detail}</Typography>}
@@ -589,6 +590,55 @@ const WinProbLine = ({ payload }) => {
   );
 };
 
+/**
+ * A side's bowling, over by over (services/ig_posts/captains_call.plan_card): one row per bowler, one chip per over
+ * they bowled with its runs, pace and spin in the first two series colours, the over in question ringed, and how many
+ * overs each still had left before it.
+ * payload: {team, mark, overs, rows:[{name, kind:'pace'|'spin'|'other', cells:[{o, runs}], left}]}
+ */
+const ordinal = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}`;
+const BowlingPlan = ({ payload }) => {
+  const { rows, mark } = payload;
+  const kindColour = { pace: SERIES[0], spin: SERIES[1], other: '#5b6b85' };
+  const cols = '74px repeat(20, 1fr) 30px';
+  const head = (o) => (o === 1 || o % 5 === 0 || o === mark ? o : '');
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '5px' }}
+      role="img" aria-label={`${payload.team} bowling by over; over ${mark} marked; ${rows.map((r) => `${r.name} ${r.cells.length} overs, ${r.left} left`).join('; ')}`}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: cols, gap: '2px', alignItems: 'end' }}>
+        <span />
+        {Array.from({ length: 20 }, (_, i) => (
+          <Typography key={i} sx={{ ...mono, fontSize: 9.5, textAlign: 'center', color: i + 1 === mark ? colors.textHi : colors.textLo, fontWeight: i + 1 === mark ? 700 : 400 }}>{head(i + 1)}</Typography>
+        ))}
+        <Typography sx={{ fontSize: 9.5, color: colors.textLo, textAlign: 'right', lineHeight: 1.1 }}>left</Typography>
+      </Box>
+      {rows.map((r) => {
+        const at = Object.fromEntries(r.cells.map((c) => [c.o, c.runs]));
+        return (
+          <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: cols, gap: '2px', alignItems: 'center' }}>
+            <Typography noWrap sx={{ fontSize: 12, color: colors.textHi }}>{r.short || raceName(r.name)}</Typography>
+            {Array.from({ length: 20 }, (_, i) => {
+              const o = i + 1; const runs = at[o]; const isMark = o === mark;
+              return (
+                <Box key={o} title={runs != null ? `Over ${o}: ${runs} runs` : undefined} sx={{
+                  height: 24, borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  bgcolor: runs != null ? kindColour[r.kind] : (isMark ? 'rgba(255,255,255,0.06)' : colors.surface2),
+                  outline: isMark && runs != null ? `2px solid ${colors.textHi}` : 'none', outlineOffset: '1px',
+                }}>
+                  {runs != null && <Typography sx={{ ...mono, fontSize: 9.5, color: '#fff', fontWeight: 600, lineHeight: 1 }}>{runs}</Typography>}
+                </Box>
+              );
+            })}
+            <Typography sx={{ ...mono, fontSize: 12, textAlign: 'right', color: r.left ? colors.textHi : colors.textLo }}>{r.left}</Typography>
+          </Box>
+        );
+      })}
+      <Legend items={[['Pace', kindColour.pace], ['Spin', kindColour.spin]]} />
+      <Typography sx={{ fontSize: 11.5, color: colors.textLo, mt: -0.25 }}>{`Runs in each over. Left: overs each still had before the ${ordinal(mark)}.`}</Typography>
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
   deep_compare: DeepCompare,
   innings_scorecard: InningsScorecard,
@@ -600,5 +650,6 @@ export const POST_VISUALS = {
   win_prob_line: WinProbLine,
   forest: Forest,
   bucket_bars: BucketBars,
+  bowling_plan: BowlingPlan,
   pair_dumbbell: PairDumbbell,
 };
