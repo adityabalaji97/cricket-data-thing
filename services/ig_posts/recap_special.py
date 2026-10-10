@@ -15,6 +15,8 @@ None when the match doesn't clear its bar:
                  the batters and what those balls usually cost (so the runs read against the balls, not as blame)
   conditions     the deeper cut: both innings and both bowler types against expected (a spin gap is a possible dew
                  sign, said as such), the ground's previous highest; it always says what can't be measured
+  captains_plan  the losing side's bowling plan, when the swing over came at the death and the plan around it was unusual
+                 (services/ig_posts/captains_call.py, which also makes the follow-up post)
   death_pace     a top-TOP finish (overs 16-20) in a successful chase, framed as batting
 
 Expected runs: each ball gets the average runs (and control %) of men's T20I balls of the same bowler type, phase, line
@@ -44,6 +46,8 @@ BIG_SWING = 30      # the win-probability card fires on an over this big, or ...
 PEAK = 80           # ... a loser who was at least this likely to win
 TAGGED = 0.8        # share of balls with line and length needed for the expected-runs cards
 CLOSE = 0.5         # runs an over: a finish this close to the fastest is "level with" it, not ahead
+PLAN_GAP = 30       # the bowling-plan card: a death-overs spin share this far from the 200-defending norm, or ...
+PLAN_LEFT = 2       # ... this many overs of the other kind still in hand at the swing over
 DEW_GAP = 0.2       # spin's runs-to-expected ratio this much higher in the chase reads as a possible dew sign
 GOOD = ("GOOD_LENGTH", "YORKER")
 KINDS = (("pace bowler", "Pace"), ("spin bowler", "Spin"))
@@ -483,6 +487,28 @@ def wp_line(x: Match) -> Optional[Dict[str, Any]]:
     return c
 
 
+def captains_plan(x: Match) -> Optional[Dict[str, Any]]:
+    """The losing side's bowling plan (services/ig_posts/captains_call.plan_card), when the over that swung the chase
+    came at the death and the plan around it was unusual: a death-overs spin share PLAN_GAP points off what teams
+    defending 200 do, or PLAN_LEFT+ overs of the other kind still in hand."""
+    from services.ig_posts import captains_call as C
+
+    if not x.innings[2] or x.innings[2][0]["team_bowl"] != x.loser:
+        return None
+    c = C.plan_card(x.db, x.id, None, x.sample)
+    if not c or c["facts"]["mark"] < 16:
+        return None
+    f = c["facts"]
+    norm = (C.mix_norm(x.db, x.day, f["mark"]).get("defended") or {}).get("death")
+    share = 100 * f["spin_death"] / f["death"] if f["death"] else None
+    off = norm is not None and share is not None and abs(share - norm) >= PLAN_GAP
+    if not off and f["other_left"] < PLAN_LEFT:
+        return None
+    if norm is not None:
+        c["help"] += f" Teams defending 200 bowl spin in about {round(norm)}% of the last five overs."
+    return c
+
+
 def _kicker() -> str:
     from services.ig_posts.deep_cut import KICKER
 
@@ -506,7 +532,7 @@ def special(db: Session, m: Dict[str, Any], label: str) -> Optional[Dict[str, An
         return None
     deep = [c for c in (execution(x), expected(x)) if c]
     cond = conditions(x)
-    cards = [c for c in [chase or lost, *deep, wp, cond, death_pace(x), lost if chase else None] if c]
+    cards = [c for c in [chase or lost, *deep, wp, captains_plan(x), cond, death_pace(x), lost if chase else None] if c]
     cards += innings_scorecards(db, x.id, sample)
     target = x.mine[1]["runs"] + 1 if 1 in x.mine else None
     if chase and chase["facts"]["beat_loser"] and chase["facts"]["previous_v_loser"]:
