@@ -8,7 +8,8 @@ Match-day posts: a preview before each match of a series, a "what decided it" po
            day so the last meeting is this match), who swung it (WPA), who added and saved the most runs
            (Impact for batters, RAA for bowlers): all from ball_metrics through the query builder; then the Impact
            scorecard, one slide per innings (batting in order: runs (balls), strike rate, Impact; bowling as on the
-           match page: figures, wickets, Impact), from the scorecard service the match page uses
+           match page: figures, wickets, Impact), from the scorecard service the match page uses; a T20I that broke a
+           record gets the special recap instead (services/ig_posts/recap_special.py)
 
 Labels like "2nd T20I · Ekana Cricket Stadium" count the sides' meetings in the past SERIES_DAYS.
 """
@@ -109,6 +110,12 @@ def recap_post(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
                    {"id": str(match_id)}).mappings().first()
     if not m or m["format"] not in FORMAT_WORD:
         return None
+    label = series_label(db, m["team1"], m["team2"], m["format"], m["date"], m["venue"], played=True)
+    from services.ig_posts.recap_special import special
+
+    built = special(db, dict(m), label)  # a record-breaking T20I: the record, and why (told fairly)
+    if built:
+        return built
     ctx = PreviewContext(db=db, venue=m["venue"], team1=m["team1"], team2=m["team2"], fmt=m["format"], gender="male",
                          end=m["date"])
     swing = last_meeting(ctx)
@@ -119,7 +126,6 @@ def recap_post(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
     sj["title"] = sj["title"].replace("Last time: ", "")
     sj["title"] = sj["title"][:1].upper() + sj["title"][1:]
     cards.append(sj)
-    label = series_label(db, m["team1"], m["team2"], m["format"], m["date"], m["venue"], played=True)
     sample = f"{label} · {m['date']:%d %b %Y}"
     players = [*_players(db, m["id"], m["format"], "batter"), *_players(db, m["id"], m["format"], "bowler")]
     with_wpa = sorted([p for p in players if p["wpa"] is not None], key=lambda p: abs(p["wpa"]), reverse=True)[:7]

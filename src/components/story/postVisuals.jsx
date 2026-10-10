@@ -531,6 +531,64 @@ const InningsWagon = ({ payload }) => (
   </Box>
 );
 
+/**
+ * One side's win probability through a chase, ball by ball (services/ig_posts/recap_special.wp_line): the line in the
+ * side's colour, a 50% guide, and the overs that moved it most shaded and numbered, each named below with who did it
+ * (the over and the batters, not the bowler). Each ball's tooltip: ball, score, chance.
+ * payload: {team, label, start, points:[{wp, label, score, over}], bands:[{i0, i1, over, from, to, text}]}
+ */
+const WinProbLine = ({ payload }) => {
+  const { points, bands = [] } = payload;
+  const W = 300; const H = 200; const L = 30; const R = 10; const T = 16; const B = 176;
+  const n = points.length;
+  const sx = (i) => L + ((i + 1) / n) * (W - L - R); // x 0 is the start of the innings (payload.start)
+  const sy = (v) => B - (v / 100) * (B - T);
+  const line = `M${L},${sy(payload.start)} ` + points.map((p, i) => `L${sx(i).toFixed(1)},${sy(p.wp).toFixed(1)}`).join(' ');
+  const colour = teamColour(payload.team, colors.accent);
+  const overTicks = [];
+  points.forEach((p, i) => {
+    if (i && p.over !== points[i - 1].over && (p.over % 5 === 0)) overTicks.push([i, p.over]);
+  });
+  const last = points[n - 1];
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.75 }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+        aria-label={`${payload.label}: ${Math.round(payload.start)}% at the start of the chase, ${Math.round(last.wp)}% at the end; ${bands.map((b) => `over ${b.over} ${b.from}% to ${b.to}%`).join(', ')}`}>
+        {[0, 50, 100].map((v) => (
+          <g key={v}>
+            <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke={v === 50 ? colors.borderStrong : colors.border}
+              strokeDasharray={v === 50 ? '4 4' : undefined} />
+            <text x={L - 6} y={sy(v) + 4} textAnchor="end" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{`${v}%`}</text>
+          </g>
+        ))}
+        {bands.map((b) => (
+          <g key={b.over}>
+            <rect x={sx(b.i0 - 1)} y={T} width={Math.max(3, sx(b.i1) - sx(b.i0 - 1))} height={B - T} fill={colors.textHi} fillOpacity="0.09" />
+            <text x={(sx(b.i0 - 1) + sx(b.i1)) / 2} y={T - 4} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textHi, fontWeight: 700 }}>{b.over}</text>
+          </g>
+        ))}
+        <path d={line} fill="none" stroke={colour} strokeWidth="2" strokeLinejoin="round" />
+        <circle cx={sx(n - 1)} cy={sy(last.wp)} r="4" fill={colour} stroke={colors.bg} strokeWidth="2" />
+        {points.map((p, i) => (
+          <rect key={i} x={sx(i - 1)} y={T} width={Math.max(1, sx(i) - sx(i - 1))} height={B - T} fill="transparent">
+            <title>{`${p.label} · ${p.score} · ${Math.round(p.wp)}%`}</title>
+          </rect>
+        ))}
+        {overTicks.map(([i, o]) => (
+          <text key={o} x={sx(i - 1)} y={H - 6} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{`${o} ov`}</text>
+        ))}
+      </Box>
+      {bands.map((b) => (
+        <Box key={b.over} sx={{ display: 'grid', gridTemplateColumns: '22px 1fr auto', gap: 1, alignItems: 'baseline' }}>
+          <Typography sx={{ ...mono, fontSize: 12, fontWeight: 700, color: colors.textHi }}>{b.over}</Typography>
+          <Typography sx={{ fontSize: 12.5, color: colors.textMed, lineHeight: 1.3 }}>{b.text.replace(/^Over \d+: /, '')}</Typography>
+          <Typography sx={{ ...mono, fontSize: 12, color: colors.textHi, whiteSpace: 'nowrap' }}>{`${b.from}% → ${b.to}%`}</Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
   deep_compare: DeepCompare,
   innings_scorecard: InningsScorecard,
@@ -539,6 +597,7 @@ export const POST_VISUALS = {
   scatter_plus: ScatterPlus,
   metric_bars: MetricBars,
   race_lines: RaceLines,
+  win_prob_line: WinProbLine,
   forest: Forest,
   bucket_bars: BucketBars,
   pair_dumbbell: PairDumbbell,
