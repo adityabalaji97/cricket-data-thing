@@ -531,7 +531,8 @@ def recap_pack(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
     built = recap_post(db, match_id)
     if not built:
         return None
-    slides = ([{"type": "hook", "text": built["hook"], "kicker": built["kicker"], "sub": "The swing, and who swung it"}]
+    slides = ([{"type": "hook", "text": built["hook"], "kicker": built["kicker"],
+                "sub": built.get("sub") or "The swing, and who swung it"}]
               + [{"type": "card", "card": c, "teams": built["teams"]} for c in built["cards"]]
               + [{"type": "end", "heading": "The full scorecard",
                   "body": "Ball-by-ball win probability, Impact and every innings: free on Hindsight."}])
@@ -541,10 +542,13 @@ def recap_pack(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
     a, b = built["teams"]
     occasion = [ig_captions.tag(f"{a}v{b}")] + (["#TeamIndia"] if "India" in (a, b) or "IND" in (a, b) else [])
     primer = any(c["id"] in ("wpa", "impact") for c in built["cards"])
-    caption = ig_captions.build(built["hook"], built["verdict"], "reactive",
-                                "win probability, Impact and runs saved are computed ball by ball (T20 Primer method)."
-                                if primer else "from the ball-by-ball scorecard.",
+    method = (built.get("method") or ("win probability, Impact and runs saved are computed ball by ball (T20 Primer method)."
+                                      if primer else "from the ball-by-ball scorecard."))
+    caption = ig_captions.build(built["hook"], built["verdict"], "reactive", method,
                                 built["players"], built["kicker"], occasion)
+    if built.get("deep_cut"):  # the special recap brings its own deeper cuts (slides 3 on)
+        fact["deep_cut"] = built["deep_cut"]
+        caption = ig_captions.with_deep_cut(caption, built["deep_cut"]["sentence"])
     return {"key": f"recap-{match_id}", "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"],
             "warnings": [], "caption": caption, "players": built["players"], "day": built["day"] + timedelta(days=1)}
 

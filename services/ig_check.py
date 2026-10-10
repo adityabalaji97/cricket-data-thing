@@ -72,10 +72,12 @@ def _label(slide: Dict[str, Any]) -> str:
     return slide.get("text") or slide.get("heading") or slide.get("type") or ""
 
 
-def compare(old: List[Dict[str, Any]], new: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-    """What changed between two slide lists (the deeper cut compared on its own): a title or a chart's values."""
-    old = [s for s in old if not _is_deep(s)]
-    new = [s for s in new if not _is_deep(s)]
+def compare(old: List[Dict[str, Any]], new: List[Dict[str, Any]], deep: bool = False) -> List[Dict[str, str]]:
+    """What changed between two slide lists: a title or a chart's values. The deeper cut is compared on its own, unless
+    `deep` (a post's own deeper cuts, rebuilt from the same data like any slide: the special recap's)."""
+    if not deep:
+        old = [s for s in old if not _is_deep(s)]
+        new = [s for s in new if not _is_deep(s)]
     diffs = []
     for i, (o, n) in enumerate(zip(old, new), start=1):
         if _label(o) != _label(n):
@@ -211,9 +213,9 @@ def check_today(db: Session, today: date, base: Optional[str] = None, write: boo
                 result = {"status": "static", "diffs": []}
             else:
                 old = db.execute(text("SELECT data FROM chart_snapshots WHERE id = :i"), {"i": fact.get("carousel_id")}).scalar() or {}
-                diffs = compare(old.get("slides") or [], captured["slides"])
                 dc = fact.get("deep_cut") or {}
-                if dc and dc.get("by") != "spotlight":
+                diffs = compare(old.get("slides") or [], captured["slides"], deep=dc.get("by") == "recap")
+                if dc and dc.get("by") not in ("spotlight", "recap"):
                     now = deep_cut_now(db, fact)
                     if now != dc.get("sentence"):
                         diffs.append({"slide": 0, "was": f"The deeper cut: {dc.get('sentence')}",
@@ -227,7 +229,7 @@ def check_today(db: Session, today: date, base: Optional[str] = None, write: boo
                     for k in KEEP:
                         if k in fact and k not in post["fact"]:
                             post["fact"][k] = fact[k]
-                    if not post["fact"].get("deep_cut"):  # a spotlight brings its own
+                    if not post["fact"].get("deep_cut"):  # a spotlight or a special recap brings its own
                         ig_backlog.add_deep_cut(db, post, today)
                     post["fact"]["check"] = {"at": at, "status": "rebuilt", "diffs": result["diffs"]}
                     with engine.begin() as conn:
