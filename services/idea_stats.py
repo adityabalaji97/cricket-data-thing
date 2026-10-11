@@ -165,7 +165,12 @@ def _where(scope: Dict[str, Any], team_col: str, opp_expr: str) -> Tuple[str, Di
     clauses = ["m.format = :fmt", "m.gender = 'male'"]
     params: Dict[str, Any] = {"fmt": scope["fmt"]}
     if scope.get("league") == "T20I":
-        clauses.append("m.match_type = 'international'")
+        # match_type 'international' also covers A sides (Emerging Teams Asia Cup, Lions series): the competition
+        # bucket is what makes it a T20I, as in the query builder (competition_normalizer.international_competitions).
+        from services.competition_normalizer import international_competitions
+
+        clauses.append("m.match_type = 'international' AND m.competition = ANY(:intl)")
+        params["intl"] = international_competitions(scope["fmt"])
     elif scope.get("league"):
         clauses.append("m.competition = ANY(:comps)")
         params["comps"] = variants_for(canonical_competition(scope["league"]))
@@ -175,6 +180,9 @@ def _where(scope: Dict[str, Any], team_col: str, opp_expr: str) -> Tuple[str, Di
     if scope.get("opponent"):
         clauses.append(f"{opp_expr} = :opp")
         params["opp"] = scope["opponent"]
+    if scope.get("opponents"):  # any of these (e.g. full members only)
+        clauses.append(f"{opp_expr} = ANY(:opps)")
+        params["opps"] = list(scope["opponents"])
     if scope.get("start"):
         clauses.append("m.date >= :start")
         params["start"] = date.fromisoformat(scope["start"])

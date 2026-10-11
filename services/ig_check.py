@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 KEEP = ("optional", "post_time", "pinned", "headlines", "appeal", "appeal_by", "note_id", "note_slug", "posted_on",
-        "deep_cut_scope", "deep_cut_exclude", "spec", "captains_call")  # carried from the old fact onto a rebuilt one
+        "deep_cut_scope", "deep_cut_exclude", "spec", "captains_call", "record")  # carried from the old fact onto a rebuilt one
 
 
 @contextmanager
@@ -127,6 +127,9 @@ def rebuild(db: Session, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         post = built if built.get("status") == "resolved" else None
     elif kind == "recap" and fact.get("match_id"):
         post = ig_backlog.recap_pack(db, fact["match_id"])
+    elif fact.get("record", {}).get("idea"):
+        r = fact["record"]
+        post = ig_backlog.record_post(db, key, r["idea"], deep=r.get("deep", False), expect=r.get("expect"))
     elif kind == "spotlight" and fact.get("captains_call"):
         from services.ig_posts import captains_call
 
