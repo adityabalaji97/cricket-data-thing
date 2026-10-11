@@ -50,7 +50,7 @@ def _zones(shares, n=1000):
 
 
 def _ctx(ground=None, h2h=(1, 4, 0), fmt="T20", par_series=((2024, 189, 7), (2025, 180, 7), (2026, 212, 7)),
-         international=False, here=(9, 8, 11), everywhere=(8.5, 8, 10), zones=None, outs=None):
+         international=False, here=(9, 8, 11), everywhere=(8.5, 8, 10), zones=None, outs=None, ground_par=None):
     ctx = PreviewContext(db=None, venue="Wankhede Stadium, Mumbai", team1="Mumbai Indians", team2="Chennai Super Kings",
                          fmt=fmt, start=date(2022, 1, 1), end=date(2026, 10, 4), team1_short="MI", team2_short="CSK")
     history = {
@@ -67,7 +67,7 @@ def _ctx(ground=None, h2h=(1, 4, 0), fmt="T20", par_series=((2024, 189, 7), (202
                   "series": [{"year": y, "par": p, "n": n} for y, p, n in par_series]}
     # cached_property values can be preset on the instance.
     ctx.__dict__.update(
-        history=history, primer_par=primer if fmt == "T20" else None,
+        history=history, primer_par=primer if fmt == "T20" else None, ground_par=ground_par,
         ground_matches=_ground() if ground is None else ground,
         scope={"leagues": ["IPL"], "include_international": True, "top_teams": 20},
         main_competition="IPL", comparison_scope={"label": "IPL", "filters": {"leagues": ["IPL"]}},
@@ -134,6 +134,21 @@ def test_international_par_is_by_country():
     cards = _cards(build_story(_ctx(international=True)))
     assert cards["par"]["title"] == "Par for a T20I in India is about 212"
     assert cards["par"]["sample"] == "T20Is in India · 2026 · T20 Primer par"
+
+
+def test_international_par_uses_the_grounds_own_t20is_when_it_has_enough():
+    gp = {"mode": "ground", "value": 198, "country": 212, "n": 9,
+          "series": [{"year": 2025, "par": 190, "n": 4}, {"year": 2026, "par": 200, "n": 5}]}
+    cards = _cards(build_story(_ctx(international=True, ground_par=gp)))
+    assert cards["par"]["title"] == "Par for a T20I here is about 198"
+    assert cards["par"]["sample"].startswith("9 complete T20I first innings at Wankhede Stadium")
+
+
+def test_international_par_moves_by_the_grounds_league_effect():
+    gp = {"mode": "effect", "value": 209, "country": 212, "n": 13, "effect": -3, "competition": "IPL", "series": []}
+    cards = _cards(build_story(_ctx(international=True, ground_par=gp)))
+    assert cards["par"]["title"] == "Par for a T20I here is about 209"
+    assert cards["par"]["sample"] == "T20I par in India 212, −3 for this ground from 13 IPL games"
 
 
 def test_odi_par_is_the_average_complete_first_innings():
