@@ -77,6 +77,31 @@ def main() -> None:
         items = ", ".join(f"{row[label]} ({row.get('users') or row.get('views')})" for row in last7[key][:8])
         print(f"{title} (7d): {items or '-'}")
 
+    reels(db)
+
+
+def reels(db) -> None:
+    """Reel v1 (the slideshow) against v2 (voiced, captioned, payoff-first): the stats typed into admin per post."""
+    from sqlalchemy.sql import text
+
+    rows = db.execute(text("""
+        SELECT COALESCE(facts->'reel'->>'variant', 'v1') AS variant, COUNT(*) AS posts,
+               AVG((facts->'reel_stats'->>'views')::float) AS views,
+               AVG((facts->'reel_stats'->>'avg_watch_s')::float) AS watch,
+               AVG((facts->'reel_stats'->>'hold_3s_pct')::float) AS hold,
+               AVG((facts->'reel_stats'->>'shares')::float) AS shares,
+               AVG((facts->'reel_stats'->>'saves')::float) AS saves
+        FROM content_packs WHERE channel = 'instagram' AND facts ? 'reel_stats'
+        GROUP BY 1 ORDER BY 1
+    """)).mappings().all()
+    if not rows:
+        return
+    print("\nReels (stats from admin): variant, posts, avg views, avg watch (s), 3s hold %, shares, saves")
+    fmt = lambda v, p=1: "-" if v is None else f"{v:.{p}f}"  # noqa: E731
+    for r in rows:
+        print(f"  {r['variant']:<3} {r['posts']:>3} {fmt(r['views'], 0):>8} {fmt(r['watch']):>6} {fmt(r['hold']):>6} "
+              f"{fmt(r['shares']):>5} {fmt(r['saves']):>5}")
+
 
 if __name__ == "__main__":
     main()

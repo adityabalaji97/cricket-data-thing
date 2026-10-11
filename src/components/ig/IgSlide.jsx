@@ -89,8 +89,20 @@ const Slide = ({ snap, n }) => {
   return <Frame n={n} total={total} last={slide.type === 'end'}>{body(slide)}</Frame>;
 };
 
+/**
+ * ?animate=1 (Reel v2, scripts/record_ig_beats.mjs): the chart is revealed left to right, so bars grow from the left
+ * and lines draw in, over REVEAL_MS. The recorder pauses the animation and steps it frame by frame; the finished frame
+ * is exactly the static slide.
+ */
+export const REVEAL_MS = 1400;
+const ANIMATE_CSS = `
+[data-ig-slide][data-animate] [data-story-chart] { animation: igReveal ${REVEAL_MS}ms cubic-bezier(.22,.7,.2,1) both; }
+@keyframes igReveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+`;
+
 const IgSlide = () => {
   const { carouselId, n } = useParams();
+  const animate = new URLSearchParams(window.location.search).get('animate') === '1';
   const [snap, setSnap] = useState(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
@@ -114,8 +126,9 @@ const IgSlide = () => {
   }, [snap]);
 
   return (
-    <Box data-ig-slide data-ready={ready ? 'true' : undefined}
+    <Box data-ig-slide data-ready={ready ? 'true' : undefined} data-animate={animate ? 'true' : undefined}
       sx={{ width: W, height: H, bgcolor: colors.bg, overflow: 'hidden', m: 0 }}>
+      {animate && <style>{ANIMATE_CSS}</style>}
       {error && <Typography sx={{ color: colors.red, p: 2 }}>{error}</Typography>}
       {snap && <Slide snap={snap} n={Math.max(1, Number(n) || 1)} />}
     </Box>

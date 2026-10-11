@@ -63,6 +63,16 @@ def with_deep_cut(caption: str, sentence: str) -> str:
     return caption.replace(LINK_LINE, f"{line}\n\n{LINK_LINE}", 1) if LINK_LINE in caption else f"{caption}\n\n{line}"
 
 
+AI_VOICE = "Narrated with an AI voice."
+
+
+def with_ai_voice(caption: str) -> str:
+    """The caption with the AI-voice line (a Reel v2's voiceover is AI-generated: OpenAI's terms require saying so)."""
+    if not caption or AI_VOICE in caption:
+        return caption
+    return caption.replace(LINK_LINE, f"{AI_VOICE}\n\n{LINK_LINE}", 1) if LINK_LINE in caption else f"{caption}\n\n{AI_VOICE}"
+
+
 def build(hook: str, answer: str, pillar: str, method: Optional[str] = None, players: Iterable[str] = (),
           kicker: str = "", extra_tags: Iterable[str] = (), body: Iterable[str] = ()) -> str:
     """A caption: hook, answer (or body lines), method, a question, the link line, hashtags."""
