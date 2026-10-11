@@ -106,6 +106,7 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
 
       <Box
         ref={chartRef}
+        data-story-chart
         onClick={keepInChart}
         onPointerDown={keepInChart}
         onPointerUp={keepInChart}

@@ -1,7 +1,7 @@
 """Admin "Social" queue: content packs (services/content_packs.py). All routes need the admin token."""
 import json
 from datetime import date
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -72,9 +72,12 @@ class PackUpdate(BaseModel):
     bench: Optional[bool] = None
     # An optional preview (facts.optional, a top-20 game beyond the day's one): false puts it in the feed.
     optional: Optional[bool] = None
+    # The Reel's numbers from Instagram's insights (facts.reel_stats), typed in by hand: the Reel v1/v2 comparison.
+    reel_stats: Optional[Dict[str, float]] = None
 
 
 PLATFORMS = ("instagram", "youtube", "x")
+REEL_STATS = ("views", "avg_watch_s", "hold_3s_pct", "shares", "saves")
 
 
 @router.patch("/packs/{pack_id}")
@@ -126,6 +129,12 @@ def update_pack(pack_id: int, body: PackUpdate, db: Session = Depends(get_sessio
     if body.optional is not None:
         fact_sets.append(("optional", "opt"))
         params["opt"] = json.dumps(bool(body.optional))
+    if body.reel_stats is not None:
+        unknown = set(body.reel_stats) - set(REEL_STATS)
+        if unknown:
+            raise HTTPException(status_code=400, detail=f"reel_stats takes {', '.join(REEL_STATS)}")
+        fact_sets.append(("reel_stats", "rs"))
+        params["rs"] = json.dumps({k: body.reel_stats[k] for k in REEL_STATS if k in body.reel_stats})
     if fact_sets:  # one assignment to facts, however many keys change
         expr = "COALESCE(facts, '{}'::jsonb)"
         for key, param in fact_sets:

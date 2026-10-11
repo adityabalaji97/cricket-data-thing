@@ -108,8 +108,16 @@ def load_reel(db: Session, carousel_id: str) -> Optional[bytes]:
 
 
 def reel_from_stored(carousel_id: str, slide_count: int) -> Optional[float]:
-    """make_reel from the slides already stored (carousels rendered before reels existed)."""
+    """The post's Reel: v2 (services/ig_reel_v2: voiced, captioned, opening on the payoff chart) when it's switched on
+    and the post's A/B day is v2; otherwise, or if v2 fails, make_reel from the slides already stored."""
     from database import engine
+
+    if os.getenv("REEL_V2") == "1":
+        from services import ig_reel_v2
+
+        seconds = ig_reel_v2.for_carousel(carousel_id)
+        if seconds:
+            return seconds
 
     with engine.connect() as conn:
         rows = conn.execute(text("SELECT n, png FROM ig_slide_images WHERE carousel_id = :c ORDER BY n"),

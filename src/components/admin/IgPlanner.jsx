@@ -120,9 +120,40 @@ const InstagramTab = ({ pack, copy, toast }) => {
   );
 };
 
-const VideoTab = ({ pack, copy, toast }) => {
+// The Reel's numbers from Instagram's insights, typed in after posting: they feed the Reel v1/v2 comparison
+// (scripts/usage_report.py).
+const REEL_STATS = [['views', 'Views'], ['avg_watch_s', 'Avg watch (s)'], ['hold_3s_pct', '3s hold %'], ['shares', 'Shares'], ['saves', 'Saves']];
+
+const ReelStats = ({ pack, onUpdate, toast }) => {
+  const saved = (pack.facts || {}).reel_stats || {};
+  const [vals, setVals] = useState(() => Object.fromEntries(REEL_STATS.map(([k]) => [k, saved[k] ?? ''])));
+  const save = () => {
+    const body = Object.fromEntries(Object.entries(vals).filter(([, v]) => v !== '' && !Number.isNaN(Number(v)))
+      .map(([k, v]) => [k, Number(v)]));
+    onUpdate(pack, { reel_stats: body });
+    toast('Reel stats saved');
+  };
+  return (
+    <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${C.line}` }}>
+      <SectionLabel>Reel stats from Instagram</SectionLabel>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 1, mt: 1 }}>
+        {REEL_STATS.map(([k, label]) => (
+          <Box key={k} component="label" sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography sx={{ fontSize: 11, color: C.lo }}>{label}</Typography>
+            <Box component="input" inputMode="decimal" value={vals[k]} onChange={(e) => setVals({ ...vals, [k]: e.target.value })}
+              sx={{ minHeight: 40, px: 1, borderRadius: 1, border: `1px solid ${C.line}`, bgcolor: '#14171e', color: C.hi, fontSize: 15 }} />
+          </Box>
+        ))}
+      </Box>
+      <Button onClick={save} sx={{ mt: 1, minHeight: 44, color: C.lime, fontWeight: 700 }}>Save stats</Button>
+    </Box>
+  );
+};
+
+const VideoTab = ({ pack, copy, toast, onUpdate }) => {
   const id = (pack.facts || {}).carousel_id;
   const yt = (pack.facts || {}).youtube;
+  const reel = (pack.facts || {}).reel || {};
   const { files, busy, tap } = useTwoTapShare(async () => {
     const res = await fetch(`${config.API_URL}/snapshots/${id}/reel.mp4`);
     if (!res.ok) throw new Error('no reel');
@@ -138,12 +169,20 @@ const VideoTab = ({ pack, copy, toast }) => {
         </Button>
         <Typography sx={{ fontSize: 12, color: C.lo }}>Same video for an Instagram Reel and a YouTube Short</Typography>
       </Box>
+      {reel.variant && (
+        <Typography sx={{ fontSize: 12, color: reel.variant === 'v2' ? C.amber : C.lo, mt: 1 }}>
+          {reel.variant === 'v2'
+            ? `Reel v2 · voiced (${reel.voice || 'AI'}). It's an AI voice: turn on "AI label" in Instagram's advanced settings when posting.`
+            : 'Reel v1 · the slideshow (this post is on the v1 side of the comparison)'}
+        </Typography>
+      )}
       {yt ? (
         <>
           <CopyRow label="YouTube Short · title" text={yt.title} onCopy={copy} />
           <CopyRow label="YouTube Short · description" text={yt.description} onCopy={copy} multiline />
         </>
       ) : <Typography sx={{ fontSize: 13, color: C.lo, mt: 1.5 }}>YouTube copy arrives with the next nightly run.</Typography>}
+      {onUpdate && <ReelStats pack={pack} onUpdate={onUpdate} toast={toast} />}
     </>
   );
 };
@@ -206,7 +245,7 @@ const PostDetail = ({ pack, onUpdate, copy, toast, openDays = [] }) => {
         ))}
       </Box>
       {tab === 'instagram' && <InstagramTab pack={pack} copy={copy} toast={toast} />}
-      {tab === 'video' && <VideoTab pack={pack} copy={copy} toast={toast} />}
+      {tab === 'video' && <VideoTab pack={pack} copy={copy} toast={toast} onUpdate={onUpdate} />}
       {tab === 'x' && <XTab pack={pack} copy={copy} toast={toast} />}
       {pack.post_by && (
         <Typography sx={{ fontSize: 12, color: C.amber, mt: 1.5 }}>
@@ -383,7 +422,8 @@ const IgPlanner = ({ client, toast, onAuthFail }) => {
   const onUpdate = useCallback(async (pack, body) => {
     const before = pack;
     const after = { ...pack, ...(body.status ? { status: body.status } : {}),
-      facts: { ...(pack.facts || {}), ...(body.posted_on ? { posted_on: body.posted_on } : {}) } };
+      facts: { ...(pack.facts || {}), ...(body.posted_on ? { posted_on: body.posted_on } : {}),
+        ...(body.reel_stats ? { reel_stats: body.reel_stats } : {}) } };
     setPacks((list) => list.map((p) => (p.id === pack.id ? after : p)));
     try {
       await client.patch(`/admin/content/packs/${pack.id}`, body);

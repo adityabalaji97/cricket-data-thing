@@ -179,6 +179,10 @@ jobs:
       - name: Instagram match-day posts
         continue-on-error: true
         env:
+          # Reel v2 (services/ig_reel_v2.py): on when the REEL_V2 repository variable is 1; voiced with OpenAI TTS.
+          REEL_V2: ${{ vars.REEL_V2 }}
+          REEL_VOICE: ${{ vars.REEL_VOICE }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CHROME: google-chrome
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
         run: python scripts/ig_match_day.py --team India --top-teams 20
@@ -186,6 +190,11 @@ jobs:
       # (services/ig_season.py); then Reels for anything rendered without one.
       - name: Instagram queue upkeep
         continue-on-error: true
+        env:
+          REEL_V2: ${{ vars.REEL_V2 }}
+          REEL_VOICE: ${{ vars.REEL_VOICE }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CHROME: google-chrome
         run: |
           python scripts/build_ig_backlog.py --bench-unposted --reorder
           python scripts/build_ig_backlog.py --reels-pending
@@ -194,6 +203,10 @@ jobs:
       - name: Morning check of today's posts
         continue-on-error: true
         env:
+          # Reel v2 (services/ig_reel_v2.py): on when the REEL_V2 repository variable is 1; voiced with OpenAI TTS.
+          REEL_V2: ${{ vars.REEL_V2 }}
+          REEL_VOICE: ${{ vars.REEL_VOICE }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CHROME: google-chrome
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
         run: python scripts/ig_check_today.py
