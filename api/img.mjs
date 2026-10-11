@@ -324,7 +324,8 @@ function fieldBody(size, data) {
   const cy = S / 2;
   const R = S * 0.36;
   const pt = (deg, r) => { const a = ((deg - 90) * Math.PI) / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
-  const order = [8, 1, 2, 3, 4, 5, 6, 7];
+  // Zones are stored from the batter's side; a left-hander's wheel is drawn mirrored (leg side on the left).
+  const order = data.hand === 'LHB' ? [8, 7, 6, 5, 4, 3, 2, 1] : [8, 1, 2, 3, 4, 5, 6, 7];
   const top = [...zones].sort((a, b) => (b.value || 0) - (a.value || 0))[0];
   const children = [{ type: 'circle', props: { cx, cy, r: R, fill: C.surface, stroke: 'rgba(255,255,255,0.18)', strokeWidth: 3 } }];
   const labels = [];

@@ -107,7 +107,7 @@ def _pace_spin(p, f):
 
 
 def _zones(p, f):
-    return {"layout": "field", "metric_label": "boundaries",
+    return {"layout": "field", "metric_label": "boundaries", "hand": p.get("hand"),
             "zones": [{"zone": z["zone"], "label": z["name"], "value": z["boundaries"]} for z in p["zones"]]}
 
 

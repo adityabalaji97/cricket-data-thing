@@ -607,7 +607,7 @@ def _stacked_form(rows, label_key, split_key, metric, subject_label, data):
     return _form_base(data, layout="stacked", title=title, metric=metric, parts=[pretty[p] for p in parts], rows=out_rows), title
 
 
-def _field_form(rows, metric, data, parts):
+def _field_form(rows, metric, data, parts, hand=None):
     """Share of the metric by wagon-wheel zone (zone 0 = no recorded direction, left out)."""
     from services.match_scorecard import ZONE_LABELS
 
@@ -618,7 +618,7 @@ def _field_form(rows, metric, data, parts):
     who = parts["who"]
     title = f"{who + ' takes ' if who else ''}{round(top['value'] * 100 / total)}% of {'his ' if who else ''}{metric_label(metric).lower()} through {top['label'].lower()}"
     title = title[:1].upper() + title[1:]
-    return _form_base(data, layout="field", title=title, metric=metric, zones=zones), title
+    return _form_base(data, layout="field", title=title, metric=metric, zones=zones, hand=hand), title
 
 
 def _diverging_form(rows, label_key, metric, data, parts, title, split_rows):
@@ -785,7 +785,11 @@ def attempt(db: Session, idea_text: str, planned: Dict[str, Any], created_by: st
             form_data["stacked"] = _stacked_form(_complete_split_rows(db, rows, label_key, query_params),
                                                  label_key, split_key, metric, subject_label, data)
     if "field" in forms:
-        form_data["field"] = _field_form(rows, metric, data, parts)
+        from services.ig_posts.cards import batter_hand
+
+        batters = params.get("batters") or []
+        form_data["field"] = _field_form(rows, metric, data, parts,
+                                         hand=batter_hand(db, batters[0]) if len(batters) == 1 else None)
     snaps = {}
     for form in ranking["order"]:
         form_payload, form_title = form_data.get(form, (None, None))

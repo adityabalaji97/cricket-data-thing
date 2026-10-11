@@ -58,3 +58,9 @@ def test_opposition_drops_players_without_enough_balls():
     c = RP.opposition_card(None, pool, rb, "")
     assert [r["name"] for r in c["payload"]["rows"]] == ["One", "Two", "Four"]
     assert "ahead of Two (171)" in c["title"] and "C Three" in c["help"]
+
+
+def test_zones_drawn_from_the_batters_side():
+    from services.ig_posts.cards import zones_help
+
+    assert "left-hander" in zones_help("LHB") and "right-hander" in zones_help("RHB") and "right-hander" in zones_help(None)

@@ -334,7 +334,7 @@ def boundary_zones(ctx) -> Optional[Card]:
     return Card(
         id="boundary-zones", chapter="ground", visual="boundary_zones",
         title=f"{ZONES[int(top)]} gets {ratio:.1f}× its usual share of boundaries here",
-        help="Share of boundaries hit to each part of the ground, for a right-hander",
+        help="Share of boundaries hit to each part of the ground, drawn for a right-hander (left-handers' shots mirrored)",
         sample=f"{n:,} boundaries with a direction at {short_venue(ctx.venue)} · every season", n=n,
         payload={"zones": zones, "top": int(top), "leg_side_pct": leg},
         info=Info(

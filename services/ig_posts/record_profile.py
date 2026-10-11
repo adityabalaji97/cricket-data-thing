@@ -227,7 +227,9 @@ def types_card(db, lead, since, sample):
 
 
 def zones_card(db, lead, since, sample):
-    from services.ig_posts.cards import LEG_SIDE, ZONES
+    from services.ig_posts.cards import LEG_SIDE, ZONES, batter_hand, zones_help
+
+    hand = batter_hand(db, lead["name"])
 
     def counts(rows):
         return {int(r["wagon_zone"]): (r.get("fours") or 0) + (r.get("sixes") or 0)
@@ -244,8 +246,8 @@ def zones_card(db, lead, since, sample):
     return card("zones", "boundary_zones",
                 f"{short(lead['name'])} hits {top['pct']:.0f}% of boundaries to {top['name'].lower()} (T20I batters: "
                 f"{top['usual_pct']:.0f}%)",
-                {"zones": zones_, "top": top["zone"], "leg_side_pct": leg},
-                f"{n:,} boundaries with a direction · {sample}", "Share of boundaries to each part of the ground, as a right-hander")
+                {"zones": zones_, "top": top["zone"], "leg_side_pct": leg, "hand": hand},
+                f"{n:,} boundaries with a direction · {sample}", zones_help(hand))
 
 
 def _ground(db, since, until) -> Optional[Dict[str, float]]:
