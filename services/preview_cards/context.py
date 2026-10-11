@@ -23,6 +23,17 @@ WEB_URL = "https://hindsightcricket.com"
 INNINGS_GROUP_BY = ["match_id", "innings", "year", "season", "competition", "batting_team", "full_length"]
 
 
+#: Likely XIs (PreviewContext.last_xis): earlier matches used to fill a side that didn't bat deep.
+XI_EARLIER = 3
+XI_DAYS = 60
+
+#: Ground par for a T20I (PreviewContext.ground_par).
+GROUND_T20IS = 6      # complete T20I first innings at the ground to use its own par
+GROUND_SHRINK = 6     # ... shrunk toward the country's par as if it had this many innings at that par
+GROUND_LEAGUE = 8     # league games at the ground to adjust the country's par by the ground's effect
+EFFECT_SHRINK = 5     # ... that effect shrunk by n / (n + this)
+
+
 @dataclass
 class GroundMatch:
     """One match at the ground, from its two innings rows."""
@@ -317,27 +328,58 @@ class PreviewContext:
 
     @cached_property
     def last_xis(self) -> Dict[str, Dict[str, Any]]:
-        """Each side's XI from its latest match in this format, in batting order."""
+        """
+        Each side's likely XI from its latest match in this format: everyone who batted or bowled there. A side that
+        didn't bat deep leaves out players who did neither, so the XI is topped up to 11 from the side's earlier matches
+        (up to XI_EARLIER of them, within XI_DAYS), most recent first. Everyone is placed by their latest batting
+        position (the latest match's, else the most recent earlier one they batted in); players with none go last, in
+        bowling order. {date, opponent, players, earlier: {name: date of the match they're taken from}}
+        """
         out = {}
         for label, names in self.team_names.items():
-            m = self.db.execute(text("""
+            ms = self.db.execute(text("""
                 SELECT id, date, team1, team2 FROM matches
                 WHERE (team1 = ANY(:names) OR team2 = ANY(:names)) AND format = :fmt AND gender = :gender
                   AND (CAST(:end AS date) IS NULL OR date <= :end)
-                ORDER BY date DESC LIMIT 1
-            """), {"names": names, "fmt": self.fmt, "gender": self.gender, "end": self.end}).mappings().first()
-            if not m:
+                ORDER BY date DESC, id DESC LIMIT :k
+            """), {"names": names, "fmt": self.fmt, "gender": self.gender, "end": self.end,
+                   "k": XI_EARLIER + 1}).mappings().all()
+            if not ms:
                 continue
-            players = self.db.execute(text("""
-                SELECT striker FROM batting_stats WHERE match_id = :m AND batting_team = ANY(:names)
-                ORDER BY batting_position NULLS LAST, id
-            """), {"m": m["id"], "names": names}).scalars().all()
-            bowlers = self.db.execute(text("""
-                SELECT bowler FROM bowling_stats WHERE match_id = :m AND bowling_team = ANY(:names) ORDER BY id
-            """), {"m": m["id"], "names": names}).scalars().all()
-            xi = list(dict.fromkeys([*players, *bowlers]))
+            m = ms[0]
+            ms = [x for x in ms if (m["date"] - x["date"]).days <= XI_DAYS]
+
+            def used(match_id):
+                bat = self.db.execute(text("""
+                    SELECT striker, batting_position FROM batting_stats WHERE match_id = :m AND batting_team = ANY(:names)
+                    ORDER BY batting_position NULLS LAST, id
+                """), {"m": match_id, "names": names}).all()
+                bowl = self.db.execute(text("""
+                    SELECT bowler FROM bowling_stats WHERE match_id = :m AND bowling_team = ANY(:names) ORDER BY id
+                """), {"m": match_id, "names": names}).scalars().all()
+                return bat, bowl
+
+            bat, bowl = used(m["id"])
+            xi = list(dict.fromkeys([*(b[0] for b in bat), *bowl]))[:12]
+            position = {name: pos for name, pos in bat if pos is not None}
+            order = {name: i for i, name in enumerate(bowl)}
+            earlier: Dict[str, Any] = {}
+            for prev in ms[1:]:
+                pbat, pbowl = used(prev["id"])
+                for name, pos in pbat:
+                    if pos is not None:
+                        position.setdefault(name, pos)
+                for name in [*(b[0] for b in pbat), *pbowl]:
+                    if len(xi) >= 11:
+                        break
+                    if name not in xi:
+                        xi.append(name)
+                        earlier[name] = prev["date"].isoformat()
+                for i, name in enumerate(pbowl):
+                    order.setdefault(name, 100 + i)
+            xi.sort(key=lambda n: (position.get(n, 99), order.get(n, 999)))
             opponent = m["team2"] if m["team1"] in names else m["team1"]
-            out[label] = {"date": m["date"], "opponent": opponent, "players": xi[:12]}
+            out[label] = {"date": m["date"], "opponent": opponent, "players": xi, "earlier": earlier}
         return out
 
     @cached_property
@@ -409,6 +451,69 @@ class PreviewContext:
         if not series:
             return None
         return {"competition": label, "where": where, "international": label == "T20Is", "series": series}
+
+    @cached_property
+    def ground_par(self) -> Optional[Dict[str, Any]]:
+        """
+        For a T20I, par at this ground rather than the country's (primer_par sets T20I par by country and season).
+
+        1. Ground par: the ground's complete T20I first innings in the window (GROUND_T20IS or more), shrunk toward the
+           country's par (GROUND_SHRINK innings of it), so a couple of freak scores don't swing it.
+        2. Else country par plus the ground's effect: how far the Primer's par for the ground's league games sits from
+           its league's average that season (GROUND_LEAGUE or more games), shrunk (EFFECT_SHRINK).
+        3. Else None: the country's par stands.
+
+        {mode: 'ground'|'effect', value, country, n, effect?, competition?, series}
+        """
+        from services.competition_normalizer import international_competitions
+
+        primer = self.primer_par
+        if not primer or not primer["international"]:
+            return None
+        country = primer["series"][-1]["par"]
+        params = {"venues": self.venue_aliases, "start": self.start, "end": self.end,
+                  "intl": international_competitions(self.fmt)}
+        window = ("(CAST(:start AS date) IS NULL OR m.date >= :start) "
+                  "AND (CAST(:end AS date) IS NULL OR m.date <= :end)")
+        firsts = self.db.execute(text(f"""
+            SELECT EXTRACT(YEAR FROM m.date)::int AS year, MAX(dd.inns_runs) AS runs
+            FROM matches m JOIN delivery_details dd ON dd.p_match = m.id AND dd.inns = 1
+            WHERE m.venue = ANY(:venues) AND m.format = 'T20' AND m.gender = 'male' AND m.competition = ANY(:intl)
+              AND {window}
+            GROUP BY m.id, 1
+            HAVING MAX(dd.inns_balls) >= MAX(dd.max_balls) OR MAX(dd.inns_wkts) = 10
+        """), params).mappings().all()
+        if len(firsts) >= GROUND_T20IS:
+            n = len(firsts)
+            value = round((sum(r["runs"] for r in firsts) + GROUND_SHRINK * country) / (n + GROUND_SHRINK))
+            by_year: Dict[int, List[int]] = {}
+            for r in firsts:
+                by_year.setdefault(r["year"], []).append(r["runs"])
+            series = [{"year": y, "par": round(sum(v) / len(v)), "n": len(v)} for y, v in sorted(by_year.items())]
+            return {"mode": "ground", "value": value, "country": country, "n": n, "series": series}
+        row = self.db.execute(text(f"""
+            WITH g AS (
+                SELECT m.competition AS c, EXTRACT(YEAR FROM m.date)::int AS y, mp.par
+                FROM matches m JOIN match_par mp ON mp.p_match = m.id AND mp.format = 'T20' AND mp.gender = 'male'
+                WHERE m.venue = ANY(:venues) AND mp.par_source = 'league' AND m.format = 'T20' AND {window}),
+            league AS (
+                SELECT m.competition AS c, EXTRACT(YEAR FROM m.date)::int AS y, AVG(mp.par) AS a
+                FROM matches m JOIN match_par mp ON mp.p_match = m.id AND mp.format = 'T20' AND mp.gender = 'male'
+                WHERE mp.par_source = 'league' AND (m.competition, EXTRACT(YEAR FROM m.date)::int) IN (SELECT c, y FROM g)
+                GROUP BY 1, 2)
+            SELECT COUNT(*) AS n, AVG(g.par - league.a) AS effect,
+                   (SELECT c FROM g GROUP BY c ORDER BY COUNT(*) DESC LIMIT 1) AS comp
+            FROM g JOIN league USING (c, y)
+        """), params).mappings().first()
+        if row and (row["n"] or 0) >= GROUND_LEAGUE and row["effect"] is not None:
+            n = int(row["n"])
+            effect = round(float(row["effect"]) * n / (n + EFFECT_SHRINK))
+            from services.competition_aliases import canonical_competition
+
+            return {"mode": "effect", "value": country + effect, "country": country, "n": n, "effect": effect,
+                    "competition": canonical_competition(row["comp"]) if row["comp"] else "league",
+                    "series": primer["series"]}
+        return None
 
     @cached_property
     def venue_record(self) -> Dict[str, Any]:

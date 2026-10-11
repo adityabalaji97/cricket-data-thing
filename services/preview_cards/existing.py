@@ -56,7 +56,24 @@ def par(ctx) -> Optional[Card]:
     if primer:
         series = [{"year": r["year"], "value": r["par"], "n": r["n"]} for r in primer["series"]][-6:]
         now = series[-1]
-        if primer["international"]:
+        ground = ctx.ground_par if primer["international"] else None
+        if ground and ground["mode"] == "ground":
+            series = [{"year": r["year"], "value": r["par"], "n": r["n"]} for r in ground["series"]][-6:]
+            now = {"value": ground["value"], "year": series[-1]["year"]}
+            title = f"Par for a T20I here is about {now['value']}"
+            sample = (f"{ground['n']} complete T20I first innings at {short_venue(ctx.venue)} · leaning on "
+                      f"the par {primer['where']} ({ground['country']})")
+            how = ("Par here starts from this ground's own complete T20I first innings and leans on the par for "
+                   f"T20Is {primer['where']}, so a couple of big scores don't swing it.")
+        elif ground:
+            now = {"value": ground["value"], "year": now["year"]}
+            sign = "+" if ground["effect"] >= 0 else "−"
+            title = f"Par for a T20I here is about {now['value']}"
+            sample = (f"T20I par {primer['where']} {ground['country']}, {sign}{abs(ground['effect'])} for this ground "
+                      f"from {ground['n']} {ground['competition']} games")
+            how = (f"This ground has too few T20Is to set its own par, so it's the par for T20Is {primer['where']}, "
+                   f"moved by how far the ground's {ground['competition']} par sits from that league's average.")
+        elif primer["international"]:
             title = f"Par for a T20I {primer['where']} is about {now['value']}"
             sample = f"T20Is {primer['where']} · {now['year']} · T20 Primer par"
             how = ("For internationals the Primer sets par by country and season, not by ground: there are "

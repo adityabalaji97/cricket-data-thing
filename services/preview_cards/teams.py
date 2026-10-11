@@ -253,13 +253,14 @@ def likely_xis(ctx) -> Optional[Card]:
     if len(xis) < 2:
         return None
     sides = [{"team": t, "date": xis[t]["date"].isoformat(), "opponent": xis[t]["opponent"],
-              "players": xis[t]["players"]} for t in (ctx.t1, ctx.t2)]
+              "players": xis[t]["players"], "earlier": xis[t].get("earlier") or {}} for t in (ctx.t1, ctx.t2)]
     return Card(
         id="xis", chapter="lineups", visual="xis",
         title="Likely XIs, from their last matches", help=None,
         sample=f"Each side's last {ctx.fmt} match · batting order", n=11,
         payload={"sides": sides},
-        info=Info(what="The players each side used last time, in batting order, then anyone who only bowled. "
+        info=Info(what="The players each side used last time, placed by their latest batting position. A side that "
+                       "didn't bat deep is topped up to 11 from its previous matches (marked with that match's date). "
                        "Teams change; this is a starting point, not a prediction.",
                   how_to_read="A twelfth name is a substitute who batted or bowled (the IPL's Impact Player rule)."),
         relevance=0.6,

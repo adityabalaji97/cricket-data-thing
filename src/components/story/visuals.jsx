@@ -522,6 +522,11 @@ const Xis = ({ payload }) => (
           <Typography key={p} noWrap sx={{ fontSize: 14, lineHeight: 1.6, color: colors.textMed }}>
             <Box component="span" sx={{ display: 'inline-block', width: 20, fontFamily: fonts.mono, fontSize: 11, color: colors.textFaint }}>{i + 1}</Box>
             {p}
+            {s.earlier?.[p] && (
+              <Box component="span" sx={{ ml: 0.75, fontFamily: fonts.mono, fontSize: 10.5, color: colors.textFaint }}>
+                {new Date(s.earlier[p]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+              </Box>
+            )}
           </Typography>
         ))}
       </Box>
