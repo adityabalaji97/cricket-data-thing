@@ -175,19 +175,23 @@ def make(db: Session, item: Dict[str, Any], created_by: str = "ig-backlog") -> D
 
 def _record_post(db: Session, item: Dict[str, Any], created_by: str) -> Optional[Dict[str, Any]]:
     """A career race ("fastest to 1,000 IPL runs") as a carousel drawn by the app (services/ig_posts/records.py):
-    the race by balls, by innings, and how they got there. None for other record ideas (they keep the ranking form)."""
+    the race by balls, by innings, and how they got there. None for other record ideas (they keep the ranking form).
+    item["deep"]: with the deeper cut, the record holder's profile and the full-members race; item["expect"]: only when
+    that player leads the race."""
     from services import ig_captions, ig_carousel
     from services.ig_posts import records
 
     try:
-        built = records.build(db, item["idea"])
+        built = records.build(db, item["idea"], deep=bool(item.get("deep")), expect=item.get("expect"))
     except Exception:  # a race the data can't build: fall back to the ranking form
         logger.exception("record post %s failed", item["key"])
         db.rollback()
         return None
     if not built:
         return None
-    slides = ([{"type": "hook", "text": built["hook"], "kicker": built["kicker"], "sub": "By balls, by innings, and how they got there"}]
+    sub = ("The race, the deeper cut, and the profile behind it" if item.get("deep")
+           else "By balls, by innings, and how they got there")
+    slides = ([{"type": "hook", "text": built["hook"], "kicker": built["kicker"], "sub": sub}]
               + [{"type": "card", "card": c, "teams": None} for c in built["cards"]]
               + [{"type": "end", "heading": "Run it yourself",
                   "body": "Every number comes from ball-by-ball data. Ask your own question on the query builder: it's free."}])
@@ -198,7 +202,22 @@ def _record_post(db: Session, item: Dict[str, Any], created_by: str) -> Optional
     caption = ig_captions.build(built["hook"], built["verdict"], "weird",
                                 "careers counted from the first ball-by-ball season; rates over each career up to the milestone.",
                                 built["players"], built["kicker"])
-    return {"status": "resolved", "fact": fact, "snapshot": carousel, "warnings": [], "caption": caption}
+    if built.get("deep_cut"):
+        fact["deep_cut"] = built["deep_cut"]
+        caption = ig_captions.with_deep_cut(caption, built["deep_cut"]["sentence"])
+    if item.get("deep"):
+        fact["record"] = {"idea": item["idea"], "deep": True, "expect": item.get("expect")}
+    return {"status": "resolved", "fact": fact, "snapshot": carousel, "warnings": [], "caption": caption,
+            "players": built["players"]}
+
+
+def record_post(db: Session, key: str, idea: str, deep: bool = False, expect: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """A one-off record post (not in IDEAS), as a queueable post: scripts/make_record_post.py and the morning check."""
+    result = _record_post(db, {"key": key, "idea": idea, "deep": deep, "expect": expect}, "ig-record")
+    if not result:
+        return None
+    return {"key": key, "pillar": "weird", "fact": result["fact"], "snapshot_id": result["snapshot"]["id"],
+            "warnings": [], "caption": result["caption"], "players": result["players"]}
 
 
 def schedule(made: List[Dict[str, Any]], start: date, days: int = DAYS) -> List[Dict[str, Any]]:

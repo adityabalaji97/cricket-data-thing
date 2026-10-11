@@ -67,6 +67,24 @@ def display(ctx: QuestionContext, name: str) -> str:
     return name if clash else short(name)
 
 
+def batter_hand(db, name: Optional[str]) -> Optional[str]:
+    """'RHB' / 'LHB': the hand a batter is recorded with most (the wagon-zone chart is drawn from their side)."""
+    if not db or not name:
+        return None
+    from sqlalchemy import text
+
+    return db.execute(text("""
+        SELECT bat_hand FROM delivery_details WHERE bat = :n AND bat_hand IN ('RHB', 'LHB')
+        GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 1
+    """), {"n": name}).scalar()
+
+
+def zones_help(hand: Optional[str]) -> str:
+    """Wagon zones are stored from the batter's side: a left-hander's chart is drawn mirrored."""
+    return ("Share of boundaries to each part of the ground, as a left-hander (leg side on the left)" if hand == "LHB"
+            else "Share of boundaries to each part of the ground, as a right-hander")
+
+
 def card(cid: str, visual: str, title: str, payload: Dict[str, Any], sample: str, help_: str = "") -> Dict[str, Any]:
     return {"id": cid, "visual": visual, "title": title, "help": help_, "sample": sample, "payload": payload}
 
@@ -139,8 +157,10 @@ def zones(ctx: QuestionContext, name: str, sample_scope: str) -> Optional[Dict[s
     top = max(zones_, key=lambda z: z["pct"])
     leg = round(100 * sum(mine.get(z, 0) for z in LEG_SIDE) / n)
     title = f"{display(ctx, name)} hits {top['pct']:.0f}% of boundaries to {top['name'].lower()} (field: {top['usual_pct']:.0f}%)"
-    return card(f"zones-{short(name).lower()}", "boundary_zones", title, {"zones": zones_, "top": top["zone"], "leg_side_pct": leg},
-                f"{n:,} boundaries with a direction · {sample_scope}", "Share of boundaries to each part of the ground, as a right-hander")
+    hand = batter_hand(ctx.db, name)
+    return card(f"zones-{short(name).lower()}", "boundary_zones", title,
+                {"zones": zones_, "top": top["zone"], "leg_side_pct": leg, "hand": hand},
+                f"{n:,} boundaries with a direction · {sample_scope}", zones_help(hand))
 
 
 def scorecard(ctx: QuestionContext, angles: List[Angle], sample: str, top: int = 7) -> Optional[Dict[str, Any]]:

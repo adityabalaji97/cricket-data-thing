@@ -261,7 +261,10 @@ const PaceSpin = ({ payload }) => (
 /** B6: share of boundaries to each zone; behind the batter at the top, leg side on the right. */
 const BoundaryZones = ({ payload }) => {
   const cx = 150; const cy = 120; const R = 104;
-  const order = [8, 1, 2, 3, 4, 5, 6, 7]; // third man top-left, fine leg top-right, round to point
+  // Zones are stored from the batter's side. A right-hander: third man top-left, fine leg top-right, round to point.
+  // A left-hander is drawn mirrored (leg side on the left), so their shots point the way they went.
+  const lefty = payload.hand === 'LHB';
+  const order = lefty ? [1, 8, 7, 6, 5, 4, 3, 2] : [8, 1, 2, 3, 4, 5, 6, 7];
   const max = Math.max(...payload.zones.map((z) => z.pct));
   const rad = (deg) => (deg * Math.PI) / 180;
   const centre = (i) => -112.5 + i * 45;
@@ -289,7 +292,7 @@ const BoundaryZones = ({ payload }) => {
         <rect x={cx - 4} y={cy - 12} width="8" height="24" rx="2" fill="#c8b48a" />
       </Box>
       <Typography sx={{ fontSize: 13, color: colors.textLo }}>
-        {`Behind the batter at the top, leg side on the right. ${payload.leg_side_pct}% go to the leg side.`}
+        {`Behind the batter at the top, leg side on the ${lefty ? 'left (a left-hander)' : 'right'}. ${payload.leg_side_pct}% go to the leg side.`}
       </Typography>
     </Box>
   );

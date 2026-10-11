@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from services import idea_stats as S
 from services.ig_posts.cards import card, fmt, short
+from services.ig_posts.spotlight import short_name
 from services.player_aliases import ALIAS_MAP_CTE
 
 TOP = 5
@@ -101,7 +102,7 @@ def _race_card(db, spec, scope, unit: str, words: Dict[str, str]) -> Optional[Di
     lead, second = top[0], top[1]
     gap = second["value"] - lead["value"]
     title = (f"{lead['name']} got to {words['what']} in {lead['value']:,} {unit}"
-             + (f", {gap:,} fewer than {short(second['name'])}" if gap > 0 else f", level with {short(second['name'])}"))
+             + (f", {gap:,} fewer than {short_name(second['name'])}" if gap > 0 else f", level with {short_name(second['name'])}"))
     payload = {"unit": unit, "target": spec["target"], "measure": "runs" if spec["measure"] == "runs" else "wickets",
                "series": [{"name": r["name"], "points": series.get(r["name"], []), "reached_at": r["value"]} for r in top
                           if series.get(r["name"])]}
@@ -124,13 +125,16 @@ def _at_milestone(db, spec, scope, names_dates: List[Tuple[str, date]]) -> Dict[
         if rows:
             r = rows[0]
             mb = r.get("metric_balls") or 0
-            out[name] = {"sr": r.get("strike_rate"), "economy": round(r["strike_rate"] * 6 / 100, 2) if r.get("strike_rate") and not batter else None,
+            out[name] = {"sr": r.get("strike_rate"), "impact": r.get("impact_per_100"),
+                         "economy": round(r["strike_rate"] * 6 / 100, 2) if r.get("strike_rate") and not batter else None,
                          "raa": r.get("raa_per_100"), "wpa": round(r["wpa"] * 100 / mb, 3) if r.get("wpa") is not None and mb else None}
     return out
 
 
-def build(db: Session, idea: str) -> Optional[Dict[str, Any]]:
-    """A record post for a career race idea ("Fastest to 1000 IPL runs"), or None if it isn't one / lacks data."""
+def build(db: Session, idea: str, deep: bool = False, expect: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """A record post for a career race idea ("Fastest to 1000 IPL runs"), or None if it isn't one / lacks data.
+    deep: add the deeper cut, the record holder's profile and the full-members race (services/ig_posts/record_profile);
+    expect: None unless this player leads the race by balls (a record post waits for the data to catch up)."""
     spec = S.parse_race(idea)
     if not spec or S.span_of(spec) != "career" or spec["subject"] == "team":
         return None
@@ -141,6 +145,8 @@ def build(db: Session, idea: str) -> Optional[Dict[str, Any]]:
     if not made:
         return None
     balls_card, balls_rows = made
+    if expect and (not balls_rows or balls_rows[0]["name"] != expect):
+        return None
     cards = [balls_card]
     inns = _race_card(db, spec, scope, "innings", words)
     inns_rows = []
@@ -157,7 +163,8 @@ def build(db: Session, idea: str) -> Optional[Dict[str, Any]]:
     metrics = [("balls", "Balls", False, "int"), ("innings", "Innings", False, "int"),
                ("sr" if batter else "economy", "SR" if batter else "Econ", batter, "dec1" if batter else "dec2")]
     if t20:
-        metrics += [("raa", "RAA/100", True, "signed1"), ("wpa", "WPA/100", True, "signed2")]
+        metrics += ([("impact", "Impact/100", True, "signed1")] if batter else []) + [
+            ("raa", "RAA/100", True, "signed1"), ("wpa", "WPA/100", True, "signed2")]
     table = []
     for r in pool:
         vals = {"balls": r["value"], "innings": by_inn.get(r["name"])}
@@ -173,12 +180,13 @@ def build(db: Session, idea: str) -> Optional[Dict[str, Any]]:
             best = (max if higher else min)(have, key=lambda t: t["values"][key])
             best.setdefault("leader", []).append(key)
     phrases = {"balls": "fewest balls", "innings": "fewest innings", "sr": "fastest scoring", "economy": "cheapest",
+               "impact": "most Impact",
                "raa": "most runs above average", "wpa": "most win probability added"}
     leaders: Dict[str, List[str]] = {}
     for t in table:
         for k in t.get("leader", []):
             leaders.setdefault(t["name"], []).append(phrases[k])
-    verdict = "; ".join(f"{short(n)}: {', '.join(v)}" for n, v in leaders.items()) + "."
+    verdict = "; ".join(f"{short_name(n)}: {', '.join(v)}" for n, v in leaders.items()) + "."
     if inns_rows and inns_rows[0]["name"] not in {t["name"] for t in table}:
         # The innings race reaches back further than ball-by-ball data: its winner isn't in the table, so say so.
         first = inns_rows[0]
@@ -186,7 +194,7 @@ def build(db: Session, idea: str) -> Optional[Dict[str, Any]]:
                     f"was quicker still: {first['value']}.").replace(" () ", " ")
     score = card("scorecard", "scorecard", f"How they got to {words['what']}", {
         "metrics": [{"key": k, "label": lbl, "format": f} for k, lbl, _, f in metrics],
-        "rows": [{"name": t["name"], "short": short(t["name"]), "values": t["values"], "pct": t.get("pct", {}),
+        "rows": [{"name": t["name"], "short": short_name(t["name"]), "values": t["values"], "pct": t.get("pct", {}),
                   "leader": t.get("leader", [])} for t in table],
         "verdict": verdict,
         "method": "Rates are over each career up to the day of the milestone"
@@ -195,5 +203,27 @@ def build(db: Session, idea: str) -> Optional[Dict[str, Any]]:
     }, f"The fastest to {words['what']} · {caveat}")
     cards.append(score)
     hook = f"Who is the fastest to {words['what']}?"
-    return {"hook": hook, "kicker": S.scope_label(scope), "cards": cards, "verdict": verdict,
-            "players": list(leaders), "title": balls_card["title"]}
+    out = {"hook": hook, "kicker": S.scope_label(scope), "cards": cards, "verdict": verdict,
+           "players": list(leaders), "title": balls_card["title"], "deep_cut": None}
+    if deep:
+        from services.ig_posts import record_profile as RP
+
+        teams = {r["name"]: r.get("team") for r in balls_rows}
+        prof = RP.deep_cards(db, scope, spec, [{"name": r["name"], "date": r["date"], "team": teams.get(r["name"])}
+                                               for r in pool[:5]], words, f"The fastest to {words['what']}")
+        if prof["associates"]:
+            for c in cards:
+                c["help"] = ((c.get("help") or "") + " " + prof["associates"]).strip() if c["id"] == "race-balls" else c.get("help")
+            score["payload"]["method"] += " †: associate nation."
+            for row in score["payload"]["rows"]:
+                if RP.associate(teams.get(row["name"])):
+                    row["short"] += "†"
+        # hook, race by balls, the deeper cut, race by innings, the milestone table, the profile, the full-members race
+        cards = ([balls_card] + ([prof["deep"]] if prof["deep"] else []) + cards[1:]
+                 + prof["profile"] + ([prof["opposition"]] if prof["opposition"] else []))
+        leader = balls_rows[0]["name"]
+        out.update(cards=cards, hook=f"{leader} is the fastest to {words['what']}. What's behind it?",
+                   players=list(dict.fromkeys([leader, *out["players"]])),
+                   deep_cut={"probe": "record-raa-v-wpa", "subject": leader, "sentence": prof["deep"]["title"] + ".",
+                             "by": "recap"} if prof["deep"] else None)
+    return out
