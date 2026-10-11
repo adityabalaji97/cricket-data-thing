@@ -36,11 +36,12 @@ ROOT = Path(__file__).resolve().parents[1]
 FONT_BOLD = ROOT / "api/_lib/fonts/BarlowSemiCondensed-Bold.ttf"
 FONT_BODY = ROOT / "api/_lib/fonts/Barlow-SemiBold.ttf"
 SITE = os.getenv("REEL_BASE", "https://hindsightcricket.com")
-VOICE = os.getenv("REEL_VOICE", "ash")
+VOICE = os.getenv("REEL_VOICE", "verse")
 TTS_MODEL = "gpt-4o-mini-tts"
 SCRIPT_MODEL = "gpt-4o-mini"
-TONE = ("Brisk, confident cricket analyst on a highlights show: a quick, lively pace. Conversational, energetic but "
-        "not shouty; land each number clearly; slight lift on the hook.")
+#: How the voice speaks (gpt-4o-mini-tts instructions): REEL_TONE overrides it, like REEL_VOICE, without a deploy.
+TONE = os.getenv("REEL_TONE") or ("Brisk, confident cricket analyst on a highlights show: a quick, lively pace. "
+                                  "Conversational, energetic but not shouty; land each number clearly; slight lift on the hook.")
 FPS = 30
 W, H, SLIDE_H, TOP = 1080, 1920, 1350, 285
 BG = "0x0a0c11"

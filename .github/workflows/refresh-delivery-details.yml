@@ -182,6 +182,7 @@ jobs:
           # Reel v2 (services/ig_reel_v2.py): on when the REEL_V2 repository variable is 1; voiced with OpenAI TTS.
           REEL_V2: ${{ vars.REEL_V2 }}
           REEL_VOICE: ${{ vars.REEL_VOICE }}
+          REEL_TONE: ${{ vars.REEL_TONE }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CHROME: google-chrome
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
@@ -193,6 +194,7 @@ jobs:
         env:
           REEL_V2: ${{ vars.REEL_V2 }}
           REEL_VOICE: ${{ vars.REEL_VOICE }}
+          REEL_TONE: ${{ vars.REEL_TONE }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CHROME: google-chrome
         run: |
@@ -206,6 +208,7 @@ jobs:
           # Reel v2 (services/ig_reel_v2.py): on when the REEL_V2 repository variable is 1; voiced with OpenAI TTS.
           REEL_V2: ${{ vars.REEL_V2 }}
           REEL_VOICE: ${{ vars.REEL_VOICE }}
+          REEL_TONE: ${{ vars.REEL_TONE }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CHROME: google-chrome
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
