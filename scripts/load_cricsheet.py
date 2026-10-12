@@ -421,12 +421,23 @@ def write_playing_xis(session, matches: Iterable[CricsheetMatch], name_of) -> in
     ids = sorted({r['m'] for r in rows})
     known = {r[0] for r in session.execute(text("SELECT id FROM matches WHERE id = ANY(:ids)"), {'ids': ids})}
     rows = [r for r in rows if r['m'] in known]
-    if rows:
-        session.execute(text("""
-            INSERT INTO match_players (match_id, team, player, position) VALUES (:m, :t, :p, :pos)
+    # One statement per CHUNK rows: row-by-row inserts are a network round trip each against a remote database.
+    seen, unique = set(), []
+    for r in rows:  # a name resolving twice in one side would trip ON CONFLICT within a single statement
+        key = (r['m'], r['t'], r['p'])
+        if key not in seen:
+            seen.add(key)
+            unique.append(r)
+    CHUNK = 1000
+    for i in range(0, len(unique), CHUNK):
+        part = unique[i:i + CHUNK]
+        values = ", ".join(f"(:m{j}, :t{j}, :p{j}, :pos{j})" for j in range(len(part)))
+        params = {f"{k}{j}": r[k] for j, r in enumerate(part) for k in ('m', 't', 'p', 'pos')}
+        session.execute(text(f"""
+            INSERT INTO match_players (match_id, team, player, position) VALUES {values}
             ON CONFLICT (match_id, team, player) DO UPDATE SET position = EXCLUDED.position
-        """), rows)
-    return len(rows)
+        """), params)
+    return len(unique)
 
 
 def existing_ids(session, ids: List[str]) -> set:
