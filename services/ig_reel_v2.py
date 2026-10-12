@@ -138,6 +138,11 @@ def guard(script: Dict[str, Any], ok: set, k: int, words_range: Tuple[int, int] 
     if not words_range[0] <= words <= words_range[1]:
         return f"{words} words"
     h = script["hook"].strip()
+    stats = lambda t: {m.rstrip("%").replace(",", "") for m in re.findall(r"\d[\d,]*(?:\.\d+)?%?", t)
+                       if "%" in m or "." in m}  # noqa: E731  percentages and decimals: the stats people notice twice
+    again = stats(h) & stats(lines[0])
+    if again:
+        return f"the first line repeats the hook's {', '.join(sorted(again))}: move the story on instead"
     if h.endswith("?") and not numbers(h) and len(re.split(r"(?<=[.!?])\s+", h)) < 2:
         return "the hook is a bare question: give it a number or a sharp claim first (\"X happened. But why?\")"
     said = numbers(" ".join([script["hook"], *lines]))
@@ -321,14 +326,30 @@ def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str = "", len
 
 # ---- voice ----------------------------------------------------------------------------------------------------------
 
+def pronunciations() -> Dict[str, Dict[str, str]]:
+    """Names the voice says differently from how they're spelled (services/reel_pronounce.py)."""
+    from services.reel_pronounce import PRONOUNCE
+
+    return PRONOUNCE
+
+
+def hints(text_: str) -> str:
+    """Pronunciation notes for the names in a script, for the voice's instructions."""
+    return " ".join(v["hint"] for k, v in pronunciations().items() if v.get("hint") and k in text_)
+
+
 def spoken(text_: str) -> str:
-    """What the voice reads: signs as words ("−0.29" -> "minus 0.29", "+0.64" -> "plus 0.64")."""
+    """What the voice reads: names respelled (reel_pronounce.py), signs as words ("−0.29" -> "minus 0.29")."""
+    for name, v in pronunciations().items():
+        if v.get("say") and v["say"] != name:
+            text_ = re.sub(rf"\b{re.escape(name)}\b", v["say"], text_)
     text_ = re.sub(r"(?<![\w.])[−–-](?=\d)", "minus ", text_)
     return re.sub(r"\+(?=\d)", "plus ", text_)
 
 
 def tts(text_: str, voice: str, out: Path) -> float:
-    resp = _client().audio.speech.create(model=TTS_MODEL, voice=voice, input=spoken(text_), instructions=TONE,
+    resp = _client().audio.speech.create(model=TTS_MODEL, voice=voice, input=spoken(text_),
+                                         instructions=(TONE + " " + hints(text_)).strip(),
                                          response_format="mp3")
     raw = out.with_suffix(".raw.mp3")
     raw.write_bytes(resp.read() if hasattr(resp, "read") else resp.content)

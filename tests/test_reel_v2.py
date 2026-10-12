@@ -89,5 +89,21 @@ def test_guard_needs_exact_values_and_a_statement_hook():
     assert "14" in R.guard(base, ok, 2)  # 14 isn't on these cards
     q = {"hook": "Should Shami return?", "lines": [f"Prasidh averages 28.9 {words}", "He goes for 8.2."]}
     assert "question" in R.guard(q, ok, 2)  # a bare question
-    q2 = {"hook": "Prasidh averages 28.9. Should Shami return?", "lines": q["lines"]}
+    q2 = {"hook": "Shami goes for 8.2. Should he return?", "lines": q["lines"]}
     assert R.guard(q2, ok, 2) is None  # a question with a number is a fine hook
+
+
+def test_first_line_cant_repeat_the_hooks_numbers():
+    bs = [(2, {"title": "86% with him, 58% without", "payload": {}}), (3, {"title": "7.9 to 0.9", "payload": {}})]
+    ok = R.allowed("", bs)
+    pad = " ".join(["word"] * 45)
+    rep = {"hook": "India win 86% with Bumrah.", "lines": [f"With Bumrah it's 86%, without 58%. {pad}", "Then 7.9 to 0.9."]}
+    assert "repeats" in R.guard(rep, ok, 2)
+    moved = {"hook": "India win 86% with Bumrah.", "lines": [f"Without him, it's 58%. {pad}", "Then 7.9 to 0.9."]}
+    assert R.guard(moved, ok, 2) is None
+
+
+def test_pronunciation_respells_for_the_voice_only(monkeypatch):
+    monkeypatch.setattr(R, "pronunciations", lambda: {"Bumrah": {"say": "Boomrah", "hint": "BOOM-rah"}})
+    assert R.spoken("Bumrah bowls; Bumrah's spell") == "Boomrah bowls; Boomrah's spell"
+    assert R.hints("without Bumrah") == "BOOM-rah" and R.hints("without Siraj") == ""
