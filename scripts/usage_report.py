@@ -85,10 +85,12 @@ def reels(db) -> None:
     from sqlalchemy.sql import text
 
     rows = db.execute(text("""
-        SELECT COALESCE(facts->'reel'->>'variant', 'v1') AS variant, COUNT(*) AS posts,
+        SELECT COALESCE(facts->'reel'->>'variant', 'v1') || COALESCE('-' || (facts->'reel'->>'length'), '') AS variant,
+               COUNT(*) AS posts,
                AVG((facts->'reel_stats'->>'views')::float) AS views,
                AVG((facts->'reel_stats'->>'avg_watch_s')::float) AS watch,
                AVG((facts->'reel_stats'->>'hold_3s_pct')::float) AS hold,
+               AVG((facts->'reel_stats'->>'end_pct')::float) AS ended,
                AVG((facts->'reel_stats'->>'shares')::float) AS shares,
                AVG((facts->'reel_stats'->>'saves')::float) AS saves
         FROM content_packs WHERE channel = 'instagram' AND facts ? 'reel_stats'
@@ -96,10 +98,10 @@ def reels(db) -> None:
     """)).mappings().all()
     if not rows:
         return
-    print("\nReels (stats from admin): variant, posts, avg views, avg watch (s), 3s hold %, shares, saves")
+    print("\nReels (stats from admin): variant, posts, avg views, avg watch (s), 3s hold %, watched to end %, shares, saves")
     fmt = lambda v, p=1: "-" if v is None else f"{v:.{p}f}"  # noqa: E731
     for r in rows:
-        print(f"  {r['variant']:<3} {r['posts']:>3} {fmt(r['views'], 0):>8} {fmt(r['watch']):>6} {fmt(r['hold']):>6} "
+        print(f"  {r['variant']:<8} {r['posts']:>3} {fmt(r['views'], 0):>8} {fmt(r['watch']):>6} {fmt(r['hold']):>6} {fmt(r['ended']):>6} "
               f"{fmt(r['shares']):>5} {fmt(r['saves']):>5}")
 
 

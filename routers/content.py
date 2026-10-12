@@ -77,7 +77,7 @@ class PackUpdate(BaseModel):
 
 
 PLATFORMS = ("instagram", "youtube", "x")
-REEL_STATS = ("views", "avg_watch_s", "hold_3s_pct", "shares", "saves")
+REEL_STATS = ("views", "avg_watch_s", "hold_3s_pct", "end_pct", "shares", "saves")
 
 
 @router.patch("/packs/{pack_id}")

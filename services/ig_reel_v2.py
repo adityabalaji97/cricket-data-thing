@@ -38,7 +38,7 @@ FONT_BODY = ROOT / "api/_lib/fonts/Barlow-SemiBold.ttf"
 SITE = os.getenv("REEL_BASE", "https://hindsightcricket.com")
 VOICE = os.getenv("REEL_VOICE", "verse")
 TTS_MODEL = "gpt-4o-mini-tts"
-SCRIPT_MODEL = "gpt-4o-mini"
+SCRIPT_MODEL = os.getenv("REEL_SCRIPT_MODEL", "gpt-4o")   # follows the fairness rules far better than 4o-mini
 #: How the voice speaks (gpt-4o-mini-tts instructions): REEL_TONE overrides it, like REEL_VOICE, without a deploy.
 TONE = os.getenv("REEL_TONE") or ("Brisk, confident cricket analyst on a highlights show: a quick, lively pace. "
                                   "Conversational, energetic but not shouty; land each number clearly; slight lift on the hook.")
@@ -46,8 +46,14 @@ FPS = 30
 W, H, SLIDE_H, TOP = 1080, 1920, 1350, 285
 BG = "0x0a0c11"
 GAP = 0.12                     # seconds of silence between lines
-WORDS = (28, 56)               # a script's word count must sit in this range (about 15-25 seconds spoken; 30 max)
-MAX_SECONDS = 30
+#: Two lengths: short (about 25-30s, 3 charts) and long (45-60s, up to 5 charts, room for the advanced metrics).
+LENGTHS = {
+    "short": {"words": (45, 76), "say": "55 to 72", "spoken": "about 28 seconds", "seconds": 30, "beats": 3},
+    "long": {"words": (75, 175), "say": "90 to 160", "spoken": "35 to 60 seconds", "seconds": 60, "beats": 5},
+}
+WORDS = LENGTHS["short"]["words"]
+MAX_SECONDS = 60
+TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept (ffmpeg atempo)
 CAPTION_WORDS = 3              # words on screen at a time
 ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth")
 #: The payoff, in order of preference: what opens the Reel.
@@ -106,8 +112,11 @@ def _flatten(v) -> List[str]:
     if isinstance(v, bool) or v is None:
         return []
     if isinstance(v, (int, float)):
-        f = float(v)
-        return [str(int(round(f))), f"{f:.1f}", f"{f:.2f}", f"{abs(f):.0f}", f"{abs(f):.1f}", f"{abs(f):.2f}"]
+        # Exact values only (as charts show them): 28.9 never allows "29" or "30".
+        f = abs(float(v))
+        if f.is_integer():
+            return [str(int(f))]
+        return [_short(f"{f:.1f}"), _short(f"{f:.2f}")]
     return [str(v)]
 
 
@@ -120,14 +129,17 @@ def allowed(hook: str, bs: List[Tuple[int, Dict[str, Any]]]) -> set:
     return nums | {_short(n) for n in nums}
 
 
-def guard(script: Dict[str, Any], ok: set, k: int) -> Optional[str]:
+def guard(script: Dict[str, Any], ok: set, k: int, words_range: Tuple[int, int] = WORDS) -> Optional[str]:
     """None if the script is usable, else why not."""
     lines = script.get("lines")
     if not isinstance(script.get("hook"), str) or not isinstance(lines, list) or len(lines) != k:
         return "shape"
     words = len(" ".join([script["hook"], *lines]).split())
-    if not WORDS[0] <= words <= WORDS[1]:
+    if not words_range[0] <= words <= words_range[1]:
         return f"{words} words"
+    h = script["hook"].strip()
+    if h.endswith("?") and not numbers(h) and len(re.split(r"(?<=[.!?])\s+", h)) < 2:
+        return "the hook is a bare question: give it a number or a sharp claim first (\"X happened. But why?\")"
     said = numbers(" ".join([script["hook"], *lines]))
     extra = {n for n in said if n not in ok and _short(n) not in ok}
     return f"numbers not on the cards: {sorted(extra)}" if extra else None
@@ -157,48 +169,148 @@ def _client():
     return OpenAI(api_key=key)
 
 
-PROMPT = """You write the voiceover for a 15-20 second Instagram Reel about cricket data.
+PROMPT = """You write the voiceover for a %(spoken)s Instagram Reel about cricket data.
 Return JSON: {"hook": string, "lines": [string, ...]} with exactly %(k)d lines, one per chart, in the order given.
+It is ONE story told in %(spoken)s, spoken in one take: the hook sets it up, the lines carry it forward, the last
+line lands it. The video cuts to each chart as its line starts, so each line is the moment the story reaches that chart.
 Rules:
-- 35 to 50 words in total (15-25 seconds spoken). Spoken English, short sentences.
-- The hook comes first and must grab in the first 2 seconds. Base it on the post hook below, keeping its key number and
-  name, in under 10 words.
-- Each line says what its chart shows, in one short sentence.
+- Make it flow like a person telling a story: each line follows from the one before ("But...", "Here's the thing...",
+  "So...", "And yet..."). Never read a chart's title out; the chart shows the number, you say why it matters.
+- HARD LIMIT: %(say)s words in total, hook included (%(spoken)s spoken, briskly). Use only as many as the story
+  needs: never pad. Count them before you answer.
+  Spoken English, short sentences.
+- The hook comes first and must grab in the first 2 seconds, in under 12 words, keeping the key name. It can be a
+  statement or a question, but never a bare generic question: a question needs a number or a sharp claim with it
+  ("A big first over dents Varun's numbers. Is it just him?"). Don't just repeat the post hook. The hook must agree with THE VERDICT when there is one, and
+  with what the charts show; never claim more than they do. Use a number in the hook when one carries the answer.
+- Be specific, never hype: no "like no one else", "elite", "insane", "massive", "game-changer", "shines", "knack",
+  "unmatched". A precise claim beats a big one.
+  When the verdict is inconclusive or partly, the hook states what the charts DO show and the doubt, as a statement,
+  e.g. "A bad first over hurts Varun. It hurts every spinner." or "The data doesn't back the Varun myth."
+- Write a negative number with the word "minus" (e.g. "minus 0.29"), never a minus sign.
+- Each line is one to three short sentences about its chart. When a line uses an advanced metric (runs saved or added
+  against an average player, win probability added, Impact), explain it inside that same sentence, the first time,
+  e.g. "he saves 0.8 runs an over compared with an average bowler in the same spot" -- never as a separate definition.%(extra)s
 - Use ONLY numbers that appear in the material below, written as digits exactly as given (e.g. 85%%, 1,024, 0.27).
   Never round, combine, or compute new numbers. If unsure, leave the number out.
-- Don't blame players; describe what happened. No hashtags, no emojis, no "in this video".
-- End the last line with a short question or a punchy closer that makes people want to comment or rewatch.
+- Be fair: don't blame players; describe what happened. Don't overclaim: a small lead is "slightly", a mixed result is
+  "mixed". If the material has a doubt or a cost, say it.
+- Keep every claim's scope: "among India's pacers" never becomes "no one"; "at the death" stays at the death; "1 of 5
+  tests finds a clear effect" means the evidence is mixed, so no "crash", "big dip" or flat yes/no. "Only", "the best",
+  "none have matched" need a chart's rows to prove them; a lead of a couple of balls is "slightly", not "no one matches".
+- Never list more than three things in one sentence. No hashtags, no emojis, no "in this video".
+- End the last line with a short question that invites a comment, or a punchy closer.
 
 Post hook: %(hook)s
 
 Charts:
 %(charts)s
-"""
+%(notes)s"""
 
 
-def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = "") -> Dict[str, Any]:
+def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = "", notes: str = "",
+               length: str = "short") -> Dict[str, Any]:
     charts = "\n".join(f"{i + 1}. {c.get('title', '')}" + (f" ({c['help']})" if c.get("help") else "")
                        for i, (_, c) in enumerate(bs))
-    msg = PROMPT % {"k": len(bs), "hook": hook, "charts": charts}
+    L = LENGTHS[length]
+    extra = ("\n- Around the middle, turn the story with a re-hook (e.g. \"But here's what the scorecard doesn't show.\")"
+             " so people who drift come back. Give the advanced numbers room: that is why this Reel is longer."
+             if length == "long" else "")
+    msg = PROMPT % {"k": len(bs), "hook": hook, "charts": charts, "say": L["say"], "spoken": L["spoken"], "extra": extra,
+                    "notes": f"\nAlso on the slides (may be used in the lines, e.g. the doubts):\n{notes}\n" if notes else ""}
     if feedback:
-        msg += f"\nYour last attempt was rejected ({feedback}). Fix that."
+        msg += (f"\nYour last attempt was rejected ({feedback}). Fix that"
+                + (f": land within {L['say']} words." if "words" in feedback else f", and keep it {L['say']} words long.")
+                + " Keep everything else that worked.")
     resp = _client().chat.completions.create(model=SCRIPT_MODEL, temperature=0.6,
                                              response_format={"type": "json_object"},
                                              messages=[{"role": "user", "content": msg}])
     return json.loads(resp.choices[0].message.content or "{}")
 
 
-def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]]) -> Tuple[Dict[str, Any], str]:
-    """(script, source): the model's when it passes the guard (one retry), else the template's."""
-    ok = allowed(hook, bs)
+def notes_of(slides: List[Dict[str, Any]]) -> str:
+    """The post's own text slides (the claim, the doubts) as extra material for the script. Credited outside figures
+    ("From elsewhere", "Source: ...") are left out: they're shown on a slide with their source, never voiced."""
+    out = []
+    for s in slides:
+        if s.get("type") == "verdict":  # a myth test's answer: the hook must agree with it
+            out.append(f"THE VERDICT (the post's answer): {s.get('verdict')}: "
+                       f"{' / '.join(l for l in (s.get('body') or '').splitlines() if l.strip())}")
+            continue
+        if s.get("type") != "text":
+            continue
+        heading, body = s.get("heading") or "", s.get("body") or ""
+        if "elsewhere" in heading.lower() or "source:" in body.lower():
+            continue
+        out.append(f"{heading}: {' / '.join(l for l in body.splitlines() if l.strip())}")
+    return "\n".join(out)
+
+
+CHECK = """You check a cricket Reel voiceover against its source material.
+Reply JSON {"problems": [...]} listing ONLY real problems (an empty list if there are none). Never list a claim that is
+fine. A problem is:
+- a claim beyond the material's scope ("among India's pacers" turned into "no one"; "at the death" dropped), or
+  "only", "the best", "none have matched" that the chart's rows don't prove;
+- a metric described as a different one (runs saved or above average is never "win probability" or "chance of
+  winning"; Impact is never runs saved; a strike rate is never an average);
+- a statement that contradicts THE VERDICT (a flat yes/no when it is "Partly" or "Inconclusive");
+- blaming a player, or hype ("game-changer", "elite", "unmatched").
+Not problems: restating a chart's title or help line in other words (titles are verified facts computed from the data);
+a number rounded the way the title or help line rounds it; for balls per wicket, economy and averages, lower is better;
+fair framing such as "raises questions", "is it worth it?", "slightly", "mixed"; the closing question.
+
+Material:
+%(material)s
+
+Voiceover:
+%(script)s
+"""
+
+
+def chart_text(c: Dict[str, Any]) -> str:
+    """A chart as text for the checker: title, help line, and its rows' values (so "only X is under 30" can be
+    checked against every row, not just the headline)."""
+    p = c.get("payload") or {}
+    rows = []
+    for r in (p.get("rows") or [])[:10]:
+        if not isinstance(r, dict):
+            continue
+        name = r.get("name") or r.get("label") or r.get("short") or ""
+        vals = {k: v for k, v in r.items() if k in ("value", "subject", "field") or k == "values"}
+        rows.append(f"{name}: {json.dumps(vals, default=str)}")
+    return (f"Chart: {c.get('title', '')}. {c.get('help', '')}"
+            + (f" Rows: {'; '.join(rows)}" if rows else ""))
+
+
+def check(sc: Dict[str, Any], hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str) -> Optional[str]:
+    """None if a second reading finds every claim supported by the cards, else the problems."""
+    material = "\n".join([f"Post hook: {hook}"] + [chart_text(c) for _, c in bs] + ([notes] if notes else []))
+    resp = _client().chat.completions.create(
+        model=SCRIPT_MODEL, temperature=0, response_format={"type": "json_object"},
+        messages=[{"role": "user", "content": CHECK % {"material": material,
+                                                        "script": " ".join([sc["hook"], *sc["lines"]])}}])
+    got = json.loads(resp.choices[0].message.content or "{}")
+    problems = [p for p in (got.get("problems") or []) if isinstance(p, str) and p.strip()]
+    return "; ".join(problems) if problems else None
+
+
+def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str = "", length: str = "short") -> Tuple[Dict[str, Any], str]:
+    """(script, source): the model's when it passes the guard (one retry), else the template's. notes: the post's text
+    slides, whose numbers may be voiced too."""
+    ok = allowed(hook, bs) | numbers(notes) | {_short(n) for n in numbers(notes)}
     why = ""
-    for _ in range(2):
+    for _ in range(4):
         try:
-            s = script_llm(hook, bs, why)
+            s = script_llm(hook, bs, why, notes, length)
         except Exception as exc:  # no key, network: the template
             logger.warning("reel script: %r", exc)
             break
-        why = guard(s, ok, len(bs)) or ""
+        why = guard(s, ok, len(bs), LENGTHS[length]["words"]) or ""
+        if not why:
+            try:
+                why = check(s, hook, bs, notes) or ""
+            except Exception as exc:  # the check couldn't run: don't ship an unchecked script
+                why = f"check failed: {exc!r}"[:200]
         if not why:
             return s, SCRIPT_MODEL
         logger.info("reel script rejected: %s", why)
@@ -207,10 +319,21 @@ def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]]) -> Tuple[Dict[str, A
 
 # ---- voice ----------------------------------------------------------------------------------------------------------
 
+def spoken(text_: str) -> str:
+    """What the voice reads: signs as words ("−0.29" -> "minus 0.29", "+0.64" -> "plus 0.64")."""
+    text_ = re.sub(r"(?<![\w.])[−–-](?=\d)", "minus ", text_)
+    return re.sub(r"\+(?=\d)", "plus ", text_)
+
+
 def tts(text_: str, voice: str, out: Path) -> float:
-    resp = _client().audio.speech.create(model=TTS_MODEL, voice=voice, input=text_, instructions=TONE,
+    resp = _client().audio.speech.create(model=TTS_MODEL, voice=voice, input=spoken(text_), instructions=TONE,
                                          response_format="mp3")
-    out.write_bytes(resp.read() if hasattr(resp, "read") else resp.content)
+    raw = out.with_suffix(".raw.mp3")
+    raw.write_bytes(resp.read() if hasattr(resp, "read") else resp.content)
+    if abs(TEMPO - 1) > 0.01:  # a touch quicker: Reels reward pace
+        _ff([shutil.which("ffmpeg"), "-y", "-loglevel", "error", "-i", str(raw), "-filter:a", f"atempo={TEMPO}", str(out)])
+    else:
+        raw.replace(out)
     return duration(out)
 
 
@@ -274,98 +397,123 @@ def _drawtext(textfile: Path, font: Path, size: int, y: str, start: float, end: 
     return f
 
 
-def compose(tmp: Path, beat_frames: List[Path], segs: List[Dict[str, Any]], hook_text: str, out: Path) -> float:
-    """segs: one per beat {"audio": [mp3, ...], "lines": [text, ...], "seconds": total}; the first holds the hook too."""
+def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: Path,
+            captions: List[Tuple[float, float, str]], hook_text: str, hook_end: float, out: Path) -> float:
+    """The Reel: each beat's reveal frames, then its finished frame held for its duration; the voice (one take) under
+    them with a quiet bed; the hook above the slide until the story moves on, then the brand; timed captions below."""
     ffmpeg = shutil.which("ffmpeg")
-    # 1. Each beat: its reveal frames, then the finished frame held, on the 9:16 canvas.
     clips = []
-    for i, (frames, seg) in enumerate(zip(beat_frames, segs)):
+    for i, (frames, secs) in enumerate(zip(beat_frames, durations)):
         clip = tmp / f"beat{i}.mp4"
         n = len(list(frames.glob("*.png")))
-        hold = max(0.0, seg["seconds"] - n / FPS)
-        subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-framerate", str(FPS), "-i", str(frames / "%03d.png"),
-                        "-vf", f"scale={W}:{SLIDE_H},tpad=stop_mode=clone:stop_duration={hold:.3f},"
-                               f"pad={W}:{H}:0:{TOP}:color={BG},setsar=1,fps={FPS},format=yuv420p",
-                        "-t", f"{seg['seconds']:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(clip)],
-                       check=True, capture_output=True, timeout=300)
+        hold = max(0.0, secs - n / FPS)
+        _ff([ffmpeg, "-y", "-loglevel", "error", "-framerate", str(FPS), "-i", str(frames / "%03d.png"),
+             "-vf", f"scale={W}:{SLIDE_H},tpad=stop_mode=clone:stop_duration={hold:.3f},"
+                    f"pad={W}:{H}:0:{TOP}:color={BG},setsar=1,fps={FPS},format=yuv420p",
+             "-t", f"{secs:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(clip)], timeout=300)
         clips.append(clip)
     listing = tmp / "clips.txt"
     listing.write_text("".join(f"file '{c}'\n" for c in clips))
     video = tmp / "video.mp4"
-    subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing), "-c", "copy",
-                    str(video)], check=True, capture_output=True, timeout=300)
-    total = sum(s["seconds"] for s in segs)
+    _ff([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing), "-c", "copy", str(video)])
+    total = sum(durations)
 
-    # 2. The voice: every line in order, a short gap after each.
-    voice_parts, t, captions = [], 0.0, []
-    hook_end = None
-    for seg in segs:
-        for mp3, line in zip(seg["audio"], seg["lines"]):
-            d = duration(mp3)
-            captions += caption_chunks(line, t, d)
-            if hook_end is None:
-                hook_end = t + d
-            voice_parts.append((mp3, d))
-            t += d + GAP
-    vlist = tmp / "voice.txt"
-    silence = tmp / "gap.mp3"
-    subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-f", "lavfi", "-i", f"anullsrc=r=24000:cl=mono", "-t", str(GAP),
-                    "-c:a", "libmp3lame", str(silence)], check=True, capture_output=True)
-    vlist.write_text("".join(f"file '{p}'\nfile '{silence}'\n" for p, _ in voice_parts))
-    voice = tmp / "voice.wav"
-    subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(vlist), "-ar", "44100",
-                    "-ac", "2", str(voice)], check=True, capture_output=True, timeout=120)
-
-    # 3. Text: the hook above the slide while it's spoken, then the brand; captions below, in step with the voice.
     hook_file = tmp / "hook.txt"
     hook_file.write_text(wrap(hook_text, 26))
     brand = tmp / "brand.txt"
     brand.write_text("HINDSIGHT  ·  hindsightcricket.com")
-    draws = [_drawtext(hook_file, FONT_BOLD, 66, f"({TOP}-text_h)/2", 0, hook_end or 2.5),
-             _drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", hook_end or 2.5, total + 1, color="0xb6f24a")]
+    draws = [_drawtext(hook_file, FONT_BOLD, 66, f"({TOP}-text_h)/2", 0, hook_end),
+             _drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", hook_end, total + 1, color="0xb6f24a")]
     for i, (a, b, c) in enumerate(captions):
         f = tmp / f"cap{i}.txt"
         f.write_text(c)
         draws.append(_drawtext(f, FONT_BOLD, 64, f"{TOP + SLIDE_H}+({H - TOP - SLIDE_H}-text_h)/2", a, b))
     filt = (f"[0:v]{','.join(draws)},fade=t=out:st={max(0, total - 0.35):.2f}:d=0.35[v];"
-            # a soft pad under the voice: two low sines, slowly swelling, well below it
+            # a soft pad under the voice: low sines, slowly swelling, well below it
             f"aevalsrc='0.5*sin(2*PI*110*t)*(0.6+0.4*sin(2*PI*0.25*t))+0.35*sin(2*PI*164.8*t)+0.25*sin(2*PI*220*t)':"
             f"s=44100:d={total:.2f},lowpass=f=900,volume=0.05,afade=t=in:d=0.6,afade=t=out:st={max(0, total - 0.8):.2f}:d=0.8,"
-            f"aformat=channel_layouts=stereo[bed];[1:a]volume=1.0[vo];[vo][bed]amix=inputs=2:duration=first,volume=2[a]")
+            f"aformat=channel_layouts=stereo[bed];[1:a]aformat=sample_rates=44100:channel_layouts=stereo,apad[vo];"
+            f"[vo][bed]amix=inputs=2:duration=shortest,volume=2[a]")
     _ff([ffmpeg, "-y", "-loglevel", "error", "-i", str(video), "-i", str(voice), "-filter_complex", filt,
          "-map", "[v]", "-map", "[a]", "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
          "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out)])
     return round(total, 2)
 
 
+def words_timed(audio: Path) -> List[Dict[str, float]]:
+    """[{word, start, end}] for the voice, from OpenAI's transcription (we know the text; this only times it)."""
+    with open(audio, "rb") as f:
+        resp = _client().audio.transcriptions.create(model="whisper-1", file=f, response_format="verbose_json",
+                                                     timestamp_granularities=["word"])
+    return [{"word": w.word, "start": float(w.start), "end": float(w.end)} for w in (getattr(resp, "words", None) or [])]
+
+
+def align(segments: List[str], timed: List[Dict[str, float]], total: float,
+          per: int = CAPTION_WORDS) -> Tuple[List[float], List[Tuple[float, float, str]]]:
+    """(each segment's start, captions) for the script's segments spoken in one take. Our words map onto the
+    transcription's in proportion (numbers can be one word to us and three spoken), so a segment starts when its first
+    word is said. Without a transcription, time is shared out by characters."""
+    ours = [w for seg in segments for w in seg.split()]
+    n = len(ours)
+
+    def at(j: int) -> float:
+        if j >= n:
+            return total
+        if timed:
+            k = min(len(timed) - 1, round(j * len(timed) / n))
+            return timed[k]["start"]
+        chars = sum(len(w) + 1 for w in ours[:j])
+        return total * chars / max(1, sum(len(w) + 1 for w in ours))
+    starts, caps, j = [], [], 0
+    for seg in segments:
+        ws = seg.split()
+        starts.append(0.0 if j == 0 else at(j))
+        for c in range(0, len(ws), per):
+            caps.append((at(j + c), at(min(j + c + per, j + len(ws))), " ".join(ws[c:c + per])))
+        j += len(ws)
+    caps = [(round(a, 3), round(max(b, a + 0.25), 3), t) for a, b, t in caps]
+    return starts, caps
+
+
 def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = None, base: str = SITE,
-         store: bool = True, out: Optional[Path] = None, plan: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-    """Build the v2 Reel. plan: a script already made (the same script in several voices); else one is written."""
+         store: bool = True, out: Optional[Path] = None, plan: Optional[Dict[str, Any]] = None,
+         length: str = "short") -> Optional[Dict[str, Any]]:
+    """Build the v2 Reel. plan: a script already made (the same script in several voices); else one is written.
+    length: "short" (about 25-30s) or "long" (45-60s, up to 5 charts)."""
     if not shutil.which("ffmpeg"):
         return None
     hook = next((s.get("text") for s in slides if s.get("type") == "hook"), "") or ""
-    bs = beats(slides)
+    bs = beats(slides, k=LENGTHS[length]["beats"])
+    if plan and plan.get("beats"):  # beats chosen by hand (scripts/make_reel_v2.py --beats)
+        bs = [(n, slides[n - 1]["card"]) for n in plan["beats"]]
     if len(bs) < 2:
         return None
-    if plan is None:
-        sc, source = script(hook, bs)
-        plan = {"script": sc, "source": source, "beats": [n for n, _ in bs]}
+    if plan is None or not plan.get("script"):
+        sc, source = script(hook, bs, notes_of(slides), length)
+        plan = {"script": sc, "source": source, "beats": [n for n, _ in bs], "length": length}
     sc, voice = plan["script"], voice or VOICE
     with tempfile.TemporaryDirectory() as d:
         tmp = Path(d)
         got = record(carousel_id, plan["beats"], tmp / "frames", base)
         if got.get("failed"):
             raise RuntimeError(f"recording failed: {got['failed']}")
-        segs = []
-        lines = [sc["hook"], *sc["lines"]]
-        clips = [tmp / f"line{i}.mp3" for i in range(len(lines))]
-        secs = [tts(l, voice, c) for l, c in zip(lines, clips)]
-        # The first beat carries the hook and its own line; each other beat its line.
-        segs.append({"audio": clips[:2], "lines": lines[:2], "seconds": secs[0] + secs[1] + 2 * GAP})
-        for i in range(2, len(lines)):
-            segs.append({"audio": [clips[i]], "lines": [lines[i]], "seconds": secs[i] + GAP})
+        # One take: the whole story spoken at once, so it flows; then timed, so each chart arrives with its line.
+        segments = [sc["hook"], *sc["lines"]]
+        voice_file = tmp / "voice.mp3"
+        spoken_len = tts(" ".join(segments), voice, voice_file)
+        try:
+            timed = words_timed(voice_file)
+        except Exception as exc:  # no transcription: share the time out by characters
+            logger.warning("reel timing: %r", exc)
+            timed = []
+        starts, captions = align(segments, timed, spoken_len)
+        hook_end = starts[1]
+        # Beat 1 carries the hook and its line; each other beat starts with its line. A short tail after the last word.
+        cuts = [0.0] + starts[2:] + [spoken_len + 0.6]
+        durations = [round(b - a, 3) for a, b in zip(cuts, cuts[1:])]
         mp4 = out or (tmp / "reel.mp4")
-        seconds = compose(tmp, [tmp / "frames" / str(n) for n in plan["beats"]], segs, sc["hook"], mp4)
+        seconds = compose(tmp, [tmp / "frames" / str(n) for n in plan["beats"]], durations, voice_file, captions,
+                          sc["hook"], hook_end, mp4)
         if seconds > MAX_SECONDS:
             logger.warning("reel v2 for %s is %.1fs", carousel_id, seconds)
         if store:
@@ -379,6 +527,7 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
                     ON CONFLICT (carousel_id) DO UPDATE SET mp4 = EXCLUDED.mp4, seconds = EXCLUDED.seconds, made_at = now()
                 """), {"c": carousel_id, "m": mp4.read_bytes(), "s": seconds})
     return {"seconds": seconds, "script": sc, "source": plan["source"], "voice": voice, "beats": plan["beats"],
+            "length": plan.get("length", length),
             "mp4": str(out) if out else None}
 
 

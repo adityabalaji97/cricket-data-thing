@@ -27,7 +27,8 @@ def test_guard_rejects_numbers_not_on_the_cards():
     bs = R.beats(SLIDES)
     ok = R.allowed(SLIDES[0]["text"], bs)
     good = {"hook": "Kuldeep's 17th went for 24.", "lines": [
-        "India still had 4 pace overs left by the 17th, and spin bowled 3 of the last 4.",
+        "India still had 4 pace overs left by the 17th, and spin bowled 3 of the last 4. That is the plan around it, "
+        "and it matters more than the one over everyone remembers from the night.",
         "At the death, spin costs 11.1 an over to set batters, pace 11.8.",
         "Teams defending 200 bowl spin in 21% of death overs. India: 75%. Your call?"]}
     assert R.guard(good, ok, 3) is None
@@ -57,3 +58,36 @@ def test_variant_ab_and_eligibility(monkeypatch):
     assert R.variant("preview", even) == "v1"
     monkeypatch.setenv("REEL_AB", "0")
     assert R.variant("recap", odd) == "v2"
+
+
+def test_signs_are_spoken_and_verdicts_are_material():
+    assert R.spoken("falls to −0.29 from +0.35") == "falls to minus 0.29 from plus 0.35"
+    assert R.spoken("2-0 up") == "2-0 up" or "minus" not in R.spoken("in 2026-27")  # hyphens between words stay
+    notes = R.notes_of([{"type": "verdict", "verdict": "Partly", "body": "a. claim: Inconclusive"},
+                        {"type": "text", "heading": "From elsewhere", "body": "15 wickets\nSource: ESPNcricinfo"}])
+    assert "THE VERDICT" in notes and "ESPNcricinfo" not in notes
+
+
+def test_align_one_take_into_segments():
+    segs = ["Hook words here.", "Second part comes next.", "Third."]
+    timed = [{"word": w, "start": i * 0.5, "end": i * 0.5 + 0.4} for i, w in enumerate(" ".join(segs).split())]
+    starts, caps = R.align(segs, timed, 4.0)
+    assert starts == [0.0, 1.5, 3.5]  # each segment starts when its first word is said
+    assert caps[0][2] == "Hook words here." and caps[-1][2] == "Third."
+    assert all(a < b for a, b, _ in caps)
+    starts, _ = R.align(segs, [], 8.0)  # no transcription: by characters
+    assert starts[0] == 0.0 and 0 < starts[1] < starts[2] < 8.0
+
+
+def test_guard_needs_exact_values_and_a_statement_hook():
+    bs = [(2, {"title": "Averages since", "payload": {"rows": [{"name": "Prasidh", "value": 28.9}]}}),
+          (3, {"title": "Cost", "payload": {"rows": [{"name": "Shami", "value": 8.2}]}})]
+    ok = R.allowed("Shami", bs)
+    assert "28.9" in ok and "30" not in ok and "29" not in ok
+    words = " ".join(["word"] * 45)
+    base = {"hook": "Shami takes one every 14 balls.", "lines": [f"Prasidh averages 28.9 {words}", "He goes for 8.2."]}
+    assert "14" in R.guard(base, ok, 2)  # 14 isn't on these cards
+    q = {"hook": "Should Shami return?", "lines": [f"Prasidh averages 28.9 {words}", "He goes for 8.2."]}
+    assert "question" in R.guard(q, ok, 2)  # a bare question
+    q2 = {"hook": "Prasidh averages 28.9. Should Shami return?", "lines": q["lines"]}
+    assert R.guard(q2, ok, 2) is None  # a question with a number is a fine hook
