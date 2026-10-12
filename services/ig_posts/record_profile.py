@@ -135,15 +135,15 @@ def phase_card(db, pool, sample):
 
 def start_card(db, pool, since, until, sample):
     def early(rows):
-        r = next((r for r in rows if str(r.get("batter_balls_faced_bucket")) == "1-9"), None)
+        r = next((r for r in rows if str(r.get("batter_ball_number_bucket")) == "1-10"), None)
         return r if r and r["balls"] >= MIN_CELL else None
     rows = []
     for p in pool:
-        e = early(_qb(db, p["name"], p["date"], ["batter_balls_faced_bucket"]))
+        e = early(_qb(db, p["name"], p["date"], ["batter_ball_number_bucket"]))
         if e:
             rows.append({"name": label(p), "value": round(e["strike_rate"]), "team": p.get("team"),
                          "highlight": p is pool[0], "detail": f"{e['runs']} off {e['balls']} balls"})
-    field = early(_qb(db, None, until, ["batter_balls_faced_bucket"], start_date=since))
+    field = early(_qb(db, None, until, ["batter_ball_number_bucket"], start_date=since))
     if len(rows) < 3 or not field:
         return None
     rows.append({"name": "Average batter", "value": round(field["strike_rate"]), "detail": f"T20Is since {since.year}"})
