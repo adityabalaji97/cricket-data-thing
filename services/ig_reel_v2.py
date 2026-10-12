@@ -179,6 +179,7 @@ Rules:
 - HARD LIMIT: %(say)s words in total, hook included (%(spoken)s spoken, briskly). Use only as many as the story
   needs: never pad. Count them before you answer.
   Spoken English, short sentences.
+- Don't repeat the hook in the first line: the first line moves the story on.
 - The hook comes first and must grab in the first 2 seconds, in under 12 words, keeping the key name. It can be a
   statement or a question, but never a bare generic question: a question needs a number or a sharp claim with it
   ("A big first over dents Varun's numbers. Is it just him?"). Don't just repeat the post hook. The hook must agree with THE VERDICT when there is one, and
@@ -195,7 +196,8 @@ Rules:
   Never round, combine, or compute new numbers. If unsure, leave the number out.
 - Be fair: don't blame players; describe what happened. Don't overclaim: a small lead is "slightly", a mixed result is
   "mixed". If the material has a doubt or a cost, say it.
-- Keep every claim's scope: "among India's pacers" never becomes "no one"; "at the death" stays at the death; "1 of 5
+- Keep every claim's scope, in the hook too: a number "against top sides" must say so; "among India's pacers" never
+  becomes "no one"; "at the death" stays at the death; "1 of 5
   tests finds a clear effect" means the evidence is mixed, so no "crash", "big dip" or flat yes/no. "Only", "the best",
   "none have matched" need a chart's rows to prove them; a lead of a couple of balls is "slightly", not "no one matches".
 - Never list more than three things in one sentence. No hashtags, no emojis, no "in this video".
