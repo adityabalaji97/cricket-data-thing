@@ -130,3 +130,9 @@ def test_word_times_follow_the_transcription():
 def test_long_captions_split_near_the_middle():
     assert R.balance("In the powerplay,") == ["In the powerplay,"]
     assert R.balance("it's 0.31 versus minus 0.02.") == ["it's 0.31 versus", "minus 0.02."]
+
+
+def test_one_word_phrases_join_the_one_before():
+    ws = "Against top sides, India win 86% with Bumrah and 58% without. So what changes?".split()
+    got = [" ".join(ws[a:b]) for a, b in R.phrases(ws)]
+    assert "without." not in got and any(p.endswith("58% without.") for p in got)

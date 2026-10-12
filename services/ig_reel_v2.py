@@ -54,7 +54,7 @@ LENGTHS = {
 WORDS = LENGTHS["short"]["words"]
 MAX_SECONDS = 60
 TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept (ffmpeg atempo)
-COVER_SECONDS = 0.5           # the carousel's first slide opens the Reel: the frame to pick as the cover
+COVER_SECONDS = float(os.getenv("REEL_COVER", "1.5"))   # the carousel's first slide opens the Reel (the cover frame)
 CAPTION_WORDS = 3              # words on screen at a time
 ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth")
 #: The payoff, in order of preference: what opens the Reel.
@@ -536,11 +536,15 @@ def phrases(words: List[str], most: int = 6, chars: int = 32, hard: int = 40) ->
             out.append((start, i + 1))
             start = i + 1
     if start < len(words):
-        if out and len(words) - start == 1:
-            out[-1] = (out[-1][0], len(words))
+        out.append((start, len(words)))
+    # A one-word phrase ("without.") joins the phrase before it when the two still fit.
+    merged: List[Tuple[int, int]] = []
+    for a, b in out:
+        if merged and b - a == 1 and len(" ".join(words[merged[-1][0]:b])) <= 48:  # two caption lines
+            merged[-1] = (merged[-1][0], b)
         else:
-            out.append((start, len(words)))
-    return out
+            merged.append((a, b))
+    return merged
 
 
 def word_times(ours: List[str], timed: List[Dict[str, float]], total: float) -> List[float]:
