@@ -54,6 +54,7 @@ LENGTHS = {
 WORDS = LENGTHS["short"]["words"]
 MAX_SECONDS = 60
 TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept (ffmpeg atempo)
+COVER_SECONDS = 0.5           # the carousel's first slide opens the Reel: the frame to pick as the cover
 CAPTION_WORDS = 3              # words on screen at a time
 ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth")
 #: The payoff, in order of preference: what opens the Reel.
@@ -198,7 +199,11 @@ Rules:
   against an average player, win probability added, Impact), explain it inside that same sentence, the first time,
   e.g. "he saves 0.8 runs an over compared with an average bowler in the same spot" -- never as a separate definition.%(extra)s
 - Use ONLY numbers that appear in the material below, written as digits exactly as given (e.g. 85%%, 1,024, 0.27).
-  Never round, combine, or compute new numbers. If unsure, leave the number out.
+  Never round, combine, or compute new numbers, and never compute comparisons in words ("twice", "double", "half",
+  "three times"): give both numbers instead. If unsure, leave the number out.
+- Line N is spoken while chart N is on screen: it must be about THAT chart's numbers, in the order given.
+- State only facts that a chart's title or help line says, in your own words. Don't draw new conclusions from the
+  numbers (a level is not a difference: "0.59 with him" is not "0.59 more").
 - Be fair: don't blame players; describe what happened. Don't overclaim: a small lead is "slightly", a mixed result is
   "mixed". If the material has a doubt or a cost, say it.
 - Keep every claim's scope, in the hook too: a number "against top sides" must say so; "among India's pacers" never
@@ -258,6 +263,10 @@ Reply JSON {"problems": [...]} listing ONLY real problems (an empty list if ther
 fine. A problem is:
 - a claim beyond the material's scope ("among India's pacers" turned into "no one"; "at the death" dropped), or
   "only", "the best", "none have matched" that the chart's rows don't prove;
+- a line that isn't about its own chart (line 1 goes with chart 1, line 2 with chart 2, and so on);
+- a comparison computed in words ("twice", "double", "half", "x times") that the material doesn't state;
+- a number given the wrong meaning (a level stated as a difference, a "with" value as a gap);
+- a claim about how or when a player is used that the material doesn't show, or that a chart contradicts;
 - a metric described as a different one (runs saved or above average is never "win probability" or "chance of
   winning"; Impact is never runs saved; a strike rate is never an average);
 - a statement that contradicts THE VERDICT (a flat yes/no when it is "Partly" or "Inconclusive");
@@ -291,11 +300,13 @@ def chart_text(c: Dict[str, Any]) -> str:
 
 def check(sc: Dict[str, Any], hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str) -> Optional[str]:
     """None if a second reading finds every claim supported by the cards, else the problems."""
-    material = "\n".join([f"Post hook: {hook}"] + [chart_text(c) for _, c in bs] + ([notes] if notes else []))
+    material = "\n".join([f"Post hook: {hook}"] + [f"Chart {i + 1}: " + chart_text(c) for i, (_, c) in enumerate(bs)]
+                         + ([notes] if notes else []))
     resp = _client().chat.completions.create(
         model=SCRIPT_MODEL, temperature=0, response_format={"type": "json_object"},
         messages=[{"role": "user", "content": CHECK % {"material": material,
-                                                        "script": " ".join([sc["hook"], *sc["lines"]])}}])
+                                                        "script": "\n".join([f"Hook: {sc['hook']}"] + [
+                                                            f"Line {i + 1}: {l}" for i, l in enumerate(sc["lines"])])}}])
     got = json.loads(resp.choices[0].message.content or "{}")
     problems = [p for p in (got.get("problems") or []) if isinstance(p, str) and p.strip()]
     return "; ".join(problems) if problems else None
@@ -421,11 +432,23 @@ def _drawtext(textfile: Path, font: Path, size: int, y: str, start: float, end: 
 
 
 def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: Path,
-            captions: List[Tuple[float, float, str]], hook_text: str, hook_end: float, out: Path) -> float:
+            captions: List[Tuple[float, float, str]], hook_text: str, hook_end: float, out: Path,
+            cover: Optional[Path] = None) -> float:
     """The Reel: each beat's reveal frames, then its finished frame held for its duration; the voice (one take) under
     them with a quiet bed; the hook above the slide until the story moves on, then the brand; timed captions below."""
     ffmpeg = shutil.which("ffmpeg")
     clips = []
+    lead = 0.0
+    if cover is not None and durations and durations[0] > COVER_SECONDS + 1:
+        # The carousel's first slide for a moment (the voice already going), so it's the frame offered as the cover;
+        # the first beat gives up that time, so everything after stays where the voice put it.
+        clip = tmp / "cover.mp4"
+        _ff([ffmpeg, "-y", "-loglevel", "error", "-loop", "1", "-t", f"{COVER_SECONDS:.3f}", "-i", str(cover),
+             "-vf", f"scale={W}:{SLIDE_H},pad={W}:{H}:0:{TOP}:color={BG},setsar=1,fps={FPS},format=yuv420p",
+             "-t", f"{COVER_SECONDS:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(clip)], timeout=120)
+        clips.append(clip)
+        lead = COVER_SECONDS
+        durations = [durations[0] - lead] + list(durations[1:])
     for i, (frames, secs) in enumerate(zip(beat_frames, durations)):
         clip = tmp / f"beat{i}.mp4"
         n = len(list(frames.glob("*.png")))
@@ -439,13 +462,13 @@ def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: P
     listing.write_text("".join(f"file '{c}'\n" for c in clips))
     video = tmp / "video.mp4"
     _ff([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing), "-c", "copy", str(video)])
-    total = sum(durations)
+    total = sum(durations) + lead
 
     hook_file = tmp / "hook.txt"
     hook_file.write_text(wrap(hook_text, 26))
     brand = tmp / "brand.txt"
     brand.write_text("HINDSIGHT  ·  hindsightcricket.com")
-    draws = [_drawtext(hook_file, FONT_BOLD, 66, f"({TOP}-text_h)/2", 0, hook_end),
+    draws = [_drawtext(hook_file, FONT_BOLD, 66, f"({TOP}-text_h)/2", lead, hook_end),
              _drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", hook_end, total + 1, color="0xb6f24a")]
     for i, (a, b, c) in enumerate(captions):
         f = tmp / f"cap{i}.txt"
@@ -498,6 +521,21 @@ def align(segments: List[str], timed: List[Dict[str, float]], total: float,
     return starts, caps
 
 
+def first_slide(carousel_id: str, tmp: Path) -> Optional[Path]:
+    """The carousel's rendered first slide (ig_slide_images), or None if it isn't rendered yet."""
+    from sqlalchemy import text
+
+    from database import engine
+
+    with engine.connect() as conn:
+        png = conn.execute(text("SELECT png FROM ig_slide_images WHERE carousel_id = :c AND n = 1"), {"c": carousel_id}).scalar()
+    if not png:
+        return None
+    f = tmp / "cover.png"
+    f.write_bytes(bytes(png))
+    return f
+
+
 def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = None, base: str = SITE,
          store: bool = True, out: Optional[Path] = None, plan: Optional[Dict[str, Any]] = None,
          length: str = "short") -> Optional[Dict[str, Any]]:
@@ -535,8 +573,9 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
         cuts = [0.0] + starts[2:] + [spoken_len + 0.6]
         durations = [round(b - a, 3) for a, b in zip(cuts, cuts[1:])]
         mp4 = out or (tmp / "reel.mp4")
+        cover = first_slide(carousel_id, tmp)
         seconds = compose(tmp, [tmp / "frames" / str(n) for n in plan["beats"]], durations, voice_file, captions,
-                          sc["hook"], hook_end, mp4)
+                          sc["hook"], hook_end, mp4, cover=cover)
         if seconds > MAX_SECONDS:
             logger.warning("reel v2 for %s is %.1fs", carousel_id, seconds)
         if store:
