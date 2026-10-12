@@ -71,7 +71,7 @@ def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[
         if i == 1:
             suffix = f"\n\nA thread 🧵 1/{total}\n{tags}"
         elif i == total:
-            suffix = f"\n\nFull data, free: {LINK}\n{i}/{total} {tags}"
+            suffix = f"\n\nFull data, free: {LINK}\nData: @himganj153 & @TechRadar9\n{i}/{total} {tags}"
         else:
             suffix = f"\n\n{i}/{total} {tags}"
         tweets.append({"n": i, "slide": i, "text": _fit(body, suffix)})

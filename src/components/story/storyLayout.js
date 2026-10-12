@@ -31,5 +31,6 @@ export const useStoryCoreSize = () => {
 
 // Short form of the credits every card carries (full wording lives in the info sheet and in
 // analysis/hypotheses/credits.py; the 2015+ feed provider is still to be confirmed).
-export const CARD_CREDITS = 'Data: Cricsheet, [feed TBC], Primer method';
+// Ball-by-ball data (2015+, with line, length, shots, control): Himanish Ganjoo, collected with TechRadar.
+export const CARD_CREDITS = 'Data: Himanish Ganjoo & TechRadar, Cricsheet';
 export const CARD_BRAND = 'Hindsight · hindsightcricket.com';

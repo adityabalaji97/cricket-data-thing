@@ -33,6 +33,8 @@ FORMAT_TAGS = {"IPL": "#IPL", "ODI": "#ODI", "T20I": "#T20I", "T20": "#T20"}
 BASE_TAGS = ["#cricket", "#cricketstats"]
 MAX_TAGS = 5
 LINK_LINE = "Free ball-by-ball cricket stats: link in bio."
+#: The data credit on every caption: Himanish Ganjoo's ball-by-ball feed (collected with TechRadar), and Cricsheet.
+CREDIT_LINE = "Ball-by-ball data: Himanish Ganjoo & TechRadar, Cricsheet."
 
 
 def tag(text: str) -> str:
@@ -86,5 +88,6 @@ def build(hook: str, answer: str, pillar: str, method: Optional[str] = None, pla
         parts.append(f"How: {_one_line(method)}")
     parts.append(PROMPTS.get(pillar, PROMPTS["debate"]))
     # Instagram collapses blank lines unless something sits on them; a lone "." keeps the tags apart from the text.
+    parts.append(CREDIT_LINE)
     parts.append(f"{LINK_LINE}\n.\n{' '.join(hashtags(players, kicker, extra_tags))}")
     return "\n\n".join(parts)

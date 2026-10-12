@@ -191,7 +191,8 @@ Rules:
   ("A big first over dents Varun's numbers. Is it just him?"). Don't just repeat the post hook. The hook must agree with THE VERDICT when there is one, and
   with what the charts show; never claim more than they do. Use a number in the hook when one carries the answer.
 - Be specific, never hype: no "like no one else", "elite", "insane", "massive", "game-changer", "shines", "knack",
-  "unmatched". A precise claim beats a big one.
+  "unmatched", "plummets", "crashes", "collapses", "sharply", "skyrockets". Let the two numbers show the size; say
+  win probability numbers as "percentage points". A precise claim beats a big one.
   When the verdict is inconclusive or partly, the hook states what the charts DO show and the doubt, as a statement,
   e.g. "A bad first over hurts Varun. It hurts every spinner." or "The data doesn't back the Varun myth."
 - Write a negative number with the word "minus" (e.g. "minus 0.29"), never a minus sign.
