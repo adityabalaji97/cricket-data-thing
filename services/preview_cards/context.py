@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 from functools import cached_property
-from typing import Any, Dict, List, Optional
+from typing import Tuple, Any, Dict, List, Optional
 
 from sqlalchemy import text
 from urllib.parse import urlencode
@@ -26,6 +26,13 @@ INNINGS_GROUP_BY = ["match_id", "innings", "year", "season", "competition", "bat
 #: Likely XIs (PreviewContext.last_xis): earlier matches used to fill a side that didn't bat deep.
 XI_EARLIER = 3
 XI_DAYS = 60
+
+def _same_player(name: str, others) -> bool:
+    """A near-identical spelling of a name already listed ("Ishaan Sawney" / "Ishaan Swaney")."""
+    import difflib
+
+    return any(difflib.SequenceMatcher(None, name.lower(), o.lower()).ratio() >= 0.85 for o in others)
+
 
 #: Ground par for a T20I (PreviewContext.ground_par).
 GROUND_T20IS = 6      # complete T20I first innings at the ground to use its own par
@@ -364,7 +371,17 @@ class PreviewContext:
             position = {name: pos for name, pos in bat if pos is not None}
             order = {name: i for i, name in enumerate(bowl)}
             earlier: Dict[str, Any] = {}
-            for prev in ms[1:]:
+            # The real playing XI, when Cricsheet has published it (match_players, migration 020): its players who
+            # didn't bat or bowl join the list; a near-identical spelling of a name already there is skipped.
+            stored = self._stored_xi(m["id"], names)
+            source = "scorecard" if stored else "recent games"
+            for name, pos in stored:
+                if len(xi) >= 11 and not any(n == name for n in xi):
+                    break
+                if name not in xi and not _same_player(name, xi):
+                    xi.append(name)
+                    order.setdefault(name, 50 + (pos or 0))
+            for prev in ([] if stored else ms[1:]):
                 pbat, pbowl = used(prev["id"])
                 for name, pos in pbat:
                     if pos is not None:
@@ -379,8 +396,18 @@ class PreviewContext:
                     order.setdefault(name, 100 + i)
             xi.sort(key=lambda n: (position.get(n, 99), order.get(n, 999)))
             opponent = m["team2"] if m["team1"] in names else m["team1"]
-            out[label] = {"date": m["date"], "opponent": opponent, "players": xi, "earlier": earlier}
+            out[label] = {"date": m["date"], "opponent": opponent, "players": xi, "earlier": earlier, "source": source}
         return out
+
+    def _stored_xi(self, match_id, names) -> List[Tuple[str, Optional[int]]]:
+        """[(player, Cricsheet position)] for the side in match_players, or [] (not published / no table yet)."""
+        try:
+            return [(r[0], r[1]) for r in self.db.execute(text("""
+                SELECT player, position FROM match_players WHERE match_id = :m AND team = ANY(:names) ORDER BY position
+            """), {"m": str(match_id), "names": names}).all()]
+        except Exception:  # the table may not exist yet on a database without migration 020
+            self.db.rollback()
+            return []
 
     @cached_property
     def fixture_competition(self) -> Optional[str]:

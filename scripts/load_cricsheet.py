@@ -407,6 +407,28 @@ class NameResolver:
         return cls(names)
 
 
+def write_playing_xis(session, matches: Iterable[CricsheetMatch], name_of) -> int:
+    """Each match's playing XI (info.players) into match_players (migration 020), for matches already in `matches`:
+    the ball-by-ball feed only shows who batted or bowled. Upserted, so re-runs are harmless. Returns rows written."""
+    rows = []
+    for m in matches:
+        for team, players in (m.info.get('players') or {}).items():
+            side = canonical_team(team)
+            for pos, name in enumerate(players or [], start=1):
+                rows.append({'m': m.match_id, 't': side, 'p': name_of(name), 'pos': pos})
+    if not rows:
+        return 0
+    ids = sorted({r['m'] for r in rows})
+    known = {r[0] for r in session.execute(text("SELECT id FROM matches WHERE id = ANY(:ids)"), {'ids': ids})}
+    rows = [r for r in rows if r['m'] in known]
+    if rows:
+        session.execute(text("""
+            INSERT INTO match_players (match_id, team, player, position) VALUES (:m, :t, :p, :pos)
+            ON CONFLICT (match_id, team, player) DO UPDATE SET position = EXCLUDED.position
+        """), rows)
+    return len(rows)
+
+
 def existing_ids(session, ids: List[str]) -> set:
     if not ids:
         return set()
@@ -477,11 +499,9 @@ def run(source: str, only_ids: Optional[List[str]] = None, dry_run: bool = False
             else:
                 to_load.append(m)
 
+        name_of = NameResolver.build(session, in_scope, read_people_register(people_source))
         if not to_load:
             logger.info("Nothing new to load from Cricsheet")
-            return dict(summary)
-
-        name_of = NameResolver.build(session, to_load, read_people_register(people_source))
         stats_writer = StatsFromDeliveryDetails()
         for m in to_load:
             label = f"{m.match_id} {m.date} {m.fmt} {' v '.join(m.info['teams'])}"
@@ -498,6 +518,14 @@ def run(source: str, only_ids: Optional[List[str]] = None, dry_run: bool = False
                 session.rollback()
                 summary['errors'] += 1
                 logger.error(f"Failed {label}: {e}")
+        # Playing XIs for every match in the archive we have, from the feed or loaded just now (migration 020).
+        if not dry_run:
+            try:
+                summary['xi_rows'] = write_playing_xis(session, in_scope, name_of)
+                session.commit()
+            except Exception as e:  # the XIs never block the load
+                session.rollback()
+                logger.error(f"Playing XIs not written: {e}")
     finally:
         session.close()
 
