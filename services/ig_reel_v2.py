@@ -433,7 +433,8 @@ def record(carousel_id: str, numbers_: List[int], out: Path, base: str) -> Dict[
 
 def _drawtext(textfile: Path, font: Path, size: int, y: str, start: float, end: float, color: str = "white",
               box: bool = False) -> str:
-    f = (f"drawtext=fontfile='{font}':textfile='{textfile}':fontsize={size}:fontcolor={color}:line_spacing=10"
+    # expansion=none: text is drawn as written ("86%" would otherwise be read as a format code and the line dropped).
+    f = (f"drawtext=fontfile='{font}':textfile='{textfile}':expansion=none:fontsize={size}:fontcolor={color}:line_spacing=10"
          f":x=(w-text_w)/2:y={y}:enable='between(t,{start:.3f},{end:.3f})'")
     if box:
         f += ":box=1:boxcolor=black@0.55:boxborderw=18"
@@ -479,6 +480,8 @@ def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: P
     brand.write_text("HINDSIGHT  ·  hindsightcricket.com")
     draws = [_drawtext(hook_file, FONT_BOLD, 66, f"({TOP}-text_h)/2", lead, hook_end),
              _drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", hook_end, total + 1, color="0xb6f24a")]
+    # No captions while the hook is spoken: it's on screen in big type above the slide (and the cover frame stays clean).
+    captions = [(max(a, hook_end), b, c) for a, b, c in captions if b > hook_end + 0.05]
     for i, (a, b, c) in enumerate(captions):
         # Fixed positions (not centred on each phrase's own height), so the text never bobs; a long phrase is split
         # near its middle into two lines, each centred.
@@ -559,7 +562,11 @@ def word_times(ours: List[str], timed: List[Dict[str, float]], total: float) -> 
             hi = t[nxt] if nxt is not None else total
             span = (nxt if nxt is not None else n) - prev
             t[j] = t[prev] + (hi - t[prev]) / span
-    return [max(t[j], t[j - 1]) if j else t[j] for j in range(n)]
+    out, last = [], 0.0
+    for v in t:  # never earlier than the word before
+        last = max(last, v)
+        out.append(last)
+    return out
 
 
 def align(segments: List[str], timed: List[Dict[str, float]], total: float,
