@@ -478,10 +478,10 @@ def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: P
     hook_file.write_text(wrap(hook_text, 26))
     brand = tmp / "brand.txt"
     brand.write_text("HINDSIGHT  ·  hindsightcricket.com")
-    draws = [_drawtext(hook_file, FONT_BOLD, 66, f"({TOP}-text_h)/2", lead, hook_end),
-             _drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", hook_end, total + 1, color="0xb6f24a")]
-    # No captions while the hook is spoken: it's on screen in big type above the slide (and the cover frame stays clean).
-    captions = [(max(a, hook_end), b, c) for a, b, c in captions if b > hook_end + 0.05]
+    # The top band carries the brand throughout; the hook is captioned at the bottom like every other line.
+    draws = [_drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", lead, total + 1, color="0xb6f24a")]
+    # No captions over the cover frame (it's the post's cover); from then on every line, the hook included.
+    captions = [(max(a, lead), b, c) for a, b, c in captions if b > lead + 0.05]
     for i, (a, b, c) in enumerate(captions):
         # Fixed positions (not centred on each phrase's own height), so the text never bobs; a long phrase is split
         # near its middle into two lines, each centred.

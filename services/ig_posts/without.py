@@ -23,6 +23,7 @@ from services.ig_posts.spotlight import short_name
 TOP = ["India", "Australia", "England", "South Africa", "New Zealand", "Pakistan", "West Indies", "Sri Lanka", "Afghanistan"]
 PHASES = (("powerplay", "Powerplay"), ("middle", "Middle overs"), ("death", "Death overs"))
 MIN_DEATH_BALLS = 36
+SWING_POINTS = 5      # deployment: "after an over that cost the side this many points of win probability"
 
 
 def _q(db, ids, **kw):
@@ -113,10 +114,15 @@ def deployment_card(db, team, player, who, since, sample):
     """When the player bowls: overs by band, after an expensive over, how much is riding on it (leverage), against
     the team's other pacers. Said as the data shows it, whatever the usual story is."""
     ov = [dict(r) for r in db.execute(text("""
-        WITH o AS (SELECT p_match, inns, over, MAX(bowl) AS bowl, MAX(bowl_kind) AS kind, SUM(score) AS runs
-                   FROM delivery_details WHERE competition = 'T20I' AND team_bowl = :t AND match_date >= :s GROUP BY 1, 2, 3),
-        -- the previous over of the innings, whoever bowled it (computed before keeping only the pacers' overs)
-        p AS (SELECT *, LAG(runs) OVER (PARTITION BY p_match, inns ORDER BY over) AS prev FROM o)
+        WITH b AS (SELECT dd.p_match, dd.inns, dd.over, dd.id, dd.bowl, dd.bowl_kind, dd.score, bm.wp_after
+                   FROM delivery_details dd LEFT JOIN ball_metrics bm ON bm.delivery_id = dd.id
+                   WHERE dd.competition = 'T20I' AND dd.team_bowl = :t AND dd.match_date >= :s),
+        o AS (SELECT p_match, inns, over, MAX(bowl) AS bowl, MAX(bowl_kind) AS kind,
+                     (ARRAY_AGG(wp_after ORDER BY id DESC))[1] AS wp_end FROM b GROUP BY 1, 2, 3),
+        -- the previous over of the innings, whoever bowled it: how far it moved the batting side's chance of winning
+        -- (computed before keeping only the pacers' overs)
+        p AS (SELECT *, LAG(wp_end) OVER w - LAG(wp_end, 2) OVER w AS prev
+              FROM o WINDOW w AS (PARTITION BY p_match, inns ORDER BY over))
         SELECT bowl, over, prev FROM p WHERE kind = 'pace bowler'
     """), {"t": team, "s": since.isoformat()}).mappings()]
     me = [r for r in ov if r["bowl"] == player]
@@ -129,7 +135,8 @@ def deployment_card(db, team, player, who, since, sample):
     rows = [{"label": f"Overs: {lbl}", "subject": share(me, o), "field": share(rest, o)} for lbl, o in bands]
     top = max(rows, key=lambda r: r["subject"] - r["field"])
     top["highlight"] = True
-    after = lambda grp: round(100 * sum((r["prev"] or 0) >= 10 for r in grp if r["prev"] is not None)  # noqa: E731
+    # after an over that cost the bowling side SWING_POINTS+ of win probability (the game turning, not just runs)
+    after = lambda grp: round(100 * sum(float(r["prev"]) >= SWING_POINTS / 100 for r in grp if r["prev"] is not None)  # noqa: E731
                               / max(1, sum(r["prev"] is not None for r in grp)))
     lev = {k: (_q(db, None, bowling_teams=[team], start_date=since, bowl_kind=["pace bowler"], group_by=["bowl_kind"],
                   **({"bowlers": [player]} if k else {"exclude_bowlers": [player]})) or [{}])[0].get("avg_leverage")
@@ -140,8 +147,8 @@ def deployment_card(db, team, player, who, since, sample):
         lev_line = (f" {who}'s overs {'carry more' if more else 'do not carry more'} at stake than the others' on average "
                     f"(leverage {lev[True]:.3f} against {lev[False]:.3f}).")
     return card("deployment", "deep_compare",
-                f"{who}'s overs: {top['label'].replace('Overs: ', 'the ')} more than other {team} pacers; "
-                f"after a 10+ over, {after(me)}% of his overs to their {after(rest)}%",
+                f"{who}'s overs: {top['label'].replace('Overs: ', 'the ')} more than other {team} pacers. After an over "
+                f"that cost {team} {SWING_POINTS}+ points of win probability: {after(me)}% of his overs, {after(rest)}% of theirs",
                 {"metric": {"label": "% of each pacer group's overs", "format": "pct0", "signed": False},
                  "series": [who, f"Other {team} pacers"], "rows": rows}, sample,
                 f"{len(me)} overs by {who}, {len(rest)} by the others.{lev_line}")
