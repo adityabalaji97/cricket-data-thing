@@ -392,6 +392,15 @@ def caption_chunks(line: str, start: float, length: float, per: int = CAPTION_WO
     return out
 
 
+def balance(text_: str, width: int = 24) -> List[str]:
+    """One line, or two split at the word break nearest the middle (no stranded "0.02.")."""
+    if len(text_) <= width:
+        return [text_]
+    ws = text_.split()
+    best = min(range(1, len(ws)), key=lambda k: abs(len(" ".join(ws[:k])) - len(" ".join(ws[k:]))))
+    return [" ".join(ws[:best]), " ".join(ws[best:])]
+
+
 def wrap(text_: str, width: int) -> str:
     lines, cur = [], ""
     for w in text_.split():
@@ -471,9 +480,12 @@ def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: P
     draws = [_drawtext(hook_file, FONT_BOLD, 66, f"({TOP}-text_h)/2", lead, hook_end),
              _drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", hook_end, total + 1, color="0xb6f24a")]
     for i, (a, b, c) in enumerate(captions):
-        f = tmp / f"cap{i}.txt"
-        f.write_text(c)
-        draws.append(_drawtext(f, FONT_BOLD, 64, f"{TOP + SLIDE_H}+({H - TOP - SLIDE_H}-text_h)/2", a, b))
+        # Fixed positions (not centred on each phrase's own height), so the text never bobs; a long phrase is split
+        # near its middle into two lines, each centred.
+        for k, line in enumerate(balance(c)):
+            f = tmp / f"cap{i}_{k}.txt"
+            f.write_text(line)
+            draws.append(_drawtext(f, FONT_BOLD, 58, str(TOP + SLIDE_H + 60 + 72 * k), a, b))
     filt = (f"[0:v]{','.join(draws)},fade=t=out:st={max(0, total - 0.35):.2f}:d=0.35[v];"
             # a soft pad under the voice: low sines, slowly swelling, well below it
             f"aevalsrc='0.5*sin(2*PI*110*t)*(0.6+0.4*sin(2*PI*0.25*t))+0.35*sin(2*PI*164.8*t)+0.25*sin(2*PI*220*t)':"
@@ -494,31 +506,90 @@ def words_timed(audio: Path) -> List[Dict[str, float]]:
     return [{"word": w.word, "start": float(w.start), "end": float(w.end)} for w in (getattr(resp, "words", None) or [])]
 
 
+def _norm(w: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", w.lower().replace("−", "minus").replace("+", "plus"))
+
+
+#: Words a caption phrase shouldn't end on: the phrase carries on to the word they lead into.
+WEAK = {"a", "an", "the", "of", "to", "in", "on", "at", "for", "from", "with", "without", "against", "and", "but", "or",
+        "is", "are", "was", "his", "her", "their", "its", "india's", "than", "just", "only", "per", "by", "as", "top"}
+
+
+def phrases(words: List[str], most: int = 6, chars: int = 32, hard: int = 40) -> List[Tuple[int, int]]:
+    """[(first word, end)] caption phrases: break after punctuation, or once a phrase reaches `most` words or `chars`
+    characters, but not after a small word ("against", "the"), unless it would pass `hard` characters; a lone last
+    word joins the phrase before it."""
+    out, start = [], 0
+    for i, w in enumerate(words):
+        length = len(" ".join(words[start:i + 1]))
+        ends = w.endswith((",", ".", "?", "!", ";", ":"))
+        full = i + 1 - start >= most or length >= chars
+        weak = w.lower().strip(",.?!;:") in WEAK
+        if ends or (full and (not weak or length >= hard)):
+            out.append((start, i + 1))
+            start = i + 1
+    if start < len(words):
+        if out and len(words) - start == 1:
+            out[-1] = (out[-1][0], len(words))
+        else:
+            out.append((start, len(words)))
+    return out
+
+
+def word_times(ours: List[str], timed: List[Dict[str, float]], total: float) -> List[float]:
+    """When each of our words starts: matched to the transcription's words where they agree (difflib), the rest placed
+    between their matched neighbours (a number we write as one word can be several spoken)."""
+    import difflib
+
+    n = len(ours)
+    if not timed:
+        chars = [sum(len(w) + 1 for w in ours[:j]) for j in range(n)]
+        whole = max(1, sum(len(w) + 1 for w in ours))
+        return [total * c / whole for c in chars]
+    a, b = [_norm(w) for w in ours], [_norm(w["word"]) for w in timed]
+    t: List[Optional[float]] = [None] * n
+    for blk in difflib.SequenceMatcher(None, a, b, autojunk=False).get_matching_blocks():
+        for k in range(blk.size):
+            t[blk.a + k] = timed[blk.b + k]["start"]
+    t[0] = 0.0 if t[0] is None else t[0]
+    for j in range(n):  # fill gaps by interpolating between known neighbours
+        if t[j] is None:
+            prev = j - 1
+            nxt = next((k for k in range(j + 1, n) if t[k] is not None), None)
+            hi = t[nxt] if nxt is not None else total
+            span = (nxt if nxt is not None else n) - prev
+            t[j] = t[prev] + (hi - t[prev]) / span
+    return [max(t[j], t[j - 1]) if j else t[j] for j in range(n)]
+
+
 def align(segments: List[str], timed: List[Dict[str, float]], total: float,
           per: int = CAPTION_WORDS) -> Tuple[List[float], List[Tuple[float, float, str]]]:
-    """(each segment's start, captions) for the script's segments spoken in one take. Our words map onto the
-    transcription's in proportion (numbers can be one word to us and three spoken), so a segment starts when its first
-    word is said. Without a transcription, time is shared out by characters."""
+    """(each segment's start, captions) for the script's segments spoken in one take. Every word is timed from the
+    transcription (word_times); captions are phrases (phrases), each on screen from its first word until the next
+    phrase starts, so the text changes with the voice, not on a fixed count."""
     ours = [w for seg in segments for w in seg.split()]
-    n = len(ours)
-
-    def at(j: int) -> float:
-        if j >= n:
-            return total
-        if timed:
-            k = min(len(timed) - 1, round(j * len(timed) / n))
-            return timed[k]["start"]
-        chars = sum(len(w) + 1 for w in ours[:j])
-        return total * chars / max(1, sum(len(w) + 1 for w in ours))
+    if not ours:
+        return [0.0] * len(segments), []
+    at = word_times(ours, timed, total)
     starts, caps, j = [], [], 0
+    bounds = []
     for seg in segments:
         ws = seg.split()
-        starts.append(0.0 if j == 0 else at(j))
-        for c in range(0, len(ws), per):
-            caps.append((at(j + c), at(min(j + c + per, j + len(ws))), " ".join(ws[c:c + per])))
+        starts.append(0.0 if j == 0 else at[j])
+        bounds += [(j + a, j + b) for a, b in phrases(ws)]
         j += len(ws)
-    caps = [(round(a, 3), round(max(b, a + 0.25), 3), t) for a, b, t in caps]
+    for i, (a, b) in enumerate(bounds):
+        end = at[bounds[i + 1][0]] if i + 1 < len(bounds) else total
+        caps.append((round(at[a], 3), round(max(end, at[a] + 0.3), 3), " ".join(ours[a:b])))
     return starts, caps
+
+
+def srt(captions: List[Tuple[float, float, str]], offset: float = 0.0) -> str:
+    """The captions as a SubRip file, for YouTube Studio's subtitles upload."""
+    def ts(x: float) -> str:
+        ms = int(round((x + offset) * 1000))
+        return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
+    return "\n".join(f"{i}\n{ts(a)} --> {ts(b)}\n{t}\n" for i, (a, b, t) in enumerate(captions, 1))
 
 
 def first_slide(carousel_id: str, tmp: Path) -> Optional[Path]:
@@ -573,6 +644,7 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
         cuts = [0.0] + starts[2:] + [spoken_len + 0.6]
         durations = [round(b - a, 3) for a, b in zip(cuts, cuts[1:])]
         mp4 = out or (tmp / "reel.mp4")
+        subtitles = srt(captions)
         cover = first_slide(carousel_id, tmp)
         seconds = compose(tmp, [tmp / "frames" / str(n) for n in plan["beats"]], durations, voice_file, captions,
                           sc["hook"], hook_end, mp4, cover=cover)
@@ -589,7 +661,7 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
                     ON CONFLICT (carousel_id) DO UPDATE SET mp4 = EXCLUDED.mp4, seconds = EXCLUDED.seconds, made_at = now()
                 """), {"c": carousel_id, "m": mp4.read_bytes(), "s": seconds})
     return {"seconds": seconds, "script": sc, "source": plan["source"], "voice": voice, "beats": plan["beats"],
-            "length": plan.get("length", length),
+            "length": plan.get("length", length), "srt": subtitles,
             "mp4": str(out) if out else None}
 
 
@@ -633,7 +705,7 @@ def for_carousel(carousel_id: str) -> Optional[float]:
         if made:
             seconds = made["seconds"]
             info.update(script=made["script"], source=made["source"], voice=made["voice"], beats=made["beats"],
-                        seconds=seconds)
+                        seconds=seconds, length=made.get("length"), srt=made.get("srt"))
     with engine.begin() as conn:
         conn.execute(text("UPDATE content_packs SET facts = jsonb_set(COALESCE(facts, '{}'::jsonb), '{reel}', CAST(:r AS jsonb)) "
                           "WHERE id = :i"), {"r": json.dumps(info), "i": row["id"]})

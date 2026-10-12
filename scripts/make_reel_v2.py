@@ -51,7 +51,7 @@ def main() -> int:
         return 1
     print(json.dumps({k: made[k] for k in ("seconds", "source", "voice", "beats", "length", "script")}, indent=2))
     if args.store:
-        info = {"variant": "v2", **{k: made[k] for k in ("script", "source", "voice", "beats", "seconds", "length")}}
+        info = {"variant": "v2", **{k: made[k] for k in ("script", "source", "voice", "beats", "seconds", "length", "srt")}}
         with engine.begin() as conn:
             conn.execute(text("UPDATE content_packs SET caption = :c, facts = jsonb_set(COALESCE(facts, '{}'::jsonb), "
                               "'{reel}', CAST(:r AS jsonb)) WHERE id = :i"),
