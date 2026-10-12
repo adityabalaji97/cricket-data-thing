@@ -33,4 +33,4 @@ export const useStoryCoreSize = () => {
 // analysis/hypotheses/credits.py; the 2015+ feed provider is still to be confirmed).
 // Ball-by-ball data (2015+, with line, length, shots, control): Himanish Ganjoo, collected with TechRadar.
 export const CARD_CREDITS = 'Data: Himanish Ganjoo & TechRadar, Cricsheet';
-export const CARD_BRAND = 'Hindsight · hindsightcricket.com';
+export const CARD_BRAND = 'hindsightcricket.com';

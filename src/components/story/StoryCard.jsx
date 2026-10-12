@@ -122,7 +122,8 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
             <Box component="span" sx={{ color: colors.gold, fontWeight: 600 }}> · small sample</Box>
           )}
         </Typography>
-        <Typography sx={{ fontSize: 11, color: colors.textFaint, lineHeight: 1.35, mt: 0.25 }}>
+        {/* One line, always: the brand and the data credit. */}
+        <Typography noWrap sx={{ fontSize: 11, color: colors.textFaint, lineHeight: 1.35, mt: 0.25 }}>
           {CARD_BRAND} · {CARD_CREDITS}
         </Typography>
       </Box>
