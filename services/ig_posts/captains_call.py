@@ -69,7 +69,7 @@ def overs(db: Session, match_id: str, inns: int = 2) -> List[Dict[str, Any]]:
     balls = [dict(r) for r in db.execute(text("""
         SELECT over, bowl, bowl_kind, bowl_style, bat, cur_bat_bf, cur_bat_runs, score, batruns, win_prob, team_bat,
                team_bowl, wide, noball
-        FROM delivery_details WHERE p_match = :m AND inns = :i ORDER BY id
+        FROM delivery_details WHERE p_match = :m AND inns = :i ORDER BY over, ball, id  -- bowling order (ids can jump)
     """), {"m": str(match_id), "i": inns}).mappings().all()]
     out: "OrderedDict[int, Dict[str, Any]]" = OrderedDict()
     prev = None

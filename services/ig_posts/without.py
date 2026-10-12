@@ -114,11 +114,11 @@ def deployment_card(db, team, player, who, since, sample):
     """When the player bowls: overs by band, after an expensive over, how much is riding on it (leverage), against
     the team's other pacers. Said as the data shows it, whatever the usual story is."""
     ov = [dict(r) for r in db.execute(text("""
-        WITH b AS (SELECT dd.p_match, dd.inns, dd.over, dd.id, dd.bowl, dd.bowl_kind, dd.score, bm.wp_after
+        WITH b AS (SELECT dd.p_match, dd.inns, dd.over, dd.ball, dd.id, dd.bowl, dd.bowl_kind, dd.score, bm.wp_after
                    FROM delivery_details dd LEFT JOIN ball_metrics bm ON bm.delivery_id = dd.id
                    WHERE dd.competition = 'T20I' AND dd.team_bowl = :t AND dd.match_date >= :s),
         o AS (SELECT p_match, inns, over, MAX(bowl) AS bowl, MAX(bowl_kind) AS kind,
-                     (ARRAY_AGG(wp_after ORDER BY id DESC))[1] AS wp_end FROM b GROUP BY 1, 2, 3),
+                     (ARRAY_AGG(wp_after ORDER BY ball DESC, id DESC))[1] AS wp_end FROM b GROUP BY 1, 2, 3),
         -- the previous over of the innings, whoever bowled it: how far it moved the batting side's chance of winning
         -- (computed before keeping only the pacers' overs)
         p AS (SELECT *, LAG(wp_end) OVER w - LAG(wp_end, 2) OVER w AS prev

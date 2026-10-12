@@ -244,7 +244,7 @@ _SEQUENCE_GROUPS = {"year", "over", "ball", "ball_in_over", "ball_in_spell", "in
                     "bowler_first_over_runs", "bowler_first_over_runs_bucket", "prev_over_runs",
                     "prev_over_runs_bucket", "prev_over_raa", "prev_over_raa_bucket", "next_over_runs",
                     "next_over_runs_bucket", "match_date", "batter_balls_faced",
-                    "batter_balls_faced_bucket", "total_bucket"}
+                    "batter_balls_faced_bucket", "batter_ball_number", "batter_ball_number_bucket", "total_bucket"}
 # Ranked ascending when a chart is "by" them.
 _LOWER_IS_BETTER = {"economy", "bowling_average", "bowling_strike_rate"}
 

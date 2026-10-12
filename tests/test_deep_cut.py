@@ -2,25 +2,25 @@ from services.ig_posts import deep_cut as D
 
 
 def bucket(label, balls, runs):
-    return {"batter_balls_faced_bucket": label, "balls": balls, "runs": runs}
+    return {"batter_ball_number_bucket": label, "balls": balls, "runs": runs}
 
 
-FIELD_BUCKETS = [bucket("1-9", 10000, 10500), bucket("10-19", 8000, 10000), bucket("20-29", 6000, 8400)]
+FIELD_BUCKETS = [bucket("1-10", 10000, 10500), bucket("11-20", 8000, 10000), bucket("21-30", 6000, 8400)]
 
 
 def test_slow_start_finds_a_slow_starter_and_writes_the_numbers():
-    rows = [bucket("1-9", 100, 66), bucket("10-19", 80, 100), bucket("20-29", 120, 198)]
+    rows = [bucket("1-10", 100, 66), bucket("11-20", 80, 100), bucket("21-30", 120, 198)]
     c = D.slow_start("Sherfane Rutherford", "batter", rows, FIELD_BUCKETS, "T20s since 2023")
     assert c and c.probe == "slow-start"
     assert c.sentence == ("Sherfane Rutherford strikes at 66 in the first 10 balls of an innings and 165 after 20. "
                           "The average batter: 105, then 140.")
-    assert [r["label"] for r in c.rows] == ["Balls 1-9", "Balls 10-19", "Balls 20+"]
+    assert [r["label"] for r in c.rows] == ["Balls 1-10", "Balls 11-20", "Balls 21+"]
 
 
 def test_slow_start_needs_a_sample_and_a_real_difference():
-    small = [bucket("1-9", 20, 13), bucket("20-29", 120, 198)]
+    small = [bucket("1-10", 20, 13), bucket("21-30", 120, 198)]
     assert D.slow_start("A", "batter", small, FIELD_BUCKETS, "s") is None  # 20 early balls: too few
-    like_field = [bucket("1-9", 100, 105), bucket("20-29", 120, 168)]
+    like_field = [bucket("1-10", 100, 105), bucket("21-30", 120, 168)]
     assert D.slow_start("A", "batter", like_field, FIELD_BUCKETS, "s") is None  # same shape as the field
 
 

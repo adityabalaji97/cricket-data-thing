@@ -254,10 +254,11 @@ def likely_xis(ctx) -> Optional[Card]:
         return None
     sides = [{"team": t, "date": xis[t]["date"].isoformat(), "opponent": xis[t]["opponent"],
               "players": xis[t]["players"], "earlier": xis[t].get("earlier") or {}} for t in (ctx.t1, ctx.t2)]
+    from_scorecard = all(xis[t].get("source") == "scorecard" for t in (ctx.t1, ctx.t2))
     return Card(
         id="xis", chapter="lineups", visual="xis",
         title="Likely XIs, from their last matches", help=None,
-        sample=f"Each side's last {ctx.fmt} match · batting order", n=11,
+        sample=(f"Each side's last {ctx.fmt} match · " + ("the playing XIs" if from_scorecard else "batting order")), n=11,
         payload={"sides": sides},
         info=Info(what="The players each side used last time, placed by their latest batting position. A side that "
                        "didn't bat deep is topped up to 11 from its previous matches (marked with that match's date). "

@@ -13,7 +13,9 @@ as `dimension_filters` ('name:op:value').
                                    better than average for the game state), men's T20 only
     next_over_runs(_bucket)        runs off the NEXT over of the innings -- a placebo: what happens
                                    after a ball cannot cause it, so any pattern here is confounding
-    batter_balls_faced(_bucket)    balls the batter faced in that innings (wides excluded)
+    batter_balls_faced(_bucket)    innings length: balls the batter faced in that whole innings (wides excluded)
+    batter_ball_number(_bucket)    the batter's Nth ball of the innings at that delivery (1, 2, ...; a wide keeps
+                                   the count before it): "his first 10 balls" is batter_ball_number <= 10
     batter_innings_strike_rate(_bucket) the batter's strike rate over that whole innings
     impact_player_era              'pre-2023' / '2023+' by the season's start year (the IPL's Impact
                                    Player rule began in 2023; BBL 2022/23 counts as pre-2023)
@@ -21,7 +23,10 @@ as `dimension_filters` ('name:op:value').
 
 Each comes from a CTE over every ball of the matches the query touches (scope_matches), not just
 the filtered balls: a bowler's over number or the previous over must count overs the filters drop.
-All are delivery_details only (2015+ for men's T20), like line/length.
+Every dimension works on both tables: delivery_details (2015+ men's T20, ODIs from 2000) and the legacy
+`deliveries` table (men's T20, 2005-2014) through build_legacy_ctes / legacy_dimensions, which use the same CTE
+aliases so most expressions are shared. The exception is prev_over_raa(_bucket): RAA needs ball metrics, which
+start in 2015, so it is NULL on legacy rows (and routing keeps it to delivery_details).
 
 Bucket labels are ASCII so they survive URLs: '0-6', '7-9', '10+'.
 """
@@ -44,6 +49,7 @@ CROSS_YEAR_COMPETITIONS = ("BBL", "Super Smash", "ILT20", "SA20", "BPL")
 
 RUNS_BUCKETS = (("0-6", None, 6), ("7-9", 7, 9), ("10+", 10, None))
 RAA_BUCKETS = (("below -2", None, -2), ("-2 to +2", -2, 2), ("above +2", 2, None))
+BALL_NUMBER_BUCKETS = (("1-10", None, 10), ("11-20", 11, 20), ("21-30", 21, 30), ("31+", 31, None))
 BALLS_FACED_BUCKETS = (("1-9", None, 9), ("10-19", 10, 19), ("20-29", 20, 29), ("30-39", 30, 39),
                        ("40-49", 40, 49), ("50+", 50, None))
 STRIKE_RATE_BUCKETS = ("under 110", "110-129", "130-149", "150+")
@@ -122,6 +128,11 @@ def dimensions(competition_expr: str) -> Dict[str, Dimension]:
         "batter_balls_faced_bucket": Dimension(
             _int_bucket_sql("bi.balls_faced", BALLS_FACED_BUCKETS), "batter_inns", False,
             order=tuple(b[0] for b in BALLS_FACED_BUCKETS)),
+        # The feed's own running count of the batter's balls (current ball included, no-balls counted; checked
+        # against a recount: 98.9% of T20 and 99.3% of ODI balls agree).
+        "batter_ball_number": Dimension("dd.cur_bat_bf", None, True),
+        "batter_ball_number_bucket": Dimension(_int_bucket_sql("dd.cur_bat_bf", BALL_NUMBER_BUCKETS), None, False,
+                                               order=tuple(b[0] for b in BALL_NUMBER_BUCKETS)),
         "batter_innings_strike_rate": Dimension("ROUND(bi.strike_rate)::int", "batter_inns", True,
                                                 filter_expr="bi.strike_rate"),
         "batter_innings_strike_rate_bucket": Dimension(_strike_rate_bucket_sql("bi.strike_rate"), "batter_inns", False,
@@ -135,7 +146,8 @@ def dimensions(competition_expr: str) -> Dict[str, Dimension]:
 DIMENSION_NAMES = (
     "bowler_over_number", "bowler_entry_over", "spell_number", "bowler_first_over_runs",
     "bowler_first_over_runs_bucket", "prev_over_runs", "prev_over_runs_bucket", "prev_over_raa",
-    "prev_over_raa_bucket", "next_over_runs", "next_over_runs_bucket", "batter_balls_faced", "batter_balls_faced_bucket", "batter_innings_strike_rate",
+    "prev_over_raa_bucket", "next_over_runs", "next_over_runs_bucket", "batter_balls_faced", "batter_balls_faced_bucket",
+    "batter_ball_number", "batter_ball_number_bucket", "batter_innings_strike_rate",
     "batter_innings_strike_rate_bucket", "impact_player_era", "season",
 )
 
@@ -259,4 +271,97 @@ def build_ctes(families: Sequence[str], scope_from_where: str, metrics_enabled: 
             GROUP BY d.p_match, d.inns, d.bat
         )""")
         joins.append("LEFT JOIN batter_inns bi ON bi.p_match = dd.p_match AND bi.inns = dd.inns AND bi.bat = dd.bat")
+    return ctes, joins
+
+
+#: Dimensions that need ball metrics (2015+ only): a query using one stays on delivery_details.
+METRIC_DIMENSIONS = ("prev_over_raa", "prev_over_raa_bucket")
+
+
+def legacy_dimensions(competition_expr: str) -> Dict[str, Dimension]:
+    """The same dimensions for the legacy `deliveries d` / `matches m` query (build_legacy_ctes): the shared CTE
+    aliases keep most expressions as they are; season and era read m.date; the batter's ball number is counted
+    (the legacy table has no running count); RAA doesn't exist before 2015."""
+    dims = dict(dimensions(competition_expr))
+    date_expr, year_expr = "TO_CHAR(m.date, 'YYYY-MM-DD')", "EXTRACT(YEAR FROM m.date)::int"
+    dims["season"] = Dimension(season_sql(competition_expr, date_expr, year_expr), None, False)
+    dims["impact_player_era"] = Dimension(era_sql(competition_expr, date_expr, year_expr), None, False,
+                                          order=("pre-2023", "2023+"))
+    dims["batter_ball_number"] = Dimension("bb.n", "batter_ball", True)
+    dims["batter_ball_number_bucket"] = Dimension(_int_bucket_sql("bb.n", BALL_NUMBER_BUCKETS), "batter_ball", False,
+                                                  order=tuple(b[0] for b in BALL_NUMBER_BUCKETS))
+    dims["prev_over_raa"] = Dimension("NULL::int", None, True, filter_expr="NULL::double precision")
+    dims["prev_over_raa_bucket"] = Dimension("NULL::text", None, False)
+    return dims
+
+
+def build_legacy_ctes(families: Sequence[str], scope_from_where: str) -> Tuple[List[str], List[str]]:
+    """build_ctes for the legacy `deliveries` table (men's T20 before 2015): the same families and aliases, joined
+    to `d`. scope_from_where = 'FROM deliveries d JOIN matches m ... WHERE ...'. Balls are ordered by over, ball."""
+    if not families:
+        return [], []
+    bowler_runs = sql_defs.legacy_defs(sql_defs.BOWLER, "x").runs
+    ctes = [f"scope_matches AS MATERIALIZED (SELECT DISTINCT d.match_id {scope_from_where})"]
+    joins = []
+    in_scope = "x.match_id IN (SELECT match_id FROM scope_matches)"
+    if "bowler_ctx" in families:
+        ctes.append(f"""bowler_over_runs AS (
+            SELECT x.match_id, x.innings, x.bowler, x.over, SUM({bowler_runs}) AS runs
+            FROM deliveries x
+            WHERE {in_scope}
+            GROUP BY x.match_id, x.innings, x.bowler, x.over
+        )""")
+        ctes.append("""bowler_over_ctx AS (
+            SELECT match_id, innings, bowler, over,
+                   ROW_NUMBER() OVER w AS bowler_over_number,
+                   MIN(over) OVER (PARTITION BY match_id, innings, bowler) AS bowler_entry_over,
+                   SUM(new_spell) OVER (w ROWS UNBOUNDED PRECEDING) AS spell_number,
+                   FIRST_VALUE(runs) OVER w AS first_over_runs
+            FROM (
+                SELECT r.*,
+                       CASE WHEN LAG(over) OVER (PARTITION BY match_id, innings, bowler ORDER BY over) IS NULL
+                              OR over - LAG(over) OVER (PARTITION BY match_id, innings, bowler ORDER BY over) <> 2
+                            THEN 1 ELSE 0 END AS new_spell
+                FROM bowler_over_runs r
+            ) marked
+            WINDOW w AS (PARTITION BY match_id, innings, bowler ORDER BY over)
+        )""")
+        joins.append("LEFT JOIN bowler_over_ctx bo ON bo.match_id = d.match_id AND bo.innings = d.innings "
+                     "AND bo.bowler = d.bowler AND bo.over = d.over")
+    if "prev_over" in families or "next_over" in families:
+        ctes.append(f"""innings_over AS (
+            SELECT x.match_id, x.innings, x.over,
+                   SUM(COALESCE(x.runs_off_bat, 0) + COALESCE(x.extras, 0)) AS runs, NULL::double precision AS raa
+            FROM deliveries x
+            WHERE {in_scope}
+            GROUP BY x.match_id, x.innings, x.over
+        )""")
+        if "prev_over" in families:
+            joins.append("LEFT JOIN innings_over po ON po.match_id = d.match_id AND po.innings = d.innings "
+                         "AND po.over = d.over - 1")
+        if "next_over" in families:
+            joins.append("LEFT JOIN innings_over nxo ON nxo.match_id = d.match_id AND nxo.innings = d.innings "
+                         "AND nxo.over = d.over + 1")
+    if "batter_inns" in families:
+        ctes.append(f"""batter_inns AS (
+            SELECT x.match_id, x.innings, x.batter,
+                   SUM(CASE WHEN COALESCE(x.wides, 0) = 0 THEN 1 ELSE 0 END) AS balls_faced,
+                   SUM(COALESCE(x.runs_off_bat, 0)) * 100.0
+                       / NULLIF(SUM(CASE WHEN COALESCE(x.wides, 0) = 0 THEN 1 ELSE 0 END), 0) AS strike_rate
+            FROM deliveries x
+            WHERE {in_scope}
+            GROUP BY x.match_id, x.innings, x.batter
+        )""")
+        joins.append("LEFT JOIN batter_inns bi ON bi.match_id = d.match_id AND bi.innings = d.innings "
+                     "AND bi.batter = d.batter")
+    if "batter_ball" in families:
+        ctes.append(f"""batter_ball AS (
+            SELECT x.id,
+                   SUM(CASE WHEN COALESCE(x.wides, 0) = 0 THEN 1 ELSE 0 END)
+                       OVER (PARTITION BY x.match_id, x.innings, x.batter ORDER BY x.over, x.ball, x.id
+                             ROWS UNBOUNDED PRECEDING) AS n
+            FROM deliveries x
+            WHERE {in_scope}
+        )""")
+        joins.append("LEFT JOIN batter_ball bb ON bb.id = d.id")
     return ctes, joins

@@ -41,8 +41,9 @@ ADVANCED_COLUMNS = {
     'bat_hand',
     # Computed ball-position columns require the delivery_details schema.
     'ball_in_over', 'ball', 'ball_in_spell',
-    # Match-context dimensions are computed from delivery_details (services/query_dimensions.py).
-    *query_dimensions.DIMENSION_NAMES,
+    # Match-context dimensions work on both tables (services/query_dimensions.build_legacy_ctes), except the
+    # ones built on ball metrics (RAA starts in 2015).
+    *query_dimensions.METRIC_DIMENSIONS,
 }
 
 # Columns available in both tables (can be queried across full date range)
@@ -869,12 +870,22 @@ def query_legacy_ungrouped(where_clause, params, limit, offset, db, merge_order=
     return formatted_results, total_count
 
 
-def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=False, total_balls_override=None):
+def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=False, total_balls_override=None,
+                         dimension_filters=None):
     """
     Query legacy deliveries table for grouped/aggregated results.
     Returns fully calculated results matching the new table format.
+    Match-context dimensions (group_by or dimension_filters) come from services/query_dimensions.build_legacy_ctes:
+    scoped to the matches the query touches, joined per ball, filtered after the scope is taken (as on the new table).
     """
     grouping_columns = get_legacy_grouping_columns_map()
+    ldims = query_dimensions.legacy_dimensions(competition_canonical_sql("m.competition"))
+    for name, dim in ldims.items():
+        grouping_columns[name] = dim.expr
+    dimension_filters = dimension_filters or []
+    dim_families = query_dimensions.needed_families(list(group_by) + [f[0] for f in dimension_filters], ldims)
+    dim_ctes, dim_joins = query_dimensions.build_legacy_ctes(
+        dim_families, f"FROM deliveries d JOIN matches m ON d.match_id = m.id LEFT JOIN players p ON p.name = d.bowler {where_clause}")
     
     # Build GROUP BY clause
     group_columns = []
@@ -899,6 +910,11 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
     ball_defs = sql_defs.legacy_defs(sql_defs.perspective_for(group_by, has_batter_filters), "d")
     
     query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
+    if dimension_filters:
+        where_clause = where_clause + " AND " + " AND ".join(
+            query_dimensions.filter_sql(dimension_filters, ldims, query_params, prefix="ldimf"))
+    dim_cte_prefix = (",\n        ".join(dim_ctes) + ",\n        ") if dim_ctes else ""
+    dim_join = " ".join(dim_joins)
 
     # Single combined CTE — replaces total_balls_query + parent_query +
     # aggregation_query with one scan of `deliveries`. universe_balls and
@@ -933,7 +949,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
         )
 
     combined_query = f"""
-        WITH {bat_pos_cte}all_groups AS (
+        WITH {dim_cte_prefix}{bat_pos_cte}all_groups AS (
             SELECT
                 {select_group_clause},
                 {ball_defs.balls_sum} as balls,
@@ -949,6 +965,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
             LEFT JOIN players p ON p.name = d.bowler
             {bat_pos_join}
             {pa_join}
+            {dim_join}
             {where_clause}
             GROUP BY {group_by_clause}
         )
@@ -2558,7 +2575,8 @@ def query_deliveries_service(
             else:
                 # Grouped query
                 legacy_results, legacy_total_balls = query_legacy_grouped(
-                    legacy_where_clause, legacy_params, group_by, db, has_batter_filters
+                    legacy_where_clause, legacy_params, group_by, db, has_batter_filters,
+                    dimension_filters=dimension_filters,
                 )
                 legacy_total_count = len(legacy_results)
                 legacy_total_innings = sum(int(r.get("innings_count") or 0) for r in legacy_results)

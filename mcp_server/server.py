@@ -194,7 +194,8 @@ _PLAYER_COLUMNS = ("batter", "bowler", "non_striker", "player")
 _ROW_INTERNAL = {"metric_balls", "metrics_perspective"}
 _SEQUENTIAL_KEYS = {"year", "over", "ball", "ball_in_over", "ball_in_spell", "innings", "batting_position",
                     "bowler_over_number", "bowler_entry_over", "spell_number", "bowler_first_over_runs",
-                    "prev_over_runs", "prev_over_raa", "next_over_runs", "batter_balls_faced", "season", "match_date"}
+                    "prev_over_runs", "prev_over_raa", "next_over_runs", "batter_balls_faced", "batter_ball_number",
+                    "season", "match_date"}
 # Bucketed dimensions sort in their natural order, not alphabetically ('10+' after '7-9').
 _BUCKET_ORDER = {
     "bowler_first_over_runs_bucket": ("0-6", "7-9", "10+"),
@@ -202,6 +203,7 @@ _BUCKET_ORDER = {
     "next_over_runs_bucket": ("0-6", "7-9", "10+"),
     "prev_over_raa_bucket": ("below -2", "-2 to +2", "above +2"),
     "batter_balls_faced_bucket": ("1-9", "10-19", "20-29", "30-39", "40-49", "50+"),
+    "batter_ball_number_bucket": ("1-10", "11-20", "21-30", "31+"),
     "batter_innings_strike_rate_bucket": ("under 110", "110-129", "130-149", "150+"),
     "impact_player_era": ("pre-2023", "2023+"),
     "total_bucket": ("<140", "140-159", "160-179", "180-199", "200-219", "220-249", "250+"),
@@ -520,11 +522,13 @@ How to use the tools:
    group_by and as dimension_filters 'name:op:value': bowler_over_number (his 1st/2nd/... over),
    bowler_entry_over, spell_number, bowler_first_over_runs(_bucket '0-6'/'7-9'/'10+'),
    prev_over_runs(_bucket), prev_over_raa(_bucket), next_over_runs(_bucket) (a placebo),
-   batter_balls_faced(_bucket),
-   impact_player_era ('pre-2023'/'2023+'), season ('2024' or '2024/25' for BBL-style seasons).
+   batter_ball_number(_bucket '1-10'/'11-20'/'21-30'/'31+': the batter's Nth ball of the innings, so
+   "his first 10 balls" = batter_ball_number:lte:10), batter_balls_faced(_bucket) (innings LENGTH: how many balls
+   that whole innings lasted -- not the ball's position), impact_player_era ('pre-2023'/'2023+'), season ('2024' or '2024/25' for BBL-style seasons).
    Example, "does a bad first over hurt him for the rest of the match": bowlers=[X],
    group_by=['match_id','bowler_first_over_runs_bucket'], dimension_filters=['bowler_over_number:gte:2'],
-   metrics_perspective='bowling'.
+   metrics_perspective='bowling'. Example, "his strike rate in his first 10 balls": batters=[X],
+   group_by=['batter_ball_number_bucket']. Every dimension covers pre-2015 men's T20 too, except prev_over_raa.
    query_mode='team_innings' gives one record per team innings (total, wickets, run rate, phase run
    rates, pct_200_plus/pct_250_plus, win %): "how often do IPL teams pass 200" = leagues=['IPL'],
    group_by=['season'], dimension_filters=['full_length:eq:1'].
@@ -674,7 +678,7 @@ def structure_query_result(
         "set it explicitly for bowler questions grouped by anything else. The perspective is printed "
         "with every result. Match-context dimensions (group_by and dimension_filters): "
         "bowler_over_number, bowler_entry_over, spell_number, bowler_first_over_runs(_bucket), "
-        "prev_over_runs(_bucket), prev_over_raa(_bucket), next_over_runs(_bucket), batter_balls_faced(_bucket), match_date, "
+        "prev_over_runs(_bucket), prev_over_raa(_bucket), next_over_runs(_bucket), batter_ball_number(_bucket), batter_balls_faced(_bucket), match_date, "
         "impact_player_era, season. query_mode='team_innings' returns one record per team innings "
         "(total, wickets, run rate, phase run rates, 200+/250+ rates, result)."
     ),
@@ -720,7 +724,7 @@ def query_cricket_data(
     is_chase: Annotated[Optional[bool], Field(description="True = chasing innings only, False = setting only.")] = None,
     chase_outcome: Annotated[List[Literal["win", "loss", "tie", "no_result"]], Field(description="Result of the chase (chasing side's view).")] = [],
     toss_decision: Annotated[List[Literal["bat", "field"]], Field(description="Toss decision.")] = [],
-    dimension_filters: Annotated[List[str], Field(description="Filters on match-context dimensions, each 'name:op:value' (op eq/ne/gt/gte/lt/lte/in; 'in' values separated by '|'). E.g. ['bowler_over_number:gte:2'] = the bowler's overs after his first; ['prev_over_runs_bucket:in:10+']; ['batter_balls_faced:gte:30']; ['impact_player_era:eq:2023+']. team_innings mode: total, wickets, balls, full_length, year, season, impact_player_era, match_outcome, total_bucket (e.g. ['full_length:eq:1']). Bucket labels: '0-6','7-9','10+'; RAA buckets 'below -2','-2 to +2','above +2'.")] = [],
+    dimension_filters: Annotated[List[str], Field(description="Filters on match-context dimensions, each 'name:op:value' (op eq/ne/gt/gte/lt/lte/in; 'in' values separated by '|'). E.g. ['bowler_over_number:gte:2'] = the bowler's overs after his first; ['prev_over_runs_bucket:in:10+']; ['batter_ball_number:lte:10'] = each innings' first 10 balls; ['batter_balls_faced:gte:30'] = innings of 30+ balls; ['impact_player_era:eq:2023+']. team_innings mode: total, wickets, balls, full_length, year, season, impact_player_era, match_outcome, total_bucket (e.g. ['full_length:eq:1']). Bucket labels: '0-6','7-9','10+'; RAA buckets 'below -2','-2 to +2','above +2'.")] = [],
     metrics_perspective: Annotated[Optional[Literal["bowling", "batting"]], Field(description="Sign of impact/raa/waa/wpa. 'bowling' = + is good for the bowler (and runs exclude byes/leg-byes); 'batting' = + is good for the batter. Omit to infer: bowling when grouped by bowler and not batter, batting otherwise. Set 'bowling' for any bowler question not grouped by bowler.")] = None,
     min_balls: Annotated[Optional[int], Field(ge=1, description="Drop groups with fewer balls (use for leaderboards, e.g. 120).")] = None,
     min_runs: Annotated[Optional[int], Field(ge=0, description="Drop groups with fewer runs.")] = None,

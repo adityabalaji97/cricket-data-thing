@@ -121,10 +121,12 @@ def _lower(bucket: Any) -> Optional[int]:
 # ---------------------------------------------------------------- probes
 
 def slow_start(name, role, rows, field_rows, scope_label, peer="bowler"):
+    # The batter's Nth ball of the innings (batter_ball_number_bucket): every innings' first 10 balls, balls 11-20,
+    # and 21 on. (Not innings length: short innings are mostly ones that ended early, a different, biased stat.)
     def split(rs):
-        early = [r for r in rs if _lower(r.get("batter_balls_faced_bucket")) == 1]
-        mid = [r for r in rs if _lower(r.get("batter_balls_faced_bucket")) == 10]
-        late = [r for r in rs if (_lower(r.get("batter_balls_faced_bucket")) or 0) >= 20]
+        early = [r for r in rs if _lower(r.get("batter_ball_number_bucket")) == 1]
+        mid = [r for r in rs if _lower(r.get("batter_ball_number_bucket")) == 11]
+        late = [r for r in rs if (_lower(r.get("batter_ball_number_bucket")) or 0) >= 21]
         return early, mid, late
     e, m, l = split(rows)
     fe, fm, fl = split(field_rows)
@@ -138,7 +140,7 @@ def slow_start(name, role, rows, field_rows, scope_label, peer="bowler"):
     sentence = (f"{nm} strikes at {_sr(e):.0f} in the first 10 balls of an innings and {_sr(l):.0f} after 20. "
                 f"The average batter: {_sr(fe):.0f}, then {_sr(fl):.0f}.")
     out_rows = [{"label": lab, "subject": _sr(s), "field": _sr(f)} for lab, s, f in
-                (("Balls 1-9", e, fe), ("Balls 10-19", m, fm), ("Balls 20+", l, fl)) if _sum(s, "balls")]
+                (("Balls 1-10", e, fe), ("Balls 11-20", m, fm), ("Balls 21+", l, fl)) if _sum(s, "balls")]
     return Candidate("slow-start", name, sentence, surprise, {"label": "strike rate", "format": "int"}, out_rows,
                      f"{nm} · {scope_label} · {int(_sum(rows, 'balls')):,} balls", (nm, "Average batter"))
 
@@ -380,7 +382,7 @@ def conversion(name, role, rows, field_rows, scope_label, peer="bowler"):
 
 
 PROBES: Tuple[Probe, ...] = (
-    Probe("slow-start", ("batter",), ("batter_balls_faced_bucket",), slow_start),
+    Probe("slow-start", ("batter",), ("batter_ball_number_bucket",), slow_start),
     Probe("false-shots", ("batter",), ("control", "bowl_kind"), false_shots),
     Probe("zones", ("batter",), ("wagon_zone",), zones),
     Probe("length", ("batter",), ("length",), length),
