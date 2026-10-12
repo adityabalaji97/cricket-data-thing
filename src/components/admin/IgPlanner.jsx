@@ -183,6 +183,10 @@ const VideoTab = ({ pack, copy, toast, onUpdate }) => {
           <CopyRow label="YouTube Short · description" text={yt.description} onCopy={copy} multiline />
         </>
       ) : <Typography sx={{ fontSize: 13, color: C.lo, mt: 1.5 }}>YouTube copy arrives with the next nightly run.</Typography>}
+      {reel.srt && (
+        <CopyRow label="YouTube subtitles (.srt): in YouTube Studio, Subtitles → Add → Upload file (save as .srt) or paste"
+          text={reel.srt} onCopy={copy} multiline />
+      )}
       {onUpdate && <ReelStats pack={pack} onUpdate={onUpdate} toast={toast} />}
     </>
   );

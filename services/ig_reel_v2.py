@@ -54,6 +54,7 @@ LENGTHS = {
 WORDS = LENGTHS["short"]["words"]
 MAX_SECONDS = 60
 TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept (ffmpeg atempo)
+COVER_SECONDS = 0.5           # the carousel's first slide opens the Reel: the frame to pick as the cover
 CAPTION_WORDS = 3              # words on screen at a time
 ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth")
 #: The payoff, in order of preference: what opens the Reel.
@@ -190,7 +191,8 @@ Rules:
   ("A big first over dents Varun's numbers. Is it just him?"). Don't just repeat the post hook. The hook must agree with THE VERDICT when there is one, and
   with what the charts show; never claim more than they do. Use a number in the hook when one carries the answer.
 - Be specific, never hype: no "like no one else", "elite", "insane", "massive", "game-changer", "shines", "knack",
-  "unmatched". A precise claim beats a big one.
+  "unmatched", "plummets", "crashes", "collapses", "sharply", "skyrockets". Let the two numbers show the size; say
+  win probability numbers as "percentage points". A precise claim beats a big one.
   When the verdict is inconclusive or partly, the hook states what the charts DO show and the doubt, as a statement,
   e.g. "A bad first over hurts Varun. It hurts every spinner." or "The data doesn't back the Varun myth."
 - Write a negative number with the word "minus" (e.g. "minus 0.29"), never a minus sign.
@@ -198,7 +200,11 @@ Rules:
   against an average player, win probability added, Impact), explain it inside that same sentence, the first time,
   e.g. "he saves 0.8 runs an over compared with an average bowler in the same spot" -- never as a separate definition.%(extra)s
 - Use ONLY numbers that appear in the material below, written as digits exactly as given (e.g. 85%%, 1,024, 0.27).
-  Never round, combine, or compute new numbers. If unsure, leave the number out.
+  Never round, combine, or compute new numbers, and never compute comparisons in words ("twice", "double", "half",
+  "three times"): give both numbers instead. If unsure, leave the number out.
+- Line N is spoken while chart N is on screen: it must be about THAT chart's numbers, in the order given.
+- State only facts that a chart's title or help line says, in your own words. Don't draw new conclusions from the
+  numbers (a level is not a difference: "0.59 with him" is not "0.59 more").
 - Be fair: don't blame players; describe what happened. Don't overclaim: a small lead is "slightly", a mixed result is
   "mixed". If the material has a doubt or a cost, say it.
 - Keep every claim's scope, in the hook too: a number "against top sides" must say so; "among India's pacers" never
@@ -216,7 +222,7 @@ Charts:
 
 
 def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = "", notes: str = "",
-               length: str = "short") -> Dict[str, Any]:
+               length: str = "short", close: str = "") -> Dict[str, Any]:
     charts = "\n".join(f"{i + 1}. {c.get('title', '')}" + (f" ({c['help']})" if c.get("help") else "")
                        for i, (_, c) in enumerate(bs))
     L = LENGTHS[length]
@@ -225,6 +231,8 @@ def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = 
              if length == "long" else "")
     msg = PROMPT % {"k": len(bs), "hook": hook, "charts": charts, "say": L["say"], "spoken": L["spoken"], "extra": extra,
                     "notes": f"\nAlso on the slides (may be used in the lines, e.g. the doubts):\n{notes}\n" if notes else ""}
+    if close:
+        msg += f"\nEnd the last line with exactly this question: \"{close}\""
     if feedback:
         msg += (f"\nYour last attempt was rejected ({feedback}). Fix that"
                 + (f": land within {L['say']} words." if "words" in feedback else f", and keep it {L['say']} words long.")
@@ -258,6 +266,10 @@ Reply JSON {"problems": [...]} listing ONLY real problems (an empty list if ther
 fine. A problem is:
 - a claim beyond the material's scope ("among India's pacers" turned into "no one"; "at the death" dropped), or
   "only", "the best", "none have matched" that the chart's rows don't prove;
+- a line that isn't about its own chart (line 1 goes with chart 1, line 2 with chart 2, and so on);
+- a comparison computed in words ("twice", "double", "half", "x times") that the material doesn't state;
+- a number given the wrong meaning (a level stated as a difference, a "with" value as a gap);
+- a claim about how or when a player is used that the material doesn't show, or that a chart contradicts;
 - a metric described as a different one (runs saved or above average is never "win probability" or "chance of
   winning"; Impact is never runs saved; a strike rate is never an average);
 - a statement that contradicts THE VERDICT (a flat yes/no when it is "Partly" or "Inconclusive");
@@ -291,24 +303,27 @@ def chart_text(c: Dict[str, Any]) -> str:
 
 def check(sc: Dict[str, Any], hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str) -> Optional[str]:
     """None if a second reading finds every claim supported by the cards, else the problems."""
-    material = "\n".join([f"Post hook: {hook}"] + [chart_text(c) for _, c in bs] + ([notes] if notes else []))
+    material = "\n".join([f"Post hook: {hook}"] + [f"Chart {i + 1}: " + chart_text(c) for i, (_, c) in enumerate(bs)]
+                         + ([notes] if notes else []))
     resp = _client().chat.completions.create(
         model=SCRIPT_MODEL, temperature=0, response_format={"type": "json_object"},
         messages=[{"role": "user", "content": CHECK % {"material": material,
-                                                        "script": " ".join([sc["hook"], *sc["lines"]])}}])
+                                                        "script": "\n".join([f"Hook: {sc['hook']}"] + [
+                                                            f"Line {i + 1}: {l}" for i, l in enumerate(sc["lines"])])}}])
     got = json.loads(resp.choices[0].message.content or "{}")
     problems = [p for p in (got.get("problems") or []) if isinstance(p, str) and p.strip()]
     return "; ".join(problems) if problems else None
 
 
-def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str = "", length: str = "short") -> Tuple[Dict[str, Any], str]:
+def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str = "", length: str = "short",
+           close: str = "") -> Tuple[Dict[str, Any], str]:
     """(script, source): the model's when it passes the guard (one retry), else the template's. notes: the post's text
     slides, whose numbers may be voiced too."""
     ok = allowed(hook, bs) | numbers(notes) | {_short(n) for n in numbers(notes)}
     why = ""
     for _ in range(4):
         try:
-            s = script_llm(hook, bs, why, notes, length)
+            s = script_llm(hook, bs, why, notes, length, close)
         except Exception as exc:  # no key, network: the template
             logger.warning("reel script: %r", exc)
             break
@@ -381,6 +396,15 @@ def caption_chunks(line: str, start: float, length: float, per: int = CAPTION_WO
     return out
 
 
+def balance(text_: str, width: int = 24) -> List[str]:
+    """One line, or two split at the word break nearest the middle (no stranded "0.02.")."""
+    if len(text_) <= width:
+        return [text_]
+    ws = text_.split()
+    best = min(range(1, len(ws)), key=lambda k: abs(len(" ".join(ws[:k])) - len(" ".join(ws[k:]))))
+    return [" ".join(ws[:best]), " ".join(ws[best:])]
+
+
 def wrap(text_: str, width: int) -> str:
     lines, cur = [], ""
     for w in text_.split():
@@ -413,7 +437,8 @@ def record(carousel_id: str, numbers_: List[int], out: Path, base: str) -> Dict[
 
 def _drawtext(textfile: Path, font: Path, size: int, y: str, start: float, end: float, color: str = "white",
               box: bool = False) -> str:
-    f = (f"drawtext=fontfile='{font}':textfile='{textfile}':fontsize={size}:fontcolor={color}:line_spacing=10"
+    # expansion=none: text is drawn as written ("86%" would otherwise be read as a format code and the line dropped).
+    f = (f"drawtext=fontfile='{font}':textfile='{textfile}':expansion=none:fontsize={size}:fontcolor={color}:line_spacing=10"
          f":x=(w-text_w)/2:y={y}:enable='between(t,{start:.3f},{end:.3f})'")
     if box:
         f += ":box=1:boxcolor=black@0.55:boxborderw=18"
@@ -421,11 +446,23 @@ def _drawtext(textfile: Path, font: Path, size: int, y: str, start: float, end: 
 
 
 def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: Path,
-            captions: List[Tuple[float, float, str]], hook_text: str, hook_end: float, out: Path) -> float:
+            captions: List[Tuple[float, float, str]], hook_text: str, hook_end: float, out: Path,
+            cover: Optional[Path] = None) -> float:
     """The Reel: each beat's reveal frames, then its finished frame held for its duration; the voice (one take) under
     them with a quiet bed; the hook above the slide until the story moves on, then the brand; timed captions below."""
     ffmpeg = shutil.which("ffmpeg")
     clips = []
+    lead = 0.0
+    if cover is not None and durations and durations[0] > COVER_SECONDS + 1:
+        # The carousel's first slide for a moment (the voice already going), so it's the frame offered as the cover;
+        # the first beat gives up that time, so everything after stays where the voice put it.
+        clip = tmp / "cover.mp4"
+        _ff([ffmpeg, "-y", "-loglevel", "error", "-loop", "1", "-t", f"{COVER_SECONDS:.3f}", "-i", str(cover),
+             "-vf", f"scale={W}:{SLIDE_H},pad={W}:{H}:0:{TOP}:color={BG},setsar=1,fps={FPS},format=yuv420p",
+             "-t", f"{COVER_SECONDS:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(clip)], timeout=120)
+        clips.append(clip)
+        lead = COVER_SECONDS
+        durations = [durations[0] - lead] + list(durations[1:])
     for i, (frames, secs) in enumerate(zip(beat_frames, durations)):
         clip = tmp / f"beat{i}.mp4"
         n = len(list(frames.glob("*.png")))
@@ -439,18 +476,23 @@ def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: P
     listing.write_text("".join(f"file '{c}'\n" for c in clips))
     video = tmp / "video.mp4"
     _ff([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing), "-c", "copy", str(video)])
-    total = sum(durations)
+    total = sum(durations) + lead
 
     hook_file = tmp / "hook.txt"
     hook_file.write_text(wrap(hook_text, 26))
     brand = tmp / "brand.txt"
     brand.write_text("HINDSIGHT  ·  hindsightcricket.com")
-    draws = [_drawtext(hook_file, FONT_BOLD, 66, f"({TOP}-text_h)/2", 0, hook_end),
-             _drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", hook_end, total + 1, color="0xb6f24a")]
+    # The top band carries the brand throughout; the hook is captioned at the bottom like every other line.
+    draws = [_drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", lead, total + 1, color="0xb6f24a")]
+    # No captions over the cover frame (it's the post's cover); from then on every line, the hook included.
+    captions = [(max(a, lead), b, c) for a, b, c in captions if b > lead + 0.05]
     for i, (a, b, c) in enumerate(captions):
-        f = tmp / f"cap{i}.txt"
-        f.write_text(c)
-        draws.append(_drawtext(f, FONT_BOLD, 64, f"{TOP + SLIDE_H}+({H - TOP - SLIDE_H}-text_h)/2", a, b))
+        # Fixed positions (not centred on each phrase's own height), so the text never bobs; a long phrase is split
+        # near its middle into two lines, each centred.
+        for k, line in enumerate(balance(c)):
+            f = tmp / f"cap{i}_{k}.txt"
+            f.write_text(line)
+            draws.append(_drawtext(f, FONT_BOLD, 58, str(TOP + SLIDE_H + 60 + 72 * k), a, b))
     filt = (f"[0:v]{','.join(draws)},fade=t=out:st={max(0, total - 0.35):.2f}:d=0.35[v];"
             # a soft pad under the voice: low sines, slowly swelling, well below it
             f"aevalsrc='0.5*sin(2*PI*110*t)*(0.6+0.4*sin(2*PI*0.25*t))+0.35*sin(2*PI*164.8*t)+0.25*sin(2*PI*220*t)':"
@@ -471,31 +513,109 @@ def words_timed(audio: Path) -> List[Dict[str, float]]:
     return [{"word": w.word, "start": float(w.start), "end": float(w.end)} for w in (getattr(resp, "words", None) or [])]
 
 
+def _norm(w: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", w.lower().replace("−", "minus").replace("+", "plus"))
+
+
+#: Words a caption phrase shouldn't end on: the phrase carries on to the word they lead into.
+WEAK = {"a", "an", "the", "of", "to", "in", "on", "at", "for", "from", "with", "without", "against", "and", "but", "or",
+        "is", "are", "was", "his", "her", "their", "its", "india's", "than", "just", "only", "per", "by", "as", "top"}
+
+
+def phrases(words: List[str], most: int = 6, chars: int = 32, hard: int = 40) -> List[Tuple[int, int]]:
+    """[(first word, end)] caption phrases: break after punctuation, or once a phrase reaches `most` words or `chars`
+    characters, but not after a small word ("against", "the"), unless it would pass `hard` characters; a lone last
+    word joins the phrase before it."""
+    out, start = [], 0
+    for i, w in enumerate(words):
+        length = len(" ".join(words[start:i + 1]))
+        ends = w.endswith((",", ".", "?", "!", ";", ":"))
+        full = i + 1 - start >= most or length >= chars
+        weak = w.lower().strip(",.?!;:") in WEAK
+        if ends or (full and (not weak or length >= hard)):
+            out.append((start, i + 1))
+            start = i + 1
+    if start < len(words):
+        if out and len(words) - start == 1:
+            out[-1] = (out[-1][0], len(words))
+        else:
+            out.append((start, len(words)))
+    return out
+
+
+def word_times(ours: List[str], timed: List[Dict[str, float]], total: float) -> List[float]:
+    """When each of our words starts: matched to the transcription's words where they agree (difflib), the rest placed
+    between their matched neighbours (a number we write as one word can be several spoken)."""
+    import difflib
+
+    n = len(ours)
+    if not timed:
+        chars = [sum(len(w) + 1 for w in ours[:j]) for j in range(n)]
+        whole = max(1, sum(len(w) + 1 for w in ours))
+        return [total * c / whole for c in chars]
+    a, b = [_norm(w) for w in ours], [_norm(w["word"]) for w in timed]
+    t: List[Optional[float]] = [None] * n
+    for blk in difflib.SequenceMatcher(None, a, b, autojunk=False).get_matching_blocks():
+        for k in range(blk.size):
+            t[blk.a + k] = timed[blk.b + k]["start"]
+    t[0] = 0.0 if t[0] is None else t[0]
+    for j in range(n):  # fill gaps by interpolating between known neighbours
+        if t[j] is None:
+            prev = j - 1
+            nxt = next((k for k in range(j + 1, n) if t[k] is not None), None)
+            hi = t[nxt] if nxt is not None else total
+            span = (nxt if nxt is not None else n) - prev
+            t[j] = t[prev] + (hi - t[prev]) / span
+    out, last = [], 0.0
+    for v in t:  # never earlier than the word before
+        last = max(last, v)
+        out.append(last)
+    return out
+
+
 def align(segments: List[str], timed: List[Dict[str, float]], total: float,
           per: int = CAPTION_WORDS) -> Tuple[List[float], List[Tuple[float, float, str]]]:
-    """(each segment's start, captions) for the script's segments spoken in one take. Our words map onto the
-    transcription's in proportion (numbers can be one word to us and three spoken), so a segment starts when its first
-    word is said. Without a transcription, time is shared out by characters."""
+    """(each segment's start, captions) for the script's segments spoken in one take. Every word is timed from the
+    transcription (word_times); captions are phrases (phrases), each on screen from its first word until the next
+    phrase starts, so the text changes with the voice, not on a fixed count."""
     ours = [w for seg in segments for w in seg.split()]
-    n = len(ours)
-
-    def at(j: int) -> float:
-        if j >= n:
-            return total
-        if timed:
-            k = min(len(timed) - 1, round(j * len(timed) / n))
-            return timed[k]["start"]
-        chars = sum(len(w) + 1 for w in ours[:j])
-        return total * chars / max(1, sum(len(w) + 1 for w in ours))
+    if not ours:
+        return [0.0] * len(segments), []
+    at = word_times(ours, timed, total)
     starts, caps, j = [], [], 0
+    bounds = []
     for seg in segments:
         ws = seg.split()
-        starts.append(0.0 if j == 0 else at(j))
-        for c in range(0, len(ws), per):
-            caps.append((at(j + c), at(min(j + c + per, j + len(ws))), " ".join(ws[c:c + per])))
+        starts.append(0.0 if j == 0 else at[j])
+        bounds += [(j + a, j + b) for a, b in phrases(ws)]
         j += len(ws)
-    caps = [(round(a, 3), round(max(b, a + 0.25), 3), t) for a, b, t in caps]
+    for i, (a, b) in enumerate(bounds):
+        end = at[bounds[i + 1][0]] if i + 1 < len(bounds) else total
+        caps.append((round(at[a], 3), round(max(end, at[a] + 0.3), 3), " ".join(ours[a:b])))
     return starts, caps
+
+
+def srt(captions: List[Tuple[float, float, str]], offset: float = 0.0) -> str:
+    """The captions as a SubRip file, for YouTube Studio's subtitles upload."""
+    def ts(x: float) -> str:
+        ms = int(round((x + offset) * 1000))
+        return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
+    return "\n".join(f"{i}\n{ts(a)} --> {ts(b)}\n{t}\n" for i, (a, b, t) in enumerate(captions, 1))
+
+
+def first_slide(carousel_id: str, tmp: Path) -> Optional[Path]:
+    """The carousel's rendered first slide (ig_slide_images), or None if it isn't rendered yet."""
+    from sqlalchemy import text
+
+    from database import engine
+
+    with engine.connect() as conn:
+        png = conn.execute(text("SELECT png FROM ig_slide_images WHERE carousel_id = :c AND n = 1"), {"c": carousel_id}).scalar()
+    if not png:
+        return None
+    f = tmp / "cover.png"
+    f.write_bytes(bytes(png))
+    return f
 
 
 def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = None, base: str = SITE,
@@ -512,7 +632,7 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
     if len(bs) < 2:
         return None
     if plan is None or not plan.get("script"):
-        sc, source = script(hook, bs, notes_of(slides), length)
+        sc, source = script(hook, bs, notes_of(slides), length, (plan or {}).get("close", ""))
         plan = {"script": sc, "source": source, "beats": [n for n, _ in bs], "length": length}
     sc, voice = plan["script"], voice or VOICE
     with tempfile.TemporaryDirectory() as d:
@@ -535,8 +655,10 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
         cuts = [0.0] + starts[2:] + [spoken_len + 0.6]
         durations = [round(b - a, 3) for a, b in zip(cuts, cuts[1:])]
         mp4 = out or (tmp / "reel.mp4")
+        subtitles = srt(captions)
+        cover = first_slide(carousel_id, tmp)
         seconds = compose(tmp, [tmp / "frames" / str(n) for n in plan["beats"]], durations, voice_file, captions,
-                          sc["hook"], hook_end, mp4)
+                          sc["hook"], hook_end, mp4, cover=cover)
         if seconds > MAX_SECONDS:
             logger.warning("reel v2 for %s is %.1fs", carousel_id, seconds)
         if store:
@@ -550,7 +672,7 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
                     ON CONFLICT (carousel_id) DO UPDATE SET mp4 = EXCLUDED.mp4, seconds = EXCLUDED.seconds, made_at = now()
                 """), {"c": carousel_id, "m": mp4.read_bytes(), "s": seconds})
     return {"seconds": seconds, "script": sc, "source": plan["source"], "voice": voice, "beats": plan["beats"],
-            "length": plan.get("length", length),
+            "length": plan.get("length", length), "srt": subtitles,
             "mp4": str(out) if out else None}
 
 
@@ -594,7 +716,7 @@ def for_carousel(carousel_id: str) -> Optional[float]:
         if made:
             seconds = made["seconds"]
             info.update(script=made["script"], source=made["source"], voice=made["voice"], beats=made["beats"],
-                        seconds=seconds)
+                        seconds=seconds, length=made.get("length"), srt=made.get("srt"))
     with engine.begin() as conn:
         conn.execute(text("UPDATE content_packs SET facts = jsonb_set(COALESCE(facts, '{}'::jsonb), '{reel}', CAST(:r AS jsonb)) "
                           "WHERE id = :i"), {"r": json.dumps(info), "i": row["id"]})

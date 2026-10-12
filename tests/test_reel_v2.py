@@ -107,3 +107,26 @@ def test_pronunciation_respells_for_the_voice_only(monkeypatch):
     monkeypatch.setattr(R, "pronunciations", lambda: {"Bumrah": {"say": "Boomrah", "hint": "BOOM-rah"}})
     assert R.spoken("Bumrah bowls; Bumrah's spell") == "Boomrah bowls; Boomrah's spell"
     assert R.hints("without Bumrah") == "BOOM-rah" and R.hints("without Siraj") == ""
+
+
+def test_phrases_break_at_punctuation_and_length():
+    ws = "India win 86% against top sides with Bumrah. Without him, 58%.".split()
+    got = [" ".join(ws[a:b]) for a, b in R.phrases(ws)]
+    assert got[0] == "India win 86% against top sides" and got[1] == "with Bumrah." and got[-1].endswith("58%.")
+    assert all(len(p) <= 40 for p in got)
+
+
+def test_word_times_follow_the_transcription():
+    ours = "falls to −0.29 from +0.35 a game".split()
+    timed = [{"word": w, "start": i * 0.4, "end": i * 0.4 + 0.3} for i, w in
+             enumerate(["falls", "to", "minus", "zero", "point", "two", "nine", "from", "plus", "0.35", "a", "game"])]
+    t = R.word_times(ours, timed, 5.0)
+    assert t[0] == 0.0 and t[3] == timed[7]["start"]  # "from" lands on the spoken "from", not a guess
+    assert t == sorted(t)
+    srt = R.srt([(0.0, 1.5, "falls to −0.29"), (1.5, 3.0, "from +0.35")])
+    assert srt.startswith("1\n00:00:00,000 --> 00:00:01,500\nfalls to −0.29")
+
+
+def test_long_captions_split_near_the_middle():
+    assert R.balance("In the powerplay,") == ["In the powerplay,"]
+    assert R.balance("it's 0.31 versus minus 0.02.") == ["it's 0.31 versus", "minus 0.02."]

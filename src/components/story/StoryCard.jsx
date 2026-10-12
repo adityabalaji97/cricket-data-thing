@@ -122,7 +122,8 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
             <Box component="span" sx={{ color: colors.gold, fontWeight: 600 }}> · small sample</Box>
           )}
         </Typography>
-        <Typography sx={{ fontSize: 11, color: colors.textFaint, lineHeight: 1.35, mt: 0.25 }}>
+        {/* One line, always: the brand and the data credit. */}
+        <Typography noWrap sx={{ fontSize: 11, color: colors.textFaint, lineHeight: 1.35, mt: 0.25 }}>
           {CARD_BRAND} · {CARD_CREDITS}
         </Typography>
       </Box>
@@ -141,8 +142,8 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
           <Box sx={{ color: colors.textMed, fontSize: 14, lineHeight: 1.5 }}>{card.info}</Box>
           <Typography sx={{ mt: 2, fontSize: 12, color: colors.textFaint, lineHeight: 1.5 }}>
             Data: Hindsight (hindsightcricket.com). Ball-by-ball data before 2015: Cricsheet (ODC-By 1.0).
-            2015+ ball-by-ball, line, length and shot: provider to be confirmed. Impact, RAA, WAA, WPA and
-            leverage are computed ball by ball using Himanish Ganjoo&apos;s T20 Primer method.
+            2015+ ball-by-ball, line, length, shot and control: Himanish Ganjoo&apos;s data, collected with TechRadar.
+            Impact, RAA, WAA, WPA and leverage are computed ball by ball using Himanish Ganjoo&apos;s T20 Primer method.
           </Typography>
         </DetailSheet>
         </Box>
