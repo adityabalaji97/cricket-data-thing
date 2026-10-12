@@ -26,6 +26,7 @@ def main() -> int:
     parser.add_argument("--out")
     parser.add_argument("--store", action="store_true")
     parser.add_argument("--long", action="store_true", help="45-60 seconds, up to 5 charts")
+    parser.add_argument("--close", default="", help="the closing question, word for word")
     parser.add_argument("--base", default=None)
     args = parser.parse_args()
 
@@ -43,6 +44,8 @@ def main() -> int:
     cid = row["facts"]["carousel_id"]
     slides = db.execute(text("SELECT data FROM chart_snapshots WHERE id = :c"), {"c": cid}).scalar()["slides"]
     plan = {"beats": [int(n) for n in args.beats.split(",")]} if args.beats else None
+    if args.close:
+        plan = {**(plan or {}), "close": args.close}
     out = Path(args.out) if args.out else None
     made = R.make(cid, slides, base=args.base or R.SITE, store=args.store, out=out, plan=plan,
                   length="long" if args.long else "short")

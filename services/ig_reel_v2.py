@@ -221,7 +221,7 @@ Charts:
 
 
 def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = "", notes: str = "",
-               length: str = "short") -> Dict[str, Any]:
+               length: str = "short", close: str = "") -> Dict[str, Any]:
     charts = "\n".join(f"{i + 1}. {c.get('title', '')}" + (f" ({c['help']})" if c.get("help") else "")
                        for i, (_, c) in enumerate(bs))
     L = LENGTHS[length]
@@ -230,6 +230,8 @@ def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = 
              if length == "long" else "")
     msg = PROMPT % {"k": len(bs), "hook": hook, "charts": charts, "say": L["say"], "spoken": L["spoken"], "extra": extra,
                     "notes": f"\nAlso on the slides (may be used in the lines, e.g. the doubts):\n{notes}\n" if notes else ""}
+    if close:
+        msg += f"\nEnd the last line with exactly this question: \"{close}\""
     if feedback:
         msg += (f"\nYour last attempt was rejected ({feedback}). Fix that"
                 + (f": land within {L['say']} words." if "words" in feedback else f", and keep it {L['say']} words long.")
@@ -312,14 +314,15 @@ def check(sc: Dict[str, Any], hook: str, bs: List[Tuple[int, Dict[str, Any]]], n
     return "; ".join(problems) if problems else None
 
 
-def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str = "", length: str = "short") -> Tuple[Dict[str, Any], str]:
+def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str = "", length: str = "short",
+           close: str = "") -> Tuple[Dict[str, Any], str]:
     """(script, source): the model's when it passes the guard (one retry), else the template's. notes: the post's text
     slides, whose numbers may be voiced too."""
     ok = allowed(hook, bs) | numbers(notes) | {_short(n) for n in numbers(notes)}
     why = ""
     for _ in range(4):
         try:
-            s = script_llm(hook, bs, why, notes, length)
+            s = script_llm(hook, bs, why, notes, length, close)
         except Exception as exc:  # no key, network: the template
             logger.warning("reel script: %r", exc)
             break
@@ -628,7 +631,7 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
     if len(bs) < 2:
         return None
     if plan is None or not plan.get("script"):
-        sc, source = script(hook, bs, notes_of(slides), length)
+        sc, source = script(hook, bs, notes_of(slides), length, (plan or {}).get("close", ""))
         plan = {"script": sc, "source": source, "beats": [n for n, _ in bs], "length": length}
     sc, voice = plan["script"], voice or VOICE
     with tempfile.TemporaryDirectory() as d:
