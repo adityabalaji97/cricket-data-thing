@@ -4,6 +4,5 @@ keep the real spelling); "hint" goes into the voice's instructions when the name
 Reel gets it wrong.
 """
 PRONOUNCE = {
-    "Bumrah": {"say": "Bumrah",
-               "hint": "Pronounce Bumrah as BOOM-rah with a short, clipped 'oo' (as in 'book'), stress on the first syllable."},
+    "Bumrah": {"say": "Boomrah"},  # BOOM-rah, a short "oo" (picked by ear, 12 Oct 2026)
 }
