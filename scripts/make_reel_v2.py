@@ -25,6 +25,7 @@ def main() -> int:
     parser.add_argument("--beats")
     parser.add_argument("--out")
     parser.add_argument("--store", action="store_true")
+    parser.add_argument("--long", action="store_true", help="45-60 seconds, up to 5 charts")
     parser.add_argument("--base", default=None)
     args = parser.parse_args()
 
@@ -43,13 +44,14 @@ def main() -> int:
     slides = db.execute(text("SELECT data FROM chart_snapshots WHERE id = :c"), {"c": cid}).scalar()["slides"]
     plan = {"beats": [int(n) for n in args.beats.split(",")]} if args.beats else None
     out = Path(args.out) if args.out else None
-    made = R.make(cid, slides, base=args.base or R.SITE, store=args.store, out=out, plan=plan)
+    made = R.make(cid, slides, base=args.base or R.SITE, store=args.store, out=out, plan=plan,
+                  length="long" if args.long else "short")
     if not made:
         print("no Reel: not enough beats, or no ffmpeg")
         return 1
-    print(json.dumps({k: made[k] for k in ("seconds", "source", "voice", "beats", "script")}, indent=2))
+    print(json.dumps({k: made[k] for k in ("seconds", "source", "voice", "beats", "length", "script")}, indent=2))
     if args.store:
-        info = {"variant": "v2", **{k: made[k] for k in ("script", "source", "voice", "beats", "seconds")}}
+        info = {"variant": "v2", **{k: made[k] for k in ("script", "source", "voice", "beats", "seconds", "length")}}
         with engine.begin() as conn:
             conn.execute(text("UPDATE content_packs SET caption = :c, facts = jsonb_set(COALESCE(facts, '{}'::jsonb), "
                               "'{reel}', CAST(:r AS jsonb)) WHERE id = :i"),

@@ -122,7 +122,8 @@ const InstagramTab = ({ pack, copy, toast }) => {
 
 // The Reel's numbers from Instagram's insights, typed in after posting: they feed the Reel v1/v2 comparison
 // (scripts/usage_report.py).
-const REEL_STATS = [['views', 'Views'], ['avg_watch_s', 'Avg watch (s)'], ['hold_3s_pct', '3s hold %'], ['shares', 'Shares'], ['saves', 'Saves']];
+const REEL_STATS = [['views', 'Views'], ['avg_watch_s', 'Avg watch (s)'], ['hold_3s_pct', '3s hold %'], ['end_pct', 'Watched to end %'],
+  ['shares', 'Shares'], ['saves', 'Saves']];
 
 const ReelStats = ({ pack, onUpdate, toast }) => {
   const saved = (pack.facts || {}).reel_stats || {};
@@ -172,7 +173,7 @@ const VideoTab = ({ pack, copy, toast, onUpdate }) => {
       {reel.variant && (
         <Typography sx={{ fontSize: 12, color: reel.variant === 'v2' ? C.amber : C.lo, mt: 1 }}>
           {reel.variant === 'v2'
-            ? `Reel v2 · voiced (${reel.voice || 'AI'}). It's an AI voice: turn on "AI label" in Instagram's advanced settings when posting.`
+            ? `Reel v2${reel.length === 'long' ? ' · long' : ''} · voiced (${reel.voice || 'AI'}). It's an AI voice: turn on "AI label" in Instagram's advanced settings when posting.`
             : 'Reel v1 · the slideshow (this post is on the v1 side of the comparison)'}
         </Typography>
       )}

@@ -46,8 +46,13 @@ FPS = 30
 W, H, SLIDE_H, TOP = 1080, 1920, 1350, 285
 BG = "0x0a0c11"
 GAP = 0.12                     # seconds of silence between lines
-WORDS = (45, 76)               # a script's word count must sit in this range (about 15-28 seconds spoken; 30 max)
-MAX_SECONDS = 30
+#: Two lengths: short (about 25-30s, 3 charts) and long (45-60s, up to 5 charts, room for the advanced metrics).
+LENGTHS = {
+    "short": {"words": (45, 76), "say": "55 to 72", "spoken": "about 28 seconds", "seconds": 30, "beats": 3},
+    "long": {"words": (75, 175), "say": "90 to 160", "spoken": "35 to 60 seconds", "seconds": 60, "beats": 5},
+}
+WORDS = LENGTHS["short"]["words"]
+MAX_SECONDS = 60
 TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept (ffmpeg atempo)
 CAPTION_WORDS = 3              # words on screen at a time
 ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth")
@@ -124,13 +129,13 @@ def allowed(hook: str, bs: List[Tuple[int, Dict[str, Any]]]) -> set:
     return nums | {_short(n) for n in nums}
 
 
-def guard(script: Dict[str, Any], ok: set, k: int) -> Optional[str]:
+def guard(script: Dict[str, Any], ok: set, k: int, words_range: Tuple[int, int] = WORDS) -> Optional[str]:
     """None if the script is usable, else why not."""
     lines = script.get("lines")
     if not isinstance(script.get("hook"), str) or not isinstance(lines, list) or len(lines) != k:
         return "shape"
     words = len(" ".join([script["hook"], *lines]).split())
-    if not WORDS[0] <= words <= WORDS[1]:
+    if not words_range[0] <= words <= words_range[1]:
         return f"{words} words"
     h = script["hook"].strip()
     if h.endswith("?") and not numbers(h) and len(re.split(r"(?<=[.!?])\s+", h)) < 2:
@@ -164,29 +169,35 @@ def _client():
     return OpenAI(api_key=key)
 
 
-PROMPT = """You write the voiceover for a 15-25 second Instagram Reel about cricket data.
+PROMPT = """You write the voiceover for a %(spoken)s Instagram Reel about cricket data.
 Return JSON: {"hook": string, "lines": [string, ...]} with exactly %(k)d lines, one per chart, in the order given.
-It is ONE story told in about 25 seconds, spoken in one take: the hook sets it up, the lines carry it forward, the last
+It is ONE story told in %(spoken)s, spoken in one take: the hook sets it up, the lines carry it forward, the last
 line lands it. The video cuts to each chart as its line starts, so each line is the moment the story reaches that chart.
 Rules:
 - Make it flow like a person telling a story: each line follows from the one before ("But...", "Here's the thing...",
   "So...", "And yet..."). Never read a chart's title out; the chart shows the number, you say why it matters.
-- HARD LIMIT: 55 to 72 words in total, hook included (about 28 seconds spoken, briskly). Count them before you answer.
+- HARD LIMIT: %(say)s words in total, hook included (%(spoken)s spoken, briskly). Use only as many as the story
+  needs: never pad. Count them before you answer.
   Spoken English, short sentences.
 - The hook comes first and must grab in the first 2 seconds, in under 12 words, keeping the key name. It can be a
   statement or a question, but never a bare generic question: a question needs a number or a sharp claim with it
-  ("One bad over and Varun's numbers crash. But is it him?"). Don't just repeat the post hook. The hook must agree with THE VERDICT when there is one, and
+  ("A big first over dents Varun's numbers. Is it just him?"). Don't just repeat the post hook. The hook must agree with THE VERDICT when there is one, and
   with what the charts show; never claim more than they do. Use a number in the hook when one carries the answer.
-- Be specific, never hype: no "like no one else", "elite", "insane", "massive". A precise claim beats a big one.
+- Be specific, never hype: no "like no one else", "elite", "insane", "massive", "game-changer", "shines", "knack",
+  "unmatched". A precise claim beats a big one.
   When the verdict is inconclusive or partly, the hook states what the charts DO show and the doubt, as a statement,
   e.g. "A bad first over hurts Varun. It hurts every spinner." or "The data doesn't back the Varun myth."
 - Write a negative number with the word "minus" (e.g. "minus 0.29"), never a minus sign.
-- Each line is one or two short sentences about its chart. Say what a stat means in plain words the first time
-  (e.g. "runs saved against an average bowler", not "RAA").
+- Each line is one to three short sentences about its chart. When a line uses an advanced metric (runs saved or added
+  against an average player, win probability added, Impact), explain it inside that same sentence, the first time,
+  e.g. "he saves 0.8 runs an over compared with an average bowler in the same spot" -- never as a separate definition.%(extra)s
 - Use ONLY numbers that appear in the material below, written as digits exactly as given (e.g. 85%%, 1,024, 0.27).
   Never round, combine, or compute new numbers. If unsure, leave the number out.
 - Be fair: don't blame players; describe what happened. Don't overclaim: a small lead is "slightly", a mixed result is
   "mixed". If the material has a doubt or a cost, say it.
+- Keep every claim's scope: "among India's pacers" never becomes "no one"; "at the death" stays at the death; "1 of 5
+  tests finds a clear effect" means the evidence is mixed, so no "crash", "big dip" or flat yes/no. "Only", "the best",
+  "none have matched" need a chart's rows to prove them; a lead of a couple of balls is "slightly", not "no one matches".
 - Never list more than three things in one sentence. No hashtags, no emojis, no "in this video".
 - End the last line with a short question that invites a comment, or a punchy closer.
 
@@ -197,14 +208,20 @@ Charts:
 %(notes)s"""
 
 
-def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = "", notes: str = "") -> Dict[str, Any]:
+def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = "", notes: str = "",
+               length: str = "short") -> Dict[str, Any]:
     charts = "\n".join(f"{i + 1}. {c.get('title', '')}" + (f" ({c['help']})" if c.get("help") else "")
                        for i, (_, c) in enumerate(bs))
-    msg = PROMPT % {"k": len(bs), "hook": hook, "charts": charts,
+    L = LENGTHS[length]
+    extra = ("\n- Around the middle, turn the story with a re-hook (e.g. \"But here's what the scorecard doesn't show.\")"
+             " so people who drift come back. Give the advanced numbers room: that is why this Reel is longer."
+             if length == "long" else "")
+    msg = PROMPT % {"k": len(bs), "hook": hook, "charts": charts, "say": L["say"], "spoken": L["spoken"], "extra": extra,
                     "notes": f"\nAlso on the slides (may be used in the lines, e.g. the doubts):\n{notes}\n" if notes else ""}
     if feedback:
         msg += (f"\nYour last attempt was rejected ({feedback}). Fix that"
-                + (": land between 55 and 70 words." if "words" in feedback else ".") + " Keep everything else that worked.")
+                + (f": land within {L['say']} words." if "words" in feedback else f", and keep it {L['say']} words long.")
+                + " Keep everything else that worked.")
     resp = _client().chat.completions.create(model=SCRIPT_MODEL, temperature=0.6,
                                              response_format={"type": "json_object"},
                                              messages=[{"role": "user", "content": msg}])
@@ -229,13 +246,18 @@ def notes_of(slides: List[Dict[str, Any]]) -> str:
     return "\n".join(out)
 
 
-CHECK = """You check a cricket Reel voiceover against its source material. Reply JSON {"ok": true} or
-{"ok": false, "problems": ["..."]}. Reject if any sentence claims more than the material shows. Check scope word by word: a claim
-about "India's pacers" can't become "no one" or "anyone"; "at the death" can't become "late" without saying it; "since
-his last game" stays bounded. Reject "none have matched him", "the best", "only X" unless the chart's rows prove it.
-Reject anything that contradicts THE VERDICT, blames a player, or uses hype. Wording may differ; meaning and scope may not.
-When THE VERDICT is "Partly" or "Inconclusive", fair summaries include "the evidence is mixed", "not clearly", "it's not
-just him", "mostly not" (if most parts are inconclusive or not supported): accept those; reject a flat "yes" or "no".
+CHECK = """You check a cricket Reel voiceover against its source material.
+Reply JSON {"problems": [...]} listing ONLY real problems (an empty list if there are none). Never list a claim that is
+fine. A problem is:
+- a claim beyond the material's scope ("among India's pacers" turned into "no one"; "at the death" dropped), or
+  "only", "the best", "none have matched" that the chart's rows don't prove;
+- a metric described as a different one (runs saved or above average is never "win probability" or "chance of
+  winning"; Impact is never runs saved; a strike rate is never an average);
+- a statement that contradicts THE VERDICT (a flat yes/no when it is "Partly" or "Inconclusive");
+- blaming a player, or hype ("game-changer", "elite", "unmatched").
+Not problems: restating a chart's title or help line in other words (titles are verified facts computed from the data);
+a number rounded the way the title or help line rounds it; for balls per wicket, economy and averages, lower is better;
+fair framing such as "raises questions", "is it worth it?", "slightly", "mixed"; the closing question.
 
 Material:
 %(material)s
@@ -268,21 +290,22 @@ def check(sc: Dict[str, Any], hook: str, bs: List[Tuple[int, Dict[str, Any]]], n
         messages=[{"role": "user", "content": CHECK % {"material": material,
                                                         "script": " ".join([sc["hook"], *sc["lines"]])}}])
     got = json.loads(resp.choices[0].message.content or "{}")
-    return None if got.get("ok") else "; ".join(got.get("problems") or ["unsupported claim"])
+    problems = [p for p in (got.get("problems") or []) if isinstance(p, str) and p.strip()]
+    return "; ".join(problems) if problems else None
 
 
-def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str = "") -> Tuple[Dict[str, Any], str]:
+def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str = "", length: str = "short") -> Tuple[Dict[str, Any], str]:
     """(script, source): the model's when it passes the guard (one retry), else the template's. notes: the post's text
     slides, whose numbers may be voiced too."""
     ok = allowed(hook, bs) | numbers(notes) | {_short(n) for n in numbers(notes)}
     why = ""
-    for _ in range(3):
+    for _ in range(4):
         try:
-            s = script_llm(hook, bs, why, notes)
+            s = script_llm(hook, bs, why, notes, length)
         except Exception as exc:  # no key, network: the template
             logger.warning("reel script: %r", exc)
             break
-        why = guard(s, ok, len(bs)) or ""
+        why = guard(s, ok, len(bs), LENGTHS[length]["words"]) or ""
         if not why:
             try:
                 why = check(s, hook, bs, notes) or ""
@@ -453,19 +476,21 @@ def align(segments: List[str], timed: List[Dict[str, float]], total: float,
 
 
 def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = None, base: str = SITE,
-         store: bool = True, out: Optional[Path] = None, plan: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-    """Build the v2 Reel. plan: a script already made (the same script in several voices); else one is written."""
+         store: bool = True, out: Optional[Path] = None, plan: Optional[Dict[str, Any]] = None,
+         length: str = "short") -> Optional[Dict[str, Any]]:
+    """Build the v2 Reel. plan: a script already made (the same script in several voices); else one is written.
+    length: "short" (about 25-30s) or "long" (45-60s, up to 5 charts)."""
     if not shutil.which("ffmpeg"):
         return None
     hook = next((s.get("text") for s in slides if s.get("type") == "hook"), "") or ""
-    bs = beats(slides)
+    bs = beats(slides, k=LENGTHS[length]["beats"])
     if plan and plan.get("beats"):  # beats chosen by hand (scripts/make_reel_v2.py --beats)
         bs = [(n, slides[n - 1]["card"]) for n in plan["beats"]]
     if len(bs) < 2:
         return None
     if plan is None or not plan.get("script"):
-        sc, source = script(hook, bs, notes_of(slides))
-        plan = {"script": sc, "source": source, "beats": [n for n, _ in bs]}
+        sc, source = script(hook, bs, notes_of(slides), length)
+        plan = {"script": sc, "source": source, "beats": [n for n, _ in bs], "length": length}
     sc, voice = plan["script"], voice or VOICE
     with tempfile.TemporaryDirectory() as d:
         tmp = Path(d)
@@ -502,6 +527,7 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
                     ON CONFLICT (carousel_id) DO UPDATE SET mp4 = EXCLUDED.mp4, seconds = EXCLUDED.seconds, made_at = now()
                 """), {"c": carousel_id, "m": mp4.read_bytes(), "s": seconds})
     return {"seconds": seconds, "script": sc, "source": plan["source"], "voice": voice, "beats": plan["beats"],
+            "length": plan.get("length", length),
             "mp4": str(out) if out else None}
 
 
