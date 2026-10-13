@@ -43,8 +43,17 @@ def test_deep_cut_needs_different_raa_and_wpa_leaders(monkeypatch):
     split = {"A One": {"raa_per_100": 64, "wpa": 2.7, "metric_balls": 1000},
              "B Two": {"raa_per_100": 36, "wpa": 3.8, "metric_balls": 1000}}
     monkeypatch.setattr(RP, "_qb", fake_qb(split, by_phase))
+    monkeypatch.setattr(RP, "past_powerplay", lambda db, name, until: {"innings": 25, "runs": 930, "balls": 394,
+                                                                         "sr": 236, "wp0": 63, "wp6": 64})
     c = RP.deep_card(None, POOL, by_phase, "")
     assert c and c["kicker"] == "The deeper cut" and "most of all in the middle overs" in c["title"]
+    # His own start already tilted the game: the card says so, rather than that his later runs matter less.
+    monkeypatch.setattr(RP, "past_powerplay", lambda db, name, until: {"innings": 25, "runs": 930, "balls": 394,
+                                                                         "sr": 236, "wp0": 63, "wp6": 76})
+    c = RP.deep_card(None, POOL, by_phase, "")
+    assert c["title"] == "One adds the most runs above average, and he does it up front"
+    assert "from 63% to 76%" in c["help"] and "low stakes" not in c["help"]
+    assert [r["label"] for r in c["payload"]["rows"] if r.get("highlight")] == ["Powerplay"]
     same = {"A One": {"raa_per_100": 64, "wpa": 4.0, "metric_balls": 1000}, "B Two": split["B Two"]}
     monkeypatch.setattr(RP, "_qb", fake_qb(same, by_phase))
     assert RP.deep_card(None, POOL, by_phase, "") is None

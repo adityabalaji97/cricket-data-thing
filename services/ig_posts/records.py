@@ -219,6 +219,11 @@ def build(db: Session, idea: str, deep: bool = False, expect: Optional[str] = No
                 if first and RP.associate(first.get("team")) and c["title"].startswith(first["name"]):
                     c["title"] = f"{first['name']} ({first['team']})" + c["title"][len(first["name"]):]
             score["payload"]["method"] += " †: associate nation."
+            # The verdict travels without the table (the caption): name an associate player's side there too.
+            for n in leaders:
+                if RP.associate(teams.get(n)):
+                    verdict = verdict.replace(f"{short_name(n)}:", f"{short_name(n)} ({teams[n]}):")
+            out["verdict"] = score["payload"]["verdict"] = verdict
             for row in score["payload"]["rows"]:
                 if RP.associate(teams.get(row["name"])):
                     row["short"] += "†"
