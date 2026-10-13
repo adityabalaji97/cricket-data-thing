@@ -214,6 +214,10 @@ def build(db: Session, idea: str, deep: bool = False, expect: Optional[str] = No
         if prof["associates"]:
             for c in cards:
                 c["help"] = ((c.get("help") or "") + " " + prof["associates"]).strip() if c["id"] == "race-balls" else c.get("help")
+                # The innings race can be led by an associate player: name his side.
+                first = inns_rows[0] if c["id"] == "race-innings" and inns_rows else None
+                if first and RP.associate(first.get("team")) and c["title"].startswith(first["name"]):
+                    c["title"] = f"{first['name']} ({first['team']})" + c["title"][len(first["name"]):]
             score["payload"]["method"] += " †: associate nation."
             for row in score["payload"]["rows"]:
                 if RP.associate(teams.get(row["name"])):
