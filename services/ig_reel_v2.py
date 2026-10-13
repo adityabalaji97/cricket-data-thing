@@ -54,7 +54,9 @@ LENGTHS = {
 WORDS = LENGTHS["short"]["words"]
 MAX_SECONDS = 60
 TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept (ffmpeg atempo)
-COVER_SECONDS = float(os.getenv("REEL_COVER", "1.5"))   # the carousel's first slide opens the Reel (the cover frame)
+# Seconds of the carousel's first slide, still, before the story: 0 by default, since a still opening lost two in three
+# viewers in the first 3s (12 Oct). The cover is picked when posting instead (admin: Reel tab → Cover).
+COVER_SECONDS = float(os.getenv("REEL_COVER", "0"))
 CAPTION_WORDS = 3              # words on screen at a time
 ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth")
 #: The payoff, in order of preference: what opens the Reel.
@@ -453,7 +455,7 @@ def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: P
     ffmpeg = shutil.which("ffmpeg")
     clips = []
     lead = 0.0
-    if cover is not None and durations and durations[0] > COVER_SECONDS + 1:
+    if cover is not None and COVER_SECONDS > 0 and durations and durations[0] > COVER_SECONDS + 1:
         # The carousel's first slide for a moment (the voice already going), so it's the frame offered as the cover;
         # the first beat gives up that time, so everything after stays where the voice put it.
         clip = tmp / "cover.mp4"
