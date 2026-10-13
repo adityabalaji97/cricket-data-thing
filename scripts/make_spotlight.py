@@ -30,7 +30,7 @@ def show(built) -> None:
             print("   " + " " * 14 + "".join(f"{k:>8}" for k in cols))
             for r in pl["rows"]:
                 vals = "".join(f"{'-' if r['values'][k] is None else format(r['values'][k], '+.2f'):>8}" for k in cols)
-                print(f"   {('*' if r['highlight'] else ' ') + r['short']:<14}{vals}")
+                print(f"   {('*' if r.get('highlight') else ' ') + r['short']:<14}{vals}")
         elif c["visual"] == "metric_bars":
             for r in pl["rows"]:
                 print(f"   {'*' if r.get('highlight') else ' '}{r['name']:<14}{r['value']:6.2f}  {r.get('detail') or ''}")

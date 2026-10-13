@@ -325,7 +325,9 @@ def deep_card(db, pool, by_phase, sample):
         r = (_qb(db, p["name"], p["date"], ["batter"]) or [None])[0]
         if r:
             totals[p["name"]] = {"raa": r.get("raa_per_100"), "wpa": _wpa100(r)}
-    have = [p for p in pool if totals.get(p["name"], {}).get("raa") is not None and totals[p["name"]].get("wpa") is not None]
+    # Full members only: an associate player's runs mostly come against associates, so his rates don't compare.
+    have = [p for p in pool if not associate(p.get("team"))
+            and totals.get(p["name"], {}).get("raa") is not None and totals[p["name"]].get("wpa") is not None]
     if len(have) < 2:
         return None
     raa_lead = max(have, key=lambda p: totals[p["name"]]["raa"])
