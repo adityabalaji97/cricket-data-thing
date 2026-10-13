@@ -37,6 +37,7 @@ MIN_CELL = 60        # balls for a phase or bowling-style cell
 MIN_STYLES = 4       # bowling styles shown beyond pace and spin
 MIN_BOUNDARIES = 40
 DEEP = 0.6           # a catch this far out (share of the boundary radius) is in the deep
+TILT = 5             # win-probability points a batter's powerplay must add to call a later phase "already tilted"
 OFF_PLOT = 1.1       # beyond this, the plotted point isn't a catch position
 PHASES = (("powerplay", "Powerplay"), ("middle", "Middle"), ("death", "Death"))
 DISMISSALS = (("caught", "Caught"), ("bowled", "Bowled"), ("leg before wicket", "LBW"), ("stumped", "Stumped"))
@@ -316,6 +317,34 @@ def outs_card(db, lead, since, sample):
                          + (f" Out {bpd}." if bpd else "")))
 
 
+def past_powerplay(db: Session, name: str, until: date) -> Optional[Dict[str, Any]]:
+    """In T20I innings where `name` batted on past the powerplay: his powerplay runs and balls, and his side's win
+    probability (delivery_details.win_prob is the batting side's, in %) at the first ball and at the end of the powerplay.
+    A quiet phase after that is often one his own start decided."""
+    r = db.execute(text("""
+        WITH his AS (
+            SELECT p_match, inns, MAX(over) AS last_over,
+                   SUM(CASE WHEN over < 6 THEN COALESCE(batruns, 0) ELSE 0 END) AS runs,
+                   COUNT(*) FILTER (WHERE over < 6 AND COALESCE(wide, 0) = 0) AS balls
+            FROM delivery_details WHERE bat = :n AND competition = 'T20I' AND match_date <= :d
+            GROUP BY p_match, inns
+        ), wp AS (
+            SELECT dd.p_match, dd.inns,
+                   (ARRAY_AGG(dd.win_prob ORDER BY dd.over, dd.ball))[1] AS wp0,
+                   (ARRAY_AGG(dd.win_prob ORDER BY dd.over DESC, dd.ball DESC) FILTER (WHERE dd.over < 6))[1] AS wp6
+            FROM delivery_details dd JOIN his h ON h.p_match = dd.p_match AND h.inns = dd.inns
+            WHERE h.last_over >= 6 GROUP BY dd.p_match, dd.inns
+        )
+        SELECT COUNT(*) AS innings, SUM(h.runs) AS runs, SUM(h.balls) AS balls, AVG(wp.wp0) AS wp0, AVG(wp.wp6) AS wp6
+        FROM his h JOIN wp ON wp.p_match = h.p_match AND wp.inns = h.inns
+        WHERE wp.wp0 IS NOT NULL AND wp.wp6 IS NOT NULL
+    """), {"n": name, "d": until.isoformat()}).mappings().first()
+    if not r or not r["innings"] or not r["balls"]:
+        return None
+    return {"innings": r["innings"], "runs": int(r["runs"]), "balls": int(r["balls"]),
+            "sr": round(100 * r["runs"] / r["balls"]), "wp0": round(r["wp0"]), "wp6": round(r["wp6"])}
+
+
 def deep_card(db, pool, by_phase, sample):
     """The deeper cut: the RAA leader against the WPA leader, win probability added by phase."""
     from services.ig_posts.deep_cut import KICKER
@@ -335,6 +364,7 @@ def deep_card(db, pool, by_phase, sample):
     if raa_lead is wpa_lead:
         return None
     a, b = raa_lead["name"], wpa_lead["name"]
+    a_date = raa_lead["date"]
     pa, pb = by_phase.get(a) or {}, by_phase.get(b) or {}
     rows = []
     for k, lbl in PHASES:
@@ -347,18 +377,27 @@ def deep_card(db, pool, by_phase, sample):
     edge["highlight"] = True
     ta, tb = totals[a], totals[b]
     phase = edge["label"].lower() + (" overs" if edge["label"] != "Powerplay" else "")
-    title = f"{short(a)} adds the most runs above average. {short(b)}'s runs move more matches, most of all in the {phase}"
-    low = pa.get("middle") or {}
+    # A later phase where the RAA leader adds little win probability is often one his own powerplay already decided:
+    # when his starts in those innings lifted his side by TILT points or more, say that, not that his runs matter less.
+    early = past_powerplay(db, a, a_date) if edge["label"] != "Powerplay" else None
+    tilted = early and early["wp6"] - early["wp0"] >= TILT
+    if tilted:
+        title = f"{short(a)} adds the most runs above average, and he does it up front"
+        edge.pop("highlight", None)  # the chart points where the title does: his powerplay
+        next(r for r in rows if r["label"] == "Powerplay")["highlight"] = True
+        why = (f" The gap comes from the {phase}: when {short(a)} bats past the powerplay ({early['innings']} innings), "
+               f"he has already scored at {early['sr']} and lifted his side from {early['wp0']}% to {early['wp6']}%.")
+    else:
+        title = f"{short(a)} adds the most runs above average. {short(b)}'s runs move more matches, most of all in the {phase}"
+        why = ""
     c = card("raa-v-wpa", "deep_compare", title, {
         "metric": {"label": "win probability added per 100 balls (percentage points)", "format": "dec2", "signed": False},
         "series": [short(a), short(b)], "rows": rows,
     }, sample, (f"Runs above average per 100 balls: {short(a)} {ta['raa']:.0f}, {short(b)} {tb['raa']:.0f}. Win probability "
-                f"added per 100 balls: {short(b)} {tb['wpa']:.2f}, {short(a)} {ta['wpa']:.2f}. RAA: runs beyond what an average "
-                "batter makes from the same balls; WPA: how much the runs moved their side's chance of winning."
-                + (f" {short(a)}'s middle overs come at low stakes (leverage {low['avg_leverage']:.2f})."
-                   if low.get("avg_leverage") is not None else "")))
+                f"added per 100 balls: {short(b)} {tb['wpa']:.2f}, {short(a)} {ta['wpa']:.2f}." + why
+                + " RAA: runs beyond an average batter's from the same balls; WPA: how much the runs moved the chance of winning."))
     c["kicker"] = KICKER
-    c["facts"] = {"raa_lead": a, "wpa_lead": b}
+    c["facts"] = {"raa_lead": a, "wpa_lead": b, "past_powerplay": early if tilted else None}
     return c
 
 
