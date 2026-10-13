@@ -232,7 +232,9 @@ def build(db: Session, idea: str, deep: bool = False, expect: Optional[str] = No
                  + prof["profile"] + ([prof["opposition"]] if prof["opposition"] else []))
         leader = balls_rows[0]["name"]
         out.update(cards=cards, hook=f"{leader} is the fastest to {words['what']}. What's behind it?",
-                   players=list(dict.fromkeys([leader, *out["players"]])),
+                   # Hashtags follow this order: the record holder, then who the deeper cut compares him with.
+                   players=list(dict.fromkeys([leader, *([prof["deep"]["facts"]["wpa_lead"]] if prof["deep"] else []),
+                                               *out["players"]])),
                    deep_cut={"probe": "record-raa-v-wpa", "subject": leader, "sentence": prof["deep"]["title"] + ".",
                              "by": "recap"} if prof["deep"] else None)
     return out
