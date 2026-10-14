@@ -50,6 +50,22 @@ def chapter_leads(story: Dict[str, Any], skip=SKIP_CHAPTERS) -> List[str]:
     return [ch["cards"][0]["id"] for ch in story["chapters"] if ch["cards"] and ch.get("id") not in skip]
 
 
+#: At an IPL side's home ground the ground and its players are the story (the Reel's beats, ig_reel_v2.PREVIEW_BEATS),
+#: then the teams' edge and the fantasy pick.
+HOME_GROUND_CARDS = ("totals", "form-strips", "suits-ground", "ground-records", "key-battles", "milestones",
+                     "where-won", "projected-points")
+
+
+def preview_cards(story: Dict[str, Any]) -> List[str]:
+    """The preview post's cards: HOME_GROUND_CARDS when the story found the ground's IPL side among the players
+    (suits-ground or ground-records carry `home`), else each chapter's lead."""
+    built = {c["id"]: c for ch in story["chapters"] for c in ch["cards"]}
+    home = any((built.get(i) or {}).get("payload", {}).get("home") for i in ("suits-ground", "ground-records"))
+    if home:
+        return [i for i in HOME_GROUND_CARDS if i in built]
+    return chapter_leads(story)
+
+
 def _players(db: Session, match_id: str, fmt: str, role: str) -> List[Dict[str, Any]]:
     from services.query_builder_v2 import run_deliveries_query
 

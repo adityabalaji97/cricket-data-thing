@@ -22,7 +22,7 @@ try {
   for (let n = 1; n <= Number(countArg); n++) {
     const page = await browser.page({ width: W, height: H, scale: SCALE });
     await page.goto(`${base}/ig/${id}/${n}?r=${Date.now()}`);
-    const ready = await page.waitFor("document.querySelector('[data-ig-slide][data-ready=\"true\"]') !== null");
+    const ready = await page.waitFor("document.querySelector('[data-ig-slide][data-ready=\"true\"]') !== null", 90000);  // a dev server's first load is slow
     if (!ready) { result.failed.push({ n, reason: 'not ready', errors: browser.errors.slice(-3) }); await page.close(); continue; }
     const file = `${out}/${n}.png`;
     writeFileSync(file, await page.screenshot({ x: 0, y: 0, width: W, height: H }));

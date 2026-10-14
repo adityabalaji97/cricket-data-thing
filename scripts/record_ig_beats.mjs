@@ -23,7 +23,7 @@ try {
   for (const n of list.split(',').map(Number)) {
     const page = await browser.page({ width: W, height: H, scale: SCALE });
     await page.goto(`${base}/ig/${id}/${n}?animate=1&r=${Date.now()}`);
-    const ready = await page.waitFor("document.querySelector('[data-ig-slide][data-ready=\"true\"]') !== null");
+    const ready = await page.waitFor("document.querySelector('[data-ig-slide][data-ready=\"true\"]') !== null", 90000);  // a dev server's first load is slow
     if (!ready) { result.failed.push({ n, reason: 'not ready' }); await page.close(); continue; }
     mkdirSync(`${out}/${n}`, { recursive: true });
     const frames = Math.ceil((REVEAL_MS / 1000) * fps);

@@ -28,7 +28,7 @@ REGISTRY: List[CardSpec] = [*EXISTING, *GROUND, *TEAMS, *PLAYERS, *FANTASY]
 
 # Part of the cached story's key (routers/match_preview.py): bump when any card's logic or copy
 # changes, so a deploy never serves stories built by older code. Data loads expire it on their own.
-STORY_VERSION = "2026-10-12"
+STORY_VERSION = "2026-10-14.1"
 
 
 def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[str, Any]:

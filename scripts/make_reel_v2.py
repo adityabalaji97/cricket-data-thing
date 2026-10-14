@@ -3,7 +3,9 @@ A Reel v2 (services/ig_reel_v2.py) for one queued post, out of the A/B: the post
 
     python scripts/make_reel_v2.py --key ig:myth-note-34 [--beats 4,5,7] --out /tmp/varun.mp4          # preview only
     python scripts/make_reel_v2.py --key ig:myth-note-34 [--beats 4,5,7] --store                        # the post's Reel
+    python scripts/make_reel_v2.py --key ig:preview-... --cards totals,form-strips,milestones --long --out /tmp/p.mp4
 
+--cards: the same by card id (a preview's cards: services/ig_reel_v2.PREVIEW_BEATS is the default).
 --beats: slide numbers to use (the first opens the Reel); default: services/ig_reel_v2.beats. With --store the Reel
 replaces the post's in ig_reels, facts.reel records the script, and the caption gets the AI-voice line.
 Voice and style: REEL_VOICE / REEL_TONE.
@@ -23,6 +25,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--key", required=True)
     parser.add_argument("--beats")
+    parser.add_argument("--cards", help="card ids instead of slide numbers, e.g. totals,form-strips,milestones")
     parser.add_argument("--out")
     parser.add_argument("--store", action="store_true")
     parser.add_argument("--long", action="store_true", help="45-60 seconds, up to 5 charts")
@@ -44,6 +47,8 @@ def main() -> int:
     cid = row["facts"]["carousel_id"]
     slides = db.execute(text("SELECT data FROM chart_snapshots WHERE id = :c"), {"c": cid}).scalar()["slides"]
     plan = {"beats": [int(n) for n in args.beats.split(",")]} if args.beats else None
+    if args.cards:
+        plan = {"beats": R.by_card_id(slides, [c.strip() for c in args.cards.split(",") if c.strip()])}
     if args.close:
         plan = {**(plan or {}), "close": args.close}
     out = Path(args.out) if args.out else None

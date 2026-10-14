@@ -85,10 +85,18 @@ def what_wins(ctx) -> Optional[Card]:
         title = f"Nobody has posted {line} here{when}"
     points = [{"year": m.year, "total": m.first["runs"], "won": m.result == "bat",
                "recent": since is None or m.year >= since} for m in full]
+    # At an IPL ground hosting an international, most dots are IPL innings: say so, and count the huge ones.
+    comps = {m.first.get("competition") for m in full}
+    mixed = "IPL" in comps and len(comps) > 1 and ctx.fixture_competition != "IPL"
+    huge = sum(1 for m in recent if m.first["runs"] >= 250)
+    help_ = f"Each dot is one first innings; the dashed line is {line}"
+    if huge >= 2:
+        help_ += f". {huge} totals of 250+{when}"
+    where = "IPL and T20I " if mixed else ""
     return Card(
         id="totals", chapter="ground", visual="totals_scatter",
-        title=title, help=f"Each dot is one first innings; the dashed line is {line}",
-        sample=f"{plural(len(full), 'first innings')} at {short_venue(ctx.venue)} · {span(ctx.start, ctx.end)}",
+        title=title, help=help_,
+        sample=f"{len(full)} {where}first innings at {short_venue(ctx.venue)} · {span(ctx.start, ctx.end)}",
         n=len(full),
         payload={"points": points, "line": line, "since": since,
                  "years": [years[0], years[-1]], "faded_label": f"before {since}" if since else None},

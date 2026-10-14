@@ -58,7 +58,10 @@ TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept
 # viewers in the first 3s (12 Oct). The cover is picked when posting instead (admin: Reel tab → Cover).
 COVER_SECONDS = float(os.getenv("REEL_COVER", "0"))
 CAPTION_WORDS = 3              # words on screen at a time
-ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth")
+ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth", "preview")
+#: A match preview's Reel, in story order: what wins here, who's in form, who suits the ground, who has gone big here,
+#: the match-up, and a milestone to close on. The first k the carousel has; the milestone is kept as the closer.
+PREVIEW_BEATS = ("totals", "form-strips", "suits-ground", "ground-records", "key-battles", "milestones")
 #: The payoff, in order of preference: what opens the Reel.
 PAYOFF = ("win_prob_line", "race_lines", "bowling_plan", "metric_bars", "deep_compare", "scorecard", "bucket_bars",
           "boundary_zones", "pair_dumbbell", "scatter_plus")
@@ -73,6 +76,9 @@ def beats(slides: List[Dict[str, Any]], k: int = 3) -> List[Tuple[int, Dict[str,
              and s["card"].get("visual") not in SKIP]
     if not cards:
         return []
+    picks = preview_beats(cards, k)
+    if picks:
+        return picks
 
     def rank(c):
         v = c[1].get("visual")
@@ -90,6 +96,27 @@ def beats(slides: List[Dict[str, Any]], k: int = 3) -> List[Tuple[int, Dict[str,
         if c not in out:
             out.append(c)
     return [out[0]] + sorted(out[1:], key=lambda c: c[0])
+
+
+def preview_beats(cards: List[Tuple[int, Dict[str, Any]]], k: int) -> List[Tuple[int, Dict[str, Any]]]:
+    """A preview's beats (PREVIEW_BEATS order), or [] when the carousel has fewer than two of them. Over k, cards are
+    dropped from the end, except a closing milestone."""
+    by_id = {c.get("id"): (n, c) for n, c in cards}
+    picks = [by_id[i] for i in PREVIEW_BEATS if i in by_id]
+    if len(picks) < 2:
+        return []
+    while len(picks) > k:
+        picks.pop(-2 if picks[-1][1].get("id") == "milestones" else -1)
+    return picks
+
+
+def by_card_id(slides: List[Dict[str, Any]], ids: List[str]) -> List[int]:
+    """Slide numbers for card ids (scripts/make_reel_v2.py --cards), in the order given; unknown ids are an error."""
+    where = {s["card"].get("id"): i + 1 for i, s in enumerate(slides) if s.get("type") == "card" and s.get("card")}
+    missing = [i for i in ids if i not in where]
+    if missing:
+        raise ValueError(f"not in this carousel: {', '.join(missing)}")
+    return [where[i] for i in ids]
 
 
 # ---- the script -----------------------------------------------------------------------------------------------------
