@@ -511,24 +511,56 @@ def name_matches(db: Session, guess: str, answer: str) -> bool:
 
 # ------------------------------------------------------------------------ Guess the Innings
 #
-# One 40+ innings a day (IPL, or T20Is between top-10 sides, since 2015): the wagon wheel and the
-# score (and the season) are the clue; name the batter. Hints: team, opposition, venue, initials.
+# One innings a day that helped its side win (IPL, or T20Is between top-10 sides, since 2015): it must have raised
+# the batting side's win probability by POOL_MIN_WPA or more and added runs over an average batter (T20 Primer WPA
+# and Impact, summed from ball_metrics). A match-winning 30 qualifies; a slow 45 in a lost chase doesn't. The wagon
+# wheel, the score, the season and those two numbers are the clue; name the batter. Hints: team, opposition, venue,
+# initials.
 
 INNINGS_HINTS = ("team", "opposition", "venue", "initials")  # the season is shown up front
+POOL_MIN_WPA = 0.05      # +5 percentage points of win probability
+_POOL_FIELDS = ("match_id", "innings", "batter", "venue", "competition", "match_date", "balls", "runs", "strike_rate",
+                "batting_team", "bowling_team", "wpa", "impact")
 
 
 def _innings_pool(db: Session) -> List[Dict[str, Any]]:
-    rows = db.execute(text("""
-        SELECT match_id, innings, batter, venue, competition, match_date, balls, runs, strike_rate,
-               batting_team, bowling_team
-        FROM guess_innings_pool
-        WHERE runs >= 40 AND match_date::date >= DATE '2015-01-01'
-          AND (competition IN ('IPL', 'Indian Premier League')
-               OR (competition IN ('T20I', 'International Twenty20')
-                   AND batting_team = ANY(:teams) AND bowling_team = ANY(:teams)))
-        ORDER BY match_id, innings, batter
-    """), {"teams": list(TOP_T20I_TEAMS)}).mappings().all()
-    return [dict(r) for r in rows]
+    """~4,400 innings; the WPA sum takes ~12s, so the pool is kept in the query cache (one build per data load)."""
+    from services.query_cache import cached_run
+
+    def run():
+        rows = db.execute(text("""
+            SELECT p.match_id, p.innings, p.batter, p.venue, p.competition, p.match_date::text AS match_date, p.balls,
+                   p.runs, p.strike_rate, p.batting_team, p.bowling_team, m.wpa, m.impact
+            FROM guess_innings_pool p
+            JOIN LATERAL (
+                SELECT SUM(bm.wpa) AS wpa, SUM(bm.impact) AS impact
+                FROM delivery_details dd JOIN ball_metrics bm ON bm.delivery_id = dd.id
+                WHERE dd.p_match = p.match_id AND dd.inns = p.innings AND dd.bat = p.batter
+            ) m ON TRUE
+            WHERE p.match_date::date >= DATE '2015-01-01'
+              AND (p.competition IN ('IPL', 'Indian Premier League')
+                   OR (p.competition IN ('T20I', 'International Twenty20')
+                       AND p.batting_team = ANY(:teams) AND p.bowling_team = ANY(:teams)))
+              AND m.wpa >= :min_wpa AND m.impact > 0
+            ORDER BY p.match_id, p.innings, p.batter
+        """), {"teams": list(TOP_T20I_TEAMS), "min_wpa": POOL_MIN_WPA}).all()
+        # Rows as lists: the cache keeps results under 1 MB.
+        return {"rows": [[r[0], r[1], r[2], r[3], r[4], r[5], int(r[6]), int(r[7]), float(r[8] or 0), r[9], r[10],
+                          round(float(r[11]), 4), round(float(r[12]), 2)] for r in rows]}
+
+    out = cached_run(db, {"endpoint": "guess_innings_pool", "min_wpa": POOL_MIN_WPA, "v": 2}, run)
+    return [dict(zip(_POOL_FIELDS, r)) for r in out["rows"]]
+
+
+def impact_lines(wpa: Optional[float], impact: Optional[float]) -> List[str]:
+    """The two free clues, in words: win probability added (in %) and runs over an average batter."""
+    lines = []
+    if wpa is not None:
+        lines.append(f"Raised their side's win probability by {round(wpa * 100):.0f}%")
+    if impact is not None:
+        n = round(impact)
+        lines.append(f"Added {n} run{'s' if n != 1 else ''} more than an average batter")
+    return lines
 
 
 def innings_puzzle(db: Session, puzzle: Puzzle) -> Dict[str, Any]:
@@ -561,6 +593,9 @@ def innings_question(pick: Dict[str, Any]) -> Dict[str, Any]:
         "bat_hand": {"RHB": "Right-hand bat", "LHB": "Left-hand bat"}.get(hand, hand),
         "name_shape": name_shape(pick["batter"]),
         "season": innings_hint(pick, "season"),
+        "wpa_pct": round(float(pick["wpa"]) * 100) if pick.get("wpa") is not None else None,
+        "impact": round(float(pick["impact"])) if pick.get("impact") is not None else None,
+        "impact_lines": impact_lines(pick.get("wpa"), pick.get("impact")),
         "hints": list(INNINGS_HINTS),
         "deliveries": [
             {"over": d["over"], "ball": d["ball"], "runs": int(d["runs"] or 0), "x": d["wagon_x"], "y": d["wagon_y"]}
