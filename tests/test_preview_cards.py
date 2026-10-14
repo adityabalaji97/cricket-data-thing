@@ -450,3 +450,43 @@ def test_closing_card_links_one_card_per_chapter_first():
     assert 2 <= len(links) <= 4
     assert all(l["url"].startswith("https://hindsightcricket.com/query?") for l in links)
     assert links[0]["label"].endswith("?")  # the card's own question
+
+
+# --- the ground's IPL side ---------------------------------------------------------------------------------------
+
+def _home_ctx(monkeypatch, competition="T20I", innings=None):
+    ctx = _players_ctx(monkeypatch, {
+        ("batting_team",): [{"batting_team": "Mumbai Indians", "balls": 900}, {"batting_team": "Rajasthan Royals", "balls": 120},
+                            {"batting_team": "Gujarat Titans", "balls": 120}],
+        ("batter", "batting_team", "year"): [
+            {"batter": "SK Yadav", "batting_team": "Mumbai Indians", "year": 2026, "balls": 300},
+            {"batter": "S Samson", "batting_team": "Mumbai Indians", "year": 2024, "balls": 200},   # moved on since
+            {"batter": "S Samson", "batting_team": "Chennai Super Kings", "year": 2026, "balls": 250}],
+        ("bowler", "bowling_team", "year"): [{"bowler": "JJ Bumrah", "bowling_team": "Mumbai Indians", "year": 2026, "balls": 280}],
+        ("batter", "match_id", "batting_team", "bowling_team", "competition", "year"): innings or [],
+    })
+    ctx.__dict__["fixture_competition"] = competition
+    return ctx
+
+
+def test_home_side_is_found_in_the_data(monkeypatch):
+    from services.preview_cards import players as P
+    home = P.home_side(_home_ctx(monkeypatch))
+    assert home == {"team": "Mumbai Indians", "short": "MI", "players": ["JJ Bumrah", "SK Yadav"]}
+    assert P.home_side(_home_ctx(monkeypatch, competition="IPL")) is None  # an IPL match is no one's away game
+
+
+def test_ground_records_count_hundreds_and_mark_the_home_side(monkeypatch):
+    from services.preview_cards import players as P
+    inn = lambda name, runs, balls, team, year: {"batter": name, "match_id": f"{name}{year}", "batting_team": team,
+                                                 "bowling_team": "Gujarat Titans", "competition": "IPL", "year": year,
+                                                 "runs": runs, "balls": balls}
+    ctx = _home_ctx(monkeypatch, innings=[inn("SK Yadav", 103, 49, "Mumbai Indians", 2025),
+                                          inn("S Samson", 111, 47, "Chennai Super Kings", 2024),
+                                          inn("HH Pandya", 61, 30, "Mumbai Indians", 2026),
+                                          inn("N Ahmad", 12, 9, "Chennai Super Kings", 2026)])
+    card = P.ground_records(ctx)
+    assert card.title == "2 T20 hundreds here by today's players: S Samson and SK Yadav"
+    assert [r["runs"] for r in card.payload["rows"]] == [111, 103, 61]  # 50+ only, biggest first
+    assert [r["home"] for r in card.payload["rows"]] == [False, True, True]
+    assert card.payload["home"] == "MI"

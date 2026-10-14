@@ -638,33 +638,109 @@ const SuitsScatter = ({ payload, teams }) => {
   const [t1, t2] = teams || [];
   const vals = payload.rows.flatMap((r) => [r.here, r.elsewhere]);
   const span = Math.max(20, Math.ceil(Math.max(...vals.map(Math.abs)) / 10) * 10);
-  const W = 300; const H = 186; const left = 10; const right = 10; const top = 16; const bottom = 154;
+  const W = 300; const H = 186; const left = 10; const right = 10; const top = 24; const bottom = 154;
   const x = (v) => left + ((v + span) / (2 * span)) * (W - left - right);
   const y = (v) => bottom - ((v + span) / (2 * span)) * (bottom - top);
+  const home = new Set(payload.home?.players || []);
+  // Labelled: the ground's IPL side's own players, and the three biggest gaps either way.
   const gaps = payload.rows.map((r) => Math.abs(r.here - r.elsewhere)).sort((a, b) => b - a);
-  const labelled = new Set(payload.rows.filter((r) => Math.abs(r.here - r.elsewhere) >= (gaps[2] ?? 0)).map((r) => r.name));
+  const labelled = new Set(payload.rows.filter((r) => home.has(r.name) || Math.abs(r.here - r.elsewhere) >= (gaps[2] ?? 0)).map((r) => r.name));
+  // Each label takes the first spot that stays inside the chart and clear of the labels already placed: right of its
+  // dot, left of it (near the right edge), below, above.
+  const placed = {};
+  const boxes = [];
+  [...payload.rows].sort((a, b) => Math.abs(b.here - b.elsewhere) - Math.abs(a.here - a.elsewhere)).forEach((r) => {
+    if (!labelled.has(r.name)) return;
+    const cx = x(r.elsewhere); const cy = y(r.here); const w = surname(r.name).length * 6.6; const h = 12;
+    const g = home.has(r.name) ? 12 : 8; // clear of the ring
+    const spots = [
+      { x: cx + g, y: cy + 4, anchor: 'start', box: [cx + g, cy - 8, cx + g + w, cy + 4] },
+      { x: cx - g, y: cy + 4, anchor: 'end', box: [cx - g - w, cy - 8, cx - g, cy + 4] },
+      { x: cx, y: cy + 19, anchor: 'middle', box: [cx - w / 2, cy + 8, cx + w / 2, cy + 8 + h] },
+      { x: cx, y: cy - 10, anchor: 'middle', box: [cx - w / 2, cy - 10 - h, cx + w / 2, cy - 10] },
+    ];
+    const fits = (b) => b[0] >= 0 && b[2] <= W && b[1] >= 12 && !boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]);
+    const spot = spots.find((sp) => fits(sp.box)) || spots[cx > W * 0.7 ? 1 : 0];
+    boxes.push(spot.box);
+    placed[r.name] = spot;
+  });
+  const label = (r) => placed[r.name];
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Runs above average per 100 balls at ${payload.ground} against elsewhere`} sx={{ width: '100%' }}>
         <line x1={x(-span)} y1={y(-span)} x2={x(span)} y2={y(span)} stroke={colors.textFaint} strokeDasharray="4 4" />
         <line x1={x(0)} x2={x(0)} y1={top} y2={bottom} stroke={colors.border} />
         <line x1={left} x2={W - right} y1={y(0)} y2={y(0)} stroke={colors.border} />
-        {payload.rows.map((r) => (
-          <g key={r.name}>
-            <circle cx={x(r.elsewhere)} cy={y(r.here)} r="5" fill={sideColor(r.side, t1, t2)} stroke={colors.surface1} strokeWidth="1.5">
-              <title>{`${r.name}: ${signed(r.here)} here (${r.balls_here} balls), ${signed(r.elsewhere)} elsewhere`}</title>
-            </circle>
-            {labelled.has(r.name) && (
-              <text x={x(r.elsewhere) + 8} y={y(r.here) + 4} style={{ fontFamily: fonts.body, fontSize: 12, fill: colors.textHi }}>{surname(r.name)}</text>
-            )}
-          </g>
-        ))}
+        {payload.rows.map((r) => {
+          const l = label(r);
+          return (
+            <g key={r.name}>
+              {home.has(r.name) && <circle cx={x(r.elsewhere)} cy={y(r.here)} r="8.5" fill="none" stroke={colors.textHi} strokeWidth="1.2" />}
+              <circle cx={x(r.elsewhere)} cy={y(r.here)} r="5" fill={sideColor(r.side, t1, t2)} stroke={colors.surface1} strokeWidth="1.5">
+                <title>{`${r.name}: ${signed(r.here)} here (${r.balls_here} balls), ${signed(r.elsewhere)} elsewhere`}</title>
+              </circle>
+              {labelled.has(r.name) && (
+                <text x={l.x} y={l.y} textAnchor={l.anchor} style={{ fontFamily: fonts.body, fontSize: 12, fill: colors.textHi }}>{surname(r.name)}</text>
+              )}
+            </g>
+          );
+        })}
         <text x={x(-span)} y={H - 18} style={{ ...svgText, fill: colors.textFaint }}>{signed(-span)}</text>
         <text x={x(span)} y={H - 18} textAnchor="end" style={{ ...svgText, fill: colors.textFaint }}>{signed(span)}</text>
         <text x={(left + W - right) / 2} y={H - 2} textAnchor="middle" style={{ ...svgText, fill: colors.textLo }}>Elsewhere</text>
-        <text x="4" y={top + 8} style={{ ...svgText, fill: colors.textLo }}>{`At ${payload.ground}`}</text>
+        <text x="4" y="10" style={{ ...svgText, fill: colors.textLo }}>Here</text>
       </Box>
-      {t1 && <Legend items={[[t1, sideColor(t1, t1, t2)], [t2, sideColor(t2, t1, t2)]]} />}
+      {t1 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 1.5 }}>
+          <Legend items={[[t1, sideColor(t1, t1, t2)], [t2, sideColor(t2, t1, t2)]]} />
+          {home.size > 0 && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 1 }}>
+              <Box sx={{ width: 10, height: 10, borderRadius: '50%', border: `1.5px solid ${colors.textHi}` }} />
+              <Typography sx={{ fontSize: 13, color: colors.textMed }}>{`${payload.home.team} at home`}</Typography>
+            </Box>
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+};
+
+/** D4b: the biggest innings at the ground by today's players, one bar each; the home IPL side's innings ringed. */
+const GroundInnings = ({ payload, teams }) => {
+  const [t1, t2] = teams || [];
+  const max = Math.max(...payload.rows.map((r) => r.runs), 100);
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.1 }}>
+      {payload.rows.map((r) => (
+        <Box key={`${r.name}-${r.year}-${r.runs}-${r.opp}`}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
+            <Typography noWrap sx={{ fontSize: 14, color: colors.textHi, minWidth: 0 }}>
+              <Box component="span" sx={{ fontWeight: 600 }}>{r.name}</Box>
+              <Box component="span" sx={{ color: colors.textLo, fontSize: 12 }}>{`  ${r.team} v ${r.opp} · ${r.competition} ${r.year}`}</Box>
+            </Typography>
+            <Typography sx={{ fontSize: 14, color: colors.textHi, fontFamily: fonts.mono, flexShrink: 0 }}>
+              {r.runs}<Box component="span" sx={{ color: colors.textLo, fontSize: 12 }}>{` (${r.balls})`}</Box>
+            </Typography>
+          </Box>
+          <Box sx={{ position: 'relative', height: 10, mt: 0.4 }}>
+            <Box sx={{
+              position: 'absolute', left: 0, top: 0, height: 10, borderRadius: '0 4px 4px 0', width: `${(100 * r.runs) / max}%`,
+              bgcolor: sideColor(r.side, t1, t2), outline: r.home ? `1.5px solid ${colors.textHi}` : 'none', outlineOffset: '1px',
+            }} />
+          </Box>
+        </Box>
+      ))}
+      {t1 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 1.5 }}>
+          <Legend items={[[t1, sideColor(t1, t1, t2)], [t2, sideColor(t2, t1, t2)]]} />
+          {payload.rows.some((r) => r.home) && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 1 }}>
+              <Box sx={{ width: 10, height: 10, borderRadius: '3px', border: `1.5px solid ${colors.textHi}` }} />
+              <Typography sx={{ fontSize: 13, color: colors.textMed }}>{`For ${payload.home}, at home`}</Typography>
+            </Box>
+          )}
+        </Box>
+      )}
     </Box>
   );
 };
@@ -673,14 +749,25 @@ const SuitsScatter = ({ payload, teams }) => {
 const Milestones = ({ payload, teams }) => {
   const [t1, t2] = teams || [];
   return (
-    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.25 }}>
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2.25 }}>
       {payload.rows.map((m) => (
-        <Box key={`${m.player}-${m.stat}`} sx={{ display: 'flex', gap: 1, alignItems: 'baseline' }}>
-          <Box sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: sideColor(m.side, t1, t2), flexShrink: 0, transform: 'translateY(-1px)' }} />
-          <Typography sx={{ fontSize: 15, color: colors.textHi, lineHeight: 1.35 }}>
-            <Box component="span" sx={{ fontWeight: 600 }}>{m.player}</Box>
-            {` ${m.text}`}
-          </Typography>
+        <Box key={`${m.player}-${m.stat}`}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'baseline' }}>
+            <Box sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: sideColor(m.side, t1, t2), flexShrink: 0, transform: 'translateY(-1px)' }} />
+            <Typography sx={{ fontSize: 15, color: colors.textHi, lineHeight: 1.35 }}>
+              <Box component="span" sx={{ fontWeight: 600 }}>{m.player}</Box>
+              {` ${m.text}`}
+            </Typography>
+          </Box>
+          {m.target > 0 && (
+            // How far along: the total against the target, so the gap left is the bit that stands out.
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75, pl: 2.1 }}>
+              <Box sx={{ position: 'relative', flex: 1, height: 8, borderRadius: 4, bgcolor: colors.surface2 }}>
+                <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4, width: `${Math.min(100, (100 * m.total) / m.target)}%`, bgcolor: sideColor(m.side, t1, t2) }} />
+              </Box>
+              <Typography sx={{ fontSize: 13, color: colors.textMed, fontFamily: fonts.mono, flexShrink: 0 }}>{`${m.total}/${m.target}`}</Typography>
+            </Box>
+          )}
         </Box>
       ))}
     </Box>
@@ -788,6 +875,7 @@ export const VISUALS = {
   player_bars: PlayerBars,
   form_strips: FormStrips,
   suits_scatter: SuitsScatter,
+  ground_innings: GroundInnings,
   milestones: Milestones,
   pitch_usage: PitchUsage,
   captaincy: Captaincy,

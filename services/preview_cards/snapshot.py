@@ -206,6 +206,11 @@ def _suits(p, f):
                        for r in p["rows"]]}
 
 
+def _ground_innings(p, f):
+    return _bars([{"name": f"{r['name']} · {r['team']} v {r['opp']} {r['year']}", "value": r["runs"]} for r in p["rows"]],
+                 "runs", lambda r: str(r["value"]), highlight_first=True)
+
+
 def _milestones(p, f):
     return {"layout": "list", "rows": [{"label": r["player"], "sub": r["side"] or "", "details": [r["text"]]} for r in p["rows"]]}
 
@@ -228,6 +233,7 @@ CONVERTERS: Dict[str, Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
     "dismissals": _dismissals, "recent_results": _recent, "h2h": _h2h, "form": _form, "dumbbell": _dumbbell,
     "rank_bars": _ranks, "elo_lines": _elo, "last_meeting": _last_meeting, "xis": _xis, "battles": _battles,
     "player_bars": _player_bars, "form_strips": _strips, "suits_scatter": _suits, "milestones": _milestones,
+    "ground_innings": _ground_innings,
     "pitch_usage": _pitch, "captaincy": _captaincy,
     "links": lambda p, f: {"layout": "list", "rows": [{"label": l["label"], "sub": "", "details": ["hindsightcricket.com/query"]}
                                                       for l in p["links"]]},

@@ -55,7 +55,7 @@ def test_variant_ab_and_eligibility(monkeypatch):
     monkeypatch.setenv("REEL_V2", "1")
     even, odd = date(2026, 10, 12), date(2026, 10, 13)
     assert {R.variant("recap", even), R.variant("recap", odd)} == {"v1", "v2"}
-    assert R.variant("preview", even) == "v1"
+    assert R.variant("play", even) == "v1"  # not a Reel kind
     monkeypatch.setenv("REEL_AB", "0")
     assert R.variant("recap", odd) == "v2"
 
@@ -136,3 +136,23 @@ def test_one_word_phrases_join_the_one_before():
     ws = "Against top sides, India win 86% with Bumrah and 58% without. So what changes?".split()
     got = [" ".join(ws[a:b]) for a, b in R.phrases(ws)]
     assert "without." not in got and any(p.endswith("58% without.") for p in got)
+
+
+def _preview_slides(ids):
+    return [{"type": "hook", "text": "7 things the data says before India v West Indies"}] + [
+        {"type": "card", "card": {"id": i, "visual": "player_bars", "title": i, "payload": {}}} for i in ids]
+
+
+def test_preview_beats_follow_the_story_and_close_on_a_milestone():
+    slides = _preview_slides(["key-battles", "totals", "milestones", "form-strips", "suits-ground", "ground-records",
+                              "where-won"])
+    bs = R.beats(slides, k=5)
+    assert [c["id"] for _, c in bs] == ["totals", "form-strips", "suits-ground", "ground-records", "milestones"]
+    assert [c["id"] for _, c in R.beats(slides, k=3)] == ["totals", "form-strips", "milestones"]
+    assert R.by_card_id(slides, ["milestones", "totals"]) == [4, 3]
+
+
+def test_preview_beats_need_two_of_their_cards():
+    slides = _preview_slides(["totals", "where-won", "projected-points"])
+    assert [c["id"] for _, c in R.beats(slides, k=3)][0] != "milestones"
+    assert R.preview_beats([(2, {"id": "totals"})], 3) == []

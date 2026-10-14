@@ -308,6 +308,54 @@ def form_strips(ctx) -> Optional[Card]:
 
 
 # --------------------------------------------------------------------------------------------
+# The ground's IPL side: an international at an IPL ground has players who know it as home
+# --------------------------------------------------------------------------------------------
+
+HOME_SEASONS = 2            # the side with the most IPL balls batted here over the last two seasons
+HOME_SHARE = 0.3            # ... and at least this share of them (a home side bats ~half the balls at its ground)
+
+
+def _short_team(name: str) -> str:
+    from models import teams_mapping
+
+    return teams_mapping.get(name, name)
+
+
+def home_side(ctx) -> Optional[Dict[str, Any]]:
+    """{"team", "short", "players"} when the fixture isn't an IPL match and the ground is an IPL side's home:
+    the side from the data (most IPL balls batted here in the last two seasons), its players = those in either XI
+    who played for it in their latest IPL season. None otherwise."""
+    def build():
+        if ctx.fmt != "T20" or ctx.fixture_competition == "IPL":
+            return None
+        end = _end(ctx)
+        start = date(end.year - HOME_SEASONS + 1, 1, 1)
+        teams = _run(ctx, _args(ctx, start, venue=ctx.venue, leagues=["IPL"], group_by=["batting_team"]))
+        total = sum(r["balls"] for r in teams)
+        top = max(teams, key=lambda r: r["balls"], default=None)
+        if not top or top["balls"] < HOME_SHARE * total:
+            return None
+        team = top["batting_team"]
+        players = sorted(_sides(ctx))
+        latest: Dict[str, Dict[int, set]] = defaultdict(lambda: defaultdict(set))
+        since = date(end.year - 3, 1, 1)  # a player's latest IPL side, within the last few seasons
+        for r in _run(ctx, _args(ctx, since, leagues=["IPL"], batters=players, group_by=["batter", "batting_team", "year"])):
+            latest[r["batter"]][int(r["year"])].add(r["batting_team"])
+        for r in _run(ctx, _args(ctx, since, leagues=["IPL"], bowlers=players, group_by=["bowler", "bowling_team", "year"],
+                                 metrics_perspective="bowling")):
+            latest[r["bowler"]][int(r["year"])].add(r["bowling_team"])
+        own = [p for p in players if latest.get(p) and team in latest[p][max(latest[p])]]
+        return {"team": team, "short": _short_team(team), "players": own}
+
+    return _memo(ctx, "home", build)
+
+
+def _names(names: List[str]) -> str:
+    """'A', 'A and B', 'A, B and C'."""
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+
+
+# --------------------------------------------------------------------------------------------
 # D4: who suits this ground
 # --------------------------------------------------------------------------------------------
 
@@ -341,23 +389,98 @@ def suits_ground(ctx) -> Optional[Card]:
     lift = best["here"] - best["elsewhere"]
     drop = worst["here"] - worst["elsewhere"]
     ground = short_venue(ctx.venue)
+    home = home_side(ctx)
+    plotted = {r["name"] for r in rows}
+    home_players = [p for p in (home or {}).get("players", []) if p in plotted]
     if lift >= -drop:
         title = f"{best['name']} lifts at {ground}: {lift:+.0f} runs per 100 balls over their record elsewhere"
+        others = [p for p in home_players if p != best["name"]]
+        if others:
+            # The ground's IPL side knows it best: say how the visitor's lift compares with them (named in the help).
+            own = f"{home['short']}'s own batters" if len(others) > 1 else f"{home['short']}'s {others[0]}"
+            title = f"{best['name']} lifts most here, more than {own}: {lift:+.0f} runs per 100 balls"
     else:
         title = f"{worst['name']} struggles at {ground}: {drop:+.0f} runs per 100 balls against their record elsewhere"
     return Card(
         id="suits-ground", chapter="players", visual="suits_scatter",
-        title=title, help=f"Above the line: better at {ground} than elsewhere",
+        title=title,
+        help=(f"Ringed: {home['short']}'s {_names(home_players)}. Above the line: better here than elsewhere"
+              if home_players else f"Above the line: better at {ground} than elsewhere"),
         sample=f"Both XIs · all men's T20 since {start.year} · {HERE_BALLS}+ balls here", n=len(rows),
-        payload={"rows": rows, "ground": ground},
+        payload={"rows": rows, "ground": ground,
+                 **({"home": {"team": home["short"], "players": home_players}} if home_players else {})},
         info=Info(
-            what=f"Each batter's record at {ground} against their record everywhere else, same seasons.",
+            what=f"Each batter's record at {ground} against their record everywhere else, same seasons."
+                 + (f" {_names(home_players)} play their IPL cricket here for {home['team']}." if home_players else ""),
             how_to_read="Each dot is a batter. Dots above the diagonal have done better here than elsewhere.",
             definitions=[("Measure", "T20 Primer RAA per 100 balls: runs above an average batter in the same "
                                      "situations.")],
         ),
         query_url=ctx.query_url(args=here_args),
         relevance=1.0 + min(max(lift, -drop) / 40.0, 0.8),
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# D4b: the best innings here by anyone in either XI
+# --------------------------------------------------------------------------------------------
+
+RECORD_RUNS = 50        # an innings worth listing
+RECORD_ROWS = 6
+
+
+def _team_label(ctx, team: str) -> str:
+    if team == ctx.team1:
+        return ctx.team1_short or team
+    if team == ctx.team2:
+        return ctx.team2_short or team
+    return _short_team(team)
+
+
+def ground_records(ctx) -> Optional[Card]:
+    """The biggest innings at this ground by today's players, any men's T20 in the window: at an IPL ground most of
+    them are IPL innings, which is the point (these players know the ground)."""
+    sides = _sides(ctx)
+    players = sorted(sides)
+    if not players:
+        return None
+    start = ctx.start or date(_end(ctx).year - 4, 1, 1)
+    args = _args(ctx, start, venue=ctx.venue, batters=players,
+                 group_by=["batter", "match_id", "batting_team", "bowling_team", "competition", "year"])
+    inns = [r for r in _memo(ctx, "record-inns", lambda: _run(ctx, args))
+            if r.get("runs") is not None and r["runs"] >= RECORD_RUNS and sides.get(r["batter"])]
+    if len(inns) < 3:
+        return None
+    inns.sort(key=lambda r: (-r["runs"], r["balls"]))
+    home = home_side(ctx)
+    rows = [{"name": r["batter"], "side": sides[r["batter"]], "runs": int(r["runs"]), "balls": int(r["balls"]),
+             "team": _team_label(ctx, r["batting_team"]), "opp": _team_label(ctx, r["bowling_team"]),
+             "competition": r.get("competition"), "year": int(r["year"]),
+             "home": bool(home and r["batting_team"] == home["team"])} for r in inns[:RECORD_ROWS]]
+    hundreds = [r for r in inns if r["runs"] >= 100]
+    ground = short_venue(ctx.venue)
+    top = rows[0]
+    if len(hundreds) >= 2:
+        by = sorted({r["batter"] for r in hundreds}, key=lambda n: min(-r["runs"] for r in hundreds if r["batter"] == n))
+        title = (f"{len(hundreds)} T20 hundreds here by today's players: {_names(by)}" if len(by) <= 3
+                 else f"Today's players have {len(hundreds)} T20 hundreds at {ground}")
+    else:
+        title = f"{top['name']}'s {top['runs']} off {top['balls']} is the best innings here by anyone in either XI"
+    home_note = (f"; {home['short']} is the home IPL side" if home and any(r["home"] for r in rows) else "")
+    return Card(
+        id="ground-records", chapter="players", visual="ground_innings",
+        title=title, help=f"Biggest innings at {ground} by today's players, runs (balls){home_note}",
+        sample=f"Both XIs · all men's T20 since {start.year} · {RECORD_RUNS}+ runs", n=len(inns),
+        payload={"rows": rows, "ground": ground, "hundreds": len(hundreds),
+                 **({"home": home["short"]} if home else {})},
+        info=Info(
+            what=f"The highest scores at {ground} by anyone in either likely XI, in any men's T20 (IPL and "
+                 "internationals alike).",
+            how_to_read="Each bar is one innings; the label says who they batted for, against whom and when.",
+            definitions=[("Window", f"Since {start.year}, the same years as the rest of the preview.")],
+        ),
+        query_url=ctx.query_url(args=args),
+        relevance=1.0 + min(len(hundreds) / 4.0, 0.8),
     )
 
 
@@ -460,6 +583,8 @@ PLAYERS = (
              sample=SampleRule(flag_below=0), scale_by_sample=False),
     CardSpec("form-strips", "players", "Who's hot?", form_strips, sample=SampleRule(flag_below=0), scale_by_sample=False),
     CardSpec("suits-ground", "players", "Who suits this ground?", suits_ground, formats=("T20",),
+             sample=SampleRule(flag_below=0), scale_by_sample=False),
+    CardSpec("ground-records", "players", "Who has gone big here?", ground_records, formats=("T20",),
              sample=SampleRule(flag_below=0), scale_by_sample=False),
     CardSpec("milestones", "players", "Any records in play?", milestones, sample=SampleRule(flag_below=0), scale_by_sample=False),
     CardSpec("how-they-bowl", "players", "How does the key bowler work?", how_they_bowl, formats=("T20",),

@@ -511,10 +511,10 @@ def preview_post(db: Session, venue: str, team1: str, team2: str, cards: Optiona
     params = context_params(ctx)
     story = cached_story(db, ctx)  # the story the site shows for this fixture
     built = {c["id"]: c for chapter in story["chapters"] for c in chapter["cards"]}
-    if not cards:  # each chapter's lead card, as the site's story swipes through them
-        from services.ig_posts.match import chapter_leads
+    if not cards:  # each chapter's lead card, as the site's story swipes through them (at an IPL home ground, its own set)
+        from services.ig_posts.match import preview_cards
 
-        cards = chapter_leads(story)
+        cards = preview_cards(story)
     chosen, titles, warnings = [], [], []
     for card_id in cards:
         card = built.get(card_id)
