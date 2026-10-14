@@ -153,7 +153,7 @@ const ReelStats = ({ pack, onUpdate, toast }) => {
 
 /** The Reel opens straight on the story (no still frame), so its cover is picked when posting: the carousel's first
  *  slide on a 9:16 frame (as it sits in the Reel, so Instagram doesn't crop it), saved here, then "Edit cover" →
- *  "Add from camera roll" in Instagram (or "Thumbnail" in YouTube Studio). */
+ *  "Add from camera roll" in Instagram. YouTube only lets a new channel pick a frame, so the Short ends on it. */
 const ReelCover = ({ url, title, toast }) => {
   const { files, busy, tap } = useTwoTapShare(() => fetchImageFiles([url], 'hindsight-reel-cover'), `${title} · cover`, toast);
   return (
@@ -163,7 +163,7 @@ const ReelCover = ({ url, title, toast }) => {
       <Box sx={{ minWidth: 0 }}>
         <SectionLabel>Cover</SectionLabel>
         <Typography sx={{ fontSize: 12, color: C.lo, mt: 0.25 }}>
-          Instagram: Edit cover → Add from camera roll. YouTube Studio: Thumbnail.
+          Instagram: Edit cover → Add from camera roll. YouTube: use the Short's last frame.
         </Typography>
         <Button size="small" onClick={tap} disabled={busy} sx={{ color: C.lime, fontWeight: 700, minHeight: 36, px: 0 }}>
           {busy ? 'Loading…' : files ? 'Share cover' : 'Get cover'}
@@ -182,6 +182,12 @@ const VideoTab = ({ pack, copy, toast, onUpdate }) => {
     if (!res.ok) throw new Error('no reel');
     return [new File([await res.blob()], `hindsight-${id}.mp4`, { type: 'video/mp4' })];
   }, pack.title, toast);
+  // The Shorts cut ends on the 9:16 cover for half a second: pick that frame as the Short's thumbnail.
+  const short = useTwoTapShare(async () => {
+    const res = await fetch(`${config.API_URL}/snapshots/${id}/short.mp4`);
+    if (!res.ok) throw new Error('no short');
+    return [new File([await res.blob()], `hindsight-${id}-short.mp4`, { type: 'video/mp4' })];
+  }, `${pack.title} · Short`, toast);
   if (!id) return <Typography sx={{ fontSize: 13, color: C.lo }}>This post has no carousel, so no Reel.</Typography>;
   return (
     <>
@@ -190,8 +196,14 @@ const VideoTab = ({ pack, copy, toast, onUpdate }) => {
           sx={{ bgcolor: C.lime, color: C.bg, fontWeight: 700, minHeight: 44, '&:hover': { bgcolor: '#a3dc3f' } }}>
           {busy ? 'Loading reel…' : files ? 'Share reel' : 'Get reel'}
         </Button>
-        <Typography sx={{ fontSize: 12, color: C.lo }}>Same video for an Instagram Reel and a YouTube Short</Typography>
+        <Button variant="outlined" onClick={short.tap} disabled={short.busy}
+          sx={{ borderColor: C.lime, color: C.lime, fontWeight: 700, minHeight: 44 }}>
+          {short.busy ? 'Loading Short…' : short.files ? 'Share Short' : 'Get Short'}
+        </Button>
       </Box>
+      <Typography sx={{ fontSize: 12, color: C.lo, mt: 0.75 }}>
+        Reel for Instagram. Short for YouTube: it ends on the cover for half a second, so pick the last frame as the thumbnail.
+      </Typography>
       {id && <ReelCover url={`${config.API_URL}/snapshots/${id}/cover.png`} title={pack.title} toast={toast} />}
       {reel.variant && (
         <Typography sx={{ fontSize: 12, color: reel.variant === 'v2' ? C.amber : C.lo, mt: 1 }}>

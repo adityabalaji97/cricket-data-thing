@@ -63,9 +63,11 @@ def render(carousel_id: str, slide_count: int, base: str = SITE) -> Dict[str, li
         if not result["failed"] and len(result["ok"]) == slide_count:
             reel = make_reel(carousel_id, [Path(out) / f"{n}.png" for n in range(1, slide_count + 1)])
         if (Path(out) / "1.png").exists():
-            from services.ig_reel_v2 import save_cover
+            from services.ig_reel_v2 import make_short, save_cover
 
             save_cover(carousel_id, Path(out) / "1.png")
+            if reel:
+                make_short(carousel_id)
     return {"ok": [int(Path(f).stem) for f in result["ok"]], "failed": result["failed"], "reel": reel}
 
 
@@ -109,6 +111,17 @@ def make_reel(carousel_id: str, pngs: List[Path]) -> Optional[float]:
                 ON CONFLICT (carousel_id) DO UPDATE SET mp4 = EXCLUDED.mp4, seconds = EXCLUDED.seconds, made_at = now()
             """), {"c": carousel_id, "m": mp4.read_bytes(), "s": total})
     return total
+
+
+def load_short(db: Session, carousel_id: str) -> Optional[bytes]:
+    """The YouTube Shorts cut (the Reel ending on its cover), or the Reel itself until one is made."""
+    try:
+        row = db.execute(text("SELECT COALESCE(short_mp4, mp4) FROM ig_reels WHERE carousel_id = :c"),
+                         {"c": carousel_id}).first()
+    except Exception:  # before migration 021
+        db.rollback()
+        return load_reel(db, carousel_id)
+    return bytes(row[0]) if row else None
 
 
 def load_reel(db: Session, carousel_id: str) -> Optional[bytes]:

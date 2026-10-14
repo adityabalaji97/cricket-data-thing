@@ -677,6 +677,62 @@ def save_cover(carousel_id: str, slide: Path) -> bool:
     return True
 
 
+#: Seconds of the cover at the end of the YouTube Shorts cut: long enough to pick as the thumbnail frame, short
+#: enough to go unnoticed (it's after the last line).
+SHORT_COVER_SECONDS = 0.5
+
+
+def make_short(carousel_id: str) -> bool:
+    """The YouTube Shorts cut (ig_reels.short_mp4): the stored Reel, then its 9:16 cover for SHORT_COVER_SECONDS,
+    silent. YouTube only lets a new channel pick a frame as a Short's thumbnail, and the Reel opens on a chart (a still
+    opening cost viewers), so the cover goes at the end. False without ffmpeg or a stored Reel."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return False
+    from sqlalchemy import text
+
+    from database import engine
+    from services.ig_slides import COVER_N
+
+    with engine.connect() as conn:
+        reel = conn.execute(text("SELECT mp4 FROM ig_reels WHERE carousel_id = :c"), {"c": carousel_id}).scalar()
+        cover = conn.execute(text("SELECT png FROM ig_slide_images WHERE carousel_id = :c AND n = :n"),
+                             {"c": carousel_id, "n": COVER_N}).scalar()
+        first = conn.execute(text("SELECT png FROM ig_slide_images WHERE carousel_id = :c AND n = 1"),
+                             {"c": carousel_id}).scalar()
+    if reel is None or (cover is None and first is None):
+        return False
+    with tempfile.TemporaryDirectory() as d:
+        tmp = Path(d)
+        (tmp / "reel.mp4").write_bytes(bytes(reel))
+        if cover is None:  # a Reel made before covers were: make the cover from slide 1
+            (tmp / "slide1.png").write_bytes(bytes(first))
+            save_cover(carousel_id, tmp / "slide1.png")
+            cover = cover_png(tmp / "slide1.png", tmp / "cover.png").read_bytes()
+        (tmp / "cover.png").write_bytes(bytes(cover))
+        probe = subprocess.run([shutil.which("ffprobe") or "ffprobe", "-v", "error", "-select_streams", "a",
+                                "-show_entries", "stream=index", "-of", "csv=p=0", str(tmp / "reel.mp4")],
+                               capture_output=True, text=True)
+        audio = bool(probe.stdout.strip())
+        t = f"{SHORT_COVER_SECONDS:.2f}"
+        args = [ffmpeg, "-y", "-loglevel", "error", "-i", str(tmp / "reel.mp4"), "-loop", "1", "-t", t, "-i", str(tmp / "cover.png")]
+        still = f"[1:v]scale={W}:{H},setsar=1,fps={FPS},format=yuv420p[c]"
+        if audio:
+            args += ["-f", "lavfi", "-t", t, "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
+            graph = (f"{still};[0:v]setsar=1,fps={FPS},format=yuv420p[v];[0:a]aresample=44100,"
+                     "aformat=channel_layouts=stereo[a];[v][a][c][2:a]concat=n=2:v=1:a=1[ov][oa]")
+            maps = ["-map", "[ov]", "-map", "[oa]", "-c:a", "aac", "-b:a", "160k"]
+        else:
+            graph = f"{still};[0:v]setsar=1,fps={FPS},format=yuv420p[v];[v][c]concat=n=2:v=1:a=0[ov]"
+            maps = ["-map", "[ov]"]
+        _ff(args + ["-filter_complex", graph, *maps, "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+                    "-movflags", "+faststart", str(tmp / "short.mp4")], timeout=600)
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE ig_reels SET short_mp4 = :m WHERE carousel_id = :c"),
+                         {"m": (tmp / "short.mp4").read_bytes(), "c": carousel_id})
+    return True
+
+
 def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = None, base: str = SITE,
          store: bool = True, out: Optional[Path] = None, plan: Optional[Dict[str, Any]] = None,
          length: str = "short") -> Optional[Dict[str, Any]]:
@@ -732,6 +788,7 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
                     INSERT INTO ig_reels (carousel_id, mp4, seconds) VALUES (:c, :m, :s)
                     ON CONFLICT (carousel_id) DO UPDATE SET mp4 = EXCLUDED.mp4, seconds = EXCLUDED.seconds, made_at = now()
                 """), {"c": carousel_id, "m": mp4.read_bytes(), "s": seconds})
+            make_short(carousel_id)
     return {"seconds": seconds, "script": sc, "source": plan["source"], "voice": voice, "beats": plan["beats"],
             "length": plan.get("length", length), "srt": subtitles,
             "mp4": str(out) if out else None}
