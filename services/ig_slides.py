@@ -27,8 +27,13 @@ def load(db: Session, carousel_id: str, n: int) -> Optional[bytes]:
     return bytes(row[0]) if row else None
 
 
+#: ig_slide_images n = 0 is the Reel cover (9:16, services/ig_reel_v2.save_cover); slides are 1..N.
+COVER_N = 0
+
+
 def count(db: Session, carousel_id: str) -> int:
-    return db.execute(text("SELECT COUNT(*) FROM ig_slide_images WHERE carousel_id = :c"), {"c": carousel_id}).scalar() or 0
+    return db.execute(text("SELECT COUNT(*) FROM ig_slide_images WHERE carousel_id = :c AND n >= 1"),
+                      {"c": carousel_id}).scalar() or 0
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +62,10 @@ def render(carousel_id: str, slide_count: int, base: str = SITE) -> Dict[str, li
         reel = None
         if not result["failed"] and len(result["ok"]) == slide_count:
             reel = make_reel(carousel_id, [Path(out) / f"{n}.png" for n in range(1, slide_count + 1)])
+        if (Path(out) / "1.png").exists():
+            from services.ig_reel_v2 import save_cover
+
+            save_cover(carousel_id, Path(out) / "1.png")
     return {"ok": [int(Path(f).stem) for f in result["ok"]], "failed": result["failed"], "reel": reel}
 
 

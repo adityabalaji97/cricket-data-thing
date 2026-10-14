@@ -651,6 +651,32 @@ def first_slide(carousel_id: str, tmp: Path) -> Optional[Path]:
     return f
 
 
+def cover_png(slide: Path, out: Path) -> Path:
+    """The Reel's cover as Instagram wants it, 9:16: the 4:5 slide where it sits in the Reel, under the brand band.
+    (A 4:5 image picked as the cover gets its sides cropped.)"""
+    brand = out.parent / "cover-brand.txt"
+    brand.write_text("HINDSIGHT  ·  hindsightcricket.com")
+    _ff([shutil.which("ffmpeg"), "-y", "-loglevel", "error", "-i", str(slide), "-vf",
+         f"scale={W}:{SLIDE_H},pad={W}:{H}:0:{TOP}:color={BG},"
+         + _drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", 0, 1, color="0xb6f24a"),
+         "-frames:v", "1", str(out)], timeout=60)
+    return out
+
+
+def save_cover(carousel_id: str, slide: Path) -> bool:
+    """Store the 9:16 cover (ig_slide_images n = 0, served at /snapshots/<id>/cover.png); False without ffmpeg."""
+    if not shutil.which("ffmpeg"):
+        return False
+    from database import engine
+    from services.ig_slides import COVER_N, save
+
+    with tempfile.TemporaryDirectory() as d:
+        png = cover_png(slide, Path(d) / "cover.png").read_bytes()
+    with engine.begin() as conn:
+        save(conn, carousel_id, COVER_N, png)
+    return True
+
+
 def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = None, base: str = SITE,
          store: bool = True, out: Optional[Path] = None, plan: Optional[Dict[str, Any]] = None,
          length: str = "short") -> Optional[Dict[str, Any]]:
@@ -690,6 +716,8 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
         mp4 = out or (tmp / "reel.mp4")
         subtitles = srt(captions)
         cover = first_slide(carousel_id, tmp)
+        if store and cover is not None:
+            save_cover(carousel_id, cover)
         seconds = compose(tmp, [tmp / "frames" / str(n) for n in plan["beats"]], durations, voice_file, captions,
                           sc["hook"], hook_end, mp4, cover=cover)
         if seconds > MAX_SECONDS:

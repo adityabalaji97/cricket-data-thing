@@ -152,13 +152,14 @@ const ReelStats = ({ pack, onUpdate, toast }) => {
 };
 
 /** The Reel opens straight on the story (no still frame), so its cover is picked when posting: the carousel's first
- *  slide, saved here, then "Edit cover" → "Add from camera roll" in Instagram (or "Thumbnail" in YouTube Studio). */
+ *  slide on a 9:16 frame (as it sits in the Reel, so Instagram doesn't crop it), saved here, then "Edit cover" →
+ *  "Add from camera roll" in Instagram (or "Thumbnail" in YouTube Studio). */
 const ReelCover = ({ url, title, toast }) => {
   const { files, busy, tap } = useTwoTapShare(() => fetchImageFiles([url], 'hindsight-reel-cover'), `${title} · cover`, toast);
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: '72px 1fr', gap: 1.25, mt: 1.5, alignItems: 'center' }}>
       <Box component="img" src={url} alt="Reel cover" loading="lazy"
-        sx={{ width: 72, aspectRatio: '4 / 5', borderRadius: 1, border: `1px solid ${C.line}`, bgcolor: '#14171e' }} />
+        sx={{ width: 72, aspectRatio: '9 / 16', objectFit: 'cover', borderRadius: 1, border: `1px solid ${C.line}`, bgcolor: '#14171e' }} />
       <Box sx={{ minWidth: 0 }}>
         <SectionLabel>Cover</SectionLabel>
         <Typography sx={{ fontSize: 12, color: C.lo, mt: 0.25 }}>
@@ -191,7 +192,7 @@ const VideoTab = ({ pack, copy, toast, onUpdate }) => {
         </Button>
         <Typography sx={{ fontSize: 12, color: C.lo }}>Same video for an Instagram Reel and a YouTube Short</Typography>
       </Box>
-      {slideUrlsOf(pack)[0] && <ReelCover url={slideUrlsOf(pack)[0]} title={pack.title} toast={toast} />}
+      {id && <ReelCover url={`${config.API_URL}/snapshots/${id}/cover.png`} title={pack.title} toast={toast} />}
       {reel.variant && (
         <Typography sx={{ fontSize: 12, color: reel.variant === 'v2' ? C.amber : C.lo, mt: 1 }}>
           {reel.variant === 'v2'
@@ -220,7 +221,7 @@ const Tweet = ({ tweet, total, url, copy, toast }) => {
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: '72px 1fr', gap: 1.25, py: 1.25, borderTop: `1px solid ${C.line}` }}>
       <Box component="img" src={url} alt={`Slide ${tweet.slide}`} loading="lazy"
-        sx={{ width: 72, aspectRatio: '4 / 5', borderRadius: 1, border: `1px solid ${C.line}`, bgcolor: '#14171e' }} />
+        sx={{ width: 72, aspectRatio: '9 / 16', objectFit: 'cover', borderRadius: 1, border: `1px solid ${C.line}`, bgcolor: '#14171e' }} />
       <Box sx={{ minWidth: 0 }}>
         <SectionLabel>{tweet.n === 1 ? 'Tweet 1 · the post' : `Reply ${tweet.n - 1} of ${total - 1}`}</SectionLabel>
         <Typography sx={{ fontSize: 13, color: C.hi, whiteSpace: 'pre-wrap', lineHeight: 1.4, overflowWrap: 'anywhere', mt: 0.5 }}>
