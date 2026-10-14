@@ -86,3 +86,17 @@ def test_puzzle_ids_split_daily_from_practice():
     assert dg.Puzzle("call-it", "pabc123").rng.random() == practice.rng.random()
     with pytest.raises(ValueError):
         dg.Puzzle("call-it", "bad token!")
+
+
+def test_innings_clues_say_win_probability_and_runs_added():
+    from services.daily_games import impact_lines, innings_question
+
+    assert impact_lines(0.183, 23.4) == ["Raised their side's win probability by 18%",
+                                         "Added 23 runs more than an average batter"]
+    assert impact_lines(0.05, 0.6) == ["Raised their side's win probability by 5%", "Added 1 run more than an average batter"]
+    pick = {"runs": 31, "balls": 14, "strike_rate": 221.4, "batter": "Rinku Singh", "competition": "IPL",
+            "match_date": "2023-04-09", "wpa": 0.462, "impact": 19.8,
+            "deliveries": [{"over": 19, "ball": 1, "runs": 6, "wagon_x": 40, "wagon_y": 30, "bat_hand": "LHB"}]}
+    q = innings_question(pick)
+    assert (q["wpa_pct"], q["impact"]) == (46, 20)
+    assert q["impact_lines"][0] == "Raised their side's win probability by 46%"

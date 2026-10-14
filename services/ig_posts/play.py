@@ -31,7 +31,8 @@ def guess_innings_post(db: Session, day: date) -> Optional[Dict[str, Any]]:
     hint = lambda key: dg.innings_hint(pick, key)  # noqa: E731
     sixes = f", {q['sixes']} six{'es' if q['sixes'] != 1 else ''}" if q.get("sixes") else ""
     innings = card("innings", "innings_wagon", f"{q['runs']} off {q['balls']}{sixes}, from a {q['bat_hand'].split('-')[0].lower()}-hander",
-                   {k: q[k] for k in ("runs", "balls", "strike_rate", "fours", "sixes", "bat_hand", "season", "deliveries") if k in q},
+                   {k: q[k] for k in ("runs", "balls", "strike_rate", "fours", "sixes", "bat_hand", "season", "impact_lines",
+                                       "deliveries") if k in q},
                    f"{q['season']} · scoring shots by direction", "Each line is a scoring shot")
     answer = pick["batter"]
     slides = [

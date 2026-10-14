@@ -1,6 +1,6 @@
 /**
- * Guess the Innings (daily). Name the batter from one innings: the score line and a wagon wheel of
- * every scoring shot, with the season given. Hints (team, opposition, venue, initials) and wrong guesses each
+ * Guess the Innings (daily). Name the batter from one innings: the score line, the win probability and runs it
+ * added, and a wagon wheel of every scoring shot, with the season given. Hints (team, opposition, venue, initials) and wrong guesses each
  * cost a point; see NameGuessGame for the shared mechanics.
  */
 import React from 'react';
@@ -69,6 +69,13 @@ export const InningsClue = ({ puzzle }) => (
         SR {puzzle.strike_rate} · {puzzle.fours}×4 · {puzzle.sixes}×6 · {puzzle.bat_hand}
       </Typography>
     </Box>
+    {puzzle.impact_lines?.length > 0 && (
+      <Box sx={{ mt: 1.25 }}>
+        {puzzle.impact_lines.map((line) => (
+          <Typography key={line} sx={{ fontSize: 14, color: colors.textMed, lineHeight: 1.45 }}>{line}</Typography>
+        ))}
+      </Box>
+    )}
     <Box sx={{ mt: 1.5 }}>
       <WagonWheel deliveries={puzzle.deliveries} />
     </Box>
