@@ -371,7 +371,7 @@ def render_carousels(posts: List[Dict[str, Any]], base: Optional[str] = None) ->
 
     done, failed = 0, []
     with engine.connect() as conn:  # one connection for the "already rendered?" checks
-        have = dict(conn.execute(text("SELECT carousel_id, COUNT(*) FROM ig_slide_images GROUP BY 1")).all())
+        have = dict(conn.execute(text("SELECT carousel_id, COUNT(*) FROM ig_slide_images WHERE n >= 1 GROUP BY 1")).all())
     for post in posts:
         fact = post["fact"]
         if not fact.get("render"):

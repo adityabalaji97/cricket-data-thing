@@ -230,6 +230,35 @@ def reel_mp4(snapshot_id: str, db: Session = Depends(get_session)):
                                                           "Content-Disposition": f'inline; filename="hindsight-{snapshot_id}.mp4"'})
 
 
+@router.get("/{snapshot_id}/short.mp4")
+def short_mp4(snapshot_id: str, db: Session = Depends(get_session)):
+    """The YouTube Shorts cut: the Reel ending on its 9:16 cover, so the cover can be picked as the thumbnail frame."""
+    from fastapi.responses import Response
+
+    from services import ig_slides
+
+    mp4 = ig_slides.load_short(db, snapshot_id) if _ID.match(snapshot_id) else None
+    if mp4 is None:
+        raise HTTPException(status_code=404, detail="Reel not made")
+    return Response(mp4, media_type="video/mp4", headers={"Cache-Control": "public, max-age=3600",
+                                                          "Content-Disposition": f'inline; filename="hindsight-{snapshot_id}-short.mp4"'})
+
+
+@router.get("/{snapshot_id}/cover.png")
+def reel_cover_png(snapshot_id: str, db: Session = Depends(get_session)):
+    """The Reel's 9:16 cover (the first slide where it sits in the Reel); the 4:5 first slide until one is made."""
+    from fastapi.responses import Response
+
+    from services import ig_slides
+
+    png = None
+    if _ID.match(snapshot_id):
+        png = ig_slides.load(db, snapshot_id, ig_slides.COVER_N) or ig_slides.load(db, snapshot_id, 1)
+    if png is None:
+        raise HTTPException(status_code=404, detail="Cover not made")
+    return Response(png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+
+
 @router.get("/{snapshot_id}/slides/{n}.png")
 def slide_png(snapshot_id: str, n: int, db: Session = Depends(get_session)):
     """A carousel slide rendered from the app's own components (services/ig_slides.py); 404 until rendered."""
