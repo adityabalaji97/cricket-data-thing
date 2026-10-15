@@ -76,8 +76,10 @@ def with_ai_voice(caption: str) -> str:
 
 
 def build(hook: str, answer: str, pillar: str, method: Optional[str] = None, players: Iterable[str] = (),
-          kicker: str = "", extra_tags: Iterable[str] = (), body: Iterable[str] = ()) -> str:
-    """A caption: hook, answer (or body lines), method, a question, the link line, hashtags."""
+          kicker: str = "", extra_tags: Iterable[str] = (), body: Iterable[str] = (), prompt: Optional[str] = None,
+          tags: Optional[List[str]] = None) -> str:
+    """A caption: hook, answer (or body lines), method, a question, the link line, hashtags (`tags` replaces the
+    built set when a post chooses its own)."""
     parts = [hook.strip()]
     if answer:
         parts.append(answer.strip())
@@ -86,8 +88,8 @@ def build(hook: str, answer: str, pillar: str, method: Optional[str] = None, pla
         parts.append("\n".join(lines))
     if method:
         parts.append(f"How: {_one_line(method)}")
-    parts.append(PROMPTS.get(pillar, PROMPTS["debate"]))
+    parts.append(prompt or PROMPTS.get(pillar, PROMPTS["debate"]))
     # Instagram collapses blank lines unless something sits on them; a lone "." keeps the tags apart from the text.
     parts.append(CREDIT_LINE)
-    parts.append(f"{LINK_LINE}\n.\n{' '.join(hashtags(players, kicker, extra_tags))}")
+    parts.append(f"{LINK_LINE}\n.\n{' '.join(tags[:MAX_TAGS] if tags else hashtags(players, kicker, extra_tags))}")
     return "\n\n".join(parts)

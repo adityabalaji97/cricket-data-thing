@@ -132,6 +132,11 @@ def recap_post(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
     built = special(db, dict(m), label)  # a record-breaking T20I: the record, and why (told fairly)
     if built:
         return built
+    from services.ig_posts.recap_series import series_recap
+
+    built = series_recap(db, dict(m), label)  # a T20I inside a series: the match against the series
+    if built:
+        return built
     ctx = PreviewContext(db=db, venue=m["venue"], team1=m["team1"], team2=m["team2"], fmt=m["format"], gender="male",
                          end=m["date"])
     swing = last_meeting(ctx)
