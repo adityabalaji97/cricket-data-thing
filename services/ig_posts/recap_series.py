@@ -109,22 +109,30 @@ def wp_swings(x: Match, sc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         points.append({"wp": round(wp, 1), "label": f"{b['over']}.{max(1, legal - 6 * b['over'])}",
                        "score": f"{b['inns_runs']}/{b['inns_wkts']}", "over": b["over"]})
         o = overs.setdefault(b["over"], {"over": b["over"], "from": prev, "runs": 0, "outs": [], "bowl": b["bowl"],
-                                         "i0": len(points) - 1})
+                                         "i0": len(points) - 1, "bat": defaultdict(int)})
+        o["bat"][b["bat"]] += b["score"] or 0
         o["to"], o["i1"] = wp, len(points) - 1
         o["runs"] += b["score"] or 0
         if b["wkt"]:
             o["outs"].append(short_name(b["bat"]))
         prev = wp
     chasing = chase[0]["team_bat"]
-    drops = sorted((o for o in overs.values() if o["from"] - o["to"] >= MIN_SWING),
-                   key=lambda o: o["to"] - o["from"])[:SWINGS]
+    drops = []
+    for o in sorted((o for o in overs.values() if o["from"] - o["to"] >= MIN_SWING), key=lambda o: o["to"] - o["from"]):
+        if len(drops) < SWINGS and all(abs(o["over"] - d["over"]) > 1 for d in drops):  # adjacent bands' labels collide
+            drops.append(o)
     if not drops:
         return None
     drops.sort(key=lambda o: o["over"])
     bands = []
     for o in drops:
         bowler = short_name(o["bowl"]) if o["bowl"] else "the bowler"
-        what = (f"{bowler} removed {' & '.join(o['outs'])}" if o["outs"] else f"{bowler}, {o['runs']} runs")
+        hitters = [short_name(n) for n, r in sorted(o["bat"].items(), key=lambda kv: -kv[1]) if r > 0][:2]
+        # No wicket: a chasing loser was held to few runs (the bowler's over), or a defending loser's bowling went for
+        # runs, which is said as the batting (services/ig_posts: no-blame framing).
+        what = (f"{bowler} removed {' & '.join(o['outs'])}" if o["outs"]
+                else f"{bowler}: {o['runs']} off the over" if chasing == x.loser
+                else f"{' & '.join(hitters) or 'the batters'} hit {o['runs']} off {bowler}")
         bands.append({"i0": o["i0"], "i1": o["i1"], "over": o["over"] + 1, "from": round(o["from"]),
                       "to": round(o["to"]), "bowler": bowler, "text": what})
     peak = max([start] + [p["wp"] for p in points])
@@ -159,7 +167,7 @@ def score_race(x: Match) -> Optional[Dict[str, Any]]:
     if not level or n < 18:
         return None
     last = level[-1]  # the last over (0-based) where the chase was level or ahead
-    if last >= n - 1:
+    if last >= n - 3:  # level until the last two overs: the race is just the final over or two, not a story
         return None
     tail_a = a["values"][-1] - a["values"][last]
     tail_b = b["values"][n - 1] - b["values"][last]

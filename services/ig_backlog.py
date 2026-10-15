@@ -576,6 +576,29 @@ def recap_pack(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
             "warnings": [], "caption": caption, "players": built["players"], "day": built["day"] + timedelta(days=1)}
 
 
+def otd_pack(db: Session, day: date, avoid: Iterable[str] = ()) -> Optional[Dict[str, Any]]:
+    """The On this day post for `day` (services/on_this_day.py): a past match on this calendar day, as a carousel."""
+    from services import ig_captions, ig_carousel, on_this_day
+
+    built = on_this_day.post(db, day, avoid=tuple(avoid))
+    if not built:
+        return None
+    slides = ([{"type": "hook", "text": built["hook"], "kicker": built["kicker"], "sub": built["sub"]}]
+              + [{"type": "card", "card": c, "teams": built["teams"]} for c in built["cards"]]
+              + [{"type": "end", "heading": "Every scorecard, free",
+                  "body": "Ball-by-ball Impact and win probability for this match, and every one since 2015."}])
+    carousel = ig_carousel.save(db, slides, built["title"], {"otd": str(day)}, "ig-otd")
+    cap = built["caption"]
+    caption = ig_captions.build(built["hook"], "", "reactive", built["method"], built["players"], built["kicker"],
+                                body=cap["lines"], prompt=cap["prompt"], tags=cap["tags"])
+    fact = {"kind": "otd", "subject": (built["players"] or [None])[0], "title": built["title"],
+            "verdict": built["verdict"], "match_id": built["match_id"], "competition": built["candidate"]["key"],
+            "candidate": built["candidate"], "carousel_id": carousel["id"], "slides": len(slides), "render": True,
+            "hook": built["hook"], "kicker": built["kicker"]}
+    return {"key": f"otd-{day.isoformat()}", "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"],
+            "warnings": [], "caption": caption, "players": built["players"], "day": day}
+
+
 def refresh(db: Session, keys: Iterable[str]) -> List[Dict[str, Any]]:
     """Remake these backlog posts in place: same pack, same planned day (a partial build() would reschedule them)."""
     from database import engine

@@ -187,6 +187,13 @@ jobs:
           CHROME: google-chrome
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
         run: python scripts/ig_match_day.py --team India --top-teams 20
+      # On this day (scripts/ig_on_this_day.py): tomorrow's look back at the best past match on that calendar day,
+      # queued for 9 am IST and rendered; its Reel comes with the upkeep step's --reels-pending.
+      - name: Instagram On this day
+        continue-on-error: true
+        env:
+          CHROME: google-chrome
+        run: python scripts/ig_on_this_day.py
       # Unposted evergreen posts from past days to the bench; then the next 30 days lead with the format that's on
       # (services/ig_season.py); then Reels for anything rendered without one.
       - name: Instagram queue upkeep

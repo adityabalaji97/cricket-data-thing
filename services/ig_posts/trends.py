@@ -32,6 +32,8 @@ FEEDS = {
     "Google News": "https://news.google.com/rss/search?q=cricket&hl=en-IN&gl=IN&ceid=IN:en",
 }
 UA = "hindsight-trend-radar/1.0 (+https://hindsightcricket.com)"
+REDDIT_TRIES = 4
+REDDIT_GAP = 8  # seconds between Reddit feeds
 #: Surnames too common in headlines (or among players) to stand for one person on their own.
 AMBIGUOUS = {"sharma", "singh", "khan", "kumar", "patel", "yadav", "ali", "ahmed", "iyer", "pandya", "malik", "shah",
              "rahman", "hasan", "smith", "taylor", "williams", "green", "head", "root", "wood", "starc", "king", "hope"}
@@ -41,15 +43,24 @@ def headlines(log=print) -> List[Dict[str, str]]:
     out = []
     with httpx.Client(headers={"User-Agent": UA}, follow_redirects=True, timeout=15) as client:
         for source, url in FEEDS.items():
-            root = None
-            for attempt in range(2):  # Reddit sends an empty body to back-to-back requests: wait, try once more
+            root, resp = None, None
+            # Reddit rate-limits back-to-back requests (429, often with an empty body): back off, honouring
+            # Retry-After, for up to REDDIT_TRIES tries. r/IndiaCricket failed every run with one 3-second retry.
+            for attempt in range(REDDIT_TRIES):
                 try:
-                    root = ET.fromstring(client.get(url).content)
+                    resp = client.get(url)
+                    if resp.status_code == 429:
+                        raise RuntimeError(f"429, retry after {resp.headers.get('retry-after') or '?'}s")
+                    root = ET.fromstring(resp.content)
                     break
                 except Exception as exc:  # one feed down doesn't stop the radar
-                    if attempt:
+                    if attempt == REDDIT_TRIES - 1:
                         log(f"  feed {source} failed: {exc}")
-                    time.sleep(3)
+                        break
+                    wait = resp.headers.get("retry-after") if resp is not None else None
+                    time.sleep(min(60, float(wait)) if wait and str(wait).replace(".", "").isdigit() else 10 * (attempt + 1))
+            if "reddit.com" in url:
+                time.sleep(REDDIT_GAP)  # space the next Reddit feed out
             if root is None:
                 continue
             for el in root.iter():
