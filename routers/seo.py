@@ -1,7 +1,8 @@
 """
 Data for the site's sitemap.xml (growth plan G1), formatted into XML by api/sitemap.mjs on Vercel.
 
-Lists the pages worth indexing: scorecards from the last year, the most-covered men's T20 players
+Lists the pages worth indexing: every scorecard (one sitemap per year, /seo/scorecards), the most-covered men's T20
+players
 (their pages carry Impact/WPA nobody else publishes), the busiest venues, and every published note.
 Cached for a day -- it changes with the nightly ingest at most -- except notes, which are read
 fresh (one small query) so a note is in the sitemap the moment it is published.
@@ -58,3 +59,30 @@ def _data_entries(db: Session) -> Dict[str, Any]:
     }
     _CACHE.update(ts=time.time(), data=data)
     return data
+
+
+_YEARS: Dict[str, Any] = {"ts": 0.0, "data": None}
+
+
+@router.get("/scorecard-years")
+def scorecard_years(db: Session = Depends(get_session)) -> Dict[str, Any]:
+    """Years with T20 or ODI scorecards, newest first, with their latest match date (a sitemap's lastmod)."""
+    if _YEARS["data"] is None or time.time() - _YEARS["ts"] > _TTL:
+        rows = db.execute(text("""
+            SELECT EXTRACT(YEAR FROM date)::int AS year, COUNT(*) AS n, MAX(date) AS latest FROM matches
+            WHERE date IS NOT NULL AND format IN ('T20', 'ODI') GROUP BY 1 ORDER BY 1 DESC
+        """)).fetchall()
+        _YEARS.update(ts=time.time(), data=[{"year": r.year, "matches": r.n, "lastmod": r.latest.isoformat()}
+                                            for r in rows])
+    return {"years": _YEARS["data"]}
+
+
+@router.get("/scorecards")
+def scorecards(year: int, db: Session = Depends(get_session)) -> Dict[str, Any]:
+    """Every T20 and ODI scorecard of one year (a sitemap holds 50,000 URLs; a year is a few thousand)."""
+    rows = db.execute(text("""
+        SELECT id, date FROM matches
+        WHERE date >= make_date(:y, 1, 1) AND date < make_date(:y + 1, 1, 1) AND format IN ('T20', 'ODI')
+        ORDER BY date DESC, id DESC
+    """), {"y": year}).fetchall()
+    return {"year": year, "matches": [{"id": str(r.id), "date": r.date.isoformat()} for r in rows]}

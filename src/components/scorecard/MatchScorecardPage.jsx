@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ShareButton from '../ui/ShareButton';
 import ChartExportButton from '../ui/ChartExportButton';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import config from '../../config';
 import './matchScorecard.css';
@@ -277,6 +277,7 @@ const ScorecardSummaryScreen = ({ data, searchParams, setSearchParams }) => {
         {data.match.player_of_match && <PlayerOfMatchCard player={data.match.player_of_match} />}
         <MomentumWorm data={data} />
         {data.summary.primer && <ImpactCard data={data} primer={data.summary.primer} />}
+        <MoreScorecards match={data.match} />
       </div>
 
       <section className="scorecard-collapse">
@@ -291,6 +292,31 @@ const ScorecardSummaryScreen = ({ data, searchParams, setSearchParams }) => {
         </div>
       </section>
     </main>
+  );
+};
+
+// Ways out to other scorecards (the /scorecards browse page, filtered): the same two sides, the same competition and
+// season, and the same calendar day in other years. Also internal links for search engines.
+const MoreScorecards = ({ match }) => {
+  if (!match?.team1 || !match?.team2) return null;
+  const q = (params) => `/scorecards?${new URLSearchParams(params).toString()}`;
+  const year = match.date ? match.date.slice(0, 4) : null;
+  const day = match.date ? match.date.slice(5, 10) : null;
+  const dayLabel = day ? new Date(`2000-${day}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) : null;
+  const links = [
+    [`Every ${match.team1} v ${match.team2} scorecard`, q({ team: match.team1, opponent: match.team2 })],
+    match.competition && year ? [`${match.competition} ${year}`, q({ competition: match.competition, year })] : null,
+    day ? [`On this day: ${dayLabel}`, q({ on: day })] : null,
+  ].filter(Boolean);
+  return (
+    <section className="worm-card more-scorecards">
+      <div className="card-heading-row"><span>More scorecards</span></div>
+      {links.map(([label, to]) => (
+        <Link key={to} to={to} className="more-scorecards-link">
+          <span>{label}</span><b>→</b>
+        </Link>
+      ))}
+    </section>
   );
 };
 

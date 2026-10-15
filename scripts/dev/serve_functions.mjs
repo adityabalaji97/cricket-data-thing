@@ -23,6 +23,8 @@ const ROUTES = [
   [/^\/img\/([A-Za-z0-9]{6,16})\.png$/, (m) => ['img', `id=${m[1]}`]],
   [/^\/_og$/, () => ['og', '']],
   [/^\/sitemap\.xml$/, () => ['sitemap', '']],
+  [/^\/sitemap-pages\.xml$/, () => ['sitemap', 'kind=pages']],
+  [/^\/sitemap-scorecards-(\d{4})\.xml$/, (m) => ['sitemap', `kind=scorecards&year=${m[1]}`]],
   [/^\/bot(\/.*)$/, (m) => ['meta', `__path=${encodeURIComponent(m[1])}`]],
 ];
 
