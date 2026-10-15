@@ -137,6 +137,22 @@
   margin: 0 18px 20px;
 }
 
+/* Links to other scorecards (the /scorecards page, filtered) */
+.more-scorecards-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  color: #f3f4f6;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.more-scorecards-link b {
+  color: #b6f24a;
+}
+
 /* Win probability & Impact card (T20 Primer metrics) */
 .impact-card .wp-labels {
   display: flex;

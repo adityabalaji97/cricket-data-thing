@@ -63,3 +63,26 @@ def get_recent_matches_discover(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/browse")
+def browse_matches(
+    competition: str = Query("all", description="all, T20I, ODI, Test, or a league"),
+    team: Optional[str] = Query(None, description="A side, either team1 or team2"),
+    opponent: Optional[str] = Query(None, description="The other side, for head-to-heads"),
+    year: Optional[int] = Query(None, ge=2000, le=2100),
+    month_day: Optional[str] = Query(None, description="MM-DD: this calendar day in every year (on this day)"),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    limit: int = Query(24, ge=1, le=48),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_session),
+):
+    """Every scorecard, newest first, filtered (services/match_browse.py); each with its biggest Impact."""
+    from services.match_browse import browse
+
+    try:
+        return browse(db, competition=competition, team=team, opponent=opponent, year=year, month_day=month_day,
+                      date_from=date_from, date_to=date_to, limit=limit, offset=offset)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

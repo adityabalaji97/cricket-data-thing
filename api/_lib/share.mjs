@@ -252,6 +252,14 @@ async function homeSummary() {
 /** Summary for a site path + query string, or null for the site-wide card. */
 export async function summarize(pathname, search) {
   if (pathname === '/' || /^\/links\/?$/.test(pathname)) return homeSummary();
+  if (/^\/scorecards\/?$/.test(pathname)) {
+    return {
+      kind: 'text',
+      title: `Scorecards: every T20 and ODI, with Impact | ${SITE_NAME}`,
+      description: 'Every T20 and ODI scorecard by competition, team, year or date, with Impact and win probability on every ball from 2015.',
+      card: { kicker: 'Scorecards', headline: 'Every scorecard, ball by ball', sub: 'Filter by team, year or date: who added and saved the most runs' },
+    };
+  }
   const graphic = pathname.match(/^\/g\/([A-Za-z0-9]{6,16})\/?$/);
   if (graphic) return graphicSummary(graphic[1]);
   const params = new URLSearchParams(search || '');

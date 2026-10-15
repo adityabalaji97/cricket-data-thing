@@ -43,6 +43,14 @@
       "dest": "/api/sitemap.mjs"
     },
     {
+      "src": "/sitemap-pages.xml",
+      "dest": "/api/sitemap.mjs?kind=pages"
+    },
+    {
+      "src": "/sitemap-scorecards-(\\d{4}).xml",
+      "dest": "/api/sitemap.mjs?kind=scorecards&year=$1"
+    },
+    {
       "src": "/img/([A-Za-z0-9]{6,16})\\.png",
       "dest": "/api/img.mjs?id=$1"
     },
@@ -66,7 +74,7 @@
       "dest": "/api/meta.mjs?__path=/"
     },
     {
-      "src": "/(scorecard/[^/]+|player|venue|query|rankings|links|games/[^/]+|notes(?:/[^/]+)?|g/[^/]+)",
+      "src": "/(scorecard/[^/]+|scorecards|player|venue|query|rankings|links|games/[^/]+|notes(?:/[^/]+)?|g/[^/]+)",
       "has": [
         {
           "type": "header",

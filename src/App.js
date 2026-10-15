@@ -53,6 +53,7 @@ const IgSlide = React.lazy(() => import('./components/ig/IgSlide'));
 const IgLinks = React.lazy(() => import('./components/ig/IgLinks'));
 const NotesList = React.lazy(() => import('./components/notes/NotesList'));
 const NotePage = React.lazy(() => import('./components/notes/NotePage'));
+const ScorecardsBrowse = React.lazy(() => import('./components/scorecard/ScorecardsBrowse'));
 const GraphicPage = React.lazy(() => import('./components/GraphicPage'));
 const GraphicsLanding = React.lazy(() => import('./components/GraphicsLanding'));
 const AdminNotes = React.lazy(() => import('./components/notes/AdminNotes'));
@@ -727,6 +728,7 @@ const AppContent = () => {
         <Route path="/credits" element={<CreditsPage />} />
         <Route path="/fantasy-planner" element={<MensT20Scope><FantasyPlanner isMobile={isMobile} /></MensT20Scope>} />
         <Route path="/scorecard/:matchId" element={<MatchScorecardPage />} />
+        <Route path="/scorecards" element={<React.Suspense fallback={null}><ScorecardsBrowse /></React.Suspense>} />
         <Route path="/admin" element={<React.Suspense fallback={null}><AdminPage /></React.Suspense>} />
         <Route path="/admin/notes" element={<React.Suspense fallback={null}><AdminNotes /></React.Suspense>} />
         <Route path="/notes" element={<React.Suspense fallback={null}><NotesList /></React.Suspense>} />

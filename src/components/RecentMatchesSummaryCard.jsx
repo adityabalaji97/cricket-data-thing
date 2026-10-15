@@ -232,7 +232,10 @@ const RecentMatchesSummaryCard = () => {
           <Chip
             size="small"
             color="primary"
-            label={data.mode === 'filtered' ? `${data.total} matches` : `${data.total_matches} matches`}
+            clickable
+            component={Link}
+            to="/scorecards"
+            label={`All ${(data.mode === 'filtered' ? data.total : data.total_matches).toLocaleString('en-US')} →`}
           />
         </Box>
 
