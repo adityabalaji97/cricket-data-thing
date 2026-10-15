@@ -68,11 +68,18 @@ SPECS: Dict[str, Dict[str, Any]] = {
 }
 
 
+#: Surname particles that belong with the surname: "de Kock", "van der Dussen", "du Plessis", "ul Haq".
+PARTICLES = ("de", "du", "van", "von", "der", "den", "ul", "al", "da", "di", "le", "la", "ten")
+
+
 def short_name(name: str) -> str:
     parts = str(name).split()
     if len(parts) < 2:
         return name
-    return parts[0] if parts[-1] in COMMON_SURNAMES else parts[-1]
+    if parts[-1] in COMMON_SURNAMES:
+        return parts[0]
+    first = next((i for i, p in enumerate(parts[1:], 1) if p.lower() in PARTICLES), len(parts) - 1)
+    return " ".join(parts[first:])
 
 
 def per_over(row: Dict[str, Any], measure: str) -> Optional[float]:

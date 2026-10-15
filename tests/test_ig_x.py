@@ -84,3 +84,9 @@ def test_a_team_subject_is_not_a_player_page():
 
     assert "/player" not in post_link({"kind": "idea", "subject": "Gujarat Titans"})
     assert "/player" not in post_link({"kind": "idea", "subject": "West Indies"})
+
+
+def test_a_surname_with_a_particle_is_a_name():
+    out = tag_players(["Quinton de Kock's 78*", "de Kock & Rohit hit 16"], ["Quinton de Kock", "Rohit Sharma"])
+    assert out == ["#QuintondeKock's 78*", "de Kock & #RohitSharma hit 16"]
+    assert players_in([{"type": "card", "card": {"payload": {"rows": [{"name": "Quinton de Kock"}]}}}]) == ["Quinton de Kock"]

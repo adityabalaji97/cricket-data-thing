@@ -3,7 +3,7 @@ Where a post's X thread sends people: the exact page behind the post, not the bi
 
     post_link(fact)  ->  "/scorecard/1529233?utm_source=x&utm_medium=thread"
 
-  recap      the match's scorecard
+  recap, otd the match's scorecard
   debate     the query builder with the question's own query (facts.link, written when the post is built)
   note/record  the note the post comes from
   preview    the match preview (venue page with both teams)
@@ -51,7 +51,7 @@ def _is_team(name: str) -> bool:
 def _path(fact: Dict[str, Any]) -> str:
     if fact.get("link"):
         return fact["link"]
-    if fact.get("kind") == "recap" and fact.get("match_id"):
+    if fact.get("kind") in ("recap", "otd") and fact.get("match_id"):
         return f"/scorecard/{fact['match_id']}"
     if fact.get("note_slug"):
         return f"/notes/{fact['note_slug']}"

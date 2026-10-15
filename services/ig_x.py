@@ -41,9 +41,14 @@ NAME_KEYS = ("name", "label", "batter", "bowler", "player")
 TEAM_KEYS = ("team", "batting_team", "bowling_team", "legend", "series", "teams")
 
 
+PARTICLES = {"de", "du", "van", "von", "der", "den", "ul", "al", "da", "di", "le", "la", "ten"}
+
+
 def _is_name(value: Any) -> bool:
+    """"Shai Hope", "Quinton de Kock" (surname particles in lower case), not "Good length (SR 128)"."""
     words = str(value).split()
-    return 2 <= len(words) <= 4 and all(w[:1].isupper() and w.replace("-", "").replace("'", "").isalpha() for w in words)
+    return (2 <= len(words) <= 5 and words[0][:1].isupper()
+            and all((w[:1].isupper() or w in PARTICLES) and w.replace("-", "").replace("'", "").isalpha() for w in words))
 
 
 def players_in(slides: List[Dict[str, Any]]) -> List[str]:
@@ -72,13 +77,16 @@ def players_in(slides: List[Dict[str, Any]]) -> List[str]:
 
 def _aliases(names: List[str]) -> Dict[str, str]:
     """name or unique short form -> the full name: "Hope" -> "Shai Hope" unless two of the players are Hopes."""
+    from services.ig_posts.spotlight import short_name
+
     out = {n: n for n in names}
-    for pos in (-1, 0):
+    forms = [lambda n: short_name(n), lambda n: n.split()[-1], lambda n: n.split()[0]]  # "de Kock", "Kock", "Quinton"
+    for form in forms:
         counts: Dict[str, int] = {}
         for n in names:
-            counts[n.split()[pos]] = counts.get(n.split()[pos], 0) + 1
+            counts[form(n)] = counts.get(form(n), 0) + 1
         for n in names:
-            w = n.split()[pos]
+            w = form(n)
             if counts[w] == 1 and w not in out:
                 out[w] = n
     return out

@@ -22,9 +22,9 @@ feature is what the first one links to.
 
 | # | Chunk | Status |
 |---|-------|--------|
-| 1 | `on_this_day` picker | [ ] |
-| 2 | On-this-day post (carousel + caption + X + Reel) | [ ] |
-| 3 | Schedule it daily | [ ] |
+| 1 | `on_this_day` picker | [x] 2026-10-15 |
+| 2 | On-this-day post (carousel + caption + X + Reel) | [x] 2026-10-15 (Reel via nightly --reels-pending) |
+| 3 | Schedule it daily | [x] 2026-10-15 (nightly workflow step) |
 | 4 | `/scorecards` browse page | [x] 2026-10-15 (PR open) |
 | 5 | Matches in search | [ ] |
 | 6 | Every scorecard in the sitemap; links from player, team and venue pages | [~] 2026-10-15: sitemap + scorecard-page links done; player/team/venue match lists to do |
