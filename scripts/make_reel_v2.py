@@ -4,10 +4,13 @@ A Reel v2 (services/ig_reel_v2.py) for one queued post, out of the A/B: the post
     python scripts/make_reel_v2.py --key ig:myth-note-34 [--beats 4,5,7] --out /tmp/varun.mp4          # preview only
     python scripts/make_reel_v2.py --key ig:myth-note-34 [--beats 4,5,7] --store                        # the post's Reel
     python scripts/make_reel_v2.py --key ig:preview-... --cards totals,form-strips,milestones --long --out /tmp/p.mp4
+    python scripts/make_reel_v2.py --key ig:recap-1529233 --beats 3,4,5,7 --script hand.json --store      # a hand script
 
 --cards: the same by card id (a preview's cards: services/ig_reel_v2.PREVIEW_BEATS is the default).
 --beats: slide numbers to use (the first opens the Reel); default: services/ig_reel_v2.beats. With --store the Reel
 replaces the post's in ig_reels, facts.reel records the script, and the caption gets the AI-voice line.
+--script: a JSON file {"hook": "...", "lines": ["...", ...]} spoken word for word, one line per beat (the first beat
+carries the hook and its line); needs --beats or --cards.
 Voice and style: REEL_VOICE / REEL_TONE.
 """
 from __future__ import annotations
@@ -31,6 +34,7 @@ def main() -> int:
     parser.add_argument("--long", action="store_true", help="45-60 seconds, up to 5 charts")
     parser.add_argument("--close", default="", help="the closing question, word for word")
     parser.add_argument("--base", default=None)
+    parser.add_argument("--script", help="a hand-written script: JSON file {hook, lines}, one line per beat")
     args = parser.parse_args()
 
     from sqlalchemy import text
@@ -51,6 +55,13 @@ def main() -> int:
         plan = {"beats": R.by_card_id(slides, [c.strip() for c in args.cards.split(",") if c.strip()])}
     if args.close:
         plan = {**(plan or {}), "close": args.close}
+    if args.script:
+        sc = json.loads(Path(args.script).read_text())
+        if not plan or len(sc.get("lines") or []) != len(plan["beats"]):
+            print("--script needs --beats or --cards, and one line per beat")
+            return 1
+        plan = {**plan, "script": {"hook": sc["hook"], "lines": sc["lines"]}, "source": "hand",
+                "length": "long" if args.long else "short"}
     out = Path(args.out) if args.out else None
     made = R.make(cid, slides, base=args.base or R.SITE, store=args.store, out=out, plan=plan,
                   length="long" if args.long else "short")

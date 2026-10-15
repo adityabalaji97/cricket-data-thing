@@ -563,11 +563,15 @@ def recap_pack(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
     primer = any(c["id"] in ("wpa", "impact") for c in built["cards"])
     method = (built.get("method") or ("win probability, Impact and runs saved are computed ball by ball (T20 Primer method)."
                                       if primer else "from the ball-by-ball scorecard."))
-    caption = ig_captions.build(built["hook"], built["verdict"], "reactive", method,
-                                built["players"], built["kicker"], occasion)
-    if built.get("deep_cut"):  # the special recap brings its own deeper cuts (slides 3 on)
+    cap = built.get("caption")  # a series recap writes its own findings, question and hashtags
+    caption = (ig_captions.build(built["hook"], "", "reactive", method, built["players"], built["kicker"],
+                                 body=cap["lines"], prompt=cap["prompt"], tags=cap["tags"]) if cap else
+               ig_captions.build(built["hook"], built["verdict"], "reactive", method,
+                                 built["players"], built["kicker"], occasion))
+    if built.get("deep_cut"):  # the special and series recaps bring their own deeper cuts
         fact["deep_cut"] = built["deep_cut"]
-        caption = ig_captions.with_deep_cut(caption, built["deep_cut"]["sentence"])
+        if not cap:  # a series recap's caption already carries it
+            caption = ig_captions.with_deep_cut(caption, built["deep_cut"]["sentence"])
     return {"key": f"recap-{match_id}", "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"],
             "warnings": [], "caption": caption, "players": built["players"], "day": built["day"] + timedelta(days=1)}
 

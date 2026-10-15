@@ -393,7 +393,7 @@ const BucketBars = ({ payload }) => {
  * payload: {series:[a, b], format, rows:[{label, a, b, highlight?}]}
  */
 const PairDumbbell = ({ payload }) => {
-  const W = 300; const rowH = 30; const H = payload.rows.length * rowH + 26; const L = 104; const R = 44;
+  const W = 300; const rowH = 30; const H = payload.rows.length * rowH + 26; const L = payload.values ? 130 : 104; const R = payload.values ? 70 : 44;
   const vals = payload.rows.flatMap((r) => [r.a, r.b]);
   const lo = Math.min(...vals); const hi = Math.max(...vals); const pad = (hi - lo) * 0.1 || 1;
   const sx = (v) => L + ((v - lo + pad) / (hi - lo + 2 * pad)) * (W - L - R);
@@ -409,7 +409,13 @@ const PairDumbbell = ({ payload }) => {
               <line x1={sx(r.a)} x2={sx(r.b)} y1={y} y2={y} stroke={colors.borderStrong} strokeWidth="3" />
               <circle cx={sx(r.a)} cy={y} r="5" fill={ca} />
               <circle cx={sx(r.b)} cy={y} r="5" fill={cb} />
-              <text x={W} y={y + 4} textAnchor="end" style={{ ...mono, fontSize: 11, fill: colors.textMed }}>{fmt(r.b - r.a, 'signed1')}</text>
+              {payload.values && (
+                <>
+                  <text x={sx(Math.min(r.a, r.b)) - 8} y={y + 4} textAnchor="end" style={{ ...mono, fontSize: 10, fill: r.a <= r.b ? ca : cb }}>{fmt(Math.min(r.a, r.b), payload.format)}</text>
+                  <text x={sx(Math.max(r.a, r.b)) + 8} y={y + 4} style={{ ...mono, fontSize: 10, fill: r.a <= r.b ? cb : ca }}>{fmt(Math.max(r.a, r.b), payload.format)}</text>
+                </>
+              )}
+              <text x={W} y={y + 4} textAnchor="end" style={{ ...mono, fontSize: 11, fill: colors.textMed }}>{fmt(r.b - r.a, payload.format === 'int' ? 'signed0' : 'signed1')}</text>
             </g>
           );
         })}
@@ -639,7 +645,94 @@ const BowlingPlan = ({ payload }) => {
   );
 };
 
+/**
+ * "How it was won": the match page's recap card (services/match_recap.build_recap), headline and bullets as the site
+ * shows them (services/ig_posts/recap_series.how_it_was_won).
+ * payload: {headline, bullets:[string]}
+ */
+const RecapText = ({ payload }) => (
+  <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.5 }}>
+    <Typography sx={{ fontSize: 19, fontWeight: 700, color: colors.textHi, lineHeight: 1.25 }}>{payload.headline}</Typography>
+    {payload.bullets.map((b) => (
+      <Box key={b} sx={{ display: 'grid', gridTemplateColumns: '10px 1fr', gap: 1, alignItems: 'baseline' }}>
+        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: colors.accent, transform: 'translateY(-2px)' }} />
+        <Typography sx={{ fontSize: 14.5, color: colors.textMed, lineHeight: 1.4 }}>{b}</Typography>
+      </Box>
+    ))}
+  </Box>
+);
+
+/**
+ * Both innings' scores at the end of every over (the match page's momentum worm), wickets as dots, the over the chase
+ * was last level or ahead marked (services/ig_posts/recap_series.score_race).
+ * payload: {series:[{team, values:[runs], wickets:[count]}], mark}
+ */
+const ScoreRace = ({ payload }) => {
+  const { series, mark } = payload;
+  const W = 300; const H = 180; const L = 30; const R = 40; const T = 12; const B = 152;
+  const top = Math.max(...series.flatMap((s) => s.values), 1);
+  const sx = (o) => L + (o / 20) * (W - L - R);
+  const sy = (v) => B - (v / top) * (B - T);
+  const tones = series.map((s, i) => teamColour(s.team, SERIES[i]));
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+        aria-label={series.map((s) => `${s.team}: ${s.values[mark - 1]} after ${mark} overs, ${s.values[s.values.length - 1]} at the end`).join('; ')}>
+        {[0, 100, 200].filter((v) => v <= top).map((v) => (
+          <g key={v}>
+            <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke={colors.border} />
+            <text x={L - 6} y={sy(v) + 4} textAnchor="end" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{v}</text>
+          </g>
+        ))}
+        {mark && (
+          <g>
+            <rect x={sx(mark)} y={T} width={sx(20) - sx(mark)} height={B - T} fill={colors.textHi} fillOpacity="0.07" />
+            <line x1={sx(mark)} x2={sx(mark)} y1={T} y2={B} stroke={colors.textLo} strokeDasharray="3 4" />
+          </g>
+        )}
+        {series.map((s, i) => {
+          const d = `M${sx(0)},${sy(0)} ` + s.values.map((v, o) => `L${sx(o + 1).toFixed(1)},${sy(v).toFixed(1)}`).join(' ');
+          const last = s.values.length;
+          return (
+            <g key={s.team}>
+              <path d={d} fill="none" stroke={tones[i]} strokeWidth="2.2" strokeLinejoin="round" />
+              {s.values.map((v, o) => (s.wickets[o] > (o ? s.wickets[o - 1] : 0) ? (
+                <circle key={o} cx={sx(o + 1)} cy={sy(v)} r="3.2" fill={colors.bg} stroke={tones[i]} strokeWidth="1.6" />
+              ) : null))}
+              <text x={sx(last) + 4} y={sy(s.values[last - 1]) + (i ? 12 : -4)} style={{ ...mono, fontSize: 12, fill: tones[i], fontWeight: 700 }}>
+                {s.values[last - 1]}
+              </text>
+            </g>
+          );
+        })}
+        {[5, 10, 15, 20].map((o) => (
+          <text key={o} x={sx(o)} y={H - 10} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{`${o} ov`}</text>
+        ))}
+      </Box>
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto auto', columnGap: 1.5, rowGap: 0.25, mt: 0.5 }}>
+        <span />
+        <Typography sx={{ ...mono, fontSize: 11, color: colors.textLo, textAlign: 'right' }}>{`after ${mark}`}</Typography>
+        <Typography sx={{ ...mono, fontSize: 11, color: colors.textLo, textAlign: 'right' }}>{`last ${series[0].values.length - mark}`}</Typography>
+        {series.map((s, i) => {
+          const n = s.values.length;
+          return (
+            <React.Fragment key={s.team}>
+              <Typography sx={{ fontSize: 13, color: tones[i], fontWeight: 600 }}>{s.team}</Typography>
+              <Typography sx={{ ...mono, fontSize: 13, color: colors.textHi, textAlign: 'right' }}>{`${s.values[mark - 1]}/${s.wickets[mark - 1]}`}</Typography>
+              <Typography sx={{ ...mono, fontSize: 13, color: colors.textHi, textAlign: 'right' }}>
+                {`${s.values[n - 1] - s.values[mark - 1]}/${s.wickets[n - 1] - s.wickets[mark - 1]}`}
+              </Typography>
+            </React.Fragment>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
+  recap_text: RecapText,
+  score_race: ScoreRace,
   deep_compare: DeepCompare,
   innings_scorecard: InningsScorecard,
   innings_wagon: InningsWagon,
