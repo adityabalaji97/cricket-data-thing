@@ -132,7 +132,7 @@ def wp_swings(x: Match, sc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         # runs, which is said as the batting (services/ig_posts: no-blame framing).
         what = (f"{bowler} removed {' & '.join(o['outs'])}" if o["outs"]
                 else f"{bowler}: {o['runs']} off the over" if chasing == x.loser
-                else f"{' & '.join(hitters) or 'the batters'} hit {o['runs']}")
+                else f"{' & '.join(hitters) or 'the batters'} hit {o['runs']} off {bowler}")
         bands.append({"i0": o["i0"], "i1": o["i1"], "over": o["over"] + 1, "from": round(o["from"]),
                       "to": round(o["to"]), "bowler": bowler, "text": what})
     peak = max([start] + [p["wp"] for p in points])
