@@ -332,7 +332,7 @@ def debate_post(db: Session, entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     carousel = ig_carousel.save(db, built["slides"], q.text, {"debate": q.key}, "ig-debate")
     plan = entry["plan"]
-    fact = {"kind": "debate", "subject": None, "title": q.text, "verdict": built["verdict"], "question": q.key,
+    fact = {"kind": "debate", "link": built.get("link"), "subject": None, "title": q.text, "verdict": built["verdict"], "question": q.key,
             "noun": q.noun, "kicker": q.kicker, "scope_label": q.scope_label,
             "leaders": built["leaders"], "angles": [a.id for a in plan["angles"]], "angle_scores": plan["scores"],
             "angles_by": plan["by"], "appeal": entry["appeal"], "appeal_by": entry["appeal_by"],
@@ -353,7 +353,7 @@ def trend_post(db: Session, entry: Dict[str, Any], key: str, headlines: List[Dic
         return None
     carousel = ig_carousel.save(db, built["slides"], q.text, {"trend": q.key, "post": key}, "ig-trend")
     plan = entry["plan"]
-    fact = {"kind": "debate", "trending": True, "subject": q.subject, "title": q.text, "verdict": built["verdict"],
+    fact = {"kind": "debate", "link": built.get("link"), "trending": True, "subject": q.subject, "title": q.text, "verdict": built["verdict"],
             "headlines": headlines, "leaders": built["leaders"], "angles": [a.id for a in plan["angles"]],
             "angle_scores": plan["scores"], "angles_by": plan["by"], "appeal": entry.get("appeal"),
             "appeal_by": entry.get("appeal_by"), "method": built["method"], "carousel_id": carousel["id"],

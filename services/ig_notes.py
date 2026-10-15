@@ -125,8 +125,10 @@ def youtube_copy(fact: Dict[str, Any], caption: str, search_title: Optional[str]
     return {"title": f"{title} #shorts", "description": f"{body.strip()}\n\nFull data, free: hindsightcricket.com\n\n{' '.join(tags)}"}
 
 
-def x_copy(db: Session, carousel_id: str, caption: str) -> List[Dict[str, Any]]:
-    """The carousel as an X thread (services/ig_x.py), one tweet per slide; chart slides take their chart's title."""
+def x_copy(db: Session, carousel_id: str, caption: str, fact: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """The carousel as an X thread (services/ig_x.py), one tweet per slide; chart slides take their chart's title. The
+    last tweet links to the post's own page (services/ig_links.py) when the fact is given."""
+    from services.ig_links import post_link
     from services.ig_x import x_thread
 
     snap = db.execute(text("SELECT data FROM chart_snapshots WHERE id = :i"), {"i": carousel_id}).scalar()
@@ -134,7 +136,7 @@ def x_copy(db: Session, carousel_id: str, caption: str) -> List[Dict[str, Any]]:
     chart_ids = [s["snapshot_id"] for s in slides if s.get("type") == "chart" and s.get("snapshot_id")]
     titles = dict(db.execute(text("SELECT id, title FROM chart_snapshots WHERE id = ANY(:ids)"),
                              {"ids": chart_ids}).all()) if chart_ids else {}
-    return x_thread(slides, caption, titles)
+    return x_thread(slides, caption, titles, link=post_link(fact) if fact else None)
 
 
 def extras_pending(db: Session) -> Dict[str, int]:
@@ -170,7 +172,7 @@ def extras_pending(db: Session) -> Dict[str, int]:
             fact["youtube"] = youtube_copy(fact, r["caption"] or "", title)
             made["youtube"] += 1
         if not fact.get("x"):
-            fact["x"] = x_copy(db, fact["carousel_id"], r["caption"] or "")
+            fact["x"] = x_copy(db, fact["carousel_id"], r["caption"] or "", fact)
             made["x"] += 1
         with engine.begin() as conn:
             conn.execute(text("UPDATE content_packs SET facts = CAST(:f AS jsonb) WHERE id = :i"),

@@ -78,6 +78,26 @@ function playerCard(card) {
   return frame(card.kicker, card.headline, h('div', { flexDirection: 'column' }, stats, bars));
 }
 
+function homeCard(card) {
+  const tiles = h('div', { flexWrap: 'wrap', gap: 14, marginTop: 24, width: card.latest ? 620 : 1080 },
+    card.features.map(([name, what]) => h('div', { flexDirection: 'column', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 20px', width: card.latest ? 300 : 520 },
+      h('div', { fontSize: 26, fontWeight: 700 }, name),
+      h('div', { fontSize: 20, color: C.low, marginTop: 4 }, what))));
+  const latest = card.latest
+    ? h('div', { flexDirection: 'column', marginLeft: 'auto', width: 380, background: C.surface, border: `2px solid ${C.lime}`, borderRadius: 20, padding: '20px 26px', marginTop: 24 },
+      h('div', { color: C.lime, fontSize: 20, letterSpacing: 2, fontWeight: 700 }, 'LATEST MATCH'),
+      h('div', { color: C.mid, fontSize: 22, marginTop: 8 }, card.latest.result),
+      h('div', { fontSize: 34, fontWeight: 700, marginTop: 16 }, card.latest.player),
+      h('div', { color: C.mid, fontSize: 26, marginTop: 2 }, card.latest.figure),
+      h('div', { alignItems: 'baseline', gap: 10, marginTop: 14 },
+        h('div', { fontSize: 54, fontWeight: 700, color: C.lime }, card.latest.impact),
+        h('div', { fontSize: 22, color: C.low }, 'runs of Impact')))
+    : null;
+  return frame('hindsightcricket.com', card.headline, h('div', { flexDirection: 'column' },
+    h('div', { color: C.mid, fontSize: 28, marginTop: 30 }, card.sub),
+    h('div', { alignItems: 'flex-start' }, tiles, latest)));
+}
+
 function textCard(card) {
   return frame(card?.kicker || 'T20 analytics', card?.headline || 'Every ball, in context', card?.sub
     ? h('div', { color: C.mid, fontSize: 32, marginTop: 18 }, card.sub)
@@ -95,6 +115,7 @@ export default async function handler(req, res) {
   }
   const card = summary?.card;
   const element = summary?.kind === 'scorecard' ? scorecardCard(card)
+    : summary?.kind === 'home' ? homeCard(card)
     : summary?.kind === 'player' ? playerCard(card)
       : textCard(card);
 
@@ -102,6 +123,8 @@ export default async function handler(req, res) {
   const png = Buffer.from(await image.arrayBuffer());
   res.setHeader('Content-Type', 'image/png');
   // Finished matches never change; players and pages change slowly.
-  res.setHeader('Cache-Control', `public, max-age=3600, s-maxage=${summary?.kind === 'scorecard' ? 604800 : 86400}, stale-while-revalidate=86400`);
+  // The home card shows the latest match, so it turns over within hours.
+  const sMaxAge = summary?.kind === 'scorecard' ? 604800 : summary?.kind === 'home' ? 3600 : 86400;
+  res.setHeader('Cache-Control', `public, max-age=3600, s-maxage=${sMaxAge}, stale-while-revalidate=86400`);
   res.end(png);
 }

@@ -55,5 +55,9 @@ def build(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     method = (f"{ctx.n} {q.role}s ({q.scope_label}), compared on {', '.join(a.label for a in chosen)}; "
               + ("these measures were picked for this question by our model, Jev." if by == "jev"
                  else "the measures are our default set for this question type."))
-    return {"slides": slides, "cards": data_cards, "title": q.text, "verdict": verdict, "leaders": leaders,
+    from services.ig_links import query_path
+
+    group = {"partnership": "partnership"}.get(q.role, q.role)
+    link = query_path({**ctx.params, "min_balls": ctx.min_balls}, [group], ctx.fmt, ctx.gender)
+    return {"slides": slides, "cards": data_cards, "title": q.text, "verdict": verdict, "leaders": leaders, "link": link,
             "players": [p for l in leaders for p in l.split(" & ")], "method": method}

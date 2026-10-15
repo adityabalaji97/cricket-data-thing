@@ -8,7 +8,8 @@ player in the thread ("Shai Hope", or "Hope" when only one of the post's players
 
 Tweet 1 is the hook slide (marked as a thread), each reply is the next slide with the sentence it shows (a card's
 title is its takeaway), and the last carries the link (hindsightcricket.com/links?utm_source=x, counted by the usage
-report). Every tweet fits X's 280 characters, counting a link as 23 as X does. Posting is by hand from the admin page.
+report), or, when given, the post's own page: its scorecard, query or note (services/ig_links.py). Every tweet fits
+X's 280 characters, counting a link as 23 as X does. Posting is by hand from the admin page.
 """
 from __future__ import annotations
 
@@ -103,8 +104,11 @@ def tag_players(texts: List[str], names: List[str]) -> List[str]:
     return out
 
 
+URL = re.compile(r"(?:https?://)?hindsightcricket\.com\S*")
+
+
 def _weight(text: str) -> int:
-    text = text.replace(LINK, "x" * LINK_WEIGHT)
+    text = URL.sub("x" * LINK_WEIGHT, text)
     return len(text) + sum(1 for ch in text if ord(ch) > 0xFFFF)  # emoji count twice
 
 
@@ -147,7 +151,9 @@ def slide_text(slide: Dict[str, Any], chart_titles: Dict[str, str]) -> str:
 
 
 def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[Dict[str, str]] = None,
-             players: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+             players: Optional[List[str]] = None, link: Optional[str] = None) -> List[Dict[str, Any]]:
+    """link: the post's own page (services/ig_links.post_link) for the last tweet; default the bio page."""
+    link = link or LINK
     tags = " ".join(thread_tags(caption))
     total = len(slides)
     names = list(dict.fromkeys([*(players or []), *players_in(slides)]))
@@ -157,7 +163,7 @@ def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[
         if i == 1:
             suffix = f"\n\nA thread 🧵 1/{total}\n{tags}"
         elif i == total:
-            suffix = f"\n\nFull data, free: {LINK}\nData: @himganj153 & @TechRadar9\n{i}/{total} {tags}"
+            suffix = f"\n\nFull data, free: {link}\nData: @himganj153 & @TechRadar9\n{i}/{total} {tags}"
         else:
             suffix = f"\n\n{i}/{total} {tags}"
         tweets.append({"n": i, "slide": i, "text": _fit(body, suffix)})
