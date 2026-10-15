@@ -62,3 +62,25 @@ def test_text_visuals_tweet_their_words():
     thread = x_thread(s, CAPTION)
     assert thread[0]["text"].startswith("247 was 59 above par. Hope added 39.9. Paul saved 19.2.")
     assert "Over 5: Paul removed Samson (30→16%)" in thread[1]["text"]
+
+
+def test_the_last_tweet_links_to_the_posts_own_page():
+    from services.ig_links import post_link, query_path
+
+    assert post_link({"kind": "recap", "match_id": "1529233"}) == \
+        "hindsightcricket.com/scorecard/1529233?utm_source=x&utm_medium=thread"
+    q = query_path({"leagues": ["IPL"], "start_date": "2023-01-01", "min_balls": 120}, ["bowler"])
+    assert q == "/query?leagues=IPL&start_date=2023-01-01&min_balls=120&group_by=bowler&fmt=mens-t20"
+    assert post_link({"kind": "debate", "link": q}).endswith(q + "&utm_source=x&utm_medium=thread")
+    assert post_link({"kind": "record", "note_slug": "fastest-to-2000"}).startswith("hindsightcricket.com/notes/fastest-to-2000?")
+    assert post_link({}) == "hindsightcricket.com/links?utm_source=x&utm_medium=thread"
+    long_link = post_link({"kind": "debate", "link": q + "&x=" + "y" * 200})
+    thread = x_thread(slides(), CAPTION, link=long_link)
+    assert long_link in thread[-1]["text"] and weight(thread[-1]["text"]) <= LIMIT  # a link counts as 23 however long
+
+
+def test_a_team_subject_is_not_a_player_page():
+    from services.ig_links import post_link
+
+    assert "/player" not in post_link({"kind": "idea", "subject": "Gujarat Titans"})
+    assert "/player" not in post_link({"kind": "idea", "subject": "West Indies"})

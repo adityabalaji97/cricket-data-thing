@@ -206,8 +206,52 @@ async function graphicSummary(id) {
   };
 }
 
+// The home page (and /links, the bio link): what the site does, plus the latest finished match's
+// biggest Impact as proof. A pinned tweet or a bio link shows this card, so it has to sell the click.
+export const HOME_FEATURES = [
+  ['Scorecards', 'Impact + win probability, every ball'],
+  ['Query builder', 'Ask in plain English'],
+  ['Match previews', 'Matchups, venue, form'],
+  ['Players & venues', 'Line, length, phase, zones'],
+];
+
+async function latestImpact() {
+  const recent = await getJSON('/recent-matches/discover?competition=all&flat=true&limit=4', 4000);
+  for (const m of (recent?.matches || []).slice(0, 4)) {
+    const data = await getJSON(`/matches/${encodeURIComponent(m.match_id)}/scorecard`, 4000);
+    if (!data?.summary?.primer) continue;
+    const rows = (data.innings || []).flatMap((inn) => [
+      ...(inn.batting || []).map((r) => ({ ...r, figure: `${r.runs}${r.not_out ? '*' : ''} (${r.balls})` })),
+      ...(inn.bowling || []).map((r) => ({ ...r, figure: r.figures })),
+    ]).filter((r) => typeof r.impact === 'number');
+    const top = rows.sort((a, b) => b.impact - a.impact)[0];
+    if (!top) continue;
+    return {
+      match: `${shortTeam(data.match.team1)} v ${shortTeam(data.match.team2)}`,
+      date: data.match.date,
+      result: data.match.result_text,
+      player: top.name,
+      figure: top.figure,
+      impact: signed(top.impact),
+      path: `/scorecard/${m.match_id}`,
+    };
+  }
+  return null;
+}
+
+async function homeSummary() {
+  return {
+    kind: 'home',
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    card: { headline: 'Who really won the match?', sub: 'Impact and win probability for every ball of men\'s T20 cricket',
+      features: HOME_FEATURES, latest: await latestImpact().catch(() => null) },
+  };
+}
+
 /** Summary for a site path + query string, or null for the site-wide card. */
 export async function summarize(pathname, search) {
+  if (pathname === '/' || /^\/links\/?$/.test(pathname)) return homeSummary();
   const graphic = pathname.match(/^\/g\/([A-Za-z0-9]{6,16})\/?$/);
   if (graphic) return graphicSummary(graphic[1]);
   const params = new URLSearchParams(search || '');
