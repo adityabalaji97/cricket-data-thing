@@ -52,7 +52,8 @@ def _rows(db: Session, start: date, end: date) -> List[Dict[str, Any]]:
 
 
 def week(db: Session, start: date, days: int = 7) -> List[Dict[str, Any]]:
-    """[{date, posts: [{id, kind, title, status, time, slides, reel}], trending_extra: n}] for each day."""
+    """[{date, posts: [{id, kind, title, status, time, slides, reel}], trending: [{id, kind, title}], trending_extra: n}]
+    for each day."""
     from services import ig_season
 
     rows = _rows(db, start, start + timedelta(days=days - 1))
@@ -83,6 +84,9 @@ def week(db: Session, start: date, days: int = 7) -> List[Dict[str, Any]]:
                        "carousel_id": (r["facts"] or {}).get("carousel_id"),
                        "note_id": (r["facts"] or {}).get("note_id")} for r in picked],
             "trending_extra": max(0, len(trends) - (1 if trends and trends[0] in picked else 0)),
+            # Trending posts made for the day but not in its plan: the admin lists them, one tap pins one in.
+            "trending": [{"id": r["id"], "kind": "trend", "title": r["title"]} for r in trends
+                         if r not in picked and r["status"] == "ready"],
         })
     return out
 

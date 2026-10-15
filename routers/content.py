@@ -72,6 +72,8 @@ class PackUpdate(BaseModel):
     bench: Optional[bool] = None
     # An optional preview (facts.optional, a top-20 game beyond the day's one): false puts it in the feed.
     optional: Optional[bool] = None
+    # A trending post (facts.pinned): true puts it in its day's plan beside the other posts (services/ig_plan.week).
+    pinned: Optional[bool] = None
     # The Reel's numbers from Instagram's insights (facts.reel_stats), typed in by hand: the Reel v1/v2 comparison.
     reel_stats: Optional[Dict[str, float]] = None
 
@@ -129,6 +131,9 @@ def update_pack(pack_id: int, body: PackUpdate, db: Session = Depends(get_sessio
     if body.optional is not None:
         fact_sets.append(("optional", "opt"))
         params["opt"] = json.dumps(bool(body.optional))
+    if body.pinned is not None:
+        fact_sets.append(("pinned", "pin"))
+        params["pin"] = json.dumps(bool(body.pinned))
     if body.reel_stats is not None:
         unknown = set(body.reel_stats) - set(REEL_STATS)
         if unknown:

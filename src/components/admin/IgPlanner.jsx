@@ -390,7 +390,7 @@ const PostRow = ({ pack, time, open, onToggle, onUpdate, copy, toast, openDays }
   );
 };
 
-const Day = ({ label, isToday, posts, empty, focus, extras = [], openId, setOpenId, ...rest }) => (
+const Day = ({ label, isToday, posts, empty, focus, extras = [], trending = [], openId, setOpenId, ...rest }) => (
   <Box sx={{ bgcolor: C.card, border: `1px solid ${isToday ? 'rgba(182,242,74,.35)' : C.line}`, borderRadius: 3, px: 1.75, pt: 1.25, pb: 0.5, mb: 1.25 }}>
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1, pb: 0.75 }}>
       <Typography sx={{ fontSize: 13, fontWeight: 700, color: isToday ? C.lime : C.hi }}>{isToday ? `Today · ${label}` : label}</Typography>
@@ -409,6 +409,25 @@ const Day = ({ label, isToday, posts, empty, focus, extras = [], openId, setOpen
           <Box key={pack.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.25 }}>
             <Typography sx={{ flex: 1, fontSize: 13, color: C.mid, lineHeight: 1.35 }}>{pack.title}</Typography>
             <Button size="small" onClick={() => rest.onUpdate(pack, { optional: false })} sx={{ color: C.lime, fontWeight: 700, minWidth: 0 }}>Add to feed</Button>
+          </Box>
+        ))}
+      </Box>
+    )}
+    {trending.length > 0 && (
+      // Trending posts the radar made for the day (scripts/trend_radar.py) that aren't in its plan: the plan takes one
+      // only on a day with nothing else. Open one to see it; Add to feed pins it in (facts.pinned).
+      <Box sx={{ borderTop: `1px solid ${C.line}`, py: 1 }}>
+        <SectionLabel sx={{ mb: 0.5 }}>Also trending · not in the plan</SectionLabel>
+        {trending.map(({ pack }) => (
+          <Box key={pack.id}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.25 }}>
+              <Typography component="button" type="button" onClick={() => setOpenId(openId === pack.id ? null : pack.id)}
+                sx={{ flex: 1, textAlign: 'left', background: 'none', border: 0, p: 0, cursor: 'pointer', fontSize: 13, color: C.mid, lineHeight: 1.35 }}>
+                {pack.title}
+              </Typography>
+              <Button size="small" onClick={() => rest.onUpdate(pack, { pinned: true })} sx={{ color: C.lime, fontWeight: 700, minWidth: 0 }}>Add to feed</Button>
+            </Box>
+            {openId === pack.id && <PostDetail pack={pack} onUpdate={rest.onUpdate} copy={rest.copy} toast={rest.toast} openDays={rest.openDays} />}
           </Box>
         ))}
       </Box>
@@ -469,7 +488,7 @@ const IgPlanner = ({ client, toast, onAuthFail }) => {
       await client.patch(`/admin/content/packs/${pack.id}`, body);
       // A new day, the bench, or into the feed: which day shows the post is the plan's call, so read it again
       // (quietly: the list stays on screen).
-      if (body.planned_for || body.bench || body.optional === false) {
+      if (body.planned_for || body.bench || body.optional === false || body.pinned) {
         load();
         toast(body.bench ? 'Moved to the bench' : body.planned_for ? `On ${dayLabel(body.planned_for)}` : 'In the feed');
       }
@@ -488,6 +507,7 @@ const IgPlanner = ({ client, toast, onAuthFail }) => {
       focus: d.focus,
       posts: d.posts.map((p) => ({ pack: byId[p.id], time: p.time })).filter((x) => x.pack),
       extras: (d.extras || []).map((p) => ({ pack: byId[p.id] })).filter((x) => x.pack),
+      trending: (d.trending || []).map((p) => ({ pack: byId[p.id] })).filter((x) => x.pack),
     }));
     // Days from tomorrow with nothing planned (or only skipped posts): where a bench post can go.
     const openDays = weekDays.filter((d) => d.date > today && !d.posts.some((x) => x.pack.status !== 'skipped')).map((d) => d.date);
@@ -527,7 +547,7 @@ const IgPlanner = ({ client, toast, onAuthFail }) => {
       )}
       {view.weekDays.map((d) => (
         <Day key={d.date} label={dayLabel(d.date)} isToday={d.date === view.today} posts={d.posts} focus={d.focus}
-          extras={d.extras} {...dayProps} />
+          extras={d.extras} trending={d.trending} {...dayProps} />
       ))}
       {Object.keys(view.later).length > 0 && (
         <Fold title="Later" count={Object.values(view.later).flat().length}>{groups(view.later)}</Fold>
