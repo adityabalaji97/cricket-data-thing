@@ -59,6 +59,10 @@
       "dest": "/api/embed.mjs?kind=$1&id=$2"
     },
     {
+      "src": "/mcp/?",
+      "dest": "https://cricket-data-thing-672dfbacf476.herokuapp.com/mcp"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/proxy.js"
     },

@@ -14,8 +14,9 @@ plain JSON responses: every request stands alone (fits a single Heroku dyno and 
 limit), and no SSE stream has to survive main.py's BaseHTTPMiddleware, which is known to break
 streaming responses.
 
-Guardrails: read-only SQL, a per-statement timeout, capped rows, and a global request budget so a
-chatty assistant cannot starve the small DB pool the website shares.
+Guardrails: read-only SQL, a per-statement timeout, capped rows, a global request budget, the connector's own small
+DB pool with a cap on concurrent calls (the website's pool is never touched), no paid Jev calls, and no tracking-data
+group (line/length/shot/zone/control) smaller than MIN_TAGGED_GROUP_BALLS balls.
 """
 
 from __future__ import annotations
@@ -44,7 +45,6 @@ from mcp.server.mcpserver import Context
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
-from database import SessionLocal
 from services.query_builder_v2 import GROUP_BY_COLUMNS, QueryValidationError, run_deliveries_query
 from services.team_innings import GROUP_BY as TEAM_INNINGS_GROUP_BY
 
@@ -59,6 +59,13 @@ MAX_ROWS = 10000
 # Rows fetched before sorting/truncating, so "top 10 by strike rate" ranks the whole result
 # rather than whichever 10 groups the service happened to return first.
 SORT_FETCH_LIMIT = MAX_ROWS
+CREDIT = "Data: Hindsight; ball-by-ball tracking by Himanish Ganjoo & TechRadar; scorecards from Cricsheet."
+# Line, length, shot, wagon zone and control come from the licensed ball-by-ball feed: aggregate only, the same rule
+# as the website's API (services/tracking_guard.py).
+from services.tracking_guard import MIN_GROUP_BALLS as MIN_TAGGED_GROUP_BALLS  # noqa: E402  (same rule as the API)
+from services.tracking_guard import TAGGED_COLUMNS as _TAGGED  # noqa: E402
+
+TAGGED_COLUMNS = set(_TAGGED)
 # Rows shown in the human-readable markdown table; the full result rides along as CSV/JSON.
 TEXT_TABLE_ROWS = 25
 
@@ -98,6 +105,33 @@ class _RequestBudget:
 
 _budget = _RequestBudget(int(os.getenv("MCP_CALLS_PER_MINUTE", "60")))
 
+# The connector's own connections, apart from the website's pool (database.py: 2 + 1 per worker), so a burst of slow
+# connector queries can't make the site wait for a connection. MCP_CONCURRENCY calls run at once per worker; the rest
+# wait up to MCP_QUEUE_SECONDS, then get the busy message.
+MCP_CONCURRENCY = int(os.getenv("MCP_CONCURRENCY", "2"))
+MCP_QUEUE_SECONDS = float(os.getenv("MCP_QUEUE_SECONDS", "8"))
+_slots = threading.BoundedSemaphore(MCP_CONCURRENCY)
+_engine = None
+_Session = None
+
+
+class _Busy(Exception):
+    """Every connector slot is taken."""
+
+
+def _session_factory():
+    global _engine, _Session
+    if _Session is None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from database import DATABASE_URL
+
+        _engine = create_engine(DATABASE_URL, pool_size=MCP_CONCURRENCY, max_overflow=0, pool_timeout=MCP_QUEUE_SECONDS,
+                                pool_recycle=1800, pool_pre_ping=True)
+        _Session = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+    return _Session
+
 _BUSY = CallToolResult(
     content=[TextContent(type="text", text="Hindsight is busy right now (too many queries in the last minute). Please try again shortly.")],
     is_error=True,
@@ -106,17 +140,26 @@ _BUSY = CallToolResult(
 
 @contextmanager
 def _read_only_session() -> Iterator[Any]:
-    """A DB session whose statements are capped and can never write."""
-    db = SessionLocal()
+    """A DB session whose statements are capped and can never write, from the connector's own pool, holding one of
+    MCP_CONCURRENCY slots, with Jev (a paid API) off: connector calls never spend on it."""
+    from services import jev_client
+
+    if not _slots.acquire(timeout=MCP_QUEUE_SECONDS):
+        raise _Busy("all connector slots busy")
+    db = None
     try:
+        db = _session_factory()()
         # SET LOCAL lasts for the surrounding transaction, which is the whole tool call because
         # the query paths never commit. READ ONLY makes accidental writes impossible.
         db.execute(text("SET TRANSACTION READ ONLY"))
         db.execute(text(f"SET LOCAL statement_timeout = {STATEMENT_TIMEOUT_MS}"))
-        yield db
+        with jev_client.suppress():
+            yield db
     finally:
-        db.rollback()
-        db.close()
+        if db is not None:
+            db.rollback()
+            db.close()
+        _slots.release()
 
 
 def _log_call(tool: str, ctx: Optional[Context], args: Dict[str, Any], started: float, outcome: str) -> None:
@@ -159,6 +202,8 @@ def _user_message(exc: Exception, fallback: str) -> str:
     carries hostnames and internals, so it is logged server-side and replaced with a plain message.
     """
     text_ = str(exc).lower()
+    if isinstance(exc, _Busy) or "queuepool limit" in text_:
+        return "Hindsight is busy right now (too many queries at once). Please try again shortly."
     if "statement timeout" in text_ or "canceling statement" in text_:
         return "That query took too long. Narrow it (a player, team, season or competition) and try again."
     detail = getattr(exc, "detail", None)
@@ -506,6 +551,9 @@ Hindsight is a ball-by-ball cricket database (men's T20 since 2005 incl. IPL, BB
 SA20, T20 Blast, The Hundred, T20Is; men's ODIs since 2000). Line/length/shot data exists from
 2015 and is patchier than the rest.
 
+When you share results, credit them: "Data: Hindsight (hindsightcricket.com); ball-by-ball tracking by Himanish
+Ganjoo & TechRadar; scorecards from Cricsheet." Impact, RAA and WPA follow Himanish Ganjoo's T20 Primer.
+
 How to use the tools:
 1. Resolve names first with find_entities — player, team and venue names must match the data
    exactly (e.g. "V Kohli", "M Chinnaswamy Stadium, Bengaluru").
@@ -806,7 +854,14 @@ def query_cricket_data(
         if params.get(key):
             params[key] = list(dict.fromkeys(canonical_name(n, alias_map) for n in params[key]))
     result = dict(result)
-    result["data"], merged = canonicalize_rows([dict(r) for r in result.get("data") or []], group_by, alias_map)
+    from services import tracking_guard
+
+    # Tracking tags as groups, or as filters (length=GOOD_LENGTH grouped by over and ball would list those balls).
+    data, hidden = tracking_guard.floor_groups(
+        [dict(r) for r in result.get("data") or []], group_by,
+        {"line": line, "length": length, "shot": shot, "shot_family": shot_family, "wagon_zone": wagon_zone,
+         "control": control})
+    result["data"], merged = canonicalize_rows(data, group_by, alias_map)
     structured = structure_query_result(
         result, params, group_by, query_mode=query_mode, format=format, gender=gender, batters=batters,
         bowlers=bowlers, sort_by=sort_by, sort_descending=sort_descending, limit=limit, chart=chart,
@@ -818,6 +873,8 @@ def query_cricket_data(
     perspective = structured["metrics_perspective"]
     if merged:
         warnings.append(f"{merged} rows under other spellings of the same player were combined into one name each.")
+    if hidden:
+        warnings.append(tracking_guard.hidden_note(hidden))
     if sorting and total_rows > SORT_FETCH_LIMIT:
         warnings.append(f"Ranked within the {SORT_FETCH_LIMIT:,} largest of {total_rows:,} groups; add filters for an exact ranking.")
 
@@ -837,7 +894,7 @@ def query_cricket_data(
             + perspective_line + "\n\n"
             + _markdown_table(columns, rows, must_show=[sort_by, chart_spec.get("metric")], perspective=perspective)
             + (f"\n\nMore rows: call again with offset={structured['next_offset']}." if structured["next_offset"] else "")
-            + f"\n\nOpen this query on Hindsight: {url}"
+            + f"\n\nOpen this query on Hindsight: {url}\n{CREDIT}"
         )
         if warnings:
             summary += "\n\nNotes: " + " ".join(warnings)
@@ -1175,7 +1232,7 @@ def preview_match(
             lines.append(f"Headline: {take['headline']}")
         for sec in take["sections"]:
             lines.append(f"{sec['title']}: " + " ".join(sec["bullets"] or []))
-    lines += ["", f"Full preview on Hindsight: {link}"]
+    lines += ["", f"Full preview on Hindsight: {link}", CREDIT]
 
     _log_call("preview_match", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
@@ -1236,7 +1293,7 @@ def match_recap(
         lines += [f"- {b}" for b in recap["bullets"]]
     else:
         lines.append("No ball-by-ball Impact/WPA for this match, so no recap; the scorecard is linked below.")
-    lines += ["", f"Scorecard on Hindsight: {link}"]
+    lines += ["", f"Scorecard on Hindsight: {link}", CREDIT]
     _log_call("match_recap", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
 
@@ -1288,7 +1345,7 @@ def player_profile(
         lines += ["", f"Player DNA (since {start.isoformat()}, fact-checked):", structured["player_dna"]]
     if len(lines) == 2:
         lines.append("No T20 data for this player in the window.")
-    lines += ["", f"Profile on Hindsight: {link}"]
+    lines += ["", f"Profile on Hindsight: {link}", CREDIT]
     _log_call("player_profile", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
 
@@ -1368,7 +1425,7 @@ def player_advanced(
             lines.append(f"- {key.replace('_', ' ')}: {b.get('overs')} overs, economy {b.get('economy')} (unadjusted), RAA/over {b.get('raa_per_over')}")
         fb = context.get("first_ball_last_ball_stats") or {}
         lines.append(f"- first-ball boundary rate {fb.get('first_ball_boundary_rate_pct')}%, last-ball {fb.get('last_ball_boundary_rate_pct')}%")
-    lines += ["", "Full JSON:", json.dumps(structured["bowling_context"], default=str), "", f"Profile on Hindsight: {link}"]
+    lines += ["", "Full JSON:", json.dumps(structured["bowling_context"], default=str), "", f"Profile on Hindsight: {link}", CREDIT]
     _log_call("player_advanced", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
 

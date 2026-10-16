@@ -4,7 +4,8 @@ Hindsight's query builder, exposed as an [MCP](https://modelcontextprotocol.io) 
 ChatGPT and other MCP hosts can query the ball-by-ball data and show results as an interactive
 table/chart. Code: `mcp_server/` (server + widget), mounted by `main.py`.
 
-**Endpoint:** `https://cricket-data-thing-672dfbacf476.herokuapp.com/mcp` (streamable HTTP, no auth).
+**Endpoint:** `https://hindsightcricket.com/mcp` (streamable HTTP, no auth). Vercel forwards it to the Heroku app's
+`/mcp` (`vercel.json`); `https://cricket-data-thing-672dfbacf476.herokuapp.com/mcp` keeps working for existing users.
 
 ## Adding it
 
@@ -29,8 +30,10 @@ ODIs"*. The URL and these steps are also on the Home page ("Use Hindsight in Cla
 | `player_advanced` | The profile's Advanced Analytics for a bowler as JSON: previous-over pressure split, spell shape, entry point, first/last-ball boundary rates, state on entry, rolling form. Every bucket has raw economy (labelled unadjusted for game state) and bowling-view `raa_per_over` / `waa_per_over`. |
 | `preview_match` | Fixture preview for two teams at a venue in T20 or ODI: venue record, leading run-scorers/wicket-takers there, head-to-head, recent form, standout batter-vs-bowler matchups, and a link to the site's preview. Format-specific throughout. History window defaults to 1 January 8 years back for ODIs and 4 years back for T20s (same as the website's preview). |
 
-All are read-only (`readOnlyHint`). Results are **aggregated only** — `group_by` is required, so
-raw ball-by-ball rows (line/length/shot from the licensed feed) are never redistributed.
+All are read-only (`readOnlyHint`). Results are **aggregated only**: `group_by` is required, and whenever the query
+groups or filters by the licensed tracking columns (line, length, shot, shot family, wagon zone, control), groups
+of fewer than `MCP_MIN_TAGGED_GROUP_BALLS` (6) balls are left out with a note. Without that, grouping by match,
+over and ball listed the feed ball by ball (checked 16 Oct 2026). Untagged per-ball rows (Cricsheet-level) still work.
 
 ## How it is built
 
@@ -45,9 +48,16 @@ raw ball-by-ball rows (line/length/shot from the licensed feed) are never redist
 * **Same query path as the website.** `services.query_builder_v2.run_deliveries_query` is shared
   by `GET /query/deliveries` and the tool, including the per-format over/innings validation.
 * **Guardrails:** every call runs in a `READ ONLY` transaction with `statement_timeout`
-  (`MCP_STATEMENT_TIMEOUT_MS`, default 15s); rows capped at 10,000 (`offset` paging); a global budget of
-  `MCP_CALLS_PER_MINUTE` (default 60) — global rather than per-IP because hosts call from shared
+  (`MCP_STATEMENT_TIMEOUT_MS`, default 15s); rows capped at 10,000 (`offset` paging); a budget of
+  `MCP_CALLS_PER_MINUTE` (default 60, per web worker) — global rather than per-IP because hosts call from shared
   servers. Driver errors are logged, not shown to users.
+* **The website is protected from the connector:** connector calls use their own pool
+  (`MCP_CONCURRENCY` connections per worker, default 2; the rest wait `MCP_QUEUE_SECONDS`, default 8, then get a
+  busy message), never the website's. **Jev is off** inside connector calls (`jev_client.suppress()`), so the
+  connector never spends on it; recaps and previews use their deterministic versions (a cached Jev version is
+  still served), and a Jev-less recap is never cached for the website.
+* **Kill switch:** `heroku config:set MCP_CALLS_PER_MINUTE=0 -a cricket-data-thing` turns every tool call into the
+  busy message without a deploy.
 * **DNS-rebinding protection is off** on purpose: it protects localhost servers, and on a public
   credential-less endpoint it would only reject legitimate Host/Origin values.
 * **Logging:** each call logs one `mcp_call` JSON line (tool, args, outcome, ms, client) —
@@ -62,5 +72,5 @@ npx @modelcontextprotocol/inspector     # connect to http://localhost:8000/mcp (
 
 ## Not yet
 
-Auth (add OAuth before sharing widely) and wagon-wheel / pitch-map widgets. (The T20 Primer
+Auth (OAuth would allow per-user limits; not needed for read-only public stats) and wagon-wheel / pitch-map widgets. (The T20 Primer
 metrics arrived with Phase 2 as query-builder columns, so the connector has them.)

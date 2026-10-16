@@ -31,6 +31,10 @@ _INSERTS = {
         "INSERT INTO mcp_call_log (tool, outcome, ms, client, caller_hash, args) "
         "VALUES (%(tool)s, %(outcome)s, %(ms)s, %(client)s, %(caller_hash)s, %(args)s)"
     ),
+    "jev": (
+        "INSERT INTO jev_usage_log (source, questions, input_tokens, output_tokens, ms, ok) "
+        "VALUES (%(source)s, %(questions)s, %(input_tokens)s, %(output_tokens)s, %(ms)s, %(ok)s)"
+    ),
     "event": (
         "INSERT INTO app_events (anon_id, session_id, event, path, props, referrer, country) "
         "VALUES (%(anon_id)s, %(session_id)s, %(event)s, %(path)s, %(props)s, %(referrer)s, %(country)s)"
@@ -56,6 +60,9 @@ def _ensure_worker() -> None:
             return
         _WORKER = threading.Thread(target=_run, name="usage-log", daemon=True)
         _WORKER.start()
+        import atexit
+
+        atexit.register(flush)
 
 
 def enqueue(kind: str, row: Dict[str, Any]) -> None:
@@ -69,6 +76,16 @@ def enqueue(kind: str, row: Dict[str, Any]) -> None:
     _ensure_worker()
 
 
+def log_jev_call(questions: int, input_tokens: Optional[int], output_tokens: Optional[int], ms: int, ok: bool) -> None:
+    """One Jev call (services/jev_client.ask), tagged with the process that made it."""
+    import sys
+
+    argv0 = os.path.basename(sys.argv[0] or "") if sys.argv else ""
+    source = "web" if argv0 in ("uvicorn", "gunicorn", "") or "uvicorn" in argv0 else argv0
+    enqueue("jev", {"source": source[:64], "questions": questions, "input_tokens": input_tokens,
+                    "output_tokens": output_tokens, "ms": ms, "ok": ok})
+
+
 def log_mcp_call(tool: str, outcome: str, ms: int, client: str, forwarded_for: Optional[str], args: Dict[str, Any]) -> None:
     enqueue("mcp", {
         "tool": tool[:48], "outcome": outcome[:16], "ms": ms, "client": (client or "")[:80],
@@ -76,9 +93,37 @@ def log_mcp_call(tool: str, outcome: str, ms: int, client: str, forwarded_for: O
     })
 
 
-def _run() -> None:
+def _write(batch) -> None:
     from database import engine
 
+    try:
+        raw = engine.raw_connection()
+        try:
+            cur = raw.cursor()
+            for kind in _INSERTS:
+                rows = [row for k, row in batch if k == kind]
+                if rows:
+                    cur.executemany(_INSERTS[kind], rows)
+            raw.commit()
+        finally:
+            raw.close()
+    except Exception as exc:  # never let logging take anything down
+        logger.warning("usage log write failed (%s rows dropped): %r", len(batch), exc)
+
+
+def flush() -> None:
+    """Write whatever is queued now: at exit, so a short script (a nightly job) doesn't lose its last rows."""
+    batch = []
+    while True:
+        try:
+            batch.append(_QUEUE.get_nowait())
+        except queue.Empty:
+            break
+    if batch:
+        _write(batch)
+
+
+def _run() -> None:
     while True:
         batch = []
         deadline = time.monotonic() + _FLUSH_SECONDS
@@ -87,18 +132,5 @@ def _run() -> None:
                 batch.append(_QUEUE.get(timeout=max(0.05, deadline - time.monotonic())))
             except queue.Empty:
                 break
-        if not batch:
-            continue
-        try:
-            raw = engine.raw_connection()
-            try:
-                cur = raw.cursor()
-                for kind in _INSERTS:
-                    rows = [row for k, row in batch if k == kind]
-                    if rows:
-                        cur.executemany(_INSERTS[kind], rows)
-                raw.commit()
-            finally:
-                raw.close()
-        except Exception as exc:  # never let logging take anything down
-            logger.warning("usage log write failed (%s rows dropped): %r", len(batch), exc)
+        if batch:
+            _write(batch)
