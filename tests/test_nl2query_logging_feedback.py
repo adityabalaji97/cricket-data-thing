@@ -44,7 +44,7 @@ def test_parse_nl_query_passes_few_shot_examples_to_openai(monkeypatch):
     captured = {}
     monkeypatch.setattr(nl2query, "get_few_shot_examples", lambda query, db, limit=5: expected_examples)
 
-    def fake_call_openai(query, few_shot_examples=None, model=None):
+    def fake_call_openai(query, few_shot_examples=None, model=None, **_kw):
         captured["query"] = query
         captured["few_shot_examples"] = few_shot_examples
         captured["model"] = model

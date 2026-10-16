@@ -38,6 +38,11 @@ CONFIG_SETS: Dict[str, List[Tuple[str, str, Optional[str], Optional[str]]]] = {
         ("5.6luna/low", "gpt-5.6-luna", "low", None),
         ("5.4mini/low", "gpt-5.4-mini", "low", None),
     ],
+    # What production runs (nl2query.MODEL_PRIMARY / REASONING_EFFORT / Fast mode).
+    "production": [
+        ("gpt-4o", "gpt-4o", None, None),
+        ("prod", nl2query.MODEL_PRIMARY, nl2query.REASONING_EFFORT, "fast"),
+    ],
 }
 CONFIGS = CONFIG_SETS["quality"]
 

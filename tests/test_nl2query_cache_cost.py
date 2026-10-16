@@ -2,7 +2,7 @@ from services import nl2query
 
 
 def _fake_openai(calls):
-    def fake(_q):
+    def fake(_q, **_kw):
         calls.append(_q)
         return {
             "filters": {"batters": ["Virat Kohli"], "query_mode": "delivery"},

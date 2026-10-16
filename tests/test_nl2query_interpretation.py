@@ -6,7 +6,7 @@ def test_interpretation_fallback_is_populated_from_filters(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: {
+        lambda _q, **_kw: {
             "filters": {
                 "batters": ["Virat Kohli"],
                 "bowl_kind": ["spin bowler"],
@@ -32,7 +32,7 @@ def test_invalid_confidence_defaults_to_medium(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: {
+        lambda _q, **_kw: {
             "filters": {"batters": ["Virat Kohli"], "query_mode": "delivery"},
             "group_by": ["batter"],
             "explanation": "kohli breakdown",
@@ -52,7 +52,7 @@ def test_recommended_columns_defaults_for_bowling_query(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: {
+        lambda _q, **_kw: {
             "filters": {"bowlers": ["Jasprit Bumrah"], "query_mode": "delivery"},
             "group_by": ["bowler", "competition"],
             "explanation": "bumrah bowling split",
@@ -74,7 +74,7 @@ def test_recommended_columns_are_sanitized_and_deduped(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: {
+        lambda _q, **_kw: {
             "filters": {"batters": ["Virat Kohli"], "query_mode": "delivery"},
             "group_by": ["batter"],
             "explanation": "kohli metrics",
@@ -97,7 +97,7 @@ def test_recommended_chart_is_sanitized_when_valid(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: {
+        lambda _q, **_kw: {
             "filters": {"batters": ["Virat Kohli"], "query_mode": "delivery"},
             "group_by": ["batter"],
             "explanation": "kohli by batter",
@@ -126,7 +126,7 @@ def test_recommended_chart_invalid_type_becomes_none(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: {
+        lambda _q, **_kw: {
             "filters": {"batters": ["Virat Kohli"], "query_mode": "delivery"},
             "group_by": ["batter"],
             "explanation": "kohli grouped by batter",
