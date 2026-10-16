@@ -44,6 +44,21 @@ SPECS: Dict[str, Dict[str, Any]] = {
         "tags": ["#INDvNZ", "#TeamIndia", "#Bhuvi"],
         "key": "spotlight-bhuvneshwar-kumar-2026-10",
     },
+    "bhuvi-blr": {
+        "type": "venue_matchups", "player": "Bhuvneshwar Kumar", "role": "bowler", "bowl_kind": "pace bowler",
+        "team": "India", "opponent": "West Indies", "series_start": date(2026, 10, 1), "since": date(2025, 1, 1),
+        "venue": "M Chinnaswamy Stadium", "venue_short": "Chinnaswamy",
+        "short_names": {"Gujarat Titans": "GT", "Delhi Capitals": "DC", "Punjab Kings": "PBKS", "Rajasthan Royals": "RR",
+                        "Chennai Super Kings": "CSK", "Sunrisers Hyderabad": "SRH", "Lucknow Super Giants": "LSG",
+                        "Mumbai Indians": "MI", "Kolkata Knight Riders": "KKR"},
+        "hook": "Bhuvneshwar Kumar is back for India at the Chinnaswamy, his IPL home. Pacers get hit there. Does he?",
+        "kicker": "India v West Indies · 5th T20I, Bengaluru",
+        "sub": "Every spell there, the new ball, and West Indies' top order",
+        "tags": ["#INDvWI", "#TeamIndia", "#Bhuvi", "#Chinnaswamy"],
+        "method": ("Impact is computed ball by ball (T20 Primer method) on every men's T20, IPL included; matchups "
+                   "cover every T20 each batter played."),
+        "key": "spotlight-bhuvneshwar-kumar-chinnaswamy-2026-10",
+    },
     "shami-odi": {
         "type": "case_odi", "player": "Mohammad Shami", "role": "bowler", "bowl_kind": "pace bowler", "team": "India",
         "since": date(2019, 1, 1), "peers_since": date(2023, 1, 1), "last_game": date(2025, 3, 9), "own_from": date(2025, 1, 1),
@@ -329,6 +344,10 @@ def accuracy_card(db, spec, bowlers: List[str]) -> Optional[Dict[str, Any]]:
 
 
 def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if spec.get("type") == "venue_matchups":  # a ground and an opposition (services/ig_posts/venue_spotlight.py)
+        from services.ig_posts import venue_spotlight
+
+        return venue_spotlight.build(db, spec)
     if spec.get("type") == "case_odi":  # an ODI case (services/ig_posts/case_odi.py)
         from services.ig_posts import case_odi
 
