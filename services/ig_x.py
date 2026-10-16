@@ -133,7 +133,91 @@ def _lines(text: Optional[str]) -> str:
     return " ".join(line.strip() for line in str(text or "").splitlines() if line.strip())
 
 
+def _f(value: Any, kind: str = "dec1") -> str:
+    from services.ig_posts.cards import fmt
+
+    return fmt(value, kind)
+
+
+def _first(name: str) -> str:
+    from services.ig_posts.spotlight import short_name
+
+    return short_name(name)
+
+
+def _series_word(w: str) -> str:
+    """"This match" -> "this match" mid-sentence; a player's name stays as it is."""
+    return w if _is_name(w) else w[:1].lower() + w[1:]
+
+
+def _figures(r: Dict[str, Any]) -> str:
+    """"4.0-0-18" with 2 wickets -> "2/18 (4 ov)"."""
+    parts = str(r.get("figures") or "").split("-")
+    if len(parts) < 3:
+        return str(r.get("figures") or "")
+    overs = parts[0][:-2] if parts[0].endswith(".0") else parts[0]
+    return f"{r.get('wickets') or 0}/{parts[2]} ({overs} ov)"
+
+
+def details(card: Dict[str, Any]) -> List[str]:
+    """Stat lines a tweet can carry beyond the slide's title: the numbers the slide draws as a chart (a leaderboard's
+    values, a comparison's two sides, a scorecard's top lines). X has room the image doesn't need, so the thread
+    reads as more than the slides' captions. Every number is from the card's own payload."""
+    p = card.get("payload") or {}
+    v = card.get("visual")
+    lines: List[str] = []
+    if v == "recap_text":
+        lines = list(p.get("bullets") or [])
+    elif v == "win_prob_line":
+        lines = [f"Over {b['over']}: {b['text']} ({b['from']}→{b['to']}%)" for b in p.get("bands") or []]
+    elif v == "metric_bars":
+        rows = p.get("rows") or []
+        fmt_ = (p.get("metric") or {}).get("format", "dec1")
+        top = rows[:3] + [r for r in rows[3:] if r.get("highlight")][:1]
+        lines = [f"{'→ ' if r.get('highlight') else ''}{r['name']} {_f(r['value'], fmt_)}"
+                 + (f" ({r['detail']})" if r.get("detail") else "") for r in top]
+    elif v == "scatter_plus":
+        x, y = p.get("x") or {}, p.get("y") or {}
+        ranked = sorted((pt for pt in p.get("points") or [] if pt.get("label") or pt.get("highlight")),
+                        key=lambda pt: (pt.get("label") or 99))[:3]
+        lines = [f"{pt['name']}: {_f(pt['y'], y.get('format', 'dec1'))} {y.get('label', '')}, "
+                 f"{_f(pt['x'], x.get('format', 'dec1'))} {x.get('label', '')}" for pt in ranked]
+    elif v == "deep_compare":
+        a, b = (_series_word(w) for w in (p.get("series") or ["", ""])[:2])
+        fmt_ = (p.get("metric") or {}).get("format", "dec1")
+        lines = [f"{r['label']}: {_f(r['subject'], fmt_)} {a} v {_f(r['field'], fmt_)} {b}"
+                 for r in p.get("rows") or [] if r.get("field") is not None]
+    elif v == "pair_dumbbell":
+        a, b = (p.get("series") or ["", ""])[:2]
+        fmt_ = p.get("format", "dec1")
+        lines = [f"{_first(r['label'])}: {_f(r['a'], fmt_)} {a}, {_f(r['b'], fmt_)} {b}" for r in p.get("rows") or []]
+    elif v == "score_race":
+        series, mark = p.get("series") or [], p.get("mark")
+        for o in (6, 10):
+            if mark and o < mark and all(len(s_["values"]) >= o for s_ in series):
+                lines.append(f"After {o}: " + ", ".join(f"{s_['team']} {s_['values'][o - 1]}/{s_['wickets'][o - 1]}"
+                                                       for s_ in series))
+    elif v == "innings_scorecard":
+        bats = sorted(p.get("batting") or [], key=lambda r: -(r.get("runs") or 0))[:3]
+        bowls = sorted(p.get("bowling") or [], key=lambda r: -(r.get("wickets") or 0))[:2]
+        imp = lambda r: f", {_f(r['impact'], 'signed1')}" if r.get("impact") is not None else ""  # noqa: E731
+        # Full names: a scorecard's "Rahul" could be either Rahul in the thread (and the hashtag needs the full name).
+        lines = [f"{r['name']} {r['runs']}{'*' if r.get('not_out') else ''} ({r['balls']}){imp(r)}" for r in bats]
+        lines += [f"{r['name']} {_figures(r)}{imp(r)}" for r in bowls]
+    elif v == "scorecard":
+        metrics = p.get("metrics") or []
+        for r in (p.get("rows") or [])[:3]:
+            vals = ", ".join(f"{m['label']} {_f((r.get('values') or {}).get(m['key']), m.get('format', 'dec1'))}"
+                             for m in metrics[:3])
+            lines.append(f"{r['name']}: {vals}")
+    if not lines and card.get("help") and any(ch.isdigit() for ch in str(card["help"])):
+        lines = [str(card["help"])]  # a note with numbers in it; never the chart's reading instructions
+    title = str(card.get("title") or "")
+    return [l for l in lines if l and l.rstrip(".") not in title]
+
+
 def slide_text(slide: Dict[str, Any], chart_titles: Dict[str, str]) -> str:
+    """The slide's own sentence: a card's title (its takeaway), the hook, a chart's title."""
     kind = slide.get("type")
     if kind == "hook":
         kicker = slide.get("kicker")
@@ -142,11 +226,10 @@ def slide_text(slide: Dict[str, Any], chart_titles: Dict[str, str]) -> str:
         card = slide.get("card") or {}
         title = str(card.get("title") or "")
         payload = card.get("payload") or {}
-        if card.get("visual") == "recap_text":  # the words are the payload: the headline and its first bullets
-            title = " ".join([payload.get("headline") or title, *(payload.get("bullets") or [])[:2]])
-        elif card.get("visual") == "win_prob_line" and payload.get("bands"):  # the annotated overs
-            title = title.split(":")[0] + ". " + ". ".join(f"Over {b['over']}: {b['text']} ({b['from']}→{b['to']}%)"
-                                                          for b in payload["bands"])
+        if card.get("visual") == "recap_text":  # the words are the payload: the headline (bullets are its details)
+            title = payload.get("headline") or title
+        elif card.get("visual") == "win_prob_line" and payload.get("bands"):
+            title = title.split(":")[0] + "."
         return f"{card['kicker']}: {title}" if card.get("kicker") else title
     if kind == "chart":
         return chart_titles.get(slide.get("snapshot_id") or "", "")
@@ -158,23 +241,48 @@ def slide_text(slide: Dict[str, Any], chart_titles: Dict[str, str]) -> str:
     return f"{heading}: {_lines(slide.get('body'))}" if heading else _lines(slide.get("body"))
 
 
+def slide_lines(slide: Dict[str, Any]) -> List[str]:
+    if slide.get("type") == "hook":
+        return [str(slide["sub"])] if slide.get("sub") else []
+    if slide.get("type") == "card":
+        return details(slide.get("card") or {})
+    return []
+
+
+def _fit_lines(head: str, lines: List[str], suffix: str) -> str:
+    """The head, then as many whole stat lines as fit with the suffix (a line is dropped, never cut)."""
+    body = head.strip()
+    for line in lines:
+        trial = f"{body}\n{line}"
+        if _weight(trial + suffix) > LIMIT:
+            break
+        body = trial
+    return _fit(body, suffix)
+
+
 def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[Dict[str, str]] = None,
              players: Optional[List[str]] = None, link: Optional[str] = None) -> List[Dict[str, Any]]:
-    """link: the post's own page (services/ig_links.post_link) for the last tweet; default the bio page."""
+    """link: the post's own page (services/ig_links.post_link) for the last tweet; default the bio page. Each tweet is
+    the slide's sentence plus the stat lines that fit (details())."""
     link = link or LINK
     tags = " ".join(thread_tags(caption))
     total = len(slides)
     names = list(dict.fromkeys([*(players or []), *players_in(slides)]))
-    bodies = tag_players([slide_text(slide, chart_titles or {}) for slide in slides], names)
-    tweets = []
-    for i, body in enumerate(bodies, start=1):
+    suffixes = []
+    for i in range(1, total + 1):
         if i == 1:
-            suffix = f"\n\nA thread 🧵 1/{total}\n{tags}"
+            suffixes.append(f"\n\nA thread 🧵 1/{total}\n{tags}")
         elif i == total:
-            suffix = f"\n\nFull data, free: {link}\nData: @himganj153 & @TechRadar9\n{i}/{total} {tags}"
+            suffixes.append(f"\n\nFull data, free: {link}\nData: @himganj153 & @TechRadar9\n{i}/{total} {tags}")
         else:
-            suffix = f"\n\n{i}/{total} {tags}"
-        tweets.append({"n": i, "slide": i, "text": _fit(body, suffix)})
+            suffixes.append(f"\n\n{i}/{total} {tags}")
+    # Which stat lines fit is settled first, then players are tagged across what's left: a line dropped for length
+    # mustn't use up a player's first mention (a hashtag is never longer than the name it replaces).
+    bodies = [_fit_lines(slide_text(slide, chart_titles or {}), slide_lines(slide), sfx)[: -len(sfx)]
+              for slide, sfx in zip(slides, suffixes)]
+    tagged = tag_players(bodies, names)
+    tweets = [{"n": i, "slide": i, "text": _fit(body, sfx)}
+              for i, (body, sfx) in enumerate(zip(tagged, suffixes), start=1)]
     return tweets
 
 
