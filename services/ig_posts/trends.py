@@ -166,6 +166,21 @@ def entry_for(db: Session, name: str, role: str, hs: List[Dict[str, Any]], scope
         log(f"  {name}: not in any post scope")
         return None
     r = scope["ctx"].role
+    # The player's most striking split (services/ig_posts/splits.py) is the question when there is one: "Abhishek
+    # strikes at 247 against spin in the powerplay. Who comes closest?" The all-round template is the fallback.
+    from services.ig_posts import splits
+
+    sample = f"{scope['label']} · balls in each split"
+    try:
+        sp = splits.build(db, name, r, scope, scope["hook"], sample)
+    except Exception as exc:  # a split query failing falls back to the template, never stops the radar
+        log(f"  {name}: splits failed ({exc})")
+        sp = None
+    if sp:
+        q = Question(key=f"trend-{re.sub(r'[^a-z0-9]+', '-', name.lower())}", text=sp["hook"], role=r, fmt=scope["fmt"],
+                     params=scope["params"], min_balls=scope["min_balls"], scope_label=sample, kicker=scope["kicker"],
+                     subject=name)
+        return {"question": q, "ctx": scope["ctx"], "split_post": sp, "headlines": hs[:3]}
     noun = "batter" if r == "batter" else "bowler"
     text_ = f"Is {name} the most complete {noun} {scope['hook']}?"
     q = Question(key=f"trend-{re.sub(r'[^a-z0-9]+', '-', name.lower())}", text=text_, role=r, fmt=scope["fmt"],

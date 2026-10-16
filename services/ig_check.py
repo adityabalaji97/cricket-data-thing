@@ -186,11 +186,12 @@ def _trend(db, fact, key):
 
     title = fact.get("title") or ""
     scope = "odiwc" if "ODIs" in title else "t20i23" if "T20Is" in title else "ipl23" if "IPL" in title else None
-    role = "bowler" if "bowlers" in (fact.get("method") or "") else "batter"
+    role = "bowler" if "bowler" in (fact.get("method") or "") else "batter"
     e = trends.entry_for(db, fact.get("subject"), role, fact.get("headlines") or [], scope_key=scope, log=lambda m: None)
     if not e:
         return None
-    e = {**e, **_entry(db, e["question"], fact.get("angles") or [], fact)}
+    if not e.get("split_post"):  # a split question (services/ig_posts/splits.py) brings its own cards
+        e = {**e, **_entry(db, e["question"], fact.get("angles") or [], fact)}
     return ig_backlog.trend_post(db, e, key, fact.get("headlines") or [])
 
 
