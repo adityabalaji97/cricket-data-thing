@@ -522,6 +522,11 @@ const CONNECTOR_PROMPTS = [
 
 const ConnectorSection = () => {
   const [copied, setCopied] = useState(false);
+  const ref = useRef(null);
+  // hindsightcricket.com/mcp opened in a browser lands here (vercel.json): scroll to the section once it renders.
+  useEffect(() => {
+    if (window.location.hash === '#connector' && ref.current) ref.current.scrollIntoView({ behavior: 'smooth' });
+  }, []);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(CONNECTOR_URL);
@@ -538,7 +543,7 @@ const ConnectorSection = () => {
     </Typography>
   );
   return (
-    <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
+    <Box component="section" id="connector" ref={ref} sx={{ mb: { xs: 3.75, md: 5.5 }, scrollMarginTop: 72 }}>
       <SectionHeader
         kicker="05 / Connect"
         title="Use Hindsight in Claude or ChatGPT"

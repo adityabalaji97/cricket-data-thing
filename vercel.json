@@ -60,6 +60,19 @@
     },
     {
       "src": "/mcp/?",
+      "methods": ["GET"],
+      "has": [{"type": "header", "key": "user-agent", "value": ".*(bot|Bot|BOT|crawler|Crawler|spider|Spider|facebookexternalhit|WhatsApp|Embedly|Preview|vkShare|Google|bing).*"}],
+      "dest": "/api/meta.mjs?__path=/"
+    },
+    {
+      "src": "/mcp/?",
+      "methods": ["GET"],
+      "has": [{"type": "header", "key": "accept", "value": ".*text/html.*"}],
+      "status": 302,
+      "headers": {"Location": "/#connector"}
+    },
+    {
+      "src": "/mcp/?",
       "dest": "https://cricket-data-thing-672dfbacf476.herokuapp.com/mcp"
     },
     {
