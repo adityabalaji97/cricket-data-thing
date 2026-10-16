@@ -61,6 +61,7 @@ MAX_ROWS = 10000
 SORT_FETCH_LIMIT = MAX_ROWS
 # Line, length, shot, wagon zone and control come from the licensed ball-by-ball feed: a group of these with fewer
 # balls than this is left out, so the connector can't list the feed ball by ball (grouping by match, over and ball).
+CREDIT = "Data: Hindsight; ball-by-ball tracking by Himanish Ganjoo & TechRadar; scorecards from Cricsheet."
 TAGGED_COLUMNS = {"line", "length", "shot", "shot_family", "wagon_zone", "control"}
 MIN_TAGGED_GROUP_BALLS = int(os.getenv("MCP_MIN_TAGGED_GROUP_BALLS", "6"))
 # Rows shown in the human-readable markdown table; the full result rides along as CSV/JSON.
@@ -548,6 +549,9 @@ Hindsight is a ball-by-ball cricket database (men's T20 since 2005 incl. IPL, BB
 SA20, T20 Blast, The Hundred, T20Is; men's ODIs since 2000). Line/length/shot data exists from
 2015 and is patchier than the rest.
 
+When you share results, credit them: "Data: Hindsight (hindsightcricket.com); ball-by-ball tracking by Himanish
+Ganjoo & TechRadar; scorecards from Cricsheet." Impact, RAA and WPA follow Himanish Ganjoo's T20 Primer.
+
 How to use the tools:
 1. Resolve names first with find_entities — player, team and venue names must match the data
    exactly (e.g. "V Kohli", "M Chinnaswamy Stadium, Bengaluru").
@@ -889,7 +893,7 @@ def query_cricket_data(
             + perspective_line + "\n\n"
             + _markdown_table(columns, rows, must_show=[sort_by, chart_spec.get("metric")], perspective=perspective)
             + (f"\n\nMore rows: call again with offset={structured['next_offset']}." if structured["next_offset"] else "")
-            + f"\n\nOpen this query on Hindsight: {url}"
+            + f"\n\nOpen this query on Hindsight: {url}\n{CREDIT}"
         )
         if warnings:
             summary += "\n\nNotes: " + " ".join(warnings)
@@ -1227,7 +1231,7 @@ def preview_match(
             lines.append(f"Headline: {take['headline']}")
         for sec in take["sections"]:
             lines.append(f"{sec['title']}: " + " ".join(sec["bullets"] or []))
-    lines += ["", f"Full preview on Hindsight: {link}"]
+    lines += ["", f"Full preview on Hindsight: {link}", CREDIT]
 
     _log_call("preview_match", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
@@ -1288,7 +1292,7 @@ def match_recap(
         lines += [f"- {b}" for b in recap["bullets"]]
     else:
         lines.append("No ball-by-ball Impact/WPA for this match, so no recap; the scorecard is linked below.")
-    lines += ["", f"Scorecard on Hindsight: {link}"]
+    lines += ["", f"Scorecard on Hindsight: {link}", CREDIT]
     _log_call("match_recap", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
 
@@ -1340,7 +1344,7 @@ def player_profile(
         lines += ["", f"Player DNA (since {start.isoformat()}, fact-checked):", structured["player_dna"]]
     if len(lines) == 2:
         lines.append("No T20 data for this player in the window.")
-    lines += ["", f"Profile on Hindsight: {link}"]
+    lines += ["", f"Profile on Hindsight: {link}", CREDIT]
     _log_call("player_profile", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
 
@@ -1420,7 +1424,7 @@ def player_advanced(
             lines.append(f"- {key.replace('_', ' ')}: {b.get('overs')} overs, economy {b.get('economy')} (unadjusted), RAA/over {b.get('raa_per_over')}")
         fb = context.get("first_ball_last_ball_stats") or {}
         lines.append(f"- first-ball boundary rate {fb.get('first_ball_boundary_rate_pct')}%, last-ball {fb.get('last_ball_boundary_rate_pct')}%")
-    lines += ["", "Full JSON:", json.dumps(structured["bowling_context"], default=str), "", f"Profile on Hindsight: {link}"]
+    lines += ["", "Full JSON:", json.dumps(structured["bowling_context"], default=str), "", f"Profile on Hindsight: {link}", CREDIT]
     _log_call("player_advanced", ctx, args, started, "ok")
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], structured_content=structured)
 
