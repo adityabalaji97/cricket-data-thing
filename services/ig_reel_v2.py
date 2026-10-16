@@ -9,7 +9,8 @@ as a silent slideshow (services/ig_slides.make_reel, v1).
    bar chart ...), the deeper cut, one more. Previews and play-alongs get no v2 Reel.
 2. script: the strong model (SCRIPT_MODEL) writes a hook and one line per beat from the cards' titles and help lines; the guard rejects it if
    any number isn't on the cards, or it's too long (one retry, then a template from the titles). Stored with its source.
-3. voice: OpenAI TTS, one clip per line, so each beat lasts exactly as long as its line.
+3. voice: OpenAI's realtime voice (TTS_MODEL, VOICE), one response per line in one session, so each beat lasts exactly
+   as long as its line; a line whose transcript isn't the line word for word is asked for again.
 4. frames: scripts/record_ig_beats.mjs records each beat's chart revealed left to right (/ig/<id>/<n>?animate=1).
 5. compose (ffmpeg): 1080x1920; the slide in the middle (as v1); the hook in big type above it while it's spoken, then
    the brand; captions below, a few words at a time in step with the voice; a quiet generated music bed under the voice.
@@ -38,12 +39,16 @@ ROOT = Path(__file__).resolve().parents[1]
 FONT_BOLD = ROOT / "api/_lib/fonts/BarlowSemiCondensed-Bold.ttf"
 FONT_BODY = ROOT / "api/_lib/fonts/Barlow-SemiBold.ttf"
 SITE = os.getenv("REEL_BASE", "https://hindsightcricket.com")
-VOICE = os.getenv("REEL_VOICE", "verse")
-TTS_MODEL = "gpt-4o-mini-tts"
+# gpt-4o-mini-tts (and /v1/audio/speech's other models) leave the API on 2027-01-06; their replacement only
+# speaks through the Realtime API. Marin from 16 Oct 2026 (verse before it), a week's trial of a female voice.
+VOICE = os.getenv("REEL_VOICE", "marin")
+TTS_MODEL = os.getenv("REEL_TTS_MODEL", "gpt-realtime-2.1-mini")
+RATE = 24000                   # the Realtime API's PCM: 16-bit mono at 24 kHz
+LINE_TRIES = 3                 # a line the voice doesn't read word for word is asked for again, then the Reel fails
 # The strong model: gpt-4o was picked because it followed the fairness rules far better than 4o-mini; Sol is
 # its successor (services/llm.py).
 SCRIPT_MODEL = os.getenv("REEL_SCRIPT_MODEL", llm.MODEL_STRONG)
-#: How the voice speaks (gpt-4o-mini-tts instructions): REEL_TONE overrides it, like REEL_VOICE, without a deploy.
+#: How the voice speaks (the realtime voice's instructions): REEL_TONE overrides it, like REEL_VOICE, without a deploy.
 TONE = os.getenv("REEL_TONE") or ("Brisk, confident cricket analyst on a highlights show: a quick, lively pace. "
                                   "Conversational, energetic but not shouty; land each number clearly; slight lift on the hook.")
 FPS = 30
@@ -392,20 +397,68 @@ def spoken(text_: str) -> str:
         if v.get("say") and v["say"] != name:
             text_ = re.sub(rf"\b{re.escape(name)}\b", v["say"], text_)
     text_ = re.sub(r"(?<![\w.])[−–-](?=\d)", "minus ", text_)
+    text_ = re.sub(r"(?<=\d)\*", " not out", text_)  # 49* is "49 not out"
     return re.sub(r"\+(?=\d)", "plus ", text_)
 
 
-def tts(text_: str, voice: str, out: Path) -> float:
-    resp = _client().audio.speech.create(model=TTS_MODEL, voice=voice, input=spoken(text_),
-                                         instructions=(TONE + " " + hints(text_)).strip(),
-                                         response_format="mp3")
-    raw = out.with_suffix(".raw.mp3")
-    raw.write_bytes(resp.read() if hasattr(resp, "read") else resp.content)
-    if abs(TEMPO - 1) > 0.01:  # a touch quicker: Reels reward pace
-        _ff([shutil.which("ffmpeg"), "-y", "-loglevel", "error", "-i", str(raw), "-filter:a", f"atempo={TEMPO}", str(out)])
-    else:
-        raw.replace(out)
-    return duration(out)
+def _said(text_: str) -> List[str]:
+    """Words for comparing what the voice said with what it was given (case, punctuation and quote marks aside)."""
+    return re.findall(r"[a-z0-9]+(?:[.'][a-z0-9]+)*", text_.lower().replace("’", "'"))
+
+
+def voice_lines(lines: List[str], voice: str, out: Path) -> List[float]:
+    """Speak each line in one Realtime session (one response per line, so the voice stays the same) into `out`
+    (mp3, GAP between lines, sped up by TEMPO). Returns each line's length in the final audio. A line whose
+    transcript isn't the line word for word is asked for again; after LINE_TRIES the Reel fails (and the post
+    gets a v1 Reel) rather than voice a number that isn't on the cards."""
+    import base64
+    import wave
+
+    texts = [spoken(line) for line in lines]
+    instructions = ("You are a voiceover artist. Each message is one line of a script: read it aloud exactly as "
+                    "written, word for word. Do not add, drop, reorder or rephrase anything, do not greet or comment, "
+                    f"and stop when the line ends. Delivery: {TONE} {hints(' '.join(lines))}").strip()
+    pcm_lines: List[bytes] = []
+    with _client().realtime.connect(model=TTS_MODEL) as conn:
+        conn.session.update(session={
+            "type": "realtime",
+            "output_modalities": ["audio"],
+            "instructions": instructions,
+            "audio": {"output": {"voice": voice, "format": {"type": "audio/pcm", "rate": RATE}}},
+        })
+        for n, line in enumerate(texts, 1):
+            for attempt in range(1, LINE_TRIES + 1):
+                conn.conversation.item.create(item={"type": "message", "role": "user",
+                                                    "content": [{"type": "input_text", "text": line}]})
+                conn.response.create()
+                audio, transcript = bytearray(), []
+                for event in conn:
+                    if event.type == "response.output_audio.delta":
+                        audio.extend(base64.b64decode(event.delta))
+                    elif event.type == "response.output_audio_transcript.delta":
+                        transcript.append(event.delta)
+                    elif event.type == "error":
+                        raise RuntimeError(f"realtime voice: {event.error}")
+                    elif event.type == "response.done":
+                        break
+                said = "".join(transcript)
+                if _said(said) == _said(line) and audio:
+                    pcm_lines.append(bytes(audio))
+                    break
+                logger.info("reel voice, line %d take %d not word for word: %r", n, attempt, said)
+            else:
+                raise RuntimeError(f"the voice wouldn't read line {n} as written")
+    gap = b"\x00\x00" * int(RATE * GAP * TEMPO)  # GAP after the speed-up
+    wav = out.with_suffix(".wav")
+    with wave.open(str(wav), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(RATE)
+        w.writeframes(gap.join(pcm_lines))
+    tempo = ["-filter:a", f"atempo={TEMPO}"] if abs(TEMPO - 1) > 0.01 else []  # a touch quicker: Reels reward pace
+    _ff([shutil.which("ffmpeg"), "-y", "-loglevel", "error", "-i", str(wav), *tempo, str(out)])
+    wav.unlink()
+    return [len(a) / 2 / RATE / TEMPO for a in pcm_lines]
 
 
 def duration(path: Path) -> float:
@@ -538,14 +591,6 @@ def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: P
     return round(total, 2)
 
 
-def words_timed(audio: Path) -> List[Dict[str, float]]:
-    """[{word, start, end}] for the voice, from OpenAI's transcription (we know the text; this only times it)."""
-    with open(audio, "rb") as f:
-        resp = _client().audio.transcriptions.create(model="whisper-1", file=f, response_format="verbose_json",
-                                                     timestamp_granularities=["word"])
-    return [{"word": w.word, "start": float(w.start), "end": float(w.end)} for w in (getattr(resp, "words", None) or [])]
-
-
 def _norm(w: str) -> str:
     return re.sub(r"[^a-z0-9]", "", w.lower().replace("−", "minus").replace("+", "plus"))
 
@@ -610,25 +655,21 @@ def word_times(ours: List[str], timed: List[Dict[str, float]], total: float) -> 
     return out
 
 
-def align(segments: List[str], timed: List[Dict[str, float]], total: float,
-          per: int = CAPTION_WORDS) -> Tuple[List[float], List[Tuple[float, float, str]]]:
-    """(each segment's start, captions) for the script's segments spoken in one take. Every word is timed from the
-    transcription (word_times); captions are phrases (phrases), each on screen from its first word until the next
-    phrase starts, so the text changes with the voice, not on a fixed count."""
-    ours = [w for seg in segments for w in seg.split()]
-    if not ours:
-        return [0.0] * len(segments), []
-    at = word_times(ours, timed, total)
-    starts, caps, j = [], [], 0
-    bounds = []
-    for seg in segments:
+def align(segments: List[str], lengths: List[float], gap: float = GAP) -> Tuple[List[float], List[Tuple[float, float, str]]]:
+    """(each segment's start, captions) for segments voiced one per line (voice_lines): a line starts when the one
+    before it ends plus the gap, so beats change exactly on the line. Within a line words are placed by characters
+    (word_times without a transcription); captions are phrases (phrases), each on screen until the next starts."""
+    starts, caps, at = [], [], 0.0
+    for seg, length in zip(segments, lengths):
         ws = seg.split()
-        starts.append(0.0 if j == 0 else at[j])
-        bounds += [(j + a, j + b) for a, b in phrases(ws)]
-        j += len(ws)
-    for i, (a, b) in enumerate(bounds):
-        end = at[bounds[i + 1][0]] if i + 1 < len(bounds) else total
-        caps.append((round(at[a], 3), round(max(end, at[a] + 0.3), 3), " ".join(ours[a:b])))
+        starts.append(round(at, 3))
+        if ws:
+            t = [at + x for x in word_times(ws, [], length)]
+            bounds = phrases(ws)
+            for i, (a, b) in enumerate(bounds):
+                end = t[bounds[i + 1][0]] if i + 1 < len(bounds) else at + length
+                caps.append((round(t[a], 3), round(max(end, t[a] + 0.3), 3), " ".join(ws[a:b])))
+        at += length + gap
     return starts, caps
 
 
@@ -759,16 +800,13 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
         got = record(carousel_id, plan["beats"], tmp / "frames", base)
         if got.get("failed"):
             raise RuntimeError(f"recording failed: {got['failed']}")
-        # One take: the whole story spoken at once, so it flows; then timed, so each chart arrives with its line.
+        # One voice session, one response per line: each line's length is known exactly, so each chart arrives
+        # with its line (no transcription needed to time it).
         segments = [sc["hook"], *sc["lines"]]
         voice_file = tmp / "voice.mp3"
-        spoken_len = tts(" ".join(segments), voice, voice_file)
-        try:
-            timed = words_timed(voice_file)
-        except Exception as exc:  # no transcription: share the time out by characters
-            logger.warning("reel timing: %r", exc)
-            timed = []
-        starts, captions = align(segments, timed, spoken_len)
+        lengths = voice_lines(segments, voice, voice_file)
+        spoken_len = sum(lengths) + GAP * (len(lengths) - 1)
+        starts, captions = align(segments, lengths)
         hook_end = starts[1]
         # Beat 1 carries the hook and its line; each other beat starts with its line. A short tail after the last word.
         cuts = [0.0] + starts[2:] + [spoken_len + 0.6]

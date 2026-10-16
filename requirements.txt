@@ -15,6 +15,7 @@ aiohttp>=3.8.4
 typing-extensions>=4.5.0
 python-multipart>=0.0.6
 openai>=1.0.0
+websockets>=13  # openai Realtime API (the Reel voice, services/ig_reel_v2.voice_lines)
 scipy==1.15.3
 pandas==2.3.3
 numpy==1.26.4
