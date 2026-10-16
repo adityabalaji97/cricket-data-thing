@@ -24,13 +24,8 @@ import axios from 'axios';
 import config from '../config';
 import CondensedName from './common/CondensedName';
 import { getTeamAbbr } from '../utils/teamAbbreviations';
+import { getTeamColor, textOn } from '../utils/teamColors';
 import { apiErrorText } from '../utils/apiError';
-
-const TEAM_COLORS = {
-    CSK: '#eff542', MI: '#42a7f5', RCB: '#f54242', RR: '#FF2AA8',
-    KKR: '#610048', PBKS: '#FF004D', SRH: '#FF7C01', LSG: '#00BBB3',
-    DC: '#004BC5', GT: '#01295B',
-};
 
 const RECOMMENDATION_RETRY_DELAYS_MS = process.env.NODE_ENV === 'test' ? [0, 1, 1] : [0, 1500, 4000];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -93,8 +88,8 @@ const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recomme
                                 label={<CondensedName name={f.team1} type="team" />}
                                 size="small"
                                 sx={{
-                                    bgcolor: TEAM_COLORS[team1Code] || '#666',
-                                    color: ['CSK', 'LSG'].includes(team1Code) ? '#000' : '#fff',
+                                    bgcolor: getTeamColor(team1Code) || '#666',
+                                    color: textOn(getTeamColor(team1Code) || '#666'),
                                     fontWeight: 700,
                                     fontSize: '0.7rem',
                                 }}
@@ -104,8 +99,8 @@ const FixtureCalendar = ({ fixtures, matchDetails, isMobile, squadTeams, recomme
                                 label={<CondensedName name={f.team2} type="team" />}
                                 size="small"
                                 sx={{
-                                    bgcolor: TEAM_COLORS[team2Code] || '#666',
-                                    color: ['CSK', 'LSG'].includes(team2Code) ? '#000' : '#fff',
+                                    bgcolor: getTeamColor(team2Code) || '#666',
+                                    color: textOn(getTeamColor(team2Code) || '#666'),
                                     fontWeight: 700,
                                     fontSize: '0.7rem',
                                 }}
@@ -245,8 +240,8 @@ const SquadBuilder = ({ squad, onRemovePlayer, onAddPlayer, onAutoPick, loading,
                                     sx={{
                                         height: 18,
                                         fontSize: '0.6rem',
-                                        bgcolor: TEAM_COLORS[teamCode] || '#666',
-                                        color: ['CSK', 'LSG'].includes(teamCode) ? '#000' : '#fff',
+                                        bgcolor: getTeamColor(teamCode) || '#666',
+                                        color: textOn(getTeamColor(teamCode) || '#666'),
                                     }}
                                 />
                             </Box>
@@ -337,8 +332,8 @@ const RecommendationsTable = ({ allPlayers, squad, onAddPlayer, isMobile }) => {
                                         sx={{
                                             height: 18,
                                             fontSize: '0.6rem',
-                                            bgcolor: TEAM_COLORS[teamCode] || '#666',
-                                            color: ['CSK', 'LSG'].includes(teamCode) ? '#000' : '#fff',
+                                            bgcolor: getTeamColor(teamCode) || '#666',
+                                            color: textOn(getTeamColor(teamCode) || '#666'),
                                         }}
                                     />
                                 </TableCell>

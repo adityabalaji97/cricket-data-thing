@@ -1,0 +1,529 @@
+{
+  "_note": "Team brand colours: primary fills a team's marks, secondary is the trim (borders, stripes). Shared by the React app (src/utils/teamColors.js) and Python. Aliases map old names and the IPL/international abbreviations to a team; league abbreviations collide (SCO is Scotland and Perth Scorchers), so other leagues are looked up by full name.",
+  "teams": {
+    "Chennai Super Kings": {
+      "primary": "#F9CD05",
+      "secondary": "#0B5AA8",
+      "league": "IPL"
+    },
+    "Deccan Chargers": {
+      "primary": "#04378C",
+      "secondary": "#F2C230",
+      "league": "IPL"
+    },
+    "Delhi Capitals": {
+      "primary": "#17449B",
+      "secondary": "#EF1B23",
+      "league": "IPL"
+    },
+    "Gujarat Lions": {
+      "primary": "#E04F16",
+      "secondary": "#1C2C5B",
+      "league": "IPL"
+    },
+    "Gujarat Titans": {
+      "primary": "#1B2A47",
+      "secondary": "#C8A15A",
+      "league": "IPL"
+    },
+    "Kochi Tuskers Kerala": {
+      "primary": "#008080",
+      "secondary": "#F28B00",
+      "league": "IPL"
+    },
+    "Kolkata Knight Riders": {
+      "primary": "#3A225D",
+      "secondary": "#D4AF37",
+      "league": "IPL"
+    },
+    "Lucknow Super Giants": {
+      "primary": "#1E3D80",
+      "secondary": "#F48B20",
+      "league": "IPL"
+    },
+    "Mumbai Indians": {
+      "primary": "#005DA0",
+      "secondary": "#D1AB3E",
+      "league": "IPL"
+    },
+    "Pune Warriors": {
+      "primary": "#2F9BD6",
+      "secondary": "#111111",
+      "league": "IPL"
+    },
+    "Punjab Kings": {
+      "primary": "#DD1F2D",
+      "secondary": "#C0C2C4",
+      "league": "IPL"
+    },
+    "Rajasthan Royals": {
+      "primary": "#EA1A85",
+      "secondary": "#254AA5",
+      "league": "IPL"
+    },
+    "Rising Pune Supergiants": {
+      "primary": "#6F61AC",
+      "secondary": "#D11D9B",
+      "league": "IPL"
+    },
+    "Royal Challengers Bengaluru": {
+      "primary": "#C8102E",
+      "secondary": "#C8A853",
+      "league": "IPL"
+    },
+    "Sunrisers Hyderabad": {
+      "primary": "#F26522",
+      "secondary": "#111111",
+      "league": "IPL"
+    },
+    "Afghanistan": {
+      "primary": "#C8202F",
+      "secondary": "#1A56A8",
+      "league": "International"
+    },
+    "Australia": {
+      "primary": "#FFCD00",
+      "secondary": "#00843D",
+      "league": "International"
+    },
+    "Bangladesh": {
+      "primary": "#006A4E",
+      "secondary": "#F42A41",
+      "league": "International"
+    },
+    "England": {
+      "primary": "#012169",
+      "secondary": "#CE1124",
+      "league": "International"
+    },
+    "India": {
+      "primary": "#1C5FC4",
+      "secondary": "#FF9933",
+      "league": "International"
+    },
+    "Ireland": {
+      "primary": "#169B62",
+      "secondary": "#FFFFFF",
+      "league": "International"
+    },
+    "Namibia": {
+      "primary": "#CD853F",
+      "secondary": "#003580",
+      "league": "International"
+    },
+    "Nepal": {
+      "primary": "#DC143C",
+      "secondary": "#003893",
+      "league": "International"
+    },
+    "Netherlands": {
+      "primary": "#FF7C01",
+      "secondary": "#1B3A8C",
+      "league": "International"
+    },
+    "New Zealand": {
+      "primary": "#1D1D1F",
+      "secondary": "#E6E6E6",
+      "league": "International"
+    },
+    "Oman": {
+      "primary": "#8B0000",
+      "secondary": "#2E7D32",
+      "league": "International"
+    },
+    "Pakistan": {
+      "primary": "#0B6E3A",
+      "secondary": "#FFFFFF",
+      "league": "International"
+    },
+    "Papua New Guinea": {
+      "primary": "#228B22",
+      "secondary": "#F2C230",
+      "league": "International"
+    },
+    "Scotland": {
+      "primary": "#4169E1",
+      "secondary": "#FFFFFF",
+      "league": "International"
+    },
+    "South Africa": {
+      "primary": "#007749",
+      "secondary": "#FFB81C",
+      "league": "International"
+    },
+    "Sri Lanka": {
+      "primary": "#0A2A6B",
+      "secondary": "#F7B500",
+      "league": "International"
+    },
+    "United Arab Emirates": {
+      "primary": "#2F4F4F",
+      "secondary": "#C8102E",
+      "league": "International"
+    },
+    "United States of America": {
+      "primary": "#B22222",
+      "secondary": "#0A3161",
+      "league": "International"
+    },
+    "West Indies": {
+      "primary": "#7B0041",
+      "secondary": "#FFC72C",
+      "league": "International"
+    },
+    "Zimbabwe": {
+      "primary": "#D40000",
+      "secondary": "#FCE300",
+      "league": "International"
+    },
+    "Adelaide Strikers": {
+      "primary": "#0093D0",
+      "secondary": "#0A2240",
+      "league": "BBL"
+    },
+    "Brisbane Heat": {
+      "primary": "#00A19A",
+      "secondary": "#E5097F",
+      "league": "BBL"
+    },
+    "Hobart Hurricanes": {
+      "primary": "#6A2C91",
+      "secondary": "#F6EB14",
+      "league": "BBL"
+    },
+    "Melbourne Renegades": {
+      "primary": "#E31E26",
+      "secondary": "#111111",
+      "league": "BBL"
+    },
+    "Melbourne Stars": {
+      "primary": "#00A651",
+      "secondary": "#0A2B1A",
+      "league": "BBL"
+    },
+    "Perth Scorchers": {
+      "primary": "#F58220",
+      "secondary": "#222222",
+      "league": "BBL"
+    },
+    "Sydney Sixers": {
+      "primary": "#E6007E",
+      "secondary": "#2A0A1E",
+      "league": "BBL"
+    },
+    "Sydney Thunder": {
+      "primary": "#A6CE39",
+      "secondary": "#111111",
+      "league": "BBL"
+    },
+    "Hyderabad Kingsmen": {
+      "primary": "#8B1E3F",
+      "secondary": "#E8C547",
+      "league": "PSL"
+    },
+    "Islamabad United": {
+      "primary": "#E4002B",
+      "secondary": "#111111",
+      "league": "PSL"
+    },
+    "Karachi Kings": {
+      "primary": "#0072CE",
+      "secondary": "#E8E8E8",
+      "league": "PSL"
+    },
+    "Lahore Qalandars": {
+      "primary": "#3AA935",
+      "secondary": "#E4002B",
+      "league": "PSL"
+    },
+    "Multan Sultans": {
+      "primary": "#00A79D",
+      "secondary": "#D4AF37",
+      "league": "PSL"
+    },
+    "Peshawar Zalmi": {
+      "primary": "#FFD100",
+      "secondary": "#111111",
+      "league": "PSL"
+    },
+    "Quetta Gladiators": {
+      "primary": "#5B2C83",
+      "secondary": "#FFD100",
+      "league": "PSL"
+    },
+    "Rawalpindiz": {
+      "primary": "#F37021",
+      "secondary": "#111111",
+      "league": "PSL"
+    },
+    "Antigua and Barbuda Falcons": {
+      "primary": "#F7A600",
+      "secondary": "#111111",
+      "league": "CPL"
+    },
+    "Barbados Royals": {
+      "primary": "#EA1A85",
+      "secondary": "#254AA5",
+      "league": "CPL"
+    },
+    "Barbados Tridents": {
+      "primary": "#1E3C78",
+      "secondary": "#F5C400",
+      "league": "CPL"
+    },
+    "Guyana Amazon Warriors": {
+      "primary": "#128C3B",
+      "secondary": "#FDB913",
+      "league": "CPL"
+    },
+    "Jamaica Kingsmen": {
+      "primary": "#FDB913",
+      "secondary": "#00843D",
+      "league": "CPL"
+    },
+    "Jamaica Tallawahs": {
+      "primary": "#FDB913",
+      "secondary": "#00843D",
+      "league": "CPL"
+    },
+    "St Kitts and Nevis Patriots": {
+      "primary": "#9E1B32",
+      "secondary": "#0A2240",
+      "league": "CPL"
+    },
+    "St Lucia Kings": {
+      "primary": "#0055A5",
+      "secondary": "#E31E26",
+      "league": "CPL"
+    },
+    "Trinbago Knight Riders": {
+      "primary": "#C8102E",
+      "secondary": "#111111",
+      "league": "CPL"
+    },
+    "Durban's Super Giants": {
+      "primary": "#1E9CD7",
+      "secondary": "#0A2240",
+      "league": "SA20"
+    },
+    "Joburg Super Kings": {
+      "primary": "#F9CD05",
+      "secondary": "#0B5AA8",
+      "league": "SA20"
+    },
+    "MI Cape Town": {
+      "primary": "#005DA0",
+      "secondary": "#D1AB3E",
+      "league": "SA20"
+    },
+    "Paarl Royals": {
+      "primary": "#EA1A85",
+      "secondary": "#254AA5",
+      "league": "SA20"
+    },
+    "Pretoria Capitals": {
+      "primary": "#17449B",
+      "secondary": "#EF1B23",
+      "league": "SA20"
+    },
+    "Sunrisers Eastern Cape": {
+      "primary": "#F26522",
+      "secondary": "#111111",
+      "league": "SA20"
+    },
+    "Abu Dhabi Knight Riders": {
+      "primary": "#3A225D",
+      "secondary": "#D4AF37",
+      "league": "ILT20"
+    },
+    "Desert Vipers": {
+      "primary": "#C8102E",
+      "secondary": "#111111",
+      "league": "ILT20"
+    },
+    "Dubai Capitals": {
+      "primary": "#17449B",
+      "secondary": "#EF1B23",
+      "league": "ILT20"
+    },
+    "Gulf Giants": {
+      "primary": "#F47920",
+      "secondary": "#0A2240",
+      "league": "ILT20"
+    },
+    "MI Emirates": {
+      "primary": "#005DA0",
+      "secondary": "#D1AB3E",
+      "league": "ILT20"
+    },
+    "Sharjah Warriors": {
+      "primary": "#00A3AD",
+      "secondary": "#0A2240",
+      "league": "ILT20"
+    },
+    "Los Angeles Knight Riders": {
+      "primary": "#3A225D",
+      "secondary": "#D4AF37",
+      "league": "MLC"
+    },
+    "MI New York": {
+      "primary": "#005DA0",
+      "secondary": "#D1AB3E",
+      "league": "MLC"
+    },
+    "San Francisco Unicorns": {
+      "primary": "#E04A1A",
+      "secondary": "#1B1F4B",
+      "league": "MLC"
+    },
+    "Seattle Orcas": {
+      "primary": "#00879F",
+      "secondary": "#0A2240",
+      "league": "MLC"
+    },
+    "Texas Super Kings": {
+      "primary": "#F9CD05",
+      "secondary": "#0B5AA8",
+      "league": "MLC"
+    },
+    "Washington Freedom": {
+      "primary": "#B31B34",
+      "secondary": "#0A2B5C",
+      "league": "MLC"
+    },
+    "Derbyshire": {
+      "primary": "#1C3F94",
+      "secondary": "#D4AF37",
+      "league": "T20 Blast"
+    },
+    "Durham": {
+      "primary": "#0D2C6C",
+      "secondary": "#F5C400",
+      "league": "T20 Blast"
+    },
+    "Essex": {
+      "primary": "#C8102E",
+      "secondary": "#0F2D69",
+      "league": "T20 Blast"
+    },
+    "Glamorgan": {
+      "primary": "#2A2160",
+      "secondary": "#F5C400",
+      "league": "T20 Blast"
+    },
+    "Gloucestershire": {
+      "primary": "#004C97",
+      "secondary": "#E4002B",
+      "league": "T20 Blast"
+    },
+    "Hampshire": {
+      "primary": "#1B365D",
+      "secondary": "#E5B22B",
+      "league": "T20 Blast"
+    },
+    "Kent": {
+      "primary": "#B5121B",
+      "secondary": "#F2F2F2",
+      "league": "T20 Blast"
+    },
+    "Lancashire": {
+      "primary": "#E30613",
+      "secondary": "#0A2240",
+      "league": "T20 Blast"
+    },
+    "Leicestershire": {
+      "primary": "#00843D",
+      "secondary": "#111111",
+      "league": "T20 Blast"
+    },
+    "Middlesex": {
+      "primary": "#E6007E",
+      "secondary": "#0A2240",
+      "league": "T20 Blast"
+    },
+    "Northamptonshire": {
+      "primary": "#8B1E3F",
+      "secondary": "#E8C547",
+      "league": "T20 Blast"
+    },
+    "Nottinghamshire": {
+      "primary": "#00653A",
+      "secondary": "#F2C230",
+      "league": "T20 Blast"
+    },
+    "Somerset": {
+      "primary": "#111111",
+      "secondary": "#BA0C2F",
+      "league": "T20 Blast"
+    },
+    "Surrey": {
+      "primary": "#4A3B2A",
+      "secondary": "#C9B37E",
+      "league": "T20 Blast"
+    },
+    "Sussex": {
+      "primary": "#0091D5",
+      "secondary": "#0A2240",
+      "league": "T20 Blast"
+    },
+    "Warwickshire": {
+      "primary": "#1A1A1A",
+      "secondary": "#F5C400",
+      "league": "T20 Blast"
+    },
+    "Worcestershire": {
+      "primary": "#007A3D",
+      "secondary": "#F2F2F2",
+      "league": "T20 Blast"
+    },
+    "Yorkshire": {
+      "primary": "#003B71",
+      "secondary": "#FFC72C",
+      "league": "T20 Blast"
+    }
+  },
+  "aliases": {
+    "Royal Challengers Bangalore": "Royal Challengers Bengaluru",
+    "Kings XI Punjab": "Punjab Kings",
+    "Delhi Daredevils": "Delhi Capitals",
+    "Rising Pune Supergiant": "Rising Pune Supergiants",
+    "Sharjah Warriorz": "Sharjah Warriors",
+    "Durban Super Giants": "Durban's Super Giants",
+    "St Lucia Zouks": "St Lucia Kings",
+    "St Lucia Stars": "St Lucia Kings",
+    "USA": "United States of America",
+    "UAE": "United Arab Emirates",
+    "CSK": "Chennai Super Kings",
+    "RCB": "Royal Challengers Bengaluru",
+    "MI": "Mumbai Indians",
+    "RR": "Rajasthan Royals",
+    "RPSG": "Rising Pune Supergiants",
+    "KKR": "Kolkata Knight Riders",
+    "PBKS": "Punjab Kings",
+    "SRH": "Sunrisers Hyderabad",
+    "LSG": "Lucknow Super Giants",
+    "DC": "Delhi Capitals",
+    "DCh": "Deccan Chargers",
+    "GL": "Gujarat Lions",
+    "GT": "Gujarat Titans",
+    "KTK": "Kochi Tuskers Kerala",
+    "AUS": "Australia",
+    "ENG": "England",
+    "IND": "India",
+    "SA": "South Africa",
+    "PAK": "Pakistan",
+    "WI": "West Indies",
+    "NZ": "New Zealand",
+    "BAN": "Bangladesh",
+    "AFG": "Afghanistan",
+    "SL": "Sri Lanka",
+    "IRE": "Ireland",
+    "NED": "Netherlands",
+    "ZIM": "Zimbabwe",
+    "SCO": "Scotland",
+    "NEP": "Nepal",
+    "OMA": "Oman",
+    "PNG": "Papua New Guinea",
+    "NAM": "Namibia"
+  }
+}
