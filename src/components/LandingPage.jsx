@@ -523,9 +523,23 @@ const CONNECTOR_PROMPTS = [
 const ConnectorSection = () => {
   const [copied, setCopied] = useState(false);
   const ref = useRef(null);
-  // hindsightcricket.com/mcp opened in a browser lands here (vercel.json): scroll to the section once it renders.
+  // hindsightcricket.com/mcp opened in a browser lands here (vercel.json). The sections above load after this one
+  // renders and push it down, so scroll again as they arrive, for a few seconds, until the reader scrolls themselves.
   useEffect(() => {
-    if (window.location.hash === '#connector' && ref.current) ref.current.scrollIntoView({ behavior: 'smooth' });
+    if (window.location.hash !== '#connector') return undefined;
+    let stopped = false;
+    const stop = () => { stopped = true; };
+    const go = () => { if (!stopped && ref.current) ref.current.scrollIntoView({ block: 'start' }); };
+    const timers = [0, 400, 1000, 2000, 3500, 5000].map((ms) => setTimeout(go, ms));
+    window.addEventListener('wheel', stop, { passive: true });
+    window.addEventListener('touchstart', stop, { passive: true });
+    window.addEventListener('keydown', stop);
+    return () => {
+      timers.forEach(clearTimeout);
+      window.removeEventListener('wheel', stop);
+      window.removeEventListener('touchstart', stop);
+      window.removeEventListener('keydown', stop);
+    };
   }, []);
   const copy = async () => {
     try {
