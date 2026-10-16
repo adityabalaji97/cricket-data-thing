@@ -62,22 +62,19 @@ def test_variant_ab_and_eligibility(monkeypatch):
 
 def test_signs_are_spoken_and_verdicts_are_material():
     assert R.spoken("falls to −0.29 from +0.35") == "falls to minus 0.29 from plus 0.35"
+    assert R.spoken("Rutherford's 49* off 26") == "Rutherford's 49 not out off 26"
     assert R.spoken("2-0 up") == "2-0 up" or "minus" not in R.spoken("in 2026-27")  # hyphens between words stay
     notes = R.notes_of([{"type": "verdict", "verdict": "Partly", "body": "a. claim: Inconclusive"},
                         {"type": "text", "heading": "From elsewhere", "body": "15 wickets\nSource: ESPNcricinfo"}])
     assert "THE VERDICT" in notes and "ESPNcricinfo" not in notes
 
 
-def test_align_one_take_into_segments():
+def test_align_lines_voiced_one_by_one():
     segs = ["Hook words here.", "Second part comes next.", "Third."]
-    timed = [{"word": w, "start": i * 0.5, "end": i * 0.5 + 0.4} for i, w in enumerate(" ".join(segs).split())]
-    starts, caps = R.align(segs, timed, 4.0)
-    assert starts == [0.0, 1.5, 3.5]  # each segment starts when its first word is said
+    starts, caps = R.align(segs, [1.0, 2.0, 0.5], gap=0.1)
+    assert starts == [0.0, 1.1, 3.2]  # each line starts when the one before ends, plus the gap
     assert caps[0][2] == "Hook words here." and caps[-1][2] == "Third."
-    assert all(a < b for a, b, _ in caps)
-    starts, _ = R.align(segs, [], 8.0)  # no transcription: by characters
-    assert starts[0] == 0.0 and 0 < starts[1] < starts[2] < 8.0
-
+    assert caps[-1][1] == 3.7 and all(a < b for a, b, _ in caps)
 
 def test_guard_needs_exact_values_and_a_statement_hook():
     bs = [(2, {"title": "Averages since", "payload": {"rows": [{"name": "Prasidh", "value": 28.9}]}}),
@@ -156,3 +153,74 @@ def test_preview_beats_need_two_of_their_cards():
     slides = _preview_slides(["totals", "where-won", "projected-points"])
     assert [c["id"] for _, c in R.beats(slides, k=3)][0] != "milestones"
     assert R.preview_beats([(2, {"id": "totals"})], 3) == []
+
+
+class _FakeRealtime:
+    """A Realtime connection that speaks each line as `takes` says: its transcript, and 0.5s of audio."""
+
+    def __init__(self, takes):
+        self.takes, self.sent, self.session_cfg = list(takes), [], None
+        outer = self
+
+        class Session:
+            def update(self, session):
+                outer.session_cfg = session
+
+        class Items:
+            def create(self, item):
+                outer.sent.append(item["content"][0]["text"])
+
+        class Conversation:
+            item = Items()
+
+        class Response:
+            def create(self):
+                pass
+
+        self.session, self.conversation, self.response = Session(), Conversation(), Response()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def __iter__(self):
+        import base64
+        from types import SimpleNamespace as E
+
+        said = self.takes.pop(0)
+        yield E(type="response.output_audio.delta", delta=base64.b64encode(b"\x01\x00" * 12000).decode())
+        yield E(type="response.output_audio_transcript.delta", delta=said)
+        yield E(type="response.done")
+
+
+def _fake_client(monkeypatch, conn):
+    from types import SimpleNamespace as NS
+
+    monkeypatch.setattr(R, "_client", lambda: NS(realtime=NS(connect=lambda model: conn)))
+    monkeypatch.setattr(R, "TEMPO", 1.0)
+
+
+def test_voice_lines_times_each_line_and_retakes_a_paraphrase(monkeypatch, tmp_path):
+    import shutil
+
+    import pytest
+
+    if not shutil.which("ffmpeg"):
+        pytest.skip("ffmpeg")
+    conn = _FakeRealtime(["Rajat Patidar leads.", "He strikes at 283.", "He strikes at 238!"])
+    _fake_client(monkeypatch, conn)
+    lengths = R.voice_lines(["Rajat Patidar leads.", "He strikes at 238."], "marin", tmp_path / "v.mp3")
+    assert lengths == [0.5, 0.5]                    # each line's length, from its own audio
+    assert conn.sent[1:] == ["He strikes at 238.", "He strikes at 238."]  # the wrong number was asked for again
+    assert conn.session_cfg["audio"]["output"]["voice"] == "marin"
+    assert (tmp_path / "v.mp3").exists()
+
+
+def test_voice_lines_gives_up_rather_than_voice_a_wrong_number(monkeypatch, tmp_path):
+    import pytest
+
+    _fake_client(monkeypatch, _FakeRealtime(["He strikes at 283."] * R.LINE_TRIES))
+    with pytest.raises(RuntimeError):
+        R.voice_lines(["He strikes at 238."], "marin", tmp_path / "v.mp3")
