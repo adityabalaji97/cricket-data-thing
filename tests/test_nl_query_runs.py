@@ -1,4 +1,5 @@
 """Relative dates resolve from today, and what happens after a question is parsed is recorded."""
+import json
 from datetime import date
 from unittest.mock import MagicMock
 
@@ -79,7 +80,7 @@ def test_prompt_carries_todays_date_and_cache_is_per_day(today, monkeypatch):
     fake = MagicMock()
     fake.chat.completions = FakeCompletions()
     monkeypatch.setenv("OPENAI_API_KEY", "test")
-    monkeypatch.setattr(nl2query, "OpenAI", lambda api_key: fake)
+    monkeypatch.setattr(nl2query, "OpenAI", lambda api_key, **kw: fake)
     nl2query.call_openai("kohli last 3 years")
     system = sent["messages"][0]["content"]
     assert "Today's date is 2026-10-15" in system
@@ -165,3 +166,71 @@ def test_graphic_attempt_outcome_is_recorded(client, monkeypatch, runs):
     assert client.post("/snapshots/idea", json={"text": "best batters against spin"}).status_code == 400
     assert runs[-1][1] == {"log_ref": "g1", "status": "no_chart", "ok": False, "rows": None,
                            "ms": runs[-1][1]["ms"], "error": "No rows for this."}
+
+
+def test_reasoning_models_get_the_arguments_they_accept():
+    assert nl2query.chat_kwargs("gpt-4o", 500, temperature=0.2) == {"temperature": 0.2, "max_tokens": 500}
+    luna = nl2query.chat_kwargs("gpt-6-luna", 1000, reasoning_effort="low", service_tier="fast")
+    assert luna["reasoning_effort"] == "low" and luna["service_tier"] == "fast"
+    assert luna["max_completion_tokens"] > 1000 and "temperature" not in luna and "max_tokens" not in luna
+
+
+def test_fast_mode_bills_double_and_stops_at_the_cap(monkeypatch):
+    assert nl2query.estimate_cost("gpt-6-luna", 1_000_000, 0, "fast") == pytest.approx(0.20)
+    assert nl2query.estimate_cost("gpt-6-luna", 1_000_000, 0) == pytest.approx(0.10)
+    monkeypatch.setattr(nl2query, "_month_spend", lambda db: 3.0)
+    assert nl2query.select_service_tier(object()) == "fast"
+    monkeypatch.setattr(nl2query, "_month_spend", lambda db: nl2query.MONTHLY_COST_CAP + 1)
+    assert nl2query.select_service_tier(object()) is None
+    monkeypatch.setattr(nl2query, "FAST_MODE", False)
+    monkeypatch.setattr(nl2query, "_month_spend", lambda db: 0.0)
+    assert nl2query.select_service_tier(object()) is None
+
+
+def test_a_failed_primary_call_falls_back(monkeypatch):
+    from openai import APITimeoutError
+
+    nl2query._cache.clear()
+    calls = []
+
+    def fake(query, few_shot_examples=None, model=None, reasoning_effort=None, service_tier=None):
+        calls.append((model, service_tier))
+        if model == nl2query.MODEL_PRIMARY:
+            raise APITimeoutError(request=MagicMock())
+        return {"filters": {}, "group_by": ["batter"], "confidence": "high"}
+
+    monkeypatch.setattr(nl2query, "call_openai", fake)
+    monkeypatch.setattr(nl2query, "select_service_tier", lambda db=None: "fast")
+    result = nl2query.parse_nl_query("best death bowlers fallback test")
+    assert result["success"] is True
+    assert calls == [(nl2query.MODEL_PRIMARY, "fast"), (nl2query.MODEL_FALLBACK, None)]
+
+
+def test_few_shot_examples_show_only_the_fields_the_model_returns():
+    out = json.loads(nl2query._serialize_few_shot_output({
+        "parsed_filters": {"batters": ["Virat Kohli"]}, "group_by": ["batter"], "explanation": "old",
+        "interpretation": {"summary": "old"}}))
+    assert "explanation" not in out and "interpretation" not in out
+    assert out["filters"] == {"batters": ["Virat Kohli"]}
+
+
+@pytest.mark.parametrize("question,kept", [
+    ("kusal mendis wagon zones", False),
+    ("Bumrah economy by season since 2018", False),
+    ("Kohli vs pace compared to other IPL batters, 150+ balls", True),
+    ("Rashid Khan economy, minimum 300 balls", True),
+    ("Shubman Gill strike rate among IPL openers", True),
+])
+def test_no_automatic_ball_floor_on_a_named_players_breakdown(question, kept):
+    result = nl2query._post_process_result(question, {"filters": {"min_balls": 20, "batters": ["X"]},
+                                                      "group_by": ["year"]})
+    assert ("min_balls" in result["filters"]) is kept
+
+
+def test_odi_questions_never_get_the_t20i_league():
+    result = nl2query._post_process_result("Shai Hope ODI batting compared to others",
+                                           {"filters": {"leagues": ["T20I"]}, "group_by": ["batter"]})
+    assert "leagues" not in result["filters"]
+    result = nl2query._post_process_result("Rohit in T20Is and ODIs",
+                                           {"filters": {"leagues": ["T20I"]}, "group_by": ["batter"]})
+    assert result["filters"]["leagues"] == ["T20I"]

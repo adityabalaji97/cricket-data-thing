@@ -13,7 +13,7 @@ import hashlib
 import uuid
 from datetime import date
 from typing import Dict, Any, Optional, List
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 try:
@@ -29,17 +29,34 @@ logger = logging.getLogger(__name__)
 # In-memory cache with TTL
 _cache: Dict[str, Dict[str, Any]] = {}
 CACHE_TTL = 86400  # 24 hours
-MODEL_PRIMARY = "gpt-4o"
-MODEL_FALLBACK = "gpt-4o-mini"
-DEFAULT_NL2QUERY_MODEL = MODEL_FALLBACK  # kept for backward compat in tests
-MONTHLY_COST_CAP = 15.0  # USD — leaves $5 buffer on $20/mo subscription
+# gpt-4o/4o-mini are removed from the API on 2027-01-14. On 100 logged questions (Oct 2026,
+# scripts/dev/compare_nl_models.py) gpt-6-luna at low reasoning made ~3 clear mistakes to gpt-4o's ~15 (it
+# applies "40+ average" thresholds that 4o dropped) at ~1/20 of the cost; Fast mode brings it from 5.6s to
+# 3.9s a question for 2x the price. Sol is the fallback when a Luna call fails: as accurate, slower, 4o's price.
+MODEL_PRIMARY = os.getenv("NL2QUERY_MODEL", "gpt-6-luna")
+MODEL_FALLBACK = os.getenv("NL2QUERY_FALLBACK_MODEL", "gpt-6.1-sol")
+DEFAULT_NL2QUERY_MODEL = MODEL_PRIMARY
+REASONING_EFFORT = os.getenv("NL2QUERY_REASONING_EFFORT", "low")
+FAST_MODE = os.getenv("NL2QUERY_FAST_MODE", "1") != "0"
+OPENAI_TIMEOUT_SECONDS = 20.0
+MONTHLY_COST_CAP = 15.0  # USD; past it, Fast mode is dropped (half price), not the model
 MAX_FEW_SHOT_EXAMPLES = 5
 
-# Approximate per-token costs (USD) as of April 2026
+# Approximate per-token costs (USD), list prices as of October 2026. Reasoning tokens bill as completion.
 MODEL_COSTS = {
     "gpt-4o": {"prompt": 2.50 / 1_000_000, "completion": 10.00 / 1_000_000},
     "gpt-4o-mini": {"prompt": 0.15 / 1_000_000, "completion": 0.60 / 1_000_000},
+    "gpt-6-luna": {"prompt": 0.10 / 1_000_000, "completion": 0.50 / 1_000_000},
+    "gpt-6.1-sol": {"prompt": 2.00 / 1_000_000, "completion": 10.00 / 1_000_000},
+    "gpt-5.6-luna": {"prompt": 0.20 / 1_000_000, "completion": 1.20 / 1_000_000},
+    "gpt-5.4-mini": {"prompt": 0.75 / 1_000_000, "completion": 4.50 / 1_000_000},
 }
+
+
+def _is_reasoning_model(model: str) -> bool:
+    """gpt-5 and later reason before answering: they take reasoning_effort and max_completion_tokens
+    (which also caps the reasoning) and reject temperature/max_tokens."""
+    return not model.startswith("gpt-4")
 ALLOWED_RECOMMENDED_COLUMNS = {
     "balls",
     "balls_faced",
@@ -82,24 +99,17 @@ Return a JSON object with these fields:
   "filters": { ... },
   "query_mode": "delivery",
   "group_by": [...],
-  "explanation": "Human-readable explanation of what the query does",
   "confidence": "high" | "medium" | "low",
-  "suggestions": ["optional improvement suggestions"],
+  "suggestions": ["0-3 short query refinements, as phrases or prompts"],
   "recommended_columns": ["4-6 metric columns to prioritize in results display"],
   "recommended_chart": {
     "type": "bar" | "scatter" | null,
     "x_axis": "column_name",
     "y_axis": "column_name",
-    "reason": "brief explanation"
-  },
-  "interpretation": {
-    "summary": "One-line summary of what will be queried",
-    "parsed_entities": [
-      {"type": "player" | "team" | "filter", "value": "resolved value", "matched_from": "text fragment from user query"}
-    ],
-    "suggestions": ["query refinement suggestions as short phrases or prompts"]
+    "reason": "under 10 words"
   }
 }
+Return only these fields: the system writes the explanation and lists what was matched itself.
 
 ## Available Filters
 
@@ -188,7 +198,7 @@ If the query groups data and would benefit from a chart, return:
   "type": "bar" | "scatter" | null,
   "x_axis": "column_name",
   "y_axis": "column_name",
-  "reason": "brief explanation"
+  "reason": "under 10 words"
 }
 Return null if the data isn't suitable for charting (for example, ungrouped or single-row output).
 Bar charts work well for comparing grouped categories. Scatter plots work for showing relationships between two metrics.
@@ -231,7 +241,9 @@ format, venue, country, match_id, competition, year, batting_team, bowling_team,
    split (e.g. "virat kohli batting since 2023" -> group_by ["batter", "format"]). Omit it only
    when the user pins one format ("his T20 record", "in ODIs") or asks for a different breakdown
    that would make format redundant.
-2. Set "min_balls" to a reasonable value (20-50) for statistical significance unless the user specifies otherwise.
+2. For rankings across many players or teams, set "min_balls" to a reasonable value (20-50) unless the user gives one.
+   When the query is about named players' own breakdowns (by year, zone, phase, shot...), leave "min_balls" unset
+   unless the user gives one: a floor would hide their small buckets.
 2a. Never drop a numeric condition on a metric ("50+ average", "SR over 140"): put it in "having".
 3. For "vs spin" queries, use "bowl_kind": ["spin bowler"]. For specific types like "vs leg spin", use "bowl_style": ["RL", "LC"].
 4. For "vs pace" queries, use "bowl_kind": ["pace bowler"].
@@ -247,7 +259,7 @@ format, venue, country, match_id, competition, year, batting_team, bowling_team,
 14. When a query says a bowler "conceded", "conceding", or "gave away" runs (e.g. "Bumrah conceding 30+ runs"), use "bowlers" (not "players") and group_by ["match_id", "innings", "bowler"] with min_runs/max_runs as the bowling-side threshold.
 15. For per-match batting queries (e.g. "centuries", "fifties", "100+ scores"), group_by ["match_id", "innings", "batter"] with the appropriate min_runs filter.
 16. For venue, use the official stadium name. Common city-to-stadium mappings: Ahmedabad/Motera → Narendra Modi Stadium, Kolkata → Eden Gardens, Chennai/Chepauk → MA Chidambaram Stadium, Bangalore/Bengaluru → M Chinnaswamy Stadium, Delhi/Kotla → Feroz Shah Kotla, Hyderabad → Rajiv Gandhi International Stadium, Jaipur → Sawai Mansingh Stadium, Mumbai → Wankhede Stadium. Use the stadium name directly in the venue filter.
-17. Do NOT set venue to "home", "away", or any non-stadium value. The database has no home/away concept. If the user asks about home/away, drop the venue filter and note it in the explanation.
+17. Do NOT set venue to "home", "away", or any non-stadium value. The database has no home/away concept. If the user asks about home/away, drop the venue filter and say so in a suggestion.
 """
 
 EXAMPLE_QUERIES = [
@@ -297,7 +309,7 @@ def _get_cache_key(query: str) -> str:
 
 # A cache hit made no OpenAI call, so it is logged at zero cost. Before this, the hit
 # carried the original call's _meta and every repeat was billed again in nl_query_log,
-# which inflated the monthly spend that select_model() checks against the cap.
+# which inflated the monthly spend that select_service_tier() checks against the cap.
 CACHE_HIT_META = {
     "model_used": "cache",
     "prompt_tokens": 0,
@@ -336,9 +348,9 @@ def get_cache_size() -> int:
 
 
 def _serialize_few_shot_output(example: Dict[str, Any]) -> str:
+    """A past parse as the model should answer now: the fields in the prompt's output format only."""
     parsed_filters = example.get("parsed_filters") if isinstance(example.get("parsed_filters"), dict) else {}
     suggestions = example.get("suggestions") if isinstance(example.get("suggestions"), list) else []
-    interpretation_payload = example.get("interpretation") if isinstance(example.get("interpretation"), dict) else {}
     recommended_columns = (
         example.get("recommended_columns")
         if isinstance(example.get("recommended_columns"), list)
@@ -353,20 +365,10 @@ def _serialize_few_shot_output(example: Dict[str, Any]) -> str:
         "filters": parsed_filters,
         "query_mode": example.get("query_mode") or parsed_filters.get("query_mode") or "delivery",
         "group_by": example.get("group_by") if isinstance(example.get("group_by"), list) else [],
-        "explanation": example.get("explanation") or "",
         "confidence": example.get("confidence") or "high",
         "suggestions": suggestions,
         "recommended_columns": recommended_columns,
         "recommended_chart": recommended_chart,
-        "interpretation": {
-            "summary": interpretation_payload.get("summary") or example.get("explanation") or "",
-            "parsed_entities": interpretation_payload.get("parsed_entities")
-            if isinstance(interpretation_payload.get("parsed_entities"), list)
-            else [],
-            "suggestions": interpretation_payload.get("suggestions")
-            if isinstance(interpretation_payload.get("suggestions"), list)
-            else suggestions,
-        },
     }
     return json.dumps(payload, ensure_ascii=True)
 
@@ -461,25 +463,34 @@ def get_few_shot_examples(query: str, db: Optional[Session], limit: int = MAX_FE
     return selected[:limit]
 
 
-def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
-    """Estimate USD cost for a single API call."""
-    costs = MODEL_COSTS.get(model, MODEL_COSTS[MODEL_FALLBACK])
-    return (prompt_tokens * costs["prompt"]) + (completion_tokens * costs["completion"])
+def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int, service_tier: Optional[str] = None) -> float:
+    """Estimate USD cost for a single API call (list prices; cached input billed as uncached)."""
+    costs = MODEL_COSTS.get(model, MODEL_COSTS["gpt-4o"])  # unknown model: assume the dearer side
+    multiplier = 2.0 if service_tier in ("fast", "priority") else 1.0
+    return multiplier * ((prompt_tokens * costs["prompt"]) + (completion_tokens * costs["completion"]))
 
 
-def select_model(db: Optional[Session] = None) -> str:
-    """Pick GPT-4o if under monthly spend cap, otherwise fall back to 4o-mini."""
-    if db is None:
-        try:
+def chat_kwargs(model: str, max_output_tokens: int, temperature: float = 0.1,
+                reasoning_effort: Optional[str] = None, service_tier: Optional[str] = None) -> Dict[str, Any]:
+    """Sampling arguments for chat.completions.create that the model accepts. Reasoning models take
+    max_completion_tokens (which also covers their reasoning, so it gets headroom) and reasoning_effort,
+    and reject temperature/max_tokens."""
+    if _is_reasoning_model(model):
+        kwargs: Dict[str, Any] = {"max_completion_tokens": max_output_tokens + 5000,
+                                  "reasoning_effort": reasoning_effort or REASONING_EFFORT}
+    else:
+        kwargs = {"temperature": temperature, "max_tokens": max_output_tokens}
+    if service_tier:
+        kwargs["service_tier"] = service_tier
+    return kwargs
+
+
+def _month_spend(db: Optional[Session]) -> Optional[float]:
+    owns_session = db is None
+    try:
+        if db is None:
             from database import SessionLocal
             db = SessionLocal()
-            owns_session = True
-        except Exception:
-            return MODEL_PRIMARY
-    else:
-        owns_session = False
-
-    try:
         from datetime import datetime
         month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         row = db.execute(
@@ -489,17 +500,24 @@ def select_model(db: Optional[Session] = None) -> str:
             ),
             {"month_start": month_start},
         ).fetchone()
-        total_spend = float(row[0]) if row else 0.0
-        return MODEL_PRIMARY if total_spend < MONTHLY_COST_CAP else MODEL_FALLBACK
+        return float(row[0]) if row else 0.0
     except Exception as exc:
-        logger.warning("select_model fallback due to: %s", exc)
-        return MODEL_PRIMARY
+        logger.warning("Monthly NL spend unavailable: %s", exc)
+        return None
     finally:
-        if owns_session:
+        if owns_session and db is not None:
             try:
                 db.close()
             except Exception:
                 pass
+
+
+def select_service_tier(db: Optional[Session] = None) -> Optional[str]:
+    """"fast" while the month's spend is under the cap (and Fast mode is on), else the standard tier."""
+    if not FAST_MODE:
+        return None
+    spend = _month_spend(db)
+    return "fast" if spend is None or spend < MONTHLY_COST_CAP else None
 
 
 def get_monthly_usage(db: Session) -> Dict[str, Any]:
@@ -536,7 +554,8 @@ def get_monthly_usage(db: Session) -> Dict[str, Any]:
         "fallback_model": MODEL_FALLBACK,
         "primary_queries": int(row[4]) if row else 0,
         "fallback_queries": int(row[5]) if row else 0,
-        "active_model": MODEL_PRIMARY if total_cost < MONTHLY_COST_CAP else MODEL_FALLBACK,
+        "active_model": MODEL_PRIMARY,
+        "fast_mode": FAST_MODE and total_cost < MONTHLY_COST_CAP,
     }
 
 
@@ -544,6 +563,8 @@ def call_openai(
     query: str,
     few_shot_examples: Optional[List[Dict[str, Any]]] = None,
     model: str = DEFAULT_NL2QUERY_MODEL,
+    reasoning_effort: Optional[str] = None,
+    service_tier: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Call OpenAI to parse a natural language cricket query.
 
@@ -553,7 +574,7 @@ def call_openai(
     if not api_key:
         raise ValueError("OPENAI_API_KEY not configured")
 
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=OPENAI_TIMEOUT_SECONDS, max_retries=1)
     messages = [{"role": "system", "content": SYSTEM_PROMPT + _date_context(_today())}]
 
     for example in few_shot_examples or []:
@@ -564,12 +585,12 @@ def call_openai(
         messages.append({"role": "assistant", "content": _serialize_few_shot_output(example)})
     messages.append({"role": "user", "content": query})
 
+    sampling = chat_kwargs(model, max_output_tokens=1000, reasoning_effort=reasoning_effort, service_tier=service_tier)
     response = client.chat.completions.create(
         model=model,
         messages=messages,
         response_format={"type": "json_object"},
-        temperature=0.1,
-        max_tokens=1000
+        **sampling,
     )
 
     content = response.choices[0].message.content
@@ -582,7 +603,9 @@ def call_openai(
             "model_used": model,
             "prompt_tokens": usage.prompt_tokens,
             "completion_tokens": usage.completion_tokens,
-            "estimated_cost_usd": estimate_cost(model, usage.prompt_tokens, usage.completion_tokens),
+            "estimated_cost_usd": estimate_cost(model, usage.prompt_tokens, usage.completion_tokens, service_tier),
+            "reasoning_tokens": getattr(getattr(usage, "completion_tokens_details", None), "reasoning_tokens", None),
+            "cached_tokens": getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", None),
         }
     else:
         parsed["_meta"] = {
@@ -687,6 +710,11 @@ def _date_context(today: date) -> str:
         "Never end a relative window before today."
     )
 
+
+_BALL_FLOOR_ASKED = re.compile(r"\b\d[\d,]*\s*\+?\s*(?:balls?|deliveries)\b|\bmin(?:imum)?\.?\s+(?:of\s+)?\d|"
+                               r"\bat\s+least\s+\d|\bqualif")
+_COMPARES_OTHERS = re.compile(r"\b(?:compared?|comparison|among|amongst|others?|rank(?:ed|ing|s)?|v(?:s\.?|ersus)?\s+other|"
+                              r"highlight(?:ed|ing)?|leaderboard|best|top)\b")
 
 _NUMBER_WORDS = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
                  "eight": 8, "nine": 9, "ten": 10}
@@ -1389,6 +1417,20 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
             filters["start_date"] = f"{since_year_match.group(1)}-01-01"
         filters.pop("end_date", None)
 
+    # No automatic ball floor on named players' own breakdowns: it hid their small buckets (a 20-ball floor
+    # on "Kusal Mendis wagon zones"). A floor the user asked for, or a comparison against others, stays.
+    if (filters.get("min_balls") is not None and (filters.get("batters") or filters.get("bowlers"))
+            and not _BALL_FLOOR_ASKED.search(q_lower) and not _COMPARES_OTHERS.search(q_lower)):
+        filters.pop("min_balls", None)
+
+    # "ODI" is a format, not a competition; the model sometimes added the T20I league to ODI questions.
+    if re.search(r"\bodis?\b|\bone[-\s]day\b", q_lower) and not re.search(r"\bt20", q_lower):
+        leagues = [lg for lg in (filters.get("leagues") or []) if lg != "T20I"]
+        if leagues:
+            filters["leagues"] = leagues
+        else:
+            filters.pop("leagues", None)
+
     # Relative windows ("last 3 years", "this year") from today's date, not the model's.
     if not _contains_explicit_end_bound(query):
         window = _relative_date_window(q_lower, _today())
@@ -1790,18 +1832,14 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
         if db is not None:
             few_shot_examples = get_few_shot_examples(query, db=db, limit=MAX_FEW_SHOT_EXAMPLES)
 
-        # Select model based on monthly spend
-        chosen_model = select_model(db)
-
         try:
-            raw = call_openai(
-                query,
-                few_shot_examples=few_shot_examples,
-                model=chosen_model,
-            )
-        except TypeError:
-            # Backward-compatible fallback for tests that monkeypatch call_openai(query).
-            raw = call_openai(query)
+            raw = call_openai(query, few_shot_examples=few_shot_examples, model=MODEL_PRIMARY,
+                              reasoning_effort=REASONING_EFFORT, service_tier=select_service_tier(db))
+        except OpenAIError as exc:
+            # An outage, timeout or rate limit on the primary: the fallback model, standard tier.
+            logger.warning("NL parse on %s failed (%r); retrying on %s", MODEL_PRIMARY, exc, MODEL_FALLBACK)
+            raw = call_openai(query, few_shot_examples=few_shot_examples, model=MODEL_FALLBACK,
+                              reasoning_effort=REASONING_EFFORT)
 
         # Extract and preserve _meta from OpenAI response before validation strips it
         api_meta = raw.pop("_meta", None) or {}

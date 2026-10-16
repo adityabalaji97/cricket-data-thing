@@ -16,7 +16,7 @@ def test_century_query_forces_per_innings_batter_grouping(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: _mock_llm_response(
+        lambda _q, **_kw: _mock_llm_response(
             filters={"batters": ["Virat Kohli"], "query_mode": "delivery"},
             group_by=["batter"],
         ),
@@ -36,7 +36,7 @@ def test_venue_phrase_becomes_filter_and_not_unintended_group_by(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: _mock_llm_response(
+        lambda _q, **_kw: _mock_llm_response(
             filters={},
             group_by=["toss_decision", "match_outcome", "venue"],
         ),
@@ -53,7 +53,7 @@ def test_since_query_drops_llm_end_date_when_not_explicit(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: _mock_llm_response(
+        lambda _q, **_kw: _mock_llm_response(
             filters={
                 "batting_teams": ["Chennai Super Kings"],
                 "start_date": "2018-01-01",
@@ -75,7 +75,7 @@ def test_wicketless_query_maps_to_max_wickets_zero_with_bowler_grouping(monkeypa
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: _mock_llm_response(
+        lambda _q, **_kw: _mock_llm_response(
             filters={"bowlers": ["Jasprit Bumrah"]},
             group_by=["bowler"],
         ),
@@ -95,7 +95,7 @@ def test_interpretation_fallback_is_populated_from_filters(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: _mock_llm_response(
+        lambda _q, **_kw: _mock_llm_response(
             filters={
                 "batters": ["Virat Kohli"],
                 "bowl_kind": ["spin bowler"],
@@ -118,7 +118,7 @@ def test_invalid_confidence_defaults_to_medium(monkeypatch):
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: {
+        lambda _q, **_kw: {
             "filters": {"batters": ["Virat Kohli"], "query_mode": "delivery"},
             "group_by": ["batter"],
             "explanation": "kohli breakdown",
@@ -137,7 +137,7 @@ def test_ambiguous_players_and_teams_are_rewritten_for_batting_context(monkeypat
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: _mock_llm_response(
+        lambda _q, **_kw: _mock_llm_response(
             filters={
                 "players": ["Tilak Varma"],
                 "teams": ["India"],
@@ -161,7 +161,7 @@ def test_ambiguous_players_and_teams_are_rewritten_for_bowling_context(monkeypat
     monkeypatch.setattr(
         nl2query,
         "call_openai",
-        lambda _q: _mock_llm_response(
+        lambda _q, **_kw: _mock_llm_response(
             filters={
                 "players": ["Jasprit Bumrah"],
                 "teams": ["India"],

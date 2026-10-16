@@ -13,7 +13,9 @@ from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from services.nl2query import (
-    select_model,
+    chat_kwargs,
+    select_service_tier,
+    OPENAI_TIMEOUT_SECONDS,
     estimate_cost,
     persist_nl_query_log,
     MODEL_PRIMARY,
@@ -114,7 +116,8 @@ def summarize_query_results(
     if not result_data or result_count == 0:
         return {"success": True, "summary": "No data available for this query.", "_meta": {}}
 
-    model = select_model(db)
+    model = MODEL_PRIMARY
+    service_tier = select_service_tier(db)
     max_rows = 50
     truncation_note = f", showing first {max_rows}" if result_count > max_rows else ""
 
@@ -129,15 +132,14 @@ def summarize_query_results(
 
     start_time = time.time()
     try:
-        client = OpenAI(api_key=api_key)
+        client = OpenAI(api_key=api_key, timeout=OPENAI_TIMEOUT_SECONDS, max_retries=1)
         response = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": SUMMARIZE_SYSTEM_PROMPT},
                 {"role": "user", "content": user_message},
             ],
-            temperature=0.2,
-            max_tokens=500,
+            **chat_kwargs(model, max_output_tokens=500, temperature=0.2, service_tier=service_tier),
         )
 
         summary_text = response.choices[0].message.content.strip()
@@ -150,6 +152,7 @@ def summarize_query_results(
                 model,
                 usage.prompt_tokens if usage else 0,
                 usage.completion_tokens if usage else 0,
+                service_tier,
             ),
         }
 
