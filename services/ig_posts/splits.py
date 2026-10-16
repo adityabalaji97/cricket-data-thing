@@ -88,11 +88,25 @@ class Split:
     pct: float
     score: float
     rows: List[Dict[str, Any]]  # the cell's qualifiers, best first
+    value_rank: Optional[int] = None  # by Impact per 100 balls, men's T20; None without it
 
 
 def _metric(role: str) -> Tuple[str, bool, str, str]:
     """(row key, higher is better, format, label)"""
     return ("strike_rate", True, "int", "strike rate") if role == "batter" else ("economy", False, "dec2", "economy")
+
+
+def _value_metric(role: str) -> Tuple[str, str, str]:
+    """The T20 Primer's value metric for the role: (row key, short label, what it means). Men's T20 only."""
+    if role == "batter":
+        return "impact_per_100", "Impact per 100 balls", "runs added to the team's expected total"
+    # Impact for bowlers too, as the site's scorecards show it: runs saved, with wickets counted as the runs they cost.
+    return "impact_per_100", "Impact per 100 balls", "runs saved from the batting side's expected total, wickets included"
+
+
+def _wpa100(r: Dict[str, Any]) -> Optional[float]:
+    """Win probability added per 100 balls, in percentage points."""
+    return 100 * 100 * r["wpa"] / r["balls"] if r.get("wpa") is not None and r.get("balls") else None
 
 
 def _econ(r: Dict[str, Any]) -> Optional[float]:
@@ -142,7 +156,14 @@ def find(db, name: str, role: str, scope: Dict[str, Any]) -> List[Split]:
             if pct < MIN_PCT or gap < MIN_GAP:
                 continue
             score = pct + 40 * min(gap, 0.5) + SPECIFIC.get(dim, 0) + (5 if rank == 1 else 0)
-            s = Split(dim, group_by, key, phrase(mine), v, field_value, rank, len(q), pct, score, q)
+            value_rank = None
+            vkey = _value_metric(role)[0]
+            if scope["fmt"] == "T20" and mine.get(vkey) is not None:
+                by_value = sorted((r for r in q if r.get(vkey) is not None), key=lambda r: -r[vkey])
+                value_rank = by_value.index(mine) + 1
+                # Fast but not valuable (a quick 20 that cost wickets) is a weaker story than fast and valuable.
+                score += 0.3 * 100 * (len(by_value) - value_rank) / max(1, len(by_value) - 1) - 15
+            s = Split(dim, group_by, key, phrase(mine), v, field_value, rank, len(q), pct, score, q, value_rank)
             if not best or s.score > best.score:
                 best = s
         if best:
@@ -151,11 +172,13 @@ def find(db, name: str, role: str, scope: Dict[str, Any]) -> List[Split]:
 
 
 def _detail(r: Dict[str, Any], role: str) -> str:
+    vkey = _value_metric(role)[0]
+    value = f" · Impact {fmt(r[vkey], 'signed1')}/100" if r.get(vkey) is not None else ""
     if role == "batter":
         avg = r.get("average")
-        return f"{r['runs']} off {r['balls']}" + (f" · avg {avg:.0f}" if avg else "")
+        return f"{r['runs']} off {r['balls']}" + (f" · avg {avg:.0f}" if avg else "") + value
     bpw = r.get("balls_per_dismissal") or (r["balls"] / r["wickets"] if r.get("wickets") else None)
-    return f"{r['wickets']} wkts in {r['balls']} balls" + (f" · a wicket every {bpw:.0f}" if bpw else "")
+    return f"{r['wickets']} wkts in {r['balls']} balls" + (f" · 1 every {bpw:.0f}" if bpw else "") + value
 
 
 def _ordinal(n: int) -> str:
@@ -178,6 +201,36 @@ def leaderboard(s: Split, name: str, role: str, sample: str, scope_hook: str, to
                   "highlight": r[role] == name} for r in shown],
     }, sample, f"{s.of} {role}s with enough balls {s.phrase}. The field as a whole: {fmt(s.field_value, f)}.")
     return c
+
+
+def value_board(s: Split, name: str, role: str, sample: str, top: int = 7) -> Optional[Dict[str, Any]]:
+    """The same cell ranked by Impact per 100 balls (the T20 Primer's value metric, for batters and bowlers), WPA in each
+    row: does the strike rate (or economy) turn into runs and wins for the team?"""
+    vkey, vlabel, meaning = _value_metric(role)
+    rows = sorted((r for r in s.rows if r.get(vkey) is not None), key=lambda r: -r[vkey])
+    mine = next((r for r in rows if r[role] == name), None)
+    if not mine or len(rows) < MIN_FIELD:
+        return None
+    rank = rows.index(mine) + 1
+    shown = rows[:top] if rank <= top else rows[:top - 1] + [mine]
+    # The title stays short (a three-line clamp); win probability goes in the rows and the note, as totals over the
+    # balls (a whole win is 100 points), since per-100 figures on small samples read bigger than they are.
+    if rank == 1:
+        title = f"By Impact, {name} is first {s.phrase} too: {fmt(mine[vkey], 'signed1')} per 100 balls"
+    else:
+        title = (f"By Impact, {name} is {_ordinal(rank)} of {len(rows)} {s.phrase}: {fmt(mine[vkey], 'signed1')}; "
+                 f"{rows[0][role]} leads at {fmt(rows[0][vkey], 'signed1')}")
+    wins = (f" {name} added {fmt(100 * mine['wpa'], 'signed0')} points of win probability in {mine['balls']} balls."
+            if mine.get("wpa") is not None else "")
+
+    def detail(r):
+        return f"{r['balls']} balls" + (f" · WPA {fmt(100 * r['wpa'], 'signed0')} pts" if r.get("wpa") is not None else "")
+
+    return card(f"value-{s.dim}", "metric_bars", title, {
+        "metric": {"label": vlabel, "format": "signed1", "signed": True}, "label_width": 150,
+        "rows": [{"name": r[role], "value": round(r[vkey], 1), "detail": detail(r), "highlight": r[role] == name}
+                 for r in shown],
+    }, sample, f"Impact: {meaning}, per 100 balls (T20 Primer method).{wins}")
 
 
 def profile(db, s: Split, name: str, role: str, scope: Dict[str, Any], sample: str) -> Optional[Dict[str, Any]]:
@@ -230,6 +283,9 @@ def build(db, name: str, role: str, scope: Dict[str, Any], scope_hook: str, samp
         hook = (f"{name} goes at {fmt(s.value, f)} an over {s.phrase} {scope_hook}. "
                 + ("Who comes closest?" if s.rank == 1 else "Who's tighter?"))
     cards = [leaderboard(s, name, role, sample, scope_hook)]
+    value = value_board(s, name, role, sample) if scope["fmt"] == "T20" else None
+    if value:
+        cards.append(value)
     prof = profile(db, s, name, role, scope, sample)
     if prof:
         cards.append(prof)
@@ -240,7 +296,10 @@ def build(db, name: str, role: str, scope: Dict[str, Any], scope_hook: str, samp
     return {"hook": hook, "cards": cards, "title": hook, "verdict": verdict, "leaders": leaders,
             "players": [name, *[l for l in leaders if l != name]],
             "split": {"dim": s.dim, "phrase": s.phrase, "rank": s.rank, "of": s.of, "pct": round(s.pct, 1),
+                      "value_rank": s.value_rank,
                       "value": round(s.value, 2), "field": round(s.field_value, 2),
                       "next": splits[1].phrase if len(splits) > 1 else None},
             "method": (f"{label.capitalize()} in each split for every {role} with enough balls there ({sample}); "
-                       f"the field figure is every ball in the split, not an average of players.")}
+                       f"the field figure is every ball in the split, not an average of players"
+                       + ("; Impact and win probability added are ball by ball (T20 Primer method)."
+                          if scope["fmt"] == "T20" else "."))}
