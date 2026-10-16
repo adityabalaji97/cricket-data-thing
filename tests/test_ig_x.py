@@ -57,11 +57,11 @@ def test_players_come_from_the_cards_not_the_teams():
 def test_text_visuals_tweet_their_words():
     s = [{"type": "card", "card": {"visual": "recap_text", "title": "How it was won",
                                    "payload": {"headline": "247 was 59 above par.", "bullets": ["Hope added 39.9.", "Paul saved 19.2.", "Won by 24."]}}},
-         {"type": "card", "card": {"visual": "win_prob_line", "title": "India never had better than 30%",
+         {"type": "card", "card": {"visual": "win_prob_line", "title": "India never had better than 30",
                                    "payload": {"bands": [{"over": 5, "text": "Paul removed Samson", "from": 30, "to": 16}]}}}]
     thread = x_thread(s, CAPTION)
-    assert thread[0]["text"].startswith("247 was 59 above par. Hope added 39.9. Paul saved 19.2.")
-    assert "Over 5: Paul removed Samson (30→16%)" in thread[1]["text"]
+    assert thread[0]["text"].startswith("247 was 59 above par.\nHope added 39.9.\nPaul saved 19.2.\nWon by 24.")
+    assert thread[1]["text"].startswith("India never had better than 30.\nOver 5: Paul removed Samson (30→16%)")
 
 
 def test_the_last_tweet_links_to_the_posts_own_page():
@@ -90,3 +90,25 @@ def test_a_surname_with_a_particle_is_a_name():
     out = tag_players(["Quinton de Kock's 78*", "de Kock & Rohit hit 16"], ["Quinton de Kock", "Rohit Sharma"])
     assert out == ["#QuintondeKock's 78*", "de Kock & #RohitSharma hit 16"]
     assert players_in([{"type": "card", "card": {"payload": {"rows": [{"name": "Quinton de Kock"}]}}}]) == ["Quinton de Kock"]
+
+
+def test_a_tweet_carries_the_numbers_the_slide_draws():
+    from services.ig_x import details
+
+    bars = {"visual": "metric_bars", "title": "Gayle's +28.8 is in the top 2%",
+            "payload": {"metric": {"format": "signed1"}, "rows": [
+                {"name": "Shikhar Dhawan", "value": 67.9, "detail": "2023 · PBKS v SRH"},
+                {"name": "Priyansh Arya", "value": 66.8}, {"name": "KL Rahul", "value": 61.7},
+                {"name": "Abhishek Sharma", "value": 61.2}, {"name": "Chris Gayle", "value": 28.8, "highlight": True}]}}
+    assert details(bars) == ["Shikhar Dhawan +67.9 (2023 · PBKS v SRH)", "Priyansh Arya +66.8", "KL Rahul +61.7",
+                             "→ Chris Gayle +28.8"]
+    comp = {"visual": "deep_compare", "title": "x", "payload": {"metric": {"format": "pct0"},
+            "series": ["This match", "Since 2023"], "rows": [{"label": "Good length", "subject": 22, "field": 40}]}}
+    assert details(comp) == ["Good length: 22% this match v 40% since 2023"]
+
+
+def test_stat_lines_are_dropped_whole_to_fit():
+    s = [{"type": "card", "card": {"visual": "recap_text", "title": "How", "payload": {
+        "headline": "Head.", "bullets": ["line " * 30, "short one"]}}}]
+    text = x_thread(s, CAPTION)[0]["text"]
+    assert weight(text) <= LIMIT and "…" not in text.split("\n\n")[0]

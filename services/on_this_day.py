@@ -257,7 +257,11 @@ def post(db: Session, day: date, avoid=()) -> Optional[Dict[str, Any]]:
         hook = f"{ago}: {top['name']}'s {figure}, {fmt(top['impact'], 'signed1')} runs of Impact."
     else:
         hook = f"{ago}: {_short_team(c['team1'])} v {_short_team(c['team2'])}."
-    sub = how["payload"]["headline"]
+    # The match itself, not a finding: How it was won (slide 2) leads with the finding, and saying it twice wastes a line.
+    venue = (c["venue"] or "").split(",")[0]
+    result = (sc.get("match") or {}).get("result_text") or ""
+    sub = f"{_short_team(c['team1'])} v {_short_team(c['team2'])}" + (f" at {venue}" if venue else "") \
+        + (f": {result}" if result else "")
     players = [p for p in [top["name"] if top else None] if p]
     lines = [how["payload"]["headline"]] + [k["title"] + "." for k in (rank, wp) if k]
     tags = ["#OnThisDay", _fixture_tag(c), *(["#" + "".join(ch for ch in top["name"] if ch.isalnum())] if top else []),
