@@ -35,11 +35,21 @@ DEFAULT_NL2QUERY_MODEL = MODEL_FALLBACK  # kept for backward compat in tests
 MONTHLY_COST_CAP = 15.0  # USD — leaves $5 buffer on $20/mo subscription
 MAX_FEW_SHOT_EXAMPLES = 5
 
-# Approximate per-token costs (USD) as of April 2026
+# Approximate per-token costs (USD), list prices as of October 2026. Reasoning tokens bill as completion.
 MODEL_COSTS = {
     "gpt-4o": {"prompt": 2.50 / 1_000_000, "completion": 10.00 / 1_000_000},
     "gpt-4o-mini": {"prompt": 0.15 / 1_000_000, "completion": 0.60 / 1_000_000},
+    "gpt-6-luna": {"prompt": 0.10 / 1_000_000, "completion": 0.50 / 1_000_000},
+    "gpt-6.1-sol": {"prompt": 2.00 / 1_000_000, "completion": 10.00 / 1_000_000},
+    "gpt-5.6-luna": {"prompt": 0.20 / 1_000_000, "completion": 1.20 / 1_000_000},
+    "gpt-5.4-mini": {"prompt": 0.75 / 1_000_000, "completion": 4.50 / 1_000_000},
 }
+
+
+def _is_reasoning_model(model: str) -> bool:
+    """gpt-5 and later reason before answering: they take reasoning_effort and max_completion_tokens
+    (which also caps the reasoning) and reject temperature/max_tokens."""
+    return not model.startswith("gpt-4")
 ALLOWED_RECOMMENDED_COLUMNS = {
     "balls",
     "balls_faced",
@@ -544,6 +554,8 @@ def call_openai(
     query: str,
     few_shot_examples: Optional[List[Dict[str, Any]]] = None,
     model: str = DEFAULT_NL2QUERY_MODEL,
+    reasoning_effort: Optional[str] = None,
+    service_tier: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Call OpenAI to parse a natural language cricket query.
 
@@ -564,12 +576,19 @@ def call_openai(
         messages.append({"role": "assistant", "content": _serialize_few_shot_output(example)})
     messages.append({"role": "user", "content": query})
 
+    if _is_reasoning_model(model):
+        sampling: Dict[str, Any] = {"max_completion_tokens": 6000}
+        if reasoning_effort:
+            sampling["reasoning_effort"] = reasoning_effort
+    else:
+        sampling = {"temperature": 0.1, "max_tokens": 1000}
+    if service_tier:  # "fast": quicker tokens at 2x the price
+        sampling["service_tier"] = service_tier
     response = client.chat.completions.create(
         model=model,
         messages=messages,
         response_format={"type": "json_object"},
-        temperature=0.1,
-        max_tokens=1000
+        **sampling,
     )
 
     content = response.choices[0].message.content
@@ -583,6 +602,8 @@ def call_openai(
             "prompt_tokens": usage.prompt_tokens,
             "completion_tokens": usage.completion_tokens,
             "estimated_cost_usd": estimate_cost(model, usage.prompt_tokens, usage.completion_tokens),
+            "reasoning_tokens": getattr(getattr(usage, "completion_tokens_details", None), "reasoning_tokens", None),
+            "cached_tokens": getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", None),
         }
     else:
         parsed["_meta"] = {
