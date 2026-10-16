@@ -257,6 +257,16 @@ def query_deliveries(
         if not bat_hand and striker_batter_type:
             bat_hand = striker_batter_type
 
+        from services import tracking_guard
+
+        tag_filters = {"line": line, "length": length, "shot": shot, "shot_family": shot_family,
+                       "wagon_zone": wagon_zone, "control": control}
+        grouped = bool([g for g in (group_by or []) if g])
+        if not grouped and query_mode == "delivery":  # the other modes reject delivery-only filters themselves
+            err = tracking_guard.ungrouped_tag_filter_error(tag_filters)
+            if err:
+                raise HTTPException(status_code=422, detail=err)
+
         result = run_deliveries_query(
             db,
             venue=venue,
@@ -312,6 +322,17 @@ def query_deliveries(
             shot_family=shot_family,
             partnership_players=partnership_players,
         )
+        # Licensed tracking columns in aggregate only (services/tracking_guard.py).
+        result = dict(result)
+        meta = dict(result.get("metadata") or {})
+        if not grouped and query_mode == "delivery":
+            result["data"] = tracking_guard.strip_tags(result.get("data") or [])
+        elif grouped:
+            result["data"], hidden = tracking_guard.floor_groups(list(result.get("data") or []), group_by, tag_filters)
+            if hidden:
+                meta["note"] = ". ".join(n.rstrip(".") for n in (meta.get("note"), tracking_guard.hidden_note(hidden)) if n) + "."
+                meta["hidden_small_tracking_groups"] = hidden
+        result["metadata"] = meta
         return result
     except QueryValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))

@@ -41,3 +41,16 @@ def test_tracking_columns_are_the_licensed_ones():
     srv = pytest.importorskip("mcp_server.server")
     assert {"line", "length", "shot", "wagon_zone", "control"} <= srv.TAGGED_COLUMNS
     assert srv.MIN_TAGGED_GROUP_BALLS >= 6
+
+
+def test_tracking_guard_rules():
+    from services import tracking_guard as tg
+
+    rows = [{"over": 1, "balls": 1, "length": "FULL"}, {"over": 2, "balls": 7, "length": "FULL"}]
+    kept, hidden = tg.floor_groups(rows, ["over", "length"], {})
+    assert hidden == 1 and kept == [rows[1]]
+    kept, hidden = tg.floor_groups(rows, ["over"], {"length": ["FULL"]})  # tags as a filter count too
+    assert hidden == 1
+    assert tg.floor_groups(rows, ["over"], {}) == (rows, 0)  # no tags: untouched
+    assert tg.strip_tags([{"batter": "A", "line": "X", "shot": "Y"}]) == [{"batter": "A", "line": None, "shot": None}]
+    assert tg.ungrouped_tag_filter_error({"wagon_zone": [3]}) and not tg.ungrouped_tag_filter_error({"line": []})

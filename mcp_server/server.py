@@ -59,11 +59,13 @@ MAX_ROWS = 10000
 # Rows fetched before sorting/truncating, so "top 10 by strike rate" ranks the whole result
 # rather than whichever 10 groups the service happened to return first.
 SORT_FETCH_LIMIT = MAX_ROWS
-# Line, length, shot, wagon zone and control come from the licensed ball-by-ball feed: a group of these with fewer
-# balls than this is left out, so the connector can't list the feed ball by ball (grouping by match, over and ball).
 CREDIT = "Data: Hindsight; ball-by-ball tracking by Himanish Ganjoo & TechRadar; scorecards from Cricsheet."
-TAGGED_COLUMNS = {"line", "length", "shot", "shot_family", "wagon_zone", "control"}
-MIN_TAGGED_GROUP_BALLS = int(os.getenv("MCP_MIN_TAGGED_GROUP_BALLS", "6"))
+# Line, length, shot, wagon zone and control come from the licensed ball-by-ball feed: aggregate only, the same rule
+# as the website's API (services/tracking_guard.py).
+from services.tracking_guard import MIN_GROUP_BALLS as MIN_TAGGED_GROUP_BALLS  # noqa: E402  (same rule as the API)
+from services.tracking_guard import TAGGED_COLUMNS as _TAGGED  # noqa: E402
+
+TAGGED_COLUMNS = set(_TAGGED)
 # Rows shown in the human-readable markdown table; the full result rides along as CSV/JSON.
 TEXT_TABLE_ROWS = 25
 
@@ -852,13 +854,13 @@ def query_cricket_data(
         if params.get(key):
             params[key] = list(dict.fromkeys(canonical_name(n, alias_map) for n in params[key]))
     result = dict(result)
-    data = [dict(r) for r in result.get("data") or []]
-    hidden = 0
+    from services import tracking_guard
+
     # Tracking tags as groups, or as filters (length=GOOD_LENGTH grouped by over and ball would list those balls).
-    tag_filters = (line, length, shot, shot_family, wagon_zone, control)
-    if TAGGED_COLUMNS & set(group_by) or any(f not in (None, [], "") for f in tag_filters):
-        kept = [r for r in data if r.get("balls") is None or (r.get("balls") or 0) >= MIN_TAGGED_GROUP_BALLS]
-        hidden, data = len(data) - len(kept), kept
+    data, hidden = tracking_guard.floor_groups(
+        [dict(r) for r in result.get("data") or []], group_by,
+        {"line": line, "length": length, "shot": shot, "shot_family": shot_family, "wagon_zone": wagon_zone,
+         "control": control})
     result["data"], merged = canonicalize_rows(data, group_by, alias_map)
     structured = structure_query_result(
         result, params, group_by, query_mode=query_mode, format=format, gender=gender, batters=batters,
@@ -872,8 +874,7 @@ def query_cricket_data(
     if merged:
         warnings.append(f"{merged} rows under other spellings of the same player were combined into one name each.")
     if hidden:
-        warnings.append(f"{hidden} groups with fewer than {MIN_TAGGED_GROUP_BALLS} balls were left out: line, length, "
-                        "shot, wagon zone and control come from licensed tracking data, shared here only in aggregate.")
+        warnings.append(tracking_guard.hidden_note(hidden))
     if sorting and total_rows > SORT_FETCH_LIMIT:
         warnings.append(f"Ranked within the {SORT_FETCH_LIMIT:,} largest of {total_rows:,} groups; add filters for an exact ranking.")
 

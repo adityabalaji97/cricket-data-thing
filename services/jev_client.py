@@ -50,6 +50,16 @@ def suppress() -> Iterator[None]:
         _SUPPRESSED.reset(token)
 
 
+def _record(questions: int, input_tokens: Optional[int], output_tokens: Optional[int], ms: int, ok: bool) -> None:
+    """Into jev_usage_log (migration 022), best effort: TypeSafe reports usage per call only, so this is our total."""
+    try:
+        from services.usage_log import log_jev_call
+
+        log_jev_call(questions, input_tokens, output_tokens, ms, ok)
+    except Exception:  # pragma: no cover - logging never fails a Jev call
+        pass
+
+
 def ask(state: Any, questions: Dict[str, Dict[str, Any]], timeout: float = 3.0) -> Optional[Dict[str, Any]]:
     """POST one fan-out request; returns the `answers` map, or None if Jev is off or failed."""
     key = api_key()
@@ -67,13 +77,15 @@ def ask(state: Any, questions: Dict[str, Dict[str, Any]], timeout: float = 3.0) 
             response.raise_for_status()
             body = response.json()
             usage = body.get("usage") or {}
+            ms = int((time.monotonic() - started) * 1000)
             logger.info(
                 "jev_call questions=%d ms=%d in_tokens=%s out_tokens=%s",
-                len(questions), int((time.monotonic() - started) * 1000),
-                usage.get("input_tokens"), usage.get("output_tokens"),
+                len(questions), ms, usage.get("input_tokens"), usage.get("output_tokens"),
             )
+            _record(len(questions), usage.get("input_tokens"), usage.get("output_tokens"), ms, True)
             return body.get("answers") or None
         except Exception as exc:  # network, HTTP or JSON: never fail the caller
             logger.warning("jev_call failed (%s): %r", type(exc).__name__, exc)
+            _record(len(questions), None, None, int((time.monotonic() - started) * 1000), False)
             return None
     return None
