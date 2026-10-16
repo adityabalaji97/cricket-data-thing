@@ -25,7 +25,7 @@ import { siteOrigin } from './ui/ChartExportButton';
 import { fetchUpcomingMatches } from '../data/iplSchedule';
 import ExploreMenu from './nav/ExploreMenu';
 import MiniWagonWheel from './MiniWagonWheel';
-import { getTeamColor, textOn } from '../utils/teamColors';
+import { getTeamColor, readableOnDark, textOn } from '../utils/teamColors';
 import SearchBar from './search/SearchBar';
 import { colors as dark, fonts } from '../theme/hindsightDark';
 import { useFormat } from '../context/FormatContext';
@@ -411,8 +411,8 @@ const TodayMatchCard = ({ match }) => {
   const live = Boolean(match.isLive);
   const startLabel = localStart(match).label;
   const status = live ? (match.statusText || 'Live') : (startLabel ? `Starts ${startLabel}` : 'Scheduled');
-  const team1Color = getTeamColor(match.team1Abbr || match.team1) || C.low;
-  const team2Color = getTeamColor(match.team2Abbr || match.team2) || C.low;
+  const team1Color = readableOnDark(getTeamColor(match.team1Abbr || match.team1) || C.low);
+  const team2Color = readableOnDark(getTeamColor(match.team2Abbr || match.team2) || C.low);
   return (
     <Box
       sx={{
@@ -714,7 +714,7 @@ const RecentMatchesSection = ({
 
 const RecentMatchTile = ({ match }) => {
   const winner = match.winner || '';
-  const winnerColor = getTeamColor(winner) || C.lime;
+  const winnerColor = readableOnDark(getTeamColor(winner) || C.lime);
   const team1Won = winner && [match.team1, match.team1_full].some((team) => String(team || '').toLowerCase() === winner.toLowerCase());
   const team2Won = winner && [match.team2, match.team2_full].some((team) => String(team || '').toLowerCase() === winner.toLowerCase());
 

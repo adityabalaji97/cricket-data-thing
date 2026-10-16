@@ -52,6 +52,7 @@ import { ScoresBarChart, WinPercentagesPie } from './venue/VenueResultCharts';
 import StoryPreview from './story/StoryPreview';
 import { toStoryChapters } from './story/visuals';
 import useStoryCards from '../hooks/useStoryCards';
+import { getTeamColor, readableOnDark } from '../utils/teamColors';
 
 const BattingScatter = ({ data, isMobile }) => {
     const [minInnings, setMinInnings] = useState(5);
@@ -155,7 +156,7 @@ const BattingScatter = ({ data, isMobile }) => {
         })
         .map(d => ({
             ...d,
-            fill: getTeamColor(d.batting_team)
+            fill: latestTeamColor(d.batting_team)
         }))
         // Sort players by total runs (descending) to show the most prolific batters
         .sort((a, b) => {
@@ -427,22 +428,8 @@ const BattingScatter = ({ data, isMobile }) => {
     );
 };
 
-const getTeamColor = (team) => {
-    const teamColors = {
-        'CSK': '#eff542',
-        'RCB': '#f54242', 
-        'MI': '#42a7f5',
-        'RR': '#FF2AA8',
-        'KKR': '#610048',
-        'PBKS': '#FF004D',
-        'SRH': '#FF7C01',
-        'LSG': '#00BBB3',
-        'DC': '#004BC5',
-        'GT': '#01295B'
-    };
-    const currentTeam = team?.split('/')?.pop()?.trim();
-    return teamColors[currentTeam] || '#000000';
-};
+// A player's career label reads "MI/CSK": colour by the latest team, lifted to show on the dark chart.
+const latestTeamColor = (team) => readableOnDark(getTeamColor(team?.split('/')?.pop()?.trim()) || '#000000');
 
 /**
  * Venue leaders (most runs / most wickets). One table for both: the two copies had drifted into the

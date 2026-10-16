@@ -309,7 +309,7 @@ const FormTileDetails = ({ match, teamCode, result }) => (
 );
 
 const TeamFormRow = ({ teamCode, matches, isMobile, onTileSelect, bare = false }) => {
-    const teamColor = getTeamColor(teamCode) || '#1d4ed8';
+    const teamColor = readableOnDark(getTeamColor(teamCode) || '#1d4ed8');
     // 32px on phones: these are tap targets (they open the match detail), not just glyphs.
     const tileSize = isMobile || bare ? 32 : 26;
 
