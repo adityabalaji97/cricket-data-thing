@@ -12,11 +12,10 @@ from typing import Dict, Any, Optional, List
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
+from services.llm import chat_kwargs, estimate_cost
 from services.nl2query import (
-    chat_kwargs,
     select_service_tier,
     OPENAI_TIMEOUT_SECONDS,
-    estimate_cost,
     persist_nl_query_log,
     MODEL_PRIMARY,
 )

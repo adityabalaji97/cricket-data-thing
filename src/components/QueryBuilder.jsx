@@ -165,7 +165,7 @@ const getActiveFilterCount = (filters, groupBy) => {
 };
 
 const QueryBuilder = ({ isMobile }) => {
-  const { formatParams, active, loading: formatsLoading } = useFormat();
+  const { formatParams, active, formats, selectFormat, loading: formatsLoading } = useFormat();
   // The auto-run from a shared link is scheduled; read the format at run time, not from the
   // render that scheduled it.
   const formatParamsRef = useRef(formatParams);
@@ -396,6 +396,7 @@ const QueryBuilder = ({ isMobile }) => {
     interpretation,
     warnings,
     logRef,
+    format: questionFormat,
   }) => {
     nlLogRefRef.current = logRef || null;
     // Reset to defaults then apply NL filters
@@ -427,6 +428,18 @@ const QueryBuilder = ({ isMobile }) => {
     // structured filters.
     const newUrl = `${window.location.pathname}?nl=${encodeURIComponent((queryText || '').trim())}`;
     window.history.replaceState({}, '', newUrl);
+
+    // A question that names a format ("in ODIs", "IPL") runs in it: switch the site like the format
+    // picker does (and like opening an ODI preview), and point this run at it now rather than after
+    // the re-render.
+    if (questionFormat && active && questionFormat !== active.format) {
+      const gender = active.gender || 'male';
+      const target = (formats || []).find((f) => f.format === questionFormat && f.gender === gender && f.available);
+      if (target) {
+        selectFormat(target.slug);
+        formatParamsRef.current = { format: target.format, gender: target.gender };
+      }
+    }
 
     // Auto-execute for high confidence, just populate for medium/low
     if (confidence === 'high') {

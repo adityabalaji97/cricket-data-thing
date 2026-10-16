@@ -69,11 +69,17 @@ def questions(db, limit: int) -> List[str]:
     return out
 
 
+def label_is_prod(model: str, effort: Optional[str], tier: Optional[str]) -> bool:
+    """Production's primary call gets production's short timeout (and its one retry)."""
+    return (model, effort, tier) == (nl2query.MODEL_PRIMARY, nl2query.REASONING_EFFORT, "fast")
+
+
 def call(question: str, shots, model: str, effort: Optional[str], tier: Optional[str]) -> Dict[str, Any]:
     started = time.monotonic()
     try:
+        timeout = nl2query.PRIMARY_TIMEOUT_SECONDS if label_is_prod(model, effort, tier) else nl2query.OPENAI_TIMEOUT_SECONDS
         raw = nl2query.call_openai(question, few_shot_examples=shots, model=model, reasoning_effort=effort,
-                                   service_tier=tier)
+                                   service_tier=tier, timeout_seconds=timeout)
         return {"raw": raw, "ms": int((time.monotonic() - started) * 1000)}
     except Exception as exc:  # a failed parse is a result too
         return {"error": repr(exc)[:300], "ms": int((time.monotonic() - started) * 1000)}

@@ -23,6 +23,7 @@ import logging
 from database import get_session
 from services.player_patterns import detect_batter_patterns, detect_bowler_patterns
 from services.player_aliases import resolve_to_legacy_name
+from services import llm
 from services.summary_check import verify_lines
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ router = APIRouter(prefix="/player-summary", tags=["Player Summary"])
 
 # Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_MODEL = os.getenv("PLAYER_SUMMARY_OPENAI_MODEL", llm.MODEL_LIGHT)  # services/llm.py
 OPENAI_TIMEOUT_SECONDS = float(
     os.getenv("PLAYER_SUMMARY_OPENAI_TIMEOUT_SECONDS", os.getenv("OPENAI_TIMEOUT_SECONDS", "15"))
 )
@@ -163,8 +164,8 @@ def generate_summary_with_llm(patterns: dict, player_type: str) -> str:
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE,
+            # Someone is waiting on the profile page: Fast mode.
+            **llm.chat_kwargs(OPENAI_MODEL, MAX_TOKENS, temperature=TEMPERATURE, service_tier="fast"),
         )
         
         content = response.choices[0].message.content.strip()

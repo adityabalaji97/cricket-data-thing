@@ -12,6 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from database import get_session
+from services import llm
 from services.cricinfo_scraper import scrape_match_setup
 from services import jev_client, typed_preview
 from services.match_preview import (
@@ -43,7 +44,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/match-preview", tags=["Match Preview"])
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("MATCH_PREVIEW_OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL = os.getenv("MATCH_PREVIEW_OPENAI_MODEL", llm.MODEL_LIGHT)  # services/llm.py
 OPENAI_TIMEOUT_SECONDS = float(
     os.getenv("MATCH_PREVIEW_OPENAI_TIMEOUT_SECONDS", os.getenv("OPENAI_TIMEOUT_SECONDS", "20"))
 )
@@ -103,7 +104,8 @@ def _inject_form_flags(context: Dict, db: Session) -> None:
 
 
 def _is_gpt5_model() -> bool:
-    return OPENAI_MODEL.startswith("gpt-5")
+    """Reasoning models (gpt-5 and later) go through the Responses API with their own instructions."""
+    return llm.is_reasoning_model(OPENAI_MODEL)
 
 
 def _chat_completion_kwargs() -> Dict[str, float]:

@@ -118,7 +118,7 @@ def test_parse_endpoint_returns_a_log_ref(client, monkeypatch):
     from routers import nl2query as router
 
     logged = {}
-    monkeypatch.setattr(router, "parse_nl_query", lambda query, db=None: {
+    monkeypatch.setattr(router, "parse_nl_query", lambda query, db=None, fmt=None: {
         "success": True, "filters": {}, "group_by": ["batter"], "confidence": "high"})
     monkeypatch.setattr(router, "log_nl_query_event_background", lambda **kw: logged.update(kw))
     payload = client.post("/nl2query/parse", json={"query": "kohli by year"}).json()
@@ -148,7 +148,7 @@ def test_refused_graphic_idea_records_why(monkeypatch, runs):
 
     logged = []
     monkeypatch.setattr("services.nl2query.parse_nl_query",
-                        lambda idea, db=None: {"success": True, "filters": {}, "group_by": []})
+                        lambda idea, db=None, fmt=None: {"success": True, "filters": {}, "group_by": []})
     monkeypatch.setattr("services.nl2query.log_nl_query_event_background", lambda **kw: logged.append(kw))
     with pytest.raises(SnapshotError):
         content_ideas.plan("kusal mendis", None, None, client="1.2.3.4")
@@ -193,7 +193,7 @@ def test_a_failed_primary_call_falls_back(monkeypatch):
     nl2query._cache.clear()
     calls = []
 
-    def fake(query, few_shot_examples=None, model=None, reasoning_effort=None, service_tier=None):
+    def fake(query, few_shot_examples=None, model=None, reasoning_effort=None, service_tier=None, page_format=None, **_kw):
         calls.append((model, service_tier))
         if model == nl2query.MODEL_PRIMARY:
             raise APITimeoutError(request=MagicMock())
@@ -234,3 +234,57 @@ def test_odi_questions_never_get_the_t20i_league():
     result = nl2query._post_process_result("Rohit in T20Is and ODIs",
                                            {"filters": {"leagues": ["T20I"]}, "group_by": ["batter"]})
     assert result["filters"]["leagues"] == ["T20I"]
+
+
+@pytest.mark.parametrize("question,page,fmt,overs", [
+    ("Rohit sharma ODI powerplay batting average and strike rate by year", None, "ODI", (0, 9)),
+    ("death overs economy for IPL bowlers", "ODI", "T20", (15, 19)),       # the question's format wins
+    ("death overs economy since 2023", "ODI", None, (40, 49)),             # else the page's
+    ("death overs economy since 2023", None, None, (15, 19)),              # else T20's
+    ("middle overs strike rate in one-day internationals", None, "ODI", (10, 39)),
+    ("kohli in overs 40-49 in ODIs", None, "ODI", (40, 49)),               # the user's own overs stay
+    ("Kohli powerplay vs death strike rate", "ODI", None, (None, None)),   # two phases: no single window
+    ("middle order batters in ODIs", None, "ODI", (None, None)),           # not "middle overs"
+    ("Joe Root test career by year", None, "TEST", (None, None)),
+])
+def test_phases_follow_the_format(question, page, fmt, overs):
+    filters = {"over_min": 40, "over_max": 49} if "40-49" in question else {}
+    result = nl2query._post_process_result(question, {"filters": filters, "group_by": ["batter"]}, page_format=page)
+    assert result["format"] == fmt
+    assert (result["filters"].get("over_min"), result["filters"].get("over_max")) == overs
+
+
+def test_overs_are_held_to_the_formats_cap_and_format_grouping_survives():
+    validated = nl2query.validate_filters({"filters": {"over_min": 40, "over_max": 49}, "group_by": ["format"]}, "")
+    assert validated["filters"]["over_max"] == 49 and validated["group_by"] == ["format"]
+    t20 = nl2query._post_process_result("IPL batters", {"filters": {"over_min": 40, "over_max": 49},
+                                                         "group_by": ["batter", "format"]})
+    assert t20["filters"]["over_max"] == 19 and "format" not in t20["group_by"]
+    both = nl2query._post_process_result("kohli in T20 and ODI by format", {"filters": {}, "group_by": ["batter", "format"]})
+    assert both["format"] is None and "format" in both["group_by"]
+
+
+def test_the_page_format_reaches_the_prompt_and_the_cache(monkeypatch):
+    nl2query._cache.clear()
+    seen = []
+
+    def fake(query, page_format=None, **kw):
+        seen.append(page_format)
+        return {"filters": {}, "group_by": ["batter"], "confidence": "high"}
+
+    monkeypatch.setattr(nl2query, "call_openai", fake)
+    monkeypatch.setattr(nl2query, "select_service_tier", lambda db=None: None)
+    nl2query.parse_nl_query("best death bowlers", fmt="ODI")
+    nl2query.parse_nl_query("best death bowlers", fmt="T20")
+    nl2query.parse_nl_query("best death bowlers", fmt="ODI")  # cached
+    assert seen == ["ODI", "T20"]
+    assert "set to ODI" in nl2query._format_context("ODI") and "all formats" in nl2query._format_context("ALL")
+
+
+def test_every_text_caller_is_off_gpt_4o():
+    from routers import match_preview, player_summary
+    from services import ig_reel_v2, llm
+
+    assert {player_summary.OPENAI_MODEL, match_preview.OPENAI_MODEL, nl2query.MODEL_PRIMARY} == {llm.MODEL_LIGHT}
+    assert {ig_reel_v2.SCRIPT_MODEL, nl2query.MODEL_FALLBACK} == {llm.MODEL_STRONG}
+    assert match_preview._is_gpt5_model()  # reasoning models take the Responses path

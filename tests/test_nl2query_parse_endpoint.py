@@ -5,7 +5,7 @@ def test_parse_endpoint_includes_structured_interpretation(client, monkeypatch):
     monkeypatch.setattr(
         nl2query_router,
         'parse_nl_query',
-        lambda query, db=None: {
+        lambda query, db=None, fmt=None: {
             'success': True,
             'filters': {'batters': ['Virat Kohli'], 'query_mode': 'delivery'},
             'group_by': ['batter'],

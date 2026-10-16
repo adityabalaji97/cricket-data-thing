@@ -95,7 +95,7 @@ def plan(idea: str, fmt_choice: Optional[str], db: Session, client: str = "admin
                      "wicket hauls so far; the query builder can't express this one yet.")
     from services.nl2query import parse_nl_query
 
-    parsed = parse_nl_query(idea, db=db)
+    parsed = parse_nl_query(idea, db=db, fmt=fmt_choice)
     log_nl_query_event_background(query_text=f"{tag} {idea}", parse_result=parsed, ip_address=client,
                                   execution_time_ms=None, log_ref=log_ref)
     if not parsed.get("success", True) or not parsed.get("group_by"):
