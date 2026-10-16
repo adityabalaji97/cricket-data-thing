@@ -152,7 +152,7 @@ def _generate_narrative_insights(
     top_features: List[Dict],
     feature_snapshot: Dict,
 ) -> List[str]:
-    """Generate natural cricket commentary for a prediction using GPT-4o-mini.
+    """Generate natural cricket commentary for a prediction with the light model (services/llm.py).
 
     Falls back to template-based insights if the OpenAI call fails.
     """
@@ -180,15 +180,15 @@ def _generate_narrative_insights(
 
     try:
         from openai import OpenAI
+        from services import llm
         client = OpenAI()  # uses OPENAI_API_KEY env var
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=llm.MODEL_LIGHT,
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": user_msg},
             ],
-            max_tokens=500,
-            temperature=0.7,
+            **llm.chat_kwargs(llm.MODEL_LIGHT, 500, temperature=0.7),
         )
         raw = response.choices[0].message.content.strip()
         # Parse bullet points — lines starting with - or * or numbered
@@ -210,7 +210,7 @@ def _generate_narrative_insights(
             if line:
                 insights.append(line)
         if insights:
-            print(f"[predict] Generated {len(insights)} narrative insights via GPT-4o-mini")
+            print(f"[predict] Generated {len(insights)} narrative insights via {llm.MODEL_LIGHT}")
             return insights[:7]
     except Exception as e:
         print(f"[predict] OpenAI narrative generation failed ({e}), using template fallback")

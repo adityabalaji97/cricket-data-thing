@@ -21,6 +21,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import axios from 'axios';
 import config from '../config';
+import { useFormat } from '../context/FormatContext';
 import { qbButtonSx, qbCardSx, qbColors, qbFonts } from './queryBuilderTheme';
 
 const EXAMPLE_QUERIES = [
@@ -51,6 +52,8 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showExamples, setShowExamples] = useState(true);
+  // A question that names no format is about the page's one (and gets its phase overs).
+  const { formatParams } = useFormat();
 
   // Allow parent to collapse examples via prop
   const examplesVisible = showExamples && !externalCollapsed;
@@ -65,7 +68,8 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
 
     try {
       const response = await axios.post(`${config.API_URL}/nl2query/parse`, {
-        query: q
+        query: q,
+        format: formatParams.format,
       });
 
       const data = response.data;
@@ -85,6 +89,7 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
           interpretation: data.interpretation || null,
           warnings: data.warnings || [],
           logRef: data.log_ref || null,
+          format: data.format || null,
         });
         return data;
       } else {

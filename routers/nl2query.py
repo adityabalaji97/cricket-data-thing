@@ -45,6 +45,8 @@ def _check_rate_limit(ip: str):
 
 class NLQueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500, description="Natural language cricket query")
+    # The page's format: a question that names none is about it (and gets its phase overs).
+    format: Optional[Literal["T20", "ODI", "TEST", "ALL"]] = None
 
 
 class NLQueryFilters(BaseModel):
@@ -115,6 +117,8 @@ class NLQueryResponse(BaseModel):
     # Conditions from the question the query cannot apply (e.g. an unsupported metric threshold).
     warnings: List[str] = Field(default_factory=list)
     error: Optional[str] = None
+    # The one format the question names ("ODI", "IPL", "in Tests"), for the page to switch to; None if none.
+    format: Optional[str] = None
     # Pass back as /query/deliveries?nl_ref= so the run's outcome lands on this question's log row.
     log_ref: Optional[str] = None
 
@@ -150,7 +154,7 @@ def parse_query(
     _check_rate_limit(client_ip)
 
     started_at = time.time()
-    result = parse_nl_query(request.query, db=db)
+    result = parse_nl_query(request.query, db=db, fmt=request.format)
     execution_time_ms = int((time.time() - started_at) * 1000)
     log_ref = new_log_ref() if result.get("success") else None
 

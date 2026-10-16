@@ -159,7 +159,7 @@ def test_unsupported_count_within_idea_is_refused(monkeypatch):
     from services.snapshots import SnapshotError
 
     monkeypatch.setattr("services.nl2query.parse_nl_query",
-                        lambda idea, db=None: {"success": True, "filters": {}, "group_by": ["batter"]})
+                        lambda idea, db=None, fmt=None: {"success": True, "filters": {}, "group_by": ["batter"]})
     monkeypatch.setattr("services.nl2query.log_nl_query_event_background", lambda **kw: None)
     with pytest.raises(SnapshotError):
         content_ideas.plan("3 batters hitting 5 sixes in an innings", None, None)

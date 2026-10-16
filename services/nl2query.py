@@ -14,6 +14,10 @@ import uuid
 from datetime import date
 from typing import Dict, Any, Optional, List
 from openai import OpenAI, OpenAIError
+
+from services import llm
+from format_config import all_formats, effective_over_max, get_format
+from services.llm import MODEL_COSTS, chat_kwargs, estimate_cost  # noqa: F401  (re-exported)
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 try:
@@ -33,30 +37,19 @@ CACHE_TTL = 86400  # 24 hours
 # scripts/dev/compare_nl_models.py) gpt-6-luna at low reasoning made ~3 clear mistakes to gpt-4o's ~15 (it
 # applies "40+ average" thresholds that 4o dropped) at ~1/20 of the cost; Fast mode brings it from 5.6s to
 # 3.9s a question for 2x the price. Sol is the fallback when a Luna call fails: as accurate, slower, 4o's price.
-MODEL_PRIMARY = os.getenv("NL2QUERY_MODEL", "gpt-6-luna")
-MODEL_FALLBACK = os.getenv("NL2QUERY_FALLBACK_MODEL", "gpt-6.1-sol")
+MODEL_PRIMARY = os.getenv("NL2QUERY_MODEL", llm.MODEL_LIGHT)
+MODEL_FALLBACK = os.getenv("NL2QUERY_FALLBACK_MODEL", llm.MODEL_STRONG)
 DEFAULT_NL2QUERY_MODEL = MODEL_PRIMARY
 REASONING_EFFORT = os.getenv("NL2QUERY_REASONING_EFFORT", "low")
 FAST_MODE = os.getenv("NL2QUERY_FAST_MODE", "1") != "0"
 OPENAI_TIMEOUT_SECONDS = 20.0
+# A Luna parse takes ~3s (p75 3.5s) but a few in each 100 stall for 20s+; past 8s one retry almost always
+# lands in ~3s, so the slow tail drops from ~25s to ~11s. The fallback model keeps the full timeout.
+PRIMARY_TIMEOUT_SECONDS = 8.0
 MONTHLY_COST_CAP = 15.0  # USD; past it, Fast mode is dropped (half price), not the model
 MAX_FEW_SHOT_EXAMPLES = 5
 
-# Approximate per-token costs (USD), list prices as of October 2026. Reasoning tokens bill as completion.
-MODEL_COSTS = {
-    "gpt-4o": {"prompt": 2.50 / 1_000_000, "completion": 10.00 / 1_000_000},
-    "gpt-4o-mini": {"prompt": 0.15 / 1_000_000, "completion": 0.60 / 1_000_000},
-    "gpt-6-luna": {"prompt": 0.10 / 1_000_000, "completion": 0.50 / 1_000_000},
-    "gpt-6.1-sol": {"prompt": 2.00 / 1_000_000, "completion": 10.00 / 1_000_000},
-    "gpt-5.6-luna": {"prompt": 0.20 / 1_000_000, "completion": 1.20 / 1_000_000},
-    "gpt-5.4-mini": {"prompt": 0.75 / 1_000_000, "completion": 4.50 / 1_000_000},
-}
 
-
-def _is_reasoning_model(model: str) -> bool:
-    """gpt-5 and later reason before answering: they take reasoning_effort and max_completion_tokens
-    (which also caps the reasoning) and reject temperature/max_tokens."""
-    return not model.startswith("gpt-4")
 ALLOWED_RECOMMENDED_COLUMNS = {
     "balls",
     "balls_faced",
@@ -136,8 +129,8 @@ Return only these fields: the system writes the explanation and lists what was m
 - "bowl_kind": list for broad grouping. Valid values: "pace bowler", "spin bowler", "mixture/unknown"
 
 ### Over/phase filters
-- "over_min": integer 0-19 (minimum over number)
-- "over_max": integer 0-19 (maximum over number)
+- "over_min": integer, 0-indexed (minimum over number; up to 19 in T20, 49 in ODIs)
+- "over_max": integer, 0-indexed (maximum over number; up to 19 in T20, 49 in ODIs)
 - Phase mappings:
   - Powerplay: over_min=0, over_max=5
   - Middle overs: over_min=6, over_max=14
@@ -247,7 +240,8 @@ format, venue, country, match_id, competition, year, batting_team, bowling_team,
 2a. Never drop a numeric condition on a metric ("50+ average", "SR over 140"): put it in "having".
 3. For "vs spin" queries, use "bowl_kind": ["spin bowler"]. For specific types like "vs leg spin", use "bowl_style": ["RL", "LC"].
 4. For "vs pace" queries, use "bowl_kind": ["pace bowler"].
-5. Use correct phase over ranges: powerplay=0-5, middle=6-14, death=15-19.
+5. Use the phase over ranges of the question's format. T20: powerplay=0-5, middle=6-14, death=15-19.
+   ODI: powerplay=0-9, middle=10-39, death=40-49. With no format in the question, use the page's (see "Format").
 6. If the query mentions a league (IPL, BBL, etc.), add it to "leagues".
 7. If the query is not about cricket or is too vague, set confidence to "low" and add helpful suggestions.
 8. Return ONLY valid JSON, no extra text.
@@ -463,28 +457,6 @@ def get_few_shot_examples(query: str, db: Optional[Session], limit: int = MAX_FE
     return selected[:limit]
 
 
-def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int, service_tier: Optional[str] = None) -> float:
-    """Estimate USD cost for a single API call (list prices; cached input billed as uncached)."""
-    costs = MODEL_COSTS.get(model, MODEL_COSTS["gpt-4o"])  # unknown model: assume the dearer side
-    multiplier = 2.0 if service_tier in ("fast", "priority") else 1.0
-    return multiplier * ((prompt_tokens * costs["prompt"]) + (completion_tokens * costs["completion"]))
-
-
-def chat_kwargs(model: str, max_output_tokens: int, temperature: float = 0.1,
-                reasoning_effort: Optional[str] = None, service_tier: Optional[str] = None) -> Dict[str, Any]:
-    """Sampling arguments for chat.completions.create that the model accepts. Reasoning models take
-    max_completion_tokens (which also covers their reasoning, so it gets headroom) and reasoning_effort,
-    and reject temperature/max_tokens."""
-    if _is_reasoning_model(model):
-        kwargs: Dict[str, Any] = {"max_completion_tokens": max_output_tokens + 5000,
-                                  "reasoning_effort": reasoning_effort or REASONING_EFFORT}
-    else:
-        kwargs = {"temperature": temperature, "max_tokens": max_output_tokens}
-    if service_tier:
-        kwargs["service_tier"] = service_tier
-    return kwargs
-
-
 def _month_spend(db: Optional[Session]) -> Optional[float]:
     owns_session = db is None
     try:
@@ -565,6 +537,8 @@ def call_openai(
     model: str = DEFAULT_NL2QUERY_MODEL,
     reasoning_effort: Optional[str] = None,
     service_tier: Optional[str] = None,
+    page_format: Optional[str] = None,
+    timeout_seconds: float = OPENAI_TIMEOUT_SECONDS,
 ) -> Dict[str, Any]:
     """Call OpenAI to parse a natural language cricket query.
 
@@ -574,8 +548,8 @@ def call_openai(
     if not api_key:
         raise ValueError("OPENAI_API_KEY not configured")
 
-    client = OpenAI(api_key=api_key, timeout=OPENAI_TIMEOUT_SECONDS, max_retries=1)
-    messages = [{"role": "system", "content": SYSTEM_PROMPT + _date_context(_today())}]
+    client = OpenAI(api_key=api_key, timeout=timeout_seconds, max_retries=1)  # a timeout is retried once
+    messages = [{"role": "system", "content": SYSTEM_PROMPT + _date_context(_today()) + _format_context(page_format)}]
 
     for example in few_shot_examples or []:
         query_text = str(example.get("query_text") or "").strip()
@@ -634,7 +608,7 @@ VALID_GROUP_BY = {
     "innings", "phase", "bat_hand", "bowl_style", "bowl_kind",
     "crease_combo", "line", "length", "shot", "control",
     "wagon_zone", "dismissal", "match_outcome", "chase_outcome", "toss_decision",
-    "toss_match_outcome"
+    "toss_match_outcome", "format",
 }
 
 
@@ -694,6 +668,42 @@ def _months_before(day: date, months: int) -> date:
         except ValueError:
             continue
     return date(year, month + 1, 28)
+
+
+# Overs are validated before the format is known, so against the loosest cap; _post_process_result
+# then holds them to the format's own.
+_ANY_FORMAT_OVER_MAX = max(effective_over_max(spec) for spec in all_formats())
+_PAGE_FORMATS = {"T20", "ODI", "TEST"}
+
+_FORMAT_PATTERNS = {
+    "ODI": re.compile(r"\bodis?\b|\bone[-\s]?day(?:er|ers| internationals?)?\b|\b50[-\s]over"),
+    "TEST": re.compile(r"\btests\b|\btest\s+(?:cricket|matche?s?|career|innings|runs|wickets|average|batting|bowling|"
+                       r"centur(?:y|ies)|debut|series)\b|\bin\s+(?:the\s+)?test\b|\bred[-\s]ball\b"),
+    "T20": re.compile(r"\bt20s?\b|\bt20is?\b|\bt-20\b|\b20[-\s]over|\bipl\b|\bbbl\b|\bpsl\b|\bcpl\b|\bsa20\b|"
+                      r"\bilt20\b|\bbpl\b|\blpl\b|\bt20 blast\b|\bthe hundred\b|\bwpl\b|\bmlc\b"),
+}
+_PHASE_PATTERNS = {
+    "powerplay": re.compile(r"\bpower\s?-?plays?\b|\bpp\b|\bfirst\s+(?:6|six|10|ten)\s+overs\b"),
+    "middle": re.compile(r"\bmiddle(?:\s+|-)overs?\b|\bmiddle\s+phase\b"),
+    "death": re.compile(r"\bdeath\b|\bslog\s+overs\b|\bfinal\s+(?:4|5|four|five|10|ten)\s+overs\b"),
+}
+_EXPLICIT_OVERS = re.compile(r"\bovers?\s+\d|\b\d+\s*(?:-|to)\s*\d+\s+overs?\b|\b\d+(?:st|nd|rd|th)\s+over\b")
+
+
+def _question_format(q_lower: str, filters: Dict[str, Any]) -> Optional[str]:
+    """The one format the question pins ("ODI", "IPL", "in Tests"), or None for none or several."""
+    found = {fmt for fmt, pattern in _FORMAT_PATTERNS.items() if pattern.search(q_lower)}
+    if not found and filters.get("leagues"):
+        found = {"T20"}  # every league in VALID_LEAGUES is a T20 competition
+    return found.pop() if len(found) == 1 else None
+
+
+def _format_context(page_format: Optional[str]) -> str:
+    if page_format in _PAGE_FORMATS:
+        return (f"\n\n## Format\nThe page is set to {page_format}. A question that names no format is about "
+                f"{page_format} cricket; use its phase overs.")
+    return ("\n\n## Format\nThe page covers all formats. A question that names no format spans them; "
+            "phases default to T20 overs.")
 
 
 def _date_context(today: date) -> str:
@@ -1228,9 +1238,9 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
 
     # Integer range filters
     if "over_min" in filters and filters["over_min"] is not None:
-        validated["over_min"] = max(0, min(19, int(filters["over_min"])))
+        validated["over_min"] = max(0, min(_ANY_FORMAT_OVER_MAX, int(filters["over_min"])))
     if "over_max" in filters and filters["over_max"] is not None:
-        validated["over_max"] = max(0, min(19, int(filters["over_max"])))
+        validated["over_max"] = max(0, min(_ANY_FORMAT_OVER_MAX, int(filters["over_max"])))
 
     if "innings" in filters:
         val = filters["innings"]
@@ -1364,7 +1374,7 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
     }
 
 
-def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
+def _post_process_result(query: str, result: Dict[str, Any], page_format: Optional[str] = None) -> Dict[str, Any]:
     filters = result.get("filters", {}) or {}
     group_by = result.get("group_by", []) or []
     q_lower = (query or "").lower()
@@ -1431,6 +1441,29 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
         else:
             filters.pop("leagues", None)
 
+    # Format: the question's own wins over the page's. Phases and the over cap follow it, from format_config
+    # (an ODI powerplay is overs 0-9, not T20's 0-5). result["format"] tells the page to switch format.
+    question_format = _question_format(q_lower, filters)
+    result["format"] = question_format
+    run_format = question_format or (page_format if page_format in _PAGE_FORMATS else None)
+    spec = get_format(run_format) if run_format else get_format("T20")
+    phases_named = [key for key, pattern in _PHASE_PATTERNS.items() if pattern.search(q_lower)]
+    if len(phases_named) == 1 and not _EXPLICIT_OVERS.search(q_lower) and "phase" not in group_by:
+        phase = next((p for p in spec.phases if p.key == phases_named[0]), None)
+        if phase is not None:  # Tests have no powerplay
+            filters["over_min"] = phase.start_over
+            if phase.end_over is None:
+                filters.pop("over_max", None)
+            else:
+                filters["over_max"] = phase.end_over
+    if run_format:
+        cap = effective_over_max(spec)
+        for key in ("over_min", "over_max"):
+            if filters.get(key) is not None:
+                filters[key] = min(int(filters[key]), cap)
+        if "format" in group_by:  # one format pinned: grouping by it is a single row
+            group_by = [g for g in group_by if g != "format"]
+
     # Relative windows ("last 3 years", "this year") from today's date, not the model's.
     if not _contains_explicit_end_bound(query):
         window = _relative_date_window(q_lower, _today())
@@ -1482,6 +1515,8 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
     interpretation["summary"] = summary
     if not isinstance(interpretation.get("parsed_entities"), list) or not interpretation.get("parsed_entities"):
         interpretation["parsed_entities"] = _derive_entities_from_filters(filters, query)
+    if result.get("format"):
+        interpretation["parsed_entities"].append({"type": "filter", "value": f"format: {result['format']}"})
     interpretation["suggestions"] = _sanitize_suggestions(
         interpretation.get("suggestions") or result.get("suggestions")
     )
@@ -1798,7 +1833,7 @@ def update_nl_query_feedback(
         return None
 
 
-def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
+def parse_nl_query(query: str, db: Optional[Session] = None, fmt: Optional[str] = None) -> Dict[str, Any]:
     """Parse a natural language query into structured filters.
 
     Returns validated filters, group_by, explanation, confidence, suggestions,
@@ -1822,8 +1857,9 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
             },
         }
 
-    # Check cache
-    cached = _get_cached(query)
+    page_format = fmt.upper() if isinstance(fmt, str) and fmt.upper() in _PAGE_FORMATS else None
+    cache_query = f"{page_format or 'ALL'}|{query}"
+    cached = _get_cached(cache_query)
     if cached:
         return cached
 
@@ -1834,12 +1870,13 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
 
         try:
             raw = call_openai(query, few_shot_examples=few_shot_examples, model=MODEL_PRIMARY,
-                              reasoning_effort=REASONING_EFFORT, service_tier=select_service_tier(db))
+                              reasoning_effort=REASONING_EFFORT, service_tier=select_service_tier(db),
+                              page_format=page_format, timeout_seconds=PRIMARY_TIMEOUT_SECONDS)
         except OpenAIError as exc:
             # An outage, timeout or rate limit on the primary: the fallback model, standard tier.
             logger.warning("NL parse on %s failed (%r); retrying on %s", MODEL_PRIMARY, exc, MODEL_FALLBACK)
             raw = call_openai(query, few_shot_examples=few_shot_examples, model=MODEL_FALLBACK,
-                              reasoning_effort=REASONING_EFFORT)
+                              reasoning_effort=REASONING_EFFORT, page_format=page_format)
 
         # Extract and preserve _meta from OpenAI response before validation strips it
         api_meta = raw.pop("_meta", None) or {}
@@ -1856,10 +1893,10 @@ def parse_nl_query(query: str, db: Optional[Session] = None) -> Dict[str, Any]:
                 if key in filters and isinstance(filters[key], list):
                     filters[key] = resolve_player_names(filters[key], db)
 
-        result = _post_process_result(query, result)
+        result = _post_process_result(query, result, page_format=page_format)
         result["success"] = True
 
-        _set_cache(query, result)
+        _set_cache(cache_query, result)
         return result
 
     except json.JSONDecodeError as e:

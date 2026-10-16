@@ -7,7 +7,7 @@ as a silent slideshow (services/ig_slides.make_reel, v1).
 
 1. beats: the 2-3 strongest cards: the payoff (a win-probability line, a record race, a bowling plan, a highlighted
    bar chart ...), the deeper cut, one more. Previews and play-alongs get no v2 Reel.
-2. script: GPT-4o-mini writes a hook and one line per beat from the cards' titles and help lines; the guard rejects it if
+2. script: the strong model (SCRIPT_MODEL) writes a hook and one line per beat from the cards' titles and help lines; the guard rejects it if
    any number isn't on the cards, or it's too long (one retry, then a template from the titles). Stored with its source.
 3. voice: OpenAI TTS, one clip per line, so each beat lasts exactly as long as its line.
 4. frames: scripts/record_ig_beats.mjs records each beat's chart revealed left to right (/ig/<id>/<n>?animate=1).
@@ -30,6 +30,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from services import llm
+
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,7 +40,9 @@ FONT_BODY = ROOT / "api/_lib/fonts/Barlow-SemiBold.ttf"
 SITE = os.getenv("REEL_BASE", "https://hindsightcricket.com")
 VOICE = os.getenv("REEL_VOICE", "verse")
 TTS_MODEL = "gpt-4o-mini-tts"
-SCRIPT_MODEL = os.getenv("REEL_SCRIPT_MODEL", "gpt-4o")   # follows the fairness rules far better than 4o-mini
+# The strong model: gpt-4o was picked because it followed the fairness rules far better than 4o-mini; Sol is
+# its successor (services/llm.py).
+SCRIPT_MODEL = os.getenv("REEL_SCRIPT_MODEL", llm.MODEL_STRONG)
 #: How the voice speaks (gpt-4o-mini-tts instructions): REEL_TONE overrides it, like REEL_VOICE, without a deploy.
 TONE = os.getenv("REEL_TONE") or ("Brisk, confident cricket analyst on a highlights show: a quick, lively pace. "
                                   "Conversational, energetic but not shouty; land each number clearly; slight lift on the hook.")
@@ -266,9 +270,9 @@ def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = 
         msg += (f"\nYour last attempt was rejected ({feedback}). Fix that"
                 + (f": land within {L['say']} words." if "words" in feedback else f", and keep it {L['say']} words long.")
                 + " Keep everything else that worked.")
-    resp = _client().chat.completions.create(model=SCRIPT_MODEL, temperature=0.6,
-                                             response_format={"type": "json_object"},
-                                             messages=[{"role": "user", "content": msg}])
+    resp = _client().chat.completions.create(model=SCRIPT_MODEL, response_format={"type": "json_object"},
+                                             messages=[{"role": "user", "content": msg}],
+                                             **llm.chat_kwargs(SCRIPT_MODEL, 1500, temperature=0.6))
     return json.loads(resp.choices[0].message.content or "{}")
 
 
@@ -335,7 +339,7 @@ def check(sc: Dict[str, Any], hook: str, bs: List[Tuple[int, Dict[str, Any]]], n
     material = "\n".join([f"Post hook: {hook}"] + [f"Chart {i + 1}: " + chart_text(c) for i, (_, c) in enumerate(bs)]
                          + ([notes] if notes else []))
     resp = _client().chat.completions.create(
-        model=SCRIPT_MODEL, temperature=0, response_format={"type": "json_object"},
+        model=SCRIPT_MODEL, response_format={"type": "json_object"}, **llm.chat_kwargs(SCRIPT_MODEL, 1000, temperature=0),
         messages=[{"role": "user", "content": CHECK % {"material": material,
                                                         "script": "\n".join([f"Hook: {sc['hook']}"] + [
                                                             f"Line {i + 1}: {l}" for i, l in enumerate(sc["lines"])])}}])
