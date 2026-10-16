@@ -69,30 +69,41 @@ def plan(idea: str, fmt_choice: Optional[str], db: Session, client: str = "admin
     """Parse the idea: {spec, scope} for count-within / race ideas, else query-builder params.
 
     Every idea is logged to nl_query_log under `client` (public graphics as "[graphic] ..."), which
-    is also what the public daily limit counts (routers/snapshots.ideas_today).
+    is also what the public daily limit counts (routers/snapshots.ideas_today). A refusal here is
+    recorded on that row (run_status "refused", with the reason); the plan carries the row's
+    log_ref so the caller can record how the attempt went.
     """
-    from services.nl2query import log_nl_query_event_background
+    from services.nl2query import log_nl_query_event_background, new_log_ref, record_nl_run
 
     tag = "[idea]" if client == "admin" else "[graphic]"
+    log_ref = new_log_ref()
+
+    def refuse(reason: str, parse_result: Optional[Dict[str, Any]] = None) -> SnapshotError:
+        if parse_result is None:
+            log_nl_query_event_background(query_text=f"{tag} {idea}", parse_result={"success": False},
+                                          ip_address=client, execution_time_ms=None, log_ref=log_ref)
+        record_nl_run(log_ref, "refused", error=reason)
+        return SnapshotError(reason)
+
     spec = idea_stats.parse_race(idea) or idea_stats.parse_debut(idea) or idea_stats.parse_count_within(idea)
     if spec:
         log_nl_query_event_background(query_text=f"{tag} {idea}", parse_result={"success": True}, ip_address=client,
-                                      execution_time_ms=None)
-        return {"spec": spec, "scope": idea_stats.parse_scope(idea, db, fmt_choice)}
+                                      execution_time_ms=None, log_ref=log_ref)
+        return {"spec": spec, "scope": idea_stats.parse_scope(idea, db, fmt_choice), "log_ref": log_ref}
     if WITHIN.search(idea) and re.search(r"\b(\d{1,2}|" + "|".join(NUMBER_WORDS) + r")\b", idea, re.I):
-        raise SnapshotError("Counting players within one innings or match only works for centuries, fifties and "
-                            "wicket hauls so far; the query builder can't express this one yet.")
+        raise refuse("Counting players within one innings or match only works for centuries, fifties and "
+                     "wicket hauls so far; the query builder can't express this one yet.")
     from services.nl2query import parse_nl_query
 
     parsed = parse_nl_query(idea, db=db)
     log_nl_query_event_background(query_text=f"{tag} {idea}", parse_result=parsed, ip_address=client,
-                                  execution_time_ms=None)
+                                  execution_time_ms=None, log_ref=log_ref)
     if not parsed.get("success", True) or not parsed.get("group_by"):
-        raise SnapshotError(parsed.get("error") or "Could not turn the idea into a query (no grouping).")
+        raise refuse(parsed.get("error") or "Could not turn the idea into a query (no grouping).", parsed)
     if parsed.get("warnings"):
         # A condition the query can't apply (e.g. a control % threshold) would make the pack rank
         # the wrong group, as "50+ average, 100+ SR" once did; refuse and say which.
-        raise SnapshotError("Can't build this pack exactly: " + " ".join(parsed["warnings"]))
+        raise refuse("Can't build this pack exactly: " + " ".join(parsed["warnings"]), parsed)
     filters = {k: v for k, v in (parsed.get("filters") or {}).items() if k in QUERY_PARAMS and v not in (None, [], "")}
     group_by = [g for g in parsed["group_by"] if g != "format"]
     fmt = _format_for(idea, fmt_choice)
@@ -116,6 +127,7 @@ def plan(idea: str, fmt_choice: Optional[str], db: Session, client: str = "admin
     metric = _metric_for(idea, parsed)
     params = {**filters, "group_by": group_by, "fmt": fmt, "gender": "male", "query_mode": filters.get("query_mode") or "delivery"}
     return {"params": params, "metric": metric, "highlight": highlight, "explanation": parsed.get("explanation"),
+            "log_ref": log_ref,
             # Kept for the chart chooser: a scatter is offered only when the question named two metrics.
             "chart": parsed.get("recommended_chart")}
 

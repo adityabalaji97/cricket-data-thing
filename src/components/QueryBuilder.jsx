@@ -207,6 +207,9 @@ const QueryBuilder = ({ isMobile }) => {
   // The exact query string of the last run: the Image & embed button snapshots this query.
   const [lastQueryString, setLastQueryString] = useState('');
   const nlInputRef = useRef(null);
+  // The parsed question's log row: sent with its runs (nl_ref) so the API records how they went.
+  // Kept out of the page URL, so a shared link's runs aren't counted against the question.
+  const nlLogRefRef = useRef(null);
 
   // Load filters from URL on mount
   useEffect(() => {
@@ -335,7 +338,9 @@ const QueryBuilder = ({ isMobile }) => {
         params.append('ball_aggregation', ballAggregation);
       }
 
-      const response = await axios.get(`${config.API_URL}/query/deliveries?${params.toString()}`);
+      const apiParams = new URLSearchParams(params);
+      if (nlLogRefRef.current) apiParams.append('nl_ref', nlLogRefRef.current);
+      const response = await axios.get(`${config.API_URL}/query/deliveries?${apiParams.toString()}`);
       setResults(response.data);
       setLastQueryString(params.toString());
       setQueryTab(1);
@@ -370,6 +375,7 @@ const QueryBuilder = ({ isMobile }) => {
     setNlInterpretation(null);
     setNlConfidence('medium');
     setNlSourceQuery('');
+    nlLogRefRef.current = null;
     setNlRawFilters({});
     setNlRecommendedColumns([]);
     setNlRecommendedChart(null);
@@ -389,7 +395,9 @@ const QueryBuilder = ({ isMobile }) => {
     recommendedChart,
     interpretation,
     warnings,
+    logRef,
   }) => {
+    nlLogRefRef.current = logRef || null;
     // Reset to defaults then apply NL filters
     const defaultFilters = getDefaultFilters();
 

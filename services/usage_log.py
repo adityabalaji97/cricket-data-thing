@@ -1,5 +1,6 @@
 """
-Best-effort usage logging (tables from migration 004): MCP tool calls and website events.
+Best-effort usage logging (tables from migration 004): MCP tool calls and website events, plus the
+outcome of natural-language query runs (nl_query_log, migration 023).
 
 Writes never run on the request path: callers enqueue a row and a single daemon thread
 batch-inserts it. If the database is slow or the tables are missing, rows are dropped (and
@@ -34,6 +35,19 @@ _INSERTS = {
     "jev": (
         "INSERT INTO jev_usage_log (source, questions, input_tokens, output_tokens, ms, ok) "
         "VALUES (%(source)s, %(questions)s, %(input_tokens)s, %(output_tokens)s, %(ms)s, %(ok)s)"
+    ),
+    # Not an insert: the outcome of a parsed natural-language question, onto its nl_query_log row
+    # (nl2query.record_nl_run). The first run's outcome is kept; re-runs only count.
+    "nl_run": (
+        "UPDATE nl_query_log SET run_count = run_count + 1, "
+        "run_status = COALESCE(run_status, %(status)s), "
+        "run_error = CASE WHEN run_status IS NULL THEN %(error)s ELSE run_error END, "
+        "run_ms = CASE WHEN run_status IS NULL THEN %(ms)s ELSE run_ms END, "
+        "run_at = CASE WHEN run_status IS NULL THEN now() ELSE run_at END, "
+        "execution_success = CASE WHEN run_status IS NULL THEN %(ok)s ELSE execution_success END, "
+        "result_row_count = CASE WHEN run_status IS NULL THEN COALESCE(%(rows)s, result_row_count) "
+        "ELSE result_row_count END "
+        "WHERE log_ref = %(log_ref)s"
     ),
     "event": (
         "INSERT INTO app_events (anon_id, session_id, event, path, props, referrer, country) "
