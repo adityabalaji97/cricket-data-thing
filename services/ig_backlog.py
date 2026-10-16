@@ -348,7 +348,10 @@ def trend_post(db: Session, entry: Dict[str, Any], key: str, headlines: List[Dic
     from services import ig_captions, ig_carousel
     from services.ig_posts import post as P
 
-    q, built = entry["question"], P.build(entry)
+    q = entry["question"]
+    if entry.get("split_post"):
+        return _split_trend_post(db, entry, key, headlines)
+    built = P.build(entry)
     if not built:
         return None
     carousel = ig_carousel.save(db, built["slides"], q.text, {"trend": q.key, "post": key}, "ig-trend")
@@ -361,6 +364,31 @@ def trend_post(db: Session, entry: Dict[str, Any], key: str, headlines: List[Dic
     return {"key": key, "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
             "players": [q.subject], "caption": ig_captions.build(q.text, built["verdict"], "debate", built["method"],
                                                                 [q.subject, *built["players"]], q.kicker)}
+
+
+def _split_trend_post(db: Session, entry: Dict[str, Any], key: str, headlines: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """A trending player's split question (services/ig_posts/splits.py) as a queueable post."""
+    from services import ig_captions, ig_carousel
+
+    q, sp = entry["question"], entry["split_post"]
+    slides = ([{"type": "hook", "text": sp["hook"], "kicker": f"{q.kicker} · in the news",
+                "sub": "Where they stand out, from every ball"}]
+              + [{"type": "card", "card": c, "teams": None} for c in sp["cards"]]
+              + [{"type": "end", "heading": "Run it yourself",
+                  "body": "Every split, every player: the query builder is free."}])
+    carousel = ig_carousel.save(db, slides, q.text, {"trend": q.key, "post": key}, "ig-trend")
+    from services.ig_links import query_path
+
+    by = {"phase": ["phase"], "kind": ["bowl_kind"], "phase-kind": ["phase", "bowl_kind"], "style": ["bowl_style"],
+          "length": ["length"], "hand": ["bat_hand"], "phase-hand": ["phase", "bat_hand"]}[sp["split"]["dim"]]
+    link = query_path({**q.params, "min_balls": 30}, [q.role, *by], q.fmt)
+    fact = {"kind": "debate", "link": link, "trending": True, "subject": q.subject, "title": q.text,
+            "verdict": sp["verdict"], "headlines": headlines, "leaders": sp["leaders"], "split": sp["split"],
+            "appeal": entry.get("appeal"), "appeal_by": entry.get("appeal_by"), "method": sp["method"],
+            "carousel_id": carousel["id"], "slides": len(slides), "render": True}
+    return {"key": key, "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
+            "players": sp["players"],
+            "caption": ig_captions.build(q.text, sp["verdict"], "debate", sp["method"], sp["players"], q.kicker)}
 
 
 def render_carousels(posts: List[Dict[str, Any]], base: Optional[str] = None) -> Dict[str, Any]:
@@ -658,19 +686,23 @@ def _rows(db: Session, where: str, params: Dict[str, Any]) -> List[Dict[str, Any
 def bench_unposted(db: Session, today: date, dry_run: bool = False) -> List[str]:
     """Evergreen posts whose day passed unposted (ready, or expired by their deadline) go to the bench: no day, no
     deadline, ready to fill an open day. Previews, recaps, spotlights and play-alongs belong to their day and stay
-    where they are. Of two posts with the same title (the radar asked the same question twice), the newest goes."""
+    where they are. A trending post is that day's news: it expires, unless it was pinned into the plan (then it was
+    chosen, and waits on the bench). Of two posts with the same title, on the bench or arriving, the newest stays."""
     from database import engine
 
     rows = [r for r in _rows(db, "status IN ('ready', 'expired') AND planned_for < :d", {"d": today})
             if r["kind"] in BENCHABLE]
-    on_bench = {r["title"] for r in _rows(db, "status = 'ready' AND planned_for IS NULL", {})}
+    news = [r for r in rows if r["kind"] == "trend" and not (r["facts"] or {}).get("pinned")]
+    rows = [r for r in rows if r not in news]
+    bench = _rows(db, "status = 'ready' AND planned_for IS NULL", {})
     newest: Dict[str, Dict[str, Any]] = {}
-    for r in rows:
-        if r["title"] not in on_bench and (r["title"] not in newest or r["id"] > newest[r["title"]]["id"]):
+    for r in bench + rows:  # the newest of each title, wherever it is
+        if r["title"] not in newest or r["id"] > newest[r["title"]]["id"]:
             newest[r["title"]] = r
-    moved = [r for r in newest.values()]
-    keep = {r["id"] for r in moved}
-    stale = [r["id"] for r in rows if r["id"] not in keep and r["status"] == "ready"]  # older copies, or already benched
+    keep = {r["id"] for r in newest.values()}
+    moved = [r for r in rows if r["id"] in keep]
+    stale = [r["id"] for r in bench + rows if r["id"] not in keep and r["status"] == "ready"]
+    stale += [r["id"] for r in news if r["status"] == "ready"]
     if (moved or stale) and not dry_run:
         with engine.begin() as conn:
             conn.execute(text("""
@@ -678,6 +710,19 @@ def bench_unposted(db: Session, today: date, dry_run: bool = False) -> List[str]
             """), {"ids": [r["id"] for r in moved]})
             conn.execute(text("UPDATE content_packs SET status = 'expired' WHERE id = ANY(:ids)"), {"ids": stale})
     return [r["angle_key"] for r in moved]
+
+
+def retire_bench_trends(db: Session, dry_run: bool = False) -> List[str]:
+    """One-off: trending posts already on the bench that were never pinned expire (the rule bench_unposted now keeps)."""
+    from database import engine
+
+    rows = [r for r in _rows(db, "status = 'ready' AND planned_for IS NULL", {})
+            if r["kind"] == "trend" and not (r["facts"] or {}).get("pinned")]
+    if rows and not dry_run:
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE content_packs SET status = 'expired' WHERE id = ANY(:ids)"),
+                         {"ids": [r["id"] for r in rows]})
+    return [r["angle_key"] for r in rows]
 
 
 def _people(fact: Dict[str, Any]) -> set:

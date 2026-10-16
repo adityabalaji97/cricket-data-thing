@@ -72,6 +72,20 @@ BATTER_SITUATIONS = [
     ("middle", "middle-overs batter", {"over_min": 6, "over_max": 14}, {"ipl23": 300, "t20i23": 200}, 2),
     ("chase", "chaser", {"is_chase": True}, {"ipl23": 400, "t20i23": 250, "odiwc": 400}, 4),
     ("all", "batter", {}, {"ipl23": 700, "t20i23": 400, "odiwc": 800}, 3),
+    # Sharper splits: a bowling style, a length, a phase against a kind of bowling (smaller fields, sharper debates).
+    ("spin_pp", "player of spin in the powerplay", {"bowl_kind": ["spin bowler"], "over_min": 0, "over_max": 5},
+     {"ipl23": 80, "t20i23": 50}, 3),
+    ("spin_mid", "player of spin in the middle overs", {"bowl_kind": ["spin bowler"], "over_min": 6, "over_max": 14},
+     {"ipl23": 200, "t20i23": 120}, 3),
+    ("pace_death", "player of pace at the death", {"bowl_kind": ["pace bowler"], "over_min": 15, "over_max": 19},
+     {"ipl23": 100, "t20i23": 60}, 4),
+    ("legspin", "player of leg-spin", {"bowl_style": ["LB", "LBG"]}, {"ipl23": 100, "t20i23": 70, "odiwc": 120}, 3),
+    ("leftspin", "player of left-arm spin", {"bowl_style": ["SLA", "LWS"]}, {"ipl23": 100, "t20i23": 70, "odiwc": 150}, 3),
+    ("leftpace", "player of left-arm pace", {"bowl_style": ["LF", "LFM", "LMF", "LM"]},
+     {"ipl23": 100, "t20i23": 70, "odiwc": 150}, 3),
+    ("goodlen", "player of good-length bowling", {"length": ["GOOD_LENGTH"]}, {"ipl23": 200, "t20i23": 120, "odiwc": 250}, 3),
+    ("shortball", "player of the short ball", {"length": ["SHORT", "SHORT_OF_A_GOOD_LENGTH"]},
+     {"ipl23": 120, "t20i23": 80, "odiwc": 150}, 3),
 ]
 BOWLER_SITUATIONS = [
     ("pp", "new-ball bowler", {"over_min": 0, "over_max": 5}, {"ipl23": 240, "t20i23": 150}, 4),
@@ -81,6 +95,14 @@ BOWLER_SITUATIONS = [
     ("middle", "middle-overs bowler", {"over_min": 6, "over_max": 14}, {"ipl23": 300, "t20i23": 200}, 2),
     ("spinner", "spinner", {"bowl_kind": ["spin bowler"]}, {"ipl23": 400, "t20i23": 300, "odiwc": 600}, 3),
     ("quick", "fast bowler", {"bowl_kind": ["pace bowler"]}, {"ipl23": 400, "t20i23": 300, "odiwc": 600}, 3),
+    # Sharper splits: the batter's hand, a kind of bowling in a phase it isn't usually trusted with.
+    ("lhb", "bowler to left-handers", {"bat_hand": "LHB"}, {"ipl23": 180, "t20i23": 120, "odiwc": 250}, 3),
+    ("death_lhb", "death bowler to left-handers", {"bat_hand": "LHB", "over_min": 15, "over_max": 19},
+     {"ipl23": 60, "t20i23": 40}, 3),
+    ("spin_pp", "powerplay spinner", {"bowl_kind": ["spin bowler"], "over_min": 0, "over_max": 5},
+     {"ipl23": 90, "t20i23": 60}, 3),
+    ("pace_mid", "middle-overs quick", {"bowl_kind": ["pace bowler"], "over_min": 6, "over_max": 14},
+     {"ipl23": 150, "t20i23": 100}, 2),
 ]
 PAIR_SCOPES = [
     ("odi_pair", "ODI partnerships since the 2023 World Cup (top 10)", "ODIs", "ODI",
