@@ -13,6 +13,7 @@ from services.nl2query import (
     get_example_queries,
     get_cache_size,
     log_nl_query_event_background,
+    new_log_ref,
     update_nl_query_feedback,
     get_monthly_usage,
     MODEL_PRIMARY,
@@ -114,6 +115,8 @@ class NLQueryResponse(BaseModel):
     # Conditions from the question the query cannot apply (e.g. an unsupported metric threshold).
     warnings: List[str] = Field(default_factory=list)
     error: Optional[str] = None
+    # Pass back as /query/deliveries?nl_ref= so the run's outcome lands on this question's log row.
+    log_ref: Optional[str] = None
 
 
 class NLQueryFeedbackRequest(BaseModel):
@@ -149,6 +152,7 @@ def parse_query(
     started_at = time.time()
     result = parse_nl_query(request.query, db=db)
     execution_time_ms = int((time.time() - started_at) * 1000)
+    log_ref = new_log_ref() if result.get("success") else None
 
     background_tasks.add_task(
         log_nl_query_event_background,
@@ -156,9 +160,10 @@ def parse_query(
         parse_result=result,
         ip_address=client_ip,
         execution_time_ms=execution_time_ms,
+        log_ref=log_ref,
     )
 
-    return NLQueryResponse(**result)
+    return NLQueryResponse(**result, log_ref=log_ref)
 
 
 @router.post("/feedback", response_model=NLQueryFeedbackResponse)

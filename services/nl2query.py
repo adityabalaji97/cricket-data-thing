@@ -10,6 +10,8 @@ import time
 import logging
 import re
 import hashlib
+import uuid
+from datetime import date
 from typing import Dict, Any, Optional, List
 from openai import OpenAI
 from sqlalchemy.orm import Session
@@ -284,8 +286,13 @@ EXAMPLE_QUERIES = [
 ]
 
 
+def _today() -> date:
+    return date.today()
+
+
 def _get_cache_key(query: str) -> str:
-    return query.strip().lower()
+    # Dated: "last 3 years" means a different window tomorrow.
+    return f"{_today().isoformat()}|{query.strip().lower()}"
 
 
 # A cache hit made no OpenAI call, so it is logged at zero cost. Before this, the hit
@@ -547,7 +554,7 @@ def call_openai(
         raise ValueError("OPENAI_API_KEY not configured")
 
     client = OpenAI(api_key=api_key)
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT + _date_context(_today())}]
 
     for example in few_shot_examples or []:
         query_text = str(example.get("query_text") or "").strip()
@@ -646,6 +653,71 @@ def _infer_venue_from_query(query: str) -> Optional[str]:
             best_match = canonical
             best_len = len(venue_text)
     return best_match
+
+
+def _years_before(day: date, years: int) -> date:
+    try:
+        return day.replace(year=day.year - years)
+    except ValueError:  # 29 Feb
+        return day.replace(year=day.year - years, day=28)
+
+
+def _months_before(day: date, months: int) -> date:
+    total = day.year * 12 + (day.month - 1) - months
+    year, month = divmod(total, 12)
+    for d in (day.day, 30, 29, 28):
+        try:
+            return date(year, month + 1, d)
+        except ValueError:
+            continue
+    return date(year, month + 1, 28)
+
+
+def _date_context(today: date) -> str:
+    """Today's date for the prompt: without it the model resolves "last 3 years" from its own
+    training-time sense of now (on 15 Oct 2026 it gave 2021-2023)."""
+    return (
+        "\n\n## Today\n"
+        f"Today's date is {today.isoformat()}; the data runs up to about today. Resolve relative dates against it:\n"
+        f'- "last/past N years" -> start_date {_years_before(today, 3).isoformat()} for N=3 (N years before today), no end_date\n'
+        f'- "last/past N months" -> start_date N months before today, no end_date\n'
+        f'- "the last year", "past year", "past 12 months" -> start_date {_years_before(today, 1).isoformat()}, no end_date\n'
+        f'- "last year" on its own (a calendar year) -> {today.year - 1}-01-01 to {today.year - 1}-12-31\n'
+        f'- "this year" -> start_date {today.year}-01-01, no end_date\n'
+        "Never end a relative window before today."
+    )
+
+
+_NUMBER_WORDS = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+                 "eight": 8, "nine": 9, "ten": 10}
+
+
+def _relative_date_window(q_lower: str, today: date) -> Optional[Dict[str, Optional[str]]]:
+    """{"start_date", "end_date"} for a relative window in the query, computed from today, or None.
+
+    Applied over whatever the model returned, so a relative window never depends on the model
+    knowing the date. "last 3 years"/"past 18 months" roll back from today; "the last year" and
+    "past year" are the last 12 months; a bare "last year" is the previous calendar year.
+    """
+    n = r"(\d{1,2}|" + "|".join(_NUMBER_WORDS) + r")"
+    m = re.search(r"\b(?:last|past|previous)\s+" + n + r"\s+(years?|seasons?|months?)\b", q_lower)
+    if m:
+        count = int(m.group(1)) if m.group(1).isdigit() else _NUMBER_WORDS[m.group(1)]
+        if count < 1:
+            return None
+        unit = m.group(2)
+        start = _months_before(today, count) if unit.startswith("month") else _years_before(today, count)
+        return {"start_date": start.isoformat(), "end_date": None}
+    if re.search(r"\b(?:the\s+(?:last|past)|past)\s+(?:year|12\s+months|twelve\s+months)\b", q_lower):
+        return {"start_date": _years_before(today, 1).isoformat(), "end_date": None}
+    if re.search(r"\blast\s+(?:year|season)\b", q_lower):
+        start = f"{today.year - 1}-01-01"
+        if re.search(r"\bsince\s+last\s+(?:year|season)\b", q_lower):
+            return {"start_date": start, "end_date": None}
+        return {"start_date": start, "end_date": f"{today.year - 1}-12-31"}
+    if re.search(r"\bthis\s+(?:year|season)\b", q_lower):
+        return {"start_date": f"{today.year}-01-01", "end_date": None}
+    return None
 
 
 def _contains_explicit_end_bound(query: str) -> bool:
@@ -1317,6 +1389,16 @@ def _post_process_result(query: str, result: Dict[str, Any]) -> Dict[str, Any]:
             filters["start_date"] = f"{since_year_match.group(1)}-01-01"
         filters.pop("end_date", None)
 
+    # Relative windows ("last 3 years", "this year") from today's date, not the model's.
+    if not _contains_explicit_end_bound(query):
+        window = _relative_date_window(q_lower, _today())
+        if window:
+            filters["start_date"] = window["start_date"]
+            if window["end_date"]:
+                filters["end_date"] = window["end_date"]
+            else:
+                filters.pop("end_date", None)
+
     # Chase/win team queries: add match-level grouping and ensure filters
     chase_match = re.search(r"\bchas(e|ing)\b", q_lower)
     win_loss_match = re.search(r"\b(wins?|won|loss(?:es)?|lost)\b", q_lower)
@@ -1421,8 +1503,13 @@ def persist_nl_query_log(
     execution_time_ms: Optional[int],
     model_used: str = DEFAULT_NL2QUERY_MODEL,
     db: Optional[Session] = None,
+    log_ref: Optional[str] = None,
 ) -> Optional[int]:
-    """Persist one NL query parse log row. Never raises to caller."""
+    """Persist one NL query parse log row. Never raises to caller.
+
+    With a log_ref a run is expected to follow (record_nl_run), so a successful parse leaves
+    execution_success NULL until that run says how it went.
+    """
     owns_session = db is None
     session = db
     if session is None:
@@ -1447,6 +1534,7 @@ def persist_nl_query_log(
     explanation = parse_result.get("explanation")
     explanation = str(explanation) if explanation is not None else None
     success = bool(parse_result.get("success"))
+    execution_success: Optional[bool] = None if (log_ref and success) else success
     row_count = parse_result.get("result_row_count")
     row_count = int(row_count) if isinstance(row_count, int) else None
 
@@ -1478,7 +1566,8 @@ def persist_nl_query_log(
                     execution_time_ms,
                     prompt_tokens,
                     completion_tokens,
-                    estimated_cost_usd
+                    estimated_cost_usd,
+                    log_ref
                 )
                 VALUES (
                     :query_text,
@@ -1494,7 +1583,8 @@ def persist_nl_query_log(
                     :execution_time_ms,
                     :prompt_tokens,
                     :completion_tokens,
-                    :estimated_cost_usd
+                    :estimated_cost_usd,
+                    :log_ref
                 )
                 RETURNING id
                 """
@@ -1507,13 +1597,14 @@ def persist_nl_query_log(
                 "explanation": explanation,
                 "confidence": confidence,
                 "model_used": actual_model,
-                "execution_success": success,
+                "execution_success": execution_success,
                 "result_row_count": row_count,
                 "ip_hash": _hash_ip(ip_address),
                 "execution_time_ms": int(execution_time_ms) if execution_time_ms is not None else None,
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": completion_tokens,
                 "estimated_cost_usd": estimated_cost,
+                "log_ref": log_ref,
             },
         )
         new_row = insert_result.fetchone()
@@ -1541,16 +1632,38 @@ def log_nl_query_event_background(
     parse_result: Dict[str, Any],
     ip_address: Optional[str],
     execution_time_ms: Optional[int],
-) -> None:
+    log_ref: Optional[str] = None,
+) -> Optional[int]:
     """Background task wrapper for non-blocking query logging."""
-    persist_nl_query_log(
+    return persist_nl_query_log(
         query_text=query_text,
         parse_result=parse_result,
         ip_address=ip_address,
         execution_time_ms=execution_time_ms,
         model_used=DEFAULT_NL2QUERY_MODEL,
         db=None,
+        log_ref=log_ref,
     )
+
+
+def new_log_ref() -> str:
+    return uuid.uuid4().hex
+
+
+RUN_STATUSES = {"ok", "empty", "error", "refused", "no_chart"}
+
+
+def record_nl_run(log_ref: Optional[str], status: str, rows: Optional[int] = None, ms: Optional[int] = None,
+                  error: Optional[str] = None) -> None:
+    """What happened when a parsed question was run: the query builder's /query/deliveries call or a
+    graphic attempt. Best effort and off the request path (services/usage_log); the first run's
+    outcome is kept, later runs only bump run_count."""
+    if not log_ref or status not in RUN_STATUSES:
+        return
+    from services.usage_log import enqueue
+
+    enqueue("nl_run", {"log_ref": str(log_ref)[:32], "status": status, "ok": status in ("ok", "empty"),
+                       "rows": rows, "ms": ms, "error": (error or None) and str(error)[:500]})
 
 
 def update_nl_query_feedback(

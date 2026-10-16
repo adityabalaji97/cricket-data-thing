@@ -5,6 +5,8 @@ Provides flexible querying of ball-by-ball cricket data with filtering,
 grouping, and aggregation capabilities.
 """
 
+import time
+
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional, Literal
@@ -203,6 +205,10 @@ def query_deliveries(
     gender: Literal["male", "female"] = Query(
         default="male", description="Men's or women's cricket"
     ),
+    nl_ref: Optional[str] = Query(
+        default=None, max_length=32, include_in_schema=False,
+        description="log_ref from /nl2query/parse: records this run's outcome on that question's log row",
+    ),
 
     db: Session = Depends(get_session)
 ):
@@ -223,6 +229,7 @@ def query_deliveries(
     - Spin bowling by line: `?bowl_kind=spin bowler&group_by=line,length`
     - Left-right combo analysis: `?group_by=crease_combo&min_balls=100`
     """
+    started = time.monotonic()
     try:
         # PREPROCESSING: Handle comma-separated list parameters
         # This fixes URLs like ?group_by=batter,shot which FastAPI parses as ['batter,shot']
@@ -333,13 +340,27 @@ def query_deliveries(
                 meta["note"] = ". ".join(n.rstrip(".") for n in (meta.get("note"), tracking_guard.hidden_note(hidden)) if n) + "."
                 meta["hidden_small_tracking_groups"] = hidden
         result["metadata"] = meta
+        rows = len(result.get("data") or [])
+        _record_run(nl_ref, "ok" if rows else "empty", started, rows=rows)
         return result
     except QueryValidationError as e:
+        _record_run(nl_ref, "error", started, error=f"422: {e}")
         raise HTTPException(status_code=422, detail=str(e))
-    except HTTPException:
+    except HTTPException as e:
+        _record_run(nl_ref, "error", started, error=f"{e.status_code}: {e.detail}")
         raise
     except Exception as e:
+        _record_run(nl_ref, "error", started, error=f"500: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _record_run(nl_ref: Optional[str], status: str, started: float, rows: Optional[int] = None,
+                error: Optional[str] = None) -> None:
+    """The outcome of a run that came from a natural-language question (nl2query.record_nl_run)."""
+    if nl_ref:
+        from services.nl2query import record_nl_run
+
+        record_nl_run(nl_ref, status, rows=rows, ms=int((time.monotonic() - started) * 1000), error=error)
 
 
 @router.get("/deliveries/columns")

@@ -182,13 +182,29 @@ def create_idea_graphic(body: IdeaGraphicRequest, request: Request, db: Session 
         raise HTTPException(status_code=429, detail=f"That's today's limit of {IDEA_DAILY_LIMIT} ideas; try again tomorrow, "
                                                     "or build it in the query builder.")
     fmt = body.format if body.format in ("T20", "ODI") else None
+    planned: Dict[str, Any] = {}
+    started = time.monotonic()
+
+    def record(status: str, error: Optional[str] = None) -> None:
+        # plan() records its own refusals; this is how the attempt on a planned idea went.
+        from services.nl2query import record_nl_run
+
+        record_nl_run(planned.get("log_ref"), status, ms=int((time.monotonic() - started) * 1000), error=error)
+
     try:
         planned = plan(idea, fmt, db, client=client)
         result = attempt(db, idea, planned, created_by="graphic")
     except SnapshotError as exc:
+        record("no_chart", str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        record("error", repr(exc))
+        raise
     if result.get("status") != "resolved":
-        raise HTTPException(status_code=400, detail=result.get("note") or "Nothing to chart for this idea yet.")
+        note = result.get("note") or "Nothing to chart for this idea yet."
+        record("no_chart", note)
+        raise HTTPException(status_code=400, detail=note)
+    record("ok")
     fact = result["fact"]
     snap = result["snapshot"]
     options = fact.get("chart_options") or [{"form": "bars", "snapshot_id": snap["id"], "title": fact.get("title"), "p": None}]

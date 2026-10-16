@@ -84,6 +84,7 @@ const NLQueryInput = React.forwardRef(({ onFiltersGenerated, disabled, examplesC
           recommendedChart: data.recommended_chart || null,
           interpretation: data.interpretation || null,
           warnings: data.warnings || [],
+          logRef: data.log_ref || null,
         });
         return data;
       } else {
