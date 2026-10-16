@@ -10,7 +10,9 @@ API: https://docs.typesafe.ai/api.md
 import logging
 import os
 import time
-from typing import Any, Dict, Optional
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Dict, Iterator, Optional
 
 import httpx
 
@@ -25,14 +27,33 @@ def api_key() -> Optional[str]:
     return os.getenv("TYPESAFE_API_KEY") or None
 
 
+#: Set for calls that must not spend on Jev (the public MCP connector): enabled() is False inside them.
+_SUPPRESSED: ContextVar[bool] = ContextVar("jev_suppressed", default=False)
+
+
 def enabled() -> bool:
-    return api_key() is not None
+    return api_key() is not None and not _SUPPRESSED.get()
+
+
+def suppressed() -> bool:
+    """True inside suppress(): callers must not cache a Jev-less result as if Jev had been tried."""
+    return _SUPPRESSED.get()
+
+
+@contextmanager
+def suppress() -> Iterator[None]:
+    """No Jev calls in this block (and this thread/task): results fall back to the deterministic path."""
+    token = _SUPPRESSED.set(True)
+    try:
+        yield
+    finally:
+        _SUPPRESSED.reset(token)
 
 
 def ask(state: Any, questions: Dict[str, Dict[str, Any]], timeout: float = 3.0) -> Optional[Dict[str, Any]]:
     """POST one fan-out request; returns the `answers` map, or None if Jev is off or failed."""
     key = api_key()
-    if not key or not questions:
+    if not key or not questions or _SUPPRESSED.get():
         return None
     payload = {"model": MODEL, "state": state, "questions": questions}
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}

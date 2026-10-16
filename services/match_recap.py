@@ -171,8 +171,8 @@ def build_recap(scorecard: Dict[str, Any], db: Session) -> Dict[str, Any]:
         "headline": chosen[0]["text"],
         "bullets": [f["text"] for f in chosen[1:]] + [f["text"] for f in fixed],
     }
-    if not jev and jev_client.enabled():
-        return recap  # Jev hiccup: serve the fallback but try Jev again next time
+    if not jev and (jev_client.enabled() or jev_client.suppressed()):
+        return recap  # Jev hiccup, or Jev off for this caller (the connector): serve the fallback, don't cache it
     if len(_CACHE) >= _CACHE_MAX:
         _CACHE.pop(next(iter(_CACHE)))
     _CACHE[match_id] = recap

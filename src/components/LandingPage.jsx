@@ -513,7 +513,7 @@ const limeButtonSx = {
 
 
 // The Hindsight MCP connector (mcp_server/): lets Claude / ChatGPT query the data directly.
-const CONNECTOR_URL = 'https://cricket-data-thing-672dfbacf476.herokuapp.com/mcp';
+const CONNECTOR_URL = 'https://hindsightcricket.com/mcp';
 const CONNECTOR_PROMPTS = [
   "Kohli's strike rate vs pace and spin by year in T20s",
   'Top 10 IPL 2026 strike rates, min 100 balls',
