@@ -80,6 +80,19 @@ SPECS: Dict[str, Dict[str, Any]] = {
                                "A wicket every 24 balls"],
                      "source": "ESPNcricinfo", "confirmed": True},
     },
+    "sky": {
+        "type": "case_t20", "player": "Suryakumar Yadav", "display": "SKY", "role": "batter", "team": "India",
+        "years": [2022, 2023, 2024, 2025, 2026], "with_from": date(2025, 1, 1), "last_game": date(2026, 3, 8),
+        "event": {"label": "2026 T20 World Cup", "start": date(2026, 2, 7), "end": date(2026, 3, 8)},
+        "hook": "Lots of fans want SKY back in India's T20I side. Is there a case?",
+        "kicker": "#BringBackSKY", "sub": "Impact and win probability, against the middle order India have used without him",
+        "tags": ["#SKY", "#BringBackSKY", "#TeamIndia", "#SuryakumarYadav"],
+        "method": ("Impact (runs added to the team's projected total) and win probability added are computed ball by ball "
+                   "(T20 Primer method) on every T20I and IPL game."),
+        "names": {"Tilak Varma": "Tilak", "Ishan Kishan": "Kishan", "Shreyas Iyer": "Iyer"},
+        "teams": {"United States of America": "USA"},
+        "key": "spotlight-suryakumar-yadav-case-2026-10",
+    },
 }
 
 
@@ -352,6 +365,10 @@ def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         from services.ig_posts import case_odi
 
         return case_odi.build(db, spec)
+    if spec.get("type") == "case_t20":  # a T20I batter's case, in Impact and WPA (services/ig_posts/case_t20.py)
+        from services.ig_posts import case_t20
+
+        return case_t20.build(db, spec)
     p = spec["player"]
     bowlers = [p] + peers(db, spec)
     data = phase_years(db, bowlers, min(spec["arc_from"], spec["years"][0]))
