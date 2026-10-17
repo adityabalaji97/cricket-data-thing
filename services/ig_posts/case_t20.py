@@ -72,42 +72,67 @@ def _flat(payload, table, cols_by_measure: List[List[str]]):
                 r["pct"][c] = flat[f"{r['name']}|{c}"]
 
 
+REGULAR_BALLS = 200   # balls at 3 to 7 since the last game to count as one of the regulars there
+
+
+def win_rate(db, spec, **dates) -> Optional[Dict[str, int]]:
+    rows = _q(db, query_mode="team_innings", batting_teams=[spec["team"]], **T20I, group_by=["match_outcome"], **dates)
+    won = sum(r.get("wins") or 0 for r in rows)
+    lost = sum(r.get("losses") or 0 for r in rows)
+    return {"won": won, "lost": lost, "pct": round(100 * won / (won + lost))} if won + lost else None
+
+
 def hole_card(db, spec) -> Optional[Dict[str, Any]]:
-    """India's no. 3 to 7 in T20Is: from `with_from` to his last game, and since."""
-    last = spec["last_game"]
-    team = {"batting_teams": [spec["team"]], **T20I, "group_by": ["batting_position"]}
+    """India's no. 3 to 7 in T20Is, from `with_from` to his last game and since, split three ways: him, the regulars there
+    since (REGULAR_BALLS), everyone else. Shows whose numbers moved, not just that the total did."""
+    p, nm, last = spec["player"], spec["display"], spec["last_game"]
+    team = {"batting_teams": [spec["team"]], **T20I, "group_by": ["batter", "batting_position"]}
     before = [r for r in _q(db, **team, start_date=spec["with_from"], end_date=last) if r.get("batting_position") in POSITIONS]
     since = [r for r in _q(db, **team, start_date=last + timedelta(days=1)) if r.get("batting_position") in POSITIONS]
     if sum(r.get("balls") or 0 for r in since) < 300:
         return None
-    by = lambda rows, p: [r for r in rows if r["batting_position"] == p]  # noqa: E731
-    # Games in each period: every innings has a no. 3 (so does almost every game's); the openers' count is exact.
-    games = lambda p: max((r.get("innings_count") or 0) for r in _q(db, batting_teams=[spec["team"]], **T20I,  # noqa: E731
-                                                                    group_by=["batting_position"], **p) if r.get("batting_position") == 1)
-    gw, gs = games({"start_date": spec["with_from"], "end_date": last}), games({"start_date": last + timedelta(days=1)})
-    cols = ["Impact · with", "Impact · since", f"WPA · with ({gw} games)", f"WPA · since ({gs} games)"]
+    balls: Dict[str, int] = {}
+    for r in since:
+        balls[r["batter"]] = balls.get(r["batter"], 0) + (r.get("balls") or 0)
+    regulars = sorted((b for b, n in balls.items() if n >= REGULAR_BALLS), key=lambda b: -balls[b])
+    if not regulars:
+        return None
+    games = lambda **d: max((r.get("innings_count") or 0) for r in _q(db, batting_teams=[spec["team"]], **T20I,  # noqa: E731
+                                                                      group_by=["batting_position"], **d) if r.get("batting_position") == 1)
+    gw, gs = games(start_date=spec["with_from"], end_date=last), games(start_date=last + timedelta(days=1))
+    cols = ["Impact · before", "Impact · since", f"WPA · before ({gw} games)", f"WPA · since ({gs} games)"]
+    groups = {nm: lambda b: b == p,
+              _names([_name(spec, b) for b in regulars]): lambda b: b in regulars,
+              "Everyone else": lambda b: b != p and b not in regulars,
+              "All 3 to 7": lambda b: True}
     table = {}
-    for p in POSITIONS:
-        table[f"No. {p}"] = {cols[0]: _per100(by(before, p), MIN_YEAR_BALLS), cols[1]: _per100(by(since, p), MIN_YEAR_BALLS),
-                             cols[2]: _wpa(by(before, p)), cols[3]: _wpa(by(since, p))}
-    table["3 to 7"] = {cols[0]: _per100(before), cols[1]: _per100(since), cols[2]: _wpa(before), cols[3]: _wpa(since)}
+    for label, keep in groups.items():
+        b_rows = [r for r in before if keep(r["batter"])]
+        s_rows = [r for r in since if keep(r["batter"])]
+        table[label] = {cols[0]: _per100(b_rows, MIN_YEAR_BALLS), cols[1]: _per100(s_rows, MIN_YEAR_BALLS),
+                        cols[2]: _wpa(b_rows) if b_rows else None, cols[3]: _wpa(s_rows) if s_rows else None}
     order = list(table)
-    payload = heat(table, cols, "3 to 7", order)
+    payload = heat(table, cols, nm, order)
     for r in payload["rows"]:
-        r["short"] = r["name"]
+        r["short"] = r["name"] if r["name"] != order[1] else "The regulars"
     for m in payload["metrics"]:
         m["format"] = "signed1" if m["key"].startswith("Impact") else "signed2"
     _flat(payload, table, [cols[:2], cols[2:]])
-    a, b = table["3 to 7"][cols[0]], table["3 to 7"][cols[1]]
-    worst = min(POSITIONS, key=lambda p: (table[f"No. {p}"][cols[1]] or 0) - (table[f"No. {p}"][cols[0]] or 0))
-    word = "down from" if b < a else "up from"
-    title = f"Since {spec['display']}'s last T20I, India's no. 3 to 7 add {fmt(b, 'signed1')} Impact per 100 balls, {word} {fmt(a, 'signed1')}"
-    help_ = (f"Win probability added: {fmt(table['3 to 7'][cols[2]], 'signed2')} with him in the side, "
-             f"{fmt(table['3 to 7'][cols[3]], 'signed2')} since. The biggest drop is at no. {worst}")
-    payload["method"] = (f"With: T20Is {spec['with_from']:%b %Y} to {last:%-d %b %Y}, his own balls included. Since: every "
-                         "T20I after. Impact per 100 balls; WPA in wins (+1.00 = one win). Brighter is better.")
+    me, reg, rest = table[nm][cols[0]], table[order[1]][cols[1]], table["Everyone else"][cols[1]]
+    if me is not None and reg is not None and rest is not None and reg > me and rest < reg:
+        title = (f"India's regulars at 3 to 7 add {fmt(reg, 'signed1')} Impact per 100 balls, more than {nm} did "
+                 f"({fmt(me, 'signed1')}). The drop is elsewhere")
+    else:
+        title = (f"Since {nm}'s last T20I, India's no. 3 to 7 add {fmt(table['All 3 to 7'][cols[1]], 'signed1')} Impact per "
+                 f"100 balls, {fmt(table['All 3 to 7'][cols[0]], 'signed1')} before")
+    wb, ws = win_rate(db, spec, start_date=spec["with_from"], end_date=last), win_rate(db, spec, start_date=last + timedelta(days=1))
+    rest_balls = sum(r["balls"] for r in since if groups["Everyone else"](r["batter"]))
+    help_ = (f"India won {wb['pct']}% of T20Is before his last game, {ws['pct']}% since. " if wb and ws else "") + \
+        (f"Everyone else at 3 to 7: {fmt(rest, 'signed1')} per 100 over {rest_balls} balls" if rest is not None else "")
+    payload["method"] = (f"Before: T20Is {spec['with_from']:%b %Y} to {last:%-d %b %Y}. Regulars: {REGULAR_BALLS}+ balls "
+                         f"at 3 to 7 since ({_names(regulars)}). Impact per 100 balls; WPA in wins (+1.00 = one win).")
     return card("hole", "scorecard", title, payload,
-                f"India's batters at 3 to 7 in T20Is · {sum(r['balls'] for r in since):,} balls since", help_)
+                f"India's batters at 3 to 7 in T20Is · {sum(r['balls'] for r in since):,} balls since {nm}'s last game", help_)
 
 
 def pace_spin_card(db, spec) -> Optional[Dict[str, Any]]:
@@ -254,10 +279,10 @@ def both_ways(db, spec, cards: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     """The case for and against, one line each from the cards' own numbers."""
     p, nm = spec["player"], spec["display"]
     lines = ["For"]
-    if "hole" in cards:
-        lines.append("· " + cards["hole"]["title"].replace(f"Since {nm}'s last T20I, ", "Since he left, "))
     if "arc" in cards:
         lines.append("· " + cards["arc"]["title"].split(". ")[0])
+    if "pace-spin" in cards:
+        lines.append("· " + cards["pace-spin"]["title"].split(". ")[0])
     lines.append("Against")
     yr = spec["years"][-1]
     ipl = [r for r in _q(db, batters=[p], **IPL, group_by=["year", "bowl_kind"], start_date=date(yr, 1, 1))
