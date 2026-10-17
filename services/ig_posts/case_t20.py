@@ -130,14 +130,15 @@ def pace_spin_card(db, spec) -> Optional[Dict[str, Any]]:
     spin = [v for v in table["T20Is v spin"].values() if v is not None]
     pace = [v for k in ("T20Is v pace", "IPL v pace") for v in table[k].values() if v is not None]
     if spin and min(spin) > 0 and pace:
-        title = (f"{nm} has added Impact against spin in T20Is every year since {years[0]}. "
-                 f"Against pace he swings from {fmt(max(pace), 'signed0')} to {fmt(min(pace), 'signed0')} per 100 balls")
+        title = (f"{nm} adds Impact against spin every year. Against pace he swings from "
+                 f"{fmt(max(pace), 'signed0')} to {fmt(min(pace), 'signed0')}")
     else:
         title = f"{nm}'s Impact per 100 balls against pace and spin, year by year"
     worst = min(((k, y) for k in ("T20Is v pace", "IPL v pace") for y in years if table[k][y] is not None), key=lambda ky: table[ky[0]][ky[1]])
     wr = [r for r in (t if worst[0].startswith("T20I") else i) if str(r["year"]) == worst[1] and r.get("bowl_kind") == "pace bowler"]
     outs, balls = sum(r.get("wickets") or 0 for r in wr), sum(r.get("balls") or 0 for r in wr)
-    help_ = f"The low: {worst[0].split(' v ')[0]} {worst[1]}, out {outs} times in {balls} balls of pace" if outs else ""
+    help_ = (f"Impact per 100 balls, T20Is since {years[0]}. The low: {worst[0].split(' v ')[0]} {worst[1]}, out {outs} "
+             f"times in {balls} balls of pace") if outs else ""
     payload["method"] = f"Impact per 100 balls, wickets included; – under {MIN_YEAR_BALLS} balls. Brighter is better."
     out = card("pace-spin", "scorecard", title, payload, f"{p} · T20Is for {spec['team']} and the IPL, by calendar year", help_)
     out["kicker"] = "The deeper cut"
