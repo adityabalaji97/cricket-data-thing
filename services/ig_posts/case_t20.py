@@ -227,6 +227,8 @@ def rise_card(db, spec) -> Optional[Dict[str, Any]]:
         r["short"] = _name(spec, r["name"])
     for m in payload["metrics"]:
         m["format"] = "signed2"
+    for r in payload["rows"]:  # a ring means best of the two: none where only one of them played
+        r["leader"] = [c for c in r["leader"] if all(table[b][c] is not None for b in table)]
     nm, rn = spec["display"], _name(spec, r_name)
     me_slump = table[p].get(f"T20Is {slump}")
     ipls = [c for c in cols if c.startswith("IPL") and table[r_name].get(c) is not None]
