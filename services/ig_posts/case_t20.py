@@ -154,26 +154,32 @@ def pace_spin_card(db, spec) -> Optional[Dict[str, Any]]:
     nm = spec["display"]
     spin = [v for v in table["T20Is v spin"].values() if v is not None]
     pace = [v for v in table["T20Is v pace"].values() if v is not None]
-    if spin and min(spin) > 0 and pace:
-        title = (f"In T20Is, {nm} adds Impact against spin every year. Against pace he swings from "
-                 f"{fmt(max(pace), 'signed0')} to {fmt(min(pace), 'signed0')}")
+    spin_ok = bool(spin) and min(spin) > 0
+    ty = [y for y in years if table["T20Is v pace"][y] is not None]
+    low = min(ty, key=lambda y: table["T20Is v pace"][y]) if ty else None
+    wr = [r for r in t if str(r["year"]) == low and r.get("bowl_kind") == "pace bowler"]
+    outs, balls = sum(r.get("wickets") or 0 for r in wr), sum(r.get("balls") or 0 for r in wr)
+    if low and table["T20Is v pace"][low] < 0 and outs:
+        title = (f"The {low} slump was against pace: {fmt(table['T20Is v pace'][low], 'signed0')} Impact per 100 balls, "
+                 f"out {outs} times in {balls}" + (". Spin stayed positive" if spin_ok else ""))
     else:
         title = f"{nm}'s Impact per 100 balls against pace and spin, year by year"
-    worst = min(((k, y) for k in ("T20Is v pace", "IPL v pace") for y in years if table[k][y] is not None), key=lambda ky: table[ky[0]][ky[1]])
-    wr = [r for r in (t if worst[0].startswith("T20I") else i) if str(r["year"]) == worst[1] and r.get("bowl_kind") == "pace bowler"]
-    outs, balls = sum(r.get("wickets") or 0 for r in wr), sum(r.get("balls") or 0 for r in wr)
-    help_ = (f"Impact per 100 balls. The low: {worst[0].split(' v ')[0]} {worst[1]}, out {outs} "
-             f"times in {balls} balls of pace") if outs else ""
+    help_ = "Impact per 100 balls" + (f". Against pace in T20Is he swings from {fmt(max(pace), 'signed0')} to "
+                                      f"{fmt(min(pace), 'signed0')}" if pace else "")
     payload["method"] = f"Impact per 100 balls, wickets included; – under {MIN_YEAR_BALLS} balls. Brighter is better."
     out = card("pace-spin", "scorecard", title, payload, f"{p} · T20Is for {spec['team']} and the IPL, by calendar year", help_)
     out["kicker"] = "The deeper cut"
+    if spin_ok:
+        out["line"] = f"In T20Is he adds Impact against spin every year"
     return out
 
 
 def arc_card(db, spec) -> Optional[Dict[str, Any]]:
-    p, years = spec["player"], [str(y) for y in spec["years"]]
-    t = {str(r["year"]): r for r in _q(db, batters=[p], **T20I, batting_teams=[spec["team"]], group_by=["year"], start_date=date(spec["years"][0], 1, 1))}
-    i = {str(r["year"]): r for r in _q(db, batters=[p], **IPL, group_by=["year"], start_date=date(spec["years"][0], 1, 1))}
+    """His T20I career so far, Impact an innings by year (the IPL alongside): the peak, the slump, where he left off."""
+    first = spec.get("career_from", spec["years"][0])
+    p, years = spec["player"], [str(y) for y in range(first, spec["years"][-1] + 1)]
+    t = {str(r["year"]): r for r in _q(db, batters=[p], **T20I, batting_teams=[spec["team"]], group_by=["year"], start_date=date(first, 1, 1))}
+    i = {str(r["year"]): r for r in _q(db, batters=[p], **IPL, group_by=["year"], start_date=date(first, 1, 1))}
     ipi = lambda r: (r["impact"] / r["innings_count"]) if r and r.get("innings_count") else None  # noqa: E731
     table = {"T20Is": {y: ipi(t.get(y)) for y in years}, "IPL": {y: ipi(i.get(y)) for y in years}}
     if sum(v is not None for v in table["T20Is"].values()) < 3:
@@ -183,22 +189,104 @@ def arc_card(db, spec) -> Optional[Dict[str, Any]]:
         r["short"] = r["name"]
     _flat(payload, table, [years])
     nm, last = spec["display"], years[-1]
-    bits = []
-    tl = table["T20Is"].get(last)
-    if tl is not None:
-        since = next((y for y in reversed(years[:-1]) if table["T20Is"][y] is not None and table["T20Is"][y] >= tl), None)
-        bits.append(f"{nm}'s {last} T20Is: {fmt(tl, 'signed1')} Impact an innings" + (f", his best since {since}" if since else ""))
-    il = table["IPL"].get(last)
-    if il is not None and all(il <= v for v in table["IPL"].values() if v is not None):
-        bits.append(f"IPL {last}: {fmt(il, 'signed1')}, his worst season")
-    if not bits:
-        return None
+    tr = {y: v for y, v in table["T20Is"].items() if v is not None}
+    peak, slump, tl = max(tr, key=tr.get), min(tr, key=tr.get), tr.get(last)
+    if slump > peak and tl is not None and slump != last and tr[slump] < 0 < tl:
+        title = (f"{nm}'s T20I career: a peak in {peak} ({fmt(tr[peak], 'signed1')} Impact an innings), a slump in {slump} "
+                 f"({fmt(tr[slump], 'signed1')}), back up in {last} ({fmt(tl, 'signed1')})")
+    else:
+        title = f"{nm}'s T20I career, Impact an innings by year: best {peak} ({fmt(tr[peak], 'signed1')})"
+    since = next((y for y in reversed(years[:-1]) if tl is not None and table["T20Is"][y] is not None and table["T20Is"][y] >= tl), None)
     wpa = lambda d, y: fmt(d[y]["wpa"], "signed2") if d.get(y) else "–"  # noqa: E731
     help_ = "WPA by year · T20Is " + ", ".join(f"{y} {wpa(t, y)}" for y in years[-3:]) + " · IPL " + \
         ", ".join(f"{y} {wpa(i, y)}" for y in years[-3:])
     payload["method"] = (f"Impact an innings, wickets included. {last} T20Is run to his last game "
                          f"({spec['last_game']:%-d %b}). Brighter is better.")
-    return card("arc", "scorecard", ". ".join(bits), payload, f"{p} · T20Is for {spec['team']} and the IPL", help_)
+    out = card("arc", "scorecard", title, payload, f"{p} · T20Is for {spec['team']} and the IPL", help_)
+    if tl is not None and tl > 0:
+        out["line"] = f"His {last} T20Is: {fmt(tl, 'signed1')} Impact an innings" + (f", his best since {since}" if since else "")
+    il = table["IPL"].get(last)
+    if il is not None and all(il <= v for v in table["IPL"].values() if v is not None):
+        out["against"] = f"IPL {last}: {fmt(il, 'signed1')} Impact an innings, his worst season"
+    return out
+
+
+def rise_card(db, spec) -> Optional[Dict[str, Any]]:
+    """The batter who took his place, over the same years: WPA in the T20Is and IPL seasons since his slump began."""
+    p, r_name, slump = spec["player"], spec["rival"], spec["slump_year"]
+    rows = _q(db, batters=[p, r_name], **T20I_IPL, group_by=["batter", "competition", "year"], start_date=date(slump, 1, 1))
+    cols = []
+    for y in range(slump, spec["years"][-1] + 1):
+        cols += [f"T20Is {y}", f"IPL {y}"]
+    get = lambda b, c: next((r for r in rows if r["batter"] == b and f"{'T20Is' if r['competition'] == 'T20I' else r['competition']} {r['year']}" == c), None)  # noqa: E731
+    table = {b: {c: (get(b, c) or {}).get("wpa") if get(b, c) else None for c in cols} for b in (p, r_name)}
+    cols = [c for c in cols if any(table[b][c] is not None for b in table)]
+    table = {b: {c: table[b][c] for c in cols} for b in table}
+    payload = heat(table, cols, p, [p, r_name])
+    for r in payload["rows"]:
+        r["short"] = _name(spec, r["name"])
+    for m in payload["metrics"]:
+        m["format"] = "signed2"
+    nm, rn = spec["display"], _name(spec, r_name)
+    me_slump = table[p].get(f"T20Is {slump}")
+    ipls = [c for c in cols if c.startswith("IPL") and table[r_name].get(c) is not None]
+    if me_slump is None or not ipls:
+        return None
+    title = (f"While {nm}'s T20Is slumped in {slump} ({fmt(me_slump, 'signed2')} WPA), {rn} added "
+             + " and ".join(f"{fmt(table[r_name][c], 'signed2')} in {c}" for c in ipls[:2]))
+    tdates = sorted(r["match_date"] for r in _q(db, batters=[r_name], **T20I, batting_teams=[spec["team"]], group_by=["match_date"]))
+    back = next((d for a, d in reversed(list(zip(tdates, tdates[1:])))  # his latest return after a year or more out
+                 if (date.fromisoformat(str(d)) - date.fromisoformat(str(a))).days > 365), None)
+    help_ = f"{rn} came back into India's T20I side on {date.fromisoformat(str(back)):%-d %B %Y}" if back else ""
+    payload["method"] = "Win probability added, total for the season (+1.00 = one win). – didn't play. Brighter is better."
+    return card("rise", "scorecard", title, payload, f"{p} and {r_name} · T20Is for {spec['team']} and the IPL", help_)
+
+
+def role_card(db, spec) -> Optional[Dict[str, Any]]:
+    """His slot (the position he batted most in `with_from`..last game) before, and the batters there since."""
+    p, nm, last = spec["player"], spec["display"], spec["last_game"]
+    team = {"batting_teams": [spec["team"]], **T20I, "group_by": ["batter", "batting_position"]}
+    before = [r for r in _q(db, **team, start_date=spec["with_from"], end_date=last) if r["batter"] == p]
+    if not before:
+        return None
+    slot = max(before, key=lambda r: r.get("innings_count") or 0)["batting_position"]
+    since = [r for r in _q(db, **team, start_date=last + timedelta(days=1)) if r.get("batting_position") == slot]
+    mine = [r for r in before if r["batting_position"] == slot]
+    cols = ["Impact /100", "WPA", "Strike rate", "Innings"]
+
+    def row(rs):
+        b = sum(r["balls"] for r in rs)
+        return {"Impact /100": _per100(rs), "WPA": _wpa(rs), "Strike rate": 100 * sum(r["runs"] for r in rs) / b if b else None,
+                "Innings": sum(r.get("innings_count") or 0 for r in rs)}
+    table = {f"{nm} (before)": row(mine)}
+    main = [r for r in since if (r.get("balls") or 0) >= PEER_MIN_BALLS]
+    for r in sorted(main, key=lambda r: -r["balls"]):
+        table[f"{_name(spec, r['batter'])} (since)"] = row([r])
+    table[f"All no. {slot}s since"] = row(since)
+    if len(table) < 2:
+        return None
+    order = list(table)
+    payload = heat(table, cols, order[0], order)
+    for r in payload["rows"]:
+        r["short"] = r["name"]
+        r["leader"] = []
+    fm = {"Impact /100": "signed1", "WPA": "signed2", "Strike rate": "int", "Innings": "int"}
+    for m in payload["metrics"]:
+        m["format"] = fm[m["key"]]
+    for r in payload["rows"]:
+        r["pct"]["Innings"] = None
+    me = table[order[0]]["Impact /100"]
+    if len(order) > 2:
+        them, who = table[order[1]]["Impact /100"], order[1].replace(" (since)", "")
+        verb = "matched" if abs(them - me) <= 2 else "beaten" if them > me else "fallen short of"
+        title = (f"At no. {slot}, {nm}'s main spot, {who} has {verb} him: {fmt(them, 'signed1')} Impact per 100 balls since, "
+                 f"{nm} {fmt(me, 'signed1')} there before")
+    else:
+        title = f"India's no. {slot}s since {nm}'s last game: {fmt(table[order[-1]]['Impact /100'], 'signed1')} Impact per 100 balls"
+    payload["method"] = (f"Before: his T20Is at no. {slot}, {spec['with_from']:%b %Y} to {last:%-d %b %Y}. Since: every India "
+                         f"no. {slot} after (named with {PEER_MIN_BALLS}+ balls).")
+    return card("role", "scorecard", title, payload, f"India's no. {slot} in T20Is · {sum(r['balls'] for r in since):,} balls since",
+                f"The role he'd come back to")
 
 
 def peers(db, spec) -> List[str]:
@@ -278,11 +366,7 @@ def event_card(db, spec) -> Optional[Dict[str, Any]]:
 def both_ways(db, spec, cards: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     """The case for and against, one line each from the cards' own numbers."""
     p, nm = spec["player"], spec["display"]
-    lines = ["For"]
-    if "arc" in cards:
-        lines.append("· " + cards["arc"]["title"].split(". ")[0])
-    if "pace-spin" in cards:
-        lines.append("· " + cards["pace-spin"]["title"].split(". ")[0])
+    lines = ["For"] + [f"· {c['line']}" for c in (cards.get("arc"), cards.get("pace-spin")) if c and c.get("line")]
     lines.append("Against")
     yr = spec["years"][-1]
     ipl = [r for r in _q(db, batters=[p], **IPL, group_by=["year", "bowl_kind"], start_date=date(yr, 1, 1))
@@ -294,18 +378,22 @@ def both_ways(db, spec, cards: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         e = cards["event"]
         lines.append(f"· {spec['event']['label']}: {e['payload']['subject_wpa']} win probability added, "
                      f"{e['payload']['top_wpa']} of it in one innings")
-    if "alternatives" in cards:
+    role = (cards.get("role") or {}).get("title", "")
+    if " has matched him" in role or " has beaten him" in role:
+        lines.append("· " + cards["role"]["title"].split(": ")[0].replace(f", {spec['display']}'s main spot", ""))
+    elif "alternatives" in cards:
         lines.append("· " + cards["alternatives"]["title"])
     return {"type": "text", "heading": "The case, both ways", "body": "\n".join(lines)}
 
 
 def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     field = peers(db, spec)
-    hole, deep = hole_card(db, spec), pace_spin_card(db, spec)
-    rest = [c for c in (arc_card(db, spec), peers_card(db, spec, field), event_card(db, spec)) if c]
-    if not hole or not deep or len(rest) < 2:
+    arc, deep = arc_card(db, spec), pace_spin_card(db, spec)
+    if not arc or not deep:
         return None
-    cards = [hole, deep, *rest]
+    # The story: his career, the slump (slide 3, the deeper cut), the rival's rise, his old role now, the rest of the case.
+    cards = [arc, deep] + [c for c in (rise_card(db, spec), role_card(db, spec), hole_card(db, spec),
+                                       peers_card(db, spec, field), event_card(db, spec)) if c]
     by_id = {c["id"]: c for c in cards}
     slides = ([{"type": "hook", "text": spec["hook"], "kicker": spec["kicker"], "sub": spec.get("sub", "")}]
               + [{"type": "card", "card": c, "teams": None} for c in cards]

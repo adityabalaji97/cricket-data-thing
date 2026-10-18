@@ -83,9 +83,10 @@ SPECS: Dict[str, Dict[str, Any]] = {
     "sky": {
         "type": "case_t20", "player": "Suryakumar Yadav", "display": "SKY", "role": "batter", "team": "India",
         "years": [2022, 2023, 2024, 2025, 2026], "with_from": date(2025, 1, 1), "last_game": date(2026, 3, 8),
+        "career_from": 2021, "slump_year": 2025, "rival": "Shreyas Iyer",
         "event": {"label": "2026 T20 World Cup", "start": date(2026, 2, 7), "end": date(2026, 3, 8)},
         "hook": "Lots of fans want SKY back in India's T20I side. Is there a case?",
-        "kicker": "#BringBackSKY", "sub": "Impact and win probability, against the middle order India have used without him",
+        "kicker": "#BringBackSKY", "sub": "His career, the slump, Shreyas Iyer's rise and the case, in Impact and win probability",
         "tags": ["#SKY", "#BringBackSKY", "#TeamIndia", "#SuryakumarYadav"],
         "method": ("Impact (runs added to the team's projected total) and win probability added are computed ball by ball "
                    "(T20 Primer method) on every T20I and IPL game."),
