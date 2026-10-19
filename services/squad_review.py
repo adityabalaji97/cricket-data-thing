@@ -27,6 +27,10 @@ MAX_OVERS = 4
 K_BAT = 120          # balls of evidence before a batter's own rate counts for half
 K_BOWL = 120         # same, bowling
 PART_TIMER = -1.5    # runs an over (Impact, bowling view) for overs nobody in the XI has bowled
+# A player starts below average and earns his way up: the prior a thin record is pulled toward, per ball above the
+# average ball. Unknown players were being picked as exactly average over known, slightly-below-average ones.
+PRIOR_BAT = -0.05    # -5 runs per 100 balls
+PRIOR_BOWL = -0.05   # -0.3 runs an over (bowling view)
 UNPROVEN_BALLS = 150 # fewer balls batting and bowling than this in the window: "unproven"
 WINDOW_DAYS = 730
 
@@ -65,11 +69,20 @@ def player_values(db, players: List[str], as_of: date) -> Dict[str, Dict[str, An
     the window."""
     start, end = as_of - timedelta(days=WINDOW_DAYS), as_of - timedelta(days=1)
     base = baselines(db, as_of)
-    out: Dict[str, Dict[str, Any]] = {p: {"bat": {}, "bowl": {}, "bat_balls": 0, "bowl_balls": 0, "pos": None} for p in players}
+    out: Dict[str, Dict[str, Any]] = {p: {"bat": {}, "bowl": {}, "bat_balls": 0, "bowl_balls": 0, "pos": None, "kind": None}
+                                      for p in players}
     bat = _q(db, batters=players, group_by=["batter", "phase"], start_date=start, end_date=end, metrics_perspective="batting")
     bowl = _q(db, bowlers=players, group_by=["bowler", "phase"], start_date=start, end_date=end, metrics_perspective="bowling")
     pos = _q(db, batters=players, group_by=["batter", "batting_position"], start_date=start, end_date=end)
+    kinds = _q(db, bowlers=players, group_by=["bowler", "bowl_kind"], start_date=start, end_date=end, metrics_perspective="bowling")
     canon = _canon(db, players)
+    most: Dict[str, Tuple[int, str]] = {}
+    for r in kinds:
+        p = canon.get(r["bowler"], r["bowler"])
+        if p in out and r.get("bowl_kind") in ("pace bowler", "spin bowler") and (r.get("balls") or 0) > most.get(p, (0, ""))[0]:
+            most[p] = (r["balls"], "pace" if r["bowl_kind"] == "pace bowler" else "spin")
+    for p, (_b, k) in most.items():
+        out[p]["kind"] = k
     for r in bat:
         p = canon.get(r["batter"], r["batter"])
         if p in out:
@@ -122,23 +135,17 @@ def slot_balls(db, league: str, as_of: date) -> Dict[int, Dict[str, float]]:
 # ---- the model --------------------------------------------------------------------------------------------------------
 
 def bat_value(v: Dict[str, Any], phase: str) -> float:
-    """Impact per ball in a phase, pulled toward 0: the phase's own record if any, else the player's whole record."""
+    """Impact per ball above the average ball in a phase, from the phase's own record, pulled toward PRIOR_BAT."""
     imp, balls = v["bat"].get(phase, (0.0, 0))
-    if balls < 30:
-        imp = sum(i for i, _ in v["bat"].values())
-        balls = sum(b for _, b in v["bat"].values())
-    return imp / (balls + K_BAT)
+    return (imp + PRIOR_BAT * K_BAT) / (balls + K_BAT)
 
 
 def bowl_value(v: Dict[str, Any], phase: str) -> Optional[float]:
     """Impact an over in a phase, pulled toward 0; None if he hasn't bowled (overs go to those who have)."""
     if not v["bowl_balls"]:
         return None
-    imp, balls = v["bowl"].get(phase, (0.0, 0))
-    if balls < 30:
-        imp = sum(i for i, _ in v["bowl"].values())
-        balls = sum(b for _, b in v["bowl"].values())
-    return 6 * imp / (balls + K_BOWL)
+    imp, balls = v["bowl"].get(phase, (0.0, 0))  # the phase on its own: a spinner who never bowls at the death isn't
+    return 6 * (imp + PRIOR_BOWL * K_BOWL) / (balls + K_BOWL)  # handed death overs on his middle-overs record
 
 
 def bowling(xi: List[str], values: Dict[str, Dict[str, Any]]) -> Tuple[float, Dict[str, Dict[str, int]]]:
@@ -224,4 +231,48 @@ def review(db, league: str, squad: List[str], as_of: date, overseas: Optional[It
     depth = sorted(worth.items(), key=lambda kv: -kv[1])[:depth_n]
     unproven = [p for p in squad if values[p]["bat_balls"] < UNPROVEN_BALLS and values[p]["bowl_balls"] < UNPROVEN_BALLS]
     return {"score": score, "bat": bat, "bowl": bowl, "xi": order, "overs": plan, "depth": depth,
-            "unproven": unproven, "values": values}
+            "unproven": unproven, "values": values, "phases": phase_split(order, plan, values, slots),
+            "kinds": kind_split(plan, values)}
+
+
+# ---- describing a squad (no ranking: the backtest showed the total doesn't order a table) ------------------------------
+
+def phase_split(xi_order: List[str], plan: Dict[str, Dict[str, int]], values, slots) -> Dict[str, Dict[str, float]]:
+    """The XI's projected runs above average by phase: batting (slots) and bowling (the overs plan)."""
+    bat = {ph: 0.0 for ph in PHASES}
+    for i, p in enumerate(xi_order, 1):
+        for ph, b in slots.get(i, {}).items():
+            bat[ph] += b * bat_value(values[p], ph)
+    bowl = {ph: 0.0 for ph in PHASES}
+    for p, by in plan.items():
+        for ph, n in by.items():
+            bowl[ph] += n * (bowl_value(values[p], ph) or 0)
+    return {"bat": bat, "bowl": bowl}
+
+
+def kind_split(plan: Dict[str, Dict[str, int]], values) -> Dict[str, Dict[str, float]]:
+    """Overs and projected runs above average by pace and spin in the XI's plan."""
+    out = {"pace": {"overs": 0, "runs": 0.0}, "spin": {"overs": 0, "runs": 0.0}}
+    for p, by in plan.items():
+        k = values[p].get("kind") or "pace"
+        for ph, n in by.items():
+            out[k]["overs"] += n
+            out[k]["runs"] += n * (bowl_value(values[p], ph) or 0)
+    return out
+
+
+def ground_profile(db, names: List[str], since: date) -> Dict[str, Any]:
+    """Pace and spin at a ground (every men's T20 since `since`, all its names): runs an over, balls a wicket, share
+    of the balls."""
+    rows = []
+    for n in names:
+        rows += _q(db, venue=n, group_by=["bowl_kind"], start_date=since, metrics_perspective="bowling")
+    out: Dict[str, Any] = {}
+    total = sum(r.get("balls") or 0 for r in rows if r.get("bowl_kind") in ("pace bowler", "spin bowler"))
+    for k, key in (("pace", "pace bowler"), ("spin", "spin bowler")):
+        rs = [r for r in rows if r.get("bowl_kind") == key]
+        b = sum(r.get("balls") or 0 for r in rs)
+        w = sum(r.get("wickets") or 0 for r in rs)
+        out[k] = {"econ": 6 * sum(r.get("runs") or 0 for r in rs) / b if b else None, "bpw": b / w if w else None,
+                  "share": b / total if total else None, "balls": b}
+    return out

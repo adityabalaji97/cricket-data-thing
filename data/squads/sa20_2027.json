@@ -1,0 +1,749 @@
+{
+ "league": "SA20",
+ "season": "2027",
+ "as_of": "2026-10-19",
+ "confirmed": false,
+ "source": "Wisden, 'SA20 2027: Full Squads For Each Team After The Auction' (auction 7 Oct 2026); overseas = Wisden's *",
+ "teams": [
+  {
+   "team": "Durban's Super Giants",
+   "home": [
+    "Kingsmead, Durban"
+   ],
+   "players": [
+    {
+     "name": "Jos Buttler",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Devon Conway",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Sam Curran",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Liam Livingstone",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Sunil Narine",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Kane Williamson",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Marques Ackerman",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "David Bedingham",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Eathan Bosch",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Gerald Coetzee",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Tony de Zorzi",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Daryn Dupavillon",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Simon Harmer",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Evan Jones",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Aiden Markram",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Kyle Simmonds",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Kwena Maphaka",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Andile Simelane",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Heinrich Klaasen",
+     "overseas": false,
+     "how": "wildcard",
+     "price": null
+    }
+   ]
+  },
+  {
+   "team": "Joburg Super Kings",
+   "home": [
+    "The Wanderers Stadium, Johannesburg"
+   ],
+   "players": [
+    {
+     "name": "Leus du Plooy",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Jason Holder",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Akeal Hosein",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "James Vince",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Matthew de Villiers",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Donovan Ferreira",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Dian Forrester",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Duan Jansen",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Rilee Rossouw",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Janco Smit",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Jarren Bacher",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Prenelan Subrayen",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Faf du Plessis",
+     "overseas": false,
+     "how": "auction",
+     "price": "R2.7m"
+    },
+    {
+     "name": "Blessing Muzarabani",
+     "overseas": true,
+     "how": "auction",
+     "price": "R500k"
+    },
+    {
+     "name": "Kieron Pollard",
+     "overseas": true,
+     "how": "auction",
+     "price": "R1.5m"
+    },
+    {
+     "name": "Andries Gous",
+     "overseas": true,
+     "how": "auction",
+     "price": "R1m"
+    },
+    {
+     "name": "Dayyaan Galiem",
+     "overseas": false,
+     "how": "auction",
+     "price": "R375k"
+    },
+    {
+     "name": "Jason Rowles",
+     "overseas": false,
+     "how": "auction",
+     "price": "R2.9m"
+    },
+    {
+     "name": "Jamie Overton",
+     "overseas": true,
+     "how": "wildcard",
+     "price": null
+    }
+   ]
+  },
+  {
+   "team": "MI Cape Town",
+   "home": [
+    "Newlands, Cape Town"
+   ],
+   "players": [
+    {
+     "name": "Will Jacks",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Rashid Khan",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Nicholas Pooran",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Corbin Bosch",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Reeza Hendricks",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Thomas Kaber",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "George Linde",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Dane Piedt",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Ryan Rickelton",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Jason Smith",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Tiaan van Vuuren",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Tristan Luus",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Kagiso Rabada",
+     "overseas": false,
+     "how": "wildcard",
+     "price": null
+    },
+    {
+     "name": "Trent Boult",
+     "overseas": true,
+     "how": "auction",
+     "price": "R1.5m"
+    },
+    {
+     "name": "Wiaan Mulder",
+     "overseas": false,
+     "how": "auction",
+     "price": "R2.6m"
+    },
+    {
+     "name": "Shimron Hetmyer",
+     "overseas": true,
+     "how": "auction",
+     "price": "R1.5m"
+    },
+    {
+     "name": "Lehan Botha",
+     "overseas": false,
+     "how": "auction",
+     "price": "R200k"
+    },
+    {
+     "name": "Daniel Smith",
+     "overseas": false,
+     "how": "auction",
+     "price": "R200k"
+    },
+    {
+     "name": "Oliver Whitehead",
+     "overseas": false,
+     "how": "auction",
+     "price": "R200k"
+    }
+   ]
+  },
+  {
+   "team": "Paarl Royals",
+   "home": [
+    "Boland Park, Paarl"
+   ],
+   "players": [
+    {
+     "name": "Dan Lawrence",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Gudakesh Motie",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Azmatullah Omarzai",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Sikandar Raza",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Thomas Rew",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Asa Tribe",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Mujeeb Ur Rahman",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Ottneil Baartman",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Bjorn Fortuin",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Rubin Hermann",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Keagan Lion-Cachet",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "David Miller",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Delano Potgieter",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Kyle Verreynne",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Hardus Viljoen",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Jacob Johannes Basson",
+     "overseas": false,
+     "how": "retained",
+     "price": null,
+     "data_name": "JJ Basson"
+    },
+    {
+     "name": "Nqobani Mokoena",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Lhuan-dre Pretorius",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Joe Root",
+     "overseas": true,
+     "how": "wildcard",
+     "price": null
+    }
+   ]
+  },
+  {
+   "team": "Pretoria Capitals",
+   "home": [
+    "SuperSport Park, Centurion"
+   ],
+   "players": [
+    {
+     "name": "Sherfane Rutherford",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Phil Salt",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Matthew Short",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Connor Esterhuizen",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Wihan Lubbe",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Keshav Maharaj",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Lungisani Ngidi",
+     "overseas": false,
+     "how": "retained",
+     "price": null,
+     "data_name": "Lungi Ngidi"
+    },
+    {
+     "name": "Bryce Parsons",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Gideon Peters",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Lizaad Williams",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Codi Yusuf",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Dewald Brevis",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Bayanda Majola",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Andre Russell",
+     "overseas": true,
+     "how": "wildcard",
+     "price": null
+    },
+    {
+     "name": "Rassie van der Dussen",
+     "overseas": false,
+     "how": "auction",
+     "price": "R500k"
+    },
+    {
+     "name": "Temba Bavuma",
+     "overseas": false,
+     "how": "auction",
+     "price": "R200k"
+    },
+    {
+     "name": "Josh Breed",
+     "overseas": false,
+     "how": "auction",
+     "price": "R200k"
+    },
+    {
+     "name": "Ackeem Auguste",
+     "overseas": true,
+     "how": "auction",
+     "price": "R200k"
+    },
+    {
+     "name": "Keemo Paul",
+     "overseas": true,
+     "how": "auction",
+     "price": "R200k"
+    }
+   ]
+  },
+  {
+   "team": "Sunrisers Eastern Cape",
+   "home": [
+    "St George's Park, Gqeberha",
+    "St George's Park, Port Elizabeth"
+   ],
+   "players": [
+    {
+     "name": "Tristan Stubbs",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Mitchell Marsh",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Adam Milne",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Rishad Hossain",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Quinton de Kock",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Matthew Breetzke",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Anrich Nortje",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Mitchell van Buuren",
+     "overseas": false,
+     "how": "retained",
+     "price": null,
+     "data_name": "Mitchell Van Buuren"
+    },
+    {
+     "name": "Jordan Hermann",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Lewis Gregory",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Senuran Muthusamy",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Patrick Kruger",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "James Coles",
+     "overseas": true,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Lutho Sipamla",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "CJ King",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "JP King",
+     "overseas": false,
+     "how": "retained",
+     "price": null
+    },
+    {
+     "name": "Marco Jansen",
+     "overseas": false,
+     "how": "wildcard",
+     "price": null
+    },
+    {
+     "name": "Nandre Burger",
+     "overseas": false,
+     "how": "auction",
+     "price": "R500k"
+    },
+    {
+     "name": "Craig Overton",
+     "overseas": true,
+     "how": "auction",
+     "price": "R1.5m"
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "data_name: the player's name in the ball-by-ball data where the squad list spells it otherwise",
+  "Jamie Overton marked overseas (English) though Wisden's list doesn't star him; Leus du Plooy and Andries Gous are starred by Wisden: check"
+ ]
+}
