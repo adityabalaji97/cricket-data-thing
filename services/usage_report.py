@@ -75,6 +75,9 @@ def build_usage_report(db: Session, weeks: int = 8) -> Dict[str, Any]:
     mcp = rows("""
         SELECT date_trunc('week', ts)::date AS week, COUNT(*) AS calls,
                COUNT(DISTINCT caller_hash) AS distinct_callers,
+               -- Conversations from people other than the owner (session_hash exists from migration 024).
+               COUNT(DISTINCT session_hash) FILTER (WHERE NOT is_owner) AS outside_sessions,
+               COUNT(*) FILTER (WHERE is_owner) AS owner_calls,
                COUNT(*) FILTER (WHERE outcome <> 'ok') AS failed_calls,
                jsonb_object_agg(COALESCE(client, '?'), 1) AS clients
         FROM mcp_call_log WHERE ts >= date_trunc('week', now()) - (:since)::interval

@@ -34,3 +34,9 @@ def test_caller_hash_is_stable_and_short():
     assert usage_log.caller_hash("203.0.113.9, 10.0.0.1") == usage_log.caller_hash("203.0.113.9")
     assert len(usage_log.caller_hash("203.0.113.9")) == 16
     assert usage_log.caller_hash(None) is None
+
+
+def test_session_hash_is_stable_short_and_optional():
+    assert usage_log.session_hash("abc123") == usage_log.session_hash(" abc123 ")
+    assert len(usage_log.session_hash("abc123")) == 16
+    assert usage_log.session_hash(None) is None and usage_log.session_hash("  ") is None

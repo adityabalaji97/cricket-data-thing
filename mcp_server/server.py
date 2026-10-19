@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import csv
 import io
+import hmac
 import json
 import logging
 import os
@@ -184,9 +185,23 @@ def _log_call(tool: str, ctx: Optional[Context], args: Dict[str, Any], started: 
     try:
         from services.usage_log import log_mcp_call
 
-        log_mcp_call(tool, outcome, ms, client, headers.get("x-forwarded-for"), kept_args)
+        log_mcp_call(tool, outcome, ms, client, headers.get("x-forwarded-for"), kept_args,
+                     session_id=headers.get("mcp-session-id"), is_owner=_is_owner(ctx))
     except Exception:  # pragma: no cover - logging must not affect the call
         pass
+
+
+def _is_owner(ctx: Optional[Context]) -> bool:
+    """A call through the owner's own connector URL (/mcp?k=MCP_OWNER_KEY), so their sessions can be left out of the
+    usage numbers. Only a label for counting: it grants nothing."""
+    key = os.environ.get("MCP_OWNER_KEY", "")
+    if not key or ctx is None:
+        return False
+    try:
+        request = ctx.request_context.request
+        return hmac.compare_digest(request.query_params.get("k", ""), key)
+    except Exception:  # pragma: no cover - best-effort, like the headers
+        return False
 
 
 def _error(message: str) -> CallToolResult:
@@ -1438,7 +1453,12 @@ def _build_mcp_routes() -> list:
     """The SDK's /mcp routes, backed by a new session manager (each can only run() once)."""
     starlette_app = mcp.streamable_http_app(
         streamable_http_path="/mcp",
-        stateless_http=True,
+        # Stateful, so each client connection gets an Mcp-Session-Id and usage can be counted per conversation (the
+        # IP hash only counted Anthropic's servers). Sessions live in memory: an idle one is dropped after 30 minutes,
+        # and after a restart a client gets a 404 for its old session and opens a new one.
+        stateless_http=False,
+        session_idle_timeout=1800,
+        max_sessions=2000,
         json_response=True,
         # DNS-rebinding protection guards servers on localhost from hostile web pages. This is a
         # public, credential-less endpoint behind Heroku's router, so it would only reject
