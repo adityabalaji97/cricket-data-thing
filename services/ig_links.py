@@ -60,7 +60,7 @@ def _path(fact: Dict[str, Any]) -> str:
         return "/venue?" + urlencode({"venue": fx["venue"], "team1": fx.get("team1", ""), "team2": fx.get("team2", "")})
     if fact.get("kind") == "play":
         return "/games/guess-innings"
-    if fact.get("subject") and not _is_team(fact["subject"]):
+    if fact.get("subject") and fact.get("subject_role") != "series" and not _is_team(fact["subject"]):  # a series isn't a player
         return "/player?" + urlencode({"name": fact["subject"]})
     return "/links"
 

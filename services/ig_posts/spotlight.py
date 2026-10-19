@@ -80,6 +80,37 @@ SPECS: Dict[str, Dict[str, Any]] = {
                                "A wicket every 24 balls"],
                      "source": "ESPNcricinfo", "confirmed": True},
     },
+    "nz-india-t20i": {
+        "type": "series_preview", "since": date(2018, 1, 1), "form_since": date(2025, 1, 1),
+        # One ground under every name it has had: Wellington's stadium went WestpacTrust -> Westpac -> Sky -> Henry
+        # (2026). Eden Park's Outer Oval (most Super Smash games in Auckland) and the Basin Reserve are other grounds.
+        "grounds": [
+            {"label": "Hagley Oval", "names": ["Hagley Oval, Christchurch"]},
+            {"label": "Wellington", "names": ["Sky Stadium, Wellington", "Westpac Stadium, Wellington", "Westpac Stadium",
+                                              "WestpacTrust Stadium, Wellington", "Henry Stadium, Wellington"]},
+            {"label": "Eden Park", "names": ["Eden Park, Auckland"]},
+            {"label": "Seddon Park", "names": ["Seddon Park, Hamilton"]},
+        ],
+        "sides": [
+            {"team": "India", "batters": ["Abhishek Sharma", "Sanju Samson", "Ishan Kishan", "Shreyas Iyer", "Tilak Varma",
+                                          "Shivam Dube", "Vaibhav Sooryavanshi"],
+             "against": ["pace", "left-arm spin", "off-spin"],
+             "attack": "pace (Henry, Ferguson, Jamieson, Duffy, Milne), Santner's left-arm spin, Bracewell's off-spin"},
+            {"team": "New Zealand", "batters": ["Finn Allen", "Devon Conway", "Tim Seifert", "Mark Chapman", "Daryl Mitchell",
+                                                "Glenn Phillips", "Michael Bracewell"],
+             "against": ["wrist spin", "left-arm pace", "right-arm pace"],
+             "attack": "wrist spin (Kuldeep, Varun), left-arm pace (Arshdeep), right-arm pace (Bhuvneshwar, Mayank)"},
+        ],
+        "names": {"Shreyas Iyer": "Iyer", "Tilak Varma": "Tilak", "Ishan Kishan": "Kishan", "Vaibhav Sooryavanshi": "Sooryavanshi",
+                  "Daryl Mitchell": "Mitchell", "Glenn Phillips": "Phillips"},
+        "hook": "Five T20Is, four grounds. What wins in New Zealand?",
+        "kicker": "India in New Zealand T20Is", "sub": "The grounds, pace v spin, and how each side's batters meet the other's attack",
+        "tags": ["#NZvIND", "#TeamIndia", "#BlackCaps", "#T20I"],
+        "method": ("Ground numbers are every men's T20 at each ground since 2018 (Super Smash and T20Is); match-ups are "
+                   "Impact per 100 balls in every T20 since 2025."),
+        "link": "/venue?venue=Hagley+Oval%2C+Christchurch&team1=New+Zealand&team2=India",
+        "key": "spotlight-nz-india-t20i-preview-2026-10",
+    },
     "sky": {
         "type": "case_t20", "player": "Suryakumar Yadav", "display": "SKY", "role": "batter", "team": "India",
         "years": [2022, 2023, 2024, 2025, 2026], "with_from": date(2025, 1, 1), "last_game": date(2026, 3, 8),
@@ -366,6 +397,10 @@ def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         from services.ig_posts import case_odi
 
         return case_odi.build(db, spec)
+    if spec.get("type") == "series_preview":  # a series' grounds and match-ups (services/ig_posts/series_preview.py)
+        from services.ig_posts import series_preview
+
+        return series_preview.build(db, spec)
     if spec.get("type") == "case_t20":  # a T20I batter's case, in Impact and WPA (services/ig_posts/case_t20.py)
         from services.ig_posts import case_t20
 
@@ -405,18 +440,20 @@ def make_post(db, spec: Dict[str, Any], built: Optional[Dict[str, Any]] = None) 
     if not built:
         return None
     carousel = ig_carousel.save(db, built["slides"], built["title"], {"spotlight": spec["key"]}, "ig-spotlight")
-    fact = {"kind": "spotlight", "subject": spec["player"], "subject_role": spec["role"], "title": built["title"],
+    subject = spec.get("player") or spec.get("kicker")  # a series preview is about a series, not one player
+    fact = {"kind": "spotlight", "subject": subject, "subject_role": spec.get("role", "series"), "title": built["title"],
             "verdict": built["verdict"], "kicker": spec["kicker"], "carousel_id": carousel["id"],
             "slides": len(built["slides"]), "render": True, "spec": next(k for k, v in SPECS.items() if v is spec)}
-    for k in ("deep_cut_scope", "deep_cut_exclude"):
+    for k in ("deep_cut_scope", "deep_cut_exclude", "link"):  # link: the post's page on the site (a series: its first ground)
         if spec.get(k):
             fact[k] = spec[k]
     caption = ig_captions.build(built["title"], built["verdict"], "debate",
                                 spec.get("method") or "Impact and runs saved are computed ball by ball (T20 Primer method), "
                                                       "on every T20 each bowler played.",
-                                [spec["player"]], spec["kicker"], spec.get("tags", []))
+                                [spec["player"]] if spec.get("player") else built.get("players", [])[:2],
+                                spec["kicker"], spec.get("tags", []))
     post = {"key": spec["key"], "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
-            "caption": caption, "players": [spec["player"]]}
+            "caption": caption, "players": [spec["player"]] if spec.get("player") else built.get("players", [])}
     if built.get("deep_cut"):  # the spotlight's own (slide 3)
         fact["deep_cut"] = built["deep_cut"]
         post["caption"] = ig_captions.with_deep_cut(caption, built["deep_cut"]["sentence"])
