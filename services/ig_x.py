@@ -177,6 +177,10 @@ def details(card: Dict[str, Any]) -> List[str]:
         top = rows[:3] + [r for r in rows[3:] if r.get("highlight")][:1]
         lines = [f"{'→ ' if r.get('highlight') else ''}{r['name']} {_f(r['value'], fmt_)}"
                  + (f" ({r['detail']})" if r.get("detail") else "") for r in top]
+    elif v == "share_bars":
+        labels = {g["key"]: g["label"].lower() for g in p.get("groups") or []}
+        lines = [f"{r['name']}: " + ", ".join(f"{_f(x['value'], p.get('format', 'pct0'))} {labels.get(x['key'], '')}"
+                                             for x in r.get("segments") or []) for r in p.get("rows") or []]
     elif v == "scatter_plus":
         x, y = p.get("x") or {}, p.get("y") or {}
         ranked = sorted((pt for pt in p.get("points") or [] if pt.get("label") or pt.get("highlight")),
@@ -269,7 +273,11 @@ def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[
     tags = " ".join(thread_tags(caption))
     # (slide number, sentence, stat lines) per tweet: with lead_chart, the hook rides on the lead card's tweet.
     units = [(i, slide_text(s, chart_titles or {}), slide_lines(s)) for i, s in enumerate(slides, start=1)]
-    if lead_chart and len(slides) > 2 and slides[0].get("type") == "hook" and slides[1].get("type") == "card":
+    hero_card = (slides[0].get("hero") or {}).get("card") if slides and slides[0].get("type") == "hook" else None
+    if lead_chart and hero_card:  # the cover carries the lead chart (services/ig_cover.py): tweet 1 shows the cover
+        hook = str(slides[0].get("text") or "").strip()
+        units[0] = (1, f"{hook}\n\n{hero_card.get('title', '')}", details(hero_card))
+    elif lead_chart and len(slides) > 2 and slides[0].get("type") == "hook" and slides[1].get("type") == "card":
         hook = str(slides[0].get("text") or "").strip()
         units = [(2, f"{hook}\n\n{slide_text(slides[1], chart_titles or {})}", slide_lines(slides[1]))] + units[2:]
     total = len(units)

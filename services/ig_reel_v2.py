@@ -74,16 +74,26 @@ ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth", 
 PREVIEW_BEATS = ("form-strips", "suits-ground", "key-battles", "ground-records", "totals", "milestones")
 #: The payoff, in order of preference: what opens the Reel.
 PAYOFF = ("win_prob_line", "race_lines", "bowling_plan", "metric_bars", "deep_compare", "scorecard", "bucket_bars",
-          "boundary_zones", "pair_dumbbell", "scatter_plus")
+          "boundary_zones", "pair_dumbbell", "scatter_plus", "share_bars")
 SKIP = ("innings_scorecard", "xis", "innings_wagon")   # walls of text: not a Reel beat
 
 
 # ---- beats ----------------------------------------------------------------------------------------------------------
 
+def slide_card(slide: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """A slide's chart card: a card slide's own, or the lead chart a hero cover carries (services/ig_cover.py), so a
+    Reel can open on the cover's chart."""
+    if slide.get("type") == "card":
+        return slide.get("card")
+    if slide.get("type") == "hook":
+        return (slide.get("hero") or {}).get("card")
+    return None
+
+
 def beats(slides: List[Dict[str, Any]], k: int = 3) -> List[Tuple[int, Dict[str, Any]]]:
     """[(slide number, card)]: the payoff first, then the deeper cut, then the next card; at most k."""
-    cards = [(i + 1, s["card"]) for i, s in enumerate(slides) if s.get("type") == "card" and s.get("card")
-             and s["card"].get("visual") not in SKIP]
+    cards = [(i + 1, slide_card(s)) for i, s in enumerate(slides) if slide_card(s)
+             and slide_card(s).get("visual") not in SKIP]
     if not cards:
         return []
     picks = preview_beats(cards, k)
@@ -408,6 +418,7 @@ def spoken(text_: str) -> str:
             text_ = re.sub(rf"\b{re.escape(name)}\b", v["say"], text_)
     text_ = re.sub(r"(?<![\w.])[−–-](?=\d)", "minus ", text_)
     text_ = re.sub(r"(?<=\d)\*", " not out", text_)  # 49* is "49 not out"
+    text_ = re.sub(r"(?<=\d)%", " percent", text_)  # the transcript says "percent": "37%" would never match it
     return re.sub(r"\+(?=\d)", "plus ", text_)
 
 
@@ -798,7 +809,7 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
     hook = next((s.get("text") for s in slides if s.get("type") == "hook"), "") or ""
     bs = beats(slides, k=LENGTHS[length]["beats"])
     if plan and plan.get("beats"):  # beats chosen by hand (scripts/make_reel_v2.py --beats)
-        bs = [(n, slides[n - 1]["card"]) for n in plan["beats"]]
+        bs = [(n, slide_card(slides[n - 1])) for n in plan["beats"]]
     if len(bs) < 2:
         return None
     if plan is None or not plan.get("script"):

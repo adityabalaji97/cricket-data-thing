@@ -404,8 +404,8 @@ def make_post(db: Session, match_id: str, over: Optional[int] = None, built: Opt
             "captains_call": {"match_id": str(match_id), "over": built["over"]}}
     a, b = built["teams"]
     occasion = [ig_captions.tag(f"{a}v{b}")] + (["#TeamIndia"] if "India" in (a, b) else [])
-    caption = ig_captions.build(built["title"], built["verdict"], "debate", built["method"], built["players"],
-                                built["kicker"], occasion)
+    caption = ig_captions.build(built["title"], built["verdict"], "spotlight", built["method"], built["players"],
+                                built["kicker"], occasion, prompt="Would you have made the same call?")
     if built.get("deep_cut"):
         fact["deep_cut"] = built["deep_cut"]
         caption = ig_captions.with_deep_cut(caption, built["deep_cut"]["sentence"])

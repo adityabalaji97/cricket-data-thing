@@ -53,6 +53,11 @@ def card_table(card: Dict[str, Any]) -> str:
         metrics = p.get("metrics", [])
         head = ["Player"] + [m["label"] for m in metrics]
         rows = [[r["name"]] + [_fmt((r.get("values") or {}).get(m["key"]), m["format"]) for m in metrics] for r in p.get("rows", [])]
+    elif v == "share_bars":
+        groups = p.get("groups") or []
+        head = ["Player"] + [g["label"] for g in groups]
+        rows = [[r["name"]] + [_fmt(next((x["value"] for x in r["segments"] if x["key"] == g["key"]), None), p.get("format", "pct0"))
+                               for g in groups] for r in p.get("rows", [])]
     elif v == "race_lines":
         head = ["Player", f"Reached it in ({p.get('unit', '')})"]
         rows = [[s["name"], f"{s['reached_at']:,}"] for s in p.get("series", [])]

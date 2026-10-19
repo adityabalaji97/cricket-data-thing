@@ -132,6 +132,8 @@ def save(db: Session, slides: List[Dict[str, Any]], title: str, key: Dict[str, A
     from services.ig_cover import with_hero
     from services.snapshots import create_static_snapshot
 
-    slides = with_hero(slides, title)  # the cover A/B: half the carousels get the lead chart on slide 1 (ig_cover.py)
+    # The cover A/B: half the carousels get the lead chart on slide 1 (ig_cover.py), which leaves the deck. In place, so
+    # the caller's slide count (what gets rendered), X thread and notes all see the deck as stored.
+    slides[:] = with_hero(slides, title)
     return create_static_snapshot(db, "carousel", {"slides": slides, "title": title}, title,
                                   {"carousel": key, "slides": slides}, created_by=created_by)

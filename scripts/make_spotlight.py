@@ -45,7 +45,7 @@ def main() -> int:
     parser.add_argument("--date", default=str(date.today() + timedelta(days=1)))
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--no-render", action="store_true")
-    parser.add_argument("--base", default="https://hindsightcricket.com")
+    parser.add_argument("--base", default=os.getenv("SITE_URL", "https://hindsightcricket.com"))  # a dev server: SITE_URL
     args = parser.parse_args()
 
     from services.ig_posts import spotlight

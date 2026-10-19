@@ -28,6 +28,7 @@ PROMPTS = {
     "myth": "Did the verdict surprise you?",
     "reactive": "Who are you backing?",
     "play": "Comment your answer before you swipe.",
+    "spotlight": "What does the data miss?",
 }
 FORMAT_TAGS = {"IPL": "#IPL", "ODI": "#ODI", "T20I": "#T20I", "T20": "#T20"}
 BASE_TAGS = ["#cricket", "#cricketstats"]
