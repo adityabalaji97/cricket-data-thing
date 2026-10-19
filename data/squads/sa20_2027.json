@@ -135,7 +135,7 @@
    "players": [
     {
      "name": "Leus du Plooy",
-     "overseas": true,
+     "overseas": false,
      "how": "retained",
      "price": null
     },
@@ -744,6 +744,10 @@
  ],
  "notes": [
   "data_name: the player's name in the ball-by-ball data where the squad list spells it otherwise",
-  "Jamie Overton marked overseas (English) though Wisden's list doesn't star him; Leus du Plooy and Andries Gous are starred by Wisden: check"
+  "Overseas checked by the owner 19 Oct 2026: Jamie Overton (England) and Andries Gous (USA) overseas; Leus du Plooy local (BBC, and no overseas flag on Wikipedia's 2027 SA20 squads)"
+ ],
+ "last_season": [
+  "2025-12-26",
+  "2026-01-26"
  ]
 }

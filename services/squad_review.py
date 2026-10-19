@@ -276,3 +276,115 @@ def ground_profile(db, names: List[str], since: date) -> Dict[str, Any]:
         out[k] = {"econ": 6 * sum(r.get("runs") or 0 for r in rs) / b if b else None, "bpw": b / w if w else None,
                   "share": b / total if total else None, "balls": b}
     return out
+
+
+# ---- the likely XI: what the team did, not what an optimiser would do ---------------------------------------------------
+# A best-XI search over small samples left Rashid Khan without an over (19 Oct 2026). The XI is the team's own: its most
+# used players last season, with the gaps filled by its new buys; overs follow how each bowler is actually used.
+
+def appearances(db, comps: List[str], team: str, start: date, end: date) -> Dict[str, int]:
+    """Games each player played for `team` in [start, end] (match_players, the scorecard XIs)."""
+    from sqlalchemy import text
+
+    rows = db.execute(text("""
+        SELECT mp.player, COUNT(*) FROM match_players mp JOIN matches m ON m.id = mp.match_id
+        WHERE m.competition = ANY(:c) AND mp.team = :t AND m.date BETWEEN :a AND :b GROUP BY 1
+    """), {"c": comps, "t": team, "a": start, "b": end}).all()
+    return {p: n for p, n in rows}
+
+
+def role(v: Dict[str, Any]) -> str:
+    """batter / bowler / all-rounder from the window's balls (a bowler who bats little is a bowler)."""
+    bat, bowl = v["bat_balls"], v["bowl_balls"]
+    if bowl >= 120 and bat >= 120 and (v["pos"] or 9) <= 7.5:
+        return "all-rounder"
+    return "bowler" if bowl >= max(bat, 60) else "batter"
+
+
+REGULAR_APPS = 4     # games last season to count as a regular (about a third of a season)
+
+
+def likely_xi(squad: List[str], overseas: set, values, apps: Dict[str, int], cap: int) -> List[str]:
+    """Last season's regulars still in the squad (REGULAR_APPS+ games, most first), then the most established of the
+    rest (T20 balls in the window: a marquee buy over a fringe player), keeping at most `cap` overseas and at least
+    five who bowl."""
+    proven = lambda p: values[p]["bat_balls"] + values[p]["bowl_balls"]  # noqa: E731
+    order = sorted(squad, key=lambda p: (apps.get(p, 0) < REGULAR_APPS, -apps.get(p, 0) if apps.get(p, 0) >= REGULAR_APPS else 0,
+                                         -proven(p)))
+    xi: List[str] = []
+    for p in order:
+        if len(xi) == 11:
+            break
+        if p in overseas and sum(1 for q in xi if q in overseas) >= cap:
+            continue
+        xi.append(p)
+    bowlers = [p for p in xi if role(values[p]) in ("bowler", "all-rounder")]
+    for p in [q for q in order if q not in xi and role(values[q]) == "bowler"]:
+        if len(bowlers) >= 5:
+            break
+        drop = next((q for q in reversed(xi) if role(values[q]) == "batter"), None)
+        if drop is None or (p in overseas and drop not in overseas and sum(1 for q in xi if q in overseas) >= cap):
+            continue
+        xi[xi.index(drop)] = p
+        bowlers.append(p)
+    return xi
+
+
+def usage_overs(xi: List[str], values) -> Dict[str, Dict[str, int]]:
+    """The 20 overs shared as the XI's bowlers are used: each gets overs in each phase in proportion to the balls he
+    has bowled there, at most 4 a bowler and the phase's overs in all."""
+    left = dict(OVERS)
+    cap = {p: MAX_OVERS for p in xi}
+    weight = {(p, ph): values[p]["bowl"].get(ph, (0, 0))[1] for p in xi for ph in PHASES}
+    plan: Dict[str, Dict[str, int]] = {}
+    for ph in PHASES:
+        while left[ph] > 0:
+            cands = [(weight[(p, ph)] / (1 + plan.get(p, {}).get(ph, 0)), p) for p in xi if cap[p] > 0 and weight[(p, ph)] > 0]
+            if not cands:
+                break
+            _w, p = max(cands)
+            plan.setdefault(p, {})[ph] = plan.get(p, {}).get(ph, 0) + 1
+            cap[p] -= 1
+            left[ph] -= 1
+    return plan
+
+
+def identity_flags(db, names: List[str], as_of: date, home: str, overseas: Iterable[str] = ()) -> Dict[str, List[str]]:
+    """Names that look like two players under one name (the data has no player ids): a local who has played for a
+    foreign national side, or anyone who has played for two national sides."""
+    from models import INTERNATIONAL_TEAMS_RANKED
+
+    nations = set(INTERNATIONAL_TEAMS_RANKED) | {"Philippines", "Hong Kong", "Japan", "Cayman Islands", "Bermuda"}
+    start = as_of - timedelta(days=WINDOW_DAYS)
+    teams: Dict[str, set] = {n: set() for n in names}
+    for r in _q(db, batters=names, group_by=["batter", "batting_team"], start_date=start, end_date=as_of):
+        teams.setdefault(r["batter"], set()).add(r["batting_team"])
+    for r in _q(db, bowlers=names, group_by=["bowler", "bowling_team"], start_date=start, end_date=as_of,
+                metrics_perspective="bowling"):
+        teams.setdefault(r["bowler"], set()).add(r["bowling_team"])
+    over = set(overseas)
+    out = {}
+    for n, ts in teams.items():
+        nat = {t for t in ts if t in nations}
+        if len(nat) > 1 or (n not in over and nat - {home}):
+            out[n] = sorted(ts)
+    return out
+
+
+def describe(db, league: str, team: str, squad: List[str], overseas: Iterable[str], as_of: date, last: Tuple[date, date],
+             values, slots) -> Dict[str, Any]:
+    """The team's likely XI with each player's role and value by phase, its overs, phase totals and pace/spin split."""
+    cfg = LEAGUES[league]
+    over = set(overseas)
+    apps = appearances(db, cfg["comps"], team, *last)
+    xi = likely_xi(squad, over, values, apps, cfg["overseas_max"])
+    _b, order = batting(xi, values, slots)
+    plan = usage_overs(xi, values)
+    players = [{"name": p, "role": role(values[p]), "overseas": p in over, "apps_last": apps.get(p, 0),
+                "bat_balls": values[p]["bat_balls"], "bowl_balls": values[p]["bowl_balls"],
+                "bat": {ph: 100 * bat_value(values[p], ph) for ph in PHASES},
+                "bowl": {ph: bowl_value(values[p], ph) for ph in PHASES} if values[p]["bowl_balls"] else None}
+               for p in order]
+    return {"xi": order, "players": players, "overs": plan, "phases": phase_split(order, plan, values, slots),
+            "kinds": kind_split(plan, values),
+            "unproven": [p for p in squad if values[p]["bat_balls"] < UNPROVEN_BALLS and values[p]["bowl_balls"] < UNPROVEN_BALLS]}
