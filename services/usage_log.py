@@ -29,8 +29,8 @@ _FLUSH_SECONDS = 2.0
 
 _INSERTS = {
     "mcp": (
-        "INSERT INTO mcp_call_log (tool, outcome, ms, client, caller_hash, args) "
-        "VALUES (%(tool)s, %(outcome)s, %(ms)s, %(client)s, %(caller_hash)s, %(args)s)"
+        "INSERT INTO mcp_call_log (tool, outcome, ms, client, caller_hash, session_hash, is_owner, args) "
+        "VALUES (%(tool)s, %(outcome)s, %(ms)s, %(client)s, %(caller_hash)s, %(session_hash)s, %(is_owner)s, %(args)s)"
     ),
     "jev": (
         "INSERT INTO jev_usage_log (source, questions, input_tokens, output_tokens, ms, ok) "
@@ -56,13 +56,23 @@ _INSERTS = {
 }
 
 
+def _hash(value: str) -> str:
+    salt = os.environ.get("USAGE_HASH_SALT", "hindsight")
+    return hashlib.sha256(f"{salt}:{value}".encode()).hexdigest()[:16]
+
+
 def caller_hash(forwarded_for: Optional[str]) -> Optional[str]:
-    """Short salted hash of the first X-Forwarded-For hop: counts distinct callers, identifies no one."""
+    """Short salted hash of the first X-Forwarded-For hop. Counts addresses, not people: every claude.ai call comes
+    from Anthropic's servers. session_hash is the one to count conversations by."""
     if not forwarded_for:
         return None
-    first = forwarded_for.split(",")[0].strip()
-    salt = os.environ.get("USAGE_HASH_SALT", "hindsight")
-    return hashlib.sha256(f"{salt}:{first}".encode()).hexdigest()[:16]
+    return _hash(forwarded_for.split(",")[0].strip())
+
+
+def session_hash(session_id: Optional[str]) -> Optional[str]:
+    """Short salted hash of the connector's Mcp-Session-Id: one per conversation (a client opens a session when it
+    connects), identifies no one."""
+    return _hash(session_id.strip()) if session_id and session_id.strip() else None
 
 
 def _ensure_worker() -> None:
@@ -100,10 +110,12 @@ def log_jev_call(questions: int, input_tokens: Optional[int], output_tokens: Opt
                     "output_tokens": output_tokens, "ms": ms, "ok": ok})
 
 
-def log_mcp_call(tool: str, outcome: str, ms: int, client: str, forwarded_for: Optional[str], args: Dict[str, Any]) -> None:
+def log_mcp_call(tool: str, outcome: str, ms: int, client: str, forwarded_for: Optional[str], args: Dict[str, Any],
+                 session_id: Optional[str] = None, is_owner: bool = False) -> None:
     enqueue("mcp", {
         "tool": tool[:48], "outcome": outcome[:16], "ms": ms, "client": (client or "")[:80],
-        "caller_hash": caller_hash(forwarded_for), "args": json.dumps(args, default=str),
+        "caller_hash": caller_hash(forwarded_for), "session_hash": session_hash(session_id), "is_owner": bool(is_owner),
+        "args": json.dumps(args, default=str),
     })
 
 
