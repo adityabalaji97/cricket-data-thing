@@ -29,3 +29,18 @@ def test_ab_side_is_stable_for_a_title(monkeypatch):
 
 def test_carousels_over_eight_slides_are_flagged():
     assert any("9 slides" in w for w in social_rules.lint_slides([{"type": "text"}] * 9))
+
+
+def test_hero_takes_the_lead_card_off_the_deck_and_x_shows_the_cover(monkeypatch):
+    from services.ig_x import x_thread
+
+    monkeypatch.setenv("COVER_HERO", "on")
+    lead = bars()
+    lead["card"]["title"] = "Lead claim"
+    deck = [{"type": "hook", "text": "Hook"}, lead, {"type": "card", "card": {"id": "next", "title": "Next claim"}},
+            {"type": "end", "heading": "End", "body": "b"}]
+    out = ig_cover.with_hero(deck, "t")
+    assert [s.get("card", {}).get("id") for s in out[1:3]] == ["next", None]  # slide 2 is new, not the cover's chart
+    thread = x_thread(out, "#INDvNZ")
+    assert thread[0]["slide"] == 1 and thread[0]["text"].startswith("Hook\n\nLead claim")
+    assert thread[1]["slide"] == 2

@@ -78,8 +78,9 @@ def lint_slides(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> Lis
         if not c:
             continue
         out += [f"Slide {n}: {w}" for w in lint_card(c)]
-        if (c.get("kicker") or "").lower() == "the deeper cut" and n != 3 and kind != "play":
-            out.append(f"Slide {n}: the deeper cut belongs on slide 3")
+        want = 2 if (slides[0].get("hero") if slides else None) else 3  # a hero cover takes the lead card off the deck
+        if (c.get("kicker") or "").lower() == "the deeper cut" and n not in (want, 3) and kind != "play":
+            out.append(f"Slide {n}: the deeper cut belongs on slide {want}")
     return out
 
 

@@ -33,7 +33,7 @@ def spec_for(squads_file: str, team: str, key: str) -> Dict[str, Any]:
     return {"type": "squad_review", "squads": squads_file, "team": team, "league": doc["league"], "season": doc["season"],
             "hook": f"{poss(team)} {doc['league']} squad: where it's strong, where it's thin",
             "kicker": f"{doc['league']} {doc['season']} squad reviews", "sub": "The likely XI, phase by phase, and the home ground",
-            "short": t.get("short") or team, "key": key, "tags": [f"#{doc['league']}", "#" + team.replace(" ", "").replace("'", "")],
+            "short": t.get("short") or team, "key": key, "prompt": "Where is your team strongest?", "tags": [f"#{doc['league']}", "#" + team.replace(" ", "").replace("'", "")],
             "method": ("Values are Impact (runs added to the team's projected total) above the average ball, from every men's "
                        "T20 in the two years before; thin records are pulled toward below average.")}
 

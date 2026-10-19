@@ -25,6 +25,7 @@ def variant(title: str) -> str:
     return "hero" if int(hashlib.sha1(title.encode()).hexdigest(), 16) % 2 == 0 else "text"
 
 
+
 def hero_from(card: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """The top rows of a bar chart (metric_bars), the highlighted row kept: {rows: [{name, value, highlight}], format,
     label}. Other visuals don't shrink to a cover well, so they give none."""
@@ -44,14 +45,17 @@ def hero_from(card: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def with_hero(slides: List[Dict[str, Any]], title: str) -> List[Dict[str, Any]]:
-    """The slides, the hook marked with its cover variant and, on the hero side, the lead bar chart's top rows."""
+    """The slides, the hook marked with its cover variant. On the hero side the lead bar chart moves onto the cover
+    (its top rows) and leaves the deck, so slide 2, the one Instagram re-shows to people who scrolled past, is new;
+    the card rides along on the hero for the X thread's first tweet."""
     if not slides or slides[0].get("type") != "hook" or "cover" in slides[0]:
         return slides
     out = deepcopy(slides)
     v = variant(title)
-    lead = next((s.get("card") for s in out[1:] if s.get("type") == "card" and hero_from(s.get("card") or {})), None)
-    if v == "hero" and lead:
-        out[0]["hero"] = hero_from(lead)
+    at = next((i for i, s in enumerate(out[1:], 1) if s.get("type") == "card" and hero_from(s.get("card") or {})), None)
+    if v == "hero" and at is not None and at == 1:  # only the lead card: a later chart would leave slide 2 as is
+        lead = out.pop(at)["card"]
+        out[0]["hero"] = {**hero_from(lead), "card": lead}
         out[0]["cover"] = "hero"
     else:
         out[0]["cover"] = "text" if v == "text" else "text-no-chart"

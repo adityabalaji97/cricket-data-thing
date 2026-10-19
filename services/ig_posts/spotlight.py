@@ -82,14 +82,16 @@ SPECS: Dict[str, Dict[str, Any]] = {
     },
     "sooryavanshi-nz": {
         "type": "batter_v_attack", "player": "Vaibhav Sooryavanshi", "role": "batter", "since": date(2025, 1, 1),
+        "team": "India", "opponent": "New Zealand", "partner": "Abhishek Sharma",
         "openers": ["Vaibhav Sooryavanshi", "Abhishek Sharma", "Sanju Samson", "Ishan Kishan", "Finn Allen", "Tim Seifert",
                     "Devon Conway"],
-        "sides": "India's and New Zealand's", "names": {"Vaibhav Sooryavanshi": "Sooryavanshi", "Ishan Kishan": "Kishan"},
-        "hook": "Vaibhav Sooryavanshi scores at 221 against new-ball pace. New Zealand bowl pace with nearly two balls in three.",
-        "kicker": "India in New Zealand T20Is", "sub": "Where his runs come from, and the one ball that slows him",
-        "watch": "Christchurch hosts games 1 and 2, the lowest-scoring of the four grounds",
+        "options": ["Vaibhav Sooryavanshi", "Sanju Samson", "Ishan Kishan"],
+        "sides": "India's and New Zealand's", "names": {"Vaibhav Sooryavanshi": "Sooryavanshi", "Ishan Kishan": "Kishan",
+                                                         "Abhishek Sharma": "Abhishek", "Sanju Samson": "Samson"},
+        "kicker": "India in New Zealand T20Is", "sub": "His runs, the other openers, and the one ball that slows him",
         "tags": ["#NZvIND", "#TeamIndia", "#VaibhavSooryavanshi"],
-        "method": "Impact and strike rate against pace bowlers in every men's T20 since January 2025 (IPL, T20Is and more).",
+        "method": "Impact and strike rate in every men's T20 since January 2025 (IPL, T20Is and more).",
+        "prompt": "Does he open in Christchurch?",
         "key": "spotlight-sooryavanshi-nz-2026-10",
     },
     "nz-india-t20i": {
@@ -121,6 +123,7 @@ SPECS: Dict[str, Dict[str, Any]] = {
         "method": ("Ground numbers are every men's T20 at each ground since 2018 (Super Smash and T20Is); match-ups are "
                    "Impact per 100 balls in every T20 since 2025."),
         "link": "/venue?venue=Hagley+Oval%2C+Christchurch&team1=New+Zealand&team2=India",
+        "prompt": "Who wins the series?",
         "key": "spotlight-nz-india-t20i-preview-2026-10",
     },
     "sky": {
@@ -135,6 +138,7 @@ SPECS: Dict[str, Dict[str, Any]] = {
                    "(T20 Primer method) on every T20I and IPL game."),
         "names": {"Tilak Varma": "Tilak", "Ishan Kishan": "Kishan", "Shreyas Iyer": "Iyer"},
         "teams": {"United States of America": "USA"},
+        "prompt": "Should he be back?",
         "key": "spotlight-suryakumar-yadav-case-2026-10",
     },
 }
@@ -467,11 +471,11 @@ def make_post(db, spec: Dict[str, Any], built: Optional[Dict[str, Any]] = None) 
     for k in ("deep_cut_scope", "deep_cut_exclude", "link"):  # link: the post's page on the site (a series: its first ground)
         if spec.get(k):
             fact[k] = spec[k]
-    caption = ig_captions.build(built["title"], built["verdict"], "debate",
+    caption = ig_captions.build(built["title"], built["verdict"], "spotlight",
                                 spec.get("method") or "Impact and runs saved are computed ball by ball (T20 Primer method), "
                                                       "on every T20 each bowler played.",
                                 [spec["player"]] if spec.get("player") else built.get("players", [])[:2],
-                                spec["kicker"], spec.get("tags", []))
+                                spec["kicker"], spec.get("tags", []), prompt=spec.get("prompt") or built.get("prompt"))
     post = {"key": spec["key"], "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
             "caption": caption, "players": [spec["player"]] if spec.get("player") else built.get("players", [])}
     if built.get("deep_cut"):  # the spotlight's own (slide 3)
