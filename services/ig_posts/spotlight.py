@@ -397,6 +397,10 @@ def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         from services.ig_posts import case_odi
 
         return case_odi.build(db, spec)
+    if spec.get("type") == "squad_review":  # one team's squad, phase by phase (services/ig_posts/squad_post.py)
+        from services.ig_posts import squad_post
+
+        return squad_post.build(db, spec)
     if spec.get("type") == "series_preview":  # a series' grounds and match-ups (services/ig_posts/series_preview.py)
         from services.ig_posts import series_preview
 
@@ -458,3 +462,21 @@ def make_post(db, spec: Dict[str, Any], built: Optional[Dict[str, Any]] = None) 
         fact["deep_cut"] = built["deep_cut"]
         post["caption"] = ig_captions.with_deep_cut(caption, built["deep_cut"]["sentence"])
     return post
+
+
+# Squad reviews: one spec a team, built from the league's squads file (services/ig_posts/squad_post.spec_for).
+def _squad_specs() -> Dict[str, Dict[str, Any]]:
+    from services.ig_posts.squad_post import spec_for
+
+    teams = {"pr": "Paarl Royals", "dsg": "Durban's Super Giants", "jsk": "Joburg Super Kings", "mict": "MI Cape Town",
+             "pc": "Pretoria Capitals", "sec": "Sunrisers Eastern Cape"}
+    out = {}
+    for short, team in teams.items():
+        try:
+            out[f"sa20-2027-{short}"] = spec_for("data/squads/sa20_2027.json", team, f"spotlight-sa20-2027-squad-{short}")
+        except (OSError, StopIteration, KeyError):  # pragma: no cover - no squads file in this checkout
+            pass
+    return out
+
+
+SPECS.update(_squad_specs())
