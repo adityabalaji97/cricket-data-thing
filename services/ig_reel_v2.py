@@ -31,7 +31,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from services import llm
+from services import llm, social_rules
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +68,10 @@ TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept
 COVER_SECONDS = float(os.getenv("REEL_COVER", "0"))
 CAPTION_WORDS = 3              # words on screen at a time
 ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth", "preview")
-#: A match preview's Reel, in story order: what wins here, who's in form, who suits the ground, who has gone big here,
-#: the match-up, and a milestone to close on. The first k the carousel has; the milestone is kept as the closer.
-PREVIEW_BEATS = ("totals", "form-strips", "suits-ground", "ground-records", "key-battles", "milestones")
+#: A match preview's Reel, in story order: who's in form, who suits the ground, the match-up, who has gone big here, what
+#: wins here, and a milestone to close on. Players first: a Reel that opened on a ground total got 193 views (14 Oct;
+#: docs/social_rules.md). The first k the carousel has; the milestone is kept as the closer.
+PREVIEW_BEATS = ("form-strips", "suits-ground", "key-battles", "ground-records", "totals", "milestones")
 #: The payoff, in order of preference: what opens the Reel.
 PAYOFF = ("win_prob_line", "race_lines", "bowling_plan", "metric_bars", "deep_compare", "scorecard", "bucket_bars",
           "boundary_zones", "pair_dumbbell", "scatter_plus")
@@ -184,6 +185,9 @@ def guard(script: Dict[str, Any], ok: set, k: int, words_range: Tuple[int, int] 
         return f"the first line repeats the hook's {', '.join(sorted(again))}: move the story on instead"
     if h.endswith("?") and not numbers(h) and len(re.split(r"(?<=[.!?])\s+", h)) < 2:
         return "the hook is a bare question: give it a number or a sharp claim first (\"X happened. But why?\")"
+    house = social_rules.hook_problem(h)  # docs/social_rules.md: one player, one plain number, no metric names
+    if house:
+        return house
     said = numbers(" ".join([script["hook"], *lines]))
     extra = {n for n in said if n not in ok and _short(n) not in ok}
     return f"numbers not on the cards: {sorted(extra)}" if extra else None
@@ -250,7 +254,10 @@ Rules:
   tests finds a clear effect" means the evidence is mixed, so no "crash", "big dip" or flat yes/no. "Only", "the best",
   "none have matched" need a chart's rows to prove them; a lead of a couple of balls is "slightly", not "no one matches".
 - Never list more than three things in one sentence. No hashtags, no emojis, no "in this video".
-- End the last line with a short question that invites a comment, or a punchy closer.
+- End on the strongest argument the charts make. A closing question comes only after that point is made.
+
+House rules for Reels (docs/social_rules.md; they win over anything above):
+%(house)s
 
 Post hook: %(hook)s
 
@@ -268,6 +275,7 @@ def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = 
              " so people who drift come back. Give the advanced numbers room: that is why this Reel is longer."
              if length == "long" else "")
     msg = PROMPT % {"k": len(bs), "hook": hook, "charts": charts, "say": L["say"], "spoken": L["spoken"], "extra": extra,
+                    "house": social_rules.section("Reels") or "-",
                     "notes": f"\nAlso on the slides (may be used in the lines, e.g. the doubts):\n{notes}\n" if notes else ""}
     if close:
         msg += f"\nEnd the last line with exactly this question: \"{close}\""
@@ -311,7 +319,9 @@ fine. A problem is:
 - a metric described as a different one (runs saved or above average is never "win probability" or "chance of
   winning"; Impact is never runs saved; a strike rate is never an average);
 - a statement that contradicts THE VERDICT (a flat yes/no when it is "Partly" or "Inconclusive");
-- blaming a player, or hype ("game-changer", "elite", "unmatched").
+- blaming a player, or hype ("game-changer", "elite", "unmatched");
+- a hook that doesn't name a player, or that leads with a ground statistic or last night's scoreline;
+- a Reel that ends on a non-finding instead of its strongest argument.
 Not problems: restating a chart's title or help line in other words (titles are verified facts computed from the data);
 a number rounded the way the title or help line rounds it; for balls per wicket, economy and averages, lower is better;
 fair framing such as "raises questions", "is it worth it?", "slightly", "mixed"; the closing question.

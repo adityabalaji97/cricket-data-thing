@@ -144,8 +144,9 @@ def test_preview_beats_follow_the_story_and_close_on_a_milestone():
     slides = _preview_slides(["key-battles", "totals", "milestones", "form-strips", "suits-ground", "ground-records",
                               "where-won"])
     bs = R.beats(slides, k=5)
-    assert [c["id"] for _, c in bs] == ["totals", "form-strips", "suits-ground", "ground-records", "milestones"]
-    assert [c["id"] for _, c in R.beats(slides, k=3)] == ["totals", "form-strips", "milestones"]
+    # players first (docs/social_rules.md: a Reel opening on a ground total flopped), the milestone kept as the closer
+    assert [c["id"] for _, c in bs] == ["form-strips", "suits-ground", "key-battles", "ground-records", "milestones"]
+    assert [c["id"] for _, c in R.beats(slides, k=3)] == ["form-strips", "suits-ground", "milestones"]
     assert R.by_card_id(slides, ["milestones", "totals"]) == [4, 3]
 
 
