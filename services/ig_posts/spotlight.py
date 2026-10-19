@@ -94,6 +94,24 @@ SPECS: Dict[str, Dict[str, Any]] = {
         "prompt": "Does he open in Christchurch?",
         "key": "spotlight-sooryavanshi-nz-2026-10",
     },
+    "india-openers-nz": {
+        "type": "openers_case", "side": "India", "side_word": "India's", "side_poss": "India's", "since": date(2025, 1, 1),
+        "candidates": ["Abhishek Sharma", "Vaibhav Sooryavanshi", "Sanju Samson", "Ishan Kishan"],
+        "keepers": ["Sanju Samson", "Ishan Kishan"],
+        "names": {"Vaibhav Sooryavanshi": "Sooryavanshi", "Ishan Kishan": "Kishan", "Abhishek Sharma": "Abhishek",
+                  "Sanju Samson": "Samson"},
+        # New Zealand's attack: the new-ball quicks, Santner's left-arm spin, Bracewell's and Phillips's off-spin
+        "attack": [{"label": "New-ball pace", "kinds": ["pace bowler"], "powerplay": True,
+                    "help": "New-ball pace: overs 1-6"},
+                   {"label": "Left-arm spin", "styles": ["SLA"], "who": "Santner", "help": "Left-arm spin (Santner)"},
+                   {"label": "Off-spin", "styles": ["OB"], "help": "Off-spin (Bracewell, Phillips)"}],
+        "kicker": "India in New Zealand T20Is", "sub": "Four openers, three top-order slots: go big or go home",
+        "tags": ["#NZvIND", "#TeamIndia", "#AbhishekSharma", "#VaibhavSooryavanshi", "#SanjuSamson", "#IshanKishan"],
+        "method": ("every powerplay innings (overs 1-6) in men's T20s since January 2025, sorted by Impact (runs added to "
+                   "the team's projected total): big at +15 or more, costly below 0."),
+        "prompt": "Which three would you pick?",
+        "key": "spotlight-india-openers-nz-2026-10",
+    },
     "nz-india-t20i": {
         "type": "series_preview", "since": date(2018, 1, 1), "form_since": date(2025, 1, 1),
         # One ground under every name it has had: Wellington's stadium went WestpacTrust -> Westpac -> Sky -> Henry
@@ -425,6 +443,10 @@ def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         from services.ig_posts import series_preview
 
         return series_preview.build(db, spec)
+    if spec.get("type") == "openers_case":  # who opens: boom, bust and the possible top threes (openers_case.py)
+        from services.ig_posts import openers_case
+
+        return openers_case.build(db, spec)
     if spec.get("type") == "case_t20":  # a T20I batter's case, in Impact and WPA (services/ig_posts/case_t20.py)
         from services.ig_posts import case_t20
 

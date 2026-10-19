@@ -74,7 +74,7 @@ ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth", 
 PREVIEW_BEATS = ("form-strips", "suits-ground", "key-battles", "ground-records", "totals", "milestones")
 #: The payoff, in order of preference: what opens the Reel.
 PAYOFF = ("win_prob_line", "race_lines", "bowling_plan", "metric_bars", "deep_compare", "scorecard", "bucket_bars",
-          "boundary_zones", "pair_dumbbell", "scatter_plus")
+          "boundary_zones", "pair_dumbbell", "scatter_plus", "share_bars")
 SKIP = ("innings_scorecard", "xis", "innings_wagon")   # walls of text: not a Reel beat
 
 

@@ -177,6 +177,10 @@ def details(card: Dict[str, Any]) -> List[str]:
         top = rows[:3] + [r for r in rows[3:] if r.get("highlight")][:1]
         lines = [f"{'→ ' if r.get('highlight') else ''}{r['name']} {_f(r['value'], fmt_)}"
                  + (f" ({r['detail']})" if r.get("detail") else "") for r in top]
+    elif v == "share_bars":
+        labels = {g["key"]: g["label"].lower() for g in p.get("groups") or []}
+        lines = [f"{r['name']}: " + ", ".join(f"{_f(x['value'], p.get('format', 'pct0'))} {labels.get(x['key'], '')}"
+                                             for x in r.get("segments") or []) for r in p.get("rows") or []]
     elif v == "scatter_plus":
         x, y = p.get("x") or {}, p.get("y") or {}
         ranked = sorted((pt for pt in p.get("points") or [] if pt.get("label") or pt.get("highlight")),

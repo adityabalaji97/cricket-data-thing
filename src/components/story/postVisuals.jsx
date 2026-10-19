@@ -66,7 +66,7 @@ const Legend = ({ items }) => (
  */
 const Scorecard = ({ payload }) => {
   const { metrics, rows } = payload;
-  const cols = `92px repeat(${metrics.length}, 1fr)`;
+  const cols = `${payload.label_width || 92}px repeat(${metrics.length}, 1fr)`; // label_width: long row labels
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.5 }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: cols, gap: '4px', alignItems: 'end' }}>
@@ -245,6 +245,40 @@ const MetricBars = ({ payload }) => {
         );
       })}
       {payload.legend && <Legend items={payload.legend.map((t) => [t, teamColour(t, '#5b6b85')])} />}
+    </Box>
+  );
+};
+
+/**
+ * Shares that add up to 100% per row (how often each opener goes big, is middling, costs the team): one stacked bar a
+ * row, the first group in the accent colour, the last in red, each segment's share written on it when it fits.
+ * payload: {groups:[{key, label}], rows:[{name, detail?, segments:[{key, value}]}], format}
+ */
+export const SHARE_COLOURS = [colors.accent, '#5b6b85', '#e66767'];
+const ShareBars = ({ payload }) => {
+  const { groups, rows } = payload;
+  const colour = (k) => SHARE_COLOURS[Math.max(0, groups.findIndex((g) => g.key === k))] || '#5b6b85';
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.1 }}>
+      {rows.map((r) => (
+        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: 1, alignItems: 'center' }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography noWrap sx={{ fontSize: 13, color: colors.textHi, fontWeight: 600 }}>{r.name}</Typography>
+            {r.detail && <Typography noWrap sx={{ fontSize: 11, color: colors.textLo, lineHeight: 1.25 }}>{r.detail}</Typography>}
+          </Box>
+          <Box sx={{ display: 'flex', height: 26, gap: '2px' }}>
+            {r.segments.map((seg) => (
+              <Box key={seg.key} sx={{ width: `${seg.value}%`, bgcolor: colour(seg.key), borderRadius: '4px', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                {seg.value >= 9 && (
+                  <Typography sx={{ ...mono, fontSize: 12, fontWeight: 700, color: colors.bg }}>{fmt(seg.value, payload.format || 'pct0')}</Typography>
+                )}
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      ))}
+      <Legend items={groups.map((g) => [g.label, colour(g.key)])} />
     </Box>
   );
 };
@@ -739,6 +773,7 @@ export const POST_VISUALS = {
   scorecard: Scorecard,
   scatter_plus: ScatterPlus,
   metric_bars: MetricBars,
+  share_bars: ShareBars,
   race_lines: RaceLines,
   win_prob_line: WinProbLine,
   forest: Forest,

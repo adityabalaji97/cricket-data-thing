@@ -6,7 +6,7 @@ import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import StoryCard from '../story/StoryCard';
 import { toStoryCard } from '../story/visuals';
-import { fmt } from '../story/postVisuals';
+import { fmt, SHARE_COLOURS } from '../story/postVisuals';
 
 /**
  * /ig/:carouselId/:n — one Instagram carousel slide (services/ig_carousel.py), drawn by the app's own components at
@@ -44,7 +44,34 @@ const Lines = ({ text, size, color = colors.textHi }) => String(text || '').spli
  * The cover's hero (services/ig_cover.py): the lead bar chart's top rows under the hook, the subject in the accent, so
  * slide 1 shows a number worth stopping for. Bars run from a centre line when any value is negative.
  */
+const ShareHero = ({ hero }) => (
+  <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', mt: 1 }}>
+    {hero.rows.map((r) => (
+      <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: '108px 1fr', gap: 1, alignItems: 'center' }}>
+        <Typography noWrap sx={{ fontSize: 15, fontWeight: 600, color: colors.textHi }}>{r.name}</Typography>
+        <Box sx={{ display: 'flex', height: 20, gap: '2px' }}>
+          {r.segments.map((seg, i) => (
+            <Box key={seg.key} sx={{ width: `${seg.value}%`, bgcolor: SHARE_COLOURS[i], borderRadius: '4px', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {seg.value >= 10 && <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, fontWeight: 700, color: colors.bg }}>{fmt(seg.value, 'pct0')}</Typography>}
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    ))}
+    <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+      {hero.groups.map((g, i) => (
+        <Box key={g.key} sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+          <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: SHARE_COLOURS[i] }} />
+          <Typography sx={{ fontSize: 11, color: colors.textMed }}>{g.label}</Typography>
+        </Box>
+      ))}
+    </Box>
+  </Box>
+);
+
 const Hero = ({ hero }) => {
+  if (hero.kind === 'share') return <ShareHero hero={hero} />;
   const rows = hero.rows || [];
   const signed = rows.some((r) => r.value < 0);
   const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1e-9);

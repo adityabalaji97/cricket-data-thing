@@ -44,3 +44,13 @@ def test_hero_takes_the_lead_card_off_the_deck_and_x_shows_the_cover(monkeypatch
     thread = x_thread(out, "#INDvNZ")
     assert thread[0]["slide"] == 1 and thread[0]["text"].startswith("Hook\n\nLead claim")
     assert thread[1]["slide"] == 2
+
+
+def test_stacked_share_chart_makes_a_cover():
+    from services.ig_cover import hero_from
+
+    card = {"visual": "share_bars", "payload": {"groups": [{"key": "big", "label": "Big"}, {"key": "cost", "label": "Cost"}],
+                                                 "rows": [{"name": "A", "segments": [{"key": "big", "value": 40}, {"key": "cost", "value": 60}]},
+                                                          {"name": "B", "segments": [{"key": "big", "value": 10}, {"key": "cost", "value": 90}]}]}}
+    h = hero_from(card)
+    assert h["kind"] == "share" and [r["name"] for r in h["rows"]] == ["A", "B"] and len(h["groups"]) == 2

@@ -28,10 +28,17 @@ def variant(title: str) -> str:
 
 def hero_from(card: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """The top rows of a bar chart (metric_bars), the highlighted row kept: {rows: [{name, value, highlight}], format,
-    label}. Other visuals don't shrink to a cover well, so they give none."""
+    label}; or a stacked-share chart (share_bars) whole: {kind: "share", groups, rows}. Other visuals don't shrink to
+    a cover well, so they give none."""
+    p = card.get("payload") or {}
+    if card.get("visual") == "share_bars":  # stacked shares: every row (a handful), drawn as on the card
+        rows = p.get("rows") or []
+        if not 2 <= len(rows) <= 5:
+            return None
+        return {"kind": "share", "groups": p.get("groups") or [], "label": "",
+                "rows": [{"name": r.get("name"), "segments": r.get("segments") or []} for r in rows]}
     if card.get("visual") != "metric_bars":
         return None
-    p = card.get("payload") or {}
     rows = [r for r in p.get("rows") or [] if isinstance(r.get("value"), (int, float))]
     if len(rows) < 2:
         return None
