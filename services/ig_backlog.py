@@ -501,9 +501,22 @@ def add_deep_cut(db: Session, post: Dict[str, Any], day: Optional[date],
 
 def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "ig-backlog",
                 post_by: Optional[Any] = None) -> None:
-    """One Instagram pack: {key, pillar, fact, snapshot_id, warnings} planned for `day` (None = bench)."""
+    """One Instagram pack: {key, pillar, fact, snapshot_id, warnings} planned for `day` (None = bench). The carousel's
+    slides are checked against docs/social_rules.md on the way in; what they break joins the pack's warnings (the
+    admin shows them), and never stops the pack."""
     fact = post["fact"]
     caption = caption_of(post)
+    warnings = list(post.get("warnings") or [])
+    cid = fact.get("carousel_id") or post.get("snapshot_id")
+    if cid:
+        try:
+            from services.social_rules import lint_slides
+
+            data = conn.execute(text("SELECT data FROM chart_snapshots WHERE id = :c"), {"c": cid}).scalar() or {}
+            got = lint_slides((data or {}).get("slides") or [], fact.get("kind"))
+            warnings += [w for w in got if w not in warnings]
+        except Exception:  # pragma: no cover - a check never blocks a post
+            logger.exception("social rules check failed for %s", cid)
     conn.execute(text("""
         INSERT INTO content_packs (match_id, snapshot_id, angle_key, title, first_comment, subreddit, flair, facts,
                                    rule_warnings, status, source, channel, planned_for, pillar, caption, post_by)
@@ -519,7 +532,7 @@ def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "
             status = CASE WHEN content_packs.status = 'expired' AND content_packs.source = 'ig-backlog'
                           THEN 'ready' ELSE content_packs.status END
     """), {"s": post["snapshot_id"], "k": f"ig:{post['key']}", "t": fact["title"],
-           "f": json.dumps(fact, default=str), "w": json.dumps(post["warnings"]), "d": day,
+           "f": json.dumps(fact, default=str), "w": json.dumps(warnings), "d": day,
            "p": post["pillar"], "c": caption, "src": source, "pb": post_by})
 
 

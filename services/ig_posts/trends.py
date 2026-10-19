@@ -195,13 +195,14 @@ def entry_for(db: Session, name: str, role: str, hs: List[Dict[str, Any]], scope
 
 def rank(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Jev's appeal score with the headlines as context (without Jev: how many feeds named the player)."""
-    from services import jev_client
+    from services import jev_client, social_rules
     from services.ig_posts.questions import APPEAL_CRITERIA
 
     scores = {}
     if entries and jev_client.enabled():
         answers = jev_client.ask(
             {"audience": "Indian and global cricket fans on Instagram, this morning",
+             "what draws strangers on Instagram": social_rules.section("Appeal"),
              "candidates": {e["question"].key: {"question": e["question"].text,
                                                "in the news": [h["title"] for h in e["headlines"]]} for e in entries}},
             {e["question"].key: {"type": "score", "criteria": APPEAL_CRITERIA,

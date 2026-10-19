@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from services import jev_client
+from services import jev_client, social_rules
 from services.ig_posts import angles as A
 from services.ig_posts.context import QuestionContext
 from services.ig_posts.planner import plan
@@ -145,7 +145,8 @@ def appeal(questions: List[Question]) -> Dict[str, float]:
     if not questions or not jev_client.enabled():
         return {}
     answers = jev_client.ask(
-        {"audience": "Indian and global cricket fans on Instagram", "questions": {q.key: q.text for q in questions}},
+        {"audience": "Indian and global cricket fans on Instagram", "questions": {q.key: q.text for q in questions},
+         "what draws strangers on Instagram": social_rules.section("Appeal")},
         {q.key: {"type": "score", "instructions": f"How much would cricket fans on Instagram argue about: \"{q.text}\"?",
                  "criteria": APPEAL_CRITERIA} for q in questions},
         timeout=10.0,
