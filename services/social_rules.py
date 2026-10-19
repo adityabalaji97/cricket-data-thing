@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 RULES_FILE = Path(__file__).resolve().parents[1] / "docs" / "social_rules.md"
 MAX_TITLE = 110
+MAX_SLIDES = 8
 #: Metric names that lose a stranger in the first seconds of a Reel.
 JARGON = re.compile(r"\b(impact|wpa|raa|waa|win probability|runs above average|per 100|per hundred)\b", re.I)
 
@@ -70,6 +71,8 @@ def lint_slides(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> Lis
     """Every testable carousel rule broken by a post's slides, as 'Slide n: ...' warnings. kind: the post's kind (a
     play-along keeps its deeper cut after the answer, on purpose)."""
     out = []
+    if len(slides or []) > MAX_SLIDES:
+        out.append(f"{len(slides)} slides: keep a carousel to {MAX_SLIDES} (completion counts)")
     for n, s in enumerate(slides or [], 1):
         c = s.get("card") if isinstance(s, dict) else None
         if not c:

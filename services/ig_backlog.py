@@ -513,7 +513,10 @@ def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "
             from services.social_rules import lint_slides
 
             data = conn.execute(text("SELECT data FROM chart_snapshots WHERE id = :c"), {"c": cid}).scalar() or {}
-            got = lint_slides((data or {}).get("slides") or [], fact.get("kind"))
+            slides_ = (data or {}).get("slides") or []
+            if slides_ and slides_[0].get("cover"):
+                fact["cover"] = slides_[0]["cover"]  # the cover A/B (services/ig_cover.py)
+            got = lint_slides(slides_, fact.get("kind"))
             warnings += [w for w in got if w not in warnings]
         except Exception:  # pragma: no cover - a check never blocks a post
             logger.exception("social rules check failed for %s", cid)

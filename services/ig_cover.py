@@ -1,0 +1,58 @@
+"""
+The carousel cover's hero: the lead chart's top rows drawn on the hook slide, so the cover shows a number worth
+stopping for, not just words (the feed shows only slide 1; strangers decide there). A two-week A/B from 19 Oct 2026:
+half the carousels get the hero, half keep the text cover, picked by the post's title so a rebuild keeps its side.
+The variant is stored on the hook slide ("cover") and on the pack (facts.cover) to compare against Instagram's numbers.
+
+    COVER_HERO=ab (default) | on | off
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+from copy import deepcopy
+from typing import Any, Dict, List, Optional
+
+ROWS = 4
+
+
+def variant(title: str) -> str:
+    mode = os.getenv("COVER_HERO", "ab").lower()
+    if mode == "on":
+        return "hero"
+    if mode == "off":
+        return "text"
+    return "hero" if int(hashlib.sha1(title.encode()).hexdigest(), 16) % 2 == 0 else "text"
+
+
+def hero_from(card: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The top rows of a bar chart (metric_bars), the highlighted row kept: {rows: [{name, value, highlight}], format,
+    label}. Other visuals don't shrink to a cover well, so they give none."""
+    if card.get("visual") != "metric_bars":
+        return None
+    p = card.get("payload") or {}
+    rows = [r for r in p.get("rows") or [] if isinstance(r.get("value"), (int, float))]
+    if len(rows) < 2:
+        return None
+    top = rows[:ROWS]
+    mine = next((r for r in rows if r.get("highlight")), None)
+    if mine and mine not in top:
+        top = top[: ROWS - 1] + [mine]
+    metric = p.get("metric") or {}
+    return {"rows": [{"name": r.get("name"), "value": r["value"], "highlight": bool(r.get("highlight"))} for r in top],
+            "format": metric.get("format", "dec1"), "label": metric.get("label", "")}
+
+
+def with_hero(slides: List[Dict[str, Any]], title: str) -> List[Dict[str, Any]]:
+    """The slides, the hook marked with its cover variant and, on the hero side, the lead bar chart's top rows."""
+    if not slides or slides[0].get("type") != "hook" or "cover" in slides[0]:
+        return slides
+    out = deepcopy(slides)
+    v = variant(title)
+    lead = next((s.get("card") for s in out[1:] if s.get("type") == "card" and hero_from(s.get("card") or {})), None)
+    if v == "hero" and lead:
+        out[0]["hero"] = hero_from(lead)
+        out[0]["cover"] = "hero"
+    else:
+        out[0]["cover"] = "text" if v == "text" else "text-no-chart"
+    return out

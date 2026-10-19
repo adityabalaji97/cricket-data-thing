@@ -80,6 +80,18 @@ SPECS: Dict[str, Dict[str, Any]] = {
                                "A wicket every 24 balls"],
                      "source": "ESPNcricinfo", "confirmed": True},
     },
+    "sooryavanshi-nz": {
+        "type": "batter_v_attack", "player": "Vaibhav Sooryavanshi", "role": "batter", "since": date(2025, 1, 1),
+        "openers": ["Vaibhav Sooryavanshi", "Abhishek Sharma", "Sanju Samson", "Ishan Kishan", "Finn Allen", "Tim Seifert",
+                    "Devon Conway"],
+        "sides": "India's and New Zealand's", "names": {"Vaibhav Sooryavanshi": "Sooryavanshi", "Ishan Kishan": "Kishan"},
+        "hook": "Vaibhav Sooryavanshi scores at 221 against new-ball pace. New Zealand bowl pace with nearly two balls in three.",
+        "kicker": "India in New Zealand T20Is", "sub": "Where his runs come from, and the one ball that slows him",
+        "watch": "Christchurch hosts games 1 and 2, the lowest-scoring of the four grounds",
+        "tags": ["#NZvIND", "#TeamIndia", "#VaibhavSooryavanshi"],
+        "method": "Impact and strike rate against pace bowlers in every men's T20 since January 2025 (IPL, T20Is and more).",
+        "key": "spotlight-sooryavanshi-nz-2026-10",
+    },
     "nz-india-t20i": {
         "type": "series_preview", "since": date(2018, 1, 1), "form_since": date(2025, 1, 1),
         # One ground under every name it has had: Wellington's stadium went WestpacTrust -> Westpac -> Sky -> Henry
@@ -397,6 +409,10 @@ def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         from services.ig_posts import case_odi
 
         return case_odi.build(db, spec)
+    if spec.get("type") == "batter_v_attack":  # a batter against the bowling he's about to face (batter_v_attack.py)
+        from services.ig_posts import batter_v_attack
+
+        return batter_v_attack.build(db, spec)
     if spec.get("type") == "squad_review":  # one team's squad, phase by phase (services/ig_posts/squad_post.py)
         from services.ig_posts import squad_post
 
