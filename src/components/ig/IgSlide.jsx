@@ -6,6 +6,7 @@ import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import StoryCard from '../story/StoryCard';
 import { toStoryCard } from '../story/visuals';
+import { fmt } from '../story/postVisuals';
 
 /**
  * /ig/:carouselId/:n — one Instagram carousel slide (services/ig_carousel.py), drawn by the app's own components at
@@ -39,12 +40,44 @@ const Lines = ({ text, size, color = colors.textHi }) => String(text || '').spli
   <Typography key={line} sx={{ fontSize: size, lineHeight: 1.35, color }}>{line}</Typography>
 ));
 
+/**
+ * The cover's hero (services/ig_cover.py): the lead bar chart's top rows under the hook, the subject in the accent, so
+ * slide 1 shows a number worth stopping for. Bars run from a centre line when any value is negative.
+ */
+const Hero = ({ hero }) => {
+  const rows = hero.rows || [];
+  const signed = rows.some((r) => r.value < 0);
+  const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1e-9);
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '7px', mt: 1 }}>
+      {rows.map((r) => {
+        const width = (100 * Math.abs(r.value)) / max / (signed ? 2 : 1);
+        const ink = r.highlight ? colors.accent : colors.textHi;
+        return (
+          <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: '108px 1fr 52px', gap: 1, alignItems: 'center' }}>
+            <Typography noWrap sx={{ fontSize: 15, fontWeight: r.highlight ? 700 : 500, color: ink }}>{r.name}</Typography>
+            <Box sx={{ position: 'relative', height: 16 }}>
+              {signed && <Box sx={{ position: 'absolute', left: '50%', top: -2, bottom: -2, width: '1px', bgcolor: colors.borderStrong }} />}
+              <Box sx={{ position: 'absolute', top: 2, height: 12, borderRadius: '4px',
+                bgcolor: r.highlight ? colors.accent : '#5b6b85',
+                left: signed ? (r.value >= 0 ? '50%' : `${50 - width}%`) : 0, width: `${Math.max(2, width)}%` }} />
+            </Box>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, color: ink, textAlign: 'right', fontFamily: fonts.mono }}>{fmt(r.value, hero.format)}</Typography>
+          </Box>
+        );
+      })}
+      {hero.label && <Typography sx={{ fontSize: 11, color: colors.textLo }}>{hero.label}</Typography>}
+    </Box>
+  );
+};
+
 const TEXT_SLIDES = {
   hook: (s) => (
-    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.5 }}>
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: s.hero ? 1.2 : 1.5 }}>
       {s.kicker && <Typography sx={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.1em', color: colors.accent }}>{s.kicker.toUpperCase()}</Typography>}
-      <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 40, lineHeight: 1.04, textWrap: 'balance' }}>{s.text}</Typography>
-      {s.sub && <Typography sx={{ fontSize: 16, color: colors.textMed }}>{s.sub}</Typography>}
+      <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: s.hero ? 32 : 40, lineHeight: 1.04, textWrap: 'balance' }}>{s.text}</Typography>
+      {s.sub && !s.hero && <Typography sx={{ fontSize: 16, color: colors.textMed }}>{s.sub}</Typography>}
+      {s.hero && <Hero hero={s.hero} />}
     </Box>
   ),
   text: (s) => (

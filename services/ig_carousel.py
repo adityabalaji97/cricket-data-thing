@@ -129,7 +129,9 @@ def for_story_cards(cards: List[Dict[str, Any]], teams: List[str], hook: str, ki
 def save(db: Session, slides: List[Dict[str, Any]], title: str, key: Dict[str, Any], created_by: str) -> Dict[str, Any]:
     """Store the slides as a carousel snapshot. Snapshots are frozen and de-duplicated by key, so the slides are part
     of the key: the same slides give back the same snapshot, changed slides a new one."""
+    from services.ig_cover import with_hero
     from services.snapshots import create_static_snapshot
 
+    slides = with_hero(slides, title)  # the cover A/B: half the carousels get the lead chart on slide 1 (ig_cover.py)
     return create_static_snapshot(db, "carousel", {"slides": slides, "title": title}, title,
                                   {"carousel": key, "slides": slides}, created_by=created_by)

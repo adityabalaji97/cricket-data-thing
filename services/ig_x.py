@@ -6,8 +6,9 @@ player in the thread ("Shai Hope", or "Hope" when only one of the post's players
 
     x_thread(slides, caption, chart_titles)  ->  [{"n": 1, "text": "...", "slide": 1}, ...]
 
-Tweet 1 is the hook slide (marked as a thread), each reply is the next slide with the sentence it shows (a card's
-title is its takeaway), and the last carries the link (hindsightcricket.com/links?utm_source=x, counted by the usage
+Tweet 1 is the hook with the lead chart (slide 2) attached and its takeaway, marked as a thread (X gives native images
+more reach than a text cover; lead_chart=False keeps the old hook-slide tweet); each reply is the next slide with the
+sentence it shows (a card's title is its takeaway), and the last carries the link (hindsightcricket.com/links?utm_source=x, counted by the usage
 report), or, when given, the post's own page: its scorecard, query or note (services/ig_links.py). Every tweet fits
 X's 280 characters, counting a link as 23 as X does. Posting is by hand from the admin page.
 """
@@ -261,12 +262,17 @@ def _fit_lines(head: str, lines: List[str], suffix: str) -> str:
 
 
 def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[Dict[str, str]] = None,
-             players: Optional[List[str]] = None, link: Optional[str] = None) -> List[Dict[str, Any]]:
+             players: Optional[List[str]] = None, link: Optional[str] = None, lead_chart: bool = True) -> List[Dict[str, Any]]:
     """link: the post's own page (services/ig_links.post_link) for the last tweet; default the bio page. Each tweet is
     the slide's sentence plus the stat lines that fit (details())."""
     link = link or LINK
     tags = " ".join(thread_tags(caption))
-    total = len(slides)
+    # (slide number, sentence, stat lines) per tweet: with lead_chart, the hook rides on the lead card's tweet.
+    units = [(i, slide_text(s, chart_titles or {}), slide_lines(s)) for i, s in enumerate(slides, start=1)]
+    if lead_chart and len(slides) > 2 and slides[0].get("type") == "hook" and slides[1].get("type") == "card":
+        hook = str(slides[0].get("text") or "").strip()
+        units = [(2, f"{hook}\n\n{slide_text(slides[1], chart_titles or {})}", slide_lines(slides[1]))] + units[2:]
+    total = len(units)
     names = list(dict.fromkeys([*(players or []), *players_in(slides)]))
     suffixes = []
     for i in range(1, total + 1):
@@ -278,11 +284,10 @@ def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[
             suffixes.append(f"\n\n{i}/{total} {tags}")
     # Which stat lines fit is settled first, then players are tagged across what's left: a line dropped for length
     # mustn't use up a player's first mention (a hashtag is never longer than the name it replaces).
-    bodies = [_fit_lines(slide_text(slide, chart_titles or {}), slide_lines(slide), sfx)[: -len(sfx)]
-              for slide, sfx in zip(slides, suffixes)]
+    bodies = [_fit_lines(head, lines, sfx)[: -len(sfx)] for (_n, head, lines), sfx in zip(units, suffixes)]
     tagged = tag_players(bodies, names)
-    tweets = [{"n": i, "slide": i, "text": _fit(body, sfx)}
-              for i, (body, sfx) in enumerate(zip(tagged, suffixes), start=1)]
+    tweets = [{"n": i, "slide": unit[0], "text": _fit(body, sfx)}
+              for i, (unit, body, sfx) in enumerate(zip(units, tagged, suffixes), start=1)]
     return tweets
 
 

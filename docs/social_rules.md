@@ -20,6 +20,8 @@ rules code can test (warnings in the admin's Daily posts tab). Edit a rule here 
 
 - A "case for a player" post tells a story: career, turning point, the rival's rise, his old role now, the rest of the case, both ways.
 - "The deeper cut" is slide 3.
+- At most 8 slides: Instagram counts how many viewers reach the last one. Fold a slide that only repeats earlier titles into the caption.
+- The cover (slide 1) carries a reason to stop: the hook, and on the hero side of the cover test (services/ig_cover.py) the lead chart's top rows.
 - Bold cards, a one-line header and footer, no legend; the data credit in the footer; no player photos or logos.
 - A card title fits the slide: 110 characters at most.
 - No list of more than three items in one sentence.
@@ -39,6 +41,7 @@ rules code can test (warnings in the admin's Daily posts tab). Edit a rule here 
 ## X
 
 - A reply to a viral take is one tweet under 280 characters with four image cards.
+- A thread's first tweet carries the lead chart (slide 2) with the hook and its claim, not a text-only cover: X gives native images more reach, and the first 30 minutes decide most of it. Links only in the last tweet.
 - In a thread, a player's first mention is a hashtag; each tweet ends with the lead tag and #CricketTwitter; credit @himganj153 and @TechRadar9; the last tweet links the post's page.
 
 ## Appeal

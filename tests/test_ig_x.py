@@ -13,7 +13,7 @@ def slides(n_cards=3, title="Par about 185, no clear edge for chasing"):
 
 def test_one_tweet_per_slide_with_tags_and_numbering():
     s = slides()
-    thread = x_thread(s, CAPTION, {"abc": "Bumrah saves the most at the death"})
+    thread = x_thread(s, CAPTION, {"abc": "Bumrah saves the most at the death"}, lead_chart=False)
     assert [t["slide"] for t in thread] == list(range(1, len(s) + 1))
     assert thread[0]["text"].startswith("1st T20I · Lucknow: 6 things the data says")
     assert "🧵" in thread[0]["text"] and f"1/{len(s)}" in thread[0]["text"]
@@ -112,3 +112,14 @@ def test_stat_lines_are_dropped_whole_to_fit():
         "headline": "Head.", "bullets": ["line " * 30, "short one"]}}}]
     text = x_thread(s, CAPTION)[0]["text"]
     assert weight(text) <= LIMIT and "…" not in text.split("\n\n")[0]
+
+
+def test_the_first_tweet_carries_the_lead_chart_and_the_hook():
+    s = slides()
+    thread = x_thread(s, CAPTION, {"abc": "Bumrah saves the most at the death"})
+    assert len(thread) == len(s) - 1  # the hook no longer has a tweet of its own
+    assert thread[0]["slide"] == 2  # the lead card's chart is the image
+    assert thread[0]["text"].startswith("6 things the data says before India v West Indies\n\nPar about 185")
+    assert "🧵" in thread[0]["text"] and f"1/{len(s) - 1}" in thread[0]["text"]
+    assert [t["slide"] for t in thread[1:]] == list(range(3, len(s) + 1))
+    assert all(weight(t["text"]) <= LIMIT for t in thread)
