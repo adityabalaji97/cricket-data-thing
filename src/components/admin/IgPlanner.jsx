@@ -178,13 +178,14 @@ const VideoTab = ({ pack, copy, toast, onUpdate }) => {
   const yt = (pack.facts || {}).youtube;
   const reel = (pack.facts || {}).reel || {};
   const { files, busy, tap } = useTwoTapShare(async () => {
-    const res = await fetch(`${config.API_URL}/snapshots/${id}/reel.mp4`);
+    // A cache-buster: a re-made Reel (v1 to voiced v2) keeps its URL, and the CDN holds the old one for an hour.
+    const res = await fetch(`${config.API_URL}/snapshots/${id}/reel.mp4?t=${Date.now()}`);
     if (!res.ok) throw new Error('no reel');
     return [new File([await res.blob()], `hindsight-${id}.mp4`, { type: 'video/mp4' })];
   }, pack.title, toast);
   // The Shorts cut ends on the 9:16 cover for half a second: pick that frame as the Short's thumbnail.
   const short = useTwoTapShare(async () => {
-    const res = await fetch(`${config.API_URL}/snapshots/${id}/short.mp4`);
+    const res = await fetch(`${config.API_URL}/snapshots/${id}/short.mp4?t=${Date.now()}`);
     if (!res.ok) throw new Error('no short');
     return [new File([await res.blob()], `hindsight-${id}-short.mp4`, { type: 'video/mp4' })];
   }, `${pack.title} · Short`, toast);

@@ -53,11 +53,12 @@ def test_variant_ab_and_eligibility(monkeypatch):
     monkeypatch.delenv("REEL_V2", raising=False)
     assert R.variant("recap", date(2026, 10, 12)) == "v1"  # off unless switched on
     monkeypatch.setenv("REEL_V2", "1")
+    monkeypatch.delenv("REEL_AB", raising=False)
     even, odd = date(2026, 10, 12), date(2026, 10, 13)
-    assert {R.variant("recap", even), R.variant("recap", odd)} == {"v1", "v2"}
+    assert R.variant("recap", even) == R.variant("recap", odd) == "v2"  # every day, by default
     assert R.variant("play", even) == "v1"  # not a Reel kind
-    monkeypatch.setenv("REEL_AB", "0")
-    assert R.variant("recap", odd) == "v2"
+    monkeypatch.setenv("REEL_AB", "1")  # the day A/B, when switched back on
+    assert {R.variant("recap", even), R.variant("recap", odd)} == {"v1", "v2"}
 
 
 def test_signs_are_spoken_and_verdicts_are_material():
