@@ -18,8 +18,6 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
-assert "localhost" in os.environ.get("DATABASE_URL", ""), "run against the local database"
-
 from services.snapshots import create_static_snapshot  # noqa: E402
 
 Q = "https://hindsightcricket.com/query?"
@@ -110,14 +108,23 @@ season26 = card(
     "IPL 2026 · batters with 250+ balls", "Impact: runs added to the team's projected total")
 
 ARTICLE = [trade, verdict, first10, partners, by_season, season26]
+# The cover carries the Impact ranking's top rows (services/ig_cover: only a bar chart shrinks onto a cover); the full
+# ranking stays in the deck as slide 3, so every tweet in the thread has a slide.
+from services.ig_cover import hero_from  # noqa: E402
+
+_hero = hero_from(verdict)
+_hero["rows"] = [{**r, "name": {"Devon Conway": "Conway", "Mayank Agarwal": "Mayank", "Suryakumar Yadav": "SKY"}.get(r["name"], r["name"])}
+                 for r in _hero["rows"]]  # the cover's name column is 108px
+
 INSTAGRAM = ([{"type": "hook", "kicker": "KL Rahul · IPL",
                "text": "KL Rahul batted 42 balls per dismissal in 2019–23, the most of any IPL top-order regular. Did it help?",
-               "sub": "Swipe through the data"}]
+               "sub": "Swipe through the data", "cover": "hero", "hero": {**_hero, "card": verdict}}]
              + [{"type": "card", "card": c, "teams": None} for c in (trade, verdict, first10, season26)]
              + [{"type": "end", "heading": "Run it yourself",
                  "body": "Every number comes from ball-by-ball data. Ask your own question on the query builder: it's free."}])
 
 if __name__ == "__main__":
+    assert "localhost" in os.environ.get("DATABASE_URL", ""), "run against the local database"
     out = {}
     for name, slides in (("article", [{"type": "card", "card": c, "teams": None} for c in ARTICLE]), ("instagram", INSTAGRAM)):
         snap = create_static_snapshot(None, "carousel", {"slides": slides, "title": f"KL: because of, or despite? ({name})"},
