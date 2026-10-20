@@ -167,6 +167,9 @@ const ScatterPlus = ({ payload }) => {
           <rect x={boxX[0]} y={boxY[0]} width={boxX[1] - boxX[0]} height={boxY[1] - boxY[0]} fill={colors.accent} fillOpacity="0.07" />
         )}
         <rect x={L} y={T} width={W - L - R} height={B - T} fill="none" stroke={colors.border} />
+        {/* Zero lines for signed measures (runs above average and the like), so the quadrants mean something. */}
+        {x0 < 0 && x1 > 0 && <line x1={sx(0)} y1={T} x2={sx(0)} y2={B} stroke={colors.borderStrong} strokeDasharray="3 3" />}
+        {y0 < 0 && y1 > 0 && <line x1={L} y1={sy(0)} x2={W - R} y2={sy(0)} stroke={colors.borderStrong} strokeDasharray="3 3" />}
         {points.filter((p) => !p.highlight && !p.label).map((p) => {
           const op = Z && p.zp != null ? 0.18 + 0.8 * (p.zp / 100) : 0.55;
           const inBox = subject && better(p, 'x', subject) && better(p, 'y', subject);
@@ -184,7 +187,9 @@ const ScatterPlus = ({ payload }) => {
         {subject && (
           <g>
             <circle cx={sx(subject.x)} cy={sy(subject.y)} r="7" fill={colors.accent} stroke={colors.bg} strokeWidth="2" />
-            <text x={sx(subject.x) > (W - R) * 0.65 ? sx(subject.x) - 10 : sx(subject.x) + 10} y={sy(subject.y) - 8}
+            {/* Beside the dot when it sits at the top of the plot, clear of the y-axis title. */}
+            <text x={sx(subject.x) > (W - R) * 0.65 ? sx(subject.x) - 11 : sx(subject.x) + 11}
+              y={sy(subject.y) < T + 20 ? sy(subject.y) + 4.5 : sy(subject.y) - 8}
               textAnchor={sx(subject.x) > (W - R) * 0.65 ? 'end' : 'start'}
               style={{ fontFamily: fonts.body, fontSize: 13, fontWeight: 600, fill: colors.accent }}>
               {subject.short || surname(subject.name)}
