@@ -5,7 +5,7 @@ Get "Gambhir's XI" ready to publish, as drafts only (nothing here posts anywhere
   2. the same rows copied into the LOCAL database, rendered by the local frontend (scripts/render_ig_slides.mjs,
      which has the ScatterPlus fix before it's deployed) and the PNGs stored in production, with the Reel
   3. a draft note on the site (kind 'article', author: Aditya), its images the stored slides
-  4. the Instagram pack queued for --date with the hand-written caption and X thread (social.md)
+  4. the Instagram pack queued for --date (default: the bench, no day) with the hand-written caption and X thread (social.md)
 
     python articles/gambhir/prepare.py                 # dry run: print the plan
     python articles/gambhir/prepare.py --write          # do it (local API on :8000, frontend on :3000)
@@ -106,7 +106,6 @@ def instagram_only(db, prod, local, tweets: list[str]) -> int:
     ig = ig_carousel.save(db, deck, HOOK, {"article": SLUG, "set": "instagram", "cover": "hero"}, "article")
     copy_to_local(ig["id"], prod, local)
     print(f"instagram {ig['id']}: cover {deck[0].get('cover')}, rendered {render_and_store(ig['id'], len(deck), prod)}/{len(deck)}")
-    print(f"reel: {ig_slides.reel_from_stored(ig['id'], len(deck))}s")
     with prod.begin() as conn:
         fact = conn.execute(text("SELECT facts FROM content_packs WHERE angle_key = :k"), {"k": f"ig:{KEY}"}).scalar()
         slide_of = {s.get("card", {}).get("id"): i + 1 for i, s in enumerate(deck) if s.get("card")}
@@ -114,6 +113,7 @@ def instagram_only(db, prod, local, tweets: list[str]) -> int:
         fact["x"] = thread(tweets, slide_of, post_link(fact))
         conn.execute(text("UPDATE content_packs SET snapshot_id = :s, facts = CAST(:f AS jsonb) WHERE angle_key = :k"),
                      {"s": ig["id"], "f": json.dumps(fact, default=str), "k": f"ig:{KEY}"})
+    print(f"reel: {ig_slides.reel_from_stored(ig['id'], len(deck))}s")  # after the pack points at this deck
     for t in fact["x"]:
         print(f"  tweet {t['n']} -> slide {t['slide']}")
     return 0
@@ -122,7 +122,7 @@ def instagram_only(db, prod, local, tweets: list[str]) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
-    ap.add_argument("--date", default="2026-10-21", help="the day the Instagram pack is planned for")
+    ap.add_argument("--date", default="bench", help="the day the Instagram pack is planned for, or 'bench' (no day)")
     ap.add_argument("--instagram-only", action="store_true",
                     help="rebuild just the Instagram deck, its slides, Reel and thread, and point the queued pack at it")
     args = ap.parse_args()
@@ -164,8 +164,6 @@ def main() -> int:
     for sid, n in ((art["id"], len(article_slides)), (ig["id"], len(deck))):
         copy_to_local(sid, prod, local)
         print(f"rendered {sid}: {render_and_store(sid, n, prod)}/{n}")
-    seconds = ig_slides.reel_from_stored(ig["id"], len(deck))
-    print(f"reel: {seconds}s")
 
     # 3. The site note, a draft.
     dek, body = note_body(art["id"])
@@ -183,8 +181,10 @@ def main() -> int:
     post = {"key": KEY, "pillar": "reactive", "fact": fact, "snapshot_id": ig["id"], "warnings": [],
             "players": ["Gautam Gambhir"], "caption": caption}
     with prod.begin() as conn:
-        ig_backlog.upsert_pack(conn, post, date.fromisoformat(args.date), source="article")
+        ig_backlog.upsert_pack(conn, post, None if args.date == "bench" else date.fromisoformat(args.date), source="article")
     print(f"queued ig:{KEY} for {args.date}")
+    # After the pack exists: the voiced v2 Reel finds its post through the pack (ig_reel_v2.for_carousel).
+    print(f"reel: {ig_slides.reel_from_stored(ig['id'], len(deck))}s")
     return 0
 
 
