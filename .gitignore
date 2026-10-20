@@ -102,3 +102,4 @@ ml/models/
 !data/squads/*.json
 articles/*/article/
 articles/*/instagram/
+articles/*/data/
