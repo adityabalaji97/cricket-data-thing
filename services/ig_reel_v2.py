@@ -3,7 +3,7 @@ Reel v2: a 15-20 second Reel that opens on the post's payoff chart, voiced and c
 as a silent slideshow (services/ig_slides.make_reel, v1).
 
     make(carousel_id, slides, voice=None, base=SITE, store=True, out=None)  ->  {seconds, script, source, voice, mp4}
-    for_carousel(carousel_id)  ->  seconds, or None (not eligible / the A/B day is v1 / it failed: v1 is made instead)
+    for_carousel(carousel_id)  ->  seconds, or None (not eligible / REEL_AB's v1 day / it failed: v1 is made instead)
 
 1. beats: the 2-3 strongest cards: the payoff (a win-probability line, a record race, a bowling plan, a highlighted
    bar chart ...), the deeper cut, one more. Previews and play-alongs get no v2 Reel.
@@ -860,11 +860,11 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
 # ---- the A/B, and the queue ------------------------------------------------------------------------------------------
 
 def variant(kind: str, day: Optional[date]) -> str:
-    """'v2' or 'v1' for a post: v2 only when switched on (REEL_V2=1) and the kind suits it; during the A/B (REEL_AB=1)
-    alternate days (even ordinals v2), so the two are compared on similar posts."""
+    """'v2' or 'v1' for a post: v2 when switched on (REEL_V2=1) and the kind suits it. Every Reel is voiced v2 since
+    20 Oct 2026; the day A/B (alternate days v1) comes back only with REEL_AB=1."""
     if os.getenv("REEL_V2") != "1" or kind not in ELIGIBLE:
         return "v1"
-    if os.getenv("REEL_AB", "1") == "1" and day is not None and day.toordinal() % 2:
+    if os.getenv("REEL_AB", "0") == "1" and day is not None and day.toordinal() % 2:
         return "v1"
     return "v2"
 
