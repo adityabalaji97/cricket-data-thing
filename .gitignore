@@ -100,3 +100,5 @@ ml/models/
 # ...and league squads for squad reviews (services/squad_review.py), confirmed from the source named inside
 !data/squads/
 !data/squads/*.json
+articles/*/article/
+articles/*/instagram/
