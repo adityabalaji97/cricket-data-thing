@@ -373,16 +373,34 @@ const localStart = (match) => {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if (zone === 'Asia/Kolkata' || zone === 'Asia/Calcutta') time = time.replace(/GMT\+5:30$/, 'IST');
   const today = new Date().toLocaleDateString('en-CA');
-  const weekday = date === today ? '' : `${start.toLocaleDateString(undefined, { weekday: 'short' })} `;
-  return { date, label: `${weekday}${time}` };
+  const tomorrow = new Date(Date.now() + 864e5).toLocaleDateString('en-CA');
+  const day = date === today ? '' : date === tomorrow ? 'Tomorrow ' : `${start.toLocaleDateString(undefined, { weekday: 'short' })} `;
+  return { date, label: `${day}${time}` };
 };
+
+// The sides and leagues whose matches lead the row, so a big game is never pushed off it by a busy day elsewhere.
+const BIG_TEAMS = new Set(['India', 'Australia', 'England', 'South Africa', 'New Zealand', 'Pakistan', 'Sri Lanka',
+  'West Indies', 'Afghanistan', 'Bangladesh']);
+const BIG_SERIES = /\b(IPL|INDIAN PREMIER LEAGUE|WORLD CUP|ASIA CUP|CHAMPIONS TROPHY|BIG BASH|BBL|PSL|SA20|CPL|THE HUNDRED|MLC)\b/i;
+const isBig = (match) => BIG_TEAMS.has(match.team1) || BIG_TEAMS.has(match.team2) || BIG_SERIES.test(match.series || '');
+const AHEAD_MS = 36 * 3600e3; // today's matches, plus anything starting in the next day and a half
+
+// Live first, then by day; within a day the big matches lead, then by start time.
+const fixtureOrder = (a, b) => (Number(b.isLive) - Number(a.isLive))
+  || localStart(a).date.localeCompare(localStart(b).date)
+  || (Number(isBig(b)) - Number(isBig(a)))
+  || String(a.startUtc || a.time || '').localeCompare(String(b.startUtc || b.time || ''));
 
 const TodaySection = ({ matches, loading, isMobile }) => {
   const trackRef = useRef(null);
   const today = new Date().toLocaleDateString('en-CA');
-  const todayMatches = matches.filter((match) => match.isLive || localStart(match).date === today);
-  const displayMatches = todayMatches.length ? todayMatches : matches.slice(0, 6);
+  const now = Date.now();
+  const soon = (match) => match.isLive || localStart(match).date === today
+    || (match.startUtc && new Date(match.startUtc).getTime() - now <= AHEAD_MS);
+  const soonMatches = matches.filter(soon).sort(fixtureOrder);
+  const displayMatches = soonMatches.length ? soonMatches : [...matches].sort(fixtureOrder).slice(0, 6);
   const hasLive = displayMatches.some((match) => match.isLive);
+  const hasToday = displayMatches.some((match) => match.isLive || localStart(match).date === today);
 
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
@@ -390,7 +408,7 @@ const TodaySection = ({ matches, loading, isMobile }) => {
         kicker={hasLive ? 'Live now' : '01 / Today'}
         kickerColor={hasLive ? C.red : C.lime}
         title="Today's Matches"
-        subtitle={todayMatches.length ? 'Live and scheduled T20 and ODI cricket' : 'No match today, showing the next fixtures'}
+        subtitle={hasToday ? 'Live, today and the next day and a half: T20 and ODI' : 'No match today, showing the next fixtures'}
         action={<CarouselButtons trackRef={trackRef} hide={isMobile || loading || displayMatches.length < 2} />}
       />
       {loading ? (
@@ -1293,7 +1311,7 @@ const LandingPage = ({ showLeagueCounts = true }) => {
     let cancelled = false;
     const loadFixtures = async () => {
       setFixturesLoading(true);
-      const nextMatches = await fetchUpcomingMatches(8);
+      const nextMatches = await fetchUpcomingMatches(20);
       if (!cancelled) {
         setFixtures(nextMatches);
         setFixturesLoading(false);
