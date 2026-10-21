@@ -71,6 +71,7 @@ def lint_slides(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> Lis
     """Every testable carousel rule broken by a post's slides, as 'Slide n: ...' warnings. kind: the post's kind (a
     play-along keeps its deeper cut after the answer, on purpose)."""
     out = []
+    hero = ((slides[0].get("hero") or {}).get("card") if slides and isinstance(slides[0], dict) else None) or {}
     if len(slides or []) > MAX_SLIDES:
         out.append(f"{len(slides)} slides: keep a carousel to {MAX_SLIDES} (completion counts)")
     for n, s in enumerate(slides or [], 1):
@@ -78,6 +79,8 @@ def lint_slides(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> Lis
         if not c:
             continue
         out += [f"Slide {n}: {w}" for w in lint_card(c)]
+        if hero and n > 1 and (c.get("id") == hero.get("id") or c.get("title") == hero.get("title")):
+            out.append(f"Slide {n}: repeats the cover's chart; the cover already shows it, so drop it from the deck")
         want = 2 if (slides[0].get("hero") if slides else None) else 3  # a hero cover takes the lead card off the deck
         if (c.get("kicker") or "").lower() == "the deeper cut" and n not in (want, 3) and kind != "play":
             out.append(f"Slide {n}: the deeper cut belongs on slide {want}")

@@ -54,3 +54,17 @@ def test_stacked_share_chart_makes_a_cover():
                                                           {"name": "B", "segments": [{"key": "big", "value": 10}, {"key": "cost", "value": 90}]}]}}
     h = hero_from(card)
     assert h["kind"] == "share" and [r["name"] for r in h["rows"]] == ["A", "B"] and len(h["groups"]) == 2
+
+
+def test_a_hand_set_hero_still_leaves_the_deck():
+    """A hand-built post sets the cover's hero itself; its chart must still not be repeated as slide 2."""
+    from services.social_rules import lint_slides
+
+    lead = {"id": "openers", "title": "Lead claim", "visual": "metric_bars", "payload": {"rows": []}}
+    deck = [{"type": "hook", "text": "Hook", "cover": "hero", "hero": {"rows": [], "card": lead}},
+            {"type": "card", "card": dict(lead)}, {"type": "card", "card": {"id": "next", "title": "Next claim"}},
+            {"type": "end", "heading": "End", "body": "b"}]
+    assert any("repeats the cover's chart" in w for w in lint_slides(deck))
+    out = ig_cover.with_hero(deck, "t")
+    assert [s.get("card", {}).get("id") for s in out[1:]] == ["next", None]
+    assert not any("repeats the cover's chart" in w for w in lint_slides(out))
