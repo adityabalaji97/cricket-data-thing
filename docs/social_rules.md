@@ -22,6 +22,7 @@ rules code can test (warnings in the admin's Daily posts tab). Edit a rule here 
 - "The deeper cut" is slide 3.
 - At most 8 slides: Instagram counts how many viewers reach the last one. Fold a slide that only repeats earlier titles into the caption.
 - The cover (slide 1) carries a reason to stop: the hook, and on the hero side of the cover test (services/ig_cover.py) the lead chart's top rows.
+- A chart on the cover never appears again in the deck: the cover takes the lead chart's top rows and the chart leaves the deck, so slide 2 is new (it's the one Instagram re-shows to people who scrolled past). The full chart goes on the X thread's first tweet. This holds for hand-built posts too (ig_cover.without_hero_card; the slide check flags a repeat).
 - Bold cards, a one-line header and footer, no legend; the data credit in the footer; no player photos or logos.
 - A card title fits the slide: 110 characters at most.
 - No list of more than three items in one sentence.
