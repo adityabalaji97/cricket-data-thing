@@ -79,19 +79,18 @@ SLIDES = ([{"type": "hook", "kicker": "New Zealand v India · 1st T20I", "text":
             "hero": {"rows": [{"name": r["name"], "value": r["value"], "highlight": r.get("highlight", False)}
                               for r in openers["payload"]["rows"]],
                      "format": "signed0", "label": "Runs added per 100 balls v new-ball pace, T20Is", "card": openers}}]
-          + [{"type": "card", "card": c, "teams": None} for c in (openers, newball, hagley)]
+          + [{"type": "card", "card": c, "teams": None} for c in (newball, hagley)]  # openers is on the cover
           + [{"type": "end", "heading": "Run it yourself",
               "body": "Every number comes from ball-by-ball data. The full match preview is free on hindsightcricket.com."}])
 LINK = "/venue?" + urlencode({"venue": "Hagley Oval, Christchurch", "team1": "New Zealand", "team2": "India"})
 
 TWEETS = [
-    (1, "1/ Shreyas Iyer says #VaibhavSooryavanshi \"can't walk in\" to India's XI, with Abhishek and Samson to open.\n\n"
-        "Against new-ball pace in T20Is since July 2025: Sooryavanshi strikes at 213, Abhishek 197, Samson 162. 🧵 #NZvIND #CricketTwitter"),
-    (2, "2/ In runs added per 100 balls: Sooryavanshi +74, Abhishek +59, Samson −28.\n\n"
-        "The case for patience: Sooryavanshi's is 71 balls, seven innings. Abhishek has done it over 435. #NZvIND #CricketTwitter"),
-    (3, "3/ Santner: \"Bhuvi will love these conditions.\" The numbers agree: his powerplay economy since 2025 is 7.5, "
+    (1, "1/ Shreyas Iyer says #VaibhavSooryavanshi \"can't walk in\", with Abhishek and Samson to open.\n\n"
+        "Against new-ball pace in T20Is since July 2025, runs added per 100 balls: Sooryavanshi +74 (in just 71 balls), "
+        "Abhishek +59, Samson −28. 🧵 #NZvIND #CricketTwitter"),
+    (2, "2/ Santner: \"Bhuvi will love these conditions.\" The numbers agree: his powerplay economy since 2025 is 7.5, "
         "with half his balls dots, the best of either side's new-ball bowlers. #NZvIND #CricketTwitter"),
-    (4, "4/ And the ground: at Hagley Oval half of first innings reach 160, and only 5 of 57 have reached 200. "
+    (3, "3/ And the ground: at Hagley Oval half of first innings reach 160, and only 5 of 57 have reached 200. "
         "Pace bowled 63% of the balls.\n\nFull preview: [post link]\n\n"
         "Data: Hindsight · ball-by-ball @himganj153 & @TechRadar9, Cricsheet #NZvIND #CricketTwitter"),
 ]
