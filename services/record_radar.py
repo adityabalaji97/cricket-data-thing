@@ -90,6 +90,9 @@ def day_matches(db, day: date) -> List[Dict[str, Any]]:
     rows = db.execute(text("""
         SELECT id, date, team1, team2, competition FROM matches
         WHERE date = :d AND format = 'T20' AND gender = 'male'
+          -- Only finished matches: the nightly file can hold a match cut off mid-innings (no winner, no outcome yet);
+          -- counting it would draft records from half a game and mark the day done before the rest arrives.
+          AND (winner IS NOT NULL OR outcome IS NOT NULL)
     """), {"d": day}).mappings().all()
     return [dict(r) for r in rows]
 
