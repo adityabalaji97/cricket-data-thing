@@ -54,6 +54,7 @@ One term per idea, the same everywhere: cards, captions, threads, Reels.
 - A "case for a player" post tells a story: career, turning point, the rival's rise, his old role now, the rest of the case, both ways.
 - "The deeper cut" is slide 3.
 - At most 8 slides: Instagram counts how many viewers reach the last one. Fold a slide that only repeats earlier titles into the caption.
+- Every post leads with a player and a number: the cover, the X thread's first tweet and the Reel's hook. The general picture (the league-wide curve, the trend, the definitions) comes after the players, never first.
 - The cover (slide 1) carries a reason to stop: the hook, and on the hero side of the cover test (services/ig_cover.py) the lead chart's top rows.
 - A chart on the cover never appears again in the deck: the cover takes the lead chart's top rows and the chart leaves the deck, so slide 2 is new (it's the one Instagram re-shows to people who scrolled past). The full chart goes on the X thread's first tweet. This holds for hand-built posts too (ig_cover.without_hero_card; the slide check flags a repeat).
 - Bold cards, a one-line header and footer, no legend; the data credit in the footer; no player photos or logos.
