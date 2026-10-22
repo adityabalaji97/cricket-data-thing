@@ -8,6 +8,7 @@ with support for filtering, grouping, and aggregation.
 from sqlalchemy.sql import text
 from fastapi import HTTPException
 import os
+import re
 from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import date
 from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
@@ -445,6 +446,37 @@ def _expand_player_names(player_names: List[str], db) -> List[str]:
     return expand_name_group(player_names, db)
 
 
+#: Players by id (player_identity, migration 026): the display name of the ball's batter / bowler.
+PLAYER_ID_JOIN_BAT = "LEFT JOIN player_identity pi_bat ON pi_bat.pid = dd.p_bat "
+PLAYER_ID_JOIN_BOWL = "LEFT JOIN player_identity pi_bowl ON pi_bowl.pid = dd.p_bowl "
+_SIDE_SUFFIX = re.compile(r"\s+\([^)]*\)$")
+
+
+def _player_ids(player_names: List[str], db) -> Optional[List[int]]:
+    """The ids the requested players mean: a namesake by its display name ("Rohit Sharma (Indonesia)"), a plain name
+    (any spelling) as its main player. None when there's no player_identity to ask (a filter then goes by name)."""
+    if not player_names or not db:
+        return None
+    # A plain name (any spelling) means its main player; a suffixed one only that namesake.
+    plain = [n for n in player_names if not _SIDE_SUFFIX.search(n)]
+    variants = expand_name_group(plain, db) if plain else []
+    try:
+        ids = db.execute(text("""
+            SELECT pid FROM player_identity WHERE display_name = ANY(:asked) OR display_name = ANY(:variants)
+        """), {"asked": list(player_names), "variants": list(variants)}).scalars().all()
+    except Exception:  # no table (before migration 026)
+        db.rollback()
+        return None
+    return list(ids) or None
+
+
+def _name_prefilter(player_names: List[str], db) -> List[str]:
+    """Every stored spelling of the requested players, side suffixes aside: the indexable name match in front of the
+    id match."""
+    plain = [_SIDE_SUFFIX.sub("", n) for n in player_names]
+    return _expand_player_names(plain, db) if db else plain
+
+
 # =============================================================================
 # LEGACY TABLE (deliveries) COLUMN MAPPING
 # =============================================================================
@@ -650,12 +682,14 @@ def build_legacy_where_clause(
     
     # Player filters - need to expand with aliases for legacy table
     if players:
-        player_variants = get_all_player_variants(players, db)
+        # A namesake ("Rohit Sharma (Indonesia)") has no pre-2015 balls: those go by name to the main player.
+        player_variants = get_all_player_variants([n for n in players if not _SIDE_SUFFIX.search(n)], db) or ["__no_such_player__"]
         conditions.append("(d.batter = ANY(:players) OR d.bowler = ANY(:players))")
         params["players"] = player_variants
     
     if batters:
-        batter_variants = get_all_player_variants(batters, db)
+        # A namesake ("Rohit Sharma (Indonesia)") has no pre-2015 balls: those go by name to the main player.
+        batter_variants = get_all_player_variants([n for n in batters if not _SIDE_SUFFIX.search(n)], db) or ["__no_such_player__"]
         conditions.append("d.batter = ANY(:batters)")
         params["batters"] = batter_variants
 
@@ -666,7 +700,8 @@ def build_legacy_where_clause(
         params["partnership_players"] = pp_variants
     
     if bowlers:
-        bowler_variants = get_all_player_variants(bowlers, db)
+        # A namesake ("Rohit Sharma (Indonesia)") has no pre-2015 balls: those go by name to the main player.
+        bowler_variants = get_all_player_variants([n for n in bowlers if not _SIDE_SUFFIX.search(n)], db) or ["__no_such_player__"]
         conditions.append("d.bowler = ANY(:bowlers)")
         params["bowlers"] = bowler_variants
 
@@ -2826,15 +2861,24 @@ def build_where_clause(
     
     # Player filters - resolve aliases so legacy names (e.g. "YS Samra")
     # also match delivery_details full names (e.g. "Yuvraj Samra")
+    # And by id where player_identity knows them: "Rohit Sharma" is India's, not Indonesia's or Haryana's.
     if players:
-        player_variants = _expand_player_names(players, db) if db else players
-        conditions.append("(dd.bat = ANY(:players) OR dd.bowl = ANY(:players))")
-        params["players"] = player_variants
+        params["players"] = _name_prefilter(players, db)
+        ids = _player_ids(players, db)
+        if ids:
+            conditions.append("((dd.bat = ANY(:players) AND (dd.p_bat IS NULL OR dd.p_bat = ANY(:player_ids))) OR "
+                              "(dd.bowl = ANY(:players) AND (dd.p_bowl IS NULL OR dd.p_bowl = ANY(:player_ids))))")
+            params["player_ids"] = ids
+        else:
+            conditions.append("(dd.bat = ANY(:players) OR dd.bowl = ANY(:players))")
 
     if batters:
-        batter_variants = _expand_player_names(batters, db) if db else batters
+        params["batters"] = _name_prefilter(batters, db)
         conditions.append("dd.bat = ANY(:batters)")
-        params["batters"] = batter_variants
+        ids = _player_ids(batters, db)
+        if ids:
+            conditions.append("(dd.p_bat IS NULL OR dd.p_bat = ANY(:batter_ids))")
+            params["batter_ids"] = ids
 
     if partnership_players:
         # Partnerships involving these players: every ball of a stand either of them was in, so a
@@ -2856,9 +2900,12 @@ def build_where_clause(
         params["partnership_players"] = pp_variants
 
     if bowlers:
-        bowler_variants = _expand_player_names(bowlers, db) if db else bowlers
+        params["bowlers"] = _name_prefilter(bowlers, db)
         conditions.append("dd.bowl = ANY(:bowlers)")
-        params["bowlers"] = bowler_variants
+        ids = _player_ids(bowlers, db)
+        if ids:
+            conditions.append("(dd.p_bowl IS NULL OR dd.p_bowl = ANY(:bowler_ids))")
+            params["bowler_ids"] = ids
     
     # Batter/Bowler attribute filters
     if bat_hand:
@@ -3341,8 +3388,10 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
         # Players. Canonical names too: a feed can change how it spells a player ("Vaibhav
         # Suryavanshi" -> "Vaibhav Sooryavanshi"), and player_aliases links the spellings.
         # pa_bat / pa_bowl joins are added by handle_grouped_query.
-        "batter": "COALESCE(pa_bat.alias_name, dd.bat)",
-        "bowler": "COALESCE(pa_bowl.alias_name, dd.bowl)",
+        # And by player id first (player_identity, PLAYER_IDS_PLAN.md): one name can be several players
+        # (Rohit Sharma: India, Indonesia, Haryana); a namesake shows as "Rohit Sharma (Indonesia)".
+        "batter": "COALESCE(pi_bat.display_name, pa_bat.alias_name, dd.bat)",
+        "bowler": "COALESCE(pi_bowl.display_name, pa_bowl.alias_name, dd.bowl)",
         # delivery_details.non_striker is mostly stored in legacy short-form
         # ("V Kohli") while dd.bat is canonical. Use player_aliases to project
         # to canonical, so non_striker / partnership groupings collapse the
@@ -3551,12 +3600,15 @@ def handle_grouped_query(
     pa_join = ""
     if needs_partner_canon or "batter" in group_by:
         pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = dd.bat "
+    if "batter" in group_by:
+        pa_join += PLAYER_ID_JOIN_BAT
     if needs_partner_canon:
         pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = dd.non_striker "
         # The stand each ball belongs to (migration 016), for partnership / non_striker.
         pa_join += PARTNERSHIP_STANDS_JOIN
     if "bowler" in group_by:
         pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bowl ON pa_bowl.player_name = dd.bowl "
+        pa_join += PLAYER_ID_JOIN_BOWL
 
     # Delivery-position grouping: ROW_NUMBER over delivery_details to produce
     # ball_in_over / ball_in_innings / ball_in_spell. Each requested column
@@ -4067,11 +4119,14 @@ def generate_summary_data(where_clause, params, group_by, ball_defs, db, total_b
             summary_pa_join = ""
             if summary_needs_partner_canon or "batter" in summary_group_by:
                 summary_pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bat ON pa_bat.player_name = dd.bat "
+            if "batter" in summary_group_by:
+                summary_pa_join += PLAYER_ID_JOIN_BAT
             if summary_needs_partner_canon:
                 summary_pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_ns ON pa_ns.player_name = dd.non_striker "
                 summary_pa_join += PARTNERSHIP_STANDS_JOIN
             if "bowler" in summary_group_by:
                 summary_pa_join += "LEFT JOIN " + UNAMBIGUOUS_ALIASES + " pa_bowl ON pa_bowl.player_name = dd.bowl "
+                summary_pa_join += PLAYER_ID_JOIN_BOWL
 
             # Same conditional CTE/join splicing as handle_grouped_query for
             # ball_in_over / ball / ball_in_spell. The bat_pos block uses a

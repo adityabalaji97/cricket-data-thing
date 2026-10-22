@@ -413,10 +413,11 @@ def fastest_milestones(db: Session, match: Dict[str, Any], scope: Dict[str, Any]
     def build():
         rows = db.execute(text(f"""
             WITH {ALIAS_MAP_CTE}
-            SELECT dd.p_match AS match_id, dd.inns, COALESCE(am.canonical_name, dd.bat) AS name, dd.team_bat AS team,
+            SELECT dd.p_match AS match_id, dd.inns, COALESCE(pi.display_name, am.canonical_name, dd.bat) AS name, dd.team_bat AS team,
                    dd.team_bowl AS opp, m.date, {cols}
             FROM delivery_details dd JOIN matches m ON m.id = dd.p_match
             LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key
+            LEFT JOIN player_identity pi ON pi.pid = dd.p_bat
             WHERE {scope['where']} AND m.gender = :gender AND m.date >= :since AND dd.cur_bat_runs >= {min(targets)}
             GROUP BY 1, 2, 3, 4, 5, 6
         """), _params(scope, gender)).mappings()

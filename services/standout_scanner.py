@@ -34,9 +34,10 @@ CONTROL_COVERAGE = 0.8  # a group needs control data on 80% of its balls to be r
 
 _POPULATIONS: Dict[Tuple, List[Dict[str, Any]]] = {}
 
-BAT = "COALESCE(am_bat.canonical_name, dd.bat)"
+# Players by id first (player_identity): one name can be several players ("Rohit Sharma (Indonesia)").
+BAT = "COALESCE(pi_bat.display_name, am_bat.canonical_name, dd.bat)"
 NS = "COALESCE(am_ns.canonical_name, dd.non_striker)"
-BOWL = "COALESCE(am_bowl.canonical_name, dd.bowl)"
+BOWL = "COALESCE(pi_bowl.display_name, am_bowl.canonical_name, dd.bowl)"
 PAIR = f"(LEAST({BAT}, {NS}) || ' & ' || GREATEST({BAT}, {NS}))"
 LEGAL = "CASE WHEN COALESCE(dd.wide, 0) = 0 THEN 1 ELSE 0 END"
 AGGS = f"""
@@ -118,8 +119,10 @@ def _group_sql(template: Dict[str, Any], scope: Dict[str, Any], match_filter: st
             FROM delivery_details dd
             JOIN matches m ON m.id = dd.p_match
             LEFT JOIN alias_map am_bat ON LOWER(dd.bat) = am_bat.name_key
+            LEFT JOIN player_identity pi_bat ON pi_bat.pid = dd.p_bat
             LEFT JOIN alias_map am_ns ON LOWER(dd.non_striker) = am_ns.name_key
             LEFT JOIN alias_map am_bowl ON LOWER(dd.bowl) = am_bowl.name_key
+            LEFT JOIN player_identity pi_bowl ON pi_bowl.pid = dd.p_bowl
             WHERE {scope['where']} AND m.gender = :gender AND m.date >= :since {match_filter}
                   {template.get('where', '')}
             GROUP BY 1, 2, 3, 4, 5, 6

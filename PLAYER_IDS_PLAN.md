@@ -57,7 +57,7 @@ through the alias map. Pre-2015 balls go by name to the name's main player, as n
 | Chunk | Status |
 |---|---|
 | 0 Identity table + indexes | [x] 2026-10-22: migration 026 on production (indexes 28 MB each, built concurrently); 9,791 players, 201 namesakes; rebuilt nightly after the alias refresh (~20s, one bulk insert); the radar reads it |
-| 1 One helper, every query | [ ] |
+| 1 One helper, every query | [~] 2026-10-22: query builder (grouping by display name; batters / bowlers / players filters by id, a suffixed name meaning only that namesake, pre-2015 balls to the main player), record ideas (idea_stats), record framings, standout scanner. Kept by name on purpose: scorecards and on-this-day (one match: the side is obvious). Match-ups wait for chunk 2 (XIs are stored by name). Tests 578 pass (3 known legacy failures, as on main); goldens unchanged |
 | 2 Stats tables | [ ] |
 | 3 Names in, names out | [ ] |
 | 4 Posts and cards | [ ] |
