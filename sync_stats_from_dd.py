@@ -59,7 +59,7 @@ class StatsFromDeliveryDetails:
     def get_match_deliveries(self, session: Session, match_id: str) -> List[Dict]:
         query = text("""
             SELECT p_match as match_id, inns as innings, over, ball,
-                   bat as batter, bowl as bowler,
+                   bat as batter, bowl as bowler, p_bat as batter_pid, p_bowl as bowler_pid,
                    team_bat as batting_team, team_bowl as bowling_team,
                    score, batruns, outcome, out, bat_out, dismissal, noball, wide, byes, legbyes,
                    format, gender
@@ -103,7 +103,9 @@ class StatsFromDeliveryDetails:
         
         stats = BattingStats(
             match_id=match_id, innings=innings, striker=batter,
-            batting_team=batter_dels[0]['batting_team']
+            batting_team=batter_dels[0]['batting_team'],
+            # The player's id (PLAYER_IDS_PLAN.md): Cricsheet-converted balls have none.
+            pid=next((d.get('batter_pid') for d in batter_dels if d.get('batter_pid')), None),
         )
         
         stats.runs = sum(d['batruns'] or 0 for d in batter_dels)
@@ -268,7 +270,8 @@ class StatsFromDeliveryDetails:
         
         stats = BowlingStats(
             match_id=match_id, innings=innings, bowler=bowler,
-            bowling_team=bowler_dels[0]['bowling_team']
+            bowling_team=bowler_dels[0]['bowling_team'],
+            pid=next((d.get('bowler_pid') for d in bowler_dels if d.get('bowler_pid')), None),
         )
         
         legal_balls = len([d for d in bowler_dels if not d['wide'] and not d['noball']])

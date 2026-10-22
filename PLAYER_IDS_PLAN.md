@@ -38,6 +38,7 @@ through the alias map. Pre-2015 balls go by name to the name's main player, as n
 - batting_stats / bowling_stats / match_players: add the id (from delivery_details per match), read names through it.
 
 ### Chunk 3: names in, names out
+- Match-ups (services/matchups.py): a fixture's players by id, resolving a plain name within the side ("Asif Ali" for Bahrain is Bahrain's), then every ball query by id.
 - Search, find_entities (MCP), NL queries, player URLs: "Rohit Sharma" is the main player; "Rohit Sharma (Indonesia)"
   resolves to his id; a namesake shows a "Did you mean" list.
 - Player page header shows the side for namesakes.
@@ -58,6 +59,6 @@ through the alias map. Pre-2015 balls go by name to the name's main player, as n
 |---|---|
 | 0 Identity table + indexes | [x] 2026-10-22: migration 026 on production (indexes 28 MB each, built concurrently); 9,791 players, 201 namesakes; rebuilt nightly after the alias refresh (~20s, one bulk insert); the radar reads it |
 | 1 One helper, every query | [~] 2026-10-22: query builder (grouping by display name; batters / bowlers / players filters by id, a suffixed name meaning only that namesake, pre-2015 balls to the main player), record ideas (idea_stats), record framings, standout scanner. Kept by name on purpose: scorecards and on-this-day (one match: the side is obvious). Match-ups wait for chunk 2 (XIs are stored by name). Tests 578 pass (3 known legacy failures, as on main); goldens unchanged |
-| 2 Stats tables | [ ] |
+| 2 Stats tables | [x] 2026-10-22: migration 027 on production (pid on batting_stats, bowling_stats, match_players; 92% / 92% / 83% filled, the rest pre-2015 or XI players who didn't bat or bowl); stats sync writes it; nightly backfill; query builder stats modes group and filter by id. Match-ups moved to chunk 3 (they need team-aware name resolution) |
 | 3 Names in, names out | [ ] |
 | 4 Posts and cards | [ ] |
