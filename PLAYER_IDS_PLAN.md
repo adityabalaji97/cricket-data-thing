@@ -1,6 +1,6 @@
 # Players by id: plan
 
-Status: **draft** (22 Oct 2026). Owner: Claude Code / Codex, one chunk per session.
+Status: **signed off** (22 Oct 2026). Owner: Claude Code / Codex, one chunk per session.
 
 ## The problem
 
@@ -56,7 +56,7 @@ through the alias map. Pre-2015 balls go by name to the name's main player, as n
 
 | Chunk | Status |
 |---|---|
-| 0 Identity table + indexes | [ ] |
+| 0 Identity table + indexes | [x] 2026-10-22: migration 026 on production (indexes 28 MB each, built concurrently); 9,791 players, 201 namesakes; rebuilt nightly after the alias refresh (~20s, one bulk insert); the radar reads it |
 | 1 One helper, every query | [ ] |
 | 2 Stats tables | [ ] |
 | 3 Names in, names out | [ ] |

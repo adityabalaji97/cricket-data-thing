@@ -114,6 +114,12 @@ jobs:
           print("player alias views refreshed")
           PY
 
+      # Players by ESPNcricinfo id (PLAYER_IDS_PLAN.md): every id's display name, namesakes carrying their side
+      # ("Rohit Sharma (Indonesia)"). After the alias refresh, which it reads; ~20s.
+      - name: Player identities
+        continue-on-error: true
+        run: python scripts/build_player_identity.py
+
       # Partnership stands (migration 016) for matches loaded above: the pair at the crease, rebuilt
       # from the striker sequence because the feed's non_striker is unreliable around wickets. After
       # the alias refresh (names are canonical); a rename via the alias scripts needs --full.
