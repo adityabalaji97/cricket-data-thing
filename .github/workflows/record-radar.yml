@@ -1,0 +1,37 @@
+name: Record radar
+
+# After each nightly load: the day's best record moves (services/record_radar.py) as at most 3 drafts on the bench of
+# the admin Instagram queue (no day: the user picks). Slides are screenshots of the live site's /ig/<id>/<n>. Queued
+# only: nothing is posted. A day already done is skipped, so a re-run is harmless.
+on:
+  workflow_run:
+    workflows: ["Refresh delivery details"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      day:
+        description: "Match day (YYYY-MM-DD); default the latest loaded"
+        required: false
+
+jobs:
+  radar:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CHROME: google-chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Bench the day's record moves
+        run: python scripts/record_radar.py ${{ github.event.inputs.day && format('--day {0}', github.event.inputs.day) || '' }}
