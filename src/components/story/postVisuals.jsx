@@ -451,7 +451,8 @@ const BucketBars = ({ payload }) => {
 
 /**
  * Two values per row (before/after, v pace/v spin): a dumbbell.
- * payload: {series:[a, b], format, rows:[{label, a, b, highlight?}]}
+ * payload: {series:[a, b], format, rows:[{label, a, b, highlight?}], values?, full_labels?} (full_labels: row labels as
+ * given, not shortened to a surname)
  */
 const PairDumbbell = ({ payload }) => {
   const W = 300; const rowH = 30; const H = payload.rows.length * rowH + 26; const L = payload.values ? 130 : 104; const R = payload.values ? 70 : 44;
@@ -466,7 +467,7 @@ const PairDumbbell = ({ payload }) => {
           const y = i * rowH + 16;
           return (
             <g key={r.label}>
-              <text x="0" y={y + 4} style={{ fontFamily: fonts.body, fontSize: 12, fill: r.highlight ? colors.accent : colors.textHi }}>{surname(r.label)}</text>
+              <text x="0" y={y + 4} style={{ fontFamily: fonts.body, fontSize: 12, fill: r.highlight ? colors.accent : colors.textHi }}>{payload.full_labels ? r.label : surname(r.label)}</text>
               <line x1={sx(r.a)} x2={sx(r.b)} y1={y} y2={y} stroke={colors.borderStrong} strokeWidth="3" />
               <circle cx={sx(r.a)} cy={y} r="5" fill={ca} />
               <circle cx={sx(r.b)} cy={y} r="5" fill={cb} />
@@ -945,6 +946,32 @@ const MetricLines = ({ payload }) => {
   );
 };
 
+/**
+ * Keep / try (services/preview_cards/series.series_keep_try): per side, up to two things to keep and two to try, each
+ * with its evidence under it. Options, not verdicts; the side's name in its team colour.
+ * payload: {sides:[{team, keep:[{text, detail}], try:[{text, detail}]}], team1, team2}
+ */
+const KeepTry = ({ payload }) => (
+  <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
+    {payload.sides.map((side) => (
+      <Box key={side.team}>
+        <Typography sx={{ fontFamily: fonts.display, fontSize: 17, fontWeight: 700, color: teamColour(side.team, colors.textHi), mb: 0.75 }}>
+          {side.team}
+        </Typography>
+        {[['Keep', side.keep, colors.accent], ['Try', side.try, colors.textHi]].map(([word, items, ink]) => items.map((it) => (
+          <Box key={`${word}-${it.text}`} sx={{ display: 'grid', gridTemplateColumns: '40px 1fr', columnGap: 1, mb: 0.75 }}>
+            <Typography sx={{ ...mono, fontSize: 11, fontWeight: 700, color: ink, letterSpacing: '0.06em', pt: '3px' }}>{word.toUpperCase()}</Typography>
+            <Box>
+              <Typography sx={{ fontSize: 14.5, color: colors.textHi, lineHeight: 1.3 }}>{it.text}</Typography>
+              <Typography sx={{ fontSize: 12, color: colors.textLo, lineHeight: 1.35 }}>{it.detail}</Typography>
+            </Box>
+          </Box>
+        )))}
+      </Box>
+    ))}
+  </Box>
+);
+
 export const POST_VISUALS = {
   recap_text: RecapText,
   score_race: ScoreRace,
@@ -963,4 +990,5 @@ export const POST_VISUALS = {
   pair_dumbbell: PairDumbbell,
   pitch_map: PitchMap,
   metric_lines: MetricLines,
+  keep_try: KeepTry,
 };
