@@ -61,3 +61,17 @@ def test_pick_one_per_player_best_first():
 def test_associate_team_lists_weigh_less_than_top_sides():
     assert R._scope_weight("t20i:India") > R._scope_weight("t20i:Malaysia")
     assert R._scope_weight("t20i") > R._scope_weight("t20i:India")
+
+
+def test_namesakes_split_by_side_main_side_keeps_the_name():
+    split = {"Rohit Sharma": {"India": "Rohit Sharma", "Indonesia": "Rohit Sharma (Indonesia)", "__main__": "Rohit Sharma"}}
+    rows = [row("Rohit Sharma", 98, team="India"), row("Rohit Sharma", 3, team="Indonesia"),
+            row("Rohit Sharma", 50, team="Mumbai Indians", t20i=False)]
+    got = R.split_namesakes(rows, split)
+    assert [r["name"] for r in got] == ["Rohit Sharma", "Rohit Sharma (Indonesia)", "Rohit Sharma"]
+    assert R._boards(PP, got, T20I, False)[None] == {"Rohit Sharma": 98, "Rohit Sharma (Indonesia)": 3}
+
+
+def test_switchers_and_renamed_sides_are_one_person():
+    assert "Tim David" in R.SWITCHED
+    assert R.SIDE_ALIAS["Swaziland"] == "Eswatini"

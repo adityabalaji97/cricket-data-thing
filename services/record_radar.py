@@ -144,6 +144,69 @@ def cube(db, who: str, day: date) -> List[Dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+# --------------------------------------------------------------------------------------------
+# Namesakes (stop-gap until player ids, RECORD_RADAR_PLAN.md chunk 0): the ball-by-ball file names players, it
+# doesn't number them, so two people with one name are one player. India's Rohit Sharma had Indonesia's Rohit Sharma's
+# three powerplay sixes (101, not 98). A name that played T20Is for two sides is split by side, its main side keeping
+# the plain name ("Rohit Sharma", "Rohit Sharma (Indonesia)"), unless it's one person who changed sides.
+# --------------------------------------------------------------------------------------------
+
+#: One country under two names, or a country and its A side.
+SIDE_ALIAS = {"Swaziland": "Eswatini", "Namibia A": "Namibia"}
+#: Not a national side (a player's appearances there are his own, whatever his country).
+NOT_A_SIDE = {"World-XI", "World XI", "ICC World XI", "Asia XI", "Africa XI", "Marylebone Cricket Club"}
+#: One person who played T20Is for two sides (kept together, as official records count them).
+SWITCHED = {"Tim David", "Mark Chapman", "David Wiese", "Corey Anderson", "Hayden Walsh", "Michael Rippon",
+            "Karima Gore", "Nitish Kumar", "Sultan Ahmed", "Tom Bruce"}
+
+
+def namesakes(db) -> Dict[str, Dict[str, str]]:
+    """{name: {side: name as counted}} for names split by side; a side with a single game folds into the main one
+    (one Bhutan v Bahrain match has its teams swapped)."""
+    from services.competition_normalizer import international_competitions
+    from services.player_aliases import ALIAS_MAP_CTE
+
+    rows = db.execute(text(f"""
+        WITH {ALIAS_MAP_CTE}, b AS (
+            SELECT COALESCE(am.canonical_name, dd.bat) AS name, dd.team_bat AS team, dd.p_match FROM delivery_details dd
+            JOIN matches m ON m.id = dd.p_match LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key
+            WHERE m.match_type = 'international' AND m.competition = ANY(:intl) AND m.format = 'T20' AND m.gender = 'male'
+            UNION ALL
+            SELECT COALESCE(am.canonical_name, dd.bowl), dd.team_bowl, dd.p_match FROM delivery_details dd
+            JOIN matches m ON m.id = dd.p_match LEFT JOIN alias_map am ON LOWER(dd.bowl) = am.name_key
+            WHERE m.match_type = 'international' AND m.competition = ANY(:intl) AND m.format = 'T20' AND m.gender = 'male'
+        )
+        SELECT name, team, COUNT(DISTINCT p_match) FROM b GROUP BY 1, 2
+    """), {"intl": international_competitions("T20")}).all()
+    sides: Dict[str, Dict[str, int]] = {}
+    for name, team, games in rows:
+        if team in NOT_A_SIDE:
+            continue
+        side = SIDE_ALIAS.get(team, team)
+        sides.setdefault(name, {})[side] = sides.setdefault(name, {}).get(side, 0) + int(games)
+    out = {}
+    for name, by in sides.items():
+        real = {s: g for s, g in by.items() if g > 1}
+        if len(real) < 2 or name in SWITCHED:
+            continue
+        main = max(real, key=real.get)
+        out[name] = {s: (name if s == main else f"{name} ({s})") for s in real}
+        out[name]["__main__"] = name
+    return out
+
+
+def split_namesakes(rows: List[Dict[str, Any]], split: Dict[str, Dict[str, str]]) -> List[Dict[str, Any]]:
+    """The counts table with each split name's T20I rows under its side's name (league rows stay with the main one)."""
+    out = []
+    for r in rows:
+        by = split.get(r["name"])
+        if by and r["t20i"]:
+            side = SIDE_ALIAS.get(r["team"], r["team"])
+            r = {**r, "name": by.get(side, r["name"])}
+        out.append(r)
+    return out
+
+
 def _in_scope(r: Dict[str, Any], scope: Scope) -> bool:
     a = scope.args
     if a.get("t20i") and not r["t20i"]:
@@ -214,7 +277,8 @@ def run_day(db, day: date, templates: Tuple[Template, ...] = TEMPLATES) -> List[
     matches = day_matches(db, day)
     if not matches:
         return []
-    cubes = {who: cube(db, who, day) for who in {t.who for t in templates}}
+    split = namesakes(db)
+    cubes = {who: split_namesakes(cube(db, who, day), split) for who in {t.who for t in templates}}
     out = []
     for scope in scopes_for(db, matches):
         for t in templates:
@@ -387,7 +451,8 @@ def drafts_for_day(db, day: date, k: int = DAILY_CAP) -> Tuple[List[Dict[str, An
     matches = day_matches(db, day)
     if not matches:
         return [], {}
-    cubes = {who: cube(db, who, day) for who in ("batter", "bowler")}
+    split = namesakes(db)
+    cubes = {who: split_namesakes(cube(db, who, day), split) for who in ("batter", "bowler")}
     events = []
     for scope in scopes_for(db, matches):
         for t in TEMPLATES:
