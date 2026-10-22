@@ -567,7 +567,7 @@ const Battles = ({ payload }) => {
           </Box>
         );
       })}
-      <Typography sx={{ fontSize: 12, color: colors.textLo }}>Likely edge, runs per 100 balls · blue: batter ahead · red: bowler ahead</Typography>
+      <Legend items={[['Batter ahead', DIVERGING.positive], ['Bowler ahead', DIVERGING.negative]]} />
     </Box>
   );
 };
@@ -596,11 +596,6 @@ const PlayerBars = ({ payload, teams }) => {
           </Typography>
         </Box>
       ))}
-      {payload.extra !== 'detail' && (
-        <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
-          {rows.map((r) => `${surname(r.name)} ${payload.extra === 'sr' ? `SR ${r.sr}` : `${r.econ} an over`}`).join(' · ')}
-        </Typography>
-      )}
       <Legend items={[[t1, sideColor(t1, t1, t2)], [t2, sideColor(t2, t1, t2)]].filter(([t]) => t)} />
     </Box>
   );
@@ -806,7 +801,7 @@ const PitchUsage = ({ payload }) => {
           </g>
         ))}
       </Box>
-      <Typography sx={{ fontSize: 12, color: colors.textLo }}>% of the bowler&apos;s balls · dot: 1.5× usual or more</Typography>
+      <Legend items={[['1.5× his usual share or more', colors.accent]]} />
     </Box>
   );
 };
