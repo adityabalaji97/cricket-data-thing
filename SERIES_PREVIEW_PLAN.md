@@ -79,7 +79,7 @@ same week are each other's best evidence; history at the ground is second-hand b
 |---|---|
 | 1 Games so far | [x] 2026-10-22 (PreviewContext.series_games; bilateral: games ≤14 days apart; leagues: same year) |
 | 2 Ball-by-ball cards | [~] 2026-10-22: 1 turn, 2 phases, 4 pace/spin, 9 new ground done; 7 matchups to do |
-| 3 Line/length cards | [~] 2026-10-22: 3 bowling pitch maps (one per side) done; 5 batting, 10 adjustments to do |
+| 3 Line/length cards | [~] 2026-10-22: 3 bowling pitch maps (one per side), 5 batting control map (the starkest weak spot; feeds keep/try) done; 10 adjustments to do |
 | 4 Usage + keep/try | [x] 2026-10-22: 6 usage (batters at 3+, below par last game, 25+ gap); 8 keep/try (keep: 1+ run an over under the series' pace average, 12+ balls; try: the other side's cheap lengths used under half as often, and usage moves) |
 | 5 Social | [ ] |
 | 6 Data lag | [ ] |

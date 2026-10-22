@@ -564,6 +564,13 @@ def series_keep_try(ctx) -> Optional[Card]:
                     try_.append({"text": f"Seamers {_cell_say(k)}",
                                  "detail": f"{_pos(other)} went {_econ(theirs[k])} there · {side} bowled {round(100 * share_me)}% of balls there",
                                  "num": f"{_pos(other)} went {_econ(theirs[k])}", "rank": (1, _econ(theirs[k]))})
+        w = _batting_weak(ctx)
+        if w and w["side"] == other and len(try_) < 2:
+            c = w["cells"][other][w["cell"]]
+            try_.insert(0, {"text": f"Seamers {_cell_say(w['cell'])} to {_pos(other)} batters",
+                            "detail": f"they were in control of {w['pct']:.0f}% there, {round(w['side_avg'][other])}% overall · "
+                                      f"{int(c['tagged'])} balls, {c['outs']} {'wicket' if c['outs'] == 1 else 'wickets'}",
+                            "num": f"{w['pct']:.0f}% in control", "rank": (1, -100)})
         for u in _memo(ctx, "usage", lambda: _usage_candidates(ctx)):
             if u["side"] == side and len(try_) < 2:
                 best = u["mine"][u["best"]]
@@ -599,6 +606,84 @@ def series_keep_try(ctx) -> Optional[Card]:
     )
 
 
+# --------------------------------------------------------------------------------------------
+# 5: batting to the conditions (control % against pace by line and length)
+# --------------------------------------------------------------------------------------------
+
+BAT_MIN_CELL = 8          # balls for a cell to be shaded and to name the weak spot
+
+
+def _batting_weak(ctx) -> Optional[Dict[str, Any]]:
+    """The side with the starkest weak spot against pace: {side, cell, pct, cells, side_avg}, or None."""
+    def build():
+        ids = _ids(ctx)
+        if not ids:
+            return None
+        rows = _q(ctx, ids, ["batting_team", "line", "length"], bowl_kind=["pace bowler"])
+        cells: Dict[str, Dict[tuple, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"balls": 0, "ctl": 0.0, "tagged": 0, "runs": 0, "outs": 0}))
+        for r in rows:
+            side = ctx.side_of(r["batting_team"])
+            line = LINE_MERGE.get(r.get("line"), r.get("line"))
+            length = LENGTH_MERGE.get(r.get("length"), r.get("length"))
+            tagged = r.get("control_tagged") or 0
+            if side and line in PITCH_LINES and length in PITCH_LENGTHS and tagged:
+                c = cells[side][(line, length)]
+                c["balls"] += r["balls"] or 0
+                c["tagged"] += tagged
+                c["ctl"] += (r.get("control_percentage") or 0) * tagged / 100
+                c["runs"] += r["runs"] or 0
+                c["outs"] += r.get("wickets") or 0
+        if set(cells) != {ctx.t1, ctx.t2}:
+            return None
+        if min(sum(c["tagged"] for c in cs.values()) for cs in cells.values()) < PITCH_MIN_SIDE:
+            return None
+        side_avg = {s: 100 * sum(c["ctl"] for c in cs.values()) / sum(c["tagged"] for c in cs.values()) for s, cs in cells.items()}
+        # The weak spot: the cell furthest below its side's own control, with enough balls.
+        weak = [(s, k, 100 * c["ctl"] / c["tagged"]) for s, cs in cells.items() for k, c in cs.items() if c["tagged"] >= BAT_MIN_CELL]
+        if not weak:
+            return None
+        side, cell, pct = min(weak, key=lambda w: w[2] - side_avg[w[0]])
+        return {"side": side, "cell": cell, "pct": pct, "cells": cells, "side_avg": side_avg}
+    return _memo(ctx, "batting_weak", build)
+
+
+def series_batting(ctx) -> Optional[Card]:
+    w = _batting_weak(ctx)
+    if not w:
+        return None
+    ids = _ids(ctx)
+    side, cell, pct, cells, side_avg = w["side"], w["cell"], w["pct"], w["cells"], w["side_avg"]
+    mine = cells[side]
+    mid = round(side_avg[side])
+    other = ctx.t2 if side == ctx.t1 else ctx.t1
+    c = mine[cell]
+    return Card(
+        id="series-batting", chapter="series", visual="pitch_map",
+        title=f"{_pos(side)} batters were in control of {pct:.0f}% of pace balls {_cell_say(cell)}; {mid}% overall",
+        help="Control % against pace by line and length; outlined: the weak spot",
+        sample=f"{_so_far(ctx)} · {int(sum(x['tagged'] for x in mine.values()))} pace balls to {_pos(side)} batters tracked",
+        n=int(sum(x["tagged"] for x in mine.values())),
+        payload={"hand": "RHB", "lines": PITCH_LINES, "lengths": PITCH_LENGTHS, "min_balls": BAT_MIN_CELL,
+                 "metric": {"label": "Control %", "format": "pct0", "higher_better": True, "mid": mid},
+                 "legend": [f"Above their {mid}%", "Below"], "show_outs": True,
+                 "cells": [{"line": k[0], "length": k[1], "value": round(100 * x["ctl"] / x["tagged"]), "balls": int(x["tagged"]),
+                            "outs": x["outs"], "highlight": k == cell} for k, x in mine.items() if x["tagged"]]},
+        info=Info(
+            what=f"How often {_pos(side)} batters played pace in control in the games so far, by line and length. The "
+                 f"outlined cell is where they were least in control against their own average: the length {other} "
+                 f"could keep bowling ({c['outs']} wickets there so far).",
+            how_to_read="Viewed from the bowler's end, drawn for a right-hander (lines are relative to the batter). "
+                        f"Lime cells are above the side's {mid}%, red below; cells under {BAT_MIN_CELL} balls are blank; "
+                        "the small number is wickets.",
+            definitions=[("Control %", "The share of balls the batter middled or left well, rather than edging, "
+                                       "missing or mistiming (ball-by-ball tracking).")],
+        ),
+        query_url=ctx.query_url(args={"match_ids": ids, "bowl_kind": ["pace bowler"], "metrics_perspective": "batting",
+                                      "group_by": ["batting_team", "line", "length"]}),
+        relevance=1.5,
+    )
+
+
 SERIES = (
     CardSpec("series-turn", "series", "How did the last game turn?", series_turn, formats=("T20",),
              sample=SampleRule(flag_below=0), scale_by_sample=False),
@@ -613,6 +698,8 @@ SERIES = (
     CardSpec("series-new-ground", "series", "Does the last game carry over to this ground?", series_new_ground,
              formats=("T20",), sample=SampleRule(flag_below=0), scale_by_sample=False),
     CardSpec("series-keep-try", "series", "What should each side keep or try?", series_keep_try, formats=("T20",),
+             sample=SampleRule(flag_below=0), scale_by_sample=False),
+    CardSpec("series-batting", "series", "Did the batters play the conditions?", series_batting, formats=("T20",),
              sample=SampleRule(flag_below=0), scale_by_sample=False),
     CardSpec("series-usage", "series", "Is anyone batting away from his strengths?", series_usage, formats=("T20",),
              sample=SampleRule(flag_below=0), scale_by_sample=False),
