@@ -151,9 +151,14 @@ const ScatterPlus = ({ payload }) => {
   // Robust to the field's outliers, but always wide enough for the named and numbered players (never pinned to an edge).
   const subjects = points.filter((p) => p.highlight);
   const named = points.filter((p) => p.highlight || p.label);
-  const reach = ([a, b], vals) => { const d = (b - a) * 0.06; return [Math.min(a, ...vals.map((v) => v - d)), Math.max(b, ...vals.map((v) => v + d))]; };
-  const [x0, x1] = reach(robustRange(points.map((p) => p.x)), named.map((p) => p.x));
-  const [y0, y1] = reach(robustRange(points.map((p) => p.y)), named.map((p) => p.y));
+  const reach = ([a, b], vals, all) => {
+    const d = (b - a) * 0.06;
+    const lo = Math.min(a, ...vals.map((v) => v - d));
+    // A measure that can't go below zero (a percentage of balls) starts at 0, never at "-1%".
+    return [Math.min(...all) >= 0 ? Math.max(0, lo) : lo, Math.max(b, ...vals.map((v) => v + d))];
+  };
+  const [x0, x1] = reach(robustRange(points.map((p) => p.x)), named.map((p) => p.x), points.map((p) => p.x));
+  const [y0, y1] = reach(robustRange(points.map((p) => p.y)), named.map((p) => p.y), points.map((p) => p.y));
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   // A lower-is-better axis runs backwards, so better is always up and to the right.
   const fx = X.higher_better === false; const fy = Y.higher_better === false;
