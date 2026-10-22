@@ -1,7 +1,7 @@
 # Numerical/ML packages are pinned to the versions production runs (pip freeze on the dyno,
 # 2026-09-24): the ML models are joblib pickles tied to their scikit-learn/xgboost versions, and
 # the rankings mixed model shifts measurably between library releases. Upgrade them deliberately.
-fastapi>=0.95.0
+fastapi==0.142.1  # pinned: an unpinned build pulled 0.157, which rejects Query(enum=...) and crashed the app (v569)
 uvicorn>=0.21.1
 # 2.1 is a behaviour-changing minor (and drops the implicit greenlet dependency); move to it
 # deliberately, not as a side effect of a rebuild.

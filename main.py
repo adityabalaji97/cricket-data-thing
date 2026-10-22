@@ -2673,7 +2673,7 @@ def get_player_ball_stats(
 @app.get("/teams/bowling-type-matchups")
 def get_team_bowling_type_matchups(
     players: List[str] = Query(...),
-    phase: str = Query("overall", enum=["overall", "powerplay", "middle", "death"]),
+    phase: Literal["overall", "powerplay", "middle", "death"] = Query("overall"),
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_session)
