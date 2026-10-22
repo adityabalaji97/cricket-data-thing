@@ -1,13 +1,16 @@
 """
 First-ball boundaries: how often a batter's first ball goes for four or six, and where Abhishek Sharma, Sanju Samson
 and Vaibhav Sooryavanshi sit. Men's T20s; "first ball" = the first legal ball a batter faces in an innings
-(batter_ball_number = 1). Numbers copied from the queries in LINKS; the field (since 2023, 60+ first balls) is
-data/field_2023.json.
+(batter_ball_number = 1). Every number comes from data/first_ball.json (data.py, the queries in LINKS) and code writes
+every title; a title's claim is checked before it's used, so a refresh that changes the story fails loudly.
 
+    python articles/first-ball/data.py                                                           # refresh the numbers
     DATABASE_URL=postgresql://localhost:5432/hindsight_local python articles/first-ball/cards.py [--reply]
 """
 import json
 import os
+import statistics
+from datetime import date
 import sys
 from pathlib import Path
 
@@ -20,8 +23,10 @@ LINKS = {"curve": Q + "dimension_filters=batter_ball_number%3Alte%3A20&group_by=
          "field": Q + "start_date=2023-01-01&dimension_filters=batter_ball_number%3Aeq%3A1&group_by=batter&min_balls=60"}
 CREDIT = "Men's T20s"
 THREE = {"Abhishek Sharma": "Abhishek", "Sanju Samson": "Samson", "Vaibhav Sooryavanshi": "Sooryavanshi"}
-# Since 2023, first balls: (balls, boundaries, sixes, wickets). Sooryavanshi has 35, under the field's 60-ball floor.
-MINE = {"Abhishek Sharma": (132, 18, 8, 7), "Sanju Samson": (107, 5, 3, 6), "Vaibhav Sooryavanshi": (35, 12, 4, 1)}
+D = json.loads((HERE / "data" / "first_ball.json").read_text())
+YEAR = date.fromisoformat(D["as_of"]).year
+# Since 2023, first balls: (balls, boundaries, sixes, wickets). Sooryavanshi is under the field's 60-ball floor.
+MINE = {r["batter"]: (r["balls"], r["boundaries"], r["sixes"], r["wickets"]) for r in D["three"]}
 
 
 def card(cid, visual, title, payload, sample, help_=""):
@@ -33,46 +38,44 @@ def pct(a, b):
 
 
 # Ball of the innings 1-20, all men's T20s: (ball, balls, boundaries, sixes)
-CURVE = [(1, 187902, 14834, 2236), (2, 174579, 18987, 3988), (3, 162202, 20449, 4657), (4, 150500, 20829, 5267),
-         (5, 139706, 20665, 5503), (6, 129930, 20658, 5911), (7, 120664, 20108, 5865), (8, 112082, 19299, 5697),
-         (9, 104104, 18187, 5567), (10, 96750, 17330, 5252), (11, 89966, 16182, 5043), (12, 83730, 15022, 4646),
-         (13, 78058, 14102, 4560), (14, 72713, 13141, 4255), (15, 67781, 12169, 4008), (16, 63208, 11293, 3725),
-         (17, 59091, 10309, 3461), (18, 55170, 9454, 3214), (19, 51396, 8728, 3075), (20, 47985, 8079, 2898)]
+CURVE = [(r["batter_ball_number"], r["balls"], r["boundaries"], r["sixes"]) for r in sorted(D["curve"], key=lambda r: r["batter_ball_number"])]
+b1 = pct(CURVE[0][2], CURVE[0][1])
+peak = max(CURVE, key=lambda c: c[2] / c[1])
 curve = card(
-    "curve", "metric_lines", "A batter's first ball goes for four or six 7.9% of the time. By ball 13, 18%",
+    "curve", "metric_lines", f"A batter's first ball goes for four or six {b1}% of the time. By ball {peak[0]}, {pct(peak[2], peak[1]):.0f}%",
     {"x": {"label": "Ball of his innings", "ticks": [1, 5, 10, 15, 20]}, "y": {"label": "% of balls", "format": "pct1"},
      "series": [{"name": "Boundary %", "highlight": True, "points": [{"x": n, "y": pct(b4, b)} for n, b, b4, _ in CURVE]},
                 {"name": "Six %", "points": [{"x": n, "y": pct(s6, b)} for n, b, _, s6 in CURVE]}],
      "callouts": [{"series": "Boundary %", "x": 1}]},
-    f"{CREDIT}, 2005–2026 · 188k first balls")
+    f"{CREDIT}, 2005–{YEAR} · {round(CURVE[0][1] / 1000)}k first balls")
 
-# First balls by season, 2015-2026: (year, balls, boundaries, sixes)
-ALL = [(2015, 8346, 624, 87), (2016, 8979, 698, 96), (2017, 7882, 634, 92), (2018, 9242, 759, 127),
-       (2019, 13296, 1052, 146), (2020, 8881, 722, 104), (2021, 16876, 1271, 183), (2022, 19223, 1502, 240),
-       (2023, 15459, 1278, 178), (2024, 21477, 1669, 274), (2025, 21304, 1711, 284), (2026, 19311, 1664, 284)]
-IPL = [(2015, 878, 69, 8), (2016, 864, 74, 8), (2017, 894, 69, 7), (2018, 902, 82, 10), (2019, 871, 85, 7),
-       (2020, 865, 71, 11), (2021, 907, 87, 12), (2022, 1155, 107, 20), (2023, 1163, 117, 23), (2024, 1109, 126, 22),
-       (2025, 1117, 138, 29), (2026, 1126, 144, 32)]
+# First balls by season, 2015 on: (year, balls, boundaries, sixes)
+ALL = [(r["year"], r["balls"], r["boundaries"], r["sixes"]) for r in sorted(D["trend_all"], key=lambda r: r["year"])]
+IPL = [(r["year"], r["balls"], r["boundaries"], r["sixes"]) for r in sorted(D["trend_ipl"], key=lambda r: r["year"])]
+ipl = {y: pct(b4, b) for y, b, b4, _ in IPL}
+assert ipl[YEAR] > ipl[2022], "the IPL first ball isn't being hit more than in 2022 any more: rewrite the trend card"
 trend = card(
-    "trend", "metric_lines", "IPL first balls: 9.3% went for four or six in 2022, 12.8% in 2026",
-    {"x": {"label": "Season", "ticks": [2015, 2018, 2021, 2024, 2026]}, "y": {"label": "First-ball boundary %", "format": "pct1"},
-     "span": {"from": 2022.5, "to": 2026, "label": "Impact Player"},
+    "trend", "metric_lines", f"IPL first balls: {ipl[2022]}% went for four or six in 2022, {ipl[YEAR]}% in {YEAR}",
+    {"x": {"label": "Season", "ticks": [2015, 2018, 2021, 2024, YEAR]}, "y": {"label": "First-ball boundary %", "format": "pct1"},
+     "span": {"from": 2022.5, "to": YEAR, "label": "Impact Player"},
      "series": [{"name": "IPL", "highlight": True, "points": [{"x": y, "y": pct(b4, b)} for y, b, b4, _ in IPL]},
                 {"name": "All T20s", "dashed": True, "points": [{"x": y, "y": pct(b4, b)} for y, b, b4, _ in ALL]}],
      "callouts": [{"series": "IPL", "x": 2022, "place": "above-left"}]},
-    f"{CREDIT}, 2015–2026 · IPL ~1,100 first balls a season")
+    f"{CREDIT}, 2015–{YEAR} · IPL ~{round(statistics.mean(b for _, b, _, _ in IPL[-4:]), -2):,.0f} first balls a season")
 
-field = json.loads((HERE / "data" / "field_2023.json").read_text())
+field = D["field"]
+N = len(field)
 names = {r["batter"] for r in field}
 pts = [{"name": r["batter"], "x": pct(r["boundaries"], r["balls"]), "y": pct(r["wickets"], r["balls"])} for r in field
        if r["batter"] not in THREE]
 pts += [{"name": n, "short": THREE[n], "x": pct(bd, b), "y": pct(w, b), "highlight": True} for n, (b, bd, s, w) in MINE.items()]
+vs, ss = MINE["Vaibhav Sooryavanshi"], MINE["Sanju Samson"]
 scatter = card(
-    "scatter", "scatter_plus", "Sooryavanshi hits 34% of his first balls for four or six. Samson, 4.7%",
+    "scatter", "scatter_plus", f"Sooryavanshi hits {pct(vs[1], vs[0]):.0f}% of his first balls for four or six. Samson, {pct(ss[1], ss[0])}%",
     {"x": {"label": "First-ball boundary %", "format": "pct0", "higher_better": True},
      "y": {"label": "Out on first ball %", "format": "pct0", "higher_better": False},
      "points": pts, "box": False},
-    f"{CREDIT}, 2023–2026 · 248 batters with 60+ first balls; Sooryavanshi 35")
+    f"{CREDIT}, 2023–{YEAR} · {N} batters with 60+ first balls; Sooryavanshi {vs[0]}")
 
 
 # The attackers: Jaiswal and Salt named in lime, the rest of the leaders numbered (named in the key under the chart).
@@ -83,12 +86,15 @@ lead_pts = [{"name": r["batter"], "x": pct(r["boundaries"], r["balls"]), "y": pc
              **({"highlight": True, "short": r["batter"].split()[-1]} if r["batter"] in LEAD else {}),
              **({"label": KEYED.index(r["batter"]) + 1, "short": SHORT.get(r["batter"])} if r["batter"] in KEYED else {})}
             for r in field]
+by = {r["batter"]: r for r in field}
+jai, salt = by["Yashasvi Jaiswal"], by["Phil Salt"]
+assert jai["wickets"] == 0, "Jaiswal has now been out on a first ball: rewrite the attackers card"
 attackers = card(
-    "attackers", "scatter_plus", "Jaiswal and Salt both go at ball one. Salt's been out 14 times, Jaiswal never",
+    "attackers", "scatter_plus", f"Jaiswal and Salt both go at ball one. Salt's been out {salt['wickets']} times, Jaiswal never",
     {"x": {"label": "First-ball boundary %", "format": "pct0", "higher_better": True},
      "y": {"label": "Out on first ball %", "format": "pct0", "higher_better": False},
      "points": lead_pts, "box": False},
-    f"{CREDIT}, 2023–2026 · 248 batters with 60+ first balls")
+    f"{CREDIT}, 2023–{YEAR} · {N} batters with 60+ first balls")
 
 
 # Along the ground or over the top: first-ball four % against six %. Kohli and Narine named, the like and unlike numbered.
@@ -98,26 +104,35 @@ style_pts = [{"name": r["batter"], "x": pct(r["fours"], r["balls"]), "y": pct(r[
               **({"highlight": True, "short": POLES[r["batter"]]} if r["batter"] in POLES else {}),
               **({"label": STYLE.index(r["batter"]) + 1, "short": {"Abhishek Sharma": "Abhishek", "Karanbir Singh": "Karanbir (Austria)"}.get(r["batter"], r["batter"].split()[-1])}
                  if r["batter"] in STYLE else {})} for r in field]
+ko = by["Virat Kohli"]
+assert ko["sixes"] == 0 and max(field, key=lambda r: r["fours"] / r["balls"])["batter"] == "Virat Kohli", \
+    "Kohli is no longer top for first-ball fours with no sixes: rewrite the Kohli card"
 kohli = card(
-    "kohli", "scatter_plus", "Kohli hits more first balls for four than anyone: 16 in 70. Not one six",
+    "kohli", "scatter_plus", f"Kohli hits more first balls for four than anyone: {ko['fours']} in {ko['balls']}. Not one six",
     {"x": {"label": "First-ball four %", "format": "pct0", "higher_better": True},
      "y": {"label": "First-ball six %", "format": "pct0", "higher_better": True},
      "points": style_pts, "box": False},
-    f"{CREDIT}, 2023–2026 · 248 batters with 60+ first balls")
+    f"{CREDIT}, 2023–{YEAR} · {N} batters with 60+ first balls")
 
 SHARE = ["Sunil Narine", "Shivam Dube", "Abhishek Sharma", "Nicholas Pooran", "Yashasvi Jaiswal", "Phil Salt",
          "Virat Kohli", "Travis Head", "Shreyas Iyer"]
-by = {r["batter"]: r for r in field}
+half = [n for n in ("Sunil Narine", "Shivam Dube") if by[n]["sixes"] * 2 == by[n]["boundaries"]]
+assert len(half) == 2, "Narine and Dube aren't both at half: rewrite the six-share card"
+field_share = round(100 * sum(r["sixes"] for r in field) / sum(r["boundaries"] for r in field))
 share = card(
     "six-share", "metric_bars", "Half of Narine's and Dube's first-ball boundaries are sixes. None of Kohli's",
     {"metric": {"label": "Sixes as % of first-ball boundaries", "format": "pct0", "signed": False}, "label_width": 130,
      "rows": [{"name": n, "value": pct(by[n]["sixes"], by[n]["boundaries"]), "highlight": n in POLES,
                "detail": f"{by[n]['sixes']} of {by[n]['boundaries']}"} for n in SHARE]},
-    f"{CREDIT}, 2023–2026 · 60+ first balls (field: 15%)")
+    f"{CREDIT}, 2023–{YEAR} · 60+ first balls (field: {field_share}%)")
 
 
 def ordinal(n):
     return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def rank(key, v, b):
+    return 1 + sum(r[key] / r["balls"] > v / b for r in field)
 
 
 def bars(metric, key, top, extra_label):
@@ -125,19 +140,23 @@ def bars(metric, key, top, extra_label):
     out = [{"name": r["batter"], "value": pct(r[key], r["balls"]), "detail": f"{r[key]} in {r['balls']}"} for r in rows[:top]]
     for n, (b, bd, s, w) in MINE.items():
         v = {"boundaries": bd, "sixes": s}[key]
-        rank = 1 + sum(r[key] / r["balls"] > v / b for r in field)
         out.append({"name": n, "value": pct(v, b), "highlight": True,
-                    "detail": f"{v} in {b}" + ("" if n in names else " · under 60") + (f" · {ordinal(rank)} of 248" if n in names else "")})
+                    "detail": f"{v} in {b}" + ("" if n in names else " · under 60") + (f" · {ordinal(rank(key, v, b))} of {N}" if n in names else "")})
     out.sort(key=lambda r: -r["value"])
     return {"metric": {"label": metric, "format": "pct1", "signed": False}, "rows": out, "label_width": 130}
 
 
-four_bars = card("boundary-bars", "metric_bars", "Abhishek is 43rd of 248 for first-ball boundaries. Samson, 225th",
+ab, sa = MINE["Abhishek Sharma"], MINE["Sanju Samson"]
+median = lambda key: statistics.median(pct(r[key], r["balls"]) for r in field)  # noqa: E731
+four_bars = card("boundary-bars", "metric_bars",
+                 f"Abhishek is {ordinal(rank('boundaries', ab[1], ab[0]))} of {N} for first-ball boundaries. "
+                 f"Samson, {ordinal(rank('boundaries', sa[1], sa[0]))}",
                  bars("First-ball boundary %", "boundaries", 6, ""),
-                 f"{CREDIT}, 2023–2026 · 60+ first balls (median 9.2%)")
-six_bars = card("six-bars", "metric_bars", "Abhishek clears the rope off 6.1% of first balls, 6th of 248",
+                 f"{CREDIT}, 2023–{YEAR} · 60+ first balls (median {median('boundaries'):.1f}%)")
+six_bars = card("six-bars", "metric_bars",
+                f"Abhishek clears the rope off {pct(ab[2], ab[0])}% of first balls, {ordinal(rank('sixes', ab[2], ab[0]))} of {N}",
                 bars("First-ball six %", "sixes", 5, ""),
-                f"{CREDIT}, 2023–2026 · 60+ first balls (median 1.0%)")
+                f"{CREDIT}, 2023–{YEAR} · 60+ first balls (median {median('sixes'):.1f}%)")
 
 # Player and number first (content rules), then the style split, then the general picture.
 CARDS = [scatter, four_bars, six_bars, kohli, share, attackers, curve, trend]
