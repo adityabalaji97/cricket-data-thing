@@ -52,7 +52,8 @@ const Legend = ({ items }) => (
   <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 1 }}>
     {items.map(([label, color]) => (
       <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
-        <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: color }} />
+        <Box sx={color === 'ring' ? { width: 10, height: 10, borderRadius: '3px', border: `2px solid ${colors.textHi}`, boxSizing: 'border-box' }
+          : { width: 10, height: 10, borderRadius: '3px', bgcolor: color }} />
         <Typography sx={{ fontSize: 12, color: colors.textMed }}>{label}</Typography>
       </Box>
     ))}
@@ -100,9 +101,7 @@ const Scorecard = ({ payload }) => {
       {payload.verdict && (
         <Typography sx={{ fontSize: 14, color: colors.textHi, mt: 1, lineHeight: 1.35 }}>{payload.verdict}</Typography>
       )}
-      <Typography sx={{ fontSize: 11, color: colors.textLo, mt: 0.25 }}>
-        {payload.method || 'Shade: percentile in the whole field (brighter is better). Ring: leads that column.'}
-      </Typography>
+      <Legend items={[['Brighter: better in the field', colors.accent], ['Ring: leads the column', 'ring']]} />
     </Box>
   );
 };
@@ -212,7 +211,7 @@ const ScatterPlus = ({ payload }) => {
         </Box>
       )}
       {Z && (
-        <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>{`Brighter dots: higher ${Z.label}`}</Typography>
+        <Legend items={[[`Brighter: higher ${Z.label}`, colors.accent]]} />
       )}
     </Box>
   );
@@ -345,8 +344,7 @@ const RaceLines = ({ payload }) => {
         })}
       </Box>
       <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
-        {`${payload.unit === 'innings' ? 'Innings' : 'Balls'} to ${payload.target.toLocaleString('en-US')} ${payload.measure}. `}
-        {`The fastest took ${n(best)}; the others, how many more.`}
+        {`${payload.unit === 'innings' ? 'Innings' : 'Balls'} to ${payload.target.toLocaleString('en-US')} ${payload.measure}`}
       </Typography>
     </Box>
   );
@@ -382,9 +380,7 @@ const Forest = ({ payload }) => {
         <text x={L} y={H - 6} style={{ ...mono, fill: colors.textFaint }}>{fmt(-span, 'signed1')}</text>
         <text x={W - R} y={H - 6} textAnchor="end" style={{ ...mono, fill: colors.textFaint }}>{fmt(span, 'signed1')}</text>
       </Box>
-      <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
-        {`Dot: the estimate (${payload.unit}); line: its 95% interval. Lime: a clear effect. Grey: the line crosses "no effect", so the data can't tell.`}
-      </Typography>
+      <Legend items={[['Clear effect', colors.accent], ["Data can't tell", colors.textFaint]]} />
     </Box>
   );
 };
@@ -422,7 +418,7 @@ const BucketBars = ({ payload }) => {
           );
         })}
       </Box>
-      <Typography sx={{ fontSize: 12, color: colors.textLo }}>{payload.metric.label}{payload.buckets.some((b) => b.lo != null) ? ' · white line: 95% interval' : ''}</Typography>
+      <Typography sx={{ fontSize: 12, color: colors.textLo }}>{payload.metric.label}</Typography>
     </Box>
   );
 };
@@ -641,7 +637,6 @@ const WinProbLine = ({ payload }) => {
  * overs each still had left before it.
  * payload: {team, mark, overs, rows:[{name, kind:'pace'|'spin'|'other', cells:[{o, runs}], left}]}
  */
-const ordinal = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}`;
 const BowlingPlan = ({ payload }) => {
   const { rows, mark } = payload;
   const kindColour = { pace: SERIES[0], spin: SERIES[1], other: '#5b6b85' };
@@ -679,7 +674,7 @@ const BowlingPlan = ({ payload }) => {
         );
       })}
       <Legend items={[['Pace', kindColour.pace], ['Spin', kindColour.spin]]} />
-      <Typography sx={{ fontSize: 11.5, color: colors.textLo, mt: -0.25 }}>{`Runs in each over. Left: overs each still had before the ${ordinal(mark)}.`}</Typography>
+      <Typography sx={{ fontSize: 11.5, color: colors.textLo, mt: -0.25 }}>Runs in each over</Typography>
     </Box>
   );
 };

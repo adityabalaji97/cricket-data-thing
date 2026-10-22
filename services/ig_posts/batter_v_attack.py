@@ -52,7 +52,7 @@ def hook_text(db, spec, me_sr: float) -> str:
     total = sum(r.get("balls") or 0 for r in rows if r.get("bowl_kind") in ("pace bowler", "spin bowler"))
     pace = sum(r.get("balls") or 0 for r in rows if r.get("bowl_kind") == "pace bowler")
     pct = f" {spec['opponent']} bowl {100 * pace / total:.0f}% of their balls with pace." if total else ""
-    return f"{spec['player']} scores at {me_sr:.0f} against new-ball pace.{pct}"
+    return f"{spec['player']} scores at {me_sr:.0f} against pace in the powerplay.{pct}"
 
 
 def openers_card(db, spec) -> Optional[Dict[str, Any]]:
@@ -67,9 +67,9 @@ def openers_card(db, spec) -> Optional[Dict[str, Any]]:
     out = [{"name": _nm(spec, r["batter"]), "value": r["impact_per_100"], "highlight": r["batter"] == p,
             "detail": f"SR {r['strike_rate']:.0f} · avg {r['average']:.0f} · {r['balls']} balls"} for r in rows]
     lead = rows[0]["batter"] == p
-    title = (f"Against new-ball pace, {_nm(spec, p)} scores at {me['strike_rate']:.0f} and averages {me['average']:.0f}"
+    title = (f"Against pace in the powerplay, {_nm(spec, p)} scores at {me['strike_rate']:.0f} and averages {me['average']:.0f}"
              + (": no opener in either squad adds more" if lead else ""))
-    payload = {"metric": {"label": "Impact per 100 balls against new-ball pace", "format": "signed0", "signed": True},
+    payload = {"metric": {"label": "Impact per 100 balls against pace in the powerplay", "format": "signed0", "signed": True},
                "rows": out, "label_width": 120}
     c = card("openers", "metric_bars", title, payload,
              f"{spec['sides']} openers · pace in overs 1-6 · every men's T20 since {spec['since']:%b %Y}",

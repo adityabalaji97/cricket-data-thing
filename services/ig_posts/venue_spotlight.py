@@ -132,7 +132,7 @@ def new_ball_card(db, spec) -> Optional[Dict[str, Any]]:
     payload = {"metric": {"label": "powerplay runs an over", "format": "dec1", "signed": False},
                "series": ["Runs an over", f"Every pacer, overs 1-6 since {since.year}"], "rows": rows}
     s_b, m_b = bpw(series), bpw(mine)
-    title = (f"{_poss(spec['team'])} new-ball pace has gone for {s_econ:.1f} an over in this series. "
+    title = (f"{_poss(spec['team'])} pace in the powerplay has gone for {s_econ:.1f} an over in this series. "
              f"{_poss(short_name(p))} powerplays since {since.year}: {m_econ:.1f}")
     help_ = (f"A wicket every {s_b:.0f} balls in this series, every {m_b:.0f} for {short_name(p)}"
              if s_b and m_b else "Overs 1-6")
@@ -180,7 +180,7 @@ def top_order_card(db, spec, batters: List[str]) -> Optional[Dict[str, Any]]:
     payload["method"] = "False shot: a ball the batter didn't control (a miss, an edge, a mis-hit). Ring: best for the batter."
     lead = order[0]
     lr = rows[lead]
-    title = (f"{short_name(lead)} has faced {int(lr['balls'])} new balls from pacers since {spec['since'].year} and "
+    title = (f"{short_name(lead)} has faced {int(lr['balls'])} powerplay balls from pacers since {spec['since'].year} and "
              f"gets out once every {lr['balls_per_dismissal']:.0f}")
     loosest = max((b for b in order if table[b]["False shots"] is not None), key=lambda b: table[b]["False shots"])
     return card("top-order", "scorecard", title, payload,

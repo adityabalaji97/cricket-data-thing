@@ -15,9 +15,15 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 RULES_FILE = Path(__file__).resolve().parents[1] / "docs" / "social_rules.md"
-MAX_TITLE = 110
+MAX_TITLE = 80  # two lines on a 4:5 card (docs/social_rules.md, Card anatomy)
 MAX_SLIDES = 8
 #: Metric names that lose a stranger in the first seconds of a Reel.
+#: Words the house vocabulary replaces (docs/social_rules.md, Vocabulary): the term to use instead.
+OFF_VOCAB = {"runs added": "Impact", "win chances": "win probability added", "new ball": "a phase name (powerplay)",
+             "new-ball": "a phase name (powerplay)", "balls per dismissal": "balls per wicket", "out every": "balls per wicket",
+             "runs above an average": "runs above par", "runs saved vs an average": "runs below par"}
+OFF_VOCAB_RE = re.compile("|".join(re.escape(k) for k in OFF_VOCAB), re.I)
+
 JARGON = re.compile(r"\b(impact|wpa|raa|waa|win probability|runs above average|per 100|per hundred)\b", re.I)
 
 
@@ -56,6 +62,15 @@ def lint_card(card: Dict[str, Any]) -> List[str]:
         if _list_too_long(sentence):
             out.append("A list of more than three in the title")
             break
+    if card.get("help") and not card.get("help_on_card") and len(card["help"]) > 90:
+        out.append("A long help line: on the card it's only for a chart that can't be read without it (help_on_card)")
+    seen = set()
+    for where in (title, card.get("help") or "", card.get("sample") or "", str((card.get("payload") or {}).get("metric") or "")):
+        for m in OFF_VOCAB_RE.finditer(where):
+            k = m.group(0).lower()
+            if k not in seen:
+                seen.add(k)
+                out.append(f"Say {OFF_VOCAB[k]!r}, not {m.group(0)!r} (docs/social_rules.md, Vocabulary)")
     payload = card.get("payload") or {}
     if card.get("visual") == "scorecard" and payload.get("rows"):
         rows = payload["rows"]
