@@ -19,7 +19,6 @@ from services.player_aliases import (
     ALIAS_MAP_CTE,
     UNAMBIGUOUS_ALIASES,
     alias_map_join_sql,
-    canonical_name_sql,
     expand_name_group,
 )
 from services.bowler_types import PACE_TYPES as ALL_KNOWN_PACE_TYPES, SPIN_TYPES as ALL_KNOWN_SPIN_TYPES
@@ -475,6 +474,20 @@ def _name_prefilter(player_names: List[str], db) -> List[str]:
     id match."""
     plain = [_SIDE_SUFFIX.sub("", n) for n in player_names]
     return _expand_player_names(plain, db) if db else plain
+
+
+def _stats_player_condition(name_col: str, pid_col: str, player_names: List[str], db, params: Dict[str, Any],
+                            key: str) -> str:
+    """The stats tables' player filter (migration 027 put the id on them): by id where the row has one; a row
+    without (pre-2015) by name, and only for plain names, so "Rohit Sharma (Indonesia)" never takes in India's Rohit
+    Sharma's early innings."""
+    plain = [n for n in player_names if not _SIDE_SUFFIX.search(n)]
+    params[key] = (_expand_player_names(plain, db) if db else plain) or ["__no_such_player__"]
+    ids = _player_ids(player_names, db)
+    if not ids:
+        return f"{name_col} = ANY(:{key})"
+    params[f"{key}_ids"] = ids
+    return f"({pid_col} = ANY(:{key}_ids) OR ({pid_col} IS NULL AND {name_col} = ANY(:{key})))"
 
 
 # =============================================================================
@@ -1492,11 +1505,9 @@ def query_batting_stats_service(
         conditions.append(f"{get_team_canonical_sql(bowling_team_expr)} = ANY(:bowling_teams_tokens)")
 
     if players:
-        params["players"] = _expand_player_names(players, db) if db else players
-        conditions.append("bs.striker = ANY(:players)")
+        conditions.append(_stats_player_condition("bs.striker", "bs.pid", players, db, params, "players"))
     if batters:
-        params["batters"] = _expand_player_names(batters, db) if db else batters
-        conditions.append("bs.striker = ANY(:batters)")
+        conditions.append(_stats_player_condition("bs.striker", "bs.pid", batters, db, params, "batters"))
 
     if innings:
         conditions.append("bs.innings = :innings")
@@ -1623,7 +1634,7 @@ def query_batting_stats_service(
         "bowling_team": bowling_team_expr,
         # Canonical name, so a player stored under both naming conventions aggregates as one
         # row instead of two. See services/player_aliases.ALIAS_MAP_CTE.
-        "batter": canonical_name_sql("bs.striker"),
+        "batter": "COALESCE(pi_s.display_name, am.canonical_name, bs.striker)",  # by id first (migration 027)
         "innings": "bs.innings",
         "match_id": "bs.match_id",
         "match_outcome": match_outcome_sql,
@@ -1640,7 +1651,7 @@ def query_batting_stats_service(
     # Added only when a player column is actually grouped on, so other groupings pay nothing.
     needs_alias = any("am.canonical_name" in col for col in group_cols)
     alias_cte = f"WITH {ALIAS_MAP_CTE}" if needs_alias else ""
-    alias_join = alias_map_join_sql("bs.striker") if needs_alias else ""
+    alias_join = (alias_map_join_sql("bs.striker") + " LEFT JOIN player_identity pi_s ON pi_s.pid = bs.pid") if needs_alias else ""
 
     having_conditions = []
     if min_balls is not None:
@@ -1867,11 +1878,9 @@ def query_bowling_stats_service(
         conditions.append(f"{get_team_canonical_sql('bs.bowling_team')} = ANY(:bowling_teams_tokens)")
 
     if players:
-        params["players"] = _expand_player_names(players, db) if db else players
-        conditions.append("bs.bowler = ANY(:players)")
+        conditions.append(_stats_player_condition("bs.bowler", "bs.pid", players, db, params, "players"))
     if bowlers:
-        params["bowlers"] = _expand_player_names(bowlers, db) if db else bowlers
-        conditions.append("bs.bowler = ANY(:bowlers)")
+        conditions.append(_stats_player_condition("bs.bowler", "bs.pid", bowlers, db, params, "bowlers"))
 
     if innings:
         conditions.append("bs.innings = :innings")
@@ -2006,7 +2015,7 @@ def query_bowling_stats_service(
         "batting_team": batting_team_expr,
         "bowling_team": "bs.bowling_team",
         # Canonical name -- see the note on the batting map.
-        "bowler": canonical_name_sql("bs.bowler"),
+        "bowler": "COALESCE(pi_s.display_name, am.canonical_name, bs.bowler)",  # by id first (migration 027)
         "innings": "bs.innings",
         "match_id": "bs.match_id",
         "match_outcome": match_outcome_sql,
@@ -2023,7 +2032,7 @@ def query_bowling_stats_service(
     # Added only when a player column is actually grouped on, so other groupings pay nothing.
     needs_alias = any("am.canonical_name" in col for col in group_cols)
     alias_cte = f"WITH {ALIAS_MAP_CTE}" if needs_alias else ""
-    alias_join = alias_map_join_sql("bs.bowler") if needs_alias else ""
+    alias_join = (alias_map_join_sql("bs.bowler") + " LEFT JOIN player_identity pi_s ON pi_s.pid = bs.pid") if needs_alias else ""
 
     having_conditions = []
     if min_balls is not None:

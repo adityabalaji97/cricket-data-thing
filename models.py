@@ -3,6 +3,7 @@ from sqlalchemy import (
     create_engine,
     Column,
     Integer,
+    BigInteger,
     String,
     Date,
     JSON,
@@ -202,6 +203,7 @@ class BattingStats(Base):
     match_id = Column(String, ForeignKey('matches.id'))
     innings = Column(Integer)
     striker = Column(String)
+    pid = Column(BigInteger)  # ESPNcricinfo id (delivery_details.p_bat); NULL before 2015 (migration 027)
     batting_team = Column(String)
 
     # Denormalized from matches so the stats tables can be filtered without a join.
@@ -268,6 +270,7 @@ class BowlingStats(Base):
     match_id = Column(String, ForeignKey('matches.id'))
     innings = Column(Integer)
     bowler = Column(String)
+    pid = Column(BigInteger)  # ESPNcricinfo id (delivery_details.p_bowl); NULL before 2015 (migration 027)
     bowling_team = Column(String)
 
     # Denormalized from matches; see the note on BattingStats about the phase columns.

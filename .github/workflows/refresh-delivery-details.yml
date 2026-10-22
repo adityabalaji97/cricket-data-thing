@@ -120,6 +120,12 @@ jobs:
         continue-on-error: true
         run: python scripts/build_player_identity.py
 
+      # The player id on stats rows and playing XIs (migration 027): new rows get it from the stats sync; this
+      # catches the rest (a Cricsheet-loaded match upgraded by tonight's CSV, a late XI). Idempotent, ~1 min.
+      - name: Player ids on stats and XIs
+        continue-on-error: true
+        run: python scripts/backfill_stats_player_ids.py
+
       # Partnership stands (migration 016) for matches loaded above: the pair at the crease, rebuilt
       # from the striker sequence because the feed's non_striker is unreliable around wickets. After
       # the alias refresh (names are canonical); a rename via the alias scripts needs --full.
