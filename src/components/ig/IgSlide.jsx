@@ -139,7 +139,8 @@ const Slide = ({ snap, n }) => {
     // A match-preview story card (or an Instagram post card): the same StoryCard the app shows.
     const card = toStoryCard(slide.card, { isMobile: true, teams: slide.teams, params: null });
     if (!card) return <Frame n={n} total={total}><Typography>Unknown visual {slide.card?.visual}</Typography></Frame>;
-    return <StoryCard card={card} width={W} height={H} exportMode corner={`${n} / ${total}`} />;
+    // The counter only where swiping matters: a set of reply images turns it off (data.counter === false).
+    return <StoryCard card={card} width={W} height={H} exportMode corner={snap.data?.counter === false ? null : `${n} / ${total}`} />;
   }
   if (slide.type === 'chart') {
     // Older carousels: a satori-drawn snapshot image fills the slide.

@@ -7,10 +7,10 @@ import { CARD_BRAND, CARD_CREDITS } from './storyLayout';
 import { track } from '../../utils/analytics';
 
 /**
- * One story card's shareable core (4:5): title (the takeaway) with an info button, at most one
- * help line ("Higher is better"), the chart, and two footer lines that always stay on the card:
- * sample + context (CARTA Complete/Accurate) and brand + credits. Everything else about the chart
- * lives in the info sheet.
+ * One story card's shareable core (4:5): the claim (title), the chart, and two footer lines that always stay on the
+ * card: the scope (who, against what, when) and brand + credits. The help line, definitions and method live in the
+ * info sheet (docs/social_rules.md, "Card anatomy"); a card shows its help line on the face only with help_on_card,
+ * when the chart can't be read without it.
  *
  * The chart area never scrolls: content that does not fit is a bug in that card, so it is
  * flagged in development (data-overflow) for the UI sweep to catch.
@@ -28,6 +28,7 @@ const keepInChart = (e) => {
 // (e.g. "2 / 7") takes the button's place.
 const StoryCard = ({ card, width, height, exportMode = false, corner = null }) => {
   const [infoOpen, setInfoOpen] = useState(false);
+  const hasSheet = Boolean(card.info || (card.help && !card.help_on_card));
   const [overflow, setOverflow] = useState(false);
   const chartRef = useRef(null);
 
@@ -89,7 +90,7 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
         {corner && (
           <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5, whiteSpace: 'nowrap' }}>{corner}</Typography>
         )}
-        {card.info && !exportMode && (
+        {hasSheet && !exportMode && (
           <IconButton
             aria-label={`About this chart: ${card.title}`}
             onClick={(e) => { e.stopPropagation(); setInfoOpen(true); track('card_info', { card: card.id }); }}
@@ -100,7 +101,7 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
           </IconButton>
         )}
       </Box>
-      {card.help && (
+      {card.help && card.help_on_card && (
         <Typography sx={{ fontSize: 13, color: colors.textLo, mt: 0.5 }}>{card.help}</Typography>
       )}
 
@@ -128,7 +129,7 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
         </Typography>
       </Box>
 
-      {card.info && !exportMode && (
+      {hasSheet && !exportMode && (
         // The sheet is a portal, but React still bubbles its events through this tree: stop them
         // here so a tap in the sheet never opens the card (grid) or counts as a swipe (story).
         <Box
@@ -139,7 +140,10 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
           onKeyDown={(e) => e.stopPropagation()}
         >
         <DetailSheet open={infoOpen} onClose={() => setInfoOpen(false)} title={card.title} subtitle={card.sample}>
-          <Box sx={{ color: colors.textMed, fontSize: 14, lineHeight: 1.5 }}>{card.info}</Box>
+          {card.help && !card.help_on_card && (
+            <Typography sx={{ color: colors.textHi, fontSize: 14, lineHeight: 1.5, mb: card.info ? 1.5 : 0 }}>{card.help}</Typography>
+          )}
+          {card.info && <Box sx={{ color: colors.textMed, fontSize: 14, lineHeight: 1.5 }}>{card.info}</Box>}
           <Typography sx={{ mt: 2, fontSize: 12, color: colors.textFaint, lineHeight: 1.5 }}>
             Data: Hindsight (hindsightcricket.com). Ball-by-ball data before 2015: Cricsheet (ODC-By 1.0).
             2015+ ball-by-ball, line, length, shot and control: Himanish Ganjoo&apos;s data, collected with TechRadar.
