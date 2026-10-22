@@ -16,6 +16,8 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 CHAPTERS: Tuple[Tuple[str, str], ...] = (
+    # Only from the second meeting of two sides on (services/preview_cards/series.py).
+    ("series", "Series so far"),
     ("glance", "At a glance"),
     ("ground", "The ground"),
     ("teams", "The teams"),

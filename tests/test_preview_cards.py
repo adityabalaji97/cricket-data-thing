@@ -53,6 +53,7 @@ def _ctx(ground=None, h2h=(1, 4, 0), fmt="T20", par_series=((2024, 189, 7), (202
          international=False, here=(9, 8, 11), everywhere=(8.5, 8, 10), zones=None, outs=None, ground_par=None):
     ctx = PreviewContext(db=None, venue="Wankhede Stadium, Mumbai", team1="Mumbai Indians", team2="Chennai Super Kings",
                          fmt=fmt, start=date(2022, 1, 1), end=date(2026, 10, 4), team1_short="MI", team2_short="CSK")
+    ctx.__dict__["series_games"] = []  # not mid-series: no "Series so far" chapter
     history = {
         "h2h_stats": {"team1_wins": h2h[0], "team2_wins": h2h[1], "draws": h2h[2]},
         "venue_results": [{"winner": "MI", "won_batting_first": False}, {"winner": "CSK", "won_batting_first": False},

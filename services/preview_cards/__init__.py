@@ -20,15 +20,16 @@ from services.preview_cards.glance import at_a_glance
 from services.preview_cards.ground import GROUND
 from services.preview_cards.spec import CHAPTERS, Card, CardSpec
 from services.preview_cards.players import PLAYERS
+from services.preview_cards.series import SERIES
 from services.preview_cards.teams import TEAMS
 
 logger = logging.getLogger(__name__)
 
-REGISTRY: List[CardSpec] = [*EXISTING, *GROUND, *TEAMS, *PLAYERS, *FANTASY]
+REGISTRY: List[CardSpec] = [*SERIES, *EXISTING, *GROUND, *TEAMS, *PLAYERS, *FANTASY]
 
 # Part of the cached story's key (routers/match_preview.py): bump when any card's logic or copy
 # changes, so a deploy never serves stories built by older code. Data loads expire it on their own.
-STORY_VERSION = "2026-10-22.1"  # card anatomy: house vocabulary in card titles
+STORY_VERSION = "2026-10-22.2"  # series so far: a chapter from the second meeting on
 
 
 def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[str, Any]:

@@ -334,6 +334,13 @@ class PreviewContext:
                 "winner": self.side_of(m["winner"]), "innings": innings, "path": path}
 
     @cached_property
+    def series_games(self) -> List[Dict[str, Any]]:
+        """The sides' earlier meetings in this series or season (services/preview_cards/series.py)."""
+        from services.preview_cards.series import find_games
+
+        return find_games(self)
+
+    @cached_property
     def last_xis(self) -> Dict[str, Dict[str, Any]]:
         """
         Each side's likely XI from its latest match in this format: everyone who batted or bowled there. A side that
