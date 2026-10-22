@@ -108,7 +108,7 @@ What exists already and gets reused:
 | Chunk | Status |
 |---|---|
 | 0 Home page next big match | [x] 2026-10-21 |
-| 1 News per fixture | [ ] |
+| 1 News per fixture | [~] 2026-10-22: services/preview_news.py + scripts/fetch_fixture_news.py + migration 025 (local); 60 headlines a fixture, 3 Google News searches + Reddit/Cricinfo naming both sides, 10 days back. To do: the table in production, nightly + match-morning runs |
 | 2 Talking points | [ ] |
 | 3 Testers | [ ] |
 | 4 Storylines chapter | [ ] |
