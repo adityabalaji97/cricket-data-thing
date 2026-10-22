@@ -776,7 +776,8 @@ const ScoreRace = ({ payload }) => {
  * Cells better for the batter than `mid` are lime, better for the bowler red, deeper with the gap; cells under
  * `min_balls` stay blank. Highlighted cells are outlined.
  * payload: {hand:'RHB'|'LHB', lines:[...], lengths:[...], metric:{label, format, higher_better, mid},
- *           min_balls, cells:[{line, length, value, balls, outs?, highlight?}], note?}
+ *           min_balls, cells:[{line, length, value, balls, outs?, highlight?}], show_outs?, legend?:[better, worse]}
+ * One number per cell; wickets under it only with show_outs (when the claim is about dismissals).
  */
 const PITCH_LINES = { WIDE_OUTSIDE_OFFSTUMP: 'Wide off', OUTSIDE_OFFSTUMP: 'Off', ON_THE_STUMPS: 'Stumps', DOWN_LEG: 'Leg', WIDE_DOWN_LEG: 'Wide leg' };
 const PITCH_LENGTHS = { YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good', SHORT_OF_A_GOOD_LENGTH: 'Back of length', SHORT: 'Short' };
@@ -784,7 +785,7 @@ const PitchMap = ({ payload }) => {
   const { metric, cells, min_balls: minBalls = 10 } = payload;
   const lines = payload.hand === 'LHB' ? [...payload.lines].reverse() : payload.lines;
   const lengths = payload.lengths;
-  const L = 92; const T = 20; const cw = (300 - L - 6) / lines.length; const ch = 40; const H = T + lengths.length * ch + 34;
+  const L = 92; const T = 20; const cw = (300 - L - 6) / lines.length; const ch = 54; const H = T + lengths.length * ch + 34;
   const at = (line, length) => cells.find((c) => c.line === line && c.length === length);
   const shown = cells.filter((c) => c.balls >= minBalls);
   const span = Math.max(...shown.map((c) => Math.abs(c.value - metric.mid)), 1e-9);
@@ -829,9 +830,9 @@ const PitchMap = ({ payload }) => {
               </rect>
               {ok ? (
                 <>
-                  <text x={x + cw / 2} y={y + ch / 2} textAnchor="middle" style={{ ...mono, fontSize: 13.5, fontWeight: 700, fill: p.ink }}>{fmt(c.value, metric.format)}</text>
+                  <text x={x + cw / 2} y={y + ch / 2 + (payload.show_outs && c.outs ? 0 : 5)} textAnchor="middle" style={{ ...mono, fontSize: 15, fontWeight: 700, fill: p.ink }}>{fmt(c.value, metric.format)}</text>
                   <text x={x + cw / 2} y={y + ch / 2 + 12} textAnchor="middle" style={{ ...mono, fontSize: 8, fill: p.ink }}>
-                    {`${c.balls}b${c.outs ? ` · ${c.outs}w` : ''}`}
+                    {payload.show_outs && c.outs ? `${c.outs} ${c.outs === 1 ? 'wicket' : 'wickets'}` : ''}
                   </text>
                 </>
               ) : (
@@ -846,9 +847,8 @@ const PitchMap = ({ payload }) => {
         <text x={L} y={H - 4} style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{offLeft ? '← off side' : '← leg side'}</text>
         <text x={296} y={H - 4} textAnchor="end" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{offLeft ? 'leg side →' : 'off side →'}</text>
       </Box>
-      <Typography sx={{ fontSize: 11.5, color: colors.textLo, mt: 0.5 }}>
-        {payload.note || `Lime: better than his ${fmt(metric.mid, metric.format)} · red: worse · grey: about the same · b balls, w wickets · blank: under ${minBalls} balls`}
-      </Typography>
+      <Legend items={[[payload.legend?.[0] || `Better than his ${fmt(metric.mid, metric.format)}`, colors.accent],
+        [payload.legend?.[1] || 'Worse', colors.red]]} />
     </Box>
   );
 };
