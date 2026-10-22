@@ -54,6 +54,7 @@ def find_games(ctx) -> List[Dict[str, Any]]:
         SELECT id, date, venue, competition, winner FROM matches
         WHERE ((team1 = ANY(:a) AND team2 = ANY(:b)) OR (team1 = ANY(:b) AND team2 = ANY(:a)))
           AND format = :fmt AND gender = :gender AND date < :day AND date >= :since
+          AND (winner IS NOT NULL OR outcome IS NOT NULL)  -- finished (a no result has an outcome), not cut off mid-match
         ORDER BY date DESC, id DESC
     """), {"a": a, "b": b, "fmt": ctx.fmt, "gender": ctx.gender, "day": day,
            "since": day - timedelta(days=200)}).mappings().all()
