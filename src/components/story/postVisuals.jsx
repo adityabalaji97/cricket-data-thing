@@ -769,6 +769,80 @@ const ScoreRace = ({ payload }) => {
   );
 };
 
+/**
+ * A pitch map of one batter against one kind of bowling: every line-and-length cell shaded by a measure, from the
+ * bowler's end (the batter at the top, full balls nearest him, short balls nearest the bowler). Off side is on the
+ * left for a right-hander and on the right for a left-hander, so the picture matches a broadcast pitch map.
+ * Cells better for the batter than `mid` are lime, better for the bowler red, deeper with the gap; cells under
+ * `min_balls` stay blank. Highlighted cells are outlined.
+ * payload: {hand:'RHB'|'LHB', lines:[...], lengths:[...], metric:{label, format, higher_better, mid},
+ *           min_balls, cells:[{line, length, value, balls, outs?, highlight?}], note?}
+ */
+const PITCH_LINES = { WIDE_OUTSIDE_OFFSTUMP: 'Wide off', OUTSIDE_OFFSTUMP: 'Off', ON_THE_STUMPS: 'Stumps', DOWN_LEG: 'Leg', WIDE_DOWN_LEG: 'Wide leg' };
+const PITCH_LENGTHS = { YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good', SHORT_OF_A_GOOD_LENGTH: 'Back of length', SHORT: 'Short' };
+const PitchMap = ({ payload }) => {
+  const { metric, cells, min_balls: minBalls = 10 } = payload;
+  const lines = payload.hand === 'LHB' ? [...payload.lines].reverse() : payload.lines;
+  const lengths = payload.lengths;
+  const L = 92; const T = 20; const cw = (300 - L - 6) / lines.length; const ch = 40; const H = T + lengths.length * ch + 34;
+  const at = (line, length) => cells.find((c) => c.line === line && c.length === length);
+  const shown = cells.filter((c) => c.balls >= minBalls);
+  const span = Math.max(...shown.map((c) => Math.abs(c.value - metric.mid)), 1e-9);
+  const good = (v) => (metric.higher_better === false ? v < metric.mid : v > metric.mid);
+  const near = (v) => Math.abs(v - metric.mid) < span * 0.2; // close to the batter's own average: no colour
+  const offLeft = payload.hand !== 'LHB';
+  const stumpsX = L + (lines.indexOf('ON_THE_STUMPS') + 0.5) * cw;
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 300 ${H}`} role="img" sx={{ width: '100%' }}
+        aria-label={`${metric.label} by line and length: ${shown.map((c) => `${PITCH_LENGTHS[c.length]} ${PITCH_LINES[c.line]} ${fmt(c.value, metric.format)}`).join('; ')}`}>
+        <rect x={L - 4} y={T - 6} width={300 - L} height={lengths.length * ch + 10} rx="10" fill={colors.surface2} />
+        <line x1={L - 4} x2={296} y1={T - 1} y2={T - 1} stroke={colors.borderStrong} strokeWidth="1.5" />
+        {lines.indexOf('ON_THE_STUMPS') >= 0 && [-5, 0, 5].map((dx) => (
+          <rect key={dx} x={stumpsX + dx - 1.2} y={2} width="2.4" height={T - 6} rx="1" fill={colors.textMed} />
+        ))}
+        {lengths.map((len, i) => (
+          <text key={len} x={L - 9} y={T + i * ch + ch / 2 + 4} textAnchor="end" style={{ fontFamily: fonts.body, fontSize: 11, fill: colors.textHi }}>
+            {PITCH_LENGTHS[len] || len}
+          </text>
+        ))}
+        {lengths.map((len, i) => lines.map((line, j) => {
+          const c = at(line, len); const x = L + j * cw; const y = T + i * ch;
+          const ok = c && c.balls >= minBalls;
+          const strength = ok ? (near(c.value) ? 0.1 : 0.2 + 0.68 * Math.min(1, Math.abs(c.value - metric.mid) / span)) : 0;
+          return (
+            <g key={`${len}-${line}`}>
+              <rect x={x + 1.5} y={y + 1.5} width={cw - 3} height={ch - 3} rx="6"
+                fill={ok ? (near(c.value) ? colors.textMed : good(c.value) ? colors.accent : colors.red) : 'none'} fillOpacity={strength}
+                stroke={ok && c.highlight ? colors.textHi : colors.border} strokeWidth={ok && c.highlight ? 2.5 : 1}>
+                {ok && <title>{`${PITCH_LENGTHS[len]}, ${PITCH_LINES[line]}: ${fmt(c.value, metric.format)} (${c.balls} balls)`}</title>}
+              </rect>
+              {ok ? (
+                <>
+                  <text x={x + cw / 2} y={y + ch / 2} textAnchor="middle" style={{ ...mono, fontSize: 13.5, fontWeight: 700, fill: colors.textHi }}>{fmt(c.value, metric.format)}</text>
+                  <text x={x + cw / 2} y={y + ch / 2 + 12} textAnchor="middle" style={{ ...mono, fontSize: 8, fill: colors.textMed }}>
+                    {`${c.balls}b${c.outs ? ` · ${c.outs}w` : ''}`}
+                  </text>
+                </>
+              ) : (
+                <text x={x + cw / 2} y={y + ch / 2 + 4} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textGhost }}>–</text>
+              )}
+            </g>
+          );
+        }))}
+        {lines.map((line, j) => (
+          <text key={line} x={L + (j + 0.5) * cw} y={T + lengths.length * ch + 15} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{PITCH_LINES[line] || line}</text>
+        ))}
+        <text x={L} y={H - 4} style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{offLeft ? '← off side' : '← leg side'}</text>
+        <text x={296} y={H - 4} textAnchor="end" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{offLeft ? 'leg side →' : 'off side →'}</text>
+      </Box>
+      <Typography sx={{ fontSize: 11.5, color: colors.textLo, mt: 0.5 }}>
+        {payload.note || `Lime: better than his ${fmt(metric.mid, metric.format)} · red: worse · grey: about the same · b balls, w wickets · blank: under ${minBalls} balls`}
+      </Typography>
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
   recap_text: RecapText,
   score_race: ScoreRace,
@@ -785,4 +859,5 @@ export const POST_VISUALS = {
   bucket_bars: BucketBars,
   bowling_plan: BowlingPlan,
   pair_dumbbell: PairDumbbell,
+  pitch_map: PitchMap,
 };
