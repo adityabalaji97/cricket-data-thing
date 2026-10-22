@@ -109,6 +109,7 @@ def cube(db, who: str, day: date) -> List[Dict[str, Any]]:
 
     bat = who == "batter"
     nm, lnm = ("dd.bat", "d.batter") if bat else ("dd.bowl", "d.bowler")
+    pid = "dd.p_bat" if bat else "dd.p_bowl"
     tm, ltm = ("dd.team_bat", "d.batting_team") if bat else ("dd.team_bowl", "d.bowling_team")
     amt = "COALESCE(dd.batruns, 0)" if bat else \
         "CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' AND LOWER(COALESCE(dd.dismissal, '')) = ANY(:wk) THEN 1 ELSE 0 END"
@@ -117,94 +118,92 @@ def cube(db, who: str, day: date) -> List[Dict[str, Any]]:
             "SUM(CASE WHEN b.amt = 4 THEN 1 ELSE 0 END) AS fours") if bat else "SUM(b.amt) AS wickets"
     # The batting position, from the order batters first faced a ball in the innings (bowling has none).
     pos = ("JOIN (SELECT mid, inns, name, RANK() OVER (PARTITION BY mid, inns ORDER BY MIN(o * 100 + bl)) AS pos "
-           "FROM balls GROUP BY mid, inns, name) p USING (mid, inns, name)") if bat else ""
+           "FROM balls GROUP BY mid, inns, name) p USING (mid, inns, name)") if bat else ""  # one name per innings
     rows = db.execute(text(f"""
         WITH {ALIAS_MAP_CTE},
         balls AS (
-            SELECT COALESCE(am.canonical_name, {nm}) AS name, {tm} AS team, m.id::text AS mid, m.date, m.competition AS comp,
+            SELECT {pid} AS pid, COALESCE(am.canonical_name, {nm}) AS name, {tm} AS team, m.id::text AS mid, m.date, m.competition AS comp,
                    (m.match_type = 'international' AND m.competition = ANY(:intl)) AS t20i, dd.inns, dd.over AS o,
                    dd.ball AS bl, {amt} AS amt
             FROM delivery_details dd JOIN matches m ON m.id = dd.p_match
             LEFT JOIN alias_map am ON LOWER({nm}) = am.name_key
             WHERE m.format = 'T20' AND m.gender = 'male' AND m.date <= :day
             UNION ALL
-            SELECT COALESCE(am.canonical_name, {lnm}), {ltm}, m.id::text, m.date, m.competition,
+            SELECT NULL::bigint, COALESCE(am.canonical_name, {lnm}), {ltm}, m.id::text, m.date, m.competition,
                    (m.match_type = 'international' AND m.competition = ANY(:intl)), d.innings, d.over, d.ball, {lamt}
             FROM deliveries d JOIN matches m ON m.id = d.match_id
             LEFT JOIN alias_map am ON LOWER({lnm}) = am.name_key
             WHERE m.format = 'T20' AND m.gender = 'male' AND m.date < :legacy
         )
-        SELECT b.name, b.team, b.comp, b.t20i,
+        SELECT b.pid, b.name, b.team, b.comp, b.t20i,
                CASE WHEN b.o < 6 THEN 'pp' WHEN b.o >= 15 THEN 'death' ELSE 'mid' END AS phase,
                {"p.pos" if bat else "NULL::int"} AS pos, (b.date = :day) AS today, {sums}
         FROM balls b {pos}
-        GROUP BY 1, 2, 3, 4, 5, 6, 7
+        GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
     """), {"intl": international_competitions("T20"), "day": day, "legacy": LEGACY_BEFORE,
            "wk": list(BOWLER_WICKETS)}).mappings().all()
     return [dict(r) for r in rows]
 
 
 # --------------------------------------------------------------------------------------------
-# Namesakes (stop-gap until player ids, RECORD_RADAR_PLAN.md chunk 0): the ball-by-ball file names players, it
-# doesn't number them, so two people with one name are one player. India's Rohit Sharma had Indonesia's Rohit Sharma's
-# three powerplay sixes (101, not 98). A name that played T20Is for two sides is split by side, its main side keeping
-# the plain name ("Rohit Sharma", "Rohit Sharma (Indonesia)"), unless it's one person who changed sides.
+# Who is who: by ESPNcricinfo player id (delivery_details.p_bat / p_bowl), not by name. Names collide: India's,
+# Indonesia's and Haryana's Rohit Sharma are three players (34102, 1542004, 934943), and counting by name gave India's
+# Rohit Indonesia's three powerplay sixes (101, not 98). Each id gets one display name; where ids share a name, the one
+# with the most balls keeps it and the others carry their main side: "Rohit Sharma (Indonesia)". Balls before 2015
+# (the legacy table) have no ids and go by name to that name's main player.
 # --------------------------------------------------------------------------------------------
 
-#: One country under two names, or a country and its A side.
-SIDE_ALIAS = {"Swaziland": "Eswatini", "Namibia A": "Namibia"}
-#: Not a national side (a player's appearances there are his own, whatever his country).
-NOT_A_SIDE = {"World-XI", "World XI", "ICC World XI", "Asia XI", "Africa XI", "Marylebone Cricket Club"}
-#: One person who played T20Is for two sides (kept together, as official records count them).
-SWITCHED = {"Tim David", "Mark Chapman", "David Wiese", "Corey Anderson", "Hayden Walsh", "Michael Rippon",
-            "Karima Gore", "Nitish Kumar", "Sultan Ahmed", "Tom Bruce"}
 
-
-def namesakes(db) -> Dict[str, Dict[str, str]]:
-    """{name: {side: name as counted}} for names split by side; a side with a single game folds into the main one
-    (one Bhutan v Bahrain match has its teams swapped)."""
+def identities(db) -> Tuple[Dict[int, str], Dict[str, str]]:
+    """({player id: display name}, {name: display name of its main player})."""
     from services.competition_normalizer import international_competitions
     from services.player_aliases import ALIAS_MAP_CTE
 
     rows = db.execute(text(f"""
         WITH {ALIAS_MAP_CTE}, b AS (
-            SELECT COALESCE(am.canonical_name, dd.bat) AS name, dd.team_bat AS team, dd.p_match FROM delivery_details dd
-            JOIN matches m ON m.id = dd.p_match LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key
-            WHERE m.match_type = 'international' AND m.competition = ANY(:intl) AND m.format = 'T20' AND m.gender = 'male'
+            SELECT dd.p_bat AS pid, COALESCE(am.canonical_name, dd.bat) AS name, dd.team_bat AS team,
+                   (m.match_type = 'international' AND m.competition = ANY(:intl)) AS t20i
+            FROM delivery_details dd JOIN matches m ON m.id = dd.p_match LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key
+            WHERE m.format = 'T20' AND m.gender = 'male' AND dd.p_bat IS NOT NULL
             UNION ALL
-            SELECT COALESCE(am.canonical_name, dd.bowl), dd.team_bowl, dd.p_match FROM delivery_details dd
-            JOIN matches m ON m.id = dd.p_match LEFT JOIN alias_map am ON LOWER(dd.bowl) = am.name_key
-            WHERE m.match_type = 'international' AND m.competition = ANY(:intl) AND m.format = 'T20' AND m.gender = 'male'
+            SELECT dd.p_bowl, COALESCE(am.canonical_name, dd.bowl), dd.team_bowl,
+                   (m.match_type = 'international' AND m.competition = ANY(:intl))
+            FROM delivery_details dd JOIN matches m ON m.id = dd.p_match LEFT JOIN alias_map am ON LOWER(dd.bowl) = am.name_key
+            WHERE m.format = 'T20' AND m.gender = 'male' AND dd.p_bowl IS NOT NULL
         )
-        SELECT name, team, COUNT(DISTINCT p_match) FROM b GROUP BY 1, 2
+        SELECT pid, name, team, t20i, COUNT(*) FROM b GROUP BY 1, 2, 3, 4
     """), {"intl": international_competitions("T20")}).all()
-    sides: Dict[str, Dict[str, int]] = {}
-    for name, team, games in rows:
-        if team in NOT_A_SIDE:
-            continue
-        side = SIDE_ALIAS.get(team, team)
-        sides.setdefault(name, {})[side] = sides.setdefault(name, {}).get(side, 0) + int(games)
-    out = {}
-    for name, by in sides.items():
-        real = {s: g for s, g in by.items() if g > 1}
-        if len(real) < 2 or name in SWITCHED:
-            continue
-        main = max(real, key=real.get)
-        out[name] = {s: (name if s == main else f"{name} ({s})") for s in real}
-        out[name]["__main__"] = name
-    return out
+    names: Dict[int, Dict[str, int]] = {}
+    teams: Dict[int, Dict[Tuple[str, bool], int]] = {}
+    for pid, name, team, t20i, n in rows:
+        names.setdefault(pid, {})[name] = names.setdefault(pid, {}).get(name, 0) + n
+        teams.setdefault(pid, {})[(team, bool(t20i))] = n + teams.setdefault(pid, {}).get((team, bool(t20i)), 0)
+    canonical = {pid: max(ns, key=ns.get) for pid, ns in names.items()}
+    balls = {pid: sum(ns.values()) for pid, ns in names.items()}
+
+    def side(pid: int) -> str:
+        t = teams[pid]
+        national = {k: v for k, v in t.items() if k[1]}
+        return max(national or t, key=(national or t).get)[0]
+
+    by_name: Dict[str, List[int]] = {}
+    for pid, name in canonical.items():
+        by_name.setdefault(name, []).append(pid)
+    display: Dict[int, str] = {}
+    main: Dict[str, str] = {}
+    for name, pids in by_name.items():
+        pids.sort(key=lambda p: -balls[p])
+        main[name] = name
+        display[pids[0]] = name
+        for p in pids[1:]:
+            display[p] = f"{name} ({side(p)})"
+    return display, main
 
 
-def split_namesakes(rows: List[Dict[str, Any]], split: Dict[str, Dict[str, str]]) -> List[Dict[str, Any]]:
-    """The counts table with each split name's T20I rows under its side's name (league rows stay with the main one)."""
-    out = []
-    for r in rows:
-        by = split.get(r["name"])
-        if by and r["t20i"]:
-            side = SIDE_ALIAS.get(r["team"], r["team"])
-            r = {**r, "name": by.get(side, r["name"])}
-        out.append(r)
-    return out
+def with_identities(rows: List[Dict[str, Any]], display: Dict[int, str], main: Dict[str, str]) -> List[Dict[str, Any]]:
+    """The counts table under each player's display name: by id where the ball has one, else by name."""
+    return [{**r, "name": display.get(r["pid"], r["name"]) if r.get("pid") is not None else main.get(r["name"], r["name"])}
+            for r in rows]
 
 
 def _in_scope(r: Dict[str, Any], scope: Scope) -> bool:
@@ -277,8 +276,8 @@ def run_day(db, day: date, templates: Tuple[Template, ...] = TEMPLATES) -> List[
     matches = day_matches(db, day)
     if not matches:
         return []
-    split = namesakes(db)
-    cubes = {who: split_namesakes(cube(db, who, day), split) for who in {t.who for t in templates}}
+    display, main = identities(db)
+    cubes = {who: with_identities(cube(db, who, day), display, main) for who in {t.who for t in templates}}
     out = []
     for scope in scopes_for(db, matches):
         for t in templates:
@@ -451,8 +450,8 @@ def drafts_for_day(db, day: date, k: int = DAILY_CAP) -> Tuple[List[Dict[str, An
     matches = day_matches(db, day)
     if not matches:
         return [], {}
-    split = namesakes(db)
-    cubes = {who: split_namesakes(cube(db, who, day), split) for who in ("batter", "bowler")}
+    display, main = identities(db)
+    cubes = {who: with_identities(cube(db, who, day), display, main) for who in ("batter", "bowler")}
     events = []
     for scope in scopes_for(db, matches):
         for t in TEMPLATES:
