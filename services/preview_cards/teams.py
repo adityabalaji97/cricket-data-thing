@@ -212,6 +212,9 @@ def last_meeting(ctx) -> Optional[Card]:
     m = ctx.last_meeting
     if not m or len(m["innings"]) < 1:
         return None
+    from services.preview_cards.series import games
+    if games(ctx):
+        return None  # mid-series: "Series so far" opens with this game (series_turn)
     first = m["innings"][0]
     second = m["innings"][1] if len(m["innings"]) > 1 else None
     w = m["winner"]
