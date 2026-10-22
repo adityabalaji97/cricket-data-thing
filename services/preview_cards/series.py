@@ -272,15 +272,17 @@ def _cell_words(phase: str, kind: str) -> str:
     return f"{KIND_WORDS[kind]} {CELL_PHASE[phase]}"
 
 
-def series_usage(ctx) -> Optional[Card]:
+def _usage_candidates(ctx) -> List[Dict[str, Any]]:
+    """Batters (at 3 or lower) who batted below par last game in a cell well below their best: [{name, side, cell,
+    best, gap, game, total, mine}]."""
     gs = games(ctx)
     if not gs or not has_primer(ctx.fmt, ctx.gender):
-        return None
+        return []
     last = gs[-1]
     faced = [r for r in _q(ctx, [last["id"]], ["batter", "batting_team", "phase", "bowl_kind"])
              if r.get("bowl_kind") in KIND_WORDS and r.get("phase") in PHASES]
     if not faced:
-        return None
+        return []
     per = defaultdict(list)
     for r in faced:
         per[r["batter"]].append(r)
@@ -289,7 +291,7 @@ def series_usage(ctx) -> Optional[Card]:
              if r.get("batting_position") is not None}
     names = [n for n, rs in per.items() if sum(r["balls"] for r in rs) >= USAGE_MIN_FACED and order.get(n, 0) >= 3]
     if not names:
-        return None
+        return []
     day = _fixture_day(ctx)
     record = _q(ctx, None, ["batter", "phase", "bowl_kind"], batters=names, leagues=[], include_international=False,
                 start_date=date(day.year - RECORD_YEARS, day.month, min(day.day, 28)), end_date=day)
@@ -314,8 +316,14 @@ def series_usage(ctx) -> Optional[Card]:
         total = {"runs": sum(r["runs"] for r in per[name]), "balls": sum(r["balls"] for r in per[name])}
         found.append({"name": name, "side": ctx.side_of(per[name][0]["batting_team"]), "cell": cell, "best": best_cell,
                       "gap": gap, "game": main, "total": total, "mine": mine})
+    return found
+
+
+def series_usage(ctx) -> Optional[Card]:
+    found = _memo(ctx, "usage", lambda: _usage_candidates(ctx))
     if not found:
         return None
+    last = games(ctx)[-1]
     f = max(found, key=lambda x: x["gap"])
     rows = [{"name": _cell_words(*c).capitalize(), "value": round(r["raa_per_100"]),
              "highlight": c == f["cell"],
@@ -436,6 +444,161 @@ def series_lengths_2(ctx) -> Optional[Card]:
     return _lengths_card(ctx, ctx.t2, ctx.t1)
 
 
+# --------------------------------------------------------------------------------------------
+# 9: a new ground (does the last game's lesson carry over?)
+# --------------------------------------------------------------------------------------------
+
+GROUND_YEARS = 5
+GROUND_MIN_BALLS = 1200   # ~5 matches of history at each ground
+
+
+def _ground_profile(ctx, venue: str) -> Optional[Dict[str, Any]]:
+    day = _fixture_day(ctx)
+    rows = _q(ctx, None, ["phase", "bowl_kind"], "bowling", venue=venue, leagues=[], include_international=False,
+              start_date=date(day.year - GROUND_YEARS, day.month, min(day.day, 28)), end_date=day)
+    balls = sum(r["balls"] or 0 for r in rows)
+    if balls < GROUND_MIN_BALLS:
+        return None
+
+    def rate(sel):
+        b = sum(r["balls"] or 0 for r in sel)
+        return round(6 * sum(r["runs"] or 0 for r in sel) / b, 2) if b else None
+
+    kind = lambda k: [r for r in rows if r.get("bowl_kind") == k]  # noqa: E731
+    phase = lambda p: [r for r in rows if r.get("phase") == p]  # noqa: E731
+    spin_balls = sum(r["balls"] or 0 for r in kind("spin bowler"))
+    return {"balls": balls, "Run rate": rate(rows), "Powerplay": rate(phase("powerplay")), "Death overs": rate(phase("death")),
+            "Pace": rate(kind("pace bowler")), "Spin": rate(kind("spin bowler")), "spin_share": round(100 * spin_balls / balls)}
+
+
+GROUND_WORDS = {"International", "Cricket", "Stadium", "Ground", "Complex", "Association"}
+
+
+def _ground(venue: str) -> str:
+    """'Rajiv Gandhi International Stadium' -> 'Rajiv Gandhi'; 'Hagley Oval, Christchurch' -> 'Hagley Oval'."""
+    words = [w for w in venue.split(",")[0].split() if w not in GROUND_WORDS]
+    return " ".join(words) or venue
+
+
+def series_new_ground(ctx) -> Optional[Card]:
+    gs = games(ctx)
+    if not gs:
+        return None
+    last = gs[-1]["venue"]
+    if last in (ctx.venue_aliases or [ctx.venue]):
+        return None  # same ground: the games so far already are the evidence
+    old, new = _ground_profile(ctx, last), _ground_profile(ctx, ctx.venue)
+    if not old or not new:
+        return None
+    labels = ["Run rate", "Powerplay", "Death overs", "Pace", "Spin"]
+    rows = [{"label": k, "a": old[k], "b": new[k]} for k in labels if old[k] is not None and new[k] is not None]
+    if len(rows) < 3:
+        return None
+    # The title: pace or spin, whichever differs more between the grounds.
+    big = max((r for r in rows if r["label"] in ("Pace", "Spin")), key=lambda r: abs(r["b"] - r["a"]), default=None)
+    if big is None:
+        return None
+    for r in rows:
+        r["highlight"] = r is big
+    a, b = _ground(last), _ground(ctx.venue)
+    word = "seamers" if big["label"] == "Pace" else "spinners"
+    return Card(
+        id="series-new-ground", chapter="series", visual="pair_dumbbell",
+        title=f"{word.capitalize()} go at {big['b']:.1f} an over at {b}, {big['a']:.1f} at {a}, where game {gs[-1]['n']} was",
+        help="Runs per over at each ground, every men's T20 there",
+        sample=f"{b} v {a} · all men's T20s, last {GROUND_YEARS} years · spin bowls {new['spin_share']}% there, "
+               f"{old['spin_share']}% at {a}",
+        n=min(old["balls"], new["balls"]) // 120,
+        payload={"series": [a, b], "format": "dec1", "values": True, "full_labels": True, "rows": rows},
+        info=Info(
+            what=f"The next game moves from {a} to {b}. How the two grounds play, from every men's T20 at each over "
+                 f"the last {GROUND_YEARS} years, so a lesson from {a} is weighed against conditions that may differ.",
+            how_to_read="Each row is runs per over at the two grounds; the number on the right is the next ground "
+                        "minus the last.",
+        ),
+        query_url=ctx.query_url(args={"venue": ctx.venue, "leagues": [], "group_by": ["phase", "bowl_kind"],
+                                      "metrics_perspective": "bowling"}),
+        relevance=1.45,
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# 8: keep / try (rules over the cards above; options, never verdicts)
+# --------------------------------------------------------------------------------------------
+
+KEEP_BALLS = 12
+KEEP_MARGIN = 1.0         # a keep is at least this many runs an over cheaper than the series' pace average
+
+
+def _cell_say(k) -> str:
+    return f"{LENGTH_SAY[k[1]]} {LINE_SAY[k[0]]}"
+
+
+def series_keep_try(ctx) -> Optional[Card]:
+    if not _ids(ctx):
+        return None
+    cells = _pace_cells(ctx)
+    sides = []
+    for side, other in ((ctx.t1, ctx.t2), (ctx.t2, ctx.t1)):
+        mine = {k: c for k, c in (cells.get(side) or {}).items() if c["balls"]}
+        theirs = {k: c for k, c in (cells.get(other) or {}).items() if c["balls"]}
+        keep, try_ = [], []
+        n_mine = sum(c["balls"] for c in mine.values())
+        if n_mine >= PITCH_MIN_SIDE and sum(c["balls"] for c in theirs.values()) >= PITCH_MIN_SIDE:
+            every = list(mine.values()) + list(theirs.values())
+            avg = 6 * sum(c["runs"] for c in every) / sum(c["balls"] for c in every)
+            own = 6 * sum(c["runs"] for c in mine.values()) / n_mine
+            # Keep: a length that beat the series' and the side's own pace average, with enough balls.
+            for k in sorted((k for k, c in mine.items() if c["balls"] >= KEEP_BALLS and _econ(c) < min(avg, own)),
+                            key=lambda k: _econ(mine[k]))[:2]:
+                if _econ(mine[k]) > avg - KEEP_MARGIN:
+                    break
+                keep.append({"text": f"Seamers {_cell_say(k)}", "detail": f"{_econ(mine[k])} an over · {mine[k]['balls']} balls",
+                             "num": f"{_econ(mine[k])} an over", "rank": (2, _econ(mine[k]))})
+            # Try: the other side's cheapest lengths that this side used under half as much.
+            for k in sorted((k for k, c in theirs.items() if c["balls"] >= KEEP_BALLS and _econ(c) <= avg - KEEP_MARGIN),
+                            key=lambda k: _econ(theirs[k])):
+                share_them = theirs[k]["balls"] / sum(c["balls"] for c in theirs.values())
+                share_me = (mine.get(k) or {"balls": 0})["balls"] / n_mine
+                if share_me < share_them / 2 and len(try_) < 2:
+                    try_.append({"text": f"Seamers {_cell_say(k)}",
+                                 "detail": f"{_pos(other)} went {_econ(theirs[k])} there · {side} bowled {round(100 * share_me)}% of balls there",
+                                 "num": f"{_pos(other)} went {_econ(theirs[k])}", "rank": (1, _econ(theirs[k]))})
+        for u in _memo(ctx, "usage", lambda: _usage_candidates(ctx)):
+            if u["side"] == side and len(try_) < 2:
+                best = u["mine"][u["best"]]
+                try_.append({"text": f"{u['name']} against {_cell_words(*u['best'])}",
+                             "detail": f"his best: {best['raa_per_100']:+.0f} runs above par per 100 balls",
+                             "num": f"{best['raa_per_100']:+.0f} per 100 there", "rank": (0, -u["gap"])})
+        if keep or try_:
+            sides.append({"team": side, "keep": keep, "try": try_})
+    if not sides:
+        return None
+    # The title: a batter to move first, then a length the other side proved, then the cheapest length to keep.
+    team, kind, first = min(((sd["team"], kind, it) for sd in sides for kind in ("try", "keep") for it in sd[kind]),
+                            key=lambda x: x[2]["rank"])
+    for sd in sides:
+        for kind_ in ("keep", "try"):
+            for it in sd[kind_]:
+                it.pop("rank", None)
+    return Card(
+        id="series-keep-try", chapter="series", visual="keep_try",
+        title=f"{team} could {kind}: {first['text'].replace('Seamers ', 'seamers ', 1)} ({first['num']})",
+        help="Options from the games so far, not verdicts",
+        sample=f"{_so_far(ctx)} · {KEEP_BALLS}+ balls behind each",
+        n=len(_ids(ctx)),
+        payload={"sides": sides, "team1": ctx.t1, "team2": ctx.t2},
+        info=Info(
+            what="What the games so far suggest each side keeps doing or tries, by fixed rules: keep a length its "
+                 "seamers went cheaper with than both the series' and their own average; try a length that worked for "
+                 "the other side and they used less than half as often; try a batter where his record is strongest.",
+            how_to_read=f"Each line has the evidence under it. A length needs {KEEP_BALLS}+ balls; one game is a "
+                        "handful of overs per length, so these are options to weigh, not verdicts.",
+        ),
+        relevance=1.4,
+    )
+
+
 SERIES = (
     CardSpec("series-turn", "series", "How did the last game turn?", series_turn, formats=("T20",),
              sample=SampleRule(flag_below=0), scale_by_sample=False),
@@ -447,6 +610,10 @@ SERIES = (
              formats=("T20",), sample=SampleRule(flag_below=0), scale_by_sample=False),
     CardSpec("series-lengths-2", "series", "Did the second side bowl to the conditions?", series_lengths_2,
              formats=("T20",), sample=SampleRule(flag_below=0), scale_by_sample=False),
+    CardSpec("series-new-ground", "series", "Does the last game carry over to this ground?", series_new_ground,
+             formats=("T20",), sample=SampleRule(flag_below=0), scale_by_sample=False),
+    CardSpec("series-keep-try", "series", "What should each side keep or try?", series_keep_try, formats=("T20",),
+             sample=SampleRule(flag_below=0), scale_by_sample=False),
     CardSpec("series-usage", "series", "Is anyone batting away from his strengths?", series_usage, formats=("T20",),
              sample=SampleRule(flag_below=0), scale_by_sample=False),
 )
