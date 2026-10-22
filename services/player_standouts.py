@@ -100,7 +100,7 @@ def _impact_facts(facts, name: str, role: str, years: List[Dict[str, Any]], rank
         _fact(facts, "impact_trend", f"{_poss(name)} {role} Impact per innings is {_signed(per)} in {latest['year']}, "
               f"{direction} from {_signed(prev_per)} in {prev['year']}.")
     if role == "batting":
-        _fact(facts, "raa", f"In {latest['year']}, {name} scored {_signed(latest['raa'])} runs above an average batter "
+        _fact(facts, "raa", f"In {latest['year']}, {name} scored {_signed(latest['raa'])} runs above par "
               f"in the same match situations (RAA).")
     _fact(facts, "wpa", f"{_poss(name)} {role} added {_signed(latest['wpa'], 2)} wins in {latest['year']} (win probability added).")
 

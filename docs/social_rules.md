@@ -5,6 +5,39 @@ numbers (Oct 2026); the Reddit study's title rules are docs/content_guidelines.m
 Reel writer's and checker's prompts and into Jev's appeal scoring, and checks every queued post's slides against the
 rules code can test (warnings in the admin's Daily posts tab). Edit a rule here and the prompts follow.
 
+## Card anatomy
+
+Every card, on the site and in every image, is three things: the claim, the picture, and enough context to trust it. A
+reader gives it about three seconds. Anything that doesn't change how a cricket fan reads the chart leaves the card for
+the caption, the thread or the card's info sheet.
+
+- **Title:** one claim, at most two lines (about 80 characters): who, what, one number. The axes already name lines,
+  lengths and phases, so the title doesn't repeat them.
+- **No help line on the card face.** Definitions, thresholds and method go in the info sheet (site) and the caption
+  (posts). A card may keep one help line only when the chart can't be read without it (`help_on_card`).
+- **Inside the chart:** one number per mark. A second number (balls, wickets) only when the claim depends on it.
+  Legends are colour chips, not sentences; no "how to read" notes.
+- **Footer:** the scope on one line (who, against what, when), then the credit line:
+  "hindsightcricket.com · Data: Himanish Ganjoo & TechRadar, Cricsheet". Always full names.
+- **Slide counter** ("2 / 7") only in carousels, where swiping matters; never on reply images or single cards.
+- **Caveats** (hand-tagged data coverage, small samples beyond the "small sample" chip) go in the caption.
+
+## Vocabulary
+
+One term per idea, the same everywhere: cards, captions, threads, Reels.
+
+| Idea | Say |
+|---|---|
+| Impact | Impact |
+| RAA | runs above par |
+| WPA | win probability added |
+| Control | control % or false shots |
+| Balls per dismissal | balls per wicket |
+| Strike rate | SR, or "scores at 106" |
+| Lengths | full, good length, back of a length, short, yorker, full toss |
+| Lines | wide outside off, outside off, on the stumps, down leg, wide down leg |
+| Phases | powerplay, middle overs, death (not "new ball" / "old ball") |
+
 ## Numbers
 
 - Every number on a slide comes from the query builder; code writes titles from the numbers. Figures from elsewhere are credited text, never charted, and only used once confirmed.
@@ -21,6 +54,7 @@ rules code can test (warnings in the admin's Daily posts tab). Edit a rule here 
 - A "case for a player" post tells a story: career, turning point, the rival's rise, his old role now, the rest of the case, both ways.
 - "The deeper cut" is slide 3.
 - At most 8 slides: Instagram counts how many viewers reach the last one. Fold a slide that only repeats earlier titles into the caption.
+- Every post leads with a player and a number: the cover, the X thread's first tweet and the Reel's hook. The general picture (the league-wide curve, the trend, the definitions) comes after the players, never first.
 - The cover (slide 1) carries a reason to stop: the hook, and on the hero side of the cover test (services/ig_cover.py) the lead chart's top rows.
 - A chart on the cover never appears again in the deck: the cover takes the lead chart's top rows and the chart leaves the deck, so slide 2 is new (it's the one Instagram re-shows to people who scrolled past). The full chart goes on the X thread's first tweet. This holds for hand-built posts too (ig_cover.without_hero_card; the slide check flags a repeat).
 - Bold cards, a one-line header and footer, no legend; the data credit in the footer; no player photos or logos.

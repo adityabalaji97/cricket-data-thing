@@ -52,7 +52,8 @@ const Legend = ({ items }) => (
   <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 1 }}>
     {items.map(([label, color]) => (
       <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
-        <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: color }} />
+        <Box sx={color === 'ring' ? { width: 10, height: 10, borderRadius: '3px', border: `2px solid ${colors.textHi}`, boxSizing: 'border-box' }
+          : { width: 10, height: 10, borderRadius: '3px', bgcolor: color }} />
         <Typography sx={{ fontSize: 12, color: colors.textMed }}>{label}</Typography>
       </Box>
     ))}
@@ -100,9 +101,7 @@ const Scorecard = ({ payload }) => {
       {payload.verdict && (
         <Typography sx={{ fontSize: 14, color: colors.textHi, mt: 1, lineHeight: 1.35 }}>{payload.verdict}</Typography>
       )}
-      <Typography sx={{ fontSize: 11, color: colors.textLo, mt: 0.25 }}>
-        {payload.method || 'Shade: percentile in the whole field (brighter is better). Ring: leads that column.'}
-      </Typography>
+      <Legend items={[['Brighter: better in the field', colors.accent], ['Ring: leads the column', 'ring']]} />
     </Box>
   );
 };
@@ -118,11 +117,13 @@ const robustRange = (vals) => {
 };
 
 /**
- * Numbered markers that don't sit on each other: each, best first, takes the nearest free spot around its dot (a short
- * line leads back to the dot when it had to move).
+ * Numbered markers that don't sit on each other or on the `avoid` points (the named dots and their labels): each, best
+ * first, takes the nearest free spot around its dot (a short line leads back to the dot when it had to move).
  */
-const spreadMarkers = (pts, sx, sy, [xmin, xmax, ymin, ymax]) => {
+const spreadMarkers = (pts, sx, sy, [xmin, xmax, ymin, ymax], avoid = []) => {
   const placed = [];
+  const clear = (x, y) => placed.every(([px, py]) => Math.hypot(px - x, py - y) >= 19)
+    && avoid.every(([ax, ay]) => Math.hypot(ax - x, ay - y) >= 13);
   const offsets = [[0, 0]];
   for (let r = 16; r <= 48; r += 16) {
     for (let k = 0; k < 8; k++) offsets.push([Math.round(r * Math.cos((k * Math.PI) / 4)), Math.round(r * Math.sin((k * Math.PI) / 4))]);
@@ -130,7 +131,7 @@ const spreadMarkers = (pts, sx, sy, [xmin, xmax, ymin, ymax]) => {
   return pts.map((p) => {
     const dx = sx(p.x); const dy = sy(p.y);
     const spot = offsets.map(([ox, oy]) => [dx + ox, dy + oy])
-      .find(([x, y]) => x >= xmin && x <= xmax && y >= ymin && y <= ymax && placed.every(([px, py]) => Math.hypot(px - x, py - y) >= 16))
+      .find(([x, y]) => x >= xmin && x <= xmax && y >= ymin && y <= ymax && clear(x, y))
       || [dx, dy];
     placed.push(spot);
     return { name: p.name, dx, dy, mx: spot[0], my: spot[1], moved: spot[0] !== dx || spot[1] !== dy };
@@ -142,11 +143,22 @@ const spreadMarkers = (pts, sx, sy, [xmin, xmax, ymin, ymax]) => {
  * region that beats the subject on both is shaded. The labelled leaders are numbered on the chart and named in a key
  * below, so names never pile up in the busy corner.
  * payload: {x:{label,format,higher_better}, y:{...}, z?:{label}, points:[{name, short, x, y, zp?, highlight?, label?}], box}
+ * Several highlighted points are all named in lime; the box is drawn only for a single subject.
  */
 const ScatterPlus = ({ payload }) => {
   const { points, x: X, y: Y, z: Z } = payload;
   const W = 300; const H = 214; const L = 8; const R = 8; const T = 18; const B = 184;
-  const [x0, x1] = robustRange(points.map((p) => p.x)); const [y0, y1] = robustRange(points.map((p) => p.y));
+  // Robust to the field's outliers, but always wide enough for the named and numbered players (never pinned to an edge).
+  const subjects = points.filter((p) => p.highlight);
+  const named = points.filter((p) => p.highlight || p.label);
+  const reach = ([a, b], vals, all) => {
+    const d = (b - a) * 0.06;
+    const lo = Math.min(a, ...vals.map((v) => v - d));
+    // A measure that can't go below zero (a percentage of balls) starts at 0, never at "-1%".
+    return [Math.min(...all) >= 0 ? Math.max(0, lo) : lo, Math.max(b, ...vals.map((v) => v + d))];
+  };
+  const [x0, x1] = reach(robustRange(points.map((p) => p.x)), named.map((p) => p.x), points.map((p) => p.x));
+  const [y0, y1] = reach(robustRange(points.map((p) => p.y)), named.map((p) => p.y), points.map((p) => p.y));
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   // A lower-is-better axis runs backwards, so better is always up and to the right.
   const fx = X.higher_better === false; const fy = Y.higher_better === false;
@@ -154,11 +166,22 @@ const ScatterPlus = ({ payload }) => {
   const ty = (v) => (fy ? (y1 - v) / (y1 - y0) : (v - y0) / (y1 - y0));
   const sx = (v) => clamp(L + tx(v) * (W - L - R), L + 3, W - R - 3);
   const sy = (v) => clamp(B - ty(v) * (B - T), T + 3, B - 3);
-  const subject = points.find((p) => p.highlight);
+  const subject = subjects.length === 1 ? subjects[0] : null; // the 'beats him on both' box needs one subject
   const better = (p, axis, ref) => (payload[axis].higher_better === false ? p[axis] < ref[axis] : p[axis] > ref[axis]);
   const boxX = subject ? [sx(subject.x), W - R] : null;
   const boxY = subject ? [T, sy(subject.y)] : null;
   const keyed = points.filter((p) => p.label && !p.highlight).sort((a, b) => a.label - b.label); // label: rank, best first
+  // A named dot's label: beside it, to the left near the right edge, below it at the top of the plot (clear of the axis title).
+  const tag = (p) => {
+    const left = sx(p.x) > (W - R) * 0.65;
+    return { x: left ? sx(p.x) - 11 : sx(p.x) + 11, y: sy(p.y) < T + 20 ? sy(p.y) + 4.5 : sy(p.y) - 8, left, text: p.short || surname(p.name) };
+  };
+  const avoid = subjects.flatMap((p) => {
+    const t = tag(p); const w = t.text.length * 7;
+    const xs = []; for (let d = 0; d <= w; d += 8) xs.push([t.left ? t.x - d : t.x + d, t.y - 4]);
+    return [[sx(p.x), sy(p.y)], ...xs];
+  });
+  const markers = spreadMarkers(keyed, sx, sy, [L + 8, W - R - 8, T + 8, B - 8], avoid);
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${Y.label} against ${X.label}`} sx={{ width: '100%' }}>
@@ -176,26 +199,28 @@ const ScatterPlus = ({ payload }) => {
           return <circle key={p.name} cx={sx(p.x)} cy={sy(p.y)} r="3.5" fill={Z ? colors.accent : '#7c8aa5'} fillOpacity={op}
             stroke={inBox ? colors.textHi : 'none'} strokeWidth="1" />;
         })}
-        {spreadMarkers(keyed, sx, sy, [L + 8, W - R - 8, T + 8, B - 8]).map((m, i) => (
+        {/* Leader lines first, so none runs over another player's marker. */}
+        {markers.filter((m) => m.moved).map((m) => (
+          <g key={`${m.name}-leader`}>
+            <line x1={m.dx} y1={m.dy} x2={m.mx} y2={m.my} stroke={colors.textMed} strokeWidth="0.8" />
+            <circle cx={m.dx} cy={m.dy} r="2.5" fill={colors.textHi} />
+          </g>
+        ))}
+        {markers.map((m, i) => (
           <g key={m.name}>
-            {m.moved && <line x1={m.dx} y1={m.dy} x2={m.mx} y2={m.my} stroke={colors.textMed} strokeWidth="0.8" />}
-            {m.moved && <circle cx={m.dx} cy={m.dy} r="2.5" fill={colors.textHi} />}
             <circle cx={m.mx} cy={m.my} r="7.5" fill={colors.textHi} stroke={colors.bg} strokeWidth="1.5" />
             <text x={m.mx} y={m.my + 3.5} textAnchor="middle" style={{ fontFamily: fonts.body, fontSize: 10, fontWeight: 700, fill: colors.bg }}>{i + 1}</text>
           </g>
         ))}
-        {subject && (
-          <g>
-            <circle cx={sx(subject.x)} cy={sy(subject.y)} r="7" fill={colors.accent} stroke={colors.bg} strokeWidth="2" />
-            {/* Beside the dot when it sits at the top of the plot, clear of the y-axis title. */}
-            <text x={sx(subject.x) > (W - R) * 0.65 ? sx(subject.x) - 11 : sx(subject.x) + 11}
-              y={sy(subject.y) < T + 20 ? sy(subject.y) + 4.5 : sy(subject.y) - 8}
-              textAnchor={sx(subject.x) > (W - R) * 0.65 ? 'end' : 'start'}
+        {subjects.map((s) => (
+          <g key={s.name}>
+            <circle cx={sx(s.x)} cy={sy(s.y)} r="7" fill={colors.accent} stroke={colors.bg} strokeWidth="2" />
+            <text x={tag(s).x} y={tag(s).y} textAnchor={tag(s).left ? 'end' : 'start'}
               style={{ fontFamily: fonts.body, fontSize: 13, fontWeight: 600, fill: colors.accent }}>
-              {subject.short || surname(subject.name)}
+              {tag(s).text}
             </text>
           </g>
-        )}
+        ))}
         <text x={L} y={H - 16} style={{ ...mono, fill: colors.textFaint }}>{fmt(fx ? x1 : x0, X.format)}</text>
         <text x={W - R} y={H - 16} textAnchor="end" style={{ ...mono, fill: colors.textFaint }}>{fmt(fx ? x0 : x1, X.format)}</text>
         <text x={(L + W - R) / 2} y={H - 2} textAnchor="middle" style={{ ...mono, fontSize: 11, fill: colors.textLo }}>
@@ -212,7 +237,7 @@ const ScatterPlus = ({ payload }) => {
         </Box>
       )}
       {Z && (
-        <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>{`Brighter dots: higher ${Z.label}`}</Typography>
+        <Legend items={[[`Brighter: higher ${Z.label}`, colors.accent]]} />
       )}
     </Box>
   );
@@ -345,8 +370,7 @@ const RaceLines = ({ payload }) => {
         })}
       </Box>
       <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
-        {`${payload.unit === 'innings' ? 'Innings' : 'Balls'} to ${payload.target.toLocaleString('en-US')} ${payload.measure}. `}
-        {`The fastest took ${n(best)}; the others, how many more.`}
+        {`${payload.unit === 'innings' ? 'Innings' : 'Balls'} to ${payload.target.toLocaleString('en-US')} ${payload.measure}`}
       </Typography>
     </Box>
   );
@@ -382,9 +406,7 @@ const Forest = ({ payload }) => {
         <text x={L} y={H - 6} style={{ ...mono, fill: colors.textFaint }}>{fmt(-span, 'signed1')}</text>
         <text x={W - R} y={H - 6} textAnchor="end" style={{ ...mono, fill: colors.textFaint }}>{fmt(span, 'signed1')}</text>
       </Box>
-      <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
-        {`Dot: the estimate (${payload.unit}); line: its 95% interval. Lime: a clear effect. Grey: the line crosses "no effect", so the data can't tell.`}
-      </Typography>
+      <Legend items={[['Clear effect', colors.accent], ["Data can't tell", colors.textFaint]]} />
     </Box>
   );
 };
@@ -422,7 +444,7 @@ const BucketBars = ({ payload }) => {
           );
         })}
       </Box>
-      <Typography sx={{ fontSize: 12, color: colors.textLo }}>{payload.metric.label}{payload.buckets.some((b) => b.lo != null) ? ' · white line: 95% interval' : ''}</Typography>
+      <Typography sx={{ fontSize: 12, color: colors.textLo }}>{payload.metric.label}</Typography>
     </Box>
   );
 };
@@ -641,7 +663,6 @@ const WinProbLine = ({ payload }) => {
  * overs each still had left before it.
  * payload: {team, mark, overs, rows:[{name, kind:'pace'|'spin'|'other', cells:[{o, runs}], left}]}
  */
-const ordinal = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}`;
 const BowlingPlan = ({ payload }) => {
   const { rows, mark } = payload;
   const kindColour = { pace: SERIES[0], spin: SERIES[1], other: '#5b6b85' };
@@ -679,7 +700,7 @@ const BowlingPlan = ({ payload }) => {
         );
       })}
       <Legend items={[['Pace', kindColour.pace], ['Spin', kindColour.spin]]} />
-      <Typography sx={{ fontSize: 11.5, color: colors.textLo, mt: -0.25 }}>{`Runs in each over. Left: overs each still had before the ${ordinal(mark)}.`}</Typography>
+      <Typography sx={{ fontSize: 11.5, color: colors.textLo, mt: -0.25 }}>Runs in each over</Typography>
     </Box>
   );
 };
@@ -769,6 +790,161 @@ const ScoreRace = ({ payload }) => {
   );
 };
 
+/**
+ * A pitch map of one batter against one kind of bowling: every line-and-length cell shaded by a measure, from the
+ * bowler's end (the batter at the top, full balls nearest him, short balls nearest the bowler). Off side is on the
+ * left for a right-hander and on the right for a left-hander, so the picture matches a broadcast pitch map.
+ * Cells better for the batter than `mid` are lime, better for the bowler red, deeper with the gap; cells under
+ * `min_balls` stay blank. Highlighted cells are outlined.
+ * payload: {hand:'RHB'|'LHB', lines:[...], lengths:[...], metric:{label, format, higher_better, mid},
+ *           min_balls, cells:[{line, length, value, balls, outs?, highlight?}], show_outs?, legend?:[better, worse]}
+ * One number per cell; wickets under it only with show_outs (when the claim is about dismissals).
+ */
+const PITCH_LINES = { WIDE_OUTSIDE_OFFSTUMP: 'Wide off', OUTSIDE_OFFSTUMP: 'Off', ON_THE_STUMPS: 'Stumps', DOWN_LEG: 'Leg', WIDE_DOWN_LEG: 'Wide leg' };
+const PITCH_LENGTHS = { YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good', SHORT_OF_A_GOOD_LENGTH: 'Back of length', SHORT: 'Short' };
+const PitchMap = ({ payload }) => {
+  const { metric, cells, min_balls: minBalls = 10 } = payload;
+  const lines = payload.hand === 'LHB' ? [...payload.lines].reverse() : payload.lines;
+  const lengths = payload.lengths;
+  const L = 92; const T = 20; const cw = (300 - L - 6) / lines.length; const ch = 54; const H = T + lengths.length * ch + 34;
+  const at = (line, length) => cells.find((c) => c.line === line && c.length === length);
+  const shown = cells.filter((c) => c.balls >= minBalls);
+  const span = Math.max(...shown.map((c) => Math.abs(c.value - metric.mid)), 1e-9);
+  const good = (v) => (metric.higher_better === false ? v < metric.mid : v > metric.mid);
+  // Three shades a side, not a smooth ramp: a smooth ramp passes through shades where neither light nor dark text
+  // reaches 4.5:1. These steps were checked against the dark pitch (lowest 5.8:1 with the ink below) and for colour
+  // blindness (lime v red at least 10 OKLab ΔE under deuteranopia).
+  const step = (v) => { const r = Math.abs(v - metric.mid) / span; return r < 0.2 ? -1 : r < 0.5 ? 0 : r < 0.8 ? 1 : 2; };
+  const SHADE = { good: [0.18, 0.32, 0.85], bad: [0.25, 0.45, 0.7] };
+  const paint = (v) => {
+    const k = step(v);
+    if (k < 0) return { fill: colors.textMed, opacity: 0.1, ink: colors.textHi };
+    const g = good(v);
+    return { fill: g ? colors.accent : colors.red, opacity: (g ? SHADE.good : SHADE.bad)[k], ink: g && k === 2 ? colors.bg : colors.textHi };
+  };
+  const offLeft = payload.hand !== 'LHB';
+  const stumpsX = L + (lines.indexOf('ON_THE_STUMPS') + 0.5) * cw;
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 300 ${H}`} role="img" sx={{ width: '100%' }}
+        aria-label={`${metric.label} by line and length: ${shown.map((c) => `${PITCH_LENGTHS[c.length]} ${PITCH_LINES[c.line]} ${fmt(c.value, metric.format)}`).join('; ')}`}>
+        <rect x={L - 4} y={T - 6} width={300 - L} height={lengths.length * ch + 10} rx="10" fill={colors.surface2} />
+        <line x1={L - 4} x2={296} y1={T - 1} y2={T - 1} stroke={colors.borderStrong} strokeWidth="1.5" />
+        {lines.indexOf('ON_THE_STUMPS') >= 0 && [-5, 0, 5].map((dx) => (
+          <rect key={dx} x={stumpsX + dx - 1.2} y={2} width="2.4" height={T - 6} rx="1" fill={colors.textMed} />
+        ))}
+        {lengths.map((len, i) => (
+          <text key={len} x={L - 9} y={T + i * ch + ch / 2 + 4} textAnchor="end" style={{ fontFamily: fonts.body, fontSize: 11, fill: colors.textHi }}>
+            {PITCH_LENGTHS[len] || len}
+          </text>
+        ))}
+        {lengths.map((len, i) => lines.map((line, j) => {
+          const c = at(line, len); const x = L + j * cw; const y = T + i * ch;
+          const ok = c && c.balls >= minBalls;
+          const p = ok ? paint(c.value) : null;
+          return (
+            <g key={`${len}-${line}`}>
+              <rect x={x + 1.5} y={y + 1.5} width={cw - 3} height={ch - 3} rx="6"
+                fill={ok ? p.fill : 'none'} fillOpacity={ok ? p.opacity : 0}
+                stroke={ok && c.highlight ? colors.textHi : colors.border} strokeWidth={ok && c.highlight ? 2.5 : 1}>
+                {ok && <title>{`${PITCH_LENGTHS[len]}, ${PITCH_LINES[line]}: ${fmt(c.value, metric.format)} (${c.balls} balls)`}</title>}
+              </rect>
+              {ok ? (
+                <>
+                  <text x={x + cw / 2} y={y + ch / 2 + (payload.show_outs && c.outs ? 0 : 5)} textAnchor="middle" style={{ ...mono, fontSize: 15, fontWeight: 700, fill: p.ink }}>{fmt(c.value, metric.format)}</text>
+                  <text x={x + cw / 2} y={y + ch / 2 + 12} textAnchor="middle" style={{ ...mono, fontSize: 8, fill: p.ink }}>
+                    {payload.show_outs && c.outs ? `${c.outs} ${c.outs === 1 ? 'wicket' : 'wickets'}` : ''}
+                  </text>
+                </>
+              ) : (
+                <text x={x + cw / 2} y={y + ch / 2 + 4} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textGhost }}>–</text>
+              )}
+            </g>
+          );
+        }))}
+        {lines.map((line, j) => (
+          <text key={line} x={L + (j + 0.5) * cw} y={T + lengths.length * ch + 15} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{PITCH_LINES[line] || line}</text>
+        ))}
+        <text x={L} y={H - 4} style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{offLeft ? '← off side' : '← leg side'}</text>
+        <text x={296} y={H - 4} textAnchor="end" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{offLeft ? 'leg side →' : 'off side →'}</text>
+      </Box>
+      <Legend items={[[payload.legend?.[0] || `Better than his ${fmt(metric.mid, metric.format)}`, colors.accent],
+        [payload.legend?.[1] || 'Worse', colors.red]]} />
+    </Box>
+  );
+};
+
+/**
+ * A few measures over an ordered axis (ball of the innings, season): one line each, the highlighted one in lime and
+ * the rest in the series colours, each named at its end with its last value. An optional shaded span marks a period
+ * (the Impact Player era) and dots can be called out with their value.
+ * payload: {x:{label, ticks:[x...]}, y:{label, format}, series:[{name, points:[{x, y}], highlight?, dashed?}],
+ *           span?:{from, to, label}, callouts?:[{series, x, place?:'below'|'above-left'}]}
+ */
+const MetricLines = ({ payload }) => {
+  const { series, x: X, y: Y, span, callouts = [] } = payload;
+  const W = 300; const H = 210; const L = 30; const R = 66; const T = 18; const B = 182;
+  const xs = series.flatMap((s) => s.points.map((p) => p.x)); const ys = series.flatMap((s) => s.points.map((p) => p.y));
+  const xa = Math.min(...xs); const xb = Math.max(...xs);
+  const top = Math.max(...ys) * 1.08;
+  const sx = (v) => L + ((v - xa) / (xb - xa || 1)) * (W - L - R);
+  const sy = (v) => B - (v / top) * (B - T);
+  const step = [1, 2, 5, 10, 20, 25, 50].find((s) => top / s <= 4) || 100;
+  const grid = []; for (let v = 0; v <= top; v += step) grid.push(v);
+  const others = SERIES.filter((c) => c !== colors.accent);
+  let k = 0;
+  const tone = series.map((s) => (s.highlight ? colors.accent : others[k++ % others.length]));
+  // End labels: spread so they never overlap, in the order the lines finish.
+  const ends = series.map((s, i) => ({ i, y: sy(s.points[s.points.length - 1].y) })).sort((a, b) => a.y - b.y);
+  ends.forEach((e, j) => { if (j && e.y - ends[j - 1].y < 26) e.y = ends[j - 1].y + 26; });
+  const endY = Object.fromEntries(ends.map((e) => [e.i, e.y]));
+  const last = (s) => s.points[s.points.length - 1];
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+        aria-label={series.map((s) => `${s.name}: ${fmt(s.points[0].y, Y.format)} at ${X.label} ${s.points[0].x}, ${fmt(last(s).y, Y.format)} at ${last(s).x}`).join('; ')}>
+        <text x={0} y={10} style={{ ...mono, fontSize: 11, fill: colors.textLo }}>{`↑ ${Y.label}`}</text>
+        {span && (
+          <g>
+            <rect x={sx(span.from)} y={T} width={sx(span.to) - sx(span.from)} height={B - T} fill={colors.textHi} fillOpacity="0.07" />
+            <text x={(sx(span.from) + sx(span.to)) / 2} y={B - 8} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textMed }}>{span.label}</text>
+          </g>
+        )}
+        {grid.map((v) => (
+          <g key={v}>
+            <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke={v ? colors.border : colors.borderStrong} />
+            <text x={L - 6} y={sy(v) + 4} textAnchor="end" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{fmt(v, Y.format === 'pct1' ? 'pct0' : Y.format)}</text>
+          </g>
+        ))}
+        {series.map((s, i) => (
+          <g key={s.name}>
+            <path d={s.points.map((p, j) => `${j ? 'L' : 'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ')} fill="none"
+              stroke={tone[i]} strokeWidth={s.highlight ? 2.6 : 2} strokeDasharray={s.dashed ? '5 4' : undefined} strokeLinejoin="round" />
+            <circle cx={sx(last(s).x)} cy={sy(last(s).y)} r="3.5" fill={tone[i]} stroke={colors.bg} strokeWidth="1.5" />
+            <text x={W - R + 6} y={endY[i] - 2} style={{ ...mono, fontSize: 12, fontWeight: 700, fill: tone[i] }}>{fmt(last(s).y, Y.format)}</text>
+            <text x={W - R + 6} y={endY[i] + 10} style={{ fontFamily: fonts.body, fontSize: 10.5, fill: colors.textMed }}>{s.name}</text>
+          </g>
+        ))}
+        {callouts.map((c) => {
+          const i = series.findIndex((s) => s.name === c.series); const p = i >= 0 && series[i].points.find((q) => q.x === c.x);
+          if (!p) return null;
+          return (
+            <g key={`${c.series}-${c.x}`}>
+              <circle cx={sx(p.x)} cy={sy(p.y)} r="4" fill={tone[i]} stroke={colors.bg} strokeWidth="1.5" />
+              <text x={c.place === 'above-left' ? sx(p.x) - 6 : sx(p.x) + 6} y={c.place === 'above-left' ? sy(p.y) - 10 : sy(p.y) + 14}
+                textAnchor={c.place === 'above-left' ? 'end' : 'start'} style={{ ...mono, fontSize: 12, fontWeight: 700, fill: tone[i] }}>{fmt(p.y, Y.format)}</text>
+            </g>
+          );
+        })}
+        {X.ticks.map((t) => (
+          <text key={t} x={sx(t)} y={B + 14} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{t}</text>
+        ))}
+        <text x={(L + W - R) / 2} y={H - 2} textAnchor="middle" style={{ ...mono, fontSize: 11, fill: colors.textLo }}>{`${X.label} →`}</text>
+      </Box>
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
   recap_text: RecapText,
   score_race: ScoreRace,
@@ -785,4 +961,6 @@ export const POST_VISUALS = {
   bucket_bars: BucketBars,
   bowling_plan: BowlingPlan,
   pair_dumbbell: PairDumbbell,
+  pitch_map: PitchMap,
+  metric_lines: MetricLines,
 };

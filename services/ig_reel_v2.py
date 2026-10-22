@@ -285,7 +285,7 @@ def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = 
              " so people who drift come back. Give the advanced numbers room: that is why this Reel is longer."
              if length == "long" else "")
     msg = PROMPT % {"k": len(bs), "hook": hook, "charts": charts, "say": L["say"], "spoken": L["spoken"], "extra": extra,
-                    "house": social_rules.section("Reels") or "-",
+                    "house": "\n".join(x for x in (social_rules.section("Reels"), social_rules.section("Vocabulary")) if x) or "-",
                     "notes": f"\nAlso on the slides (may be used in the lines, e.g. the doubts):\n{notes}\n" if notes else ""}
     if close:
         msg += f"\nEnd the last line with exactly this question: \"{close}\""

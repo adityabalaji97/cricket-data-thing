@@ -377,7 +377,7 @@ def both_ways(db, spec, cards: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
            if r.get("bowl_kind") == "pace bowler"]
     if ipl and sum(r.get("wickets") or 0 for r in ipl):
         b, w = sum(r["balls"] for r in ipl), sum(r["wickets"] for r in ipl)
-        lines.append(f"· IPL {yr}: out every {b / w:.1f} balls against pace")
+        lines.append(f"· IPL {yr}: {b / w:.1f} balls per wicket against pace")
     if "event" in cards:
         e = cards["event"]
         lines.append(f"· {spec['event']['label']}: {e['payload']['subject_wpa']} win probability added, "

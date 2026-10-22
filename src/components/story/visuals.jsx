@@ -235,26 +235,28 @@ const PhaseDiverging = ({ payload }) => (
 const PaceSpin = ({ payload }) => (
   <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
     {payload.rows.map((r) => (
-      <Box key={r.phase}>
+      <Box key={r.label || r.phase}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography sx={{ fontSize: 14, color: colors.textHi }}>{PHASE_LABEL[r.phase]}</Typography>
+          <Typography sx={{ fontSize: 14, color: colors.textHi }}>{r.label || PHASE_LABEL[r.phase]}</Typography>
           <Typography sx={{ fontSize: 14, color: colors.textHi, fontFamily: fonts.mono }}>{`spin ${r.spin_pct}%`}</Typography>
         </Box>
-        <Box component="svg" viewBox="0 0 300 26" role="img" aria-label={`${PHASE_LABEL[r.phase]}: spin ${r.spin_pct}% of balls, ${r.spin_pct_all}% across the ${payload.comparison}`} sx={{ width: '100%', display: 'block' }}>
+        <Box component="svg" viewBox="0 0 300 26" role="img" aria-label={`${r.label || PHASE_LABEL[r.phase]}: spin ${r.spin_pct}% of balls${r.spin_pct_all == null ? '' : `, ${r.spin_pct_all}% ${payload.by_side ? payload.comparison : `across the ${payload.comparison}`}`}`} sx={{ width: '100%', display: 'block' }}>
           <rect x="0" y="2" width={Math.max(0, 3 * r.spin_pct - 1)} height="20" rx="4" fill={KIND_COLORS.spin}>
             <title>{`Spin: ${r.spin_balls} balls, ${r.spin_wickets} wickets, ${r.spin_econ ?? '–'} an over`}</title>
           </rect>
           <rect x={3 * r.spin_pct + 1} y="2" width={Math.max(0, 300 - 3 * r.spin_pct - 1)} height="20" rx="4" fill={KIND_COLORS.pace}>
             <title>{`Pace: ${r.pace_balls} balls, ${r.pace_wickets} wickets, ${r.pace_econ ?? '–'} an over`}</title>
           </rect>
-          <line x1={3 * r.spin_pct_all} x2={3 * r.spin_pct_all} y1="0" y2="26" stroke={colors.textHi} strokeWidth="2" />
+          {r.spin_pct_all != null && <line x1={3 * r.spin_pct_all} x2={3 * r.spin_pct_all} y1="0" y2="26" stroke={colors.textHi} strokeWidth="2" />}
         </Box>
         <Typography sx={{ fontSize: 13, color: colors.textLo, mt: 0.25 }}>
           {`spin ${r.spin_econ ?? '–'} an over · pace ${r.pace_econ ?? '–'} an over`}
         </Typography>
       </Box>
     ))}
-    <Legend items={[['Spin', KIND_COLORS.spin], ['Pace', KIND_COLORS.pace], [`Tick: spin share across the ${payload.comparison}`, colors.textHi]]} />
+    <Legend items={[['Spin', KIND_COLORS.spin], ['Pace', KIND_COLORS.pace],
+      ...(payload.rows.some((r) => r.spin_pct_all != null)
+        ? [[payload.by_side ? `Tick: ${payload.comparison}` : `Tick: spin share across the ${payload.comparison}`, colors.textHi]] : [])]} />
   </Box>
 );
 
@@ -355,7 +357,7 @@ const Dumbbell = ({ payload }) => {
   const span = Math.max(10, Math.ceil(Math.max(...payload.rows.flatMap((r) => [Math.abs(r.team1), Math.abs(r.team2)])) / 5) * 5);
   const W = 300; const left = 84; const right = 66; const rowH = 22;
   const x = (v) => left + ((v + span) / (2 * span)) * (W - left - right);
-  const groups = ['Batting', 'Bowling'];
+  const groups = ['Batting', 'Bowling'].filter((g) => payload.rows.some((r) => r.group === g));
   let y = 0;
   const marks = [];
   groups.forEach((g) => {
@@ -379,11 +381,11 @@ const Dumbbell = ({ payload }) => {
   const H = y + 20;
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Runs per 100 balls against the ${payload.comparison} average, ${payload.team1} and ${payload.team2}`} sx={{ width: '100%' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Runs per 100 balls against the ${payload.comparison === 'par' ? 'par' : `${payload.comparison} average`}, ${payload.team1} and ${payload.team2}`} sx={{ width: '100%' }}>
         <line x1={x(0)} x2={x(0)} y1="22" y2={H - 18} stroke={colors.textFaint} />
         {marks}
         <text x={x(-span)} y={H - 2} style={{ ...svgText, fill: colors.textFaint }}>{signed(-span)}</text>
-        <text x={x(0)} y={H - 2} textAnchor="middle" style={{ ...svgText, fill: colors.textFaint }}>avg</text>
+        <text x={x(0)} y={H - 2} textAnchor="middle" style={{ ...svgText, fill: colors.textFaint }}>{payload.zero_label || 'avg'}</text>
         <text x={x(span)} y={H - 2} textAnchor="end" style={{ ...svgText, fill: colors.textFaint }}>{signed(span)}</text>
       </Box>
       <Legend items={[[payload.team1, c1], [payload.team2, c2]]} />
@@ -567,7 +569,7 @@ const Battles = ({ payload }) => {
           </Box>
         );
       })}
-      <Typography sx={{ fontSize: 12, color: colors.textLo }}>Likely edge, runs per 100 balls · blue: batter ahead · red: bowler ahead</Typography>
+      <Legend items={[['Batter ahead', DIVERGING.positive], ['Bowler ahead', DIVERGING.negative]]} />
     </Box>
   );
 };
@@ -596,11 +598,6 @@ const PlayerBars = ({ payload, teams }) => {
           </Typography>
         </Box>
       ))}
-      {payload.extra !== 'detail' && (
-        <Typography sx={{ fontSize: 12, color: colors.textLo, mt: 0.5 }}>
-          {rows.map((r) => `${surname(r.name)} ${payload.extra === 'sr' ? `SR ${r.sr}` : `${r.econ} an over`}`).join(' · ')}
-        </Typography>
-      )}
       <Legend items={[[t1, sideColor(t1, t1, t2)], [t2, sideColor(t2, t1, t2)]].filter(([t]) => t)} />
     </Box>
   );
@@ -781,16 +778,19 @@ const PitchUsage = ({ payload }) => {
   const cw = 50; const ch = 30; const x0 = 98; const y0 = 20;
   const max = Math.max(...payload.grid.map((g) => g.pct), 1);
   const cell = (line, length) => payload.grid.find((g) => g.line === line && g.length === length);
+  // The same orientation as the post pitch map (postVisuals PitchMap): from the bowler's end, off side on the left.
+  const ORDER = ['WIDE_OUTSIDE_OFFSTUMP', 'OUTSIDE_OFFSTUMP', 'ON_THE_STUMPS', 'DOWN_LEG', 'WIDE_DOWN_LEG'];
+  const lines = [...payload.lines].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <Box component="svg" viewBox={`0 0 300 ${y0 + payload.lengths.length * ch + 4}`} role="img" aria-label={`Where ${payload.bowler} pitches the ball`} sx={{ width: '100%' }}>
-        {payload.lines.map((l, j) => (
+        {lines.map((l, j) => (
           <text key={l} x={x0 + j * cw + cw / 2} y="12" textAnchor="middle" style={{ ...svgText, fill: colors.textLo }}>{LINE_LABEL[l]}</text>
         ))}
         {payload.lengths.map((len, i) => (
           <g key={len}>
             <text x={x0 - 8} y={y0 + i * ch + ch / 2 + 4} textAnchor="end" style={{ fontFamily: fonts.body, fontSize: 12, fill: colors.textHi }}>{LENGTH_LABEL[len]}</text>
-            {payload.lines.map((l, j) => {
+            {lines.map((l, j) => {
               const c = cell(l, len);
               const standout = c.usual_pct > 0 && c.pct >= 2 && c.pct / c.usual_pct >= 1.5;
               return (
@@ -806,7 +806,7 @@ const PitchUsage = ({ payload }) => {
           </g>
         ))}
       </Box>
-      <Typography sx={{ fontSize: 12, color: colors.textLo }}>% of the bowler&apos;s balls · dot: 1.5× usual or more</Typography>
+      <Legend items={[['1.5× his usual share or more', colors.accent]]} />
     </Box>
   );
 };

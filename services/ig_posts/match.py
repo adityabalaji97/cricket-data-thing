@@ -158,7 +158,7 @@ def recap_post(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
                                               else f"{p['wickets']} for {p['runs']}"), scale=100))
     bats = sorted([p for p in players if p["role"] == "batter" and p["impact"] is not None], key=lambda p: p["impact"], reverse=True)[:6]
     if bats:
-        cards.append(_bars("impact", bats, "impact", "Impact (runs added)", "signed1",
+        cards.append(_bars("impact", bats, "impact", "Impact", "signed1",
                            f"{bats[0]['name']} added the most with the bat: {fmt(bats[0]['impact'], 'signed1')} runs of Impact",
                            sample, lambda p: f"{p['runs']} off {p['balls']}"))
     bowls = sorted([p for p in players if p["role"] == "bowler" and p["raa"] is not None], key=lambda p: p["raa"], reverse=True)[:6]

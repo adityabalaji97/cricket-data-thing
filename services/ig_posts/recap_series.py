@@ -335,7 +335,7 @@ def series_leaders(db: Session, ids: List[str], sample: str, a: str, b: str) -> 
              if top["batting_team"] == second["batting_team"] else
              f"{top['batter']} has added the most in the series: {fmt(top['impact'], 'signed1')} runs of Impact")
     c = card("series", "metric_bars", title, {
-        "metric": {"label": "Impact (runs added) in the series", "format": "signed1", "signed": True},
+        "metric": {"label": "Impact in the series", "format": "signed1", "signed": True},
         "rows": [{"name": r["batter"], "value": round(r["impact"], 1), "team": r["batting_team"],
                   "detail": f"{r['runs']} off {r['balls']} · SR {round(r['strike_rate'])}"} for r in rows],
         "legend": sorted({a, b}), "label_width": 160,

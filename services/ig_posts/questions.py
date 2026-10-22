@@ -66,7 +66,7 @@ BATTER_SITUATIONS = [
     ("spin", "player of spin", {"bowl_kind": ["spin bowler"]}, {"ipl23": 250, "t20i23": 150, "odiwc": 300}, 4),
     ("pace", "player of pace", {"bowl_kind": ["pace bowler"]}, {"ipl23": 400, "t20i23": 250, "odiwc": 500}, 3),
     ("pp", "powerplay batter", {"over_min": 0, "over_max": 5}, {"ipl23": 250, "t20i23": 150}, 3),
-    ("odi_pp", "new-ball batter", {"over_min": 0, "over_max": 9}, {"odiwc": 250}, 3),
+    ("odi_pp", "powerplay batter", {"over_min": 0, "over_max": 9}, {"odiwc": 250}, 3),
     ("death", "finisher", {"over_min": 15, "over_max": 19}, {"ipl23": 120, "t20i23": 80}, 4),
     ("odi_death", "finisher", {"over_min": 40, "over_max": 49}, {"odiwc": 120}, 3),
     ("middle", "middle-overs batter", {"over_min": 6, "over_max": 14}, {"ipl23": 300, "t20i23": 200}, 2),
@@ -88,8 +88,8 @@ BATTER_SITUATIONS = [
      {"ipl23": 120, "t20i23": 80, "odiwc": 150}, 3),
 ]
 BOWLER_SITUATIONS = [
-    ("pp", "new-ball bowler", {"over_min": 0, "over_max": 5}, {"ipl23": 240, "t20i23": 150}, 4),
-    ("odi_pp", "new-ball bowler", {"over_min": 0, "over_max": 9}, {"odiwc": 250}, 3),
+    ("pp", "powerplay bowler", {"over_min": 0, "over_max": 5}, {"ipl23": 240, "t20i23": 150}, 4),
+    ("odi_pp", "powerplay bowler", {"over_min": 0, "over_max": 9}, {"odiwc": 250}, 3),
     ("death", "death bowler", {"over_min": 15, "over_max": 19}, {"ipl23": 180, "t20i23": 120}, 4),
     ("odi_death", "death bowler", {"over_min": 40, "over_max": 49}, {"odiwc": 120}, 3),
     ("middle", "middle-overs bowler", {"over_min": 6, "over_max": 14}, {"ipl23": 300, "t20i23": 200}, 2),

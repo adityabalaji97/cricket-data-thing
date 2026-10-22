@@ -76,7 +76,7 @@ def test_accuracy_card_ranks_good_length_and_flips_short(monkeypatch):
     spec = {"player": "Bhuvneshwar Kumar", "years": [2023]}
     c = S.accuracy_card(None, spec, ["Bhuvneshwar Kumar", "Mohammed Siraj", "Harshit Rana", "Arshdeep Singh"])
     assert c["kicker"] == "The deeper cut"
-    assert c["title"] == "Bhuvneshwar lands 51% of his new balls on a good length, more than any India pacer"
+    assert c["title"] == "Bhuvneshwar lands 51% of his powerplay balls on a good length, more than any India pacer"
     rows = {r["name"]: r for r in c["payload"]["rows"]}
     assert rows["Bhuvneshwar Kumar"]["pct"]["Short"] == 100 and "Short" in rows["Bhuvneshwar Kumar"]["leader"]
     assert c["help"].startswith("Accuracy, not menace: ") and "Rana" in c["help"]
@@ -101,12 +101,12 @@ def test_case_odi_phase_card_flips_shading_and_claims_only_what_it_leads():
     spec = {"player": "Mohammad Shami", "since": date(2019, 1, 1)}
     def cell(bpw):
         return {"bpw": bpw, "econ": 6.0, "balls": 300, "wickets": 20}
-    phases = {"Mohammad Shami": {"New ball": cell(39), "Middle": cell(23), "Death": cell(14)},
-              "Harshit Rana": {"New ball": cell(39), "Middle": cell(22), "Death": {"bpw": None, "econ": None}},
-              "Jasprit Bumrah": {"New ball": cell(47), "Middle": cell(39), "Death": cell(21)},
-              "Arshdeep Singh": {"New ball": cell(26), "Middle": cell(49), "Death": cell(30)}}
+    phases = {"Mohammad Shami": {"Powerplay": cell(39), "Middle": cell(23), "Death": cell(14)},
+              "Harshit Rana": {"Powerplay": cell(39), "Middle": cell(22), "Death": {"bpw": None, "econ": None}},
+              "Jasprit Bumrah": {"Powerplay": cell(47), "Middle": cell(39), "Death": cell(21)},
+              "Arshdeep Singh": {"Powerplay": cell(26), "Middle": cell(49), "Death": cell(30)}}
     c = case_odi.phase_card(spec, phases, list(phases), "bpw")
     assert c["title"] == "No India pacer takes ODI wickets at the death as often as Shami"  # Rana leads the middle
     rows = {r["name"]: r for r in c["payload"]["rows"]}
     assert rows["Mohammad Shami"]["pct"]["Death"] == 100 and "Death" in rows["Mohammad Shami"]["leader"]
-    assert rows["Arshdeep Singh"]["leader"] == ["New ball"]
+    assert rows["Arshdeep Singh"]["leader"] == ["Powerplay"]
