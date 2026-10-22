@@ -1,6 +1,6 @@
 # Record radar: plan
 
-Status: **draft** (22 Oct 2026). Owner: Claude Code / Codex, one chunk per session.
+Status: **signed off** (22 Oct 2026). Owner: Claude Code / Codex, one chunk per session.
 
 ## The problem
 
@@ -85,19 +85,18 @@ Each template states its rule on the card (e.g. "overs 1-6; associates included"
 - Race chart (running total by innings, the passer and the passed highlighted) and ranked bars with the rate as
   each row's detail; one-tweet copy for X, a carousel when there's a story.
 
-## Questions for sign-off
+## Decisions (22 Oct 2026)
 
-1. Associates included and labelled (recommended), or Full Members only?
-2. A daily cap on radar drafts (recommended: 3), and review in the admin before anything is queued (recommended at
-   first)?
-3. Start with T20Is + IPL only, or every scope at once?
+1. **Associates included**, labelled on the card.
+2. **At most 3 radar drafts a day**, reviewed in the admin before anything is queued.
+3. **Every competition** from the start (T20Is, every league in the data, all men's T20s).
 
 ## Tracker
 
 | Chunk | Status |
 |---|---|
 | 0 Definitions + parity | [ ] |
-| 1 Registry + family A | [ ] |
+| 1 Registry + family A | [x] 2026-10-22: services/record_radar.py; one counts table per side (~25s) instead of the query builder (37s a leaderboard); floors: template's first milestone, positions 1-8, first 25 to a milestone; 14 Oct 2026 gave 22 events. Pace/spin templates wait (legacy pre-2015 balls have no bowling type) |
 | 2 Families B, C | [ ] |
 | 3 Family D + in reach | [ ] |
 | 4 Scoring + queue | [ ] |
