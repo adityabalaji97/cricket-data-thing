@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 from services.ig_posts.cards import card
 from services.ig_posts.spotlight import _pct, heat, short_name
 
-PHASES = [("New ball", 0, 9), ("Middle", 10, 39), ("Death", 40, 49)]
+PHASES = [("Powerplay", 0, 9), ("Middle", 10, 39), ("Death", 40, 49)]
 MIN_PHASE_BALLS = 150   # a bowler's phase needs this many balls for a number
 PEER_MIN_BALLS = 240    # ODI balls since `since` to be one of the team's pacers
 MIN_TRACKED = 300       # tracked balls for the length / false-shot table
@@ -108,7 +108,7 @@ def phase_card(spec, phases, bowlers: List[str], measure: str) -> Optional[Dict[
     since = spec["since"].year
     nm = short_name(p)
     if measure == "bpw":
-        words = {"Middle": "in the middle overs", "Death": "at the death", "New ball": "with the new ball"}
+        words = {"Middle": "in the middle overs", "Death": "at the death", "Powerplay": "in the powerplay"}
         if leads:
             where = " or ".join([", ".join(words[c] for c in leads[:-1]), words[leads[-1]]]) if len(leads) > 1 else words[leads[0]]
             title = f"No India pacer takes ODI wickets {where} as often as {nm}"

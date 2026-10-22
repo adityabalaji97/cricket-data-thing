@@ -47,7 +47,7 @@ BATTER: Tuple[Angle, ...] = (
     Angle("wpa", "wpa_per_100", "WPA/100", "win probability added per 100 balls", "value", True, "signed2",
           "Win probability added per 100 balls: how much their batting moved their team's chance of winning.",
           t20_only=True),
-    Angle("bpd", "balls_per_dismissal", "Balls/out", "balls per dismissal", "risk", True, "dec1",
+    Angle("bpd", "balls_per_dismissal", "Balls/wkt", "balls per wicket", "risk", True, "dec1",
           "Balls faced per dismissal. Higher means harder to get out."),
     Angle("average", "average", "Avg", "average", "risk", True, "dec1", "Runs per dismissal."),
     Angle("control", "control_percentage", "Control", "control %", "skill", True, "pct1",

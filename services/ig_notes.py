@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 #: Measures as people say them, for titles ("Impact, win probability and strike rate compared").
 MEASURE_WORDS = {"raa": "runs above average", "impact": "Impact", "wpa": "win probability", "sr": "strike rate",
-                 "bpd": "balls per dismissal", "average": "average", "control": "control", "boundary": "boundaries",
+                 "bpd": "balls per wicket", "average": "average", "control": "control", "boundary": "boundaries",
                  "dot": "dot balls", "sixes": "sixes", "economy": "economy", "strike": "wicket-taking",
                  "wickets_inns": "wickets"}
 FORMAT_TAG = {"IPL": "#IPL", "ODIs": "#ODI", "T20Is": "#T20I", "ODI": "#ODI", "T20": "#T20"}

@@ -319,7 +319,7 @@ def impact_facts(db: Session, league: str, start: date, label: str, played: int)
         top = rows[0]
         runs = round(top["impact"])
         title = (f"{top[group]} leads {label} {side} Impact after {played} matches with "
-                 + (f"+{runs} runs added" if side == "batting" else f"{runs} runs saved"))
+                 + f"{runs:+d} Impact")
         snap = create_snapshot(db, "query", {**params, "title": title}, created_by="tallies")
         facts.append({
             "kind": f"season_impact_{side}", "subject": top[group], "team": None, "title": title,

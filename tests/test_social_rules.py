@@ -13,13 +13,13 @@ def card(title, **kw):
 
 
 def test_title_length_and_lists():
-    assert social_rules.lint_card(card("x" * 111))[0].startswith("Title over 110")
+    assert social_rules.lint_card(card("x" * 81))[0].startswith("Title over 80")
     assert social_rules.lint_card(card("Kishan, Iyer, Tilak, Dube and Rinku all scored")) == [
         "A list of more than three in the title"]
     # commas in brackets or numbers aren't list items, clauses aren't a list, and three items are fine
     assert social_rules.lint_card(card("A peak in 2022 (+9.8, his best), a slump in 2025, back up in 2026")) == []
     assert social_rules.lint_card(card("Abhishek Sharma got to 2,000 T20I runs in 1,024 balls, 140 fewer than Suryakumar")) == []
-    assert social_rules.lint_card(card("At no. 4, SKY's main spot, Iyer has matched him: +11.2 since, SKY +11.7 there before")) == []
+    assert social_rules.lint_card(card("At no. 4, SKY's spot, Iyer has matched him: +11.2 since, SKY +11.7 before")) == []
 
 
 def test_ring_where_only_one_row_has_a_value():
@@ -53,3 +53,17 @@ def test_reel_guard_applies_the_hook_rules():
     assert ig_reel_v2.guard(good, ok, 3) is None
     bad = {"hook": "SKY is back in form, so is he coming back to the India side now.", "lines": lines}
     assert "no number" in ig_reel_v2.guard(bad, ok, 3)
+
+
+def test_card_anatomy_and_vocabulary():
+    from services.social_rules import lint_card
+
+    ok = {"title": "Down leg, Finn Allen's SR drops to 70 and 92", "visual": "pitch_map", "payload": {"metric": {"label": "SR"}}}
+    assert lint_card(ok) == []
+    long_title = dict(ok, title="x " * 45)
+    assert any("Title over 80" in w for w in lint_card(long_title))
+    off = dict(ok, title="Allen scores at 213 against new-ball pace", payload={"metric": {"label": "Impact (runs added)"}})
+    got = " ".join(lint_card(off))
+    assert "'new-ball'" in got and "'runs added'" in got
+    assert any("help line" in w for w in lint_card(dict(ok, help="h" * 100)))
+    assert not any("help line" in w for w in lint_card(dict(ok, help="h" * 100, help_on_card=True)))

@@ -776,16 +776,19 @@ const PitchUsage = ({ payload }) => {
   const cw = 50; const ch = 30; const x0 = 98; const y0 = 20;
   const max = Math.max(...payload.grid.map((g) => g.pct), 1);
   const cell = (line, length) => payload.grid.find((g) => g.line === line && g.length === length);
+  // The same orientation as the post pitch map (postVisuals PitchMap): from the bowler's end, off side on the left.
+  const ORDER = ['WIDE_OUTSIDE_OFFSTUMP', 'OUTSIDE_OFFSTUMP', 'ON_THE_STUMPS', 'DOWN_LEG', 'WIDE_DOWN_LEG'];
+  const lines = [...payload.lines].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <Box component="svg" viewBox={`0 0 300 ${y0 + payload.lengths.length * ch + 4}`} role="img" aria-label={`Where ${payload.bowler} pitches the ball`} sx={{ width: '100%' }}>
-        {payload.lines.map((l, j) => (
+        {lines.map((l, j) => (
           <text key={l} x={x0 + j * cw + cw / 2} y="12" textAnchor="middle" style={{ ...svgText, fill: colors.textLo }}>{LINE_LABEL[l]}</text>
         ))}
         {payload.lengths.map((len, i) => (
           <g key={len}>
             <text x={x0 - 8} y={y0 + i * ch + ch / 2 + 4} textAnchor="end" style={{ fontFamily: fonts.body, fontSize: 12, fill: colors.textHi }}>{LENGTH_LABEL[len]}</text>
-            {payload.lines.map((l, j) => {
+            {lines.map((l, j) => {
               const c = cell(l, len);
               const standout = c.usual_pct > 0 && c.pct >= 2 && c.pct / c.usual_pct >= 1.5;
               return (

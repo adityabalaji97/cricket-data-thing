@@ -251,9 +251,9 @@ def arc_card(spec, data, measure: str = "impact") -> Optional[Dict[str, Any]]:
     who = short_name(p)
     earlier = [v for y, v in pp.items() if y != last and v is not None]
     if pp.get(last) is not None and earlier and pp[last] > max(earlier):
-        title = f"{who}'s best new-ball year since {first}: {fmt(pp[last], 'signed1')} Impact an over in the {last} powerplay"
+        title = f"{who}'s best powerplay year since {first}: {fmt(pp[last], 'signed1')} Impact an over in the {last} powerplay"
     elif pp.get(last) is not None and pp.get(first) is not None and pp[last] >= pp[first] * 0.6 and pp[last] > 0:
-        title = f"{who} is back near his best with the new ball: {fmt(pp[last], 'signed1')} an over in {last}"
+        title = f"{who} is back near his best in the powerplay: {fmt(pp[last], 'signed1')} an over in {last}"
     elif pp.get(last) is not None:
         title = f"{who} in the powerplay: {fmt(pp[last], 'signed1')} an over in {last}"
     else:
@@ -362,7 +362,7 @@ def grounds_card(db, spec) -> Optional[Dict[str, Any]]:
                "series": ["This ground", "All men's T20s"], "rows": rows}
     return card("grounds", "deep_compare", title, payload,
                 f"Pace bowlers, overs 1-6, every men's T20 since {spec['venues_since']} · {sum(n[3] for n in notes):,} balls at these grounds",
-                f"The series grounds for {spec['bowl_kind'].replace(' bowler', '')} with the new ball")
+                f"The series grounds for {spec['bowl_kind'].replace(' bowler', '')} in the powerplay")
 
 
 ACCURACY_MIN_BALLS = 200  # tracked powerplay balls for a row (and 8 rows leave room for the definition line)
@@ -408,7 +408,7 @@ def accuracy_card(db, spec, bowlers: List[str]) -> Optional[Dict[str, Any]]:
     me = table[p]
     more_false = [short_name(b) for b in order if table[b]["False shots"] > me["False shots"] + 2]
     first = order[0] == p
-    title = (f"{short_name(p)} lands {me['Good length']:.0f}% of his new balls on a good length"
+    title = (f"{short_name(p)} lands {me['Good length']:.0f}% of his powerplay balls on a good length"
              + (", more than any India pacer" if first else ""))
     named = more_false[:3]
     who = ", ".join(named[:-1]) + f" and {named[-1]}" if len(named) > 1 else "".join(named)

@@ -199,7 +199,7 @@ def death_hitters(ctx) -> Optional[Card]:
     top = rows[0]
     for r in rows:
         r["value"] = round(r["value"], 1)
-    title = (f"{top['name']} adds the most at the death: {top['value']:+.0f} runs per 100 balls" if primer
+    title = (f"{top['name']} adds the most at the death: {top['value']:+.0f} runs above par per 100 balls" if primer
              else f"{top['name']} scores fastest at the death: strike rate {top['sr']}")
     return Card(
         id="death-hitters", chapter="players", visual="player_bars",
@@ -236,7 +236,7 @@ def death_bowlers(ctx) -> Optional[Card]:
         return None
     primer = has_primer(ctx.fmt, ctx.gender)
     top = rows[0]
-    title = (f"{top['name']} saves the most at the death: {top['value']:+.0f} runs per 100 balls" if primer
+    title = (f"{top['name']} saves the most at the death: {abs(top['value']):.0f} runs below par per 100 balls" if primer
              else f"{top['name']} is the tightest at the death: {top['econ']} an over")
     return Card(
         id="death-bowlers", chapter="players", visual="player_bars",

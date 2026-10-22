@@ -11,10 +11,10 @@ from typing import Optional, Tuple
 
 #: metric -> (plain name on the card, definition for the info sheet)
 PLAIN = {
-    "impact": ("runs added", "Impact: how much a ball moved the batting side's projected total (T20 Primer)."),
-    "raa_bat": ("runs above an average batter", "RAA: runs above what an average batter makes in the same situations."),
-    "raa_bowl": ("runs saved vs an average bowler", "RAA (bowling): runs saved compared with an average bowler in the same situations."),
-    "wpa": ("win chances added", "WPA: how much a player changed his side's chance of winning; 1.0 is one match."),
+    "impact": ("Impact", "Impact: how much a ball moved the batting side's projected total (T20 Primer)."),
+    "raa_bat": ("runs above par", "RAA: runs above what an average batter makes in the same situations."),
+    "raa_bowl": ("runs below par", "RAA (bowling): runs saved compared with an average bowler in the same situations."),
+    "wpa": ("win probability added", "WPA: how much a player changed his side's chance of winning; 1.0 is one match."),
     "leverage": ("pressure", "Leverage: how much was riding on each ball."),
     "strike_rate": ("strike rate", "Runs per 100 balls."),
     "economy": ("economy", "Runs conceded per over."),

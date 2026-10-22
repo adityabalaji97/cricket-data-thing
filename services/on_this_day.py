@@ -188,7 +188,7 @@ def rank_card(db: Session, c: Dict[str, Any], sample: str, upto: date) -> Option
                  "highlight": r["p_match"] == c["id"] and r["name"] == top["name"],
                  "detail": f"{r['date'][:4]} · {_short_team(r['team1'])} v {_short_team(r['team2'])}"} for r in shown]
     k = card("rank", "metric_bars", title, {
-        "metric": {"label": "Impact (runs added)", "format": "signed1", "signed": False}, "rows": rows_out,
+        "metric": {"label": "Impact", "format": "signed1", "signed": False}, "rows": rows_out,
         "label_width": 150,
     }, sample, f"Impact: runs added to (or saved from) the expected total. Every {'innings' if top['role'] == 'bat' else 'bowling performance'} "
                f"in {scope} from {FIRST_YEAR} to {upto:%b %Y}.")
