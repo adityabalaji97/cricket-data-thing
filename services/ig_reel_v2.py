@@ -419,6 +419,7 @@ def spoken(text_: str) -> str:
     text_ = re.sub(r"(?<![\w.])[−–-](?=\d)", "minus ", text_)
     text_ = re.sub(r"(?<=\d)\*", " not out", text_)  # 49* is "49 not out"
     text_ = re.sub(r"(?<=\d)%", " percent", text_)  # the transcript says "percent": "37%" would never match it
+    text_ = re.sub(r"#(?=\d)", "number ", text_)  # "#61" is said "number 61" (the Jansen Reel failed on it, 22 Oct 2026)
     return re.sub(r"\+(?=\d)", "plus ", text_)
 
 

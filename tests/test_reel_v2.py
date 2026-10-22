@@ -64,6 +64,7 @@ def test_variant_ab_and_eligibility(monkeypatch):
 def test_signs_are_spoken_and_verdicts_are_material():
     assert R.spoken("falls to −0.29 from +0.35") == "falls to minus 0.29 from plus 0.35"
     assert R.spoken("Rutherford's 49* off 26") == "Rutherford's 49 not out off 26"
+    assert R.spoken("Jansen ranks #61") == "Jansen ranks number 61"  # the voice says "number"; "#61" never matched
     assert R.spoken("2-0 up") == "2-0 up" or "minus" not in R.spoken("in 2026-27")  # hyphens between words stay
     notes = R.notes_of([{"type": "verdict", "verdict": "Partly", "body": "a. claim: Inconclusive"},
                         {"type": "text", "heading": "From elsewhere", "body": "15 wickets\nSource: ESPNcricinfo"}])
