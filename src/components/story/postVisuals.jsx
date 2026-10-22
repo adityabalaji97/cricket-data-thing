@@ -789,7 +789,17 @@ const PitchMap = ({ payload }) => {
   const shown = cells.filter((c) => c.balls >= minBalls);
   const span = Math.max(...shown.map((c) => Math.abs(c.value - metric.mid)), 1e-9);
   const good = (v) => (metric.higher_better === false ? v < metric.mid : v > metric.mid);
-  const near = (v) => Math.abs(v - metric.mid) < span * 0.2; // close to the batter's own average: no colour
+  // Three shades a side, not a smooth ramp: a smooth ramp passes through shades where neither light nor dark text
+  // reaches 4.5:1. These steps were checked against the dark pitch (lowest 5.8:1 with the ink below) and for colour
+  // blindness (lime v red at least 10 OKLab ΔE under deuteranopia).
+  const step = (v) => { const r = Math.abs(v - metric.mid) / span; return r < 0.2 ? -1 : r < 0.5 ? 0 : r < 0.8 ? 1 : 2; };
+  const SHADE = { good: [0.18, 0.32, 0.85], bad: [0.25, 0.45, 0.7] };
+  const paint = (v) => {
+    const k = step(v);
+    if (k < 0) return { fill: colors.textMed, opacity: 0.1, ink: colors.textHi };
+    const g = good(v);
+    return { fill: g ? colors.accent : colors.red, opacity: (g ? SHADE.good : SHADE.bad)[k], ink: g && k === 2 ? colors.bg : colors.textHi };
+  };
   const offLeft = payload.hand !== 'LHB';
   const stumpsX = L + (lines.indexOf('ON_THE_STUMPS') + 0.5) * cw;
   return (
@@ -809,18 +819,18 @@ const PitchMap = ({ payload }) => {
         {lengths.map((len, i) => lines.map((line, j) => {
           const c = at(line, len); const x = L + j * cw; const y = T + i * ch;
           const ok = c && c.balls >= minBalls;
-          const strength = ok ? (near(c.value) ? 0.1 : 0.2 + 0.68 * Math.min(1, Math.abs(c.value - metric.mid) / span)) : 0;
+          const p = ok ? paint(c.value) : null;
           return (
             <g key={`${len}-${line}`}>
               <rect x={x + 1.5} y={y + 1.5} width={cw - 3} height={ch - 3} rx="6"
-                fill={ok ? (near(c.value) ? colors.textMed : good(c.value) ? colors.accent : colors.red) : 'none'} fillOpacity={strength}
+                fill={ok ? p.fill : 'none'} fillOpacity={ok ? p.opacity : 0}
                 stroke={ok && c.highlight ? colors.textHi : colors.border} strokeWidth={ok && c.highlight ? 2.5 : 1}>
                 {ok && <title>{`${PITCH_LENGTHS[len]}, ${PITCH_LINES[line]}: ${fmt(c.value, metric.format)} (${c.balls} balls)`}</title>}
               </rect>
               {ok ? (
                 <>
-                  <text x={x + cw / 2} y={y + ch / 2} textAnchor="middle" style={{ ...mono, fontSize: 13.5, fontWeight: 700, fill: colors.textHi }}>{fmt(c.value, metric.format)}</text>
-                  <text x={x + cw / 2} y={y + ch / 2 + 12} textAnchor="middle" style={{ ...mono, fontSize: 8, fill: colors.textMed }}>
+                  <text x={x + cw / 2} y={y + ch / 2} textAnchor="middle" style={{ ...mono, fontSize: 13.5, fontWeight: 700, fill: p.ink }}>{fmt(c.value, metric.format)}</text>
+                  <text x={x + cw / 2} y={y + ch / 2 + 12} textAnchor="middle" style={{ ...mono, fontSize: 8, fill: p.ink }}>
                     {`${c.balls}b${c.outs ? ` · ${c.outs}w` : ''}`}
                   </text>
                 </>
