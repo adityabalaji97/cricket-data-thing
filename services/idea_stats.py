@@ -299,11 +299,12 @@ def race(db: Session, spec: Dict[str, Any], scope: Dict[str, Any]) -> Tuple[List
             where, params = _where(scope, "dd.team_bat", "dd.team_bowl")
             sql = f"""
                 WITH {ALIAS_MAP_CTE}
-                SELECT dd.p_match AS match_id, dd.inns, COALESCE(am.canonical_name, dd.bat) AS name, dd.team_bat AS team,
+                SELECT dd.p_match AS match_id, dd.inns, COALESCE(pi.display_name, am.canonical_name, dd.bat) AS name, dd.team_bat AS team,
                        dd.team_bowl AS opp, m.date,
                        MIN(dd.cur_bat_bf) FILTER (WHERE dd.cur_bat_runs >= :target) AS value, MAX(dd.cur_bat_runs) AS final
                 FROM delivery_details dd JOIN matches m ON m.id = dd.p_match
                 LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key
+                LEFT JOIN player_identity pi ON pi.pid = dd.p_bat
                 WHERE {where} GROUP BY 1, 2, 3, 4, 5, 6
             """
         else:  # bowler: legal balls bowled when the Nth wicket fell (cur_bowl_ovr is overs.balls)
@@ -311,11 +312,12 @@ def race(db: Session, spec: Dict[str, Any], scope: Dict[str, Any]) -> Tuple[List
             balls = "(FLOOR(dd.cur_bowl_ovr) * 6 + ROUND((dd.cur_bowl_ovr - FLOOR(dd.cur_bowl_ovr)) * 10))"
             sql = f"""
                 WITH {ALIAS_MAP_CTE}
-                SELECT dd.p_match AS match_id, dd.inns, COALESCE(am.canonical_name, dd.bowl) AS name, dd.team_bowl AS team,
+                SELECT dd.p_match AS match_id, dd.inns, COALESCE(pi.display_name, am.canonical_name, dd.bowl) AS name, dd.team_bowl AS team,
                        dd.team_bat AS opp, m.date,
                        MIN({balls}) FILTER (WHERE dd.cur_bowl_wkts >= :target) AS value, MAX(dd.cur_bowl_wkts) AS final
                 FROM delivery_details dd JOIN matches m ON m.id = dd.p_match
                 LEFT JOIN alias_map am ON LOWER(dd.bowl) = am.name_key
+                LEFT JOIN player_identity pi ON pi.pid = dd.p_bowl
                 WHERE {where} GROUP BY 1, 2, 3, 4, 5, 6
             """
         rows = [dict(r) for r in db.execute(text(f"SELECT * FROM ({sql}) q WHERE value IS NOT NULL ORDER BY value {order}, date"),
@@ -390,15 +392,17 @@ def ball_rows_sql(scope: Dict[str, Any], batter: bool) -> Tuple[str, Dict[str, A
     team_col = "dd.team_bat" if batter else "dd.team_bowl"
     where, params = _where({**scope, "start": None, "end": None}, team_col, "dd.team_bowl" if batter else "dd.team_bat")
     who = "dd.bat" if batter else "dd.bowl"
+    pid = "dd.p_bat" if batter else "dd.p_bowl"  # players by id (player_identity): one name can be several players
     amount = ("COALESCE(dd.batruns, 0)" if batter else
               "CASE WHEN LOWER(COALESCE(dd.out::text, '')) = 'true' AND LOWER(COALESCE(dd.dismissal, '')) = ANY(:wk) THEN 1 ELSE 0 END")
     ball = ("COALESCE(dd.ballfaced, CASE WHEN COALESCE(dd.wide, 0) = 0 THEN 1 ELSE 0 END)" if batter else
             "CASE WHEN COALESCE(dd.wide, 0) = 0 AND COALESCE(dd.noball, 0) = 0 THEN 1 ELSE 0 END")
     sql = f"""
-        SELECT COALESCE(am.canonical_name, {who}) AS name, {team_col} AS team, m.date, dd.p_match::text AS p_match,
+        SELECT COALESCE(pi.display_name, am.canonical_name, {who}) AS name, {team_col} AS team, m.date, dd.p_match::text AS p_match,
                dd.inns, dd.over, dd.ball, {amount} AS amount, {ball} AS faced
         FROM delivery_details dd JOIN matches m ON m.id = dd.p_match
         LEFT JOIN alias_map am ON LOWER({who}) = am.name_key
+        LEFT JOIN player_identity pi ON pi.pid = {pid}
         WHERE {where}"""
     params = {**params, "wk": list(BOWLER_WICKETS)}
     if has_legacy_balls(scope):
