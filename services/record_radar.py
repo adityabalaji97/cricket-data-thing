@@ -155,7 +155,16 @@ def cube(db, who: str, day: date) -> List[Dict[str, Any]]:
 
 
 def identities(db) -> Tuple[Dict[int, str], Dict[str, str]]:
-    """({player id: display name}, {name: display name of its main player})."""
+    """({player id: display name}, {name: display name of its main player}): the stored player_identity table
+    (services/player_identity.py, rebuilt nightly), or computed here when it's empty."""
+    from services import player_identity
+
+    try:
+        display, main = player_identity.load(db)
+        if display:
+            return display, main
+    except Exception:  # the table isn't there (a database before migration 026)
+        db.rollback()
     from services.competition_normalizer import international_competitions
     from services.player_aliases import ALIAS_MAP_CTE
 
