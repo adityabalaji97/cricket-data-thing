@@ -99,5 +99,5 @@ Each template states its rule on the card (e.g. "overs 1-6; associates included"
 | 1 Registry + family A | [x] 2026-10-22: services/record_radar.py; one counts table per side (~25s) instead of the query builder (37s a leaderboard); floors: template's first milestone, positions 1-8, first 25 to a milestone; 14 Oct 2026 gave 22 events. Pace/spin templates wait (legacy pre-2015 balls have no bowling type) |
 | 2 Families B, C | [ ] |
 | 3 Family D + in reach | [ ] |
-| 4 Scoring + queue | [ ] |
-| 5 Cards | [ ] |
+| 4 Scoring + queue | [x] 2026-10-22: score = kind x scope x template x fame (career runs/wickets); one per player; top 3 to the bench (source record-radar, post_by +3 days); associate sides' own lists weigh 0.45; runs after each nightly load (.github/workflows/record-radar.yml) |
+| 5 Cards | [~] 2026-10-22: leaderboard card (top 8, the player in lime, passed / level marked); race chart and rates to do |

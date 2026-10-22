@@ -47,3 +47,17 @@ def test_scope_filters_team_and_t20i():
     india = R.Scope("t20i:India", "for India in T20Is", {"t20i": True, "team": "India"})
     board = R._boards(PP, rows, india, False)[None]
     assert board == {"F": 61}
+
+
+def test_pick_one_per_player_best_first():
+    e = lambda p, kind, rank, scope="t20i", tid="sixes", nth=9: {  # noqa: E731
+        "player": p, "kind": kind, "rank_after": rank, "scope": scope, "template": tid, "nth": nth}
+    events = [e("A", "passed", 1), e("A", "entered", 9), e("B", "milestone", 4, nth=1), e("C", "entered", 10, "t20i:Malaysia")]
+    fame = {"A": 1.4, "B": 1.4, "C": 1.4}
+    got = R.pick(events, fame, 2)
+    assert [x["player"] for x in got] == ["A", "B"] and got[0]["kind"] == "passed"
+
+
+def test_associate_team_lists_weigh_less_than_top_sides():
+    assert R._scope_weight("t20i:India") > R._scope_weight("t20i:Malaysia")
+    assert R._scope_weight("t20i") > R._scope_weight("t20i:India")

@@ -236,3 +236,157 @@ def headline(e: Dict[str, Any]) -> str:
         return (f"{p} moves to {ordinal(e['rank_after'])} for {label} {where} with {e['after']:,}"
                 + (f", past {names}" if names else "") + lvl)
     return f"{p} enters the top {TOP_N} for {label} {where}: {ordinal(e['rank_after'])} with {e['after']:,}"
+
+
+# --------------------------------------------------------------------------------------------
+# Chunk 4: which events become drafts (at most 3 a day, on the bench for the user to pick)
+# --------------------------------------------------------------------------------------------
+
+DAILY_CAP = 3
+MAJOR_LEAGUES = {"IPL", "BBL", "PSL", "CPL", "SA20", "Men's Hundred", "T20 Blast", "MLC", "ILT20", "BPL", "LPL"}
+TEMPLATE_WEIGHT = {"sixes": 1.3, "runs": 1.3, "wickets": 1.3, "pp-sixes": 1.2, "death-sixes": 1.1, "pp-wickets": 1.1,
+                   "death-wickets": 1.1, "pos-sixes": 1.0, "pos-runs": 1.0, "fours": 0.9, "pp-runs": 0.9}
+
+
+def _scope_weight(scope_id: str) -> float:
+    if scope_id in ("all", "t20i"):
+        return 1.3
+    if scope_id.startswith("league:"):
+        return 1.15 if scope_id.split(":", 1)[1] in MAJOR_LEAGUES else 0.6
+    # One side's T20Is: a top-12 side's list is a story for most readers, an associate side's less so (still in,
+    # labelled; decision 1).
+    from models import INTERNATIONAL_TEAMS_RANKED
+
+    return 0.9 if scope_id.split(":", 1)[1] in INTERNATIONAL_TEAMS_RANKED[:12] else 0.45
+
+
+def _kind_weight(e: Dict[str, Any]) -> float:
+    if e["kind"] == "passed":
+        return 3.0 if e["rank_after"] == 1 else 2.0 if e["rank_after"] <= 3 else 1.2
+    if e["kind"] == "milestone":
+        return 2.5 if e["nth"] == 1 else 1.6 if e["nth"] <= 5 else 1.0
+    return 1.0  # entered the top 10
+
+
+def fame(cubes: Dict[str, List[Dict[str, Any]]]) -> Dict[str, float]:
+    """How well known a player is, from his career in the data: 0.4 + up to 1 for runs (5,000) + up to 1 for wickets
+    (200). Associates are in (decision 1); a long career anywhere ranks them, a short one doesn't."""
+    runs: Dict[str, int] = {}
+    wkts: Dict[str, int] = {}
+    for r in cubes.get("batter", []):
+        runs[r["name"]] = runs.get(r["name"], 0) + int(r["runs"] or 0)
+    for r in cubes.get("bowler", []):
+        wkts[r["name"]] = wkts.get(r["name"], 0) + int(r["wickets"] or 0)
+    return {n: 0.4 + min(1.0, runs.get(n, 0) / 5000) + min(1.0, wkts.get(n, 0) / 200) for n in set(runs) | set(wkts)}
+
+
+def score(e: Dict[str, Any], fame_of: Dict[str, float]) -> float:
+    return round(_kind_weight(e) * _scope_weight(e["scope"]) * TEMPLATE_WEIGHT.get(e["template"], 1.0)
+                 * fame_of.get(e["player"], 0.4), 3)
+
+
+def pick(events: List[Dict[str, Any]], fame_of: Dict[str, float], k: int = DAILY_CAP) -> List[Dict[str, Any]]:
+    """The best k events, one per player (three stories, not one player three times)."""
+    out, seen = [], set()
+    for e in sorted(events, key=lambda e: -score(e, fame_of)):
+        if e["player"] in seen:
+            continue
+        seen.add(e["player"])
+        out.append({**e, "score": score(e, fame_of)})
+        if len(out) == k:
+            break
+    return out
+
+
+def leaderboard(rows: List[Dict[str, Any]], e: Dict[str, Any], top: int = 8) -> List[Tuple[str, int]]:
+    t = next(t for t in TEMPLATES if t.id == e["template"])
+    scope = _scope_of(e)
+    board = _boards(t, rows, scope, False).get(e["position"]) or {}
+    ranked = sorted(board.items(), key=lambda kv: (-kv[1], kv[0]))
+    out = ranked[:top]
+    if e["player"] not in dict(out):
+        out = out[: top - 1] + [(e["player"], board.get(e["player"], 0))]
+    return out
+
+
+def _scope_of(e: Dict[str, Any]) -> Scope:
+    sid = e["scope"]
+    if sid == "all":
+        return Scope("all", e["scope_label"], {})
+    if sid == "t20i":
+        return Scope("t20i", e["scope_label"], {"t20i": True})
+    if sid.startswith("t20i:"):
+        return Scope(sid, e["scope_label"], {"t20i": True, "team": sid.split(":", 1)[1]})
+    from services.competition_aliases import variants_for
+
+    return Scope(sid, e["scope_label"], {"comps": set(variants_for(sid.split(":", 1)[1]))})
+
+
+def query_params(e: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
+    """The query builder's version of the leaderboard (for the post's link)."""
+    t = next(t for t in TEMPLATES if t.id == e["template"])
+    sid = e["scope"]
+    p: Dict[str, Any] = {"metrics_perspective": "batting" if t.who == "batter" else "bowling"}
+    if sid == "all":
+        p.update(leagues=[], include_international=False)
+    elif sid.startswith("t20i"):
+        p.update(include_international=True)
+        if ":" in sid:
+            p["batting_teams" if t.who == "batter" else "bowling_teams"] = [sid.split(":", 1)[1]]
+    else:
+        p.update(leagues=[sid.split(":", 1)[1]])
+    if t.phase == "pp":
+        p["over_max"] = 5
+    elif t.phase == "death":
+        p["over_min"] = 15
+    return p, [t.who] + (["batting_position"] if t.by_position else [])
+
+
+def post_for(db, e: Dict[str, Any], rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """A queueable post: hook, the leaderboard (the player in lime, the passed in the list), the end slide."""
+    from services import ig_captions, ig_carousel
+    from services.ig_links import query_path
+
+    t = next(t for t in TEMPLATES if t.id == e["template"])
+    hook = headline(e)
+    board = leaderboard(rows, e)
+    count_word = t.label.format(pos=e["position"]) if t.by_position else t.label
+    passed = {n for n, _ in e.get("passed") or []}
+    level = {n for n, _ in e.get("level") or []}
+    d = date.fromisoformat(e["day"])
+    when = f"{d.day} {d.strftime('%b')}"
+    card_rows = [{"name": n, "value": v, "highlight": n == e["player"],
+                  "detail": (f"{e['before']:,} before {when}" if n == e["player"] else
+                             "passed" if n in passed else "level" if n in level else "")}
+                 for n, v in board]
+    card = {"id": "board", "visual": "metric_bars", "title": hook,
+            "help": "", "sample": f"Most {count_word} {e['scope_label']}, to {when} {d.year} · associates included",
+            "payload": {"metric": {"label": count_word.capitalize(), "format": "int", "signed": False},
+                        "rows": card_rows, "label_width": 140}}
+    slides = [{"type": "hook", "text": hook, "kicker": f"Record radar · {e['scope_label'].split(' ', 1)[1]}",
+               "sub": "Where he now stands"},
+              {"type": "card", "card": card, "teams": None},
+              {"type": "end", "heading": "Find your player", "body": "Every leaderboard is free in the query builder."}]
+    key = f"record-{e['template']}-{e['scope'].replace(':', '-')}-{e['player'].replace(' ', '-').lower()}-{e['day']}"
+    carousel = ig_carousel.save(db, slides, hook, {"radar": key}, "record-radar")
+    params, group_by = query_params(e)
+    fact = {"kind": "record", "title": hook, "hook": hook, "subject": e["player"], "subject_role": "player",
+            "event": {k: v for k, v in e.items() if k != "score"}, "score": e.get("score"),
+            "link": query_path(params, group_by), "carousel_id": carousel["id"], "slides": len(slides), "render": True}
+    caption = ig_captions.build(hook, "", "record", None, [e["player"]], "Record radar",
+                                body=[f"Most {count_word} {e['scope_label']}: " + ", ".join(f"{n} {v:,}" for n, v in board[:3]) + "."])
+    return {"key": key, "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
+            "players": [e["player"]], "caption": caption}
+
+
+def drafts_for_day(db, day: date, k: int = DAILY_CAP) -> Tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:
+    """The day's best k events (scored) and the counts tables they came from."""
+    matches = day_matches(db, day)
+    if not matches:
+        return [], {}
+    cubes = {who: cube(db, who, day) for who in ("batter", "bowler")}
+    events = []
+    for scope in scopes_for(db, matches):
+        for t in TEMPLATES:
+            events.extend(events_for(cubes[t.who], t, scope, day))
+    return pick(events, fame(cubes), k), cubes
