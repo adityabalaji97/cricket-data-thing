@@ -34,23 +34,21 @@ ALLEN = [(O, F, 217.05, 88, 2), (O, G, 162.28, 167, 4), (O, B, 132.12, 165, 9), 
          (L, F, 145.45, 11, 2), (L, G, 69.57, 23, 1), (L, B, 92.00, 25, 3),
          (W, F, 176.92, 13, 0), (W, G, 211.11, 9, 1), (W, B, 150.00, 8, 0)]
 allen = card(
-    "allen-pitch", "pitch_map", "Finn Allen v new-ball pace: down leg he scores at 70 and 92. Bowlers rarely go there",
+    "allen-pitch", "pitch_map", "Down leg, Finn Allen's SR drops to 70 and 92",
     {"hand": "RHB", "lines": LINES, "lengths": LENGTHS, "min_balls": 10,
-     "metric": {"label": "Strike rate", "format": "int", "higher_better": True, "mid": 164},
+     "metric": {"label": "SR", "format": "int", "higher_better": True, "mid": 164}, "legend": ["Above his SR of 164", "Below"],
      "cells": cells(ALLEN, {(L, G), (L, B)})},
-    "Finn Allen v pace, overs 1–6 · all men's T20s, Jan 2023 to 25 Feb 2026 · balls with line and length tracked",
-    "48 of his 905 tracked balls pitched down leg on a good length or back of one")
+    "Finn Allen v pace · powerplay · men's T20s, Jan 2023–Feb 2026")
 
 allen_shot = card(
-    "allen-shot", "metric_bars", "Allen has been out 11 times flicking new-ball pace: once every 12 balls",
-    {"metric": {"label": "Dismissals", "format": "int", "signed": False}, "label_width": 150,
-     "rows": [{"name": "Drive", "value": 17, "detail": "316 balls · SR 203 · out every 19"},
-              {"name": "Flick or glance", "value": 11, "highlight": True, "detail": "133 balls · SR 171 · out every 12"},
-              {"name": "Pull or hook", "value": 7, "detail": "116 balls · SR 242 · out every 17"},
-              {"name": "Slog", "value": 6, "detail": "70 balls · SR 184 · out every 12"},
-              {"name": "Work or push", "value": 4, "detail": "106 balls · SR 68"}]},
-    "Finn Allen v pace, overs 1–6 · all men's T20s, Jan 2023 to 25 Feb 2026 · balls with the shot tracked",
-    "His drives add 59 runs per 100 balls to the projected total; his flicks, about zero")
+    "allen-shot", "metric_bars", "Finn Allen has fallen 11 times flicking pace in the powerplay",
+    {"metric": {"label": "Wickets", "format": "int", "signed": False}, "label_width": 150,
+     "rows": [{"name": "Drive", "value": 17, "detail": "19 balls per wicket"},
+              {"name": "Flick or glance", "value": 11, "highlight": True, "detail": "12 balls per wicket"},
+              {"name": "Pull or hook", "value": 7, "detail": "17 balls per wicket"},
+              {"name": "Slog", "value": 6, "detail": "12 balls per wicket"},
+              {"name": "Work or push", "value": 4, "detail": "27 balls per wicket"}]},
+    "Finn Allen v pace · powerplay · men's T20s, Jan 2023–Feb 2026")
 
 # Tim Seifert v pace, all overs: (line, length, % of balls played in control, balls, outs); cells with 15+ balls.
 SEIFERT = [(W, G, 47.83, 23, 3), (W, B, 59.26, 27, 2), (W, F, 62.07, 29, 1),
@@ -59,12 +57,11 @@ SEIFERT = [(W, G, 47.83, 23, 3), (W, B, 59.26, 27, 2), (W, F, 62.07, 29, 1),
            (L, SH, 61.54, 26, 2), (L, B, 63.83, 47, 1), (L, G, 65.96, 47, 1)]
 _mid = round(sum(v * b for *_, v, b, _o in SEIFERT) / sum(b for *_, b, _o in SEIFERT))
 seifert = card(
-    "seifert-pitch", "pitch_map", "Tim Seifert v pace: wide outside off on a good length is his least controlled ball, 48%",
+    "seifert-pitch", "pitch_map", "Tim Seifert's lowest control %: wide outside off, good length (48%)",
     {"hand": "RHB", "lines": LINES, "lengths": LENGTHS, "min_balls": 15,
-     "metric": {"label": "In control", "format": "pct0", "higher_better": True, "mid": _mid},
+     "metric": {"label": "Control %", "format": "pct0", "higher_better": True, "mid": _mid}, "legend": [f"Above his {_mid}%", "Below"],
      "cells": cells(SEIFERT, {(W, G)})},
-    "Tim Seifert v pace, all overs · men's T20s, Jan 2023 to 25 Feb 2026 · balls with line and length tracked",
-    "Out 3 times in 23 balls there, at a strike rate of 113")
+    "Tim Seifert v pace · men's T20s, Jan 2023–Feb 2026")
 
 CARDS = [allen, allen_shot, seifert]
 
@@ -73,7 +70,7 @@ if __name__ == "__main__":
     from services.snapshots import create_static_snapshot
 
     slides = [{"type": "card", "card": c, "teams": None} for c in CARDS]
-    snap = create_static_snapshot(None, "carousel", {"slides": slides, "title": "Allen & Seifert reply (pitch)"},
-                                  "Allen & Seifert reply (pitch)", {"reply": "allen-seifert-pitch", "slides": slides},
+    snap = create_static_snapshot(None, "carousel", {"slides": slides, "title": "Allen & Seifert reply (pitch)", "counter": False},
+                                  "Allen & Seifert reply (pitch)", {"reply": "allen-seifert-pitch-v3", "slides": slides},
                                   created_by="reply")
     print(snap["id"], len(slides))
