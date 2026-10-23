@@ -6,9 +6,8 @@ as a carousel planned for that day (9 am IST, services/ig_plan.TIMES), with its 
     python scripts/ig_on_this_day.py --date 2026-10-16 --dry-run
     python scripts/ig_on_this_day.py --days 3 --base http://localhost:3000
 
-A day already queued is left alone (--force remakes it, unless posted). Yesterday's competition is avoided when
-another story is nearly as good, so the slot doesn't run IPL four days in a row. The post is news only on its day:
-post_by is the end of that day in IST.
+A day already queued is left alone (--force remakes it, unless posted). The best story on the day goes out, whatever
+ran the day before. The post is news only on its day: post_by is the end of that day in IST.
 """
 from __future__ import annotations
 
@@ -46,16 +45,14 @@ def main() -> int:
         if row and (not args.force or row[0] == "posted"):
             print(f"{key}: already queued ({row[0]})")
             continue
-        prev = db.execute(text("SELECT facts->>'competition' FROM content_packs WHERE angle_key = :k"),
-                          {"k": f"ig:otd-{(day - timedelta(days=1)).isoformat()}"}).scalar()
         if args.dry_run:
             from services.on_this_day import candidates
 
             for c in candidates(db, day)[:5]:
                 print(f"  {c['score']:.2f} {c['date']} {c['key']} {c['team1']} v {c['team2']} "
-                      f"({c['angle']}; top {c['top']}; loser peak {c['loser_peak']}%)")
+                      f"({c['angle']} {c['signals']}; world cup {c['world_cup']}, rivalry {c['rivalry']})")
             continue
-        post = ig_backlog.otd_pack(db, day, avoid=[prev] if prev else [])
+        post = ig_backlog.otd_pack(db, day)
         if not post:
             print(f"{key}: no match with Impact on this day")
             continue

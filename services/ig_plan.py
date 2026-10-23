@@ -9,7 +9,8 @@ Rules for the day (one feed post a day, spaced when there are two):
   - match days: the preview mid-afternoon, nothing else after 6 pm IST (the match has everyone's attention);
   - recaps the day after a match, around noon;
   - a 'Trending today' post only on a day with nothing else planned (the best one, by Jev's score);
-  - evergreen posts (debate, myth, record, play-along) at their usual times.
+  - evergreen posts (debate, myth, record, play-along) at their usual times;
+  - one On this day a day: a hand-made one takes the slot and the automatic one is listed as an extra.
 Every stat in the comment kit is a card title from a queued post: a sentence written from the data.
 """
 from __future__ import annotations
@@ -63,6 +64,10 @@ def week(db: Session, start: date, days: int = 7) -> List[Dict[str, Any]]:
         todays = [r for r in rows if r["planned_for"] == day]
         # Optional posts (a top-20 preview beyond the day's one) are made but not planned: listed as extras.
         extras = [r for r in todays if (r["facts"] or {}).get("optional") and r["status"] == "ready"]
+        # One look back a day: an On this day post made by hand takes the slot, the automatic one waits as an extra.
+        otds = [r for r in todays if _kind(r) == "otd" and r not in extras]
+        if any(r["source"] != "ig-otd" for r in otds):
+            extras += [r for r in otds if r["source"] == "ig-otd" and r["status"] == "ready"]
         todays = [r for r in todays if r not in extras]
         main = [r for r in todays if _kind(r) != "trend"]
         trends = sorted((r for r in todays if _kind(r) == "trend"),

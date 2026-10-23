@@ -620,11 +620,11 @@ def recap_pack(db: Session, match_id: str) -> Optional[Dict[str, Any]]:
             "warnings": [], "caption": caption, "players": built["players"], "day": built["day"] + timedelta(days=1)}
 
 
-def otd_pack(db: Session, day: date, avoid: Iterable[str] = ()) -> Optional[Dict[str, Any]]:
+def otd_pack(db: Session, day: date) -> Optional[Dict[str, Any]]:
     """The On this day post for `day` (services/on_this_day.py): a past match on this calendar day, as a carousel."""
     from services import ig_captions, ig_carousel, on_this_day
 
-    built = on_this_day.post(db, day, avoid=tuple(avoid))
+    built = on_this_day.post(db, day)
     if not built:
         return None
     slides = ([{"type": "hook", "text": built["hook"], "kicker": built["kicker"], "sub": built["sub"]}]
