@@ -29,7 +29,7 @@ TARGETS = (
     ("match_players", "player", "pid", "match_id"),
 )
 WHERE = """pi.pid = t.{pid} AND t.{col} IS DISTINCT FROM pi.display_name
-           AND (pi.display_name <> pi.name OR t.{col} ~ '\\s+\\([A-Za-z][^)]*\\)$')"""
+           AND (pi.display_name <> pi.name OR t.{col} ~ '\\s+\\([A-Za-z](?:[^()]|\\([^()]*\\))*\\)$')"""
 
 
 def main() -> int:

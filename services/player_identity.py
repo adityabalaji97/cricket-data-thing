@@ -7,6 +7,7 @@ first, so they stay one player. Balls with no id (the legacy pre-2015 table) go 
 """
 from __future__ import annotations
 
+import re
 from typing import Dict, List, Tuple
 
 from sqlalchemy import text
@@ -14,7 +15,8 @@ from sqlalchemy import text
 
 def strip(col: str) -> str:
     """SQL: the name without a side suffix ("Rohit Sharma (Indonesia)" -> "Rohit Sharma")."""
-    return f"regexp_replace({col}, '\\s+\\([A-Za-z][^)]*\\)$', '')"  # a side starts with a letter: not "Rameez Raja (2)"
+    # A side starts with a letter (not "Rameez Raja (2)") and may hold one bracketed part ("Lions (Zimbabwe)").
+    return f"regexp_replace({col}, '\\s+\\([A-Za-z](?:[^()]|\\([^()]*\\))*\\)$', '')"
 
 
 def compute(db) -> List[Dict]:
@@ -54,7 +56,8 @@ def compute(db) -> List[Dict]:
         t = sides[pid]
         national = {k: v for k, v in t.items() if k[1]}
         pool = national or t
-        return max(pool, key=pool.get)[0]
+        # No brackets inside the suffix ("Lions (Zimbabwe)" -> "Lions Zimbabwe"): one pair, so it strips cleanly.
+        return re.sub(r"\s*[()]\s*", " ", max(pool, key=pool.get)[0]).strip()
 
     canonical = {pid: max(ns, key=ns.get) for pid, ns in names.items()}
     balls = {pid: sum(ns.values()) for pid, ns in names.items()}
