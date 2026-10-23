@@ -3,16 +3,23 @@ On this day: the daily look back. Picks the best story among the men's T20s play
 years (2015 on, when Impact and win probability start), and builds it as a carousel (ON_THIS_DAY_PLAN.md, chunks 1-2).
 
     candidates(db, day)          -> every eligible match on that calendar day, with its story numbers and a score
-    pick(db, day, avoid=())      -> the best candidate (competitions in `avoid` lose out to anything comparable)
-    post(db, day, avoid=())      -> {hook, sub, kicker, cards, title, verdict, players, teams, day, caption, ...} or None
+    pick(db, day)                -> the best candidate
+    post(db, day)                -> {hook, sub, kicker, cards, title, verdict, players, teams, day, caption, ...} or None
 
 The story score, every number from ball_metrics / the scorecard service:
-  stage        the match's place: IPL, or a T20I between two of the top 12, counts most; the big leagues next
+  stage        the match's place: IPL, or a T20I between two of the top 12, counts most; the big leagues next. A men's
+               T20 World Cup match counts more, and so does a marquee rivalry (India v Pakistan, the Ashes sides,
+               India v Australia)
   performance  the match's biggest Impact (batting or bowling), as the scorecard counts it
+  clutch       the match's biggest win probability added by one player (an innings that won a lost chase)
   comeback     the loser's peak win probability (a side at 90% that lost is a story)
-  final        a league final or playoff (inferred: an unnumbered match at the end of a season whose league matches
-               are numbered)
+  final        a league or World Cup final or knockout (a league's: an unnumbered match at the end of a season whose
+               league matches are numbered; the World Cup's: its unnumbered matches)
   anniversary  a round number of years ago (5, 10, 15, 20)
+The strongest of performance / clutch / comeback leads and the next adds 40% of itself: a match with two stories
+(Kohli's MCG chase: a comeback and an innings) beats one with a single bigger number.
+
+No competition is held back for having run the day before: the best story on the day goes out.
 
 The carousel: the hook (the year and the story), How it was won, where the performance ranks in the competition's
 history, the loser's win probability with its swing overs, the score race, and the Impact scorecards.
@@ -33,6 +40,11 @@ BIG_LEAGUES = ("IPL", "BBL", "PSL", "CPL", "SA20", "The Hundred", "T20 Blast", "
 STAGE = {"top": 1.0, "big": 0.65, "other": 0.3}
 IMPACT_FULL = 40.0      # an Impact this big is a full-strength performance story
 COMEBACK_FROM = 75.0    # the loser's peak win probability at which a comeback starts to count
+WPA_FULL = 0.6          # win probability added (as a fraction) for a full-strength clutch story: top 5-10% of matches
+SECOND_STORY = 0.4      # how much of the second-strongest story counts on top of the strongest
+WORLD_CUP = 1.3         # stage multiplier for a men's T20 World Cup match (not its qualifiers)
+RIVALRY = 1.2           # and for a marquee rivalry
+RIVALRIES = ({"India", "Pakistan"}, {"Australia", "England"}, {"India", "Australia"})
 RANK_ROWS = 8
 ROUND_YEARS = (5, 10, 15, 20)
 
@@ -56,12 +68,56 @@ def _stage(row: Dict[str, Any], key: str) -> str:
     return "big" if key in BIG_LEAGUES else "other"
 
 
+def _world_cup(event: Optional[str]) -> bool:
+    """The men's T20 World Cup itself (its old names too), not its regional qualifiers."""
+    e = (event or "").lower()
+    return any(k in e for k in ("t20 world cup", "world twenty20", "world t20")) and not any(
+        k in e for k in ("qualifier", "region", "regional"))
+
+
+def top_wpa(db: Session, match_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    """Each match's biggest win probability added by one player, batting or bowling, counted as the query builder
+    counts it (wides off the batter, the bowler's sign flipped)."""
+    if not match_ids:
+        return {}
+    rows = db.execute(text("""
+        WITH balls AS (
+            SELECT dd.p_match, dd.bat, dd.bowl, dd.team_bat, dd.team_bowl, bm.wpa
+            FROM delivery_details dd JOIN ball_metrics bm ON bm.delivery_id = dd.id
+            WHERE dd.p_match = ANY(:ids) AND COALESCE(dd.wide, 0) = 0 AND bm.impact IS NOT NULL
+        ),
+        people AS (
+            SELECT p_match, bat AS name, MIN(team_bat) AS team, 'bat' AS role, SUM(wpa) AS wpa
+            FROM balls WHERE bat IS NOT NULL GROUP BY p_match, bat
+            UNION ALL
+            SELECT p_match, bowl AS name, MIN(team_bowl) AS team, 'bowl' AS role, -SUM(wpa) AS wpa
+            FROM balls WHERE bowl IS NOT NULL GROUP BY p_match, bowl
+        )
+        SELECT DISTINCT ON (p.p_match) p.p_match, COALESCE(pa.canonical_name, p.name) AS name, p.team, p.role, p.wpa
+        FROM people p LEFT JOIN player_alias_map pa ON LOWER(p.name) = pa.name_key
+        WHERE p.wpa IS NOT NULL
+        ORDER BY p.p_match, p.wpa DESC
+    """), {"ids": [str(i) for i in match_ids]}).mappings().all()
+    return {str(r["p_match"]): {"name": r["name"], "team": r["team"], "role": r["role"], "wpa": round(float(r["wpa"]), 3)}
+            for r in rows}
+
+
+def story_score(signals: Dict[str, float]) -> tuple[float, str]:
+    """The strongest story plus SECOND_STORY of the next: (score, the strongest one's name)."""
+    ranked = sorted(signals.items(), key=lambda kv: -kv[1])
+    lead, second = ranked[0], (ranked[1][1] if len(ranked) > 1 else 0.0)
+    return lead[1] + SECOND_STORY * second, lead[0]
+
+
 def candidates(db: Session, day: date) -> List[Dict[str, Any]]:
     from models import INTERNATIONAL_TEAMS_RANKED
     from services.match_browse import top_impact
 
     rows = [dict(r) for r in db.execute(text("""
         SELECT m.id, m.date, m.team1, m.team2, m.winner, m.venue, m.competition, m.match_type, m.event_match_number,
+               m.event_name,
+               NOT EXISTS (SELECT 1 FROM matches n WHERE n.event_name = m.event_name AND n.format = 'T20'
+                           AND n.date > m.date AND n.date <= m.date + 30) AS last_of_event,
                NOT EXISTS (SELECT 1 FROM matches n WHERE n.competition = m.competition AND n.format = 'T20'
                            AND n.date > m.date AND n.date <= m.date + 120) AS last_of_season,
                EXISTS (SELECT 1 FROM matches n WHERE n.competition = m.competition AND n.format = 'T20'
@@ -83,6 +139,7 @@ def candidates(db: Session, day: date) -> List[Dict[str, Any]]:
         return []
     ids = [str(r["id"]) for r in rows]
     tops = top_impact(db, ids)
+    clutches = top_wpa(db, ids)
     wp = db.execute(text("""
         SELECT bm.p_match, bm.inns, MIN(dd.team_bat) AS bat, MAX(bm.wp_after) AS hi, MIN(bm.wp_after) AS lo
         FROM ball_metrics bm JOIN delivery_details dd ON dd.id = bm.delivery_id
@@ -98,33 +155,37 @@ def candidates(db: Session, day: date) -> List[Dict[str, Any]]:
             peaks[mid] = max(peaks.get(mid, 0.0), peak)
         key = _comp_key(r)
         stage = _stage(r, key)
+        world_cup = r["match_type"] == "international" and _world_cup(r["event_name"])
         league_unnumbered = r["match_type"] == "league" and r["event_match_number"] is None and r["numbered"]
-        final = league_unnumbered and r["last_of_season"]
-        playoff = league_unnumbered and not final and r["before_knockout"]
-        top = tops.get(mid)
+        # A World Cup's knockouts are its unnumbered matches; the last of them is the final.
+        final = (league_unnumbered and r["last_of_season"]) or (world_cup and r["event_match_number"] is None
+                                                                  and r["last_of_event"])
+        playoff = not final and ((league_unnumbered and r["before_knockout"])
+                                 or (world_cup and r["event_match_number"] is None))
+        rivalry = {r["team1"], r["team2"]} in RIVALRIES
+        top, clutch_top = tops.get(mid), clutches.get(mid)
         years = day.year - r["date"].year
-        performance = min(1.5, (top["impact"] if top else 0) / IMPACT_FULL)
-        comeback = max(0.0, (peaks.get(mid, 0) - COMEBACK_FROM) / (100 - COMEBACK_FROM)) * 1.3
-        story = max(performance, comeback) + (0.5 if final else 0.25 if playoff else 0) \
-            + (0.2 if years in ROUND_YEARS else 0)
+        signals = {
+            "performance": min(1.5, (top["impact"] if top else 0) / IMPACT_FULL),
+            # Only a match-winner's: the loser's best player added win probability to a side that lost.
+            "clutch": min(1.5, max(0.0, clutch_top["wpa"]) / WPA_FULL) if clutch_top and clutch_top["team"] == r["winner"] else 0.0,
+            "comeback": max(0.0, (peaks.get(mid, 0) - COMEBACK_FROM) / (100 - COMEBACK_FROM)) * 1.3,
+        }
+        story, angle = story_score(signals)
+        story += (0.5 if final else 0.25 if playoff else 0) + (0.2 if years in ROUND_YEARS else 0)
+        weight = STAGE[stage] * (WORLD_CUP if world_cup else 1) * (RIVALRY if rivalry else 1)
         out.append({**r, "id": mid, "key": key, "stage": stage, "final": final, "playoff": playoff, "loser": loser,
-                    "top": top, "loser_peak": round(peaks.get(mid, 0), 1), "years": years,
-                    "angle": "comeback" if comeback > performance else "performance",
-                    "score": round(STAGE[stage] * story, 3)})
+                    "world_cup": world_cup, "rivalry": rivalry, "top": top, "clutch": clutch_top,
+                    "signals": {k: round(v, 3) for k, v in signals.items()},
+                    "loser_peak": round(peaks.get(mid, 0), 1), "years": years, "angle": angle,
+                    "score": round(weight * story, 3)})
     return sorted(out, key=lambda c: -c["score"])
 
 
-def pick(db: Session, day: date, avoid=()) -> Optional[Dict[str, Any]]:
-    """The best story; a competition in `avoid` (yesterday's) only wins when it is clearly the best (25% ahead)."""
+def pick(db: Session, day: date) -> Optional[Dict[str, Any]]:
+    """The best story on the day."""
     ranked = candidates(db, day)
-    if not ranked:
-        return None
-    best = ranked[0]
-    if best["key"] in avoid:
-        other = next((c for c in ranked if c["key"] not in avoid), None)
-        if other and other["score"] >= 0.8 * best["score"]:
-            return other
-    return best
+    return ranked[0] if ranked else None
 
 
 # ---- cards ------------------------------------------------------------------------------------------------------
@@ -223,17 +284,18 @@ def _figure(sc: Dict[str, Any], name: str, role: str) -> Optional[str]:
 
 # ---- the post ---------------------------------------------------------------------------------------------------
 
-def post(db: Session, day: date, avoid=()) -> Optional[Dict[str, Any]]:
+def post(db: Session, day: date) -> Optional[Dict[str, Any]]:
     from services.ig_posts.match import innings_scorecards
     from services.ig_posts.recap_series import (how_it_was_won, mark_wickets, score_race, wp_swings)
     from services.ig_posts.recap_special import Match
     from services.match_scorecard import get_match_scorecard_service
 
-    c = pick(db, day, avoid)
+    c = pick(db, day)
     if not c:
         return None
-    stage_word = "Final" if c["final"] else "Playoff" if c["playoff"] else None
-    kicker = " · ".join(p for p in ["On this day", f"{c['key']} {c['date'].year}", stage_word] if p)
+    stage_word = "Final" if c["final"] else ("Semi-final" if c["world_cup"] else "Playoff") if c["playoff"] else None
+    event = "T20 World Cup" if c["world_cup"] else c["key"]
+    kicker = " · ".join(p for p in ["On this day", f"{event} {c['date'].year}", stage_word] if p)
     sample = f"{c['key']} · {_short_team(c['team1'])} v {_short_team(c['team2'])} · {c['date']:%d %b %Y}"
     m = {"id": c["id"], "date": c["date"], "venue": c["venue"], "team1": c["team1"], "team2": c["team2"],
          "format": "T20", "winner": c["winner"]}
@@ -245,15 +307,22 @@ def post(db: Session, day: date, avoid=()) -> Optional[Dict[str, Any]]:
     how = how_it_was_won(db, x, sc)
     if not how:
         return None
-    rank, wp, race = rank_card(db, c, sample, day), wp_swings(x, sc), score_race(x)
+    clutch = c["clutch"] if c["angle"] == "clutch" else None
+    # The Impact ranking is about the Impact leader: on a clutch story led by someone else it would change the subject.
+    rank = rank_card(db, c, sample, day) if not clutch or (c["top"] or {}).get("name") == clutch["name"] else None
+    wp, race = wp_swings(x, sc), score_race(x)
     cards = [k for k in [how, rank, wp, race] if k] + innings_scorecards(db, c["id"], sample)
-    top = c["top"]
+    top = clutch or c["top"]
     figure = _figure(sc, top["name"], top["role"]) if top else None
     ago = f"{c['years']} years ago today" if c["years"] > 1 else "A year ago today"
-    if c["angle"] == "comeback" and c["loser_peak"] >= COMEBACK_FROM:
+    low = 100 - c["loser_peak"]  # the winner's lowest chance
+    if clutch and figure:
+        hook = (f"{ago}: {top['name']}'s {figure} took {c['winner']} from {max(1, round(low))}% to a win"
+                if low <= 25 else f"{ago}: {top['name']}'s {figure} added {round(100 * top['wpa'])} points of win probability")
+    elif c["angle"] == "comeback" and c["loser_peak"] >= COMEBACK_FROM:
         chance = "more than 99%" if c["loser_peak"] >= 99.5 else f"{round(c['loser_peak'])}%"
         hook = f"{ago}, {c['loser']} were {chance} to win. They lost."
-    elif top and figure:
+    elif c["top"] and figure:
         hook = f"{ago}: {top['name']}'s {figure}, {fmt(top['impact'], 'signed1')} runs of Impact."
     else:
         hook = f"{ago}: {_short_team(c['team1'])} v {_short_team(c['team2'])}."
@@ -271,7 +340,8 @@ def post(db: Session, day: date, avoid=()) -> Optional[Dict[str, Any]]:
     return {"hook": hook, "sub": sub, "kicker": kicker, "cards": cards, "title": hook.rstrip("."),
             "verdict": " ".join(lines[:2]), "players": players, "teams": [c["team1"], c["team2"]], "day": day,
             "caption": caption, "match_id": c["id"], "candidate": {k: c[k] for k in (
-                "id", "key", "stage", "final", "playoff", "loser_peak", "angle", "score", "years")},
+                "id", "key", "stage", "final", "playoff", "world_cup", "rivalry", "signals", "loser_peak", "angle", "score",
+                "years")},
             "method": "Impact and win probability are ball by ball (T20 Primer method), from 2015 on."}
 
 
