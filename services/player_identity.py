@@ -12,6 +12,11 @@ from typing import Dict, List, Tuple
 from sqlalchemy import text
 
 
+def strip(col: str) -> str:
+    """SQL: the name without a side suffix ("Rohit Sharma (Indonesia)" -> "Rohit Sharma")."""
+    return f"regexp_replace({col}, '\\s+\\([A-Za-z][^)]*\\)$', '')"  # a side starts with a letter: not "Rameez Raja (2)"
+
+
 def compute(db) -> List[Dict]:
     """Every id's row for player_identity: {pid, display_name, name, main_side, balls, first_date, last_date}."""
     from services.competition_normalizer import international_competitions
@@ -19,16 +24,18 @@ def compute(db) -> List[Dict]:
 
     rows = db.execute(text(f"""
         WITH {ALIAS_MAP_CTE}, b AS (
-            SELECT dd.p_bat AS pid, COALESCE(am.canonical_name, dd.bat) AS name, dd.team_bat AS team,
+            -- A namesake's balls carry his display name ("Rohit Sharma (Indonesia)", apply_namesake_names.py):
+            -- the side is stripped here, so he still shares "Rohit Sharma" and stays a namesake.
+            SELECT dd.p_bat AS pid, COALESCE(am.canonical_name, {strip('dd.bat')}) AS name, dd.team_bat AS team,
                    (m.match_type = 'international' AND m.competition = ANY(:intl)) AS intl, m.date
             FROM delivery_details dd JOIN matches m ON m.id = dd.p_match
-            LEFT JOIN alias_map am ON LOWER(dd.bat) = am.name_key
+            LEFT JOIN alias_map am ON LOWER({strip('dd.bat')}) = am.name_key
             WHERE dd.p_bat IS NOT NULL AND dd.bat IS NOT NULL
             UNION ALL
-            SELECT dd.p_bowl, COALESCE(am.canonical_name, dd.bowl), dd.team_bowl,
+            SELECT dd.p_bowl, COALESCE(am.canonical_name, {strip('dd.bowl')}), dd.team_bowl,
                    (m.match_type = 'international' AND m.competition = ANY(:intl)), m.date
             FROM delivery_details dd JOIN matches m ON m.id = dd.p_match
-            LEFT JOIN alias_map am ON LOWER(dd.bowl) = am.name_key
+            LEFT JOIN alias_map am ON LOWER({strip('dd.bowl')}) = am.name_key
             WHERE dd.p_bowl IS NOT NULL AND dd.bowl IS NOT NULL
         )
         SELECT pid, name, team, intl, COUNT(*) AS n, MIN(date) AS first, MAX(date) AS last FROM b GROUP BY 1, 2, 3, 4

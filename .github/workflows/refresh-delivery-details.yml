@@ -133,6 +133,12 @@ jobs:
         continue-on-error: true
         run: python scripts/backfill_stats_player_ids.py
 
+      # Namesakes' own rows carry their display name ("Rohit Sharma (Indonesia)"): the feed sends plain names, so this
+      # re-applies it to tonight's rows (by player id; scripts/apply_namesake_names.py). After the ids, before stands.
+      - name: Namesake names
+        continue-on-error: true
+        run: python scripts/apply_namesake_names.py
+
       # Partnership stands (migration 016) for matches loaded above: the pair at the crease, rebuilt
       # from the striker sequence because the feed's non_striker is unreliable around wickets. After
       # the alias refresh (names are canonical); a rename via the alias scripts needs --full.
