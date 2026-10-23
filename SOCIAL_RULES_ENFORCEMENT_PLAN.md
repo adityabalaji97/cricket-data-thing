@@ -27,7 +27,6 @@ What it finds today, across the 77 ready Instagram posts (23 Oct):
 | Off-vocabulary word | 28 | debates 10, on this day 5, trend 3, storylines 3 |
 | More than 8 slides | 22 | debates (`ig_backlog`) 11, match-day previews (`scripts/ig_match_day.py`) 9 |
 | No chart on the cover | 6 | match-day previews 3, recap 1, debate 1, IPL 1 |
-| Deeper cut not on slide 3 | 4 | play-alongs (check whether the play exemption is being passed) |
 | Text card, "1 runs", repeated cover chart | 1-2 each | otd (fixed in PR #198), a debate, an article spotlight |
 
 The builders were written before most of these rules (cover A/B 19 Oct, card anatomy 22 Oct) and were never updated
@@ -50,6 +49,21 @@ Three layers, in this order:
   rule × builder (`source` + key prefix + card visual), with one example each. `--json` gives the same for the digest.
 - Record today's baseline in this file (the table above) so every later chunk shows its effect.
 - Done when: the script reproduces the table above on production.
+
+**Baseline (chunk 0, 23 Oct 2026, `python scripts/audit_social_rules.py`):** 77 ready posts, 56 break at least one
+rule.
+
+| Rule | Findings | Posts | Top builders | Top visuals |
+|---|---|---|---|---|
+| title over 80 characters | 51 | 39 | debate/ig-backlog 13, preview/ig-match-day 10, spotlight/article 7, trend 6 | deep_compare 30, metric_bars 11 |
+| long help line | 30 | 24 | debate/ig-backlog 14, spotlight/article 7 | metric_bars 22 |
+| off-vocabulary word | 25 | 19 | debate/ig-backlog 10, otd/ig-otd 4, trend 3, spotlight/storylines 3 | metric_bars 19, innings_scorecard 4 |
+| more than 8 slides | 22 | 22 | debate/ig-backlog 11, preview/ig-match-day 9 | |
+| no chart on the cover | 6 | 6 | preview/ig-match-day 3, ipl 1, debate 1, recap 1 | |
+| "1 runs" / cover chart repeated / text card | 1 each | | debate, spotlight/article, otd (pre-#198 build) | |
+
+Each finding now carries a rule id (`services/social_rules.RULES`; `findings()` returns `{rule, slide, visual,
+message}`), which the gate in chunk 5 uses to tell hard rules from soft.
 
 ### Chunk 1: layout checks at render time
 
@@ -88,7 +102,8 @@ Three layers, in this order:
 
 - Match-day previews, recaps, debates and IPL posts with no chart on the cover: make each one's lead card a chart that
   can go on the cover (`ig_cover.hero_from`), as on-this-day now does.
-- Play-alongs: confirm the deeper-cut position exemption reaches the lint (`fact.kind == "play"`).
+- (Play-alongs' deeper-cut position: checked in chunk 0, the exemption reaches the lint; the 4 warnings were an
+  ad-hoc count that didn't pass the post's kind.)
 - Done when: the chunk-0 audit shows no warning type above 5 across the queue.
 
 ### Chunk 5: the gate
@@ -121,7 +136,7 @@ Three layers, in this order:
 
 | Chunk | Status |
 |---|---|
-| 0 Audit script | [ ] |
+| 0 Audit script | [x] 23 Oct 2026 |
 | 1 Layout checks at render | [ ] |
 | 2 Deeper-cut titles | [ ] |
 | 3 Deck length, help lines, vocabulary | [ ] |
