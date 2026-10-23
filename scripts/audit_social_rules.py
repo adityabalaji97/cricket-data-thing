@@ -3,7 +3,7 @@ Audit the Instagram queue against the social rules (services/social_rules.findin
 chunk 0): every rule broken, counted by the builder that made the post and the card visual it's on, with one example
 each. The baseline the later chunks are measured against, and (chunk 6) the nightly check.
 
-    python scripts/audit_social_rules.py                     # ready posts
+    python scripts/audit_social_rules.py                     # ready posts: planned from today, and the bench
     python scripts/audit_social_rules.py --posted-days 14    # and those posted or planned in the last 14 days
     python scripts/audit_social_rules.py --json              # the same, as JSON (the digest / run summary)
 
@@ -40,7 +40,10 @@ def packs(db, posted_days: int) -> List[Dict[str, Any]]:
                p.facts->'layout' AS layout, s.data
         FROM content_packs p JOIN chart_snapshots s ON s.id = p.facts->>'carousel_id'
         WHERE p.channel = 'instagram'
-          AND (p.status = 'ready' OR (:days > 0 AND p.status = 'posted' AND p.planned_for >= :since))
+          -- Ready: planned from today, or on the bench. (A ready post planned for a past day was never posted or
+          -- skipped: it isn't going out, so it isn't counted.)
+          AND ((p.status = 'ready' AND (p.planned_for IS NULL OR p.planned_for >= CURRENT_DATE))
+               OR (:days > 0 AND p.status = 'posted' AND p.planned_for >= :since))
         ORDER BY p.id
     """), {"days": posted_days, "since": since}).mappings()]
 

@@ -182,3 +182,64 @@ def test_bowlers_are_compared_with_their_own_kind(monkeypatch):
     field_calls = [c for c in calls if c["group_by"] == ["length"] and not c.get("bowlers")]
     assert field_calls and field_calls[0]["bowl_kind"] == ["spin bowler"]  # the field is spinners only
     assert cands and "The average spinner: 20%." in cands[0].sentence and cands[0].series[1] == "Average spinner"
+
+
+LONG_NAMES = ["Jan Nicol Loftie-Eaton", "Rahmanullah Gurbaz", "Rohit Sharma (Indonesia)",
+              "Charith Rajapaksa (Sebastianites Cricket and Athletic Club)"]
+
+
+def _every_probe(name):
+    """One finding per probe, from the scenarios above, for `name`."""
+    out = [D.slow_start(name, "batter", [bucket("1-10", 100, 66), bucket("11-20", 80, 100), bucket("21-30", 120, 198)],
+                        FIELD_BUCKETS, "s")]
+    spin_field = [{"control": 1, "bowl_kind": "spin bowler", "balls": 7600}, {"control": 0, "bowl_kind": "spin bowler", "balls": 2400}]
+    out.append(D.false_shots(name, "batter", [{"control": 1, "bowl_kind": "spin bowler", "balls": 180},
+                                              {"control": 0, "bowl_kind": "spin bowler", "balls": 20}], spin_field, "s"))
+    out.append(D.false_shots(name, "batter", [{"control": 1, "bowl_kind": "spin bowler", "balls": 100},
+                                              {"control": 0, "bowl_kind": "spin bowler", "balls": 100}], spin_field, "s"))
+    out.append(D.zones(name, "batter", [{"wagon_zone": 3, "runs": 150, "balls": 80}]
+                       + [{"wagon_zone": z, "runs": 30, "balls": 30} for z in (1, 2, 4, 5, 6, 7)],
+                       [{"wagon_zone": z, "runs": 1000, "balls": 800} for z in range(1, 9)], "s"))
+    out.append(D.length(name, "batter", [{"length": "SHORT_OF_A_GOOD_LENGTH", "balls": 50, "runs": 110}],
+                        [{"length": "SHORT_OF_A_GOOD_LENGTH", "balls": 5000, "runs": 6500}], "s"))
+    out.append(D.style(name, "batter", [{"bowl_style": "LMF", "balls": 60, "runs": 120}],
+                       [{"bowl_style": "LMF", "balls": 6000, "runs": 7800}], "s"))
+    for role in ("bowler", "batter"):
+        for raa in (130, -130):
+            out.append(D.phase_value(name, role, [{"phase": "middle", "balls": 300, "raa": raa}], [], "s"))
+    out.append(D.hand(name, "bowler", [{"bat_hand": "LHB", "balls": 120, "runs": 220}, {"bat_hand": "RHB", "balls": 120, "runs": 140}],
+                      [{"bat_hand": "LHB", "balls": 9000, "runs": 12000}, {"bat_hand": "RHB", "balls": 9000, "runs": 12000}], "s"))
+    out.append(D.first_over(name, "bowler", [{"bowler_first_over_runs_bucket": "10+", "balls": 60, "runs": 76},
+                                             {"bowler_first_over_runs_bucket": "0-6", "balls": 60, "runs": 85}],
+                            [{"bowler_first_over_runs_bucket": "10+", "balls": 60, "runs": 90},
+                             {"bowler_first_over_runs_bucket": "0-6", "balls": 60, "runs": 76}], "s"))
+    out.append(D.wicket_length(name, "bowler", [{"length": "SHORT_OF_A_GOOD_LENGTH", "wickets": 12, "balls": 200},
+                                                {"length": "FULL", "wickets": 8, "balls": 200}],
+                               [{"length": "SHORT_OF_A_GOOD_LENGTH", "wickets": 100, "balls": 9000},
+                                {"length": "FULL", "wickets": 300, "balls": 9000}], "s"))
+    out.append(D.conversion(name, "bowler", [{"control": 0, "balls": 231, "wickets": 42}, {"control": 1, "balls": 600, "wickets": 0}],
+                            [{"control": 0, "balls": 36000, "wickets": 5200}, {"control": 1, "balls": 90000, "wickets": 400}], "s"))
+    return out
+
+
+def test_every_probe_writes_a_short_claim_for_any_name():
+    from services.social_rules import MAX_TITLE
+
+    for name in LONG_NAMES:
+        found = _every_probe(name)
+        assert all(found), [i for i, c in enumerate(found) if not c]  # every scenario finds something
+        assert {c.probe for c in found} >= {"slow-start", "false-shots", "zones", "length", "style", "phase-value",
+                                            "hand", "first-over", "wicket-length", "conversion"}
+        for c in found:
+            title = D.to_card(c)["title"]
+            assert c.title and len(title) <= MAX_TITLE, (c.probe, len(title), title)
+            assert any(ch.isdigit() for ch in title), title  # the number is in the claim
+
+
+def test_the_card_takes_the_claim_and_the_caption_keeps_the_sentence():
+    c = D.phase_value("Mitchell Starc", "bowler", [{"phase": "powerplay", "balls": 300, "raa": -105}], [], "s")
+    assert D.to_card(c)["title"] == "Mitchell Starc goes for 2.1 runs an over above par in the powerplay"
+    assert c.sentence.startswith("In the powerplay, Mitchell Starc costs 2.1 runs an over")
+    named = D.Candidate("zones", "Rohit Sharma (Indonesia)", "s", 1.0, {"label": "x", "format": "int"}, [], "s",
+                        title="x" * 70 + " Rohit Sharma (Indonesia)")
+    assert D.to_card(named)["title"].endswith(" Sharma")

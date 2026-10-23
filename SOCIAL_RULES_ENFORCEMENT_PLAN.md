@@ -95,6 +95,16 @@ the 30 "long help line" warnings are about text that's never on a slide: change 
 - A unit test over every deep-cut template, using the longest names in `player_identity`: every title ≤ 80.
 - Rebuild the queued posts that carry a deeper cut (`ig_backlog.refresh`).
 
+**Done (23 Oct 2026):** each probe in `deep_cut.py` writes `Candidate.title`: player and number first, house
+vocabulary ("Mitchell Starc goes for 2.1 runs an over above par in the powerplay"); `deep_title` falls back to the
+surname (a namesake's side in brackets dropped) past 80 characters; the sentence is still the caption line. A test
+runs every probe with names up to 59 characters: every title is at most 80 and carries its number.
+
+The audit now counts ready posts planned from today and the bench (a ready post planned for a past day was never
+posted or skipped and isn't going out): **54 posts, 42 break a rule** (23 Oct, after chunk 1's re-render): 32 long
+titles, 24 long help lines, 19 vocabulary, 14 over 8 slides, 6 cut-short labels, 4 bare covers, 2 sentence legends,
+1 wrapped scope, 1 three-line title, 1 "1 runs", 1 text card.
+
 ### Chunk 3: deck length and help lines
 
 - Debates (`ig_backlog`) and match-day previews (`scripts/ig_match_day.py`, `services/ig_posts/match.py`): cap at
@@ -145,7 +155,7 @@ the 30 "long help line" warnings are about text that's never on a slide: change 
 |---|---|
 | 0 Audit script | [x] 23 Oct 2026 |
 | 1 Layout checks at render | [x] 23 Oct 2026 (code; queue re-render after deploy) |
-| 2 Deeper-cut titles | [ ] |
+| 2 Deeper-cut titles | [x] 23 Oct 2026 (code; queued posts rebuilt as they come up) |
 | 3 Deck length, help lines, vocabulary | [ ] |
 | 4 Covers and the rest | [ ] |
 | 5 The gate | [ ] |

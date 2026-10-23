@@ -26,6 +26,7 @@ Probes (role):
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
@@ -62,6 +63,8 @@ class Candidate:
     sample: str
     series: Tuple[str, str] = ("", "")
     extra: Dict[str, Any] = field(default_factory=dict)
+    title: str = ""                 # the card's claim: player and number first, at most MAX_TITLE characters; the
+                                    # sentence (with the field's numbers) is the caption line
 
 
 @dataclass(frozen=True)
@@ -142,7 +145,8 @@ def slow_start(name, role, rows, field_rows, scope_label, peer="bowler"):
     out_rows = [{"label": lab, "subject": _sr(s), "field": _sr(f)} for lab, s, f in
                 (("Balls 1-10", e, fe), ("Balls 11-20", m, fm), ("Balls 21+", l, fl)) if _sum(s, "balls")]
     return Candidate("slow-start", name, sentence, surprise, {"label": "strike rate", "format": "int"}, out_rows,
-                     f"{nm} · {scope_label} · {int(_sum(rows, 'balls')):,} balls", (nm, "Average batter"))
+                     f"{nm} · {scope_label} · {int(_sum(rows, 'balls')):,} balls", (nm, "Average batter"),
+                     title=f"{nm} scores at {_sr(e):.0f} in the first 10 balls, {_sr(l):.0f} after 20")
 
 
 def false_shots(name, role, rows, field_rows, scope_label, peer="bowler"):
@@ -178,8 +182,11 @@ def false_shots(name, role, rows, field_rows, scope_label, peer="bowler"):
             out_rows.append({"label": w, "subject": 100 * (sk if worse else 1 - sk), "field": 100 * (fk if worse else 1 - fk),
                              "highlight": k == kind})
     label = "% of balls beaten or mistimed" if worse else "% of balls in control"
+    title = (f"{nm}: false shots on {s:.0%} of balls against {word} (average {f:.0%})" if worse
+             else f"{nm}: {1 - s:.0%} control against {word} (average {1 - f:.0%})")
     return Candidate("false-shots", name, sentence, dev * _conf(t, 80), {"label": label, "format": "pct0"},
-                     out_rows, f"{nm} · {scope_label} · {int(t):,} tracked balls against {word}", (nm, "Average batter"))
+                     out_rows, f"{nm} · {scope_label} · {int(t):,} tracked balls against {word}", (nm, "Average batter"),
+                     title=title)
 
 
 def zones(name, role, rows, field_rows, scope_label, peer="bowler"):
@@ -202,7 +209,8 @@ def zones(name, role, rows, field_rows, scope_label, peer="bowler"):
     out_rows = [{"label": ZONES[z], "subject": 100 * s[z], "field": 100 * f.get(z, 0), "highlight": z == zone} for z in top]
     return Candidate("zones", name, sentence, (s[zone] / f[zone] - 1) * _conf(runs, 200),
                      {"label": "% of runs", "format": "pct0"}, out_rows,
-                     f"{nm} · {scope_label} · {int(runs):,} runs off the bat", (nm, "Average batter"))
+                     f"{nm} · {scope_label} · {int(runs):,} runs off the bat", (nm, "Average batter"),
+                     title=f"{s[zone]:.0%} of {nm}'s runs come through {where} (average {f[zone]:.0%})")
 
 
 def length(name, role, rows, field_rows, scope_label, peer="bowler"):
@@ -227,7 +235,8 @@ def length(name, role, rows, field_rows, scope_label, peer="bowler"):
     out_rows = [{"label": w.capitalize().replace("-", " "), "subject": _sr(by[k]), "field": _sr(fby.get(k, [])) or 0, "highlight": k == key}
                 for k, w in LENGTHS if _sum(by.get(k, []), "balls") >= 15]
     return Candidate("length", name, sentence, dev, {"label": "strike rate", "format": "int"}, out_rows,
-                     f"{nm} · {scope_label} · {int(tagged):,} tracked balls", (nm, "Average batter"))
+                     f"{nm} · {scope_label} · {int(tagged):,} tracked balls", (nm, "Average batter"),
+                     title=f"{nm} scores at {s:.0f} against {_balls(key, word)} (average {f:.0f})")
 
 
 def style(name, role, rows, field_rows, scope_label, peer="bowler"):
@@ -252,7 +261,8 @@ def style(name, role, rows, field_rows, scope_label, peer="bowler"):
     out_rows = [{"label": STYLES[k].replace("right-arm ", "RA ").replace("left-arm ", "LA ").capitalize(), "subject": _sr(by[k]),
                  "field": _sr(fby.get(k, [])) or 0, "highlight": k == key} for k in top]
     return Candidate("style", name, sentence, dev, {"label": "strike rate", "format": "int"}, out_rows,
-                     f"{nm} · {scope_label} · {int(b):,} balls against {word}", (nm, "Average batter"))
+                     f"{nm} · {scope_label} · {int(b):,} balls against {word}", (nm, "Average batter"),
+                     title=f"{nm} scores at {s:.0f} against {word} (average {f:.0f})")
 
 
 def phase_value(name, role, rows, field_rows, scope_label, peer="bowler"):
@@ -272,19 +282,23 @@ def phase_value(name, role, rows, field_rows, scope_label, peer="bowler"):
         return None
     key, word, per_over, b = best
     nm = name  # in full: "Patel" could be Axar or Harshal
+    phase = word[0].lower() + word[1:]  # "in the powerplay"
+    side = "below" if per_over > 0 else "above"
     if role == "bowler":
         verb = "saves" if per_over > 0 else "costs"
         sentence = f"{word}, {nm} {verb} {abs(per_over):.1f} runs an over against an average bowler in the same situations."
+        title = f"{nm} goes for {abs(per_over):.1f} runs an over {side} par {phase}"
     else:
         verb = "adds" if per_over > 0 else "costs"
         sentence = f"{word}, {nm} {verb} {abs(per_over):.1f} runs an over against an average batter in the same situations."
+        title = f"{nm} scores {abs(per_over):.1f} runs an over {'above' if per_over > 0 else 'below'} par {phase}"
     out_rows = [{"label": lab, "subject": 6 * _sum(by.get(k, []), "raa") / _sum(by.get(k, []), "balls"),
                  "field": 0.0, "highlight": k == key} for k, _w, lab in PHASES if _sum(by.get(k, []), "balls") >= 30]
     # Every player has a phase; damped so it doesn't win every post on availability alone.
     return Candidate("phase-value", name, sentence, (abs(per_over) / 4) * _conf(b, need),
-                     {"label": "runs above average per over", "format": "signed1"}, out_rows,
-                     f"{nm} · {scope_label} · {int(b):,} balls {word[0].lower() + word[1:]}",
-                     (nm, "Average"), {"signed": True})
+                     {"label": "runs above par per over", "format": "signed1"}, out_rows,
+                     f"{nm} · {scope_label} · {int(b):,} balls {phase}",
+                     (nm, "Average"), {"signed": True}, title=title)
 
 
 def hand(name, role, rows, field_rows, scope_label, peer="bowler"):
@@ -303,7 +317,8 @@ def hand(name, role, rows, field_rows, scope_label, peer="bowler"):
                 {"label": "v right-handers", "subject": _econ(r), "field": _econ(fby["RHB"]), "highlight": s_ratio < f_ratio}]
     return Candidate("hand", name, sentence, _rel(s_ratio, f_ratio) * _conf(min(_sum(l, "balls"), _sum(r, "balls")), 60),
                      {"label": "runs an over", "format": "dec1"}, out_rows,
-                     f"{nm} · {scope_label} · {int(_sum(rows, 'balls')):,} balls", (nm, f"Average {peer}"))
+                     f"{nm} · {scope_label} · {int(_sum(rows, 'balls')):,} balls", (nm, f"Average {peer}"),
+                     title=f"{nm} goes for {_econ(l):.1f} an over to left-handers, {_econ(r):.1f} to right-handers")
 
 
 def first_over(name, role, rows, field_rows, scope_label, peer="bowler"):
@@ -326,7 +341,8 @@ def first_over(name, role, rows, field_rows, scope_label, peer="bowler"):
     return Candidate("first-over", name, sentence, (abs(s_diff - f_diff) / 2) * _conf(_sum(bad, "balls"), 36),
                      {"label": "runs an over, overs 2 onwards", "format": "dec1"}, out_rows,
                      f"{nm} · {scope_label} · {int(_sum(bad, 'balls')):,} balls after an expensive first over",
-                     (nm, f"Average {peer}"))
+                     (nm, f"Average {peer}"),
+                     title=f"{nm} goes for {_econ(bad):.1f} after a 10+ first over, {_econ(good):.1f} after a tidy one")
 
 
 def wicket_length(name, role, rows, field_rows, scope_label, peer="bowler"):
@@ -347,7 +363,8 @@ def wicket_length(name, role, rows, field_rows, scope_label, peer="bowler"):
                 for k, wd in LENGTHS if s.get(k) or f.get(k, 0) >= 0.1]
     return Candidate("wicket-length", name, sentence, (s[key] / f[key] - 1) * _conf(w, 15),
                      {"label": "% of wickets", "format": "pct0"}, out_rows,
-                     f"{nm} · {scope_label} · {int(w):,} wickets", (nm, f"Average {peer}"))
+                     f"{nm} · {scope_label} · {int(w):,} wickets", (nm, f"Average {peer}"),
+                     title=f"{s[key]:.0%} of {nm}'s wickets come from {_balls(key, word)} (average {f[key]:.0%})")
 
 
 def conversion(name, role, rows, field_rows, scope_label, peer="bowler"):
@@ -378,7 +395,8 @@ def conversion(name, role, rows, field_rows, scope_label, peer="bowler"):
     return Candidate("conversion", name, sentence, _rel(f_bpw, s_bpw) * _conf(w, 12),
                      {"label": "fewer is better · false shot: a ball the batter didn't control", "format": "dec1"}, out_rows,
                      f"{nm} · {scope_label} · {int(w)} wickets from {int(b):,} false shots",
-                     (nm, f"Average {peer}"))
+                     (nm, f"Average {peer}"),
+                     title=f"{nm} needs {s_bpw:.1f} false shots per wicket (average {f_bpw:.1f})")
 
 
 PROBES: Tuple[Probe, ...] = (
@@ -495,13 +513,27 @@ def on_topic(fact: Dict[str, Any], cands: List[Candidate]) -> None:
 MAX_ROWS = 4  # what fits a 4:5 slide under a three-line title
 
 
+def deep_title(c: Candidate) -> str:
+    """The card's claim: the probe's title (the sentence when a probe has none), with the surname instead of the full
+    name when the full name would take it past MAX_TITLE (docs/social_rules.md, Card anatomy)."""
+    from services.social_rules import MAX_TITLE
+
+    title = c.title or c.sentence
+    if len(title) > MAX_TITLE and " " in c.subject:
+        # A namesake's side in brackets goes first ("Rohit Sharma (Indonesia)" -> "Sharma"); the scope line under the
+        # chart keeps the full name.
+        bare = re.sub(r"\s+\([A-Za-z](?:[^()]|\([^()]*\))*\)$", "", c.subject)
+        title = title.replace(c.subject, short(bare))
+    return title
+
+
 def to_card(c: Candidate) -> Dict[str, Any]:
     rows = list(c.rows)
     while len(rows) > MAX_ROWS:  # drop from the end, never the split the sentence is about
         i = max(i for i, r in enumerate(rows) if not r.get("highlight"))
         rows.pop(i)
     payload = {"metric": {**c.metric, "signed": bool(c.extra.get("signed"))}, "series": list(c.series), "rows": rows}
-    out = card(f"deep-{c.probe}", "deep_compare", c.sentence, payload, c.sample, HELP)
+    out = card(f"deep-{c.probe}", "deep_compare", deep_title(c), payload, c.sample, HELP)
     out["kicker"] = KICKER
     return out
 
