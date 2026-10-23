@@ -70,6 +70,13 @@ jobs:
             --skip-columns --skip-players --skip-sync --skip-elo
           rm -f t20_bbb.csv
 
+      # A match the file held cut off part-way (22 Oct 2026: NZ v India at 118 balls) gets its missing balls from a
+      # later file, but the later steps only fill what's missing. Matches with more balls than metrics: stats, metrics
+      # and stands cleared for the steps below to rebuild from every ball, and the result taken from the file.
+      - name: "T20 (men): repair matches that grew"
+        continue-on-error: true
+        run: python scripts/repair_grown_matches.py
+
       - name: "ODI (men): download"
         run: |
           curl -sSL -o odi_bbb.csv "${{ secrets.DROPBOX_ODI_URL }}"
