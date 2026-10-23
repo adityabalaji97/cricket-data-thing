@@ -19,12 +19,24 @@ def main() -> int:
     parser.add_argument("--days", type=int, default=3)
     parser.add_argument("--fixture", help="only this fixture_key")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--test-approved", action="store_true",
+                        help="re-test every approved point of the next days' fixtures (the numbers move with each match)")
     args = parser.parse_args()
 
     from database import engine, get_session
     from services import preview_storylines as S
 
     db = next(get_session())
+    if args.test_approved:
+        from sqlalchemy import text
+
+        ids = db.execute(text("""SELECT id FROM fixture_storylines WHERE status = 'approved'
+                                 AND match_date BETWEEN CURRENT_DATE AND CURRENT_DATE + :d"""), {"d": args.days}).scalars().all()
+        for i in ids:
+            t = S.test_point(db, i)
+            print(f"  tested {i}: {t['verdict']} — {t['finding']}")
+        print(f"{len(ids)} approved points tested")
+        return 0
     fxs = [f for f in S.fixtures_with_news(db, args.days) if not args.fixture or f["fixture_key"] == args.fixture]
     print(f"{len(fxs)} fixtures with headlines")
     for fx in fxs:

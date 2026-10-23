@@ -15,6 +15,20 @@ const TOKEN_KEY = 'hindsight_admin_token';
 const C = { bg: '#0a0c11', card: '#12151c', line: 'rgba(255,255,255,.08)', hi: '#f3f4f6', mid: '#c3c8d0', lo: '#9aa1ac', lime: '#b6f24a', red: '#e5484d', amber: '#f0b429' };
 const readToken = () => { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } };
 const STATUS_INK = { pending: C.amber, approved: C.lime, dropped: C.lo };
+const VERDICT_INK = { supported: C.lime, 'not supported': C.red, partly: C.amber, 'too little data': C.lo, context: C.mid };
+
+/** The data's answer (services/storyline_testers.py): verdict, the finding with its numbers, the query link. */
+const TestResult = ({ test }) => (
+  <Box sx={{ mt: 0.75, pl: 1.25, borderLeft: `2px solid ${VERDICT_INK[test.verdict] || C.lo}` }}>
+    <Typography sx={{ fontSize: 11, fontWeight: 700, color: VERDICT_INK[test.verdict] || C.lo, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      {`The data: ${test.verdict}`}
+    </Typography>
+    {test.finding && <Typography sx={{ fontSize: 13.5, color: C.mid, lineHeight: 1.35 }}>{test.finding}</Typography>}
+    {test.query_url && (
+      <Link href={test.query_url} target="_blank" rel="noopener noreferrer" sx={{ fontSize: 12, color: C.lo }}>Open the query</Link>
+    )}
+  </Box>
+);
 
 const day = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 
@@ -23,6 +37,10 @@ const Point = ({ point, client, onChanged, toast }) => {
   const [draft, setDraft] = useState(point.edited_claim || point.claim);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const runTest = async () => {
+    setBusy(true);
+    try { await client.post(`/storylines/admin/${point.id}/test`); onChanged(); } catch (e) { toast(apiErrorText(e)); } finally { setBusy(false); }
+  };
   const act = async (action, claim) => {
     setBusy(true);
     try {
@@ -56,6 +74,7 @@ const Point = ({ point, client, onChanged, toast }) => {
       ) : (
         <Typography sx={{ fontSize: 15.5, color: C.hi, lineHeight: 1.35 }}>{point.edited_claim || point.claim}</Typography>
       )}
+      {point.test && <TestResult test={point.test} />}
       {point.edited_claim && !editing && (
         <Typography sx={{ fontSize: 12, color: C.lo, mt: 0.25 }}>{`Found as: ${point.claim}`}</Typography>
       )}
@@ -74,6 +93,7 @@ const Point = ({ point, client, onChanged, toast }) => {
             <Button size="small" disabled={busy} onClick={() => act('approve')} sx={{ color: C.lime, fontWeight: 700 }}>Approve</Button>
           )}
           <Button size="small" disabled={busy} onClick={() => setEditing(true)} sx={{ color: C.mid }}>Edit</Button>
+          <Button size="small" disabled={busy} onClick={runTest} sx={{ color: C.mid }}>{point.test ? 'Re-test' : 'Test'}</Button>
           {point.status !== 'dropped' && (
             <Button size="small" disabled={busy} onClick={() => act('drop')} sx={{ color: C.red }}>Drop</Button>
           )}
