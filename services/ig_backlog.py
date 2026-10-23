@@ -499,6 +499,52 @@ def add_deep_cut(db: Session, post: Dict[str, Any], day: Optional[date],
     return got["deep_cut"]
 
 
+def old_deep_cut_title(slides: List[Dict[str, Any]], fact: Dict[str, Any]) -> Optional[int]:
+    """The index of the deeper-cut slide when its title is still the whole sentence (built before the deeper cut
+    wrote its own short claim, 23 Oct 2026), else None."""
+    from services.ig_posts import deep_cut
+
+    sentence = (fact.get("deep_cut") or {}).get("sentence")
+    for i, sl in enumerate(slides):
+        c = sl.get("card") or {}
+        if c.get("kicker") == deep_cut.KICKER and sentence and c.get("title") == sentence:
+            return i
+    return None
+
+
+def retitle_deep_cut(db: Session, angle_key: str) -> Dict[str, Any]:
+    """Give a queued post's deeper cut its short claim in place: the same card with the new title, as a new carousel
+    on the same pack (same day, caption untouched: the caption keeps the sentence). The caller renders it.
+    {status: 'retitled' | 'current' | 'moved' | 'missing', title?, carousel_id?}; 'moved' when the probe's numbers have
+    changed since the post was made, so the post is left as it is."""
+    from services import ig_carousel
+    from services.ig_posts import deep_cut
+
+    row = db.execute(text("SELECT id, facts FROM content_packs WHERE angle_key = :k"), {"k": angle_key}).first()
+    if not row or not (row[1] or {}).get("carousel_id"):
+        return {"status": "missing"}
+    pid, fact = row[0], dict(row[1])
+    snap = db.execute(text("SELECT data FROM chart_snapshots WHERE id = :i"), {"i": fact["carousel_id"]}).scalar() or {}
+    slides = list(snap.get("slides") or [])
+    at = old_deep_cut_title(slides, fact)
+    if at is None:
+        return {"status": "current"}
+    title = deep_cut.redo_title(db, fact)
+    if not title:
+        return {"status": "moved"}
+    slides[at] = {**slides[at], "card": {**slides[at]["card"], "title": title}}
+    carousel = ig_carousel.save(db, slides, snap.get("title") or fact.get("title") or "",
+                                {"retitled_of": fact["carousel_id"]}, "ig-deep-cut")
+    fact.update(carousel_id=carousel["id"], slides=len(slides), render=True)
+    fact.pop("reel", None)  # the voiced Reel was of the old carousel: the render makes the new one's
+    from database import engine
+
+    with engine.begin() as conn:
+        conn.execute(text("""UPDATE content_packs SET facts = CAST(:f AS jsonb), snapshot_id = :s WHERE id = :id"""),
+                     {"f": json.dumps(fact, default=str), "s": carousel["id"], "id": pid})
+    return {"status": "retitled", "title": title, "carousel_id": carousel["id"], "slides": len(slides)}
+
+
 def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "ig-backlog",
                 post_by: Optional[Any] = None) -> None:
     """One Instagram pack: {key, pillar, fact, snapshot_id, warnings} planned for `day` (None = bench). The carousel's

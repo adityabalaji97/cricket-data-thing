@@ -105,6 +105,12 @@ posted or skipped and isn't going out): **54 posts, 42 break a rule** (23 Oct, a
 titles, 24 long help lines, 19 vocabulary, 14 over 8 slides, 6 cut-short labels, 4 bare covers, 2 sentence legends,
 1 wrapped scope, 1 three-line title, 1 "1 runs", 1 text card.
 
+Queued posts (23 Oct 2026): 23 stale "ready" posts from past days marked skipped. Posts made before chunk 2 keep the
+sentence as the deeper cut's title until `scripts/build_ig_backlog.py --retitle-deep-cuts 3` (nightly, queue upkeep)
+reaches them: it re-runs the same probe for the same player, swaps in the short claim only when the numbers still
+match (else leaves the post alone and says "moved"), and re-renders (the voiced Reel with it). Run by hand for the 7
+posts planned to 1 Nov.
+
 ### Chunk 3: deck length and help lines
 
 - Debates (`ig_backlog`) and match-day previews (`scripts/ig_match_day.py`, `services/ig_posts/match.py`): cap at
