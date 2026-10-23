@@ -604,21 +604,29 @@ const InningsWagon = ({ payload }) => (
  * One side's win probability through a chase, ball by ball (services/ig_posts/recap_special.wp_line): the line in the
  * side's colour, a 50% guide, and the overs that moved it most shaded and numbered, each named below with who did it
  * (the over and the batters, not the bowler). Each ball's tooltip: ball, score, chance.
- * payload: {team, label, start, points:[{wp, label, score, over}], bands:[{i0, i1, over, from, to, text}]}
+ * payload: {team, label, start, points:[{wp, label, score, over}], bands:[{i0, i1, over, from, to, text}], upto?}
+ * upto: draw the line only to that many points, on the whole chase's axis, with the chance at that ball beside the
+ * dot (a replay: the same chart drawn a little further on each slide). Bands past it aren't drawn.
  */
 const WinProbLine = ({ payload }) => {
-  const { points, bands = [] } = payload;
+  const { points } = payload;
   const W = 300; const H = 200; const L = 30; const R = 10; const T = 16; const B = 176;
   const n = points.length;
+  const shown = Math.min(n, payload.upto || n);
+  const bands = (payload.bands || []).filter((b) => b.i1 < shown);
   const sx = (i) => L + ((i + 1) / n) * (W - L - R); // x 0 is the start of the innings (payload.start)
   const sy = (v) => B - (v / 100) * (B - T);
-  const line = `M${L},${sy(payload.start)} ` + points.map((p, i) => `L${sx(i).toFixed(1)},${sy(p.wp).toFixed(1)}`).join(' ');
+  const line = `M${L},${sy(payload.start)} ` + points.slice(0, shown).map((p, i) => `L${sx(i).toFixed(1)},${sy(p.wp).toFixed(1)}`).join(' ');
   const colour = teamColour(payload.team, colors.accent);
   const overTicks = [];
   points.forEach((p, i) => {
     if (i && p.over !== points[i - 1].over && (p.over % 5 === 0)) overTicks.push([i, p.over]);
   });
-  const last = points[n - 1];
+  const last = points[shown - 1];
+  // The replay's chance label: right of the dot (left of it near the end), on the side the line didn't come from.
+  const nowRight = sx(shown - 1) < W - 60;
+  const falling = points[Math.max(0, shown - 6)].wp >= last.wp;
+  const nowY = falling ? sy(last.wp) + 18 : sy(last.wp) - 8;
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.75 }}>
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
@@ -637,8 +645,12 @@ const WinProbLine = ({ payload }) => {
           </g>
         ))}
         <path d={line} fill="none" stroke={colour} strokeWidth="2" strokeLinejoin="round" />
-        <circle cx={sx(n - 1)} cy={sy(last.wp)} r="4" fill={colour} stroke={colors.bg} strokeWidth="2" />
-        {points.map((p, i) => (
+        <circle cx={sx(shown - 1)} cy={sy(last.wp)} r="4" fill={colour} stroke={colors.bg} strokeWidth="2" />
+        {shown < n && (
+          <text x={sx(shown - 1) + (nowRight ? 8 : -8)} y={Math.min(B + 14, nowY)} textAnchor={nowRight ? 'start' : 'end'}
+            style={{ ...mono, fontSize: 14, fontWeight: 700, fill: colors.textHi }}>{`${Math.round(last.wp)}%`}</text>
+        )}
+        {points.slice(0, shown).map((p, i) => (
           <rect key={i} x={sx(i - 1)} y={T} width={Math.max(1, sx(i) - sx(i - 1))} height={B - T} fill="transparent">
             <title>{`${p.label} · ${p.score} · ${Math.round(p.wp)}%`}</title>
           </rect>
@@ -654,6 +666,114 @@ const WinProbLine = ({ payload }) => {
           <Typography sx={{ ...mono, fontSize: 12, color: colors.textHi, whiteSpace: 'nowrap' }}>{`${b.from}% → ${b.to}%`}</Typography>
         </Box>
       ))}
+    </Box>
+  );
+};
+
+/**
+ * Where an innings went (wagon_x / wagon_y, centred on 150,150, as on the site's wheels: down the ground is down,
+ * a right-hander's leg side to the right). Boundaries reach the rope; other shots are scaled within the inner ring.
+ * Sixes gold, fours in the accent, the rest grey. Highlighted shots are drawn thick with their label at the rope and
+ * the rest fade, so the wheel can tell one moment of an innings.
+ * payload: {shots:[{x, y, runs, highlight?, label?}], left_handed?, compact?}
+ */
+export const ShotWheel = ({ payload }) => {
+  const size = 300; const c = size / 2; const rope = size * (payload.compact ? 0.46 : 0.38);
+  const shots = (payload.shots || []).filter((d) => d.runs > 0 && d.x != null && (d.x !== 150 || d.y !== 150));
+  const far = Math.max(1, ...shots.filter((d) => d.runs < 4).map((d) => Math.hypot(d.x - 150, d.y - 150)));
+  const focus = shots.some((d) => d.highlight);
+  const ink = (runs) => (runs >= 6 ? colors.gold : runs >= 4 ? colors.accent : '#8b95a7');
+  const end = (d, k) => {
+    const dx = d.x - 150; const dy = d.y - 150; const dist = Math.hypot(dx, dy) || 1;
+    const r = (d.runs >= 4 ? rope : (dist / far) * rope * 0.72) * k;
+    return [c + (dx / dist) * r, c + (dy / dist) * r];
+  };
+  const order = [...shots].sort((a, b) => Number(!!a.highlight) - Number(!!b.highlight)); // highlights on top
+  const [offX, legX] = payload.left_handed ? [size - 4, 4] : [4, size - 4];
+  return (
+    <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${size} ${size}`} role="img" sx={{ width: '100%', maxHeight: '100%' }}
+        aria-label={`Wagon wheel: ${shots.length} scoring shots${focus ? `; ${shots.filter((d) => d.highlight).map((d) => d.label).join(', ')}` : ''}`}>
+        <circle cx={c} cy={c} r={rope} fill="#12301c" stroke="rgba(255,255,255,0.25)" />
+        <circle cx={c} cy={c} r={rope * 0.55} fill="none" stroke="rgba(255,255,255,0.12)" strokeDasharray="3 4" />
+        <rect x={c - 5} y={c - 16} width={10} height={32} rx={2} fill="#c9b27c" opacity={0.7} />
+        {!payload.compact && (
+          <>
+            <text x={offX} y={14} textAnchor={payload.left_handed ? 'end' : 'start'} style={{ ...mono, fontSize: 10, fill: colors.textLo }}>OFF SIDE</text>
+            <text x={legX} y={14} textAnchor={payload.left_handed ? 'start' : 'end'} style={{ ...mono, fontSize: 10, fill: colors.textLo }}>LEG SIDE</text>
+          </>
+        )}
+        {order.map((d, i) => {
+          const [x2, y2] = end(d, 1);
+          const dim = focus && !d.highlight;
+          return (
+            <g key={i}>
+              <line x1={c} y1={c} x2={x2} y2={y2} stroke={ink(d.runs)} strokeWidth={d.highlight ? 3.2 : d.runs >= 4 ? 2 : 1.3}
+                strokeLinecap="round" opacity={dim ? 0.28 : 0.95} />
+              {d.highlight && <circle cx={x2} cy={y2} r="4" fill={ink(d.runs)} stroke={colors.bg} strokeWidth="1.5" />}
+            </g>
+          );
+        })}
+        {order.filter((d) => d.highlight && d.label).map((d, i) => {
+          // Beyond the rope, kept inside the frame: a label that would run off the side sits above or below its dot.
+          let [lx, ly] = end(d, 1.17);
+          const wide = String(d.label).length * 7.5;
+          let anchor = lx < c - 10 ? 'end' : lx > c + 10 ? 'start' : 'middle';
+          if (anchor === 'start' && lx + wide > size - 2) { [lx, ly] = end(d, 1); lx = Math.min(lx, size - 2); ly -= 14; anchor = 'end'; }
+          if (anchor === 'end' && lx - wide < 2) { [lx, ly] = end(d, 1); lx = Math.max(lx, 2); ly -= 14; anchor = 'start'; }
+          return (
+            <text key={`l${i}`} x={lx} y={ly + 4} textAnchor={anchor}
+              style={{ ...mono, fontSize: 11.5, fontWeight: 700, fill: colors.textHi }}>{d.label}</text>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+};
+
+/**
+ * One over, ball by ball (a replay): the side's chance after each delivery as a stepped line, the chance above each
+ * ball and what happened below it (W, 6nb, wd, 3b...), the highlighted ball in the accent, wickets in red.
+ * payload: {team, start, balls:[{tag, wp, highlight?, wicket?}]}
+ */
+const BallSteps = ({ payload }) => {
+  const { balls } = payload;
+  const W = 300; const H = 190; const L = 30; const R = 8; const T = 22; const B = 150;
+  const n = balls.length;
+  const col = (W - L - R) / n;
+  const sx = (i) => L + col * (i + 0.5);
+  const sy = (v) => B - (v / 100) * (B - T);
+  const colour = teamColour(payload.team, colors.accent);
+  let d = `M${L},${sy(payload.start)}`;
+  balls.forEach((b, i) => { d += ` H${(L + col * i).toFixed(1)} V${sy(b.wp).toFixed(1)}`; });
+  d += ` H${W - R}`;
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+        aria-label={`Ball by ball: ${balls.map((b) => `${b.tag} ${Math.round(b.wp)}%`).join(', ')}`}>
+        {[0, 50, 100].map((v) => (
+          <g key={v}>
+            <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke={v === 50 ? colors.borderStrong : colors.border}
+              strokeDasharray={v === 50 ? '4 4' : undefined} />
+            <text x={L - 6} y={sy(v) + 4} textAnchor="end" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{`${v}%`}</text>
+          </g>
+        ))}
+        <path d={d} fill="none" stroke={colour} strokeWidth="2" strokeLinejoin="round" />
+        {balls.map((b, i) => {
+          const hi = b.highlight; const ink = b.wicket ? colors.red : hi ? colors.accent : colors.textHi;
+          const y = sy(b.wp); const above = y > T + 14;
+          return (
+            <g key={i}>
+              <circle cx={sx(i)} cy={y} r={hi ? 4.5 : 3} fill={hi ? colors.accent : colour} stroke={colors.bg} strokeWidth="1.5" />
+              <text x={sx(i)} y={above ? y - 8 : y + 15} textAnchor="middle"
+                style={{ ...mono, fontSize: 9.5, fontWeight: hi ? 700 : 400, fill: hi ? colors.accent : colors.textMed }}>{`${Math.round(b.wp)}%`}</text>
+              <rect x={sx(i) - col / 2 + 2} y={B + 10} width={col - 4} height={22} rx={4}
+                fill={b.wicket ? 'rgba(229,72,77,.16)' : hi ? 'rgba(182,242,74,.16)' : colors.surface2} />
+              <text x={sx(i)} y={B + 25} textAnchor="middle" style={{ ...mono, fontSize: 10.5, fontWeight: 700, fill: ink }}>{b.tag}</text>
+            </g>
+          );
+        })}
+      </Box>
     </Box>
   );
 };
@@ -984,6 +1104,8 @@ export const POST_VISUALS = {
   share_bars: ShareBars,
   race_lines: RaceLines,
   win_prob_line: WinProbLine,
+  shot_wheel: ShotWheel,
+  ball_steps: BallSteps,
   forest: Forest,
   bucket_bars: BucketBars,
   bowling_plan: BowlingPlan,
