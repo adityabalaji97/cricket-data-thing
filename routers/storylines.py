@@ -41,6 +41,14 @@ def list_storylines(days: int = 4, db: Session = Depends(get_session)):
         if key not in fixtures:
             d, a, b = key.split("|")
             fixtures[key] = {"fixture_key": key, "match_date": d, "team1": a, "team2": b, "headlines": n, "points": []}
+    try:
+        ledes = dict(db.execute(text("SELECT fixture_key, lede FROM fixture_ledes WHERE fixture_key = ANY(:k)"),
+                                {"k": list(fixtures)}).all())
+    except Exception:  # before migration 031
+        db.rollback()
+        ledes = {}
+    for key, f in fixtures.items():
+        f["lede"] = ledes.get(key)
     return {"fixtures": sorted(fixtures.values(), key=lambda f: (f["match_date"], f["fixture_key"]))}
 
 
@@ -71,7 +79,20 @@ def test(point_id: int, db: Session = Depends(get_session)):
     result = test_point(db, point_id)
     if result is None:
         raise HTTPException(status_code=404, detail="No such talking point")
+    _rewrite_lede(db, point_id)
     return result
+
+
+def _rewrite_lede(db: Session, point_id: int) -> None:
+    """The fixture's lede follows its approved points (chunk 5); a failure never blocks the review."""
+    from services.preview_storylines import write_lede
+
+    key = db.execute(text("SELECT fixture_key FROM fixture_storylines WHERE id = :i"), {"i": point_id}).scalar()
+    if key:
+        try:
+            write_lede(db, key)
+        except Exception:  # pragma: no cover
+            db.rollback()
 
 
 class Review(BaseModel):
@@ -101,4 +122,5 @@ def review(point_id: int, body: Review, db: Session = Depends(get_session)):
         from services.preview_storylines import test_point
 
         out["test"] = test_point(db, point_id)
+    _rewrite_lede(db, point_id)  # approved, edited, dropped or undone: the lede follows
     return out

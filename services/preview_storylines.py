@@ -211,3 +211,61 @@ def test_point(db, point_id: int, store: bool = True) -> Optional[Dict[str, Any]
                    {"t": json.dumps(result, default=str), "i": point_id})
         db.commit()
     return result
+
+
+LEDE_PROMPT = """Write the opening of a cricket match preview: {team1} v {team2}.
+
+What's being said this week, and what the ball-by-ball data says about each:
+{facts}
+
+Two or three short sentences, at most 25 words each, for a phone screen. Lead with a player and a number. Say what
+people are saying and what the numbers say, including where they disagree. Use only these facts and only these
+numbers. No blame: describe what the numbers show, not failures or problems. No predictions, no hype, no adjectives
+the numbers don't earn. House words: "runs above par", "strike rate", "an over". Return JSON {{"lede": "..."}}."""
+
+
+def write_lede(db, fixture_key: str) -> Optional[str]:
+    """The lede from the approved, tested points; sentences whose numbers aren't in the findings are dropped.
+    Stored in fixture_ledes (removed when nothing is left)."""
+    import re as _re
+
+    from services import llm
+    from services.ig_reel_v2 import _client
+    from services.summary_check import _walk_numbers, numbers_supported
+
+    rows = db.execute(text("""
+        SELECT id, COALESCE(edited_claim, claim) AS claim, test FROM fixture_storylines
+        WHERE fixture_key = :k AND status = 'approved' ORDER BY rank
+    """), {"k": fixture_key}).mappings().all()
+    facts = [r for r in rows if (r["test"] or {}).get("finding")]
+    if not facts:
+        db.execute(text("DELETE FROM fixture_ledes WHERE fixture_key = :k"), {"k": fixture_key})
+        db.commit()
+        return None
+    d, a, b = fixture_key.split("|")
+    listing = "\n".join(f"- Said: {r['claim']}\n  Data ({r['test']['verdict']}): {r['test']['finding']}" for r in facts)
+    model = llm.MODEL_STRONG
+    resp = _client().chat.completions.create(model=model, response_format={"type": "json_object"},
+                                             messages=[{"role": "user", "content": LEDE_PROMPT.format(team1=a, team2=b, facts=listing)}],
+                                             **llm.chat_kwargs(model, 400, temperature=0.2))
+    try:
+        lede = (json.loads(resp.choices[0].message.content or "{}").get("lede") or "").strip()
+    except ValueError:
+        lede = ""
+    known = list(_walk_numbers([r["test"]["finding"] for r in facts] + [r["claim"] for r in facts]))
+    kept, dropped = [], []
+    for sentence in [x.strip() for x in _re.split(r"(?<=[.!?])\s+", lede) if x.strip()]:
+        ok, _bad = numbers_supported(sentence, known)
+        (kept if ok else dropped).append(sentence)
+    text_ = " ".join(kept[:3])
+    if not text_:
+        db.execute(text("DELETE FROM fixture_ledes WHERE fixture_key = :k"), {"k": fixture_key})
+        db.commit()
+        return None
+    db.execute(text("""
+        INSERT INTO fixture_ledes (fixture_key, lede, point_ids, dropped, model) VALUES (:k, :l, CAST(:p AS jsonb), CAST(:d AS jsonb), :m)
+        ON CONFLICT (fixture_key) DO UPDATE SET lede = EXCLUDED.lede, point_ids = EXCLUDED.point_ids,
+            dropped = EXCLUDED.dropped, model = EXCLUDED.model, written_at = now()
+    """), {"k": fixture_key, "l": text_, "p": json.dumps([r["id"] for r in facts]), "d": json.dumps(dropped), "m": model})
+    db.commit()
+    return text_

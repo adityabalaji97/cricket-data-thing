@@ -8,6 +8,7 @@ the story down.
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
@@ -29,7 +30,8 @@ REGISTRY: List[CardSpec] = [*SERIES, *EXISTING, *GROUND, *TEAMS, *PLAYERS, *FANT
 
 # Part of the cached story's key (routers/match_preview.py): bump when any card's logic or copy
 # changes, so a deploy never serves stories built by older code. Data loads expire it on their own.
-STORY_VERSION = "2026-10-23.2"  # the storylines chapter
+STORY_VERSION = "2026-10-23.3"  # storylines: the lede, and the story follows the talk
+STORYLINE_BOOST = 1.25
 
 
 def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[str, Any]:
@@ -46,6 +48,14 @@ def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[st
         from services.preview_cards.storylines import cards as storyline_cards
 
         cards.extend(storyline_cards(ctx))
+        # Cards elsewhere about a storyline's players move up in their chapter (chunk 5): the story follows the talk.
+        from services.preview_cards.storylines import players as storyline_players
+
+        names = storyline_players(ctx)
+        if names:
+            for c in cards:
+                if c.chapter != "storylines" and any(n in c.title or n in json.dumps(c.payload, default=str) for n in names):
+                    c.relevance = round(c.relevance * STORYLINE_BOOST, 4)
     except Exception as exc:  # pragma: no cover
         logger.warning("preview storylines failed: %r", exc)
     try:
