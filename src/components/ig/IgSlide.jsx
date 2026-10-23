@@ -6,7 +6,7 @@ import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import StoryCard from '../story/StoryCard';
 import { toStoryCard } from '../story/visuals';
-import { fmt, SHARE_COLOURS } from '../story/postVisuals';
+import { fmt, SHARE_COLOURS, ShotWheel } from '../story/postVisuals';
 
 /**
  * /ig/:carouselId/:n — one Instagram carousel slide (services/ig_carousel.py), drawn by the app's own components at
@@ -72,6 +72,13 @@ const ShareHero = ({ hero }) => (
 
 const Hero = ({ hero }) => {
   if (hero.kind === 'share') return <ShareHero hero={hero} />;
+  if (hero.kind === 'wheel') {
+    return (
+      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', mt: 0.5 }}>
+        <ShotWheel payload={{ ...hero, compact: true }} />
+      </Box>
+    );
+  }
   const rows = hero.rows || [];
   const signed = rows.some((r) => r.value < 0);
   const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1e-9);
@@ -100,7 +107,7 @@ const Hero = ({ hero }) => {
 
 const TEXT_SLIDES = {
   hook: (s) => (
-    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: s.hero ? 1.2 : 1.5 }}>
+    <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: s.hero ? 1.2 : 1.5 }}>
       {s.kicker && <Typography sx={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.1em', color: colors.accent }}>{s.kicker.toUpperCase()}</Typography>}
       <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: s.hero ? 32 : 40, lineHeight: 1.04, textWrap: 'balance' }}>{s.text}</Typography>
       {s.sub && !s.hero && <Typography sx={{ fontSize: 16, color: colors.textMed }}>{s.sub}</Typography>}
