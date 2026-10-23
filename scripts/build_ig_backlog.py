@@ -4,6 +4,7 @@ Line up the Instagram backlog (services/ig_backlog.py): make every curated idea,
     python scripts/build_ig_backlog.py --start 2026-10-12              # dry run: print the calendar, save nothing
     python scripts/build_ig_backlog.py --start 2026-10-12 --write      # save the charts and queue the packs
     python scripts/build_ig_backlog.py --start 2026-10-12 --only odi-pull-sixes --only ipl-fastest-1000-balls
+    python scripts/build_ig_backlog.py --retitle-deep-cuts 3          # the next 3 days' deeper cuts: short claim
 
 The dry run reads the database only (a read-only session) and stubs out chart saving, so it is safe on production.
 """
@@ -33,6 +34,9 @@ def main() -> int:
     parser.add_argument("--bench-unposted", action="store_true", help="unposted evergreen posts from past days to the bench")
     parser.add_argument("--reorder", action="store_true", help="re-date queued evergreen posts by the format that's on")
     parser.add_argument("--dry-run", action="store_true", help="with --bench-unposted / --reorder: say, don't move")
+    parser.add_argument("--retitle-deep-cuts", type=int, metavar="DAYS", default=None,
+                        help="give posts planned in the next DAYS days their deeper cut's short claim, and re-render")
+    parser.add_argument("--retitle", action="append", help="the same for these queued posts (angle keys, any day)")
     args = parser.parse_args()
 
     from services import ig_backlog
@@ -53,6 +57,33 @@ def main() -> int:
             for key, old, new in ig_backlog.reorder(db, today + _td(days=1), args.days, dry_run=args.dry_run):
                 print(f"  {key}: {old} -> {new}")
         print("dry run: nothing moved" if args.dry_run else "done")
+        return 0
+    if args.retitle_deep_cuts is not None or args.retitle:
+        # Posts made before the deeper cut wrote its own short claim (23 Oct 2026) still carry the sentence as the
+        # card title; the nightly run fixes each as it comes up, re-rendered (its Reel remade with the slides).
+        from datetime import datetime, timedelta as _td, timezone
+
+        from sqlalchemy import text
+
+        from database import get_session
+        from services import ig_slides
+
+        db = next(get_session())
+        keys = list(args.retitle or [])
+        if args.retitle_deep_cuts is not None:
+            today = datetime.now(timezone(_td(hours=5, minutes=30))).date()
+            keys += [r[0] for r in db.execute(text("""
+                SELECT angle_key FROM content_packs
+                WHERE channel = 'instagram' AND status = 'ready' AND facts->'deep_cut' IS NOT NULL
+                  AND planned_for BETWEEN :a AND :b ORDER BY planned_for, id
+            """), {"a": today, "b": today + _td(days=args.retitle_deep_cuts)}).all()]
+        for key in keys:
+            got = ig_backlog.retitle_deep_cut(db, key)
+            line = f"  {key}: {got['status']}"
+            if got["status"] == "retitled":
+                r = ig_slides.render(got["carousel_id"], got["slides"], *([args.base] if args.base else []))
+                line += f" ({got['title']}); rendered {len(r['ok'])}/{got['slides']}" + (f", failed {r['failed']}" if r["failed"] else "")
+            print(line, flush=True)
         return 0
     if args.extras_pending:
         from database import get_session

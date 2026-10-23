@@ -243,3 +243,22 @@ def test_the_card_takes_the_claim_and_the_caption_keeps_the_sentence():
     named = D.Candidate("zones", "Rohit Sharma (Indonesia)", "s", 1.0, {"label": "x", "format": "int"}, [], "s",
                         title="x" * 70 + " Rohit Sharma (Indonesia)")
     assert D.to_card(named)["title"].endswith(" Sharma")
+
+
+def test_an_old_post_is_retitled_only_when_its_numbers_still_hold(monkeypatch):
+    from services import ig_backlog
+
+    sentence = "25% of Jason Holder's runs come through long on. The average batter: 14%."
+    fact = {"kind": "debate", "deep_cut": {"probe": "zones", "subject": "Jason Holder", "sentence": sentence}}
+    old = [{"type": "hook"}, {"type": "card", "card": {"kicker": D.KICKER, "title": sentence}}]
+    assert ig_backlog.old_deep_cut_title(old, fact) == 1
+    assert ig_backlog.old_deep_cut_title([old[0], {"type": "card", "card": {"kicker": D.KICKER, "title": "short"}}], fact) is None
+
+    same = D.Candidate("zones", "Jason Holder", sentence, 1.0, {"label": "x", "format": "int"}, [], "s",
+                       title="25% of Jason Holder's runs come through long on (average 14%)")
+    monkeypatch.setattr(D, "subjects_for", lambda db, f: ([("batter", "Jason Holder", "Jason Holder")], {}, "s"))
+    monkeypatch.setattr(D, "candidates", lambda db, r, n, sc, lab, probes=(), display=None: [same])
+    assert D.redo_title(None, fact) == "25% of Jason Holder's runs come through long on (average 14%)"
+    moved = D.Candidate("zones", "Jason Holder", sentence.replace("25%", "27%"), 1.0, {"label": "x", "format": "int"}, [], "s", title="t")
+    monkeypatch.setattr(D, "candidates", lambda db, r, n, sc, lab, probes=(), display=None: [moved])
+    assert D.redo_title(None, fact) is None  # the numbers moved: leave the post as it is

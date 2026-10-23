@@ -709,3 +709,23 @@ def choose(db, fact: Dict[str, Any], avoid: Iterable[str] = (), used: Iterable[T
         return None
     return {"card": to_card(c), "deep_cut": {"probe": c.probe, "subject": c.subject, "sentence": c.sentence, "by": by,
                                              "jev": c.extra.get("jev"), "surprise": round(c.surprise, 3)}}
+
+
+def redo_title(db, fact: Dict[str, Any]) -> Optional[str]:
+    """The short claim for a post's existing deeper cut (fact.deep_cut: probe, subject, sentence), re-run from the same
+    probe for the same player in the same scope; None when the numbers have moved since (the sentence differs: the
+    chart and caption would no longer match a new title) or the probe finds nothing now."""
+    dc = fact.get("deep_cut") or {}
+    if not dc.get("probe") or not dc.get("subject"):
+        return None
+    people, scope, label = subjects_for(db, fact)
+    probes = [p for p in PROBES if p.id == dc["probe"]]
+    for role, name, display in people:
+        if dc["subject"] not in (name, display):
+            continue
+        for r in ([role] if role else ["batter", "bowler"]):
+            for c in candidates(db, r, name, scope, label, probes=probes, display=display):
+                if c.sentence == dc.get("sentence"):
+                    return deep_title(c)
+    return None
+
