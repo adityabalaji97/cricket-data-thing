@@ -1,0 +1,28 @@
+name: Preview news
+
+# Headlines for the next three days' big fixtures (scripts/fetch_fixture_news.py, MATCH_PREVIEW_STORYLINES_PLAN.md
+# chunk 1) into fixture_news: overnight, and again late morning IST so match-day talk (team news, toss-day quotes) is
+# in. Headline, outlet, link and the feed's summary only; nothing is posted.
+on:
+  schedule:
+    - cron: "7 21 * * *"   # 02:37 IST
+    - cron: "37 5 * * *"   # 11:07 IST
+  workflow_dispatch:
+
+jobs:
+  news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Fetch fixture headlines
+        run: python scripts/fetch_fixture_news.py
