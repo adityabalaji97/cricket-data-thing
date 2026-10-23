@@ -21,8 +21,9 @@ The strongest of performance / clutch / comeback leads and the next adds 40% of 
 
 No competition is held back for having run the day before: the best story on the day goes out.
 
-The carousel: the hook (the year and the story), How it was won, where the performance ranks in the competition's
-history, the loser's win probability with its swing overs, the score race, and the Impact scorecards.
+The carousel: the hook (the year and the story) over the loser's win probability with its swing overs (the cover's
+chart), where the performance ranks in the competition's history, the score race, and the Impact scorecards. How it
+was won leads the caption.
 """
 from __future__ import annotations
 
@@ -286,7 +287,7 @@ def _figure(sc: Dict[str, Any], name: str, role: str) -> Optional[str]:
 
 def post(db: Session, day: date) -> Optional[Dict[str, Any]]:
     from services.ig_posts.match import innings_scorecards
-    from services.ig_posts.recap_series import (how_it_was_won, mark_wickets, score_race, wp_swings)
+    from services.ig_posts.recap_series import (decisive_over, how_it_was_won, mark_wickets, score_race, wp_swings)
     from services.ig_posts.recap_special import Match
     from services.match_scorecard import get_match_scorecard_service
 
@@ -311,7 +312,10 @@ def post(db: Session, day: date) -> Optional[Dict[str, Any]]:
     # The Impact ranking is about the Impact leader: on a clutch story led by someone else it would change the subject.
     rank = rank_card(db, c, sample, day) if not clutch or (c["top"] or {}).get("name") == clutch["name"] else None
     wp, race = wp_swings(x, sc), score_race(x)
-    cards = [k for k in [how, rank, wp, race] if k] + innings_scorecards(db, c["id"], sample)
+    # How it was won is words, not a picture: it's the caption's first line, not a slide.
+    # The over that turned it, ball by ball, straight after the line that shows it (a clutch or comeback story).
+    turn = decisive_over(x, sc) if c["angle"] in ("clutch", "comeback") else None
+    cards = [k for k in [wp, turn, rank, race] if k] + innings_scorecards(db, c["id"], sample)
     top = clutch or c["top"]
     figure = _figure(sc, top["name"], top["role"]) if top else None
     ago = f"{c['years']} years ago today" if c["years"] > 1 else "A year ago today"

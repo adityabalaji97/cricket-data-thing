@@ -96,13 +96,18 @@ def innings_scorecards(db: Session, match_id: str, sample: str) -> List[Dict[str
         total = f"{s['runs']} all out" if s["wickets"] == 10 else f"{s['runs']}/{s['wickets']}"
         title = f"{inn['batting_team']} {total}"
         lead = max((r for r in batting if r["impact"] is not None), key=lambda r: r["impact"], default=None)
+        best_ball = max((r for r in bowling if r["impact"] is not None), key=lambda r: r["impact"], default=None)
         if lead and lead["impact"] > 0:
             title += f": {short(lead['name'])}'s {lead['runs']} led, {fmt(lead['impact'], 'signed1')} Impact"
+        elif best_ball and best_ball["impact"] > 0:  # no batter added runs: the claim is the bowling that held them
+            runs = str(best_ball["figures"]).split("-")[-1]
+            title += (f": {best_ball['name']}'s {best_ball['wickets']}/{runs} held them, "
+                      f"{fmt(best_ball['impact'], 'signed1')} Impact")
         payload = {"batting_team": inn["batting_team"], "bowling_team": inn["bowling_team"], "overs": s["overs"],
                    "accent": accents.get(inn["batting_team"]), "bowl_accent": accents.get(inn["bowling_team"]),
                    "batting": batting, "bowling": bowling, "has_impact": has_impact}
         cards.append(card(f"scorecard-{inn['innings']}", "innings_scorecard", title, payload, sample,
-                          "Impact: runs added batting, or saved bowling" if has_impact else ""))
+                          "Impact: each batter's runs and each bowler's runs saved, against par" if has_impact else ""))
     return cards
 
 

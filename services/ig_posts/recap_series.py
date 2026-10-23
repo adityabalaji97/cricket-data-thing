@@ -27,7 +27,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from services.ig_posts.cards import card, fmt
-from services.ig_posts.recap_special import LENGTH_NOTE, Match, number, poss
+from services.ig_posts.recap_special import LENGTH_NOTE, Match, number, ordinal, poss
 from services.ig_posts.spotlight import short_name
 
 SERIES_DAYS = 30
@@ -88,10 +88,10 @@ def how_it_was_won(db: Session, x: Match, sc: Dict[str, Any]) -> Optional[Dict[s
                 x.sample, "Impact: runs added to (or saved from) the expected total. Win probability: T20 Primer method.")
 
 
-def wp_swings(x: Match, sc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """The loser's chance through the chase, the SWINGS overs that cut it most annotated: bowler, wickets, runs.
-    The win probability is the match page's (the scorecard's T20 Primer points, drawn for the side batting first),
-    so the post and the site's chart agree."""
+def _chase_wp(x: Match, sc: Dict[str, Any]):
+    """(the chase's balls, the loser's chance after each, at the start) from the match page's win probability (the
+    scorecard's T20 Primer points), or None when there's no loser or the primer's balls don't line up with the feed's
+    (no chart rather than a shifted one)."""
     wp_all = ((sc.get("summary") or {}).get("primer") or {}).get("win_probability")
     if not x.loser or not x.innings[2] or not wp_all:
         return None
@@ -99,12 +99,65 @@ def wp_swings(x: Match, sc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     brk = wp_all["innings_break"]
     after = wp_all["points"][brk + 1:]
     if len(after) != len(chase) or len(wp_all["points"]) != brk + len(chase) + 1:
-        return None  # the primer's balls don't line up with the feed's: no chart rather than a shifted one
+        return None
     mine = (lambda p: 100 * p) if wp_all["team"] == x.loser else (lambda p: 100 * (1 - p))
-    start = mine(wp_all["points"][brk])
+    return chase, [mine(p) for p in after], mine(wp_all["points"][brk])
+
+
+def decisive_over(x: Match, sc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The chase's over that moved the winner's chance most, ball by ball (ball_steps): the winner's chance after each
+    delivery and what happened on it. Titled for whoever did it for the winner: the bowler when they defended, the
+    batters when they chased."""
+    aligned = _chase_wp(x, sc)
+    if not aligned:
+        return None
+    chase, after, start = aligned
+    win = [100 - v for v in after]  # the winner's chance
+    before = [100 - start] + win[:-1]
+    by_over: Dict[int, List[int]] = defaultdict(list)
+    for i, b in enumerate(chase):
+        by_over[b["over"]].append(i)
+    over, idx = max(by_over.items(), key=lambda kv: win[kv[1][-1]] - before[kv[1][0]])
+    a, z = before[idx[0]], win[idx[-1]]
+    if z - a < 30:
+        return None  # no single over turned it
+
+    def tag(b):
+        if b["wkt"]:
+            return "W"
+        if b.get("noball"):
+            return f"{b.get('batruns') or 0}nb"
+        if b.get("wide"):
+            return "wd"
+        runs = b["score"] or 0
+        return f"{runs}b" if runs and not b.get("batruns") else str(runs)
+    chasing = chase[0]["team_bat"]
+    if chasing == x.loser:  # the winner defended: the over is the bowler's
+        who = f"{chase[idx[0]]['bowl']}'s {ordinal(over + 1)} over"
+    else:
+        hitters = defaultdict(int)
+        for i in idx:
+            hitters[chase[i]["bat"]] += chase[i].get("batruns") or 0
+        top = max(hitters.items(), key=lambda kv: kv[1])[0]
+        who = f"{top} in the {ordinal(over + 1)} over"
+    title = f"{who}: {x.winner} from {max(1, round(a))}% to {round(z)}%"
+    return card("decisive-over", "ball_steps", title, {
+        "team": x.winner, "start": round(a, 1),
+        "balls": [{"tag": tag(chase[i]), "wp": round(win[i], 1), "wicket": bool(chase[i]["wkt"]),
+                   "highlight": win[i] - before[i] >= 15} for i in idx],
+    }, x.sample, f"{poss(x.winner)} chance of winning after each ball (T20 Primer)")
+
+
+def wp_swings(x: Match, sc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The loser's chance through the chase, the SWINGS overs that cut it most annotated: bowler, wickets, runs.
+    The win probability is the match page's (the scorecard's T20 Primer points, drawn for the side batting first),
+    so the post and the site's chart agree."""
+    aligned = _chase_wp(x, sc)
+    if not aligned:
+        return None
+    chase, after, start = aligned
     points, overs, prev, legal = [], {}, start, 0
-    for b, p in zip(chase, after):
-        wp = mine(p)
+    for b, wp in zip(chase, after):
         legal += 0 if (b.get("wide") or b.get("noball")) else 1
         points.append({"wp": round(wp, 1), "label": f"{b['over']}.{max(1, legal - 6 * b['over'])}",
                        "score": f"{b['inns_runs']}/{b['inns_wkts']}", "over": b["over"]})
@@ -136,12 +189,13 @@ def wp_swings(x: Match, sc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         bands.append({"i0": o["i0"], "i1": o["i1"], "over": o["over"] + 1, "from": round(o["from"]),
                       "to": round(o["to"]), "bowler": bowler, "text": what})
     peak = max([start] + [p["wp"] for p in points])
+    # One over is named ("the 19th over"), never "1 overs".
+    overs = f"the {ordinal(bands[0]['over'])} over" if len(bands) == 1 else f"{number(len(bands))} overs"
     if chasing == x.loser:
-        title = (f"{x.loser} never had better than a {round(peak)}% chance: {number(len(bands))} overs of wickets "
-                 f"took it away" if peak < 50 else
-                 f"{x.loser} peaked at {round(peak)}%, then {number(len(bands))} overs took it away")
+        title = (f"{x.loser} never had better than a {round(peak)}% chance: wickets in {overs} took it away"
+                 if peak < 50 else f"{x.loser} peaked at {round(peak)}%, then {overs} took it away")
     else:
-        title = f"{poss(x.loser)} chance through the chase: {number(len(bands))} overs decided it"
+        title = f"{poss(x.loser)} chance through the chase: {overs} decided it"
     c = card("wp-swings", "win_prob_line", title, {
         "team": x.loser, "start": round(start, 1), "points": points, "bands": bands,
         "label": f"{poss(x.loser)} chance of winning",

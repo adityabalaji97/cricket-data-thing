@@ -608,7 +608,7 @@ const InningsWagon = ({ payload }) => (
  * upto: draw the line only to that many points, on the whole chase's axis, with the chance at that ball beside the
  * dot (a replay: the same chart drawn a little further on each slide). Bands past it aren't drawn.
  */
-const WinProbLine = ({ payload }) => {
+export const WinProbLine = ({ payload }) => {
   const { points } = payload;
   const W = 300; const H = 200; const L = 30; const R = 10; const T = 16; const B = 176;
   const n = points.length;
