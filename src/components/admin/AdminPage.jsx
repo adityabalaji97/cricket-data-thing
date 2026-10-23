@@ -336,6 +336,7 @@ const AdminPage = () => {
         <Box sx={{ display: 'flex', gap: 0.5 }}>
           <Chip label="Social" sx={{ bgcolor: 'rgba(182,242,74,0.13)', color: C.lime, fontWeight: 700 }} />
           <Chip component={RouterLink} to="/admin/notes" clickable label="Notes" sx={{ bgcolor: '#1d212b', color: C.mid }} />
+          <Chip component={RouterLink} to="/admin/storylines" clickable label="Storylines" sx={{ bgcolor: '#1d212b', color: C.mid }} />
         </Box>
         {token && <Button size="small" onClick={signOut} sx={{ color: C.lo }}>Sign out</Button>}
       </Box>

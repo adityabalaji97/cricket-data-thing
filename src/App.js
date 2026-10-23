@@ -57,6 +57,7 @@ const ScorecardsBrowse = React.lazy(() => import('./components/scorecard/Scoreca
 const GraphicPage = React.lazy(() => import('./components/GraphicPage'));
 const GraphicsLanding = React.lazy(() => import('./components/GraphicsLanding'));
 const AdminNotes = React.lazy(() => import('./components/notes/AdminNotes'));
+const AdminStorylines = React.lazy(() => import('./components/admin/AdminStorylines'));
 
 const TEAM_NAME_TO_ABBREVIATION = {
   'chennai super kings': 'CSK',
@@ -731,6 +732,7 @@ const AppContent = () => {
         <Route path="/scorecards" element={<React.Suspense fallback={null}><ScorecardsBrowse /></React.Suspense>} />
         <Route path="/admin" element={<React.Suspense fallback={null}><AdminPage /></React.Suspense>} />
         <Route path="/admin/notes" element={<React.Suspense fallback={null}><AdminNotes /></React.Suspense>} />
+        <Route path="/admin/storylines" element={<React.Suspense fallback={null}><AdminStorylines /></React.Suspense>} />
         <Route path="/notes" element={<React.Suspense fallback={null}><NotesList /></React.Suspense>} />
         <Route path="/notes/:slug" element={<React.Suspense fallback={null}><NotePage /></React.Suspense>} />
         <Route path="/g/:id" element={<React.Suspense fallback={null}><GraphicPage /></React.Suspense>} />
