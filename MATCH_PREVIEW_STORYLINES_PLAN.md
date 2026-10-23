@@ -111,7 +111,7 @@ What exists already and gets reused:
 | 1 News per fixture | [x] 2026-10-23: fixture_news in production (migration 025); .github/workflows/preview-news.yml at 02:37 and 11:07 IST; 60 headlines a fixture from ~30 outlets |
 | 2 Talking points | [x] 2026-10-23: services/preview_storylines.py (one strong-model call a fixture, headlines only, each point tied to its headlines; players matched to the sides' XIs; Jev appeal, else headline count; top 5 pending), fixture_storylines (migration 028, production), twice a day in preview-news.yml |
 | 3 Testers | [x] 2026-10-23: services/storyline_testers.py — form (last 10 innings / spells v the two years before; Primer runs above par in T20s, strike rate / economy in ODIs), matchup (head-to-head shrunk, or v pace / spin), tactics (the side's batting or bowling by phase), conditions (the ground's pace / spin), selection (his numbers, no verdict); a light model call says which way a claim points and whether it's batting or bowling, never a number. Tested on approve, on demand, and nightly (migration 030) |
-| 4 Storylines chapter | [ ] |
+| 4 Storylines chapter | [x] 2026-10-23: 'The storylines' first in the preview (services/preview_cards/storylines.py): approved points with a data answer, 'what's being said' (claim + linked headlines) over the verdict and the tester's chart; a finding against the talk leads; the story's cache key carries the review state so an approval shows at once |
 | 5 Lede + reordering | [ ] |
 | 6 Social from storylines | [ ] |
 | 7 Review gate | [x] 2026-10-23: /admin/storylines (approve / edit = approve in your words / drop / undo; headlines per point; 'Find talking points' runs one fixture now); approved() is all a preview may read |

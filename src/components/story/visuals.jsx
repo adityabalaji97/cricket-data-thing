@@ -855,7 +855,38 @@ const Links = ({ payload }) => (
   </Box>
 );
 
+/**
+ * "The storylines" (services/preview_cards/storylines.py): what's being said before the match, and what the data says.
+ * The claim and the headlines making it (outlet, linked), the verdict, then the tester's own chart (any visual).
+ * payload: {said, sources:[{title, outlet, url}], verdict, finding, inner:{visual, payload}|null}
+ */
+const VERDICT_COLOR = { supported: colors.accent, 'not supported': '#e5484d', partly: '#f0b429', 'too little data': colors.textLo, context: colors.textMed };
+const Storyline = ({ payload, isMobile, teams }) => {
+  const Inner = payload.inner ? (VISUALS[payload.inner.visual] || POST_VISUALS[payload.inner.visual]) : null;
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+      <Box sx={{ borderLeft: `2px solid ${colors.textFaint}`, pl: 1.25 }}>
+        <Typography sx={{ fontSize: 11, color: colors.textLo, letterSpacing: '0.08em', textTransform: 'uppercase', mb: 0.25 }}>What's being said</Typography>
+        <Typography sx={{ fontSize: 15, color: colors.textHi, lineHeight: 1.35 }}>{payload.said}</Typography>
+        {(payload.sources || []).slice(0, 2).map((s) => (
+          <Typography key={s.url} sx={{ fontSize: 12, color: colors.textLo, lineHeight: 1.35, mt: 0.25 }}>
+            <Box component="a" href={s.url} target="_blank" rel="noopener noreferrer" sx={{ color: colors.textMed }}>{s.title}</Box>
+            {s.outlet ? ` · ${s.outlet}` : ''}
+          </Typography>
+        ))}
+      </Box>
+      {payload.verdict && payload.verdict !== 'context' && (
+        <Typography sx={{ fontSize: 12, fontWeight: 700, color: VERDICT_COLOR[payload.verdict] || colors.textMed, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          {`The data: ${payload.verdict}`}
+        </Typography>
+      )}
+      {Inner && <Inner payload={payload.inner.payload} isMobile={isMobile} teams={teams} />}
+    </Box>
+  );
+};
+
 export const VISUALS = {
+  storyline: (props) => <Storyline {...props} />,
   stat: Stat,
   par: Par,
   chase_band: ChaseBand,
