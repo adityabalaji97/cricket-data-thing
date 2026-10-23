@@ -83,6 +83,10 @@ def main() -> int:
             if got["status"] == "retitled":
                 r = ig_slides.render(got["carousel_id"], got["slides"], *([args.base] if args.base else []))
                 line += f" ({got['title']}); rendered {len(r['ok'])}/{got['slides']}" + (f", failed {r['failed']}" if r["failed"] else "")
+                # render() makes the slideshow Reel; the voiced one (REEL_V2=1) comes from the stored slides.
+                if not r["failed"] and os.getenv("REEL_V2") == "1":
+                    seconds = ig_slides.reel_from_stored(got["carousel_id"], got["slides"])
+                    line += f"; Reel {seconds}s"
             print(line, flush=True)
         return 0
     if args.extras_pending:
