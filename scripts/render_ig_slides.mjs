@@ -3,9 +3,11 @@
 //   node scripts/render_ig_slides.mjs <carousel_id> <slide_count> <out_dir> [--base https://hindsightcricket.com]
 //
 // Opens <base>/ig/<id>/<n> at 432x540 CSS px with a 2.5x device scale and saves <out_dir>/<n>.png (1080x1350).
-// Prints one JSON line: {"ok": [...files], "failed": [...]}. services/ig_slides stores the PNGs (Python side).
+// Prints one JSON line: {"ok": [...files], "failed": [...], "layout": {n: [{rule, message}]}}. services/ig_slides
+// stores the PNGs and the layout findings (scripts/lib/slide_layout.mjs: what only the drawn slide shows).
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { openBrowser } from './lib/cdp.mjs';
+import { LAYOUT_CHECK } from './lib/slide_layout.mjs';
 
 const [id, countArg, out, ...rest] = process.argv.slice(2);
 const baseAt = rest.indexOf('--base');
@@ -17,13 +19,17 @@ if (!id || !countArg || !out) {
 const W = 432, H = 540, SCALE = 2.5;
 mkdirSync(out, { recursive: true });
 const browser = await openBrowser();
-const result = { ok: [], failed: [] };
+const result = { ok: [], failed: [], layout: {} };
 try {
   for (let n = 1; n <= Number(countArg); n++) {
     const page = await browser.page({ width: W, height: H, scale: SCALE });
     await page.goto(`${base}/ig/${id}/${n}?r=${Date.now()}`);
     const ready = await page.waitFor("document.querySelector('[data-ig-slide][data-ready=\"true\"]') !== null", 90000);  // a dev server's first load is slow
     if (!ready) { result.failed.push({ n, reason: 'not ready', errors: browser.errors.slice(-3) }); await page.close(); continue; }
+    try {
+      const found = JSON.parse((await page.evaluate(LAYOUT_CHECK)) || '[]');
+      if (found.length) result.layout[n] = found;
+    } catch (e) { /* a measuring error never stops a render */ }
     const file = `${out}/${n}.png`;
     writeFileSync(file, await page.screenshot({ x: 0, y: 0, width: W, height: H }));
     result.ok.push(file);

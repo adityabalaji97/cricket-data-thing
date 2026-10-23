@@ -43,3 +43,20 @@ def test_a_play_along_keeps_its_deeper_cut_where_it_is():
 def test_every_finding_has_a_known_rule():
     slides = [{"type": "hook", "text": "t", "cover": "text-no-chart"}, _card("x" * 90, "recap_text", help="h" * 100)]
     assert {f["rule"] for f in social_rules.findings(slides)} <= set(social_rules.RULES)
+
+
+def test_layout_findings_from_the_render_join_the_audit():
+    slides = [{"type": "hook", "text": "t"}, _card("ok 1", "metric_bars")]
+    row = _row(1, "ig:debate-a", "ig-backlog", slides)
+    row["layout"] = [{"rule": "title_lines", "slide": 2, "message": "the title runs to 3 lines (2 at most)"}]
+    got = audit_mod.audit([row])["rules"][0]
+    assert got["rule"] == "title_lines" and got["by_visual"] == {"metric_bars": 1}
+    assert got["label"] == social_rules.LAYOUT_RULES["title_lines"]
+
+
+def test_a_re_render_replaces_its_own_warnings_and_keeps_the_lints():
+    from services.ig_slides import layout_warnings
+
+    first = layout_warnings(["Slide 2: Title over 80 characters (90)"], {"3": [{"rule": "legend", "message": "a legend"}]})
+    assert first == ["Slide 2: Title over 80 characters (90)", "Slide 3: a legend (as drawn)"]
+    assert layout_warnings(first, {}) == ["Slide 2: Title over 80 characters (90)"]

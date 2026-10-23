@@ -75,6 +75,20 @@ RULES = {
 }
 
 
+#: What only the drawn slide shows, measured at render (scripts/lib/slide_layout.mjs, stored as facts.layout).
+LAYOUT_RULES = {
+    "title_lines": "a title over 2 lines, as drawn",
+    "title_clipped": "a title cut off, as drawn",
+    "footer_lines": "a scope line that wraps",
+    "legend": "a legend on the card",
+    "text_clipped": "a label cut short with an ellipsis",
+    "label_outside": "a chart label outside its chart",
+    "label_overlap": "two chart labels on each other",
+    "card_overflow": "a chart that doesn't fit its card",
+    "small_chart": "a chart under 35% of the card",
+}
+
+
 def card_findings(card: Dict[str, Any]) -> List[Dict[str, str]]:
     """[{rule, message}] for one card (rule: a RULES id)."""
     out: List[Dict[str, str]] = []

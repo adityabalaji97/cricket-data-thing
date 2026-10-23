@@ -49,7 +49,7 @@ const teamColour = (team, fallback) => {
 };
 
 const Legend = ({ items }) => (
-  <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 1 }}>
+  <Box data-legend sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 1 }}>
     {items.map(([label, color]) => (
       <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
         <Box sx={color === 'ring' ? { width: 10, height: 10, borderRadius: '3px', border: `2px solid ${colors.textHi}`, boxSizing: 'border-box' }
