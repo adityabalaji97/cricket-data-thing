@@ -29,7 +29,7 @@ REGISTRY: List[CardSpec] = [*SERIES, *EXISTING, *GROUND, *TEAMS, *PLAYERS, *FANT
 
 # Part of the cached story's key (routers/match_preview.py): bump when any card's logic or copy
 # changes, so a deploy never serves stories built by older code. Data loads expire it on their own.
-STORY_VERSION = "2026-10-23.1"  # namesakes: side suffix dropped for the fixture's sides
+STORY_VERSION = "2026-10-23.2"  # the storylines chapter
 
 
 def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[str, Any]:
@@ -42,6 +42,12 @@ def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[st
             continue
         if card is not None:
             cards.append(card)
+    try:  # the approved storylines (MATCH_PREVIEW_STORYLINES_PLAN.md chunk 4): not registry cards, one per point
+        from services.preview_cards.storylines import cards as storyline_cards
+
+        cards.extend(storyline_cards(ctx))
+    except Exception as exc:  # pragma: no cover
+        logger.warning("preview storylines failed: %r", exc)
     try:
         glance = at_a_glance(ctx, cards)
     except Exception as exc:  # pragma: no cover
@@ -82,7 +88,10 @@ def cached_story(db, ctx: PreviewContext) -> Dict[str, Any]:
     story the site shows."""
     from services.query_cache import cached_run
 
-    key = {"endpoint": "preview_story", "story_version": STORY_VERSION, **context_params(ctx)}
+    from services.preview_cards.storylines import fingerprint
+
+    # An approval, edit or new test changes the storylines without a data load: part of the key, so it shows at once.
+    key = {"endpoint": "preview_story", "story_version": STORY_VERSION, "storylines": fingerprint(ctx), **context_params(ctx)}
     return cached_run(db, key, lambda: build_story(ctx))
 
 
@@ -118,7 +127,7 @@ def context_from_params(db, params: Dict[str, Any]) -> PreviewContext:
 def build_card(ctx: PreviewContext, card_id: str) -> Optional[Tuple[Dict[str, Any], str]]:
     """One card (its JSON) and its chapter title, building only what it needs."""
     titles = dict(CHAPTERS)
-    if card_id in ("glance", "ask"):  # summary cards are made from every other card
+    if card_id in ("glance", "ask") or card_id.startswith("storyline-"):  # made with the whole story
         story = build_story(ctx)
         for chapter in story["chapters"]:
             for card in chapter["cards"]:

@@ -16,6 +16,8 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 CHAPTERS: Tuple[Tuple[str, str], ...] = (
+    # What's being said, answered from the data: the user's approved talking points (services/preview_cards/storylines.py).
+    ("storylines", "The storylines"),
     # Only from the second meeting of two sides on (services/preview_cards/series.py).
     ("series", "Series so far"),
     ("glance", "At a glance"),
