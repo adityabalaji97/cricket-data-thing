@@ -68,3 +68,20 @@ def test_a_hand_set_hero_still_leaves_the_deck():
     out = ig_cover.with_hero(deck, "t")
     assert [s.get("card", {}).get("id") for s in out[1:]] == ["next", None]
     assert not any("repeats the cover's chart" in w for w in lint_slides(out))
+
+
+def test_a_win_probability_line_can_be_the_cover():
+    line = {"id": "wp", "visual": "win_prob_line", "title": "t",
+            "payload": {"team": "A", "start": 50, "points": [{"wp": 40}],
+                        "bands": [{"over": 6, "from": 82, "to": 72}, {"over": 15, "from": 80, "to": 59},
+                                  {"over": 20, "from": 96, "to": 0}]}}
+    hero = ig_cover.hero_from(line)
+    assert hero["kind"] == "line" and [b["over"] for b in hero["payload"]["bands"]] == [15, 20]
+
+
+def test_the_rules_catch_a_bare_cover_a_text_card_and_one_overs():
+    slides = [{"type": "hook", "text": "t", "cover": "text-no-chart"},
+              {"type": "card", "card": {"id": "how", "visual": "recap_text", "title": "How it was won"}},
+              {"type": "card", "card": {"id": "wp", "visual": "win_prob_line", "title": "SRH peaked at 98%, then 1 overs took it away"}}]
+    got = " | ".join(social_rules.lint_slides(slides))
+    assert "Slide 1: no chart on the cover" in got and "Slide 2: A text card" in got and "'1 overs'" in got

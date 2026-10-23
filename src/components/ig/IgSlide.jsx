@@ -6,7 +6,7 @@ import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import StoryCard from '../story/StoryCard';
 import { toStoryCard } from '../story/visuals';
-import { fmt, SHARE_COLOURS, ShotWheel } from '../story/postVisuals';
+import { fmt, SHARE_COLOURS, ShotWheel, WinProbLine } from '../story/postVisuals';
 
 /**
  * /ig/:carouselId/:n — one Instagram carousel slide (services/ig_carousel.py), drawn by the app's own components at
@@ -72,6 +72,13 @@ const ShareHero = ({ hero }) => (
 
 const Hero = ({ hero }) => {
   if (hero.kind === 'share') return <ShareHero hero={hero} />;
+  if (hero.kind === 'line') {
+    return (
+      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', mt: 0.5 }}>
+        <WinProbLine payload={hero.payload} />
+      </Box>
+    );
+  }
   if (hero.kind === 'wheel') {
     return (
       <Box sx={{ flex: 1, minHeight: 0, display: 'flex', mt: 0.5 }}>

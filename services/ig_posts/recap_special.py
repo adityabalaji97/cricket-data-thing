@@ -133,7 +133,7 @@ def innings_totals(db: Session) -> List[Dict[str, Any]]:
 def match_balls(db: Session, match_id: str) -> List[Dict[str, Any]]:
     return [dict(r) for r in db.execute(text("""
         SELECT inns, over, bat, bowl, team_bat, team_bowl, score, out, bowl_kind, line, length, control, win_prob,
-               inns_runs, inns_wkts, wide, noball
+               inns_runs, inns_wkts, wide, noball, batruns
         FROM delivery_details WHERE p_match = :m AND inns IN (1, 2) ORDER BY inns, over, ball, id  -- bowling order
     """), {"m": str(match_id)}).mappings().all()]
 

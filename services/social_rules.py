@@ -24,6 +24,11 @@ OFF_VOCAB = {"runs added": "Impact", "win chances": "win probability added", "ne
              "runs above an average": "runs above par", "runs saved vs an average": "runs below par"}
 OFF_VOCAB_RE = re.compile("|".join(re.escape(k) for k in OFF_VOCAB), re.I)
 
+#: Cards that are words, not a picture: a carousel slide is a claim and a chart (docs/social_rules.md, Card anatomy).
+TEXT_VISUALS = {"recap_text"}
+#: A count of one with a plural noun ("1 overs"): name the one instead ("the 19th over").
+ONE_PLURAL = re.compile(r"\b(?:1|one) (overs|balls|runs|wickets|sixes|fours|matches|innings|games|spells|points)\b", re.I)
+
 JARGON = re.compile(r"\b(impact|wpa|raa|waa|win probability|runs above average|per 100|per hundred)\b", re.I)
 
 
@@ -56,6 +61,11 @@ def _list_too_long(sentence: str) -> bool:
 def lint_card(card: Dict[str, Any]) -> List[str]:
     out = []
     title = card.get("title") or ""
+    if card.get("visual") in TEXT_VISUALS:
+        out.append("A text card: a slide is a claim and a picture; put the words in the caption")
+    m = ONE_PLURAL.search(title)
+    if m:
+        out.append(f"{m.group(0)!r} in the title: name the one instead")
     if len(title) > MAX_TITLE:
         out.append(f"Title over {MAX_TITLE} characters ({len(title)}): it won't fit the slide")
     for sentence in re.split(r"(?<=[.!?])\s+", title):
@@ -87,6 +97,9 @@ def lint_slides(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> Lis
     play-along keeps its deeper cut after the answer, on purpose)."""
     out = []
     hero = ((slides[0].get("hero") or {}).get("card") if slides and isinstance(slides[0], dict) else None) or {}
+    if slides and slides[0].get("type") == "hook" and slides[0].get("cover") == "text-no-chart":
+        out.append("Slide 1: no chart on the cover, and no card in the deck that can be one: lead with a chart "
+                   "(services/ig_cover.hero_from lists the ones that fit)")
     if len(slides or []) > MAX_SLIDES:
         out.append(f"{len(slides)} slides: keep a carousel to {MAX_SLIDES} (completion counts)")
     for n, s in enumerate(slides or [], 1):

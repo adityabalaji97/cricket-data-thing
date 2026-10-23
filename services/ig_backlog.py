@@ -627,7 +627,14 @@ def otd_pack(db: Session, day: date) -> Optional[Dict[str, Any]]:
     built = on_this_day.post(db, day)
     if not built:
         return None
-    slides = ([{"type": "hook", "text": built["hook"], "kicker": built["kicker"], "sub": built["sub"]}]
+    from services.ig_cover import hero_from
+
+    hook = {"type": "hook", "text": built["hook"], "kicker": built["kicker"], "sub": built["sub"]}
+    # The cover always carries a chart (outside the cover A/B): the first card that shrinks to one, the chase's line.
+    lead = next((c for c in built["cards"] if hero_from(c)), None)
+    if lead:
+        hook.update(cover="hero", hero={**hero_from(lead), "card": lead})
+    slides = ([hook]
               + [{"type": "card", "card": c, "teams": built["teams"]} for c in built["cards"]]
               + [{"type": "end", "heading": "Every scorecard, free",
                   "body": "Ball-by-ball Impact and win probability for this match, and every one since 2015."}])
