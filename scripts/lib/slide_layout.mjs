@@ -2,8 +2,8 @@
 // ready, it measures the card and returns [{rule, message}] (rule ids: services/social_rules.LAYOUT_RULES).
 //
 //   title_lines    the title runs past 2 lines            title_clipped  the title is cut off (3-line clamp)
-//   footer_lines   the scope line wraps                   legend         a legend is drawn
-//   text_clipped   a label is cut short with "…"          label_outside  a chart label falls outside its chart
+//   footer_lines   the scope line wraps                   legend         a legend chip that's a sentence
+//   text_clipped   a label is cut short with "…"          label_outside  a chart label cut off by what clips it
 //   label_overlap  two chart labels sit on each other     card_overflow  the chart doesn't fit its card
 //   small_chart    the chart gets under 35% of the card
 //
@@ -28,7 +28,13 @@ export const LAYOUT_CHECK = `(() => {
   }
   const footer = root.querySelector('[data-card-footer]');
   if (footer && lines(footer) > 1) add('footer_lines', 'the scope line wraps to ' + lines(footer) + ' lines');
-  if (root.querySelector('[data-legend]')) add('legend', 'a legend is drawn: label the marks or use one colour');
+  // Legends are colour chips, not sentences (docs/social_rules.md, Card anatomy): flag a chip that's a sentence.
+  for (const lg of root.querySelectorAll('[data-legend]')) {
+    for (const item of lg.children) {
+      const t = (item.textContent || '').trim();
+      if (t.split(/\s+/).length > 4 || t.length > 30) add('legend', 'a legend that is a sentence: "' + short(t) + '"');
+    }
+  }
   if (root.querySelector('[data-story-card][data-overflow="true"]')) add('card_overflow', "the chart doesn't fit its card");
 
   const card = root.querySelector('[data-story-card]');
@@ -46,15 +52,29 @@ export const LAYOUT_CHECK = `(() => {
     }
   }
 
+  // A chart label is lost only where something clips it: the SVG itself (unless it draws overflow), else the nearest
+  // ancestor that hides overflow, else the slide.
+  const clipOf = (svg) => {
+    if (getComputedStyle(svg).overflow !== 'visible') return svg.getBoundingClientRect();
+    for (let el = svg.parentElement; el && el !== root; el = el.parentElement) {
+      const o = getComputedStyle(el);
+      if (o.overflow !== 'visible' || o.overflowX !== 'visible' || o.overflowY !== 'visible') return el.getBoundingClientRect();
+    }
+    return root.getBoundingClientRect();
+  };
   for (const svg of root.querySelectorAll('svg')) {
     const s = svg.getBoundingClientRect();
     if (!s.width || !s.height) continue;
+    const c = clipOf(svg);
     const boxes = [];
     for (const t of svg.querySelectorAll('text')) {
       const r = t.getBoundingClientRect();
       if (!r.width || !(t.textContent || '').trim()) continue;
-      if (r.left < s.left - 1 || r.right > s.right + 1 || r.top < s.top - 1 || r.bottom > s.bottom + 1) {
-        add('label_outside', 'outside its chart: "' + short(t.textContent) + '"');
+      // A text box includes the line's padding above and below the letters: only an overshoot of a third of the
+      // label's height or more is ink that's actually cut.
+      const tol = Math.max(3, 0.35 * r.height);
+      if (r.left < c.left - tol || r.right > c.right + tol || r.top < c.top - tol || r.bottom > c.bottom + tol) {
+        add('label_outside', 'cut off at the edge: "' + short(t.textContent) + '"');
       }
       boxes.push([r, t.textContent]);
     }
