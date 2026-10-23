@@ -448,7 +448,7 @@ def _expand_player_names(player_names: List[str], db) -> List[str]:
 #: Players by id (player_identity, migration 026): the display name of the ball's batter / bowler.
 PLAYER_ID_JOIN_BAT = "LEFT JOIN player_identity pi_bat ON pi_bat.pid = dd.p_bat "
 PLAYER_ID_JOIN_BOWL = "LEFT JOIN player_identity pi_bowl ON pi_bowl.pid = dd.p_bowl "
-_SIDE_SUFFIX = re.compile(r"\s+\([A-Za-z][^)]*\)$")  # "(Indonesia)", not a legacy "Rameez Raja (2)"
+_SIDE_SUFFIX = re.compile(r"\s+\([A-Za-z](?:[^()]|\([^()]*\))*\)$")  # "(Indonesia)", not a legacy "Rameez Raja (2)"
 
 
 def _player_ids(player_names: List[str], db) -> Optional[List[int]]:
