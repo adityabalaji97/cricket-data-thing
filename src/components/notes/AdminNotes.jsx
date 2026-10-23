@@ -431,6 +431,7 @@ const AdminNotes = () => {
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             <Chip component={RouterLink} to="/admin" clickable label="Social" sx={{ bgcolor: colors.surface2, color: colors.textMed }} />
             <Chip label="Notes" sx={{ bgcolor: colors.accentSoft, color: colors.accent, fontWeight: 700 }} />
+            <Chip component={RouterLink} to="/admin/storylines" clickable label="Storylines" sx={{ bgcolor: colors.surface2, color: colors.textMed }} />
           </Box>
         )}
         {session && <Button size="small" onClick={signOut} sx={{ ml: 'auto', color: colors.textLo }}>Sign out</Button>}

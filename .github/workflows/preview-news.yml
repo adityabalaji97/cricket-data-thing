@@ -2,7 +2,7 @@ name: Preview news
 
 # Headlines for the next three days' big fixtures (scripts/fetch_fixture_news.py, MATCH_PREVIEW_STORYLINES_PLAN.md
 # chunk 1) into fixture_news: overnight, and again late morning IST so match-day talk (team news, toss-day quotes) is
-# in. Headline, outlet, link and the feed's summary only; nothing is posted.
+# in; then each fixture's talking points for review. Headline, outlet, link and the feed's summary only; nothing is posted.
 on:
   schedule:
     - cron: "7 21 * * *"   # 02:37 IST
@@ -26,3 +26,11 @@ jobs:
           pip install -r requirements.txt
       - name: Fetch fixture headlines
         run: python scripts/fetch_fixture_news.py
+      # Talking points from the headlines (scripts/build_storylines.py, chunk 2): one model call a fixture, Jev ranks
+      # them, the top 5 wait 'pending' in /admin/storylines. Nothing reaches a preview until approved there.
+      - name: Talking points
+        continue-on-error: true
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: python scripts/build_storylines.py

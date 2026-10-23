@@ -52,6 +52,7 @@ from routers.query_summarizer import router as query_summarizer_router
 from routers.usage import router as usage_router
 from routers.seo import router as seo_router
 from routers.snapshots import router as snapshots_router
+from routers.storylines import router as storylines_router
 from routers.content import digest_router, router as content_router
 from routers.notes import public as notes_router, admin as notes_admin_router, author as notes_author_router
 from services.delivery_data_service import (
@@ -247,6 +248,7 @@ app.include_router(rankings_router)
 app.include_router(fantasy_planner_router)
 app.include_router(analytics_router)
 app.include_router(nl2query_router)
+app.include_router(storylines_router)
 app.include_router(ml_predictions_router)
 app.include_router(query_summarizer_router)
 
