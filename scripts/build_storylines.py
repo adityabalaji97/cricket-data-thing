@@ -36,6 +36,10 @@ def main() -> int:
             t = S.test_point(db, i)
             print(f"  tested {i}: {t['verdict']} — {t['finding']}")
         print(f"{len(ids)} approved points tested")
+        keys = db.execute(text("""SELECT DISTINCT fixture_key FROM fixture_storylines WHERE status = 'approved'
+                                  AND match_date BETWEEN CURRENT_DATE AND CURRENT_DATE + :d"""), {"d": args.days}).scalars().all()
+        for k in keys:
+            print(f"  lede {k}: {S.write_lede(db, k)}")
         return 0
     fxs = [f for f in S.fixtures_with_news(db, args.days) if not args.fixture or f["fixture_key"] == args.fixture]
     print(f"{len(fxs)} fixtures with headlines")

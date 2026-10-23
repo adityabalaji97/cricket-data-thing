@@ -7,6 +7,7 @@ with no data answer gets no card (it can still feed the lede).
 """
 from __future__ import annotations
 
+import hashlib
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -24,7 +25,8 @@ def points(ctx) -> List[Dict[str, Any]]:
         day = ctx.end or date.today()
         try:
             rows = ctx.db.execute(text("""
-                SELECT id, COALESCE(edited_claim, claim) AS claim, kind, players, team, sources, test, rank, match_date
+                SELECT id, fixture_key, COALESCE(edited_claim, claim) AS claim, kind, players, team, sources, test, rank,
+                       match_date
                 FROM fixture_storylines
                 WHERE status = 'approved' AND match_date BETWEEN :a AND :b
                   AND ((team1 = ANY(:t1) AND team2 = ANY(:t2)) OR (team1 = ANY(:t2) AND team2 = ANY(:t1)))
@@ -44,11 +46,42 @@ def fingerprint(ctx) -> Optional[str]:
     ps = points(ctx)
     if not ps:
         return None
-    return ",".join(f"{p['id']}:{(p.get('test') or {}).get('verdict')}:{p['claim'][:20]}" for p in ps)
+    return ",".join(f"{p['id']}:{(p.get('test') or {}).get('verdict')}:{p['claim'][:20]}" for p in ps) + "|" + hashlib.md5((lede(ctx) or "").encode()).hexdigest()[:8]
+
+
+def lede(ctx) -> Optional[str]:
+    ps = points(ctx)
+    if not ps:
+        return None
+    try:
+        return ctx.db.execute(text("SELECT lede FROM fixture_ledes WHERE fixture_key = :k"),
+                              {"k": ps[0]["fixture_key"]}).scalar()
+    except Exception:  # before migration 031
+        ctx.db.rollback()
+        return None
+
+
+def players(ctx) -> List[str]:
+    """Everyone the approved points are about: the rest of the preview moves their cards up (chunk 5)."""
+    return sorted({n for p in points(ctx) for n in (p.get("players") or [])})
 
 
 def cards(ctx) -> List[Card]:
     out, seen = [], set()
+    text_ = lede(ctx)
+    if text_:
+        import re as _re
+
+        sentences = [x.strip() for x in _re.split(r"(?<=[.!?])\s+", text_) if x.strip()]
+        out.append(Card(
+            id="storyline-lede", chapter="storylines", visual="recap_text", title=sentences[0],
+            sample="From this week's headlines and the ball-by-ball data",
+            payload={"headline": " ".join(sentences[1:]), "bullets": [f"Being said: {p['claim']}" for p in points(ctx)][:4]},
+            n=1,
+            info=Info(what="The talking points picked for this preview, and what the data says about them, in two or "
+                           "three sentences. Every number in it is checked against the findings on the cards that follow."),
+            relevance=10.0,
+        ))
     for p in points(ctx):
         test = p.get("test") or {}
         if not test.get("card"):
