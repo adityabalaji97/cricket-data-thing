@@ -314,10 +314,17 @@ def test_batter_innings_strike_rate_and_era(db):
     rows = _q(db, batters=["Virat Kohli"], leagues=["IPL"], group_by=["match_id", "batter_innings_strike_rate"],
               dimension_filters=["batter_balls_faced:gte:30"])
     assert rows
-    for r in rows[:5]:
+    checked = 0
+    for r in rows:
         runs, balls = db.execute(text("""SELECT SUM(COALESCE(batruns,0)), SUM(CASE WHEN COALESCE(wide,0)=0 THEN 1 ELSE 0 END)
             FROM delivery_details WHERE p_match = :m AND bat = 'Virat Kohli'"""), {"m": r["match_id"]}).one()
+        if balls is None:  # a pre-2015 match: legacy table only, checked by the legacy tests
+            continue
         assert balls >= 30 and r["batter_innings_strike_rate"] == round(runs * 100.0 / balls)
+        checked += 1
+        if checked == 5:
+            break
+    assert checked
     # Era follows the season's start: January 2024 BBL matches belong to 2023/24, i.e. 2023+.
     eras = {(r["season"], r["impact_player_era"]) for r in _q(db, leagues=["BBL"], group_by=["season", "impact_player_era"])}
     assert all(era == "2023+" for season, era in eras if season.startswith("2023"))

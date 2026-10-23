@@ -959,6 +959,7 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
     ball_defs = sql_defs.legacy_defs(sql_defs.perspective_for(group_by, has_batter_filters), "d")
     
     query_params = {k: v for k, v in params.items() if k not in ['limit', 'offset', 'min_balls', 'max_balls', 'min_runs', 'max_runs', 'min_wickets', 'max_wickets']}
+    scope_where = where_clause  # before the dimension filters, whose columns need the dimension joins
     if dimension_filters:
         where_clause = where_clause + " AND " + " AND ".join(
             query_dimensions.filter_sql(dimension_filters, ldims, query_params, prefix="ldimf"))
@@ -1084,9 +1085,11 @@ def query_legacy_grouped(where_clause, params, group_by, db, has_batter_filters=
             FROM deliveries d
             JOIN matches m ON d.match_id = m.id
             LEFT JOIN players p ON p.name = d.bowler
-            {where_clause}
+            {scope_where}
         """
-        universe_balls = db.execute(text(fallback_query), query_params).scalar() or 0
+        # The scope's balls: the dimension filter's columns live in CTEs this count doesn't build.
+        universe_balls = db.execute(text(fallback_query), {k: v for k, v in query_params.items()
+                                                           if not k.startswith("ldimf")}).scalar() or 0
 
     total_balls = total_balls_override if total_balls_override is not None else universe_balls
     return formatted_results, total_balls
