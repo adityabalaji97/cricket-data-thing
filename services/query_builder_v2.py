@@ -448,7 +448,7 @@ def _expand_player_names(player_names: List[str], db) -> List[str]:
 #: Players by id (player_identity, migration 026): the display name of the ball's batter / bowler.
 PLAYER_ID_JOIN_BAT = "LEFT JOIN player_identity pi_bat ON pi_bat.pid = dd.p_bat "
 PLAYER_ID_JOIN_BOWL = "LEFT JOIN player_identity pi_bowl ON pi_bowl.pid = dd.p_bowl "
-_SIDE_SUFFIX = re.compile(r"\s+\([^)]*\)$")
+_SIDE_SUFFIX = re.compile(r"\s+\([A-Za-z][^)]*\)$")  # "(Indonesia)", not a legacy "Rameez Raja (2)"
 
 
 def _player_ids(player_names: List[str], db) -> Optional[List[int]]:
@@ -473,7 +473,8 @@ def _name_prefilter(player_names: List[str], db) -> List[str]:
     """Every stored spelling of the requested players, side suffixes aside: the indexable name match in front of the
     id match."""
     plain = [_SIDE_SUFFIX.sub("", n) for n in player_names]
-    return _expand_player_names(plain, db) if db else plain
+    # A namesake's balls carry his display name (scripts/apply_namesake_names.py), so the name as asked matches too.
+    return list(dict.fromkeys([*(_expand_player_names(plain, db) if db else plain), *player_names]))
 
 
 def _stats_player_condition(name_col: str, pid_col: str, player_names: List[str], db, params: Dict[str, Any],

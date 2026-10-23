@@ -384,6 +384,21 @@ def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
         # Players already formatted from search_players_with_aliases
         # Each has: name, display_name, details_name, type
         results.extend(players)
+
+        # Namesakes (player_identity, PLAYER_IDS_PLAN.md): a name several players share lists each of them, the lesser
+        # known with his side ("Rohit Sharma (Indonesia)"), which is also the name to use everywhere for him.
+        try:
+            seen = {(p.get("display_name") or p["name"]).lower() for p in players}
+            for row in db.execute(text("""
+                SELECT display_name, main_side, last_date FROM player_identity
+                WHERE display_name <> name AND LOWER(display_name) LIKE :search_pattern
+                ORDER BY balls DESC LIMIT :limit
+            """), params).fetchall():
+                if row.display_name.lower() not in seen:
+                    results.append({"name": row.display_name, "display_name": row.display_name, "type": "player",
+                                    "namesake": True, "side": row.main_side})
+        except Exception:  # no player_identity (before migration 026)
+            db.rollback()
         
         for row in teams:
             results.append({
