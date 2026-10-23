@@ -1,6 +1,6 @@
 # Social rules enforcement: plan
 
-Status: **draft** (23 Oct 2026), waiting on the decisions at the end. Owner: Claude Code / Codex, one chunk per session.
+Status: **signed off** (23 Oct 2026), with the recommended decisions. Owner: Claude Code / Codex, one chunk per session.
 
 ## The problem
 
@@ -109,12 +109,12 @@ Three layers, in this order:
   visible.
 - Any new rule the user sets gets a lint or layout check in the same change, or is explicitly marked "by eye".
 
-## Decisions (the user's)
+## Decisions (signed off 23 Oct 2026: the recommendations)
 
-1. **Hard rules (they bench a post).** Recommended: no chart on the cover; a text-only card; a title over 2 lines
+1. **Hard rules (they bench a post):** no chart on the cover; a text-only card; a title over 2 lines
    (rendered); more than 8 slides; text cut off. Everything else stays a warning.
-2. **Hand-made posts.** Recommended: warn but never bench them (the user is already looking at them).
-3. **The cover A/B.** Leave the text side as a valid cover until the test ends (~2 Nov), then decide from the
+2. **Hand-made posts:** warn, never bench (the user is already looking at them).
+3. **The cover A/B:** the text side stays as a valid cover until the test ends (~2 Nov), then decide from the
    Instagram numbers. "No chart possible" is already a hard finding regardless.
 
 ## Status
