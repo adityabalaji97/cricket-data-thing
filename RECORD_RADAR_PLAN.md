@@ -95,7 +95,7 @@ Each template states its rule on the card (e.g. "overs 1-6; associates included"
 
 | Chunk | Status |
 |---|---|
-| 0 Definitions + parity | [~] 2026-10-22: Rohit 101 v 98 was a namesake (Indonesia's Rohit Sharma, 3 powerplay sixes); radar now counts players by ESPNcricinfo id (delivery_details.p_bat / p_bowl, on every ball since 2015): 182 namesakes carry their side, e.g. Rohit Sharma (Indonesia), (Haryana). The rest of the app still counts by name: PLAYER_IDS_PLAN.md. Open: Waseem 96 v 95, SKY at 4 111 v 116 |
+| 0 Definitions + parity | [~] 2026-10-22: Rohit 101 v 98 was a namesake (Indonesia's Rohit Sharma, 3 powerplay sixes); radar now counts players by ESPNcricinfo id (delivery_details.p_bat / p_bowl, on every ball since 2015): 182 namesakes carry their side, e.g. Rohit Sharma (Indonesia), (Haryana). The rest of the app still counts by name: PLAYER_IDS_PLAN.md. Open: Waseem 96 v 95, SKY at 4 111 v 116 Namibia A's 4 games reclassified out of T20Is (migration 029); Bhutan v Bahrain 8 Dec 2025 is bad source data (documented, players unaffected).|
 | 1 Registry + family A | [x] 2026-10-22: services/record_radar.py; one counts table per side (~25s) instead of the query builder (37s a leaderboard); floors: template's first milestone, positions 1-8, first 25 to a milestone; 14 Oct 2026 gave 22 events. Pace/spin templates wait (legacy pre-2015 balls have no bowling type) |
 | 2 Families B, C | [ ] |
 | 3 Family D + in reach | [ ] |
