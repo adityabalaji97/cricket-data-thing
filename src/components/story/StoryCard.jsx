@@ -71,6 +71,7 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
         <Typography
           component="h2"
+          data-card-title
           sx={{
             flex: 1,
             minWidth: 0,
@@ -117,7 +118,7 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
       </Box>
 
       <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${colors.border}` }}>
-        <Typography sx={{ fontSize: 12, color: colors.textMed, lineHeight: 1.35 }}>
+        <Typography data-card-footer sx={{ fontSize: 12, color: colors.textMed, lineHeight: 1.35 }}>
           {card.sample}
           {card.smallSample && (
             <Box component="span" sx={{ color: colors.gold, fontWeight: 600 }}> · small sample</Box>

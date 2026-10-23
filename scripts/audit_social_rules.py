@@ -7,6 +7,9 @@ each. The baseline the later chunks are measured against, and (chunk 6) the nigh
     python scripts/audit_social_rules.py --posted-days 14    # and those posted or planned in the last 14 days
     python scripts/audit_social_rules.py --json              # the same, as JSON (the digest / run summary)
 
+Lint findings come from the slides' data; layout findings (title lines, cut-off labels, legends...) from the last
+render (facts.layout, scripts/lib/slide_layout.mjs), so a post rendered before chunk 1 has none until it's re-rendered.
+
 A builder is the post's key family and source ("debate/ig-backlog", "preview/ig-match-day", "otd/hand").
 """
 from __future__ import annotations
@@ -33,7 +36,8 @@ def packs(db, posted_days: int) -> List[Dict[str, Any]]:
 
     since = date.today() - timedelta(days=posted_days)
     return [dict(r) for r in db.execute(text("""
-        SELECT p.id, p.angle_key, p.source, p.status, p.planned_for, p.facts->>'kind' AS kind, s.data
+        SELECT p.id, p.angle_key, p.source, p.status, p.planned_for, p.facts->>'kind' AS kind,
+               p.facts->'layout' AS layout, s.data
         FROM content_packs p JOIN chart_snapshots s ON s.id = p.facts->>'carousel_id'
         WHERE p.channel = 'instagram'
           AND (p.status = 'ready' OR (:days > 0 AND p.status = 'posted' AND p.planned_for >= :since))
@@ -43,14 +47,19 @@ def packs(db, posted_days: int) -> List[Dict[str, Any]]:
 
 def audit(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     """{packs, flagged, rules: [{rule, label, findings, packs, by_builder, by_visual, example}]}, most common first."""
-    from services.social_rules import RULES, findings
+    from services.social_rules import LAYOUT_RULES, RULES, findings
+
+    labels = {**RULES, **LAYOUT_RULES}
 
     by_rule: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"findings": 0, "packs": set(), "by_builder": Counter(),
                                                               "by_visual": Counter(), "example": None})
     flagged = set()
     for r in rows:
         b = builder(r["angle_key"], r["source"])
-        for f in findings(((r["data"] or {}).get("slides")) or [], r["kind"]):
+        slides = ((r["data"] or {}).get("slides")) or []
+        drawn = [{**f, "visual": ((slides[f["slide"] - 1].get("card") or {}).get("visual")
+                                  if 0 < f["slide"] <= len(slides) else None)} for f in (r.get("layout") or [])]
+        for f in findings(slides, r["kind"]) + drawn:
             agg = by_rule[f["rule"]]
             agg["findings"] += 1
             agg["packs"].add(r["id"])
@@ -59,7 +68,7 @@ def audit(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
                 agg["by_visual"][f["visual"]] += 1
             agg["example"] = agg["example"] or {"pack": r["angle_key"], "slide": f["slide"], "message": f["message"]}
             flagged.add(r["id"])
-    out = [{"rule": k, "label": RULES.get(k, k), "findings": v["findings"], "packs": len(v["packs"]),
+    out = [{"rule": k, "label": labels.get(k, k), "findings": v["findings"], "packs": len(v["packs"]),
             "by_builder": dict(v["by_builder"].most_common()), "by_visual": dict(v["by_visual"].most_common()),
             "example": v["example"]} for k, v in by_rule.items()]
     out.sort(key=lambda x: -x["findings"])

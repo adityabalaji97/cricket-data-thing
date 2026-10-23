@@ -40,6 +40,32 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = os.getenv("SITE_URL", "https://hindsightcricket.com")
 
 
+#: Warnings from the drawn slide end with this, so a re-render replaces them and leaves the lint's alone.
+DRAWN = " (as drawn)"
+
+
+def layout_warnings(warnings: List[str], layout: Dict[str, list]) -> List[str]:
+    """The pack's warnings with the drawn slides' findings (scripts/lib/slide_layout.mjs) in place of the last
+    render's: "Slide n: <message> (as drawn)"."""
+    kept = [w for w in warnings or [] if not w.endswith(DRAWN)]
+    return kept + [f"Slide {n}: {f['message']}{DRAWN}" for n, fs in sorted(layout.items(), key=lambda kv: int(kv[0]))
+                   for f in fs]
+
+
+def record_layout(conn, carousel_id: str, layout: Dict[str, list]) -> None:
+    """Store what the render measured on every pack showing this carousel: facts.layout ([{rule, slide, message}],
+    what the audit and the gate read) and the admin's warnings."""
+    rows = conn.execute(text("""SELECT id, rule_warnings FROM content_packs WHERE facts->>'carousel_id' = :c"""),
+                        {"c": carousel_id}).all()
+    found = [{"rule": f["rule"], "slide": int(n), "message": f["message"]} for n, fs in layout.items() for f in fs]
+    for pid, warnings in rows:
+        conn.execute(text("""
+            UPDATE content_packs SET rule_warnings = CAST(:w AS jsonb),
+                   facts = jsonb_set(COALESCE(facts, '{}'::jsonb), '{layout}', CAST(:l AS jsonb))
+            WHERE id = :id
+        """), {"id": pid, "w": json.dumps(layout_warnings(warnings or [], layout)), "l": json.dumps(found)})
+
+
 def render(carousel_id: str, slide_count: int, base: str = SITE) -> Dict[str, list]:
     """Screenshot each slide of /ig/<carousel>/<n> (scripts/render_ig_slides.mjs) and store the PNGs. The page must be
     deployed at `base` (or a dev server) and read the same database the carousel was written to."""
@@ -59,6 +85,8 @@ def render(carousel_id: str, slide_count: int, base: str = SITE) -> Dict[str, li
         with engine.begin() as conn:
             for file in result["ok"]:
                 save(conn, carousel_id, int(Path(file).stem), Path(file).read_bytes())
+            if result["ok"]:
+                record_layout(conn, carousel_id, result.get("layout") or {})
         reel = None
         if not result["failed"] and len(result["ok"]) == slide_count:
             reel = make_reel(carousel_id, [Path(out) / f"{n}.png" for n in range(1, slide_count + 1)])
@@ -68,7 +96,8 @@ def render(carousel_id: str, slide_count: int, base: str = SITE) -> Dict[str, li
             save_cover(carousel_id, Path(out) / "1.png")
             if reel:
                 make_short(carousel_id)
-    return {"ok": [int(Path(f).stem) for f in result["ok"]], "failed": result["failed"], "reel": reel}
+    return {"ok": [int(Path(f).stem) for f in result["ok"]], "failed": result["failed"], "reel": reel,
+            "layout": result.get("layout") or {}}
 
 
 #: Seconds on screen: the hook, each slide in between, the end card; crossfades overlap them.

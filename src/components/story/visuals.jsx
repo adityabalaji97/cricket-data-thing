@@ -99,7 +99,7 @@ const ChaseBand = ({ payload }) => {
 
 const PHASE_LABEL = { powerplay: 'Powerplay', middle: 'Middle overs', death: 'Death overs' };
 const Legend = ({ items }) => (
-  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1 }}>
+  <Box data-legend sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1 }}>
     {items.map(([label, color]) => (
       <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
         <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: color }} />

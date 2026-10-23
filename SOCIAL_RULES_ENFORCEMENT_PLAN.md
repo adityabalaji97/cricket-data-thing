@@ -80,6 +80,13 @@ message}`), which the gate in chunk 5 uses to tell hard rules from soft.
 - Tests: a fixture page with a 3-line title and a clipped label. The renderer reports both.
 - Done when: re-rendering today's queue shows layout warnings next to the lint warnings in the admin.
 
+**Done (23 Oct 2026):** `scripts/lib/slide_layout.mjs` measures each slide in `render_ig_slides.mjs`; findings are
+stored on every pack showing the carousel (`facts.layout`, and the admin's warnings as "Slide n: … (as drawn)") by
+`services/ig_slides.record_layout`; the audit reads them (`LAYOUT_RULES` in `services/social_rules.py`). Checked on
+the first IND v PAK draft (qIyqxjkch): it finds the 3-line title, the 2-line scope, the legend and both cut-short
+names, and nothing on the final deck. Chunk 3 note: a help line is only drawn on the card with `help_on_card`, so
+the 30 "long help line" warnings are about text that's never on a slide: change that rule rather than the cards.
+
 ### Chunk 2: deeper-cut titles (27 of the 51 long titles)
 
 - `services/ig_posts/deep_cut.py`: the card title becomes a short claim (≤ 80 characters) with the player and the
@@ -137,7 +144,7 @@ message}`), which the gate in chunk 5 uses to tell hard rules from soft.
 | Chunk | Status |
 |---|---|
 | 0 Audit script | [x] 23 Oct 2026 |
-| 1 Layout checks at render | [ ] |
+| 1 Layout checks at render | [x] 23 Oct 2026 (code; queue re-render after deploy) |
 | 2 Deeper-cut titles | [ ] |
 | 3 Deck length, help lines, vocabulary | [ ] |
 | 4 Covers and the rest | [ ] |
