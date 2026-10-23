@@ -4,7 +4,8 @@ Jev, and the rules code can test, as checks on a post's slides and a Reel's scri
 services/content_rules.py.
 
     section("Reels")            -> the section's bullets, for a prompt
-    lint_slides(slides)         -> ["rule: what's wrong", ...] for a queued post (shown in the admin as warnings)
+    findings(slides, kind)      -> [{rule, slide, visual, message}]: each broken rule, by its RULES id
+    lint_slides(slides)         -> ["Slide n: what's wrong", ...] for a queued post (shown in the admin as warnings)
     hook_problem(hook)          -> why a Reel hook breaks the rules, or None (the Reel writer's guard rejects it)
 """
 from __future__ import annotations
@@ -58,29 +59,47 @@ def _list_too_long(sentence: str) -> bool:
     return len(parts) >= 4 and bool(re.search(r"\b(and|or)\b", parts[-1]))
 
 
-def lint_card(card: Dict[str, Any]) -> List[str]:
-    out = []
+#: Every rule the lint checks, by id: what the audit (scripts/audit_social_rules.py) and the gate group findings by.
+RULES = {
+    "text_card": "a text card in the deck",
+    "one_plural": "a count of one with a plural noun",
+    "long_title": f"a title over {MAX_TITLE} characters",
+    "title_list": "a list of more than three in a title",
+    "long_help": "a long help line",
+    "vocabulary": "a word the house vocabulary replaces",
+    "lonely_ring": "a 'best' ring where only one row has a value",
+    "bare_cover": "no chart on the cover, and none in the deck that can be one",
+    "slide_count": f"more than {MAX_SLIDES} slides",
+    "cover_repeat": "the cover's chart repeated in the deck",
+    "deeper_cut_slot": "the deeper cut not on its slide",
+}
+
+
+def card_findings(card: Dict[str, Any]) -> List[Dict[str, str]]:
+    """[{rule, message}] for one card (rule: a RULES id)."""
+    out: List[Dict[str, str]] = []
+    add = lambda rule, message: out.append({"rule": rule, "message": message})  # noqa: E731
     title = card.get("title") or ""
     if card.get("visual") in TEXT_VISUALS:
-        out.append("A text card: a slide is a claim and a picture; put the words in the caption")
+        add("text_card", "A text card: a slide is a claim and a picture; put the words in the caption")
     m = ONE_PLURAL.search(title)
     if m:
-        out.append(f"{m.group(0)!r} in the title: name the one instead")
+        add("one_plural", f"{m.group(0)!r} in the title: name the one instead")
     if len(title) > MAX_TITLE:
-        out.append(f"Title over {MAX_TITLE} characters ({len(title)}): it won't fit the slide")
+        add("long_title", f"Title over {MAX_TITLE} characters ({len(title)}): it won't fit the slide")
     for sentence in re.split(r"(?<=[.!?])\s+", title):
         if _list_too_long(sentence):
-            out.append("A list of more than three in the title")
+            add("title_list", "A list of more than three in the title")
             break
     if card.get("help") and not card.get("help_on_card") and len(card["help"]) > 90:
-        out.append("A long help line: on the card it's only for a chart that can't be read without it (help_on_card)")
+        add("long_help", "A long help line: on the card it's only for a chart that can't be read without it (help_on_card)")
     seen = set()
     for where in (title, card.get("help") or "", card.get("sample") or "", str((card.get("payload") or {}).get("metric") or "")):
         for m in OFF_VOCAB_RE.finditer(where):
             k = m.group(0).lower()
             if k not in seen:
                 seen.add(k)
-                out.append(f"Say {OFF_VOCAB[k]!r}, not {m.group(0)!r} (docs/social_rules.md, Vocabulary)")
+                add("vocabulary", f"Say {OFF_VOCAB[k]!r}, not {m.group(0)!r} (docs/social_rules.md, Vocabulary)")
     payload = card.get("payload") or {}
     if card.get("visual") == "scorecard" and payload.get("rows"):
         rows = payload["rows"]
@@ -88,31 +107,44 @@ def lint_card(card: Dict[str, Any]) -> List[str]:
             k = m.get("key")
             have = [r for r in rows if (r.get("values") or {}).get(k) is not None]
             if len(have) == 1 and k in (have[0].get("leader") or []):
-                out.append(f"A 'best' ring on {k!r}, where only one row has a value")
+                add("lonely_ring", f"A 'best' ring on {k!r}, where only one row has a value")
     return out
 
 
-def lint_slides(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> List[str]:
-    """Every testable carousel rule broken by a post's slides, as 'Slide n: ...' warnings. kind: the post's kind (a
-    play-along keeps its deeper cut after the answer, on purpose)."""
-    out = []
+def lint_card(card: Dict[str, Any]) -> List[str]:
+    return [f["message"] for f in card_findings(card)]
+
+
+def findings(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Every testable carousel rule broken by a post's slides: [{rule, slide (None for the deck), visual, message}].
+    kind: the post's kind (a play-along keeps its deeper cut after the answer, on purpose)."""
+    out: List[Dict[str, Any]] = []
     hero = ((slides[0].get("hero") or {}).get("card") if slides and isinstance(slides[0], dict) else None) or {}
     if slides and slides[0].get("type") == "hook" and slides[0].get("cover") == "text-no-chart":
-        out.append("Slide 1: no chart on the cover, and no card in the deck that can be one: lead with a chart "
-                   "(services/ig_cover.hero_from lists the ones that fit)")
+        out.append({"rule": "bare_cover", "slide": 1, "visual": None,
+                    "message": "no chart on the cover, and no card in the deck that can be one: lead with a chart "
+                               "(services/ig_cover.hero_from lists the ones that fit)"})
     if len(slides or []) > MAX_SLIDES:
-        out.append(f"{len(slides)} slides: keep a carousel to {MAX_SLIDES} (completion counts)")
+        out.append({"rule": "slide_count", "slide": None, "visual": None,
+                    "message": f"{len(slides)} slides: keep a carousel to {MAX_SLIDES} (completion counts)"})
     for n, s in enumerate(slides or [], 1):
         c = s.get("card") if isinstance(s, dict) else None
         if not c:
             continue
-        out += [f"Slide {n}: {w}" for w in lint_card(c)]
+        out += [{**f, "slide": n, "visual": c.get("visual")} for f in card_findings(c)]
         if hero and n > 1 and (c.get("id") == hero.get("id") or c.get("title") == hero.get("title")):
-            out.append(f"Slide {n}: repeats the cover's chart; the cover already shows it, so drop it from the deck")
+            out.append({"rule": "cover_repeat", "slide": n, "visual": c.get("visual"),
+                        "message": "repeats the cover's chart; the cover already shows it, so drop it from the deck"})
         want = 2 if (slides[0].get("hero") if slides else None) else 3  # a hero cover takes the lead card off the deck
         if (c.get("kicker") or "").lower() == "the deeper cut" and n not in (want, 3) and kind != "play":
-            out.append(f"Slide {n}: the deeper cut belongs on slide {want}")
+            out.append({"rule": "deeper_cut_slot", "slide": n, "visual": c.get("visual"),
+                        "message": f"the deeper cut belongs on slide {want}"})
     return out
+
+
+def lint_slides(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> List[str]:
+    """findings() as 'Slide n: ...' warnings, as the admin shows them."""
+    return [f"Slide {f['slide']}: {f['message']}" if f["slide"] else f["message"] for f in findings(slides, kind)]
 
 
 def hook_problem(hook: str) -> Optional[str]:
