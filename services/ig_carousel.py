@@ -135,5 +135,9 @@ def save(db: Session, slides: List[Dict[str, Any]], title: str, key: Dict[str, A
     # The cover A/B: half the carousels get the lead chart on slide 1 (ig_cover.py), which leaves the deck. In place, so
     # the caller's slide count (what gets rendered), X thread and notes all see the deck as stored.
     slides[:] = with_hero(slides, title)
+    # A namesake's side suffix is dropped on a slide about his side ("Asif Ali (Bahrain)" -> "Asif Ali"), kept elsewhere.
+    from services.player_identity import drop_obvious_sides, sides_of
+
+    slides[:] = [drop_obvious_sides(sl, sides_of(sl.get("teams"))) for sl in slides]
     return create_static_snapshot(db, "carousel", {"slides": slides, "title": title}, title,
                                   {"carousel": key, "slides": slides}, created_by=created_by)

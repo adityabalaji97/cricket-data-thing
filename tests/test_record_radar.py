@@ -69,3 +69,11 @@ def test_players_by_id_namesakes_apart_legacy_by_name():
     display = {34102: "Rohit Sharma", 1542004: "Rohit Sharma (Indonesia)"}
     got = R.with_identities(rows, display, {"Rohit Sharma": "Rohit Sharma"})
     assert R._boards(PP, got, T20I, False)[None] == {"Rohit Sharma": 103, "Rohit Sharma (Indonesia)": 3}
+
+
+def test_namesake_suffix_dropped_only_for_the_posts_own_side():
+    from services.player_identity import drop_obvious_sides
+    card = {"title": "Asif Ali (Bahrain)'s 41 (20)", "rows": ["Asif Ali (Bahrain)", "Rohit Sharma (Indonesia)", "Rameez Raja (2)"]}
+    assert drop_obvious_sides(card, ["Bahrain"]) == {"title": "Asif Ali's 41 (20)",
+                                                     "rows": ["Asif Ali", "Rohit Sharma (Indonesia)", "Rameez Raja (2)"]}
+    assert drop_obvious_sides(card, []) == card
