@@ -29,7 +29,7 @@ REGISTRY: List[CardSpec] = [*SERIES, *EXISTING, *GROUND, *TEAMS, *PLAYERS, *FANT
 
 # Part of the cached story's key (routers/match_preview.py): bump when any card's logic or copy
 # changes, so a deploy never serves stories built by older code. Data loads expire it on their own.
-STORY_VERSION = "2026-10-22.5"  # series so far: finished games only
+STORY_VERSION = "2026-10-23.1"  # namesakes: side suffix dropped for the fixture's sides
 
 
 def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[str, Any]:
@@ -53,10 +53,15 @@ def build_story(ctx: PreviewContext, registry: List[CardSpec] = None) -> Dict[st
     if closing is not None:
         cards.append(closing)
     chapters = []
+    # A namesake's side suffix is dropped for the fixture's own sides (chunk 4 of PLAYER_IDS_PLAN.md).
+    from services.player_identity import drop_obvious_sides
+
+    sides = [ctx.team1, ctx.team2, ctx.t1, ctx.t2]
     for chapter_id, title in CHAPTERS:
         chapter_cards = sorted((c for c in cards if c.chapter == chapter_id), key=lambda c: -c.relevance)
         if chapter_cards:
-            chapters.append({"id": chapter_id, "title": title, "cards": [c.to_json() for c in chapter_cards]})
+            chapters.append({"id": chapter_id, "title": title,
+                             "cards": [drop_obvious_sides(c.to_json(), sides) for c in chapter_cards]})
     return {
         "fixture": {"venue": ctx.venue, "team1": ctx.t1, "team2": ctx.t2, "format": ctx.fmt, "gender": ctx.gender,
                     # Everything needed to rebuild this story: a card's graphic (snapshot kind

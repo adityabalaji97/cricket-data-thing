@@ -442,6 +442,12 @@ def post_for(db, e: Dict[str, Any], rows: List[Dict[str, Any]]) -> Dict[str, Any
                "sub": "Where he now stands"},
               {"type": "card", "card": card, "teams": None},
               {"type": "end", "heading": "Find your player", "body": "Every leaderboard is free in the query builder."}]
+    # One side's list: its namesakes need no side suffix ("Asif Ali" on a Bahrain list), PLAYER_IDS_PLAN.md chunk 4.
+    from services.player_identity import drop_obvious_sides
+
+    side = [e["scope"].split(":", 1)[1]] if e["scope"].startswith("t20i:") else []
+    slides = drop_obvious_sides(slides, side)
+    hook = drop_obvious_sides(hook, side)
     key = f"record-{e['template']}-{e['scope'].replace(':', '-')}-{e['player'].replace(' ', '-').lower()}-{e['day']}"
     carousel = ig_carousel.save(db, slides, hook, {"radar": key}, "record-radar")
     params, group_by = query_params(e)
@@ -451,7 +457,7 @@ def post_for(db, e: Dict[str, Any], rows: List[Dict[str, Any]]) -> Dict[str, Any
     caption = ig_captions.build(hook, "", "record", None, [e["player"]], "Record radar",
                                 body=[f"Most {count_word} {e['scope_label']}: " + ", ".join(f"{n} {v:,}" for n, v in board[:3]) + "."])
     return {"key": key, "pillar": "reactive", "fact": fact, "snapshot_id": carousel["id"], "warnings": [],
-            "players": [e["player"]], "caption": caption}
+            "players": [e["player"]], "caption": drop_obvious_sides(caption, side)}
 
 
 def drafts_for_day(db, day: date, k: int = DAILY_CAP) -> Tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:

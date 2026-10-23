@@ -111,3 +111,35 @@ def namesakes(db, top: int = 50) -> List[Dict]:
         ORDER BY (SELECT MAX(balls) FROM player_identity p2 WHERE p2.name = player_identity.name) DESC, name, balls DESC
         LIMIT :n
     """), {"n": top}).mappings().all()]
+
+
+def drop_obvious_sides(obj, sides):
+    """Copy of a card, slide list or text with each namesake's side suffix dropped where the side is one of `sides`
+    (PLAYER_IDS_PLAN.md chunk 4): on a Bahrain post "Asif Ali (Bahrain)" is just "Asif Ali"; elsewhere, where the side
+    tells him apart, it stays. Strings anywhere inside dicts and lists are rewritten; nothing else changes."""
+    wanted = {s.strip().lower() for s in (sides or []) if isinstance(s, str) and s.strip()}
+    if not wanted:
+        return obj
+    pattern = re.compile(r"\s+\(([A-Za-z][^()]*)\)")
+
+    def fix(text_: str) -> str:
+        return pattern.sub(lambda m: "" if m.group(1).strip().lower() in wanted else m.group(0), text_)
+
+    def walk(x):
+        if isinstance(x, str):
+            return fix(x) if "(" in x else x
+        if isinstance(x, list):
+            return [walk(v) for v in x]
+        if isinstance(x, dict):
+            return {k: walk(v) for k, v in x.items()}
+        return x
+    return walk(obj)
+
+
+def sides_of(teams) -> List[str]:
+    """A slide's or story's sides as names: from a list, or a {team1, team2, ...} dict."""
+    if isinstance(teams, dict):
+        return [v for v in teams.values() if isinstance(v, str)]
+    if isinstance(teams, (list, tuple)):
+        return [v for v in teams if isinstance(v, str)]
+    return []
