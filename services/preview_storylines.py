@@ -36,7 +36,8 @@ against ball-by-ball data. Each one:
 - "claim": one plain sentence, at most 20 words, stating the point as it's being made (not your opinion). Name the
   player or side. No numbers that aren't in the headlines.
 - "kind": one of {kinds}.
-- "players": full names of the players it's about, as written in the headlines.
+- "players": full names of the players the claim is ABOUT (not who said it; a captain's quote about his side is about
+  the side), as written in the headlines.
 - "team": the side it's about, if one.
 - "sources": the numbers of the headlines that make this point.
 
@@ -179,3 +180,34 @@ def approved(db, fixture_key: str) -> List[Dict[str, Any]]:
         WHERE fixture_key = :k AND status = 'approved' ORDER BY rank
     """), {"k": fixture_key}).mappings().all()
     return [dict(r) for r in rows]
+
+
+def fixture_info(fixture_key: str) -> Dict[str, Any]:
+    """The fixture as the site lists it (venue, series), for the testers; the key's parts when it's no longer listed."""
+    from services.fixture_scraper import fetch_upcoming_fixtures
+
+    d, a, b = fixture_key.split("|")
+    raw = fetch_upcoming_fixtures(20)
+    rows = raw.get("fixtures", raw) if isinstance(raw, dict) else raw
+    for fx in rows or []:
+        if str(fx.get("date"))[:10] == d and {fx.get("team1"), fx.get("team2")} == {a, b}:
+            return {**fx, "team1": a, "team2": b}
+    return {"date": d, "team1": a, "team2": b, "venue": None}
+
+
+def test_point(db, point_id: int, store: bool = True) -> Optional[Dict[str, Any]]:
+    """Run a point's tester (services/storyline_testers.py); stored on the row unless store=False."""
+    from services import storyline_testers as T
+
+    row = db.execute(text("""
+        SELECT id, fixture_key, COALESCE(edited_claim, claim) AS claim, kind, players, team FROM fixture_storylines
+        WHERE id = :i
+    """), {"i": point_id}).mappings().first()
+    if not row:
+        return None
+    result = T.run(db, dict(row), fixture_info(row["fixture_key"]))
+    if store:
+        db.execute(text("UPDATE fixture_storylines SET test = CAST(:t AS jsonb), tested_at = now() WHERE id = :i"),
+                   {"t": json.dumps(result, default=str), "i": point_id})
+        db.commit()
+    return result

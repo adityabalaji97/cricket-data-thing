@@ -34,3 +34,9 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
         run: python scripts/build_storylines.py
+      # Approved points answered again from the data (chunk 3): the numbers move with every match.
+      - name: Re-test approved storylines
+        continue-on-error: true
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/build_storylines.py --test-approved

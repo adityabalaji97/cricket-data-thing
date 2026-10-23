@@ -20,7 +20,7 @@ def list_storylines(days: int = 4, db: Session = Depends(get_session)):
     """Upcoming fixtures' talking points, pending first, with their headlines."""
     rows = db.execute(text("""
         SELECT id, fixture_key, match_date, team1, team2, rank, claim, edited_claim, kind, players, team, sources,
-               appeal, appeal_by, status, reviewed_at
+               appeal, appeal_by, status, reviewed_at, test, tested_at
         FROM fixture_storylines WHERE match_date BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE + :d
         ORDER BY match_date, fixture_key, CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, rank
     """), {"d": max(1, min(days, 14))}).mappings().all()
@@ -34,8 +34,9 @@ def list_storylines(days: int = 4, db: Session = Depends(get_session)):
                                                    "team1": r["team1"], "team2": r["team2"], "headlines": news.get(r["fixture_key"], 0),
                                                    "points": []})
         f["points"].append({**{k: r[k] for k in ("id", "rank", "claim", "edited_claim", "kind", "players", "team",
-                                                  "sources", "appeal", "appeal_by", "status")},
-                            "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None})
+                                                  "sources", "appeal", "appeal_by", "status", "test")},
+                            "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None,
+                            "tested_at": r["tested_at"].isoformat() if r["tested_at"] else None})
     for key, n in news.items():  # fixtures with headlines but no points yet
         if key not in fixtures:
             d, a, b = key.split("|")
@@ -62,6 +63,17 @@ def run(body: Run, db: Session = Depends(get_session)):
     return {"fixture_key": body.fixture_key, "points": len(points), "new": new}
 
 
+@router.post("/admin/{point_id}/test")
+def test(point_id: int, db: Session = Depends(get_session)):
+    """Answer a talking point from the data now (services/storyline_testers.py)."""
+    from services.preview_storylines import test_point
+
+    result = test_point(db, point_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No such talking point")
+    return result
+
+
 class Review(BaseModel):
     action: Literal["approve", "drop", "pending", "edit"]
     claim: Optional[str] = None
@@ -84,4 +96,9 @@ def review(point_id: int, body: Review, db: Session = Depends(get_session)):
     if not row:
         raise HTTPException(status_code=404, detail="No such talking point")
     db.commit()
-    return dict(row)
+    out = dict(row)
+    if row["status"] == "approved":  # what's approved is tested straight away (chunk 3)
+        from services.preview_storylines import test_point
+
+        out["test"] = test_point(db, point_id)
+    return out
