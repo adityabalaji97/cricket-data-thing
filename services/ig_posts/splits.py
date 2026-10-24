@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from services.ig_posts.cards import card, fmt
+from services.ig_posts.cards import card, first_fit, fmt
 
 STYLES = {"OB": "off-spin", "LB": "leg-spin", "LBG": "leg-spin", "SLA": "left-arm orthodox spin",
           "LWS": "left-arm wrist spin", "RF": "right-arm fast", "RFM": "right-arm fast-medium",
@@ -188,13 +188,14 @@ def _ordinal(n: int) -> str:
 def leaderboard(s: Split, name: str, role: str, sample: str, scope_hook: str, top: int = 7) -> Dict[str, Any]:
     metric, higher, f, label = _metric(role)
     shown = s.rows[:top] if s.rank <= top else s.rows[:top - 1] + [s.rows[s.rank - 1]]
-    lead = s.rows[0]
+    # Player and number first; the leader and the next best are on the chart, the scope on the scope line.
+    v = fmt(s.value, f)
     if s.rank == 1:
-        title = (f"{name} {'scores fastest' if role == 'batter' else 'is the tightest'} {s.phrase} {scope_hook}: "
-                 f"{fmt(s.value, f)}, the next best {fmt(_value(s.rows[1], role), f)}")
+        title = first_fit([f"{name} {'scores fastest' if role == 'batter' else 'is the tightest'} {s.phrase}: {v}",
+                           f"{name} is {'fastest' if role == 'batter' else 'tightest'} {s.phrase}: {v}"], name)
     else:
-        title = (f"{name} is {_ordinal(s.rank)} of {s.of} {s.phrase}; {lead[role]} leads at "
-                 f"{fmt(_value(lead, role), f)}")
+        title = first_fit([f"{name} is {_ordinal(s.rank)} of {s.of} {s.phrase}: {v}",
+                           f"{name} is {_ordinal(s.rank)} {s.phrase}: {v}"], name)
     c = card(f"split-{s.dim}", "metric_bars", title, {
         "metric": {"label": label, "format": f, "signed": False}, "label_width": 150,
         "rows": [{"name": r[role], "value": round(_value(r, role), 2), "detail": _detail(r, role),
@@ -215,11 +216,15 @@ def value_board(s: Split, name: str, role: str, sample: str, top: int = 7) -> Op
     shown = rows[:top] if rank <= top else rows[:top - 1] + [mine]
     # The title stays short (a three-line clamp); win probability goes in the rows and the note, as totals over the
     # balls (a whole win is 100 points), since per-100 figures on small samples read bigger than they are.
+    iv = fmt(mine[vkey], 'signed1')
     if rank == 1:
-        title = f"By Impact, {name} is first {s.phrase} too: {fmt(mine[vkey], 'signed1')} per 100 balls"
-    else:
-        title = (f"By Impact, {name} is {_ordinal(rank)} of {len(rows)} {s.phrase}: {fmt(mine[vkey], 'signed1')}; "
-                 f"{rows[0][role]} leads at {fmt(rows[0][vkey], 'signed1')}")
+        title = first_fit([f"By Impact, {name} is first {s.phrase} too: {iv} per 100 balls",
+                           f"By Impact, {name} is first {s.phrase} too: {iv}",
+                           f"{name}: {iv} Impact {s.phrase}, the most"], name)
+    else:  # the leader is on the chart, and so is the rank when the title has no room for it
+        title = first_fit([f"By Impact, {name} is {_ordinal(rank)} of {len(rows)} {s.phrase}: {iv}",
+                           f"By Impact, {name} is {_ordinal(rank)} {s.phrase}: {iv}",
+                           f"{name}: {iv} Impact {s.phrase}"], name)
     wins = (f" {name} added {fmt(100 * mine['wpa'], 'signed0')} points of win probability in {mine['balls']} balls."
             if mine.get("wpa") is not None else "")
 
@@ -261,10 +266,9 @@ def profile(db, s: Split, name: str, role: str, scope: Dict[str, Any], sample: s
     if len(out) < 2:
         return None
     out.sort(key=lambda r: r.pop("_k"))
-    gap = abs(s.value - s.field_value) / s.field_value
-    title = (f"{s.phrase[:1].upper() + s.phrase[1:]}, {name} {'strikes at' if role == 'batter' else 'goes at'} "
-             f"{fmt(s.value, f)}{'' if role == 'batter' else ' an over'}: {round(100 * gap)}% "
-             f"{'faster' if role == 'batter' else 'tighter'} than the field")
+    claim = (f"{name} {'scores at' if role == 'batter' else 'goes for'} {fmt(s.value, f)}"
+             f"{'' if role == 'batter' else ' an over'} {s.phrase}")
+    title = first_fit([f"{claim} (average {fmt(s.field_value, f)})", claim], name)
     return card(f"profile-{s.dim}", "deep_compare", title, {
         "metric": {"label": label, "format": f, "signed": False}, "series": [name, f"Every {role}"], "rows": out,
     }, sample, "Every ball in the scope, the player's against everyone's.")

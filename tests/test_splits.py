@@ -40,3 +40,19 @@ def test_profile_labels_read_in_cricket_order():
     keys = [("death", "LHB"), ("powerplay", "RHB"), ("middle", "spin bowler"), ("powerplay", "pace bowler")]
     assert [sp._label(k) for k in sorted(keys, key=sp._order)] == [
         "Pace · powerplay", "Spin · middle overs", "Right-handers · powerplay", "Left-handers · death"]
+
+
+def test_trend_titles_lead_with_the_player_and_fit_two_lines():
+    long_name = "Jan Nicol Loftie-Eaton"
+    phrase = "against back-of-a-length balls in the middle overs"
+    rows = [{"batter": f"P{i}", "runs": 300 - i, "balls": 150, "strike_rate": 200 - i, "impact_per_100": 20 - i,
+             "wpa": 0.1} for i in range(80)]
+    rows[9] = {**rows[9], "batter": long_name}
+    for rank in (1, 10):
+        s = sp.Split("length", ["length"], ("SHORT_OF_A_GOOD_LENGTH",), phrase, 191.0, 141.0, rank, 81, 0.1, 1.0,
+                     rows if rank == 10 else [{**rows[9], "batter": long_name}] + rows[:9] + rows[10:])
+        board = sp.leaderboard(s, long_name, "batter", "sample", "in the IPL since 2023")
+        assert len(board["title"]) <= 80 and "191" in board["title"], board["title"]
+        assert "leads at" not in board["title"] and "the next best" not in board["title"]
+        value = sp.value_board(s, long_name, "batter", "sample")
+        assert value is None or len(value["title"]) <= 80, value["title"]
