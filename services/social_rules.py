@@ -28,7 +28,7 @@ OFF_VOCAB_RE = re.compile("|".join(re.escape(k) for k in OFF_VOCAB), re.I)
 #: Cards that are words, not a picture: a carousel slide is a claim and a chart (docs/social_rules.md, Card anatomy).
 TEXT_VISUALS = {"recap_text"}
 #: A count of one with a plural noun ("1 overs"): name the one instead ("the 19th over").
-ONE_PLURAL = re.compile(r"\b(?:1|one) (overs|balls|runs|wickets|sixes|fours|matches|innings|games|spells|points)\b", re.I)
+ONE_PLURAL = re.compile(r"(?<![\d.])\b(?:1|one) (overs|balls|runs|wickets|sixes|fours|matches|innings|games|spells|points)\b", re.I)
 
 JARGON = re.compile(r"\b(impact|wpa|raa|waa|win probability|runs above average|per 100|per hundred)\b", re.I)
 
