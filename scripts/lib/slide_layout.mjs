@@ -32,7 +32,8 @@ export const LAYOUT_CHECK = `(() => {
   for (const lg of root.querySelectorAll('[data-legend]')) {
     for (const item of lg.children) {
       const t = (item.textContent || '').trim();
-      if (t.split(/\s+/).length > 4 || t.length > 30) add('legend', 'a legend that is a sentence: "' + short(t) + '"');
+      // A labelled chip ("Brighter: more win probability added") is fine; a sentence that explains the chart isn't.
+      if (t.split(/\s+/).length > 6 || t.length > 45) add('legend', 'a legend that is a sentence: "' + short(t) + '"');
     }
   }
   if (root.querySelector('[data-story-card][data-overflow="true"]')) add('card_overflow', "the chart doesn't fit its card");

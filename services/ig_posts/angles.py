@@ -38,7 +38,7 @@ BATTER: Tuple[Angle, ...] = (
           "Share of balls hit for four or six. How often they find the rope."),
     Angle("dot", "dot_percentage", "Dot %", "dot-ball %", "pace", False, "pct1",
           "Share of balls they don't score off. Lower is better: how rarely they get stuck."),
-    Angle("raa", "raa_per_100", "RAA/100", "runs above average per 100 balls", "value", True, "signed1",
+    Angle("raa", "raa_per_100", "RAA/100", "runs above par per 100 balls", "value", True, "signed1",
           "Runs above what an average batter would score in the same situations, per 100 balls (game-state aware).",
           t20_only=True),
     Angle("impact", "impact_per_100", "Impact/100", "Impact per 100 balls", "value", True, "signed1",
