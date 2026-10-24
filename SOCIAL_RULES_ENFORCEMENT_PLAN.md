@@ -121,12 +121,23 @@ posts planned to 1 Nov.
 - Vocabulary slips at the source: fix every builder that the chunk-0 audit shows writing "runs added", "balls per
   dismissal" and the like.
 
+**Done (24 Oct 2026):** adding the deeper cut trims a deck back to 8 (`ig_backlog.trim_deck`: the lowest Jev-scored
+angle, else the last chart before the closers; never the cover, the lead chart, a closer or the deeper cut). The help
+line rule only counts a help line drawn on the card (`help_on_card`): the 30 warnings were all about info-sheet text.
+"runs added" is fine where it defines Impact. On this day's ranking title fits two lines (scope to the info sheet).
+Found on the way: the queue's vocabulary slips ("balls per dismissal") and most long titles and 9-slide decks are
+debates built on 5 Oct, before PR #166 fixed their builder; they need rebuilding, not new code (chunk 4).
+Also fixed (PR #207): every post that takes a voiced Reel gets one (on this day included); render() made only the
+slideshow, and the nightly Reels step now voices any slideshow on a post still to go out.
+
 ### Chunk 4: covers and the rest
 
 - Match-day previews, recaps, debates and IPL posts with no chart on the cover: make each one's lead card a chart that
   can go on the cover (`ig_cover.hero_from`), as on-this-day now does.
 - (Play-alongs' deeper-cut position: checked in chunk 0, the exemption reaches the lint; the 4 warnings were an
   ad-hoc count that didn't pass the post's kind.)
+- Rebuild posts built before their builder's current version (the 5 Oct debates: `debate_post` from
+  `Q.generate(only=[key])`), nightly for the next 3 days' posts like the deeper-cut retitle, and once for the bench.
 - Done when: the chunk-0 audit shows no warning type above 5 across the queue.
 
 ### Chunk 5: the gate
@@ -162,7 +173,7 @@ posts planned to 1 Nov.
 | 0 Audit script | [x] 23 Oct 2026 |
 | 1 Layout checks at render | [x] 23 Oct 2026 (code; queue re-render after deploy) |
 | 2 Deeper-cut titles | [x] 23 Oct 2026 (code; queued posts rebuilt as they come up) |
-| 3 Deck length, help lines, vocabulary | [ ] |
+| 3 Deck length, help lines, vocabulary | [x] 24 Oct 2026 |
 | 4 Covers and the rest | [ ] |
 | 5 The gate | [ ] |
 | 6 Keep it from coming back | [ ] |

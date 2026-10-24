@@ -65,7 +65,7 @@ RULES = {
     "one_plural": "a count of one with a plural noun",
     "long_title": f"a title over {MAX_TITLE} characters",
     "title_list": "a list of more than three in a title",
-    "long_help": "a long help line",
+    "long_help": "a long help line drawn on the card",
     "vocabulary": "a word the house vocabulary replaces",
     "lonely_ring": "a 'best' ring where only one row has a value",
     "bare_cover": "no chart on the cover, and none in the deck that can be one",
@@ -105,12 +105,15 @@ def card_findings(card: Dict[str, Any]) -> List[Dict[str, str]]:
         if _list_too_long(sentence):
             add("title_list", "A list of more than three in the title")
             break
-    if card.get("help") and not card.get("help_on_card") and len(card["help"]) > 90:
-        add("long_help", "A long help line: on the card it's only for a chart that can't be read without it (help_on_card)")
+    # A help line is only drawn on the card with help_on_card (else it's in the info sheet): only a drawn one counts.
+    if card.get("help") and card.get("help_on_card") and len(card["help"]) > 90:
+        add("long_help", "A long help line drawn on the card: shorten it, or move it to the info sheet")
     seen = set()
     for where in (title, card.get("help") or "", card.get("sample") or "", str((card.get("payload") or {}).get("metric") or "")):
         for m in OFF_VOCAB_RE.finditer(where):
             k = m.group(0).lower()
+            if k == "runs added" and re.search(r"\bimpact\b", where, re.I):
+                continue  # "Impact: runs added to the projected total" defines Impact, it doesn't replace it
             if k not in seen:
                 seen.add(k)
                 add("vocabulary", f"Say {OFF_VOCAB[k]!r}, not {m.group(0)!r} (docs/social_rules.md, Vocabulary)")

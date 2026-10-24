@@ -244,8 +244,10 @@ def rank_card(db: Session, c: Dict[str, Any], sample: str, upto: date) -> Option
     pct = 100 * (mine + 1) / len(rows)
     rank_words = (f"the {fmt(mine + 1, 'int')}{_suffix(mine + 1)}-biggest" if mine < 100
                   else f"in the top {max(1, round(pct))}%")
-    title = (f"{top['name']}'s {fmt(top['impact'], 'signed1')} is {rank_words} of {fmt(len(rows), 'int')} {what} "
-             f"in {scope} since {FIRST_YEAR}, by Impact")
+    # The claim fits two lines; the scope (which sides, since when) is in the info sheet.
+    comp = "T20I" if c["key"] == "T20I" else c["key"]
+    title = (f"{top['name']}'s {fmt(top['impact'], 'signed1')} Impact is {rank_words} of {fmt(len(rows), 'int')} "
+             f"{comp} {'innings' if top['role'] == 'bat' else 'spells'}")
     rows_out = [{"name": r["name"], "value": round(r["impact"], 1), "team": r["team"],
                  "highlight": r["p_match"] == c["id"] and r["name"] == top["name"],
                  "detail": f"{r['date'][:4]} · {_short_team(r['team1'])} v {_short_team(r['team2'])}"} for r in shown]

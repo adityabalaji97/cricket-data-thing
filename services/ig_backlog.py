@@ -447,6 +447,32 @@ def caption_of(post: Dict[str, Any]) -> str:
 REPEAT_DAYS = 14  # a player's stat of one kind isn't repeated within this many days
 
 
+#: Cards a deck keeps when it's trimmed to fit: the closers (verdicts, scorecards) and the deeper cut.
+KEEP_VISUALS = ("scorecard", "innings_scorecard", "verdict", "keep_try")
+
+
+def trim_deck(slides: List[Dict[str, Any]], fact: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The slides cut to social_rules.MAX_SLIDES (docs/social_rules.md: completion counts) by dropping charts: the
+    lowest-scored angle first (a debate's Jev scores, fact.angle_scores, by card id 'kind-<angle>'), else the last
+    chart before the closers. Never the cover, the lead chart (slide 2), a closer, the deeper cut or the end."""
+    from services.ig_posts import deep_cut
+    from services.social_rules import MAX_SLIDES
+
+    out = list(slides)
+    scores = fact.get("angle_scores") or {}
+    while len(out) > MAX_SLIDES:
+        droppable = [i for i, sl in enumerate(out) if i >= 2 and sl.get("type") == "card"
+                     and (sl.get("card") or {}).get("kicker") != deep_cut.KICKER
+                     and (sl.get("card") or {}).get("visual") not in KEEP_VISUALS]
+        if not droppable:
+            break
+        scored = [i for i in droppable if str((out[i].get("card") or {}).get("id", "")).split("-", 1)[-1] in scores]
+        drop = (min(scored, key=lambda i: scores[str(out[i]["card"]["id"]).split("-", 1)[-1]]) if scored
+                else droppable[-1])
+        out.pop(drop)
+    return out
+
+
 def add_deep_cut(db: Session, post: Dict[str, Any], day: Optional[date],
                  recent: Optional[List[str]] = None, used: Optional[set] = None) -> Optional[Dict[str, Any]]:
     """"The deeper cut" (services/ig_posts/deep_cut.py) into a post before it is queued: slide 3, after the hook and
@@ -489,6 +515,7 @@ def add_deep_cut(db: Session, post: Dict[str, Any], day: Optional[date],
     before_end = len(slides) - 1 if slides[-1].get("type") == "end" else len(slides)
     at = before_end if fact.get("kind") == "play" else min(DEEP_CUT_SLIDE - 1, before_end)
     slides.insert(at, {"type": "card", "card": got["card"], "teams": None})
+    slides = trim_deck(slides, fact)
     carousel = ig_carousel.save(db, slides, snap.get("title") or fact.get("title") or "", {"deep_cut_of": cid},
                                 "ig-deep-cut")
     # render: the slide is drawn by the app (/ig/:id/:n), so the carousel is rendered and served from its images.

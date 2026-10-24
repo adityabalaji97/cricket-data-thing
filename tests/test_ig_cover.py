@@ -85,3 +85,19 @@ def test_the_rules_catch_a_bare_cover_a_text_card_and_one_overs():
               {"type": "card", "card": {"id": "wp", "visual": "win_prob_line", "title": "SRH peaked at 98%, then 1 overs took it away"}}]
     got = " | ".join(social_rules.lint_slides(slides))
     assert "Slide 1: no chart on the cover" in got and "Slide 2: A text card" in got and "'1 overs'" in got
+
+
+def test_a_deck_with_its_deeper_cut_is_trimmed_to_eight():
+    from services import ig_backlog
+
+    def card(cid, visual="metric_bars", **kw):
+        return {"type": "card", "card": {"id": cid, "visual": visual, "title": cid, **kw}}
+    deck = [{"type": "hook", "text": "t"}, card("scatter-sr-raa", "scatter_plus"),
+            card("deep-zones", "deep_compare", kicker="The deeper cut"), card("bars-wpa"), card("bars-bpd"),
+            card("bars-control"), card("zones-klaasen", "boundary_zones"), card("scorecard", "scorecard"), {"type": "end"}]
+    out = ig_backlog.trim_deck(deck, {"angle_scores": {"wpa": 2.9, "bpd": 2.6, "control": 2.59}})
+    ids = [(s.get("card") or {}).get("id") or s["type"] for s in out]
+    assert len(out) == 8 and "bars-control" not in ids  # the lowest Jev score goes
+    assert ids[:3] == ["hook", "scatter-sr-raa", "deep-zones"] and ids[-2:] == ["scorecard", "end"]
+    unscored = ig_backlog.trim_deck(deck, {})
+    assert "zones-klaasen" not in [(s.get("card") or {}).get("id") for s in unscored]  # else the last chart before the closer
