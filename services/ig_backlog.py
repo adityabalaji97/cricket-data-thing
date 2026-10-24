@@ -863,9 +863,15 @@ def render_pending(base: Optional[str] = None) -> Dict[str, Any]:
 
 def reels_pending() -> Dict[str, Any]:
     """A reel for every ready or posted Instagram carousel that has its slides but no reel yet (a carousel posted
-    before reels existed can still go out as a Reel)."""
+    before reels existed can still go out as a Reel); and, for a post still to go out whose kind takes the voiced
+    Reel (services/ig_reel_v2.variant), a voiced one in place of a slideshow (rendered before its pack existed, or
+    before its kind was eligible)."""
+    import os
+
     from database import engine
     from services import ig_slides
+    from services.ig_plan import _kind
+    from services.ig_reel_v2 import variant
 
     with engine.connect() as conn:
         rows = conn.execute(text("""
@@ -873,5 +879,14 @@ def reels_pending() -> Dict[str, Any]:
             WHERE p.channel = 'instagram' AND p.status IN ('ready', 'posted') AND p.facts->>'carousel_id' IS NOT NULL
               AND NOT EXISTS (SELECT 1 FROM ig_reels r WHERE r.carousel_id = p.facts->>'carousel_id')
         """)).all()
+        unvoiced = [] if os.getenv("REEL_V2") != "1" else [
+            (r["facts"]["carousel_id"], int(r["facts"].get("slides") or 0)) for r in conn.execute(text("""
+                SELECT p.angle_key, p.source, p.pillar, p.planned_for, p.facts FROM content_packs p
+                WHERE p.channel = 'instagram' AND p.status = 'ready' AND p.facts->>'carousel_id' IS NOT NULL
+                  AND (p.planned_for IS NULL OR p.planned_for >= CURRENT_DATE)
+                  AND COALESCE(p.facts->'reel'->>'variant', '') <> 'v2'
+                  AND EXISTS (SELECT 1 FROM ig_slide_images i WHERE i.carousel_id = p.facts->>'carousel_id' AND i.n >= 1)
+            """)).mappings() if variant(_kind(dict(r)), r["planned_for"]) == "v2"]
     made = [cid for cid, n in rows if n and ig_slides.reel_from_stored(cid, n)]
-    return {"made": len(made), "missing": len(rows) - len(made)}
+    voiced = [cid for cid, n in unvoiced if n and cid not in made and ig_slides.reel_from_stored(cid, n)]
+    return {"made": len(made), "missing": len(rows) - len(made), "voiced": len(voiced), "unvoiced": len(unvoiced) - len(voiced)}

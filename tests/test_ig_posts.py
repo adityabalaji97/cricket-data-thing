@@ -210,3 +210,14 @@ def test_innings_scorecards_one_card_per_innings_batting_with_strike_rate(monkey
     assert p["batting"][0] == {"name": "Shai Hope", "runs": 52, "balls": 37, "sr": 141, "impact": 3.6, "not_out": False}
     assert p["bowling"][0] == {"name": "Axar Patel", "figures": "3.1-0-26", "wickets": 2, "impact": 21.2}
     assert p["has_impact"] and p["accent"] == "#f0b429" and cards[1]["payload"]["batting"][0]["not_out"]
+
+
+def test_on_this_day_takes_the_voiced_reel(monkeypatch):
+    from datetime import date
+
+    from services import ig_reel_v2
+
+    monkeypatch.setenv("REEL_V2", "1")
+    monkeypatch.delenv("REEL_AB", raising=False)
+    assert ig_reel_v2.variant("otd", date(2026, 10, 24)) == "v2"
+    assert ig_reel_v2.variant("play", date(2026, 10, 24)) == "v1"  # a quiz isn't narrated

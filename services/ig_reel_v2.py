@@ -67,7 +67,7 @@ TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept
 # viewers in the first 3s (12 Oct). The cover is picked when posting instead (admin: Reel tab → Cover).
 COVER_SECONDS = float(os.getenv("REEL_COVER", "0"))
 CAPTION_WORDS = 3              # words on screen at a time
-ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth", "preview")
+ELIGIBLE = ("recap", "spotlight", "record", "trend", "debate", "weird", "myth", "preview", "otd")
 #: A match preview's Reel, in story order: who's in form, who suits the ground, the match-up, who has gone big here, what
 #: wins here, and a milestone to close on. Players first: a Reel that opened on a ground total got 193 views (14 Oct;
 #: docs/social_rules.md). The first k the carousel has; the milestone is kept as the closer.

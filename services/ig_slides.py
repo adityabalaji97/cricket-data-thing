@@ -89,7 +89,9 @@ def render(carousel_id: str, slide_count: int, base: str = SITE) -> Dict[str, li
                 record_layout(conn, carousel_id, result.get("layout") or {})
         reel = None
         if not result["failed"] and len(result["ok"]) == slide_count:
-            reel = make_reel(carousel_id, [Path(out) / f"{n}.png" for n in range(1, slide_count + 1)])
+            # The post's Reel as it should go out: voiced (v2) when that's on and the post's kind takes it, else the
+            # slideshow, from the slides just stored.
+            reel = reel_from_stored(carousel_id, slide_count)
         if (Path(out) / "1.png").exists():
             from services.ig_reel_v2 import make_short, save_cover
 
