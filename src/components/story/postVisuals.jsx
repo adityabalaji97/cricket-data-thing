@@ -65,9 +65,16 @@ const Legend = ({ items }) => (
  * the leader of each metric ringed, then the verdict line ("Gill leads overall; Head is fastest...").
  * payload: {metrics:[{key,label,format}], rows:[{name, values:{k:v}, pct:{k:0..100}, leader:[k...], highlight}], verdict}
  */
+/**
+ * A name column wide enough for its longest name (about 7px a character at the cards' 13-15px), at least `base`
+ * (or the payload's label_width) and at most `most`: a name is never cut short with "…" when the row has room.
+ */
+const nameColumn = (names, base, most = 190) => Math.round(Math.min(most, Math.max(base,
+  7.2 * Math.max(0, ...names.map((n) => String(n || '').length)))));
+
 const Scorecard = ({ payload }) => {
   const { metrics, rows } = payload;
-  const cols = `${payload.label_width || 92}px repeat(${metrics.length}, 1fr)`; // label_width: long row labels
+  const cols = `${nameColumn(rows.map((r) => r.name), payload.label_width || 92, 150)}px repeat(${metrics.length}, 1fr)`;
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.5 }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: cols, gap: '4px', alignItems: 'end' }}>
@@ -237,7 +244,8 @@ const ScatterPlus = ({ payload }) => {
         </Box>
       )}
       {Z && (
-        <Legend items={[[`Brighter: higher ${Z.label}`, colors.accent]]} />
+        // A chip, not a sentence: the axis already says "per 100 balls".
+        <Legend items={[[`Brighter: more ${String(Z.label).replace(/ per 100 balls$/, '')}`, colors.accent]]} />
       )}
     </Box>
   );
@@ -252,13 +260,14 @@ const MetricBars = ({ payload }) => {
   const { rows, metric } = payload;
   const signed = metric.signed || rows.some((r) => r.value < 0);
   const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1e-9);
+  const nameCol = nameColumn(rows.map((r) => r.name), payload.label_width || 110);
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.7 }}>
       {rows.map((r) => {
         const width = (100 * Math.abs(r.value)) / max / (signed ? 2 : 1);
         const color = r.highlight ? colors.accent : teamColour(r.team, '#5b6b85');
         return (
-          <Box key={`${r.name}-${r.detail || ''}`} sx={{ display: 'grid', gridTemplateColumns: `${payload.label_width || 110}px 1fr 58px`, gap: 1, alignItems: 'center' }}>
+          <Box key={`${r.name}-${r.detail || ''}`} sx={{ display: 'grid', gridTemplateColumns: `${nameCol}px 1fr 58px`, gap: 1, alignItems: 'center' }}>
             <Box sx={{ minWidth: 0 }}>
               <Typography noWrap sx={{ fontSize: 13, color: r.highlight ? colors.accent : colors.textHi, fontWeight: r.highlight ? 600 : 400 }}>{r.name}</Typography>
               {r.detail && <Typography noWrap sx={{ fontSize: 11, color: colors.textLo, lineHeight: 1.25 }}>{r.detail}</Typography>}

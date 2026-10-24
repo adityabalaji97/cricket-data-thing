@@ -123,7 +123,7 @@ def phase_card(db, pool, sample):
         return None, by
     top = top_of(best)
     word = dict(PHASES)[best].lower() + (" overs" if best != "powerplay" else "")
-    title = (f"{short(lead)} adds {v[best]:.0f} runs above average per 100 balls in the {word}"
+    title = (f"{short(lead)} adds {v[best]:.0f} runs above par per 100 balls in the {word}"
              + (", the most of the five" if v[best] >= top else ""))
     rows = _heat(pool, metrics, values)
     return card("phase", "scorecard", title, {
