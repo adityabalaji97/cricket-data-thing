@@ -14,6 +14,8 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 ROWS = 4
+#: Charts the cover can draw whole, as on their card: a scatter, a race of running totals, a wagon wheel.
+WHOLE = ("scatter_plus", "race_lines", "innings_wagon")
 
 
 def variant(title: str) -> str:
@@ -29,8 +31,11 @@ def variant(title: str) -> str:
 def hero_from(card: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """The top rows of a bar chart (metric_bars), the highlighted row kept: {rows: [{name, value, highlight}], format,
     label}; or a stacked-share chart (share_bars) whole: {kind: "share", groups, rows}; or a wagon wheel (shot_wheel)
-    whole: {kind: "wheel", shots}; or a win probability line (win_prob_line) whole: {kind: "line", payload}. Other visuals don't shrink to a cover well, so they give none."""
+    whole: {kind: "wheel", shots}; or a win probability line (win_prob_line) whole: {kind: "line", payload}; or one of WHOLE as drawn:
+    {kind: "visual", visual, payload}. Other visuals don't shrink to a cover well, so they give none."""
     p = card.get("payload") or {}
+    if card.get("visual") in WHOLE:  # a chart that reads small: drawn whole under the hook
+        return {"kind": "visual", "visual": card["visual"], "payload": p, "label": ""}
     if card.get("visual") == "win_prob_line":  # the line whole, under the hook, with its two biggest swings marked
         bands = sorted(p.get("bands") or [], key=lambda b: -abs((b.get("from") or 0) - (b.get("to") or 0)))[:2]
         return {"kind": "line", "payload": {**p, "bands": sorted(bands, key=lambda b: b.get("over") or 0)}, "label": ""}

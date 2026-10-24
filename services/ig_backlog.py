@@ -746,6 +746,54 @@ def refresh(db: Session, keys: Iterable[str]) -> List[Dict[str, Any]]:
     return out
 
 
+#: Rules whose findings a rebuild through the post's current builder can fix (the builders follow them now).
+REBUILD_RULES = ("long_title", "slide_count", "vocabulary", "bare_cover", "title_list", "one_plural", "text_card",
+                 "cover_repeat", "title_lines", "title_clipped")
+
+
+def rebuild(db: Session, angle_key: str) -> Dict[str, Any]:
+    """Remake a queued post through its builder as it is now, on the same pack and day: a debate from its question
+    (questions.generate(only=...)), a play-along from its day, a curated idea (refresh). The deeper cut is chosen
+    again and the deck trimmed to fit. The caller renders it. {status: 'rebuilt' | 'gone' | 'unsupported' |
+    'missing', carousel_id?, slides?}; 'gone' when the builder no longer makes the post (a debate that isn't
+    contested any more): the old one stays."""
+    from database import engine
+
+    row = db.execute(text("SELECT planned_for, source FROM content_packs WHERE angle_key = :k"),
+                     {"k": angle_key}).first()
+    if not row:
+        return {"status": "missing"}
+    day, source = row
+    key = angle_key.split(":", 1)[-1]
+    if any(i["key"] == key for i in IDEAS):
+        posts = refresh(db, [key])
+        post = posts[0] if posts else None
+    elif key.startswith("debate-"):
+        from services.ig_posts import questions as Q
+
+        entries = Q.generate(db, limit=1, only=[key[len("debate-"):]], log=lambda m: logger.info(m))
+        post = debate_post(db, entries[0]) if entries else None
+        if post:
+            add_deep_cut(db, post, day)
+            with engine.begin() as conn:
+                upsert_pack(conn, post, day, source=source or "ig-backlog")
+    elif key.startswith("play-"):
+        try:
+            play_day = date.fromisoformat(key[len("play-"):])
+        except ValueError:
+            return {"status": "unsupported"}
+        post = play_post(db, play_day)
+        if post:
+            add_deep_cut(db, post, day)
+            with engine.begin() as conn:
+                upsert_pack(conn, post, day, source=source or "ig-backlog")
+    else:
+        return {"status": "unsupported"}
+    if not post:
+        return {"status": "gone"}
+    return {"status": "rebuilt", "carousel_id": post["fact"]["carousel_id"], "slides": post["fact"]["slides"]}
+
+
 #: A recap with no next meeting in sight (a one-off, or a series' last match) stays this long after the match.
 RECAP_DAYS = 3
 

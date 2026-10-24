@@ -101,3 +101,41 @@ def test_a_deck_with_its_deeper_cut_is_trimmed_to_eight():
     assert ids[:3] == ["hook", "scatter-sr-raa", "deep-zones"] and ids[-2:] == ["scorecard", "end"]
     unscored = ig_backlog.trim_deck(deck, {})
     assert "zones-klaasen" not in [(s.get("card") or {}).get("id") for s in unscored]  # else the last chart before the closer
+
+
+class _Row:
+    def __init__(self, row):
+        self.row = row
+
+    def first(self):
+        return self.row
+
+
+class _DB:
+    def __init__(self, row):
+        self.row = row
+
+    def execute(self, *a, **k):
+        return _Row(self.row)
+
+
+def test_rebuild_routes_by_kind_and_keeps_the_day(monkeypatch):
+    import contextlib
+    from datetime import date
+
+    import database
+    from services import ig_backlog
+    from services.ig_posts import questions as Q
+
+    day = date(2026, 10, 28)
+    written = []
+    monkeypatch.setattr(database, "engine", type("E", (), {"begin": staticmethod(contextlib.nullcontext)}))
+    monkeypatch.setattr(ig_backlog, "add_deep_cut", lambda db, post, d: None)
+    monkeypatch.setattr(ig_backlog, "upsert_pack", lambda conn, post, d, source: written.append((post["key"], d, source)))
+    monkeypatch.setattr(Q, "generate", lambda db, limit, only, log: [{"q": only[0]}] if only == ["ipl23-batter-all"] else [])
+    monkeypatch.setattr(ig_backlog, "debate_post", lambda db, e: {"key": f"debate-{e['q']}", "fact": {"carousel_id": "c1", "slides": 8}})
+    got = ig_backlog.rebuild(_DB((day, "ig-backlog")), "ig:debate-ipl23-batter-all")
+    assert got == {"status": "rebuilt", "carousel_id": "c1", "slides": 8} and written == [("debate-ipl23-batter-all", day, "ig-backlog")]
+    assert ig_backlog.rebuild(_DB((day, "ig-backlog")), "ig:debate-gone")["status"] == "gone"  # not contested any more
+    assert ig_backlog.rebuild(_DB((day, "ig-trend")), "ig:trend-x-2026-10-24")["status"] == "unsupported"
+    assert ig_backlog.rebuild(_DB(None), "ig:debate-x")["status"] == "missing"

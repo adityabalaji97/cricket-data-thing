@@ -37,6 +37,10 @@ def main() -> int:
     parser.add_argument("--retitle-deep-cuts", type=int, metavar="DAYS", default=None,
                         help="give posts planned in the next DAYS days their deeper cut's short claim, and re-render")
     parser.add_argument("--retitle", action="append", help="the same for these queued posts (angle keys, any day)")
+    parser.add_argument("--rebuild-breaking", type=int, metavar="DAYS", default=None,
+                        help="rebuild posts planned in the next DAYS days (0: the bench) that break a rule their "
+                             "builder now follows, and re-render")
+    parser.add_argument("--rebuild", action="append", help="rebuild these queued posts (angle keys), and re-render")
     args = parser.parse_args()
 
     from services import ig_backlog
@@ -57,6 +61,41 @@ def main() -> int:
             for key, old, new in ig_backlog.reorder(db, today + _td(days=1), args.days, dry_run=args.dry_run):
                 print(f"  {key}: {old} -> {new}")
         print("dry run: nothing moved" if args.dry_run else "done")
+        return 0
+    if args.rebuild_breaking is not None or args.rebuild:
+        # A post built before its builder followed a rule (services/social_rules: lint, and the render's layout
+        # findings) is remade through the builder as it is now, on the same day, and re-rendered with its Reel.
+        from datetime import datetime, timedelta as _td, timezone
+
+        from sqlalchemy import text
+
+        from database import get_session
+        from services import ig_slides
+        from services.social_rules import findings
+
+        db = next(get_session())
+        keys = list(args.rebuild or [])
+        if args.rebuild_breaking is not None:
+            today = datetime.now(timezone(_td(hours=5, minutes=30))).date()
+            where = ("p.planned_for IS NULL" if args.rebuild_breaking == 0
+                     else "p.planned_for BETWEEN :a AND :b")
+            for key, kind, layout, data in db.execute(text(f"""
+                SELECT p.angle_key, p.facts->>'kind', p.facts->'layout', s.data FROM content_packs p
+                JOIN chart_snapshots s ON s.id = p.facts->>'carousel_id'
+                WHERE p.channel = 'instagram' AND p.status = 'ready' AND {where} ORDER BY p.planned_for, p.id
+            """), {"a": today, "b": today + _td(days=args.rebuild_breaking)}).all():
+                rules = {f["rule"] for f in findings(((data or {}).get("slides")) or [], kind)} | {
+                    f["rule"] for f in layout or []}
+                if rules & set(ig_backlog.REBUILD_RULES):
+                    keys.append(key)
+        for key in keys:
+            got = ig_backlog.rebuild(db, key)
+            line = f"  {key}: {got['status']}"
+            if got["status"] == "rebuilt":
+                r = ig_slides.render(got["carousel_id"], got["slides"], *([args.base] if args.base else []))
+                line += f"; rendered {len(r['ok'])}/{got['slides']}" + (f", failed {r['failed']}" if r["failed"] else "")
+                line += f"; Reel {r.get('reel')}s" if r.get("reel") else ""
+            print(line, flush=True)
         return 0
     if args.retitle_deep_cuts is not None or args.retitle:
         # Posts made before the deeper cut wrote its own short claim (23 Oct 2026) still carry the sentence as the
@@ -83,10 +122,7 @@ def main() -> int:
             if got["status"] == "retitled":
                 r = ig_slides.render(got["carousel_id"], got["slides"], *([args.base] if args.base else []))
                 line += f" ({got['title']}); rendered {len(r['ok'])}/{got['slides']}" + (f", failed {r['failed']}" if r["failed"] else "")
-                # render() makes the slideshow Reel; the voiced one (REEL_V2=1) comes from the stored slides.
-                if not r["failed"] and os.getenv("REEL_V2") == "1":
-                    seconds = ig_slides.reel_from_stored(got["carousel_id"], got["slides"])
-                    line += f"; Reel {seconds}s"
+                line += f"; Reel {r.get('reel')}s" if r.get("reel") else ""  # render() makes the post's Reel
             print(line, flush=True)
         return 0
     if args.extras_pending:
