@@ -7,6 +7,8 @@ Titles are sentences written here from the rows; every number in a title or payl
 """
 from __future__ import annotations
 
+import re
+
 from typing import Any, Dict, List, Optional
 
 from services.ig_posts.angles import Angle
@@ -53,6 +55,28 @@ def short(name: str) -> str:
         if p.lower() in ("de", "du", "van", "von", "der", "ul", "al", "da", "di"):
             return " ".join(parts[i:])
     return parts[-1]
+
+
+def fit(title: str, name: str, limit: int = 80) -> str:
+    """The title with the surname for the full name when it would run past `limit` characters (two lines on a 4:5
+    card; docs/social_rules.md, Card anatomy). A namesake's side in brackets goes first; the scope line keeps it."""
+    if len(title) <= limit or " " not in name:
+        return title
+    bare = re.sub(r"\s+\([A-Za-z](?:[^()]|\([^()]*\))*\)$", "", name)
+    return title.replace(name, short(bare))
+
+
+def first_fit(options: List[str], name: str, limit: int = 80) -> str:
+    """The first wording that fits `limit` with the full name, else the first that fits with the surname (fit), else
+    the shortest: options go from the fullest claim to the barest."""
+    for o in options:
+        if len(o) <= limit:
+            return o
+    for o in options:
+        f = fit(o, name, limit)
+        if len(f) <= limit:
+            return f
+    return min((fit(o, name, limit) for o in options), key=len)
 
 
 def pair_short(name: str) -> str:
