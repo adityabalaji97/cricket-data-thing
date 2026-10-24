@@ -6,7 +6,7 @@ import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import StoryCard from '../story/StoryCard';
 import { toStoryCard } from '../story/visuals';
-import { fmt, SHARE_COLOURS, ShotWheel, WinProbLine } from '../story/postVisuals';
+import { fmt, POST_VISUALS, SHARE_COLOURS, ShotWheel, WinProbLine } from '../story/postVisuals';
 
 /**
  * /ig/:carouselId/:n — one Instagram carousel slide (services/ig_carousel.py), drawn by the app's own components at
@@ -78,6 +78,14 @@ const Hero = ({ hero }) => {
         <WinProbLine payload={hero.payload} />
       </Box>
     );
+  }
+  if (hero.kind === 'visual') {  // a whole chart (a scatter, a race, a wagon wheel), drawn as on its card
+    const Visual = POST_VISUALS[hero.visual];
+    return Visual ? (
+      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', mt: 0.5, overflow: 'hidden' }}>
+        <Visual payload={hero.payload} teams={hero.teams} />
+      </Box>
+    ) : null;
   }
   if (hero.kind === 'wheel') {
     return (

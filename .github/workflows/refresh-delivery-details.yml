@@ -220,7 +220,8 @@ jobs:
           CHROME: google-chrome
         run: python scripts/ig_on_this_day.py
       # Unposted evergreen posts from past days to the bench; then the next 30 days lead with the format that's on
-      # (services/ig_season.py); then a deeper cut still titled with its whole sentence (made before 23 Oct 2026)
+      # (services/ig_season.py); then the next 3 days' posts that break a rule their builder now follows are rebuilt;
+      # then a deeper cut still titled with its whole sentence (made before 23 Oct 2026)
       # gets its short claim for the next 3 days' posts, re-rendered; then Reels for anything rendered without one.
       - name: Instagram queue upkeep
         continue-on-error: true
@@ -232,6 +233,7 @@ jobs:
           CHROME: google-chrome
         run: |
           python scripts/build_ig_backlog.py --bench-unposted --reorder
+          python scripts/build_ig_backlog.py --rebuild-breaking 3
           python scripts/build_ig_backlog.py --retitle-deep-cuts 3
           python scripts/build_ig_backlog.py --reels-pending
       # Today's posts rebuilt with the data just loaded; a post whose numbers moved is rebuilt in place (slides, Reel,
