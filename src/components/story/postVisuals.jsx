@@ -460,11 +460,13 @@ const BucketBars = ({ payload }) => {
 
 /**
  * Two values per row (before/after, v pace/v spin): a dumbbell.
- * payload: {series:[a, b], format, rows:[{label, a, b, highlight?}], values?, full_labels?} (full_labels: row labels as
+ * payload: {series:[a, b], format, rows:[{label, a, b, highlight?}], values?, full_labels?, no_diff?} (full_labels: row labels as
  * given, not shortened to a surname)
  */
 const PairDumbbell = ({ payload }) => {
-  const W = 300; const rowH = 30; const H = payload.rows.length * rowH + 26; const L = payload.values ? 130 : 104; const R = payload.values ? 70 : 44;
+  // no_diff: no b − a column (a chart whose two series aren't a before/after, where a difference reads as noise).
+  const W = 300; const rowH = 30; const H = payload.rows.length * rowH + 26; const L = payload.values ? 130 : 104;
+  const R = (payload.values ? 70 : 44) - (payload.no_diff ? 34 : 0);
   const vals = payload.rows.flatMap((r) => [r.a, r.b]);
   const lo = Math.min(...vals); const hi = Math.max(...vals); const pad = (hi - lo) * 0.1 || 1;
   const sx = (v) => L + ((v - lo + pad) / (hi - lo + 2 * pad)) * (W - L - R);
@@ -486,7 +488,9 @@ const PairDumbbell = ({ payload }) => {
                   <text x={sx(Math.max(r.a, r.b)) + 8} y={y + 4} style={{ ...mono, fontSize: 10, fill: r.a <= r.b ? cb : ca }}>{fmt(Math.max(r.a, r.b), payload.format)}</text>
                 </>
               )}
-              <text x={W} y={y + 4} textAnchor="end" style={{ ...mono, fontSize: 11, fill: colors.textMed }}>{fmt(r.b - r.a, payload.format === 'int' ? 'signed0' : 'signed1')}</text>
+              {!payload.no_diff && (
+                <text x={W} y={y + 4} textAnchor="end" style={{ ...mono, fontSize: 11, fill: colors.textMed }}>{fmt(r.b - r.a, payload.format === 'int' ? 'signed0' : 'signed1')}</text>
+              )}
             </g>
           );
         })}
