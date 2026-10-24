@@ -97,7 +97,8 @@ def main() -> int:
         return 0
     if args.reels_pending:
         r = ig_backlog.reels_pending()
-        print(f"reels made {r['made']}, still missing {r['missing']}")
+        print(f"reels made {r['made']}, still missing {r['missing']}; voiced in place of a slideshow {r['voiced']}"
+              + (f", still unvoiced {r['unvoiced']}" if r["unvoiced"] else ""))
         return 0
     if args.render_pending:
         r = ig_backlog.render_pending(args.base)
