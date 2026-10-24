@@ -139,3 +139,9 @@ def test_rebuild_routes_by_kind_and_keeps_the_day(monkeypatch):
     assert ig_backlog.rebuild(_DB((day, "ig-backlog")), "ig:debate-gone")["status"] == "gone"  # not contested any more
     assert ig_backlog.rebuild(_DB((day, "ig-trend")), "ig:trend-x-2026-10-24")["status"] == "unsupported"
     assert ig_backlog.rebuild(_DB(None), "ig:debate-x")["status"] == "missing"
+
+
+def test_a_decimal_is_not_a_count_of_one():
+    card = {"title": "Mitchell Starc goes for 2.1 runs an over above par in the powerplay", "visual": "deep_compare"}
+    assert not any("name the one" in w for w in social_rules.lint_card(card))
+    assert any("name the one" in w for w in social_rules.lint_card({"title": "then 1 overs took it away"}))
