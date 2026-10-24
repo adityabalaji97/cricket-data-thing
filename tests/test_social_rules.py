@@ -62,8 +62,11 @@ def test_card_anatomy_and_vocabulary():
     assert lint_card(ok) == []
     long_title = dict(ok, title="x " * 45)
     assert any("Title over 80" in w for w in lint_card(long_title))
-    off = dict(ok, title="Allen scores at 213 against new-ball pace", payload={"metric": {"label": "Impact (runs added)"}})
+    off = dict(ok, title="Allen scores at 213 against new-ball pace", payload={"metric": {"label": "runs added"}})
     got = " ".join(lint_card(off))
     assert "'new-ball'" in got and "'runs added'" in got
-    assert any("help line" in w for w in lint_card(dict(ok, help="h" * 100)))
-    assert not any("help line" in w for w in lint_card(dict(ok, help="h" * 100, help_on_card=True)))
+    defined = dict(ok, help="Impact: runs added to the batting side's projected total")  # defines Impact: fine
+    assert not any("runs added" in w for w in lint_card(defined))
+    # A help line is drawn on the card only with help_on_card; otherwise it's in the info sheet and its length is fine.
+    assert not any("help line" in w for w in lint_card(dict(ok, help="h" * 100)))
+    assert any("help line" in w for w in lint_card(dict(ok, help="h" * 100, help_on_card=True)))
