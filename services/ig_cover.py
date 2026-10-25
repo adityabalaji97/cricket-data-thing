@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 ROWS = 4
 #: Charts the cover can draw whole, as on their card: a scatter, a race of running totals, a wagon wheel.
-WHOLE = ("scatter_plus", "race_lines", "innings_wagon")
+WHOLE = ("scatter_plus", "race_lines", "innings_wagon", "sankey")
 
 
 def variant(title: str) -> str:
