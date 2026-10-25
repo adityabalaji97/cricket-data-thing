@@ -3,8 +3,8 @@ India's 300th men's T20I (NZ v India, Christchurch, 24 Oct 2026): 300 matches, 2
 300 (results, toss, who batted first) and the ball-by-ball goes back to 2006 (scoring rates, the raw batting and
 bowling numbers); Impact and win probability are T20 Primer metrics, from 2015.
 
-Slides (10, approved for this landmark): cover (results by opponent); the deeper cut (toss -> batted first or chased
--> result, a Sankey); scoring rate and economy by year; team totals since 2015; batting raw; batting by Impact and win
+Slides (10, approved for this landmark): cover (results by opponent); the deeper cut (toss and batting order as
+paths, won/lost bars with the win rate); scoring rate and economy by year; team totals since 2015; batting raw; batting by Impact and win
 probability; bowling raw; bowling by Impact and win probability; the games that turned; end.
 
     python articles/india-300/post.py              # dry run: titles, lint; nothing saved (writes slides.json)
@@ -30,6 +30,9 @@ WON, LOST, TIED, NR = "#b6f24a", "#e66767", "#9aa1ac", "#3a4150"
 MATCHES = ("m.format = 'T20' AND m.gender = 'male' AND m.match_type = 'international' "
            "AND 'India' IN (m.team1, m.team2)")
 SHOWN = 6           # players on the batting and bowling grids
+COUNTRIES = {"India", "Australia", "England", "South Africa", "New Zealand", "Pakistan", "Sri Lanka", "Bangladesh",
+             "West Indies", "Zimbabwe", "Afghanistan", "Ireland", "United States of America", "United Arab Emirates"}
+COMMON_SURNAMES = {"Sharma", "Yadav", "Singh", "Kumar", "Patel", "Khan", "Iyer", "Pandya"}
 BAT_FIELD = 300     # balls for an India batter to be in the shading field
 #: India's two T20Is with no ball-by-ball anywhere (Cricsheet hasn't them either): v Afghanistan, Gros Islet 2010
 #: (412679) and Colombo 2012 (533274). Their scorecard innings for the batters on the grid (ESPNcricinfo / ESPN
@@ -58,11 +61,18 @@ def matches(db):
     from sqlalchemy import text
 
     rows = [dict(r) for r in db.execute(text(f"""
-        SELECT m.id, m.date, m.team1, m.team2, m.winner, m.outcome, m.toss_winner, m.bat_first
+        SELECT m.id, m.date, m.team1, m.team2, m.winner, m.outcome, m.toss_winner, m.bat_first, m.venue, m.city
         FROM matches m WHERE {MATCHES} ORDER BY m.date""")).mappings()]
     for r in rows:
         oc = r["outcome"] or {}
         r["opp"] = r["team2"] if r["team1"] == TEAM else r["team1"]
+        # A short place for a subtext: the town after the venue's last comma ("Barsapara Cricket Stadium,
+        # Guwahati" -> Guwahati), else the city column (when it's a town, not a country), else the venue.
+        venue, city = (r["venue"] or "").strip(), (r["city"] or "").strip()
+        r["place"] = (venue.split(",")[-1].strip() if "," in venue
+                      else city if city and city not in COUNTRIES else venue)
+        r["place"] = {"Bangalore": "Bengaluru", "Bombay": "Mumbai", "Calcutta": "Kolkata", "Madras": "Chennai"}.get(
+            r["place"], r["place"])
         r["res"] = ("tied" if oc.get("result") == "tie" else "nr" if not r["winner"] else
                     "won" if r["winner"] == TEAM else "lost")
     return rows
@@ -70,44 +80,72 @@ def matches(db):
 
 # ---- results -------------------------------------------------------------------------------------------------------
 
-def opponents_card(ms):
+SHORT_TEAMS = {"South Africa": "RSA"}  # the user's preference over the feed's "SA"
+
+
+def short_team(team):
+    from services.ig_posts.recap_special import abbr
+
+    return SHORT_TEAMS.get(team) or abbr(team)
+
+
+def opponents_card(ms, top=8):
+    """The cover's chart: all 300 flowing to each opponent (in its team colours) and on to the result."""
     by = {}
     for m in ms:
         by.setdefault(m["opp"], {"won": 0, "lost": 0, "tied": 0, "nr": 0})[m["res"]] += 1
-    top = sorted(by, key=lambda o: -sum(by[o].values()))[:5]
+    order = sorted(by, key=lambda o: -sum(by[o].values()))
+    shown, rest = order[:top], order[top:]
+    mid = [{"id": f"o:{o}", "label": short_team(o), "team": o} for o in shown]
+    if rest:
+        mid.append({"id": "o:others", "label": f"{len(rest)} others", "colour": "#5b6b85"})
+    results = [("won", "Won", WON), ("lost", "Lost", LOST), ("tied", "Tied", TIED), ("nr", "No result", NR)]
+    links = []
+    for o in shown:
+        links.append({"source": "all", "target": f"o:{o}", "value": sum(by[o].values())})
+        links += [{"source": f"o:{o}", "target": k, "value": by[o][k]} for k, _, _ in results if by[o][k]]
+    if rest:
+        tot = {k: sum(by[o][k] for o in rest) for k, _, _ in results}
+        links.append({"source": "all", "target": "o:others", "value": sum(tot.values())})
+        links += [{"source": "o:others", "target": k, "value": v} for k, v in tot.items() if v]
     won = sum(m["res"] == "won" for m in ms)
-    return card("by-opponent", "share_bars", f"{len(ms)} T20Is, {won} wins",
-                {"absolute": True, "format": "int",
-                 "groups": [{"key": "won", "label": "Won", "colour": WON}, {"key": "lost", "label": "Lost", "colour": LOST},
-                            {"key": "tied", "label": "Tied", "colour": TIED}, {"key": "nr", "label": "No result", "colour": NR}],
-                 "rows": [{"name": o, "detail": f"{sum(by[o].values())} T20Is",
-                           "segments": [{"key": k, "value": by[o][k]} for k in ("won", "lost", "tied", "nr")]} for o in top]},
-                "India's men's T20Is, Dec 2006 to Oct 2026 · the five most-played opponents",
+    return card("by-opponent", "sankey", f"{len(ms)} T20Is, {won} wins",
+                {"columns": [[{"id": "all", "label": f"{len(ms)} T20Is"}], mid,
+                             [{"id": k, "label": lab, "colour": col} for k, lab, col in results]],
+                 "links": links, "flow_column": 1, "height": 316},
+                f"India's men's T20Is, Dec 2006 to Oct 2026 · the {top} most-played opponents",
                 "Tied includes Super Over results; no result includes matches abandoned after the toss.")
 
 
-def sankey_card(ms):
-    known = [m for m in ms if m["toss_winner"] and m["bat_first"]]
-    links = {}
+def paths_card(ms):
+    """Chasing and batting first, one bar each: length = matches, the bright part the wins, labelled with the win
+    rate. (The toss split was dropped: it repeated the cover's flow and blurred the one comparison.)"""
+    known = [m for m in ms if m["bat_first"]]
+    paths = {}
     for m in known:
-        toss = "toss-won" if m["toss_winner"] == TEAM else "toss-lost"
-        inn = "bat" if m["bat_first"] == TEAM else "chase"
-        res = {"won": "won", "lost": "lost"}.get(m["res"], "other")
-        links[(toss, inn)] = links.get((toss, inn), 0) + 1
-        links[(inn, res)] = links.get((inn, res), 0) + 1
-    rate = lambda inn: (links.get((inn, "won"), 0), sum(v for (a, _), v in links.items() if a == inn))  # noqa: E731
-    cw, cn = rate("chase")
-    bw, bn = rate("bat")
-    title = (f"Chasing, India have won {round(100 * cw / cn)}% ({cw} of {cn}); batting first, "
-             f"{round(100 * bw / bn)}% ({bw} of {bn})")
-    c = card("toss-to-result", "sankey", title,
-             {"columns": [[{"id": "toss-won", "label": "Won the toss"}, {"id": "toss-lost", "label": "Lost the toss"}],
-                          [{"id": "bat", "label": "Batted first"}, {"id": "chase", "label": "Chased"}],
-                          [{"id": "won", "label": "Won", "colour": WON}, {"id": "lost", "label": "Lost", "colour": LOST},
-                           {"id": "other", "label": "Tied or no result", "colour": TIED}]],
-              "links": [{"source": a, "target": b, "value": v} for (a, b), v in links.items()]},
-             f"{len(known)} of India's {len(ms)} T20Is with the toss recorded · Dec 2006 to Oct 2026",
-             "Read left to right: who won the toss, who batted first, how it ended.")
+        key = "Batted first" if m["bat_first"] == TEAM else "Chased"
+        p = paths.setdefault(key, {"won": 0, "lost": 0, "other": 0})
+        p[{"won": "won", "lost": "lost"}.get(m["res"], "other")] += 1
+    rate = lambda k: (paths[k]["won"], sum(paths[k].values()))  # noqa: E731
+    cw, cn = rate("Chased")
+    bw, bn = rate("Batted first")
+    order = ["Chased", "Batted first"]
+    rows = []
+    for k in order:
+        p = paths.get(k, {"won": 0, "lost": 0, "other": 0})
+        n = sum(p.values())
+        rows.append({"name": k, "detail": f"won {p['won']} of {n} ({round(100 * p['won'] / n)}%)" if n else "",
+                     "segments": [{"key": "won", "value": p["won"]}, {"key": "lost", "value": p["lost"]},
+                                  {"key": "other", "value": p["other"]}]})
+    c = card("toss-to-result", "share_bars",
+             f"Chasing, India have won {round(100 * cw / cn)}% ({cw} of {cn}); batting first, "
+             f"{round(100 * bw / bn)}% ({bw} of {bn})",
+             {"absolute": True, "format": "int", "label_width": 132,
+              "groups": [{"key": "won", "label": "Won", "colour": WON}, {"key": "lost", "label": "Lost", "colour": LOST},
+                         {"key": "other", "label": "Tied or no result", "colour": TIED}],
+              "rows": rows},
+             f"{len(known)} of India's {len(ms)} T20Is · Dec 2006 to Oct 2026",
+             "Each bar: the matches India chased or batted first in, and how they ended.")
     c["kicker"] = "The deeper cut"
     return c, {"cw": cw, "cn": cn, "bw": bw, "bn": bn}
 
@@ -165,6 +203,11 @@ def totals_card(db, ms):
 
 # ---- players -------------------------------------------------------------------------------------------------------
 
+def _short(name):
+    last = name.split()[-1]
+    return name.split()[0] if last in COMMON_SURNAMES else last
+
+
 def _pct(field, key, v, higher=True):
     vals = sorted(r[key] for r in field if r.get(key) is not None)
     if v is None or not vals:
@@ -179,8 +222,10 @@ def grid(cid, rows, field, metrics, title, sample, help_):
     for r in rows:
         vals = {m["key"]: (round(r[m["key"]], 2) if r.get(m["key"]) is not None else None) for m in metrics}
         pct = {m["key"]: _pct(field, m["key"], r.get(m["key"]), m.get("higher", True)) for m in metrics}
-        # The surname, unless two of the rows share it (Rohit and Abhishek Sharma): then the full name.
-        short = r["name"].split()[-1] if surnames.count(r["name"].split()[-1]) == 1 else r["name"]
+        # The surname, but the first name where the surname is a common one or shared (Rohit and Abhishek
+        # Sharma, Suryakumar and Kuldeep Yadav, Arshdeep Singh).
+        last = r["name"].split()[-1]
+        short = r["name"].split()[0] if last in COMMON_SURNAMES or surnames.count(last) > 1 else last
         out.append({"name": r["name"], "short": short, "values": vals, "pct": pct, "leader": []})
     for m in metrics:
         have = [o for o in out if o["values"][m["key"]] is not None]
@@ -214,7 +259,7 @@ def batting(db):
     most = top[0]
     avg = max(top, key=lambda r: r["average"] or 0)
     raw = grid("batting-raw", top, field, raw_m,
-               f"{most['name']}: most runs, {most['runs']:,}. {avg['name'].split()[-1]} averages the most: {avg['average']:.1f}",
+               f"{most['name']}: most runs, {most['runs']:,}. {_short(avg['name'])} averages the most: {avg['average']:.1f}",
                "India's six leading run-scorers in men's T20Is · Dec 2006 to Oct 2026",
                f"Shading: where each figure ranks among India batters with {BAT_FIELD}+ balls. Ring: the best of the six. "
                "Ball by ball, plus the scorecards of the two 2010 and 2012 games against Afghanistan, which have no "
@@ -251,7 +296,7 @@ def bowling(db):
     most = top[0]
     econ = min(top, key=lambda r: r["economy"])
     raw = grid("bowling-raw", top, field, raw_m,
-               f"{most['name']}: most wickets, {most['wickets']}. {econ['name'].split()[-1]} goes for the least: {econ['economy']:.2f}",
+               f"{most['name']}: most wickets, {most['wickets']}. {_short(econ['name'])} goes for the least: {econ['economy']:.2f}",
                "India's six leading wicket-takers in men's T20Is · 2006 to Oct 2026, ball by ball",
                f"Shading: where each figure ranks among India bowlers with {BOWL_FIELD}+ balls. Ring: the best of the six.")
     since = {r["bowler"]: r for r in q(db, bowling_teams=[TEAM], group_by=["bowler"], metrics_perspective="bowling",
@@ -289,9 +334,10 @@ def turns_card(db, ms):
     lost = sorted((r for r in rows if res.get(r["p_match"], {}).get("res") == "lost"), key=lambda r: -r["hi"])[:3]
     pc = lambda v: max(1, round(100 * v)) if v < 0.995 else round(100 * v)  # noqa: E731
     lab = lambda r: f"v {res[r['p_match']]['opp']}, {res[r['p_match']]['date'].year}"  # noqa: E731
-    rows_out = ([{"name": lab(r), "value": 100 - pc(r["lo"]), "highlight": i == 0, "detail": f"won from {pc(r['lo'])}%"}
-                 for i, r in enumerate(won)]
-                + [{"name": lab(r), "value": -pc(r["hi"]), "detail": f"lost from {pc(r['hi'])}%"} for r in lost])
+    place = lambda r: res[r["p_match"]]["place"]  # noqa: E731
+    rows_out = ([{"name": lab(r), "value": 100 - pc(r["lo"]), "highlight": i == 0,
+                  "detail": f"won from {pc(r['lo'])}% · {place(r)}"} for i, r in enumerate(won)]
+                + [{"name": lab(r), "value": -pc(r["hi"]), "detail": f"lost from {pc(r['hi'])}% · {place(r)}"} for r in lost])
     w0, l0 = won[0], lost[0]
     c = card("turns", "metric_bars",
              f"India won from {pc(w0['lo'])}% {lab(w0)}, and lost from {pc(l0['hi'])}% {lab(l0)}",
@@ -306,7 +352,7 @@ def turns_card(db, ms):
 def build(db):
     ms = matches(db)
     lead = opponents_card(ms)
-    sk, sn = sankey_card(ms)
+    sk, sn = paths_card(ms)
     rates, rn = rates_card(db)
     tot, tn = totals_card(db, ms)
     braw, bimp, bn = batting(db)
@@ -328,10 +374,10 @@ def build(db):
 def copy(b):
     c, sn, rn, tn, bn, wn, un = b["counts"], b["sn"], b["rn"], b["tn"], b["bn"], b["wn"], b["un"]
     by, bp, bw = b["best_year"]
-    hook = f"India have played {b['n']} T20Is and won {b['won']} of them"
+    hook = f"{b['n']} T20Is, {b['won']} wins"
     caption = "\n\n".join([
         f"India's 300th T20I, in Christchurch on Saturday, was win number {b['won']}: {c['won']} won, {c['lost']} lost, "
-        f"{c['tied']} tied, {c['nr']} no result since December 2006.",
+        f"{c['tied']} tied, {c['nr']} no result, from December 2006 to October 2026.",
         f"Chasing, they've won {round(100 * sn['cw'] / sn['cn'])}% ({sn['cw']} of {sn['cn']}). Batting first, "
         f"{round(100 * sn['bw'] / sn['bn'])}% ({sn['bw']} of {sn['bn']}). Best year: {by}, {bw} wins in {bp}.",
         f"{rn['fastest']} is India's fastest-scoring year: {rn['rpo']:.1f} an over, against {rn['first_rpo']:.1f} in {rn['first']}.",
@@ -352,7 +398,7 @@ def copy(b):
 def slides_of(b, hook):
     from services.ig_cover import hero_from
 
-    cover = {"type": "hook", "text": hook, "kicker": "300 T20Is · Dec 2006 to Oct 2026", "cover": "hero",
+    cover = {"type": "hook", "text": hook, "cover": "hero",
              "hero": {**hero_from(b["lead"]), "card": b["lead"]}}
     return ([cover] + [{"type": "card", "card": c, "teams": [TEAM]} for c in b["cards"]]
             + [{"type": "end", "heading": "Every T20I, ball by ball",
