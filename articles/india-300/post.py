@@ -31,6 +31,12 @@ MATCHES = ("m.format = 'T20' AND m.gender = 'male' AND m.match_type = 'internati
            "AND 'India' IN (m.team1, m.team2)")
 SHOWN = 6           # players on the batting and bowling grids
 BAT_FIELD = 300     # balls for an India batter to be in the shading field
+#: India's two T20Is with no ball-by-ball anywhere (Cricsheet hasn't them either): v Afghanistan, Gros Islet 2010
+#: (412679) and Colombo 2012 (533274). Their scorecard innings for the batters on the grid (ESPNcricinfo / ESPN
+#: scorecards), added to the ball-by-ball career totals so they match the official ones; dot balls aren't on a
+#: scorecard, so dot % stays ball-by-ball.
+SCORECARD_ONLY = {"Virat Kohli": {"runs": 50, "balls": 39, "fours": 4, "sixes": 2, "outs": 1},   # 533274
+                  "Rohit Sharma": {"runs": 1, "balls": 1, "fours": 0, "sixes": 0, "outs": 0}}   # 533274, not out
 BOWL_FIELD = 300    # balls for an India bowler
 
 
@@ -190,6 +196,15 @@ def batting(db):
     allb = q(db, batting_teams=[TEAM], group_by=["batter"], metrics_perspective="batting")
     for r in allb:
         r["name"] = r["batter"]
+        add = SCORECARD_ONLY.get(r["name"])
+        if add:  # the scorecard-only innings: runs, balls, boundaries and dismissals; dots stay ball-by-ball
+            outs = (r["runs"] / r["average"]) if r.get("average") else 0
+            bounds = r["boundary_percentage"] * r["balls"] / 100
+            r["runs"] += add["runs"]
+            r["balls"] += add["balls"]
+            r["average"] = r["runs"] / (outs + add["outs"]) if outs + add["outs"] else None
+            r["strike_rate"] = 100 * r["runs"] / r["balls"]
+            r["boundary_percentage"] = 100 * (bounds + add["fours"] + add["sixes"]) / r["balls"]
     top = sorted(allb, key=lambda r: -r["runs"])[:SHOWN]
     field = [r for r in allb if r["balls"] >= BAT_FIELD]
     raw_m = [{"key": "runs", "label": "Runs", "format": "int"}, {"key": "average", "label": "Avg", "format": "dec1"},
@@ -200,8 +215,10 @@ def batting(db):
     avg = max(top, key=lambda r: r["average"] or 0)
     raw = grid("batting-raw", top, field, raw_m,
                f"{most['name']}: most runs, {most['runs']:,}. {avg['name'].split()[-1]} averages the most: {avg['average']:.1f}",
-               "India's six leading run-scorers in men's T20Is · 2006 to Oct 2026, ball by ball",
-               f"Shading: where each figure ranks among India batters with {BAT_FIELD}+ balls. Ring: the best of the six.")
+               "India's six leading run-scorers in men's T20Is · Dec 2006 to Oct 2026",
+               f"Shading: where each figure ranks among India batters with {BAT_FIELD}+ balls. Ring: the best of the six. "
+               "Ball by ball, plus the scorecards of the two 2010 and 2012 games against Afghanistan, which have no "
+               "ball-by-ball (dot % leaves them out).")
     since = {r["batter"]: r for r in q(db, batting_teams=[TEAM], group_by=["batter"], metrics_perspective="batting",
                                        start_date=__import__("datetime").date(2015, 1, 1))}
     sfield = [dict(r, name=n) for n, r in since.items() if r["balls"] >= BAT_FIELD]
