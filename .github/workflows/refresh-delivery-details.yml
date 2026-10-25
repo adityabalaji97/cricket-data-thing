@@ -250,6 +250,12 @@ jobs:
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
         run: python scripts/ig_check_today.py
 
+      # Our men's T20I record by year against ESPNcricinfo's (services/reference/t20i_record_by_year.json): a year that
+      # doesn't add up is a missing match, a wrong result or a match the feed hasn't finished (services/results_parity.py).
+      - name: Results parity
+        continue-on-error: true
+        run: python scripts/check_results_parity.py
+
       # Usage tables (migration 004) keep 90 days of raw rows; weekly reports need no more.
       - name: Prune raw usage events
         if: always()

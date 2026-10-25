@@ -21,6 +21,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+
+def clean_winner(value):
+    """The feed's winner, or None for a blank, "-" or "N/A" (no team won: a tie, a no-result, an unfinished match)."""
+    v = (value or "").strip()
+    return None if v in ("", "-", "--", "N/A", "NA", "None", "null") else v
+
 class DeliveryDetailsSync:
     INTERNATIONAL_COMPETITIONS = ['T20I', 'T20 World Cup', 'ICC', 'World Cup', 'Asia Cup']
     
@@ -197,6 +203,10 @@ class DeliveryDetailsSync:
         )
         overs = (max_over + 1) if max_over is not None else None
 
+        # The feed leaves the winner blank or "-" for a tie, a no-result or a match it caught unfinished: no winner
+        # (services/match_results.py records what happened from ESPN), never "-" as a team that won.
+        winner = clean_winner(first_row.winner)
+
         match_data = {
             'id': match_id,
             'date': first_row.match_date,
@@ -204,7 +214,7 @@ class DeliveryDetailsSync:
             'city': first_row.country,
             'team1': team1,
             'team2': team2,
-            'winner': first_row.winner,
+            'winner': winner,
             'toss_winner': toss_winner,
             'toss_decision': toss_decision,
             'competition': competition,
@@ -226,10 +236,10 @@ class DeliveryDetailsSync:
                 match_data['bowl_first'] = toss_winner
                 match_data['bat_first'] = team2 if toss_winner == team1 else team1
             
-            match_data['win_toss_win_match'] = (toss_winner == first_row.winner) if first_row.winner else None
-            if first_row.winner:
-                match_data['won_batting_first'] = match_data.get('bat_first') == first_row.winner
-                match_data['won_fielding_first'] = match_data.get('bowl_first') == first_row.winner
+            match_data['win_toss_win_match'] = (toss_winner == winner) if winner else None
+            if winner:
+                match_data['won_batting_first'] = match_data.get('bat_first') == winner
+                match_data['won_fielding_first'] = match_data.get('bowl_first') == winner
         
         return match_data
     
