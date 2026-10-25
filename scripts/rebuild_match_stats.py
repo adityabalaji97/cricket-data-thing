@@ -5,6 +5,7 @@ their ball_metrics scored again by the nightly incremental run's own code (the s
 
     python scripts/rebuild_match_stats.py --ids-file matches.json            # what would be rebuilt
     python scripts/rebuild_match_stats.py --ids-file matches.json --write
+    python scripts/rebuild_match_stats.py --ids-file matches.json --write --rescore-later   # metrics by the nightly run
 """
 from __future__ import annotations
 
@@ -23,6 +24,9 @@ def main() -> int:
     parser.add_argument("--ids", nargs="*", default=[])
     parser.add_argument("--ids-file")
     parser.add_argument("--write", action="store_true")
+    parser.add_argument("--rescore-later", action="store_true",
+                        help="clear their ball_metrics but leave the scoring to the nightly incremental run "
+                             "(where this machine can't run the model)")
     args = parser.parse_args()
     ids = list(args.ids) + (json.load(open(args.ids_file)) if args.ids_file else [])
     ids = sorted({str(i) for i in ids})
@@ -53,6 +57,9 @@ def main() -> int:
     subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "backfill_stats_player_ids.py")], check=True, cwd=ROOT)
     with engine.begin() as conn:
         m = conn.execute(text("DELETE FROM ball_metrics WHERE p_match = ANY(:ids)"), {"ids": ids}).rowcount
+    if args.rescore_later:
+        print(f"cleared {m} ball_metrics rows; the next `compute_primer_metrics.py incremental --write` scores them")
+        return 0
     print(f"cleared {m} ball_metrics rows; scoring them again")
     subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "compute_primer_metrics.py"), "incremental", "--write"],
                    check=True, cwd=ROOT)
