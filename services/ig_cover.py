@@ -41,6 +41,9 @@ def hero_from(card: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return {"kind": "line", "payload": {**p, "bands": sorted(bands, key=lambda b: b.get("over") or 0)}, "label": ""}
     if card.get("visual") == "shot_wheel":  # a wagon wheel: the whole wheel, smaller, under the hook
         return {"kind": "wheel", "shots": p.get("shots") or [], "left_handed": bool(p.get("left_handed")), "label": ""}
+    if card.get("visual") == "share_bars" and p.get("absolute"):  # counts: the chart whole, as on its card
+        rows = p.get("rows") or []
+        return {"kind": "visual", "visual": "share_bars", "payload": p, "label": ""} if 2 <= len(rows) <= 6 else None
     if card.get("visual") == "share_bars":  # stacked shares: every row (a handful), drawn as on the card
         rows = p.get("rows") or []
         if not 2 <= len(rows) <= 5:

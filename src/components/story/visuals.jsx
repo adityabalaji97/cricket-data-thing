@@ -142,12 +142,16 @@ const Tiles = ({ payload }) => {
   );
 };
 
-/** B1: every first innings by season, defended or chased down, against a line near par. */
+/**
+ * B1: every first innings by season, defended or chased down, against a line near par. Optional: legend [won, lost]
+ * labels for another split, no line (line null), callouts:[{year, total, label, place?}] ringing named points.
+ */
 const TotalsScatter = ({ payload }) => {
   const W = 300; const H = 220; const left = 34; const right = 8; const top = 10; const bottom = 196;
   const totals = payload.points.map((p) => p.total);
-  const lo = Math.floor((Math.min(...totals, payload.line) - 10) / 20) * 20;
-  const hi = Math.ceil((Math.max(...totals, payload.line) + 10) / 20) * 20;
+  const ref = payload.line != null ? [payload.line] : [];
+  const lo = Math.floor((Math.min(...totals, ...ref) - 10) / 20) * 20;
+  const hi = Math.ceil((Math.max(...totals, ...ref) + 10) / 20) * 20;
   const [y0, y1] = payload.years;
   const x = (yr, i) => left + ((yr - y0 + 0.5 + (((i * 37) % 11) - 5) * 0.06) / (y1 - y0 + 1)) * (W - left - right);
   const y = (v) => bottom - ((v - lo) / (hi - lo)) * (bottom - top);
@@ -162,8 +166,12 @@ const TotalsScatter = ({ payload }) => {
             <text x={left - 6} y={y(v) + 4} textAnchor="end" style={{ ...svgText, fill: colors.textFaint }}>{v}</text>
           </g>
         ))}
-        <line x1={left} x2={W - right} y1={y(payload.line)} y2={y(payload.line)} stroke={colors.textMed} strokeDasharray="4 4" />
-        <text x={W - right} y={y(payload.line) - 5} textAnchor="end" style={{ ...svgText, fill: colors.textMed }}>{payload.line}</text>
+        {payload.line != null && (
+          <>
+            <line x1={left} x2={W - right} y1={y(payload.line)} y2={y(payload.line)} stroke={colors.textMed} strokeDasharray="4 4" />
+            <text x={W - right} y={y(payload.line) - 5} textAnchor="end" style={{ ...svgText, fill: colors.textMed }}>{payload.line}</text>
+          </>
+        )}
         {payload.points.map((p, i) => (
           <circle key={i} cx={x(p.year, i)} cy={y(p.total)} r="4.5" fill={p.won ? SERIES[0] : SERIES[1]}
             fillOpacity={p.recent ? 0.95 : 0.3} stroke={colors.surface1} strokeWidth="1.5">
@@ -173,8 +181,19 @@ const TotalsScatter = ({ payload }) => {
         {years.map((yr) => (
           <text key={yr} x={x(yr, 5)} y={H - 6} textAnchor="middle" style={{ ...svgText, fill: colors.textFaint }}>{`'${String(yr).slice(2)}`}</text>
         ))}
+        {(payload.callouts || []).map((c) => {
+          const i = payload.points.findIndex((p) => p.year === c.year && p.total === c.total);
+          const cx = x(c.year, Math.max(0, i)); const cy = y(c.total); const below = c.place === 'below';
+          return (
+            <g key={`${c.year}-${c.total}`}>
+              <circle cx={cx} cy={cy} r="6.5" fill="none" stroke={colors.textHi} strokeWidth="1.5" />
+              <text x={cx > W / 2 ? cx - 9 : cx + 9} y={below ? cy + 16 : cy - 8} textAnchor={cx > W / 2 ? 'end' : 'start'}
+                style={{ ...svgText, fontSize: 11, fontWeight: 700, fill: colors.textHi }}>{c.label}</text>
+            </g>
+          );
+        })}
       </Box>
-      <Legend items={[['Defended', SERIES[0]], ['Chased down', SERIES[1]]]} />
+      <Legend items={payload.legend ? [[payload.legend[0], SERIES[0]], [payload.legend[1], SERIES[1]]] : [['Defended', SERIES[0]], ['Chased down', SERIES[1]]]} />
       {payload.faded_label && <Typography sx={{ fontSize: 13, color: colors.textLo, mt: 0.5 }}>{`Faded: ${payload.faded_label}`}</Typography>}
     </Box>
   );

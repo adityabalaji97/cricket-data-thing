@@ -291,12 +291,18 @@ const MetricBars = ({ payload }) => {
 /**
  * Shares that add up to 100% per row (how often each opener goes big, is middling, costs the team): one stacked bar a
  * row, the first group in the accent colour, the last in red, each segment's share written on it when it fits.
- * payload: {groups:[{key, label}], rows:[{name, detail?, segments:[{key, value}]}], format}
+ * payload: {groups:[{key, label, colour?}], rows:[{name, detail?, segments:[{key, value}]}], format, absolute?}
+ * absolute: values are counts, each bar as long as its total against the longest (games played, split by result).
  */
 export const SHARE_COLOURS = [colors.accent, '#5b6b85', '#e66767'];
 const ShareBars = ({ payload }) => {
   const { groups, rows } = payload;
-  const colour = (k) => SHARE_COLOURS[Math.max(0, groups.findIndex((g) => g.key === k))] || '#5b6b85';
+  // absolute: segment values are counts and a bar's length is its total (games played), against the longest bar.
+  const most = payload.absolute ? Math.max(...rows.map((r) => r.segments.reduce((t, seg) => t + seg.value, 0)), 1) : 100;
+  const colour = (k) => {
+    const g = groups.find((x) => x.key === k);
+    return (g && g.colour) || SHARE_COLOURS[Math.max(0, groups.findIndex((x) => x.key === k))] || '#5b6b85';
+  };
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.1 }}>
       {rows.map((r) => (
@@ -306,18 +312,81 @@ const ShareBars = ({ payload }) => {
             {r.detail && <Typography noWrap sx={{ fontSize: 11, color: colors.textLo, lineHeight: 1.25 }}>{r.detail}</Typography>}
           </Box>
           <Box sx={{ display: 'flex', height: 26, gap: '2px' }}>
-            {r.segments.map((seg) => (
-              <Box key={seg.key} sx={{ width: `${seg.value}%`, bgcolor: colour(seg.key), borderRadius: '4px', display: 'flex',
-                alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                {seg.value >= 9 && (
-                  <Typography sx={{ ...mono, fontSize: 12, fontWeight: 700, color: colors.bg }}>{fmt(seg.value, payload.format || 'pct0')}</Typography>
-                )}
-              </Box>
-            ))}
+            {r.segments.filter((seg) => seg.value > 0).map((seg) => {
+              const width = (100 * seg.value) / most;
+              const shown = payload.absolute ? width >= 7 : seg.value >= 9;
+              return (
+                <Box key={seg.key} sx={{ width: `${width}%`, bgcolor: colour(seg.key), borderRadius: '4px', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                  {shown && (
+                    <Typography sx={{ ...mono, fontSize: 12, fontWeight: 700, color: colors.bg }}>{fmt(seg.value, payload.format || 'pct0')}</Typography>
+                  )}
+                </Box>
+              );
+            })}
           </Box>
         </Box>
       ))}
       <Legend items={groups.map((g) => [g.label, colour(g.key)])} />
+    </Box>
+  );
+};
+
+/**
+ * How a total splits, stage by stage (won the toss -> batted first or chased -> won or lost): each column's nodes
+ * stacked to the same height, a band per link as wide as its count. Links into the last column take its node's
+ * colour; the rest are grey. Each node is labelled with its count.
+ * payload: {columns:[[{id, label, colour?}]...], links:[{source, target, value}], format?}
+ */
+const Sankey = ({ payload }) => {
+  const { columns, links } = payload;
+  const W = 300; const H = 236; const nodeW = 9; const gap = 10; const top = 6;
+  const total = Math.max(...columns.map((col) => col.reduce((t, n) => t + Math.max(
+    links.filter((l) => l.source === n.id).reduce((a, l) => a + l.value, 0),
+    links.filter((l) => l.target === n.id).reduce((a, l) => a + l.value, 0)), 0)), 1);
+  const maxNodes = Math.max(...columns.map((c) => c.length));
+  const k = (H - top - 4 - gap * (maxNodes - 1)) / total;
+  const xs = columns.map((_, i) => 4 + (i * (W - 8 - nodeW)) / (columns.length - 1));
+  const size = (id) => Math.max(links.filter((l) => l.source === id).reduce((a, l) => a + l.value, 0),
+    links.filter((l) => l.target === id).reduce((a, l) => a + l.value, 0));
+  const pos = {};
+  columns.forEach((col, ci) => {
+    const height = col.reduce((t, n) => t + size(n.id) * k, 0) + gap * (col.length - 1);
+    let y = top + (H - top - 4 - height) / 2;
+    col.forEach((n) => { pos[n.id] = { x: xs[ci], y, h: size(n.id) * k, col: ci, node: n, out: 0, in: 0 }; y += size(n.id) * k + gap; });
+  });
+  const last = columns.length - 1;
+  const ink = (n) => n.colour || colors.textLo;
+  const bands = links.map((l) => {
+    const a = pos[l.source]; const b = pos[l.target]; const w = l.value * k;
+    const y0 = a.y + a.out + w / 2; const y1 = b.y + b.in + w / 2;
+    a.out += w; b.in += w;
+    const x0 = a.x + nodeW; const x1 = b.x; const mx = (x0 + x1) / 2;
+    return { l, w, d: `M${x0},${y0} C${mx},${y0} ${mx},${y1} ${x1},${y1}`, colour: b.col === last ? ink(b.node) : colors.textLo };
+  });
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+        aria-label={links.map((l) => `${pos[l.source].node.label} to ${pos[l.target].node.label}: ${l.value}`).join('; ')}>
+        {bands.map((b, i) => (
+          <path key={i} d={b.d} fill="none" stroke={b.colour} strokeOpacity={b.colour === colors.textLo ? 0.22 : 0.5} strokeWidth={Math.max(1, b.w)} />
+        ))}
+        {Object.values(pos).map((p) => {
+          const right = p.col < last;
+          // The label pair (name over count) is centred on its node but kept inside the chart: a thin node at the
+          // bottom carries its label above it.
+          const cy = Math.min(p.y + p.h / 2, H - 16);
+          return (
+            <g key={p.node.id}>
+              <rect x={p.x} y={p.y} width={nodeW} height={Math.max(1, p.h)} rx="2" fill={p.col === last ? ink(p.node) : colors.textMed} />
+              <text x={right ? p.x + nodeW + 5 : p.x - 5} y={cy - 2} textAnchor={right ? 'start' : 'end'}
+                style={{ fontFamily: fonts.body, fontSize: 11.5, fontWeight: 600, fill: colors.textHi }}>{p.node.label}</text>
+              <text x={right ? p.x + nodeW + 5 : p.x - 5} y={cy + 11} textAnchor={right ? 'start' : 'end'}
+                style={{ ...mono, fontSize: 10.5, fill: colors.textMed }}>{fmt(size(p.node.id), payload.format || 'int')}</text>
+            </g>
+          );
+        })}
+      </Box>
     </Box>
   );
 };
@@ -1119,6 +1188,7 @@ export const POST_VISUALS = {
   win_prob_line: WinProbLine,
   shot_wheel: ShotWheel,
   ball_steps: BallSteps,
+  sankey: Sankey,
   forest: Forest,
   bucket_bars: BucketBars,
   bowling_plan: BowlingPlan,
