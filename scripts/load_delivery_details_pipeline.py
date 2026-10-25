@@ -123,6 +123,21 @@ def step_backfill_advanced(csv_path, db_url, dry_run=False, fmt="T20", gender="m
     return updated
 
 
+def step_fix_extras(db_url, dry_run=False):
+    """Step 2c: correct what the feed gets wrong on every load (services/delivery_fixes.py), before any stats are
+    built from the rows: a no-ball that also went for byes or leg-byes (the batter's runs stored as negative)."""
+    print_header("STEP 2c: Fix feed extras")
+    if dry_run:
+        print("[DRY RUN] would correct byes and leg-byes on no-balls")
+        return
+    from sqlalchemy import create_engine
+    from services.delivery_fixes import byes_on_noballs
+
+    with create_engine(db_url).begin() as conn:
+        touched = byes_on_noballs(conn)
+    print(f"byes/leg-byes on no-balls corrected in {len(touched)} matches" + (f": {touched[:10]}" if touched else ""))
+
+
 def step_populate_columns(db_url, dry_run=False):
     """Step 3: Populate non_striker and crease_combo columns."""
     print_header("STEP 3: POPULATE COLUMNS (non_striker, crease_combo)")
@@ -311,6 +326,9 @@ Examples:
             )
         else:
             print("\n[SKIPPED] Step 2b: Backfill Advanced Data")
+
+        # Step 2c: Fix the feed's extras before anything is built from the rows
+        step_fix_extras(db_url, dry_run=args.dry_run)
 
         # Step 3: Populate columns
         if not args.skip_columns:

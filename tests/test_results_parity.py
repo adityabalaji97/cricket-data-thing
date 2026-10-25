@@ -27,3 +27,10 @@ def test_the_reference_adds_up():
 def test_the_feed_s_blank_winner_is_no_winner():
     assert clean_winner("-") is None and clean_winner("") is None and clean_winner(None) is None
     assert clean_winner(" India ") == "India"
+
+
+def test_the_byes_on_noballs_fix_sets_the_batter_to_nothing():
+    from services.delivery_fixes import BYES_ON_NOBALLS
+
+    assert "batruns = 0" in BYES_ON_NOBALLS and "WHERE batruns < 0" in BYES_ON_NOBALLS
+    assert "COALESCE(byes, 0) + COALESCE(legbyes, 0)" in BYES_ON_NOBALLS
