@@ -16,7 +16,7 @@ for all-rounders especially. It must load in under a second on a phone before th
 |---|---|---|
 | V0 | Sign off decisions D1–D6 (below) | [ ] |
 | V1 | Speed: remove the load waterfall (frontend only) | [x] 2026-10-26 (PR; ~3.3–4.9s → ~2.3–2.7s) |
-| V2 | `GET /player/{name}/summary` endpoint + edge cache | [ ] |
+| V2 | `GET /player/{name}/summary` endpoint + edge cache | [x] 2026-10-26 (PR; D1–D3 as proposed) |
 | V3 | Peer strips + season chart components | [ ] |
 | V4 | Verdict screen (T20) in UnifiedPlayerProfile | [ ] |
 | V5 | Verdict line rules + 50-player review list | [ ] |
