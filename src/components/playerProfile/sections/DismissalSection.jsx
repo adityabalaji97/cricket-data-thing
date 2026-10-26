@@ -10,7 +10,16 @@ const DismissalSection = ({
   selectedVenue,
   competitionFilters,
   isMobile,
+  loading = false,
 }) => {
+  if (!dismissalData && loading) {
+    return (
+      <Box sx={{ p: 2, textAlign: 'center' }}>
+        <Typography color="text.secondary">Loading dismissals…</Typography>
+      </Box>
+    );
+  }
+
   if (!dismissalData) {
     return (
       <Box sx={{ p: 2, textAlign: 'center' }}>

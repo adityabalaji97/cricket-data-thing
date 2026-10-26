@@ -1,0 +1,554 @@
+<title>Verdict Screen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Hindsight is dark-only; these mockups commit to its palette (src/theme/hindsightDark.js). */
+:root {
+  color-scheme: dark;
+  --bg: #0a0c11; --inset: #070a0e; --s1: #101319; --s2: #14171e; --s3: #161a22;
+  --accent: #b6f24a; --accent-soft: rgba(182,242,74,0.13);
+  --hi: #f3f4f6; --med: #c3c8d0; --lo: #9aa1ac; --faint: #6b7280; --ghost: #4b5563;
+  --red: #e5484d; --red-soft: rgba(229,72,77,0.16);
+  --bowl: #5b8def; --bat: #c4850f;
+  --border: rgba(255,255,255,0.07); --border-strong: rgba(255,255,255,0.12);
+  --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --display: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+html, body { background: var(--bg); color: var(--hi); }
+body { font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.page { max-width: 1240px; margin: 0 auto; padding: 40px 20px 72px; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(32px, 5vw, 44px); font-weight: 700; line-height: 1.05; letter-spacing: -0.01em; }
+h2 { font-size: 26px; font-weight: 700; line-height: 1.15; }
+p { margin: 0; max-width: 66ch; color: var(--med); }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lo); }
+.intro { display: flex; flex-direction: column; gap: 14px; }
+.intro .q { font-family: var(--display); font-size: 20px; color: var(--hi); font-weight: 500; }
+.intro .q em { font-style: normal; color: var(--accent); }
+
+/* Phone row */
+.phones { display: flex; gap: 28px; overflow-x: auto; padding-bottom: 12px; scroll-snap-type: x mandatory; }
+.col { flex: 0 0 auto; width: min(375px, 100%); display: flex; flex-direction: column; gap: 14px; scroll-snap-align: start; }
+.col-head { display: flex; flex-direction: column; gap: 2px; }
+.col-head b { font-family: var(--display); font-size: 18px; font-weight: 600; }
+.col-head span { color: var(--lo); font-size: 13px; }
+.notes { margin: 0; padding-left: 18px; color: var(--med); font-size: 13.5px; display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 520px) {
+  .phones { flex-direction: column; overflow: visible; }
+  .col { width: 100%; }
+}
+
+.phone { position: relative; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 28px; overflow: hidden; }
+.screen { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 16px; }
+.fold { position: absolute; left: 0; right: 0; border-top: 1px dashed rgba(182,242,74,0.45); pointer-events: none; }
+.fold span { position: absolute; right: 10px; top: -9px; background: var(--bg); padding: 0 6px; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
+
+.appbar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 8px; font-family: var(--display); font-weight: 700; font-size: 16px; }
+.brand i { width: 14px; height: 14px; border-radius: 50%; background: var(--red); box-shadow: inset -3px -3px 0 rgba(0,0,0,0.25); }
+.appbar svg { color: var(--lo); }
+
+.ident { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.ident h3 { font-size: 27px; font-weight: 700; line-height: 1.05; }
+.ident .meta { color: var(--lo); font-size: 13.5px; margin-top: 3px; }
+.share { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border-strong); display: grid; place-items: center; color: var(--med); }
+
+.fmt { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 999px; padding: 2px; }
+.seg span { font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; padding: 3px 12px; border-radius: 999px; color: var(--lo); }
+.seg span.on { background: var(--accent); color: var(--bg); }
+.seg span.soon { color: var(--ghost); }
+.scope { font-size: 12px; color: var(--lo); display: inline-flex; align-items: center; gap: 4px; }
+.scope b { color: var(--med); font-weight: 500; }
+
+.verdict { font-family: var(--display); font-size: 21px; font-weight: 600; line-height: 1.2; color: var(--hi); text-wrap: balance; }
+
+.block { display: flex; flex-direction: column; gap: 8px; }
+.block-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.block-head .eyebrow { font-size: 10px; }
+.legend { display: flex; gap: 10px; font-size: 11.5px; color: var(--lo); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+.strip { display: flex; flex-direction: column; gap: 3px; }
+.strip-top { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.strip-top .lab { color: var(--med); flex: 1; }
+.strip-top .val { font-family: var(--display); font-weight: 600; font-size: 15px; color: var(--hi); font-variant-numeric: tabular-nums; }
+.strip-top .rk { font-family: var(--mono); font-size: 10.5px; color: var(--lo); min-width: 76px; text-align: right; font-variant-numeric: tabular-nums; }
+.strip-top .rk.top { color: var(--accent); }
+.axis-cue { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9.5px; color: var(--faint); letter-spacing: 0.06em; }
+
+.phases { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ph { background: var(--s1); border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 1px; }
+.ph .n { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lo); }
+.ph .v { font-family: var(--display); font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; }
+.ph .s { font-size: 11px; color: var(--lo); font-variant-numeric: tabular-nums; }
+
+.form { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.chip { border-radius: 8px; padding: 4px 0 3px; display: flex; flex-direction: column; align-items: center; gap: 0; border: 1px solid var(--border-strong); background: var(--s1); min-width: 0; }
+.chip .f { font-family: var(--display); font-weight: 600; font-size: 12.5px; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip .f2 { font-family: var(--display); font-weight: 500; font-size: 11px; line-height: 1.15; color: var(--med); white-space: nowrap; }
+.chip .o { font-family: var(--mono); font-size: 8.5px; color: var(--lo); letter-spacing: 0.02em; margin-top: 1px; }
+.chip .g { font-size: 8px; line-height: 1; height: 9px; }
+.chip.up { background: var(--accent-soft); border-color: rgba(182,242,74,0.45); }
+.chip.up .g { color: var(--accent); }
+.chip.down { background: var(--red-soft); border-color: rgba(229,72,77,0.5); }
+.chip.down .g { color: #f87171; }
+.chip.flat .g { color: var(--faint); }
+.chip.none { background: transparent; border-style: dashed; }
+
+.foot { border-top: 1px solid var(--border); padding-top: 8px; font-size: 10.5px; color: var(--lo); line-height: 1.4; }
+.foot b { color: var(--med); font-weight: 500; }
+.more { display: flex; flex-wrap: wrap; gap: 6px; }
+.more span { font-size: 12px; color: var(--lo); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+
+/* Test wireframe */
+.wire { border: 1px dashed var(--ghost); border-radius: 12px; padding: 10px 12px; color: var(--lo); font-size: 12.5px; display: flex; flex-direction: column; gap: 3px; }
+.wire b { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
+.wire-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.wire-row .wire { padding: 8px; font-size: 11.5px; }
+
+/* Lower sections */
+.section { display: flex; flex-direction: column; gap: 16px; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 16px; }
+table { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 13.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--med); }
+th { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--lo); font-weight: 500; background: var(--s1); }
+td:first-child { color: var(--hi); font-weight: 500; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td .gap { color: var(--faint); }
+
+.decisions { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; counter-reset: d; }
+.decisions li { counter-increment: d; background: var(--s1); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.decisions li::before { content: "D" counter(d); font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.08em; }
+.decisions h3 { font-size: 17px; font-weight: 600; }
+.decisions p { font-size: 13.5px; }
+.decisions .pick { color: var(--hi); }
+
+.wf svg { display: block; width: 100%; height: auto; max-width: 760px; }
+.tip { position: fixed; pointer-events: none; background: var(--s3); border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 9px; font-size: 12px; color: var(--hi); z-index: 10; max-width: 240px; line-height: 1.35; }
+.tip span { color: var(--lo); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="page">
+  <header class="intro">
+    <div class="eyebrow">Player profile · first screen · mockups for sign-off</div>
+    <h1>The verdict screen</h1>
+    <p class="q">One screenshot and a link should settle <em>"is the hype fair?"</em></p>
+    <p>Each phone below is the first screen of a profile at 375px wide, built from production numbers pulled on 26 October 2026. The dashed lime line across each phone marks roughly where an iPhone screenshot ends under Safari's bars. Everything else on today's page stays, collapsed below the fold.</p>
+  </header>
+
+  <section class="phones" id="phones" aria-label="Mockups"></section>
+
+  <section class="section">
+    <div class="eyebrow">Formats</div>
+    <h2>One layout, three formats</h2>
+    <p>The slots stay put; what fills them depends on what each format has. ODIs lack Impact and wins added until we build an ODI par model, and Tests aren't loaded yet.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Slot</th><th>T20</th><th>ODI</th><th>Test</th></tr></thead>
+        <tbody>
+          <tr><td>Scope default</td><td>Since Jan 2024 · major leagues + T20Is between top-12 sides</td><td>Since Jan 2023 · ODIs between top-12 sides</td><td>Last 3 years · Tests v top-10 sides</td></tr>
+          <tr><td>Verdict line</td><td>From ranks and seasons, written by rules</td><td>Same rules, fewer inputs</td><td>Same rules; home and away decide most of it</td></tr>
+          <tr><td>Season trend</td><td>Wins added by season, bat and ball</td><td>Economy and strike rate by year <span class="gap">(wins added once the ODI par model exists)</span></td><td>Average and balls per wicket by series</td></tr>
+          <tr><td>Peer strips</td><td>Wins added, dot %, economy, balls per wicket · SR, average</td><td>Balls per wicket, dot %, economy · SR, average</td><td>Average, balls per wicket, economy · average, balls per dismissal</td></tr>
+          <tr><td>Three-way split</td><td>Powerplay / middle overs / death</td><td>Overs 1–10 / 11–40 / 41–50</td><td>New ball (overs 1–20) / old ball / innings 3–4</td></tr>
+          <tr><td>Form chips</td><td>Last 8 matches, coloured by runs above par</td><td>Last 8 matches, neutral <span class="gap">(no par yet)</span></td><td>Last 8 innings, neutral</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="eyebrow">Speed</div>
+    <h2>Four seconds down to one call</h2>
+    <p>Measured on production with Marco Jansen's link. The page now waits on a 162 KB player list, then a fixed half-second pause, then five stats calls that must all finish, including a batting dismissals call (1.6–1.8 seconds) that the bowling screen doesn't use. The verdict screen needs one small summary, cached at the edge and warmed for upcoming fixtures.</p>
+    <div class="wf" id="waterfall"></div>
+  </section>
+
+  <section class="section">
+    <div class="eyebrow">For sign-off</div>
+    <h2>Decisions before any code</h2>
+    <ol class="decisions">
+      <li><h3>Peer pool</h3><p>Strong opposition only. Against every side, the cheapest ODI bowlers since 2023 are from Namibia, Oman, Nepal and the USA, so the strips would measure everyone against associate cricket. Against top-12 sides, Jansen sits among the 114 bowlers he actually competes with. <span class="pick">Proposed: major leagues + top-12 T20Is; ODIs and Tests v top 12.</span></p></li>
+      <li><h3>Season metric</h3><p>Wins added splits cleanly into bat and ball and answers "did he win games". Bowling Impact is too noisy to rate bowlers on, so it moves below the fold. <span class="pick">Proposed: wins added on the first screen.</span></p></li>
+      <li><h3>Form scope</h3><p>Form follows the scope, so Jansen's Hundred games (no par data) drop out and his last chip is 11 July. The other way shows all recent games, with neutral chips where par is missing. <span class="pick">Proposed: all recent games, neutral where needed.</span></p></li>
+      <li><h3>Verdict line</h3><p>Rules, not an LLM. The strongest rank becomes the claim, and a season swing of more than one win, either way, becomes the second sentence. Two lines at most, in your vocabulary. <span class="pick">Proposed: rules, with a review list of 50 players before launch.</span></p></li>
+      <li><h3>Share link</h3><p>A preview image of this screen at /img/player/&lt;id&gt;.png, so pasting the link in WhatsApp or X shows the verdict without a screenshot. <span class="pick">Proposed: build with the summary endpoint.</span></p></li>
+      <li><h3>Not Weston's card</h3><p>No single SD rating, no "translated" figures, no big ± hero number. Our picture is the spread of every peer with the player marked, and the season trend split into bat and ball. <span class="pick">Proposed: as shown.</span></p></li>
+    </ol>
+  </section>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const DATA = __DATA__;
+
+const TEAM = {"Mumbai Indians":"MI","Lucknow Super Giants":"LSG","Seattle Orcas":"SEA","MI New York":"MINY","Texas Super Kings":"TSK","San Francisco Unicorns":"SFU","Gujarat Titans":"GT","Sunrisers Hyderabad":"SRH","Royal Challengers Bengaluru":"RCB","Punjab Kings":"PBKS","Kolkata Knight Riders":"KKR","Afghanistan":"AFG","Sri Lanka":"SL","Pakistan":"PAK","West Indies":"WI","New Zealand":"NZ","England":"ENG","India":"IND","Australia":"AUS"};
+const SVGNS = "http://www.w3.org/2000/svg";
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ord = (n) => { const s = ["th","st","nd","rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+const fmtNum = (v, dp) => (v > 0 && dp === 2 ? "+" : "") + v.toFixed(dp);
+const el = (tag, attrs = {}, html) => { const e = document.createElement(tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (html !== undefined) e.innerHTML = html; return e; };
+const sv = (tag, attrs = {}) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+const tip = document.getElementById("tip");
+function bindTip(node, html) {
+  node.addEventListener("pointerenter", () => { tip.innerHTML = html; tip.hidden = false; });
+  node.addEventListener("pointermove", (e) => {
+    const w = tip.offsetWidth, x = Math.min(e.clientX + 12, innerWidth - w - 8);
+    tip.style.left = x + "px"; tip.style.top = (e.clientY + 14) + "px";
+  });
+  node.addEventListener("pointerleave", () => { tip.hidden = true; });
+}
+
+const ICON_SEARCH = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+const ICON_SHARE = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
+
+/* Season chart: wins added per season, one thin bar per role, diverging from zero. */
+function seasonChart(series) {
+  const years = [...new Set(series.flatMap(s => s.rows.map(r => r.year)))].sort();
+  const max = Math.max(0.5, ...series.flatMap(s => s.rows.map(r => Math.abs(r.wpa || 0))));
+  const dom = Math.ceil(max * 2) / 2;
+  const W = 343, left = 40, right = 40, barH = 8, gapIn = 2, rowGap = 9;
+  const rowH = series.length * barH + (series.length - 1) * gapIn;
+  const H = years.length * (rowH + rowGap) + 16;
+  const x = (v) => left + (v + dom) / (2 * dom) * (W - left - right);
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Wins added by season" });
+  [-dom, 0, dom].forEach(t => {
+    svg.appendChild(sv("line", { x1: x(t), x2: x(t), y1: 0, y2: H - 14, stroke: t === 0 ? css("--ghost") : css("--border-strong"), "stroke-width": 1, "stroke-dasharray": t === 0 ? "" : "2 3" }));
+    const tx = sv("text", { x: x(t), y: H - 2, "text-anchor": "middle", fill: css("--faint"), "font-size": 9.5, "font-family": "IBM Plex Mono, monospace" });
+    tx.textContent = t === 0 ? "0" : (t > 0 ? "+" : "−") + Math.abs(t).toFixed(1); svg.appendChild(tx);
+  });
+  years.forEach((yr, i) => {
+    const y0 = i * (rowH + rowGap) + 2;
+    const yl = sv("text", { x: 0, y: y0 + rowH / 2 + 4, fill: css("--med"), "font-size": 12, "font-family": "Barlow Semi Condensed, sans-serif", "font-weight": 600 });
+    yl.textContent = yr; svg.appendChild(yl);
+    series.forEach((s, j) => {
+      const r = s.rows.find(r => r.year === yr); if (!r) return;
+      const v = r.wpa || 0, y = y0 + j * (barH + gapIn);
+      const x0 = Math.min(x(0), x(v)), w = Math.max(2, Math.abs(x(v) - x(0)));
+      const rad = Math.min(3, w / 2);
+      // Round only the data end.
+      const p = v >= 0
+        ? `M${x0},${y} h${w - rad} a${rad},${rad} 0 0 1 ${rad},${rad} v${barH - 2 * rad} a${rad},${rad} 0 0 1 -${rad},${rad} h-${w - rad} z`
+        : `M${x0 + w},${y} h-${w - rad} a${rad},${rad} 0 0 0 -${rad},${rad} v${barH - 2 * rad} a${rad},${rad} 0 0 0 ${rad},${rad} h${w - rad} z`;
+      const bar = sv("path", { d: p, fill: s.color });
+      svg.appendChild(bar);
+      const lab = sv("text", { x: v >= 0 ? x0 + w + 4 : x0 - 4, y: y + barH - 0.5, "text-anchor": v >= 0 ? "start" : "end", fill: css("--med"), "font-size": 10, "font-family": "Barlow, sans-serif", "font-variant-numeric": "tabular-nums" });
+      lab.textContent = (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(2); svg.appendChild(lab);
+      const hit = sv("rect", { x: left, y: y - 3, width: W - left - right, height: barH + 6, fill: "transparent" });
+      bindTip(hit, `<b>${yr} · ${s.name}</b><br>${(v > 0 ? "+" : "") + v.toFixed(2)} wins added<br><span>${r.innings_count} innings · ${r.balls} balls</span>`);
+      svg.appendChild(hit);
+    });
+  });
+  return svg;
+}
+
+/* ODI season slot: economy by year against the peer median. */
+function econChart(rows, median) {
+  const W = 343, H = 92, left = 40, right = 16;
+  const vals = rows.map(r => r.economy);
+  const lo = Math.floor(Math.min(median, ...vals) - 0.5), hi = Math.ceil(Math.max(median, ...vals) + 0.3);
+  const x = (v) => left + (v - lo) / (hi - lo) * (W - left - right);
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Economy by year" });
+  const rowH = 17;
+  svg.appendChild(sv("line", { x1: x(median), x2: x(median), y1: 0, y2: rows.length * rowH, stroke: css("--lo"), "stroke-dasharray": "3 3" }));
+  const ml = sv("text", { x: x(median), y: rows.length * rowH + 11, "text-anchor": "middle", fill: css("--lo"), "font-size": 9.5, "font-family": "IBM Plex Mono, monospace" });
+  ml.textContent = `top-12 median ${median.toFixed(2)}`; svg.appendChild(ml);
+  rows.forEach((r, i) => {
+    const y = i * rowH + 9;
+    const yl = sv("text", { x: 0, y: y + 4, fill: css("--med"), "font-size": 12, "font-family": "Barlow Semi Condensed, sans-serif", "font-weight": 600 });
+    yl.textContent = r.year; svg.appendChild(yl);
+    svg.appendChild(sv("line", { x1: x(median), x2: x(r.economy), y1: y, y2: y, stroke: css("--bowl"), "stroke-width": 2, opacity: 0.5 }));
+    const c = sv("circle", { cx: x(r.economy), cy: y, r: 5, fill: css("--bowl"), stroke: css("--bg"), "stroke-width": 2 });
+    svg.appendChild(c);
+    const lab = sv("text", { x: x(r.economy) + 9, y: y + 4, fill: css("--med"), "font-size": 10.5, "font-family": "Barlow, sans-serif" });
+    lab.textContent = r.economy.toFixed(2) + (r.balls < 120 ? `  (${r.balls} balls)` : ""); svg.appendChild(lab);
+    const hit = sv("rect", { x: left, y: y - 8, width: W - left - right, height: 16, fill: "transparent" });
+    bindTip(hit, `<b>${r.year}</b><br>Economy ${r.economy.toFixed(2)}<br><span>${r.wickets} wickets · ${r.balls} balls</span>`);
+    svg.appendChild(hit);
+  });
+  return svg;
+}
+
+/* Peer strip: every peer as a faint tick, better to the right, the player as a lime dot. */
+function peerStrip(m) {
+  const wrap = el("div", { class: "strip" });
+  const top = m.rank <= Math.max(3, Math.round(m.n * 0.1));
+  const dp = m.key === "wpa" || m.key === "economy" ? 2 : 1;
+  const shown = m.key === "wpa" ? fmtNum(m.value, 2) : m.value.toFixed(dp) + (m.key === "dot_percentage" ? "%" : "");
+  wrap.appendChild(el("div", { class: "strip-top" }, `<span class="lab">${m.label}</span><span class="val">${shown}</span><span class="rk${top ? " top" : ""}">${ord(m.rank)} of ${m.n}</span>`));
+  const W = 343, H = 14;
+  const p = m.peers, q = (f) => p[Math.min(p.length - 1, Math.max(0, Math.round(f * (p.length - 1))))];
+  let lo = q(0.02), hi = q(0.98);
+  lo = Math.min(lo, m.value); hi = Math.max(hi, m.value);
+  const pos = (v) => { const t = (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo || 1); return 5 + (m.lower_better ? 1 - t : t) * (W - 10); };
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, "aria-hidden": "true" });
+  svg.appendChild(sv("rect", { x: 0, y: 6, width: W, height: 2, rx: 1, fill: css("--s2") }));
+  p.forEach(v => svg.appendChild(sv("rect", { x: pos(v) - 0.5, y: 3, width: 1, height: 8, fill: css("--ghost"), opacity: 0.75 })));
+  const med = q(0.5);
+  svg.appendChild(sv("rect", { x: pos(med) - 0.75, y: 0, width: 1.5, height: 14, fill: css("--lo") }));
+  svg.appendChild(sv("circle", { cx: pos(m.value), cy: 7, r: 5, fill: css("--accent"), stroke: css("--bg"), "stroke-width": 2 }));
+  bindTip(svg, `<b>${m.label}: ${shown}</b><br>${ord(m.rank)} of ${m.n} · median ${med}<br><span>${m.lower_better ? "Lower is better; " : ""}better to the right</span>`);
+  wrap.appendChild(svg);
+  return wrap;
+}
+
+function stripBlock(title, metrics, cue) {
+  const b = el("div", { class: "block" });
+  b.appendChild(el("div", { class: "block-head" }, `<span class="eyebrow">${title}</span>`));
+  if (cue) b.appendChild(el("div", { class: "axis-cue" }, "<span>← worse</span><span>│ median</span><span>better →</span>"));
+  metrics.forEach(m => b.appendChild(peerStrip(m)));
+  return b;
+}
+
+/* Form: last 8 matches, coloured by runs above par (bat + ball), never by wickets. */
+function formChips(bowl, bat, label) {
+  const by = {};
+  (bowl || []).forEach(r => { by[r.match_date] = Object.assign(by[r.match_date] || {}, { date: r.match_date, opp: r.batting_team, bowl: r }); });
+  (bat || []).forEach(r => { by[r.match_date] = Object.assign(by[r.match_date] || {}, { date: r.match_date, opp: r.bowling_team, bat: r }); });
+  const games = Object.values(by).sort((a, b) => a.date < b.date ? -1 : 1).slice(-8);
+  const b = el("div", { class: "block" });
+  b.appendChild(el("div", { class: "block-head" }, `<span class="eyebrow">Last 8 · ${label}</span>`));
+  const row = el("div", { class: "form" });
+  games.forEach(g => {
+    const raas = [g.bowl && g.bowl.raa, g.bat && g.bat.raa].filter(v => v !== null && v !== undefined);
+    const raa = raas.length ? raas.reduce((a, c) => a + c, 0) : null;
+    const cls = raa === null ? "none" : raa > 2 ? "up" : raa < -2 ? "down" : "flat";
+    const glyph = raa === null ? "&nbsp;" : raa > 2 ? "▲" : raa < -2 ? "▼" : "●";
+    const lines = [];
+    if (g.bowl) lines.push(`<span class="f">${g.bowl.wickets}/${g.bowl.runs}</span>`);
+    if (g.bat) lines.push(`<span class="${g.bowl ? "f2" : "f"}">${g.bat.runs}${g.bat.wickets ? "" : "*"}<span style="color:var(--lo);font-weight:500"> (${g.bat.balls})</span></span>`);
+    const c = el("div", { class: "chip " + cls, tabindex: 0 }, `<span class="g">${glyph}</span>${lines.join("")}<span class="o">${TEAM[g.opp] || g.opp.slice(0, 3).toUpperCase()}</span>`);
+    const parts = [];
+    if (g.bowl) parts.push(`Bowling ${g.bowl.wickets}/${g.bowl.runs} (${g.bowl.balls} balls)${g.bowl.raa != null ? ", " + (g.bowl.raa > 0 ? "+" : "") + g.bowl.raa.toFixed(1) + " runs above par" : ""}`);
+    if (g.bat) parts.push(`Batting ${g.bat.runs} off ${g.bat.balls}${g.bat.raa != null ? ", " + (g.bat.raa > 0 ? "+" : "") + g.bat.raa.toFixed(1) + " runs above par" : ""}`);
+    bindTip(c, `<b>v ${g.opp}</b> · ${g.date}<br>${parts.join("<br>")}${raa === null ? "<br><span>No runs above par in this format yet</span>" : ""}`);
+    row.appendChild(c);
+  });
+  b.appendChild(row);
+  return b;
+}
+
+function phaseCells(cells) {
+  const g = el("div", { class: "phases" });
+  cells.forEach(c => g.appendChild(el("div", { class: "ph" }, `<span class="n">${c.n}</span><span class="v">${c.v}</span><span class="s">${c.s}</span>`)));
+  return g;
+}
+
+function legend(items) {
+  return `<span class="legend">${items.map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join("")}</span>`;
+}
+
+function phone(cfg) {
+  const col = el("div", { class: "col" });
+  col.appendChild(el("div", { class: "col-head" }, `<b>${cfg.head}</b><span>${cfg.sub}</span>`));
+  const ph = el("div", { class: "phone" });
+  const s = el("div", { class: "screen" });
+  s.appendChild(el("div", { class: "appbar" }, `<span class="brand"><i></i>Hindsight</span>${ICON_SEARCH}`));
+  s.appendChild(el("div", { class: "ident" }, `<div><h3>${cfg.name}</h3><div class="meta">${cfg.meta}</div></div><span class="share" aria-label="Share">${ICON_SHARE}</span>`));
+  s.appendChild(el("div", { class: "fmt" }, `<span class="seg">${["T20", "ODI", "Test"].map(f => `<span class="${f === cfg.fmt ? "on" : f === "Test" ? "soon" : ""}">${f}</span>`).join("")}</span><span class="scope">${cfg.scope} ▾</span>`));
+  s.appendChild(el("div", { class: "verdict" }, cfg.verdict));
+  cfg.blocks.forEach(b => s.appendChild(b));
+  s.appendChild(el("div", { class: "more" }, cfg.more.map(m => `<span>${m} ▾</span>`).join("")));
+  s.appendChild(el("div", { class: "foot" }, `<b>${cfg.url}</b><br>Data: Hindsight · Himanish Ganjoo &amp; TechRadar, Cricsheet`));
+  ph.appendChild(s);
+  const fold = el("div", { class: "fold", title: "Roughly where an iPhone screenshot ends" });
+  fold.style.top = "720px";
+  ph.appendChild(fold);
+  col.appendChild(ph);
+  col.appendChild(el("ul", { class: "notes" }, cfg.notes.map(n => `<li>${n}</li>`).join("")));
+  return col;
+}
+
+function chartBlock(title, svg, leg) {
+  const b = el("div", { class: "block chart" });
+  b.appendChild(el("div", { class: "block-head" }, `<span class="eyebrow">${title}</span>${leg || ""}`));
+  b.appendChild(svg);
+  return b;
+}
+
+const D = (k) => DATA[k];
+const BOWL = css("--bowl"), BAT = css("--bat");
+const median = (a) => a[Math.floor((a.length - 1) / 2)];
+const phRow = (rows, name) => rows.find(r => r.phase === name);
+
+const phones = document.getElementById("phones");
+
+/* 1. Jansen, T20 */
+{
+  const bw = D("T20|Marco Jansen|bowl"), bt = D("T20|Marco Jansen|bat");
+  phones.appendChild(phone({
+    head: "Marco Jansen · T20", sub: "All-rounder: both roles on one screen",
+    name: "Marco Jansen", meta: "South Africa · left-arm fast · bats 7–8", fmt: "T20",
+    scope: "<b>Since Jan 2024</b> · strong sides",
+    verdict: "Top 10% for dot balls and won games in 2024–25. Expensive in 2026.",
+    blocks: [
+      chartBlock("Wins added by season", seasonChart([{ name: "Bowling", color: BOWL, rows: bw.years }, { name: "Batting", color: BAT, rows: bt.years }]), legend([[BOWL, "Bowling"], [BAT, "Batting"]])),
+      stripBlock(`Bowling · v ${bw.metrics[0].n} bowlers, 600+ balls`, bw.metrics, true),
+      stripBlock(`Batting · v ${bt.metrics[0].n} batters, 300+ balls`, bt.metrics.filter(m => m.key !== "wpa"), false),
+      formChips(bw.form, bt.form, "runs above par, bat + ball"),
+    ],
+    more: ["Phases", "Impact", "Matchups", "Pitch map", "Similar players"],
+    url: "hindsightcricket.com/player/marco-jansen",
+    notes: [
+      "Today's page answered with 177 wickets at 8.5 since 2020. This one says how good, against whom, and which way it's moving.",
+      "Batting wins added already sits in the season chart, so the batting strips keep strike rate and average. Ranks: 36th of 213 for wins added, 21st for dot balls, but 129th for economy. The batting average is 340th of 383, which settles the all-rounder question in T20s.",
+      "The 2/33 v LSG is green and the 1/55 v MI is red. Wickets alone no longer set the colour.",
+    ],
+  }));
+}
+
+/* 2. Jansen, ODI */
+{
+  const bw = D("ODI|Marco Jansen|bowl"), bt = D("ODI|Marco Jansen|bat");
+  const econPeers = bw.metrics.find(m => m.key === "economy").peers;
+  const pp = phRow(bw.phases, "powerplay"), mid = phRow(bw.phases, "middle"), dth = phRow(bw.phases, "death");
+  phones.appendChild(phone({
+    head: "Marco Jansen · ODI", sub: "Same layout, without wins added",
+    name: "Marco Jansen", meta: "South Africa · left-arm fast · bats 7–8", fmt: "ODI",
+    scope: "<b>Since Jan 2023</b> · v top-12 sides",
+    verdict: "Takes wickets and hits hard, but goes at 6.65 an over against top-12 sides.",
+    blocks: [
+      chartBlock("Bowling economy by year", econChart(bw.years, median(econPeers))),
+      stripBlock(`Bowling · v ${bw.metrics[0].n} bowlers, 500+ balls`, bw.metrics, true),
+      stripBlock(`Batting · v ${bt.metrics[0].n} batters, 400+ balls`, bt.metrics, false),
+      (() => { const b = el("div", { class: "block" }); b.appendChild(el("div", { class: "block-head" }, `<span class="eyebrow">Bowling by phase</span>`)); b.appendChild(phaseCells([
+        { n: "Overs 1–10", v: pp.economy.toFixed(2), s: `${pp.dot_percentage.toFixed(0)}% dots · ${pp.wickets} wkts` },
+        { n: "11–40", v: mid.economy.toFixed(2), s: `${mid.dot_percentage.toFixed(0)}% dots · ${mid.wickets} wkts` },
+        { n: "41–50", v: dth.economy.toFixed(2), s: `${dth.dot_percentage.toFixed(0)}% dots · ${dth.wickets} wkts` },
+      ])); return b; })(),
+      formChips(bw.form, bt.form, "no par in ODIs yet"),
+    ],
+    more: ["Matchups", "Pitch map", "Dismissals"],
+    url: "hindsightcricket.com/player/marco-jansen?format=odi",
+    notes: [
+      "Against top-12 sides he's 32nd of 114 for balls per wicket and 4th of 114 for strike rate. His economy is 111th.",
+      "Two dots in three balls in the first ten overs; 8.27 an over at the death.",
+      "This is where most of the Kimber case lives, along with Tests. The trend uses economy until an ODI par model gives us wins added.",
+    ],
+  }));
+}
+
+/* 3. Abhishek Sharma, T20 batter */
+{
+  const bt = D("T20|Abhishek Sharma|bat");
+  const pp = phRow(bt.phases, "powerplay"), mid = phRow(bt.phases, "middle"), dth = phRow(bt.phases, "death");
+  phones.appendChild(phone({
+    head: "Abhishek Sharma · T20", sub: "Specialist batter: one role, room for phases",
+    name: "Abhishek Sharma", meta: "India · left-hand opener", fmt: "T20",
+    scope: "<b>Since Jan 2024</b> · strong sides",
+    verdict: "The third-fastest scorer in T20 since 2024, and third for wins added.",
+    blocks: [
+      chartBlock("Wins added by season", seasonChart([{ name: "Batting", color: BAT, rows: bt.years }])),
+      stripBlock(`Batting · v ${bt.metrics[0].n} batters, 300+ balls`, bt.metrics, true),
+      (() => { const b = el("div", { class: "block" }); b.appendChild(el("div", { class: "block-head" }, `<span class="eyebrow">Strike rate by phase</span>`)); b.appendChild(phaseCells([
+        { n: "Powerplay", v: pp.strike_rate.toFixed(0), s: `${pp.balls} balls · +${pp.raa_per_100.toFixed(0)} /100` },
+        { n: "Middle", v: mid.strike_rate.toFixed(0), s: `${mid.balls} balls · +${mid.raa_per_100.toFixed(0)} /100` },
+        { n: "Death", v: dth.strike_rate.toFixed(0), s: `${dth.balls} balls · small sample` },
+      ])); return b; })(),
+      formChips(null, bt.form, "runs above par"),
+    ],
+    more: ["Impact", "Pace v spin", "Wagon wheel", "Dismissals", "Similar players"],
+    url: "hindsightcricket.com/player/abhishek-sharma",
+    notes: [
+      "With one role, the space goes to phases. The figure under each strike rate is runs above par per 100 balls.",
+      "The death cell says 'small sample' rather than hiding the 43 balls.",
+    ],
+  }));
+}
+
+/* 4. Bumrah, T20 bowler */
+{
+  const bw = D("T20|Jasprit Bumrah|bowl");
+  const pp = phRow(bw.phases, "powerplay"), mid = phRow(bw.phases, "middle"), dth = phRow(bw.phases, "death");
+  phones.appendChild(phone({
+    head: "Jasprit Bumrah · T20", sub: "Specialist bowler",
+    name: "Jasprit Bumrah", meta: "India · right-arm fast", fmt: "T20",
+    scope: "<b>Since Jan 2024</b> · strong sides",
+    verdict: "Second for wins added in T20 since 2024, and 6.89 an over at the death.",
+    blocks: [
+      chartBlock("Wins added by season", seasonChart([{ name: "Bowling", color: BOWL, rows: bw.years }])),
+      stripBlock(`Bowling · v ${bw.metrics[0].n} bowlers, 600+ balls`, bw.metrics, true),
+      (() => { const b = el("div", { class: "block" }); b.appendChild(el("div", { class: "block-head" }, `<span class="eyebrow">Economy by phase</span>`)); b.appendChild(phaseCells([
+        { n: "Powerplay", v: pp.economy.toFixed(2), s: `${pp.dot_percentage.toFixed(0)}% dots · ${pp.wickets} wkts` },
+        { n: "Middle", v: mid.economy.toFixed(2), s: `${mid.dot_percentage.toFixed(0)}% dots · ${mid.wickets} wkts` },
+        { n: "Death", v: dth.economy.toFixed(2), s: `${dth.dot_percentage.toFixed(0)}% dots · ${dth.wickets} wkts` },
+      ])); return b; })(),
+      formChips(bw.form, null, "runs above par"),
+    ],
+    more: ["Impact", "Spells", "Pitch map", "Matchups", "Similar players"],
+    url: "hindsightcricket.com/player/jasprit-bumrah",
+    notes: [
+      "0/20 v RCB and 0/35 v PBKS are both green: wicketless and well above par.",
+      "Balls per wicket is a middling 95th of 213. The strips show it plainly instead of leaving it out.",
+    ],
+  }));
+}
+
+/* 5. Test wireframe */
+{
+  const col = el("div", { class: "col" });
+  col.appendChild(el("div", { class: "col-head" }, `<b>Test · wireframe</b><span>No Test data loaded yet, so no numbers</span>`));
+  const ph = el("div", { class: "phone" });
+  ph.appendChild(el("div", { class: "screen" }, `
+    <div class="appbar"><span class="brand"><i></i>Hindsight</span>${ICON_SEARCH}</div>
+    <div class="ident"><div><h3>Marco Jansen</h3><div class="meta">South Africa · left-arm fast · bats 7–8</div></div><span class="share">${ICON_SHARE}</span></div>
+    <div class="fmt"><span class="seg"><span>T20</span><span>ODI</span><span class="on">Test</span></span><span class="scope"><b>Last 3 years</b> · v top-10 sides ▾</span></div>
+    <div class="wire"><b>Verdict</b>One claim from the strongest rank, then home v away if they differ a lot.</div>
+    <div class="wire"><b>By series</b>Average with the bat and balls per wicket, one row per series, bat and ball side by side, home series marked.</div>
+    <div class="wire"><b>Peer strips</b>Bowling: balls per wicket, average, economy. Batting: average, balls per dismissal.</div>
+    <div class="wire-row"><div class="wire"><b>New ball</b>Overs 1–20</div><div class="wire"><b>Old ball</b>Overs 21–80</div><div class="wire"><b>Inns 3–4</b>Fourth-innings bowling</div></div>
+    <div class="wire"><b>Last 8 innings</b>Figures and scores, neutral chips.</div>
+    <div class="foot"><b>hindsightcricket.com/player/marco-jansen?format=test</b><br>Data: Hindsight · Cricsheet</div>`));
+  col.appendChild(ph);
+  col.appendChild(el("ul", { class: "notes" }, [
+    "Cricsheet's Test ball-by-ball loads through chunks C0–C1 of MULTI_FORMAT_PLAN. The plan already has Test phases (new ball overs 0–19).",
+    "Home v away, and new ball v old ball, carry Test arguments the way phases carry T20 ones.",
+    "India v Australia early next year is the deadline that makes this worth doing.",
+  ].map(n => `<li>${n}</li>`).join("")));
+  phones.appendChild(col);
+}
+
+/* Waterfall: today's load v the target */
+{
+  const rows = [
+    { g: "Today", label: "Player list, 162 KB", a: 0, b: 1.3, c: "--ghost" },
+    { g: "", label: "Fixed pause before autoload", a: 1.3, b: 1.8, c: "--ghost" },
+    { g: "", label: "Player type", a: 1.3, b: 1.65, c: "--ghost" },
+    { g: "", label: "Five stats calls (waits for the slowest)", a: 1.8, b: 3.6, c: "--red" },
+    { g: "Target", label: "One cached summary", a: 0, b: 0.35, c: "--accent" },
+  ];
+  const W = 760, left = 250, right = 30, rh = 26, top = 8;
+  const H = top + rows.length * rh + 40;
+  const max = 4;
+  const x = (v) => left + v / max * (W - left - right);
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Load waterfall, today v target" });
+  for (let t = 0; t <= max; t++) {
+    svg.appendChild(sv("line", { x1: x(t), x2: x(t), y1: top - 4, y2: top + rows.length * rh, stroke: css("--border-strong"), "stroke-dasharray": "2 3" }));
+    const tx = sv("text", { x: x(t), y: top + rows.length * rh + 16, "text-anchor": "middle", fill: css("--faint"), "font-size": 11, "font-family": "IBM Plex Mono, monospace" });
+    tx.textContent = t + "s"; svg.appendChild(tx);
+  }
+  rows.forEach((r, i) => {
+    const y = top + i * rh + (i === 4 ? 6 : 0);
+    if (i === 4) svg.appendChild(sv("line", { x1: 0, x2: W, y1: y - 6, y2: y - 6, stroke: css("--border") }));
+    const lab = sv("text", { x: 0, y: y + 15, fill: css(i === 4 ? "--hi" : "--med"), "font-size": 13, "font-family": "Barlow, sans-serif" });
+    lab.textContent = r.label; svg.appendChild(lab);
+    const bar = sv("rect", { x: x(r.a), y: y + 5, width: Math.max(3, x(r.b) - x(r.a)), height: 12, rx: 3, fill: css(r.c) });
+    svg.appendChild(bar);
+    const v = sv("text", { x: x(r.b) + 6, y: y + 15, fill: css("--lo"), "font-size": 11, "font-family": "IBM Plex Mono, monospace" });
+    v.textContent = r.b.toFixed(r.b < 1 ? 2 : 1) + "s"; svg.appendChild(v);
+  });
+  const note = sv("text", { x: 0, y: H - 4, fill: css("--faint"), "font-size": 11, "font-family": "Barlow, sans-serif" });
+  note.textContent = "Before the JavaScript bundle loads. Timings from curl on production, 26 Oct 2026; target from a cached call of the same size.";
+  svg.appendChild(note);
+  const wrap = document.getElementById("waterfall");
+  wrap.style.overflowX = "auto";
+  wrap.appendChild(svg);
+  svg.style.minWidth = "620px";
+}
+</script>

@@ -205,7 +205,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
 
   const {
     battingStats, bowlingStats, dismissalStats, bowlingDismissalStats,
-    playerType, loading, error, fetchPlayerType, fetchAllData
+    playerType, loading, dismissalLoading, error, fetchPlayerType, fetchAllData
   } = usePlayerData(selectedPlayer, dateRange, selectedVenue, competitionFilters);
 
   const showBattingTab = useMemo(() => {
@@ -218,53 +218,51 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     return bowlingStats !== null;
   }, [playerType, bowlingStats]);
 
-  // Load initial data (players list + venues)
+  // Read the link first and start the profile straight away; the players and venues lists only feed
+  // the pickers, so they load in the background. Waiting for the 162 KB players list held every
+  // shared link up by about a second.
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const playerNameFromURL = getQueryParam('name');
+    const tabFromURL = getQueryParam('tab');
+    const startDateFromURL = getQueryParam('start_date');
+    const endDateFromURL = getQueryParam('end_date');
+    const venueFromURL = getQueryParam('venue');
+
+    if (tabFromURL === 'bowling') setActiveTab('bowling');
+    if (startDateFromURL || endDateFromURL) {
+      setDateRange({
+        start: startDateFromURL || DEFAULT_START_DATE,
+        end: endDateFromURL || TODAY
+      });
+    }
+    if (venueFromURL) setSelectedVenue(venueFromURL);
+    // The API resolves any spelling, so the URL name is used as given; the picker gets it added
+    // below if its list spells the player differently.
+    if (playerNameFromURL) setSelectedPlayer(playerNameFromURL);
+    setInitialLoadComplete(true);
+
+    const fetchLists = async () => {
       try {
         const [playersRes, venuesRes] = await Promise.all([
           fetch(`${config.API_URL}/players`),
           fetch(`${config.API_URL}/venues`)
         ]);
         const playersList = await playersRes.json();
-        setPlayers(playersList);
         setVenues(['All Venues', ...await venuesRes.json()]);
 
-        const playerNameFromURL = getQueryParam('name');
-        const tabFromURL = getQueryParam('tab');
-        const startDateFromURL = getQueryParam('start_date');
-        const endDateFromURL = getQueryParam('end_date');
-        const venueFromURL = getQueryParam('venue');
-
-        if (tabFromURL === 'bowling') setActiveTab('bowling');
-
-        if (startDateFromURL || endDateFromURL) {
-          setDateRange({
-            start: startDateFromURL || DEFAULT_START_DATE,
-            end: endDateFromURL || TODAY
-          });
-        }
-
-        if (venueFromURL) setSelectedVenue(venueFromURL);
-
         // The picker lists one canonical spelling per player, but links from elsewhere (query
-        // builder, matchups, old shares) carry legacy spellings ("V Kohli"). The API resolves any
-        // spelling, so accept the URL name and add it to the options rather than ignoring it.
-        if (playerNameFromURL) {
-          const match = playersList.find((p) => p.toLowerCase() === playerNameFromURL.toLowerCase());
-          if (!match) setPlayers([...playersList, playerNameFromURL]);
-          setSelectedPlayer(match || playerNameFromURL);
-          // Autoload is scheduled by the effect below (once the initial load completes). Scheduling it
-          // here as well ran the whole core fetch (stats, ball_stats, dismissals...) twice.
+        // builder, matchups, old shares) carry legacy spellings ("V Kohli"). Keep the URL's
+        // spelling selected (the profile is already loading under it) and add it to the options.
+        if (playerNameFromURL && !playersList.some((p) => p === playerNameFromURL)) {
+          setPlayers([...playersList, playerNameFromURL]);
+        } else {
+          setPlayers(playersList);
         }
-
-        setInitialLoadComplete(true);
       } catch (err) {
         console.error('Error fetching initial data:', err);
-        setInitialLoadComplete(true);
       }
     };
-    fetchInitialData();
+    fetchLists();
   }, []);
 
   useEffect(() => {
@@ -304,12 +302,15 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applied, battingStats, bowlingStats, loading]);
 
+  // A shared link (?autoload=true) loads once, at once. The old 500ms pause bought nothing, and a
+  // player with no data no longer re-triggers it.
+  const autoloaded = useRef(false);
   useEffect(() => {
-    if (initialLoadComplete && selectedPlayer && getQueryParam('autoload') === 'true' && !battingStats && !bowlingStats && !loading && !shouldFetch) {
-      const timer = setTimeout(() => setShouldFetch(true), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [initialLoadComplete, selectedPlayer, battingStats, bowlingStats, loading, shouldFetch]);
+    if (autoloaded.current || !initialLoadComplete || !selectedPlayer) return;
+    if (getQueryParam('autoload') !== 'true') return;
+    autoloaded.current = true;
+    setShouldFetch(true);
+  }, [initialLoadComplete, selectedPlayer]);
 
   useEffect(() => {
     if (!initialLoadComplete) return;
@@ -571,6 +572,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       content: (
         <DismissalSection
           dismissalData={currentDismissalStats}
+          loading={dismissalLoading}
           mode={activeTab}
           playerName={appliedPlayer}
           dateRange={appliedRange}
@@ -614,7 +616,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     // The shot map is batting-only (bowlers keep line & length in Performance).
     return activeTab === 'batting' ? groups : groups.filter((g) => g.id !== 'shot-map');
   }, [
-    hasData, currentStats, currentDismissalStats, activeTab, battingStats,
+    hasData, currentStats, currentDismissalStats, dismissalLoading, activeTab, battingStats,
     applied, isMobile, fetchTrigger, overviewTakeaway,
     globalRankPayload, globalRankLoading, globalRankFailed,
   ]);

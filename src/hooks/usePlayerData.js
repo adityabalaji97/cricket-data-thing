@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import config from '../config';
 
 /**
@@ -11,6 +11,7 @@ const usePlayerData = (playerName, dateRange, selectedVenue, competitionFilters)
   const [bowlingDismissalStats, setBowlingDismissalStats] = useState(null);
   const [playerType, setPlayerType] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [dismissalLoading, setDismissalLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const buildParams = useCallback(() => {
@@ -43,66 +44,55 @@ const usePlayerData = (playerName, dateRange, selectedVenue, competitionFilters)
     }
   }, [playerName]);
 
+  // Each fetch carries the id of the request that started it, so a slow response for the previous
+  // player or filters can't land on top of the current one.
+  const requestId = useRef(0);
+
   const fetchAllData = useCallback(async () => {
     if (!playerName) return;
 
-    setLoading(true);
-    setError(null);
+    const id = ++requestId.current;
+    const current = () => id === requestId.current;
     const params = buildParams();
+    const name = encodeURIComponent(playerName);
+    const getJson = (path) => fetch(`${config.API_URL}${path}?${params}`)
+      .then(r => (r.ok ? r.json() : null))
+      .catch(() => null);
 
-    const fetches = [];
+    setLoading(true);
+    setDismissalLoading(true);
+    setError(null);
+    setBattingStats(null);
+    setBowlingStats(null);
+    setDismissalStats(null);
+    setBowlingDismissalStats(null);
 
-    // Always try batting stats
-    fetches.push(
-      fetch(`${config.API_URL}/player/${encodeURIComponent(playerName)}/stats?${params}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => setBattingStats(data))
-        .catch(() => setBattingStats(null))
-    );
+    // Dismissals feed a section well down the page, and the batting one is the slowest call
+    // (1.6-1.8s on production). They load alongside but no longer hold up the first screen.
+    Promise.all([
+      getJson(`/players/${name}/dismissal_stats`).then(d => { if (current()) setDismissalStats(d); }),
+      getJson(`/players/${name}/bowling_dismissal_stats`).then(d => { if (current()) setBowlingDismissalStats(d); }),
+    ]).finally(() => { if (current()) setDismissalLoading(false); });
 
-    // Always try batting ball stats
-    fetches.push(
-      fetch(`${config.API_URL}/player/${encodeURIComponent(playerName)}/ball_stats?${params}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (data) {
-            setBattingStats(prev => prev ? { ...prev, ball_by_ball_stats: data.ball_by_ball_stats || [] } : null);
-          }
-        })
-        .catch(() => {})
-    );
+    const battingP = getJson(`/player/${name}/stats`);
+    const ballP = getJson(`/player/${name}/ball_stats`);
+    const bowlingP = getJson(`/player/${name}/bowling_stats`);
 
-    // Always try bowling stats
-    fetches.push(
-      fetch(`${config.API_URL}/player/${encodeURIComponent(playerName)}/bowling_stats?${params}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => setBowlingStats(data))
-        .catch(() => setBowlingStats(null))
-    );
-
-    // Batter dismissal stats
-    fetches.push(
-      fetch(`${config.API_URL}/players/${encodeURIComponent(playerName)}/dismissal_stats?${params}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => setDismissalStats(data))
-        .catch(() => setDismissalStats(null))
-    );
-
-    // Bowler dismissal stats
-    fetches.push(
-      fetch(`${config.API_URL}/players/${encodeURIComponent(playerName)}/bowling_dismissal_stats?${params}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => setBowlingDismissalStats(data))
-        .catch(() => setBowlingDismissalStats(null))
-    );
+    // Merge ball-by-ball stats once both have landed: merging into whatever state existed when
+    // ball_stats arrived lost them whenever it beat /stats.
+    const batting = Promise.all([battingP, ballP]).then(([stats, balls]) => {
+      if (!current()) return;
+      setBattingStats(stats ? { ...stats, ball_by_ball_stats: balls?.ball_by_ball_stats || [] } : null);
+    });
+    const bowling = bowlingP.then(d => { if (current()) setBowlingStats(d); });
 
     try {
-      await Promise.all(fetches);
+      await Promise.all([batting, bowling]);
     } catch (e) {
-      setError('Failed to load player data');
+      if (current()) setError('Failed to load player data');
       console.error('Error fetching player data:', e);
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   }, [playerName, buildParams]);
 
@@ -113,6 +103,7 @@ const usePlayerData = (playerName, dateRange, selectedVenue, competitionFilters)
     bowlingDismissalStats,
     playerType,
     loading,
+    dismissalLoading,
     error,
     fetchPlayerType,
     fetchAllData
