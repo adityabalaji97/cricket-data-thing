@@ -1,0 +1,205 @@
+"""
+NZ v India, 1st T20I (Christchurch, 22 Oct 2026): a storyline-led preview post, built by hand ahead of the storylines
+pipeline (MATCH_PREVIEW_STORYLINES_PLAN.md). The talking points come from the 21 Oct headlines (HEADLINES); every number
+is copied from a Hindsight query-builder result (LINKS).
+
+    python articles/storylines-nz-ind-t20i-1/post.py            # print the plan
+    python articles/storylines-nz-ind-t20i-1/post.py --write    # PRODUCTION: carousel, slides, pack, X thread, Reel, YouTube
+
+Nothing is posted: the pack waits in the admin queue for the day.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from datetime import date
+from pathlib import Path
+from urllib.parse import urlencode
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+os.environ.update(REEL_V2="1", REEL_AB="0")  # the voiced Reel, recorded from the live site
+
+KEY = "spotlight-nz-ind-storylines-2026-10-22"
+DAY = date(2026, 10, 22)
+Q = "https://hindsightcricket.com/query?"
+LINKS = {
+    "openers": Q + "start_date=2025-07-01&batters=Vaibhav+Sooryavanshi&batters=Abhishek+Sharma&batters=Sanju+Samson&bowl_kind=pace+bowler&over_max=5&metrics_perspective=batting&group_by=batter&group_by=competition&fmt=mens-t20",
+    "newball": Q + "start_date=2025-01-01&bowlers=Jacob+Duffy&bowlers=Matt+Henry&bowlers=Kyle+Jamieson&bowlers=Lockie+Ferguson&bowlers=Bhuvneshwar+Kumar&bowlers=Arshdeep+Singh&over_max=5&min_balls=120&metrics_perspective=bowling&group_by=bowler&fmt=mens-t20",
+    "hagley": Q + "venue=Hagley+Oval%2C+Christchurch&start_date=2019-01-01&query_mode=team_innings&group_by=innings&fmt=mens-t20",
+    "hagley_innings": Q + "venue=Hagley+Oval%2C+Christchurch&start_date=2019-01-01&innings=1&query_mode=team_innings&group_by=match_id&group_by=year&group_by=innings&group_by=match_outcome&fmt=mens-t20",
+    "final_bat": Q + "include_international=true&match_ids=1512773&metrics_perspective=batting&group_by=batter&group_by=batting_team&fmt=mens-t20",
+    "final_bowl": Q + "include_international=true&match_ids=1512773&metrics_perspective=bowling&group_by=bowler&group_by=bowling_team&fmt=mens-t20",
+    "hagley_kinds": Q + "venue=Hagley+Oval%2C+Christchurch&start_date=2019-01-01&metrics_perspective=bowling&group_by=bowl_kind&group_by=phase&fmt=mens-t20",
+}
+HEADLINES = [
+    ("Sooryavanshi can't walk straight into the XI: Shreyas", "Cricbuzz"),
+    ("We have plans for Sooryavanshi if he plays: Santner", "Cricbuzz"),
+    ("Santner: 'Bhuvi will love these conditions in New Zealand'", "ESPNcricinfo"),
+    ("The complicated truth: NZ pitches can be good for batting too", "Hindustan Times"),
+]
+
+
+def card(cid, visual, title, payload, sample, help_=""):
+    return {"id": cid, "visual": visual, "title": title, "help": help_, "sample": sample, "payload": payload}
+
+
+openers = card(
+    "openers", "metric_bars", "Against new-ball pace in T20Is, Sooryavanshi has added 74 runs per 100 balls. Samson: −28",
+    {"metric": {"label": "Runs added per 100 balls, powerplay v pace", "format": "signed0", "signed": True}, "label_width": 140,
+     "rows": [{"name": "Sooryavanshi", "value": 74.35, "highlight": True, "detail": "71 balls · SR 213"},
+              {"name": "Abhishek", "value": 59.03, "detail": "435 balls · SR 197"},
+              {"name": "Samson", "value": -27.52, "detail": "191 balls · SR 162"}]},
+    "Men's T20Is since 1 Jul 2025 · overs 1–6, pace bowling only",
+    "Runs added: Impact, the runs a batter adds to the projected total. Sooryavanshi's 71 balls are seven innings")
+
+newball = card(
+    "newball", "metric_bars", "Santner is right about Bhuvneshwar: the best powerplay economy of either side's new-ball bowlers",
+    {"metric": {"label": "Powerplay economy since 2025 (lower is better)", "format": "dec2", "signed": False}, "label_width": 130,
+     "rows": [{"name": "Bhuvneshwar", "value": 7.46, "highlight": True, "detail": "India · 51% dots"},
+              {"name": "Matt Henry", "value": 7.67, "team": "New Zealand", "detail": "NZ · 54% dots"},
+              {"name": "Jamieson", "value": 7.81, "team": "New Zealand", "detail": "NZ · 51% dots"},
+              {"name": "Ferguson", "value": 7.85, "team": "New Zealand", "detail": "NZ · 51% dots"},
+              {"name": "Duffy", "value": 8.26, "team": "New Zealand", "detail": "NZ · 51% dots"},
+              {"name": "Arshdeep", "value": 8.88, "team": "India", "detail": "India · 45% dots"}]},
+    "All men's T20s since 1 Jan 2025 · overs 1–6 · 120+ balls each",
+    "Runs per over with the new ball. Lower is better")
+
+#: Every decided first innings at Hagley Oval since 2019 (men's T20: Super Smash and T20Is), (year, total, defended).
+FIRST_INNINGS = [
+    (2019, 193, 0), (2019, 112, 0), (2019, 122, 0), (2019, 172, 1), (2019, 132, 0), (2019, 153, 0), (2019, 129, 0),
+    (2020, 219, 0), (2020, 181, 1), (2020, 167, 0),
+    (2021, 184, 1), (2021, 186, 1), (2021, 154, 1), (2021, 150, 0), (2021, 154, 0), (2021, 162, 0), (2021, 177, 1),
+    (2021, 172, 1), (2021, 173, 1),
+    (2022, 154, 1), (2022, 173, 0), (2022, 167, 1), (2022, 147, 0), (2022, 137, 0), (2022, 130, 0), (2022, 208, 1),
+    (2022, 173, 0), (2022, 163, 0), (2022, 147, 0),
+    (2023, 132, 0), (2023, 154, 1), (2023, 189, 1), (2023, 156, 0), (2023, 154, 0),
+    (2024, 158, 0), (2024, 134, 1), (2024, 140, 0), (2024, 202, 1), (2024, 184, 1),
+    (2025, 91, 0), (2025, 169, 0), (2025, 173, 1), (2025, 167, 1), (2025, 175, 1), (2025, 236, 1),
+    (2026, 187, 1), (2026, 194, 1), (2026, 216, 1), (2026, 178, 1), (2026, 105, 0), (2026, 171, 0),
+]
+SINCE, LINE = 2024, 170  # the preview's rule: the line at the recent median (173), rounded
+_recent = [t for t in FIRST_INNINGS if t[0] >= SINCE and t[1] >= LINE]
+_won = sum(t[2] for t in _recent)
+_big = [t for t in FIRST_INNINGS if t[1] >= 200]
+totals = card(
+    "totals", "totals_scatter", f"{LINE} has won {_won} of {len(_recent)} times here since {SINCE}",
+    {"points": [{"year": y, "total": t, "won": bool(w), "recent": y >= SINCE} for y, t, w in FIRST_INNINGS],
+     "line": LINE, "since": SINCE, "years": [2019, 2026], "faded_label": f"before {SINCE}"},
+    f"{len(FIRST_INNINGS)} decided first innings at Hagley Oval · Super Smash and T20Is since 2019",
+    f"Each dot is a first innings; the dashed line is {LINE}. 200 or more: defended {sum(t[2] for t in _big)} times in {len(_big)}")
+
+#: The T20 World Cup final, 8 Mar 2026 (match 1512773): Impact with bat and ball added together.
+final = card(
+    "final-impact", "metric_bars", "In the World Cup final, Bumrah's 4 for 15 was worth 40 runs, the most of anyone",
+    {"metric": {"label": "Impact in the final, bat and ball", "format": "signed0", "signed": False}, "label_width": 130,
+     "rows": [{"name": "Jasprit Bumrah", "value": 39.54, "team": "India", "highlight": True, "detail": "4 for 15"},
+              {"name": "Sanju Samson", "value": 27.83, "team": "India", "detail": "89 off 46"},
+              {"name": "Abhishek Sharma", "value": 25.40, "team": "India", "detail": "52 off 21 · 1 for 5"},
+              {"name": "Axar Patel", "value": 23.35, "team": "India", "detail": "3 for 27"},
+              {"name": "Mitchell Santner", "value": 20.48, "team": "New Zealand", "detail": "43 off 35"},
+              {"name": "Tim Seifert", "value": 16.55, "team": "New Zealand", "detail": "52 off 26"}]},
+    "T20 World Cup final · Narendra Modi Stadium · 8 Mar 2026",
+    "Impact: runs added to (or, for a bowler, taken off) the projected total")
+
+PREVIEW_CARDS = ("where-won", "key-battles", "last-meeting")
+
+
+def preview_cards() -> dict:
+    """The match preview's own cards for this fixture, as the site builds them."""
+    import httpx
+
+    url = ("https://hindsightcricket.com/api/match-preview/Hagley%20Oval%2C%20Christchurch/New%20Zealand/India/cards"
+           "?format=T20&team1_short=NZ&team2_short=IND")
+    d = httpx.get(url, timeout=120).json()
+    return {c["id"]: c for ch in d["chapters"] for c in ch["cards"] if c["id"] in PREVIEW_CARDS}
+
+
+HOOK = ("Shreyas Iyer says Vaibhav Sooryavanshi can't walk into India's XI. "
+        "Against the new ball in T20Is, he's scored at 213.")
+SLIDES = ([{"type": "hook", "kicker": "New Zealand v India · 1st T20I", "text": HOOK, "sub": "Swipe through the data",
+            "cover": "hero",
+            "hero": {"rows": [{"name": r["name"], "value": r["value"], "highlight": r.get("highlight", False)}
+                              for r in openers["payload"]["rows"]],
+                     "format": "signed0", "label": "Runs added per 100 balls v new-ball pace, T20Is", "card": openers}}]
+          + ["where-won", {"type": "card", "card": newball, "teams": None},
+             {"type": "card", "card": totals, "teams": None}, "key-battles", "last-meeting",
+             {"type": "card", "card": final, "teams": None}]  # openers is on the cover
+          + [{"type": "end", "heading": "Run it yourself",
+              "body": "Every number comes from ball-by-ball data. The full match preview is free on hindsightcricket.com."}])
+LINK = "/venue?" + urlencode({"venue": "Hagley Oval, Christchurch", "team1": "New Zealand", "team2": "India"})
+
+TWEETS = [
+    (1, "1/ Shreyas Iyer says #VaibhavSooryavanshi \"can't walk in\", with Abhishek and Samson to open.\n\n"
+        "Against new-ball pace in T20Is since July 2025, runs added per 100 balls: Sooryavanshi +74 (in just 71 balls), "
+        "Abhishek +59, Samson −28. 🧵 #NZvIND #CricketTwitter"),
+    (3, "2/ Santner: \"Bhuvi will love these conditions.\" The numbers agree: his powerplay economy since 2025 is 7.5, "
+        "with half his balls dots, the best of either side's new-ball bowlers. #NZvIND #CricketTwitter"),
+    (4, "3/ The ground: at Hagley Oval, 170 has won 9 of 10 times since 2024, and 200 or more has been defended 4 times "
+        "in 5. #NZvIND #CricketTwitter"),
+    (5, "4/ One to watch: Ishan Kishan has 59 off 26 balls against Ish Sodhi. He's also 50 runs from 2,000 in T20Is. "
+        "#NZvIND #CricketTwitter"),
+    (7, "5/ Last meeting: the World Cup final, India 255/5, won by 96. Most Impact: Bumrah's 4 for 15 (+40), then "
+        "Samson's 89 off 46 (+28).\n\nFull preview: [post link]\n\n"
+        "Data: Hindsight · @himganj153 & @TechRadar9, Cricsheet #NZvIND #CricketTwitter"),
+]
+CAPTION = """Shreyas Iyer says Vaibhav Sooryavanshi can't walk into India's XI. Against the new ball in T20Is, he's scored at 213.
+
+The storylines before the first T20I in Christchurch, tested against the data: India's openers against new-ball pace, Bhuvneshwar's return (Santner says he'll "love these conditions"), and what wins at Hagley Oval (170 has won 9 of 10 times since 2024). Plus Ishan Kishan v Ish Sodhi, Kishan's 50 runs to 2,000 in T20Is, and who mattered most in their last meeting, the World Cup final (Bumrah's 4 for 15, Samson's 89).
+
+Full match preview: link in bio.
+
+Data: Hindsight · ball-by-ball by Himanish Ganjoo & TechRadar, Cricsheet
+
+#NZvIND #VaibhavSooryavanshi #Bhuvneshwar #TeamIndia #CricketStats"""
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--write", action="store_true")
+    args = ap.parse_args()
+    for n, t in TWEETS:
+        print(f"slide {n} [{len(t)}] {t[:70]}…")
+    if not args.write:
+        print("dry run: nothing written")
+        return 0
+    assert "localhost" not in os.environ.get("DATABASE_URL", ""), "this writes to production"
+
+    from sqlalchemy import text
+
+    from database import engine, get_session
+    from services import ig_backlog, ig_carousel, ig_slides
+    from services.ig_links import post_link
+    from services.ig_notes import youtube_copy
+
+    db = next(get_session())
+    pc = preview_cards()
+    missing = [k for k in PREVIEW_CARDS if k not in pc]
+    assert not missing, f"preview cards missing: {missing}"
+    deck = [{"type": "card", "card": pc[s], "teams": ["NZ", "IND"]} if isinstance(s, str) else dict(s) for s in SLIDES]
+    ig = ig_carousel.save(db, deck, HOOK, {"storylines": KEY}, "storylines")
+    r = ig_slides.render(ig["id"], len(deck))  # from the live site
+    print(f"carousel {ig['id']}: rendered {len(r['ok'])}/{len(deck)} {r['failed'] or ''}")
+    fact = {"kind": "preview", "title": HOOK, "hook": HOOK, "subject": "Vaibhav Sooryavanshi", "carousel_id": ig["id"],
+            "slides": len(deck), "link": LINK, "render": False, "headlines": [{"title": t, "source": s} for t, s in HEADLINES],
+            "fixture": {"venue": "Hagley Oval, Christchurch", "team1": "New Zealand", "team2": "India"}}
+    link = post_link(fact)
+    fact["x"] = [{"n": i + 1, "text": t.replace("[post link]", link), "slide": k} for i, (k, t) in enumerate(TWEETS)]
+    post = {"key": KEY, "pillar": "reactive", "fact": fact, "snapshot_id": ig["id"], "warnings": [],
+            "players": ["Vaibhav Sooryavanshi", "Bhuvneshwar Kumar"], "caption": CAPTION}
+    with engine.begin() as conn:
+        ig_backlog.upsert_pack(conn, post, DAY, source="storylines")
+    print(f"queued ig:{KEY} for {DAY}")
+    print(f"reel: {ig_slides.reel_from_stored(ig['id'], len(deck))}s")
+    yt = youtube_copy(fact, CAPTION, "Iyer says Sooryavanshi can't walk in. Against the new ball in T20Is he's scored at 213")
+    yt["description"] = yt["description"].replace("Full match preview: link in bio.", f"Full match preview: hindsightcricket.com{LINK}")
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE content_packs SET facts = jsonb_set(facts, '{youtube}', CAST(:y AS jsonb)) WHERE angle_key = :k"),
+                     {"y": json.dumps(yt), "k": f"ig:{KEY}"})
+    print("youtube:", yt["title"])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
