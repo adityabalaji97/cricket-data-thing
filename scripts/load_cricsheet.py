@@ -13,6 +13,9 @@ database does not already have, writes:
     Cricsheet balls converted to the delivery_details shape first -- one set of definitions for
     bowler runs, LBWs, per-format phases and fantasy points.
 
+A match the CSV caught part-way and never finished is healed: Cricsheet's balls replace the partial ones in
+delivery_details (services/match_healing.py), and the CSV's version comes back when it has the whole match.
+
 When the CSV later has the match, the sync upgrades it in place
 (DeliveryDetailsSync.upgrade_cricsheet_matches): same matches row, stats rebuilt, these
 deliveries rows dropped.
@@ -510,7 +513,8 @@ def run(source: str, only_ids: Optional[List[str]] = None, dry_run: bool = False
             else:
                 to_load.append(m)
 
-        name_of = NameResolver.build(session, in_scope, read_people_register(people_source))
+        register = read_people_register(people_source)
+        name_of = NameResolver.build(session, in_scope, register)
         if not to_load:
             logger.info("Nothing new to load from Cricsheet")
         stats_writer = StatsFromDeliveryDetails()
@@ -529,6 +533,37 @@ def run(source: str, only_ids: Optional[List[str]] = None, dry_run: bool = False
                 session.rollback()
                 summary['errors'] += 1
                 logger.error(f"Failed {label}: {e}")
+        # Matches the feed caught part-way and never finished (services/match_healing.py): Cricsheet has more legal
+        # balls than we hold, so its balls replace the partial ones; the feed's version comes back when it catches up.
+        from services import match_healing
+
+        for m in (m for m in in_scope if m.match_id in have):
+            try:
+                if not match_healing.stuck(session, m):
+                    continue
+                label = f"{m.match_id} {m.date} {' v '.join(m.info['teams'])}"
+                if dry_run:
+                    logger.info(f"Would heal {label}: {match_healing.ours_legal(session, m.match_id)} -> "
+                                f"{match_healing.legal_balls(m)} legal balls")
+                    summary['would_heal'] += 1
+                    continue
+                people = m.player_ids()
+                pid_of = lambda n, people=people: next(iter(register.get(people.get(n), [])), None)  # noqa: E731
+                got = match_healing.heal(session, m, name_of, pid_of)
+                session.commit()
+                summary['healed'] += 1
+                logger.info(f"Healed {label}: {got['legal_before']} -> {got['legal_after']} legal balls, "
+                            f"{got['batting']} batting and {got['bowling']} bowling rows")
+            except Exception as e:
+                session.rollback()
+                summary['heal_errors'] += 1
+                logger.error(f"Heal failed {m.match_id}: {e}")
+        if summary['healed']:
+            from services.query_cache import bump_data_version
+
+            bump_data_version(session)
+            session.commit()
+
         # Playing XIs for every match in the archive we have, from the feed or loaded just now (migration 020).
         if not dry_run:
             try:
