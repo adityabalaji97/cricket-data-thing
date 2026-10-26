@@ -123,6 +123,52 @@ def step_backfill_advanced(csv_path, db_url, dry_run=False, fmt="T20", gender="m
     return updated
 
 
+def step_feed_caught_up(csv_path, db_url, dry_run=False, fmt="T20", gender="male"):
+    """Step 2d: matches healed from Cricsheet (services/match_healing.py) go back to the feed's rows once the file has
+    them whole, at least as many legal balls as we hold: the feed brings the tagging Cricsheet hasn't (line, length,
+    shot, control, wagon wheel). Ours are deleted with their stats, metrics and partnerships, the file's rows for the
+    match are loaded, and the nightly steps after this one rebuild the rest."""
+    print_header("STEP 2d: Healed matches the feed has caught up on")
+    import tempfile
+
+    import pandas as pd
+    from sqlalchemy import create_engine, text
+
+    from load_delivery_details_full import COL_MAP, load_csv
+    from services.match_healing import HEALED, feed_caught_up, ours_legal
+
+    engine = create_engine(db_url)
+    with engine.connect() as conn:
+        healed = [r[0] for r in conn.execute(text("SELECT id FROM matches WHERE data_source = :s"), {"s": HEALED})]
+    if not healed:
+        print("no healed matches")
+        return
+    match_col = next(k for k, v in COL_MAP.items() if v == "p_match")
+    parts = [c[c[match_col].astype(str).isin(healed)] for c in pd.read_csv(csv_path, chunksize=200000, low_memory=False)]
+    feed = pd.concat(parts) if parts else pd.DataFrame()
+    wide_col = next((k for k, v in COL_MAP.items() if v == "wide"), None)
+    nb_col = next((k for k, v in COL_MAP.items() if v == "noball"), None)
+    for mid in healed:
+        rows = feed[feed[match_col].astype(str) == mid] if len(feed) else feed
+        legal = int(((rows[wide_col].fillna(0) == 0) & (rows[nb_col].fillna(0) == 0)).sum()) if len(rows) else 0
+        with engine.connect() as conn:
+            ours = ours_legal(conn, mid)
+        if not feed_caught_up(legal, ours):
+            print(f"  {mid}: the file has {legal} legal balls, we hold {ours}: keeping Cricsheet's")
+            continue
+        print(f"  {mid}: the file has caught up ({legal} >= {ours} legal balls): {'would load' if dry_run else 'loading'} it")
+        if dry_run:
+            continue
+        with engine.begin() as conn:
+            for table, col in (("ball_metrics", "p_match"), ("partnership_stands", "p_match"),
+                               ("batting_stats", "match_id"), ("bowling_stats", "match_id"), ("delivery_details", "p_match")):
+                conn.execute(text(f"DELETE FROM {table} WHERE {col}::text = :m"), {"m": mid})
+            conn.execute(text("UPDATE matches SET data_source = 'bbb' WHERE id = :m"), {"m": mid})
+        with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
+            rows.to_csv(f.name, index=False)
+        load_csv(f.name, engine, existing_keys=set(), fmt=fmt, gender=gender)
+
+
 def step_fix_extras(db_url, dry_run=False):
     """Step 2c: correct what the feed gets wrong on every load (services/delivery_fixes.py), before any stats are
     built from the rows: a no-ball that also went for byes or leg-byes (the batter's runs stored as negative)."""
@@ -326,6 +372,10 @@ Examples:
             )
         else:
             print("\n[SKIPPED] Step 2b: Backfill Advanced Data")
+
+        # Step 2d: Healed matches the feed now has whole go back to the feed's rows
+        if not args.skip_load:
+            step_feed_caught_up(args.csv, db_url, dry_run=args.dry_run, fmt=args.fmt, gender=args.gender)
 
         # Step 2c: Fix the feed's extras before anything is built from the rows
         step_fix_extras(db_url, dry_run=args.dry_run)
