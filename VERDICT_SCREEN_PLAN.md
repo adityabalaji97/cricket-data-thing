@@ -17,6 +17,7 @@ for all-rounders especially. It must load in under a second on a phone before th
 | V0 | Sign off decisions D1–D6 (below) | [ ] |
 | V1 | Speed: remove the load waterfall (frontend only) | [x] 2026-10-26 (PR; ~3.3–4.9s → ~2.3–2.7s) |
 | V2 | `GET /player/{name}/summary` endpoint + edge cache | [x] 2026-10-26 (PR; D1–D3 as proposed) |
+| V2b | Dynamic peer floors (40% of the period's median, min 120) | [ ] |
 | V3 | Peer strips + season chart components | [ ] |
 | V4 | Verdict screen (T20) in UnifiedPlayerProfile | [ ] |
 | V5 | Verdict line rules + 50-player review list | [ ] |
@@ -70,6 +71,18 @@ RAA. Precompute peer distributions per (format, scope, window) nightly. Set
 `regression_snapshot.py check` (should be unchanged).
 Reference implementation of the numbers: `scripts/dev/verdict_mockup_data.py` (mockup page source: `scripts/dev/verdict_mockup.src.html`) (query API with
 `format=T20`, `leagues=[...]`, `include_international=true`, `top_teams=12`).
+
+### V2b Dynamic peer floors (fold into V3 or V4)
+The peer pools in `services/player_verdict.py` use fixed floors (`MIN_BALLS`: T20 600 bowling /
+300 batting; ODI 500 / 400). Switch them to the rule the statistical twins use
+(DOPPELGANGER_PLAN.md, user 2026-10-27):
+* For each role and window, take the players with 5+ innings. The floor is **40% of their median
+  balls**, never below 120.
+* A player under the floor is still ranked against the pool (as now, `qualified: false`).
+* Return the floor in `peers.min_balls`, and show it in the strip header ("v 213 bowlers, 380+
+  balls").
+* Bump `SUMMARY_VERSION` so cached summaries refresh. Share one helper with the twins engine
+  (`services/qualification.py`) so both use the same rule.
 
 ### V3 Components
 `PeerStrip` (faint tick per peer, median tick, player as a lime dot with a surface ring, better to the
