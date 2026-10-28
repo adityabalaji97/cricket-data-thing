@@ -113,8 +113,48 @@ def build(db):
                             "detail": f"Impact {vrow(p)['impact_per_innings']:+.1f} an innings"} for p in value]},
                  f"T20 Primer method · {SHORT_SCOPE}")
     worth["kicker"] = "Plays alike, worth?"
+    pct = {r["label"]: r["player"] for r in inputs}
+    pair = {r["label"]: (r["player"], r["twin"]) for r in pairs}
     return {"lead": lead, "cards": [strip, star, cloud, allen, worth], "gap": gap, "n": n, "nf": nf,
-            "value": {p: vrow(p) for p in value}, "near": near}
+            "value": {p: vrow(p) for p in value}, "near": near, "pct": pct, "pair": pair}
+
+
+def thread(b, link):
+    """The X thread, by hand: one tweet per slide, each saying what the image can't (services/ig_x.x_thread is built
+    for bar-chart slides and garbled this one: feature labels cut to their last word)."""
+    g, v, n, nf, p, pr = b["gap"], b["value"], b["n"], b["nf"], b["pct"], b["pair"]
+    rap = lambda name: f"{v[name]['raa_per_100']:+.1f}"  # noqa: E731
+    o = lambda k: f"{k}{'th' if 10 <= k % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(k % 10, 'th')}"  # noqa: E731
+    texts = [
+        (f"Who plays most like Abhishek Sharma? Out of {n} batters, the two closest are both in this series: Finn Allen "
+         f"and Vaibhav Sooryavanshi, each {g[FA]} points away.\n\nHow we found them 🧵\n#NZvIND #AbhishekSharma"),
+        (f"1. Put him on {nf} features, each a percentile of the {n}. What stands out: {o(p['boundary %'])} for "
+         f"boundary %, "
+         + (f"{o(p['powerplay strike rate'])} for powerplay and middle-overs strike rate, "
+            if p['powerplay strike rate'] == p['middle-overs strike rate'] else
+            f"{o(p['powerplay strike rate'])} for powerplay and {o(p['middle-overs strike rate'])} for middle-overs strike rate, ")
+         + f"{o(p['powerplay share'])} for powerplay share, {o(p['leave shots'])} for leaving the ball."),
+        (f"2. Measure how far every batter sits from him: the typical percentile gap across four groups (when he bats, "
+         f"how he scores, his shots, pace v spin), each weighted equally.\n\nAllen and Sooryavanshi: {g[FA]}. "
+         f"Salt and Head: {g['Phil Salt']}."),
+        (f"3. The map: every batter at his real distance from Abhishek. He sits at the edge, with almost everyone on one "
+         f"side. Most batters' nearest twin is about 13 points away; his two are right there."),
+        (f"Abhishek v Allen, percentiles: boundary % {pr['boundary %'][0]} v {pr['boundary %'][1]}, powerplay share "
+         f"{pr['powerplay share'][0]} v {pr['powerplay share'][1]}, middle-overs strike rate "
+         f"{pr['middle-overs strike rate'][0]} v {pr['middle-overs strike rate'][1]}.\n\nThe difference: Abhishek "
+         f"leaves far more balls ({pr['leave shots'][0]} v {pr['leave shots'][1]}) and flicks less "
+         f"({pr['flick glance shots'][0]} v {pr['flick glance shots'][1]})."),
+        (f"And they're worth the same: Allen {rap(FA)} runs above par per 100 balls, Abhishek {rap(AS)}. "
+         f"Sooryavanshi, just as close in style: {rap(VS)}.\n\nSalt and Head play alike ({g['Phil Salt']} points) but "
+         f"add {rap('Phil Salt')} and {rap('Travis Head')}."),
+        (f"Who plays like your favourite batter? Every Hindsight profile shows it now, under DNA & Similar.\n\n"
+         f"Free: {link}\nData: @himganj153 & @TechRadar9"),
+    ]
+    out = []
+    for i, t in enumerate(texts, 1):
+        assert len(t) <= 280, (i, len(t), t)
+        out.append({"n": i, "slide": i, "text": t})
+    return out
 
 
 def copy(b):
@@ -160,7 +200,6 @@ def main() -> int:
     if args.write:
         assert "localhost" not in os.environ.get("DATABASE_URL", ""), "--write is production: leave DATABASE_URL unset"
     from database import get_session
-    from services.ig_x import x_thread
     from services.social_rules import findings, hook_problem
 
     db = next(get_session())
@@ -176,10 +215,10 @@ def main() -> int:
     print("lint:", problems or "clean", "| hook:", hp or "ok")
     print(caption)
     players = [AS, FA, VS]
-    thread = x_thread(slides, caption, players=players)
-    for t in thread:
+    thread_ = thread(b, "hindsightcricket.com/links?utm_source=x")
+    for t in thread_:
         print(f"--- tweet {t['n']} (slide {t['slide']}, {len(t['text'])})\n{t['text']}")
-    (HERE / "slides.json").write_text(json.dumps({"slides": slides, "hook": hook, "caption": caption, "x": thread},
+    (HERE / "slides.json").write_text(json.dumps({"slides": slides, "hook": hook, "caption": caption, "x": thread_},
                                                  default=str, indent=1))
     if problems or hp or not args.write:
         return 1 if (problems or hp) else 0
@@ -193,7 +232,7 @@ def main() -> int:
     n = len(slides)
     fact = {"kind": "spotlight", "title": hook, "hook": hook, "subject": AS, "subject_role": "batter",
             "carousel_id": carousel["id"], "slides": n, "render": True, "post_time": "6 pm"}
-    fact["x"] = x_thread(slides, caption, players=players, link=post_link(fact))
+    fact["x"] = thread(b, post_link(fact))
     fact["youtube"] = youtube_copy(fact, caption, hook)
     ist = timezone(timedelta(hours=5, minutes=30))
     today = datetime.now(ist).date()
