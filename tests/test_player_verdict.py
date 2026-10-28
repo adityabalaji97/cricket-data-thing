@@ -84,3 +84,24 @@ def test_qualifying_needs_two_seasons_over_their_floors():
     assert q["floors"] == {"2024": 160, "2025": 160, "2026": 160}  # 40% of 400
     assert "parttimer" not in q["players"] and "returning" in q["players"] and "reg0" in q["players"]
     assert q["seasons_needed"] == 2
+
+
+def test_claim_ignores_a_part_time_role_and_best_reads_naturally():
+    from services.player_verdict import verdict_line
+
+    line = verdict_line({
+        "roles": {
+            "bat": {"peers": {"qualified": True, "metrics": [{"key": "average", "label": "Average", "rank": 40, "n": 339}]},
+                    "seasons": []},
+            "bowl": {"peers": {"qualified": True, "metrics": [{"key": "balls_per_dismissal", "label": "Balls per wicket", "rank": 1, "n": 331}]},
+                     "seasons": []},
+        },
+        "primary_role": "bat", "allrounder": False, "has_wins_added": True, "window": {"start_date": "2024-01-01"},
+    })
+    assert line == "Top 25% for average."
+    line = verdict_line({
+        "roles": {"bat": {"peers": {"qualified": True, "metrics": [{"key": "average", "label": "Average", "rank": 1, "n": 339}]},
+                          "seasons": []}},
+        "primary_role": "bat", "allrounder": False, "has_wins_added": True, "window": {"start_date": "2024-01-01"},
+    })
+    assert line == "Best of 339 for average."
