@@ -781,7 +781,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 {verdictOn ? (
                   <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.12em' }}>
-                    In detail
+                    In detail · T20s
                   </Typography>
                 ) : (
                   <>
