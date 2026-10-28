@@ -24,14 +24,25 @@ metrics, no usage, no shot mix, no era adjustment, and no explanation of why two
 
 | Chunk | Description | Status |
 |---|---|---|
-| S0 | Sign off feature lists + floors (below) | [ ] |
-| S1 | Feature tables: player-season + career vectors (nightly, precomputed) | [ ] |
-| S2 | Engine: percentiles, group weights, two distances, explanations | [ ] |
-| S3 | Validation: sanity twins, stability, a review list for the user | [ ] |
-| S4 | API: `/twins/{player}` (season or window, role, style/value) | [ ] |
-| S5 | Profile "Similar players" section on the new engine | [ ] |
+| S0 | Sign off feature lists + floors (below) | [x] 2026-10-28 (user: go) |
+| S1 | Feature tables: player-season + career vectors (nightly, precomputed) | [x] 2026-10-28 (migration 036, services/twins_features.py, scripts/build_player_vectors.py) |
+| S2 | Engine: percentiles, group weights, two distances, explanations | [x] 2026-10-28 (services/twins.py; style only, unreliable features dropped) |
+| S3 | Validation: sanity twins, stability, a review list for the user | [~] 2026-10-28 stability/reliability done locally; 40-player review list after the production backfill |
+| S4 | API: `/twins/{player}` (season or window, role, style/value) | [x] 2026-10-28 (GET /twins/{name}) |
+| S5 | Profile "Similar players" section on the new engine | [x] 2026-10-28 (TwinsSection, old list as fallback) |
 | S6 | Visuals: percentile strip (reuse V3 PeerStrip), distance star, twin map | [ ] |
 | S7 | Post/Reel template + the first 5 twins | [ ] |
+
+## Validation findings (28 Oct 2026, local 2024-26)
+
+* Split-half test (each half's top-5 twins ranked in the other half's ordering; 50% = chance):
+  "plays like" careers 16-18% median, single seasons 23-30%; "worth like" 35-48%, near chance even for careers.
+* Feature reliability (split-half r over careers): usage, shot mix, control, lengths and lines 0.6-0.98; runs above
+  par per 100, balls per dismissal, economy 0.4-0.55; **Impact per innings 0.09, wins added per innings 0.02-0.08**,
+  death-overs runs above par, balls per wicket, dismissal rates v pace/spin under 0.3.
+* Decision (user, 28 Oct): ship "plays like" only; value is shown side by side on each twin, never matched on.
+  Features under r = 0.4 are left out of the distance (services/twins.UNRELIABLE). The tracked threshold (0.7 v 0.5)
+  made no difference.
 
 ## Method (S1–S2)
 

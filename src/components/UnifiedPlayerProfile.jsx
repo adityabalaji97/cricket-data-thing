@@ -14,6 +14,7 @@ import TopInnings from './TopInnings';
 import BowlingMatchupMatrix from './BowlingMatchupMatrix';
 import PlayerDNASummary from './PlayerDNASummary';
 import PlayerDoppelgangers from './PlayerDoppelgangers';
+import TwinsSection from './playerProfile/TwinsSection';
 import VenueSectionTabs from './VenueSectionTabs';
 import VenueNotesDesktopNav from './VenueNotesDesktopNav';
 import OverviewSection from './playerProfile/sections/OverviewSection';
@@ -451,7 +452,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
       {
         id: 'dna',
         label: 'DNA & Similar',
-        takeaway: 'Playing style in words, and the most similar players',
+        takeaway: 'Playing style in words, and who plays most like this player',
         content: (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <PlayerDNASummary
@@ -465,16 +466,21 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
               venue={appliedVenue !== 'All Venues' ? appliedVenue : undefined}
               fetchTrigger={fetchTrigger}
             />
-            <PlayerDoppelgangers
+            <TwinsSection
               playerName={appliedPlayer}
-              playerType={activeTab === 'bowling' ? 'bowler' : 'batter'}
-              startDate={appliedRange.start}
-              endDate={appliedRange.end}
-              leagues={appliedCompetitions.leagues}
-              includeInternational={appliedCompetitions.international}
-              topTeams={appliedCompetitions.topTeams}
-              fetchTrigger={fetchTrigger}
-              isMobile={isMobile}
+              fallback={(
+              <PlayerDoppelgangers
+                playerName={appliedPlayer}
+                playerType={activeTab === 'bowling' ? 'bowler' : 'batter'}
+                startDate={appliedRange.start}
+                endDate={appliedRange.end}
+                leagues={appliedCompetitions.leagues}
+                includeInternational={appliedCompetitions.international}
+                topTeams={appliedCompetitions.topTeams}
+                fetchTrigger={fetchTrigger}
+                isMobile={isMobile}
+              />
+              )}
             />
           </Box>
         ),
