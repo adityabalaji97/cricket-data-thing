@@ -13,6 +13,16 @@ def _has_table(db: Session, name: str) -> bool:
     return bool(db.execute(text("SELECT to_regclass(:n)"), {"n": name}).scalar())
 
 
+# A referrer from somewhere other than our own site.
+_EXTERNAL_REFERRER = ("COALESCE(NULLIF(split_part(split_part(referrer, '://', 2), '/', 1), ''), '') "
+                      "NOT IN ('', :own, 'www.' || :own)")
+# Last 7 days' people (see `people` below), for the top pages, sources and countries.
+_PEOPLE_7D = f"""
+    anon_id IN (SELECT anon_id FROM app_events WHERE ts >= now() - interval '7 days' AND anon_id NOT LIKE 'embed-%'
+                GROUP BY anon_id HAVING COUNT(*) >= 2 OR bool_or({_EXTERNAL_REFERRER}))
+"""
+
+
 def build_usage_report(db: Session, weeks: int = 8) -> Dict[str, Any]:
     """Week-by-week adoption: web users and actions, games, NL searches, connector usage, and
     Notes reach (note views, embeds on other sites, packs posted and the visits they bring)."""
@@ -23,10 +33,23 @@ def build_usage_report(db: Session, weeks: int = 8) -> Dict[str, Any]:
     def rows(sql: str) -> List[Dict[str, Any]]:
         return [dict(r) for r in db.execute(text(sql), params).mappings().all()]
 
+    # People, not crawlers: search engines rendering the scorecard sitemaps (from 23 Oct 2026) arrive as one page view
+    # under a brand-new id with no referrer, ~14,000 in a day, and swamped the weekly users (18,586 v Vercel's 192). A
+    # visitor counts as a person in a week with 2+ events there, or on arriving from another site.
+    people = rows(f"""
+        WITH v AS (
+            SELECT date_trunc('week', ts)::date AS week, anon_id, COUNT(*) AS n,
+                   bool_or({_EXTERNAL_REFERRER}) AS from_outside
+            FROM app_events WHERE ts >= date_trunc('week', now()) - (:since)::interval AND anon_id NOT LIKE 'embed-%'
+            GROUP BY 1, 2
+        )
+        SELECT week, COUNT(*) FILTER (WHERE n >= 2 OR from_outside) AS users,
+               COUNT(*) FILTER (WHERE n = 1 AND NOT from_outside) AS crawler_visits,
+               COUNT(*) AS all_visitor_ids
+        FROM v GROUP BY 1 ORDER BY 1 DESC
+    """)
     web = rows("""
         SELECT date_trunc('week', ts)::date AS week,
-               -- Embeds log each view under a throwaway "embed-..." id (api/embed.mjs): views, not people.
-               COUNT(DISTINCT anon_id) FILTER (WHERE anon_id NOT LIKE 'embed-%') AS users,
                COUNT(DISTINCT session_id) AS sessions,
                COUNT(*) FILTER (WHERE event = 'page_view') AS page_views,
                COUNT(*) FILTER (WHERE event = 'query_run') AS query_runs,
@@ -83,6 +106,17 @@ def build_usage_report(db: Session, weeks: int = 8) -> Dict[str, Any]:
         FROM mcp_call_log WHERE ts >= date_trunc('week', now()) - (:since)::interval
         GROUP BY 1 ORDER BY 1 DESC
     """)
+    # Conversations by people other than the owner. Claude's connector sends no session id (2 of 487 calls in Oct
+    # 2026) and caller_hash changes with Anthropic's egress server, so a conversation is estimated from the calls'
+    # timing: 30 minutes without a call starts a new one. Two people at once count as one: an undercount.
+    convos = rows("""
+        WITH c AS (
+            SELECT ts, CASE WHEN ts - LAG(ts) OVER (ORDER BY ts) <= interval '30 minutes' THEN 0 ELSE 1 END AS starts
+            FROM mcp_call_log WHERE NOT is_owner AND ts >= date_trunc('week', now()) - (:since)::interval
+        )
+        SELECT date_trunc('week', ts)::date AS week, SUM(starts)::int AS outside_conversations FROM c
+        GROUP BY 1 ORDER BY 1 DESC
+    """)
     jev = rows("""
         SELECT date_trunc('week', ts)::date AS week, COUNT(*) AS jev_calls,
                COALESCE(SUM(input_tokens), 0) AS jev_input_tokens, COALESCE(SUM(output_tokens), 0) AS jev_output_tokens,
@@ -95,25 +129,25 @@ def build_usage_report(db: Session, weeks: int = 8) -> Dict[str, Any]:
         FROM nl_query_log WHERE created_at >= date_trunc('week', now()) - (:since)::interval
         GROUP BY 1 ORDER BY 1 DESC
     """)
-    top_pages = rows("""
+    top_pages = rows(f"""
         SELECT path, COUNT(*) AS views, COUNT(DISTINCT anon_id) AS users
-        FROM app_events WHERE event = 'page_view' AND ts >= now() - interval '7 days'
+        FROM app_events WHERE event = 'page_view' AND ts >= now() - interval '7 days' AND {_PEOPLE_7D}
         GROUP BY 1 ORDER BY 2 DESC LIMIT 15
     """)
-    referrers = rows("""
+    referrers = rows(f"""
         SELECT COALESCE(NULLIF(split_part(split_part(referrer, '://', 2), '/', 1), ''), '(direct)') AS source,
                COUNT(DISTINCT anon_id) AS users
-        FROM app_events WHERE ts >= now() - interval '7 days' AND anon_id NOT LIKE 'embed-%'
+        FROM app_events WHERE ts >= now() - interval '7 days' AND {_PEOPLE_7D}
         GROUP BY 1 ORDER BY 2 DESC LIMIT 10
     """)
-    countries = rows("""
+    countries = rows(f"""
         SELECT COALESCE(country, '?') AS country, COUNT(DISTINCT anon_id) AS users
-        FROM app_events WHERE ts >= now() - interval '7 days' AND anon_id NOT LIKE 'embed-%'
+        FROM app_events WHERE ts >= now() - interval '7 days' AND {_PEOPLE_7D}
         GROUP BY 1 ORDER BY 2 DESC LIMIT 10
     """)
 
     by_week: Dict[str, Dict[str, Any]] = defaultdict(dict)
-    for group in (web, returning, mcp, jev, nl, content):
+    for group in (people, web, returning, mcp, convos, jev, nl, content):
         for row in group:
             week = str(row.pop("week"))
             if "clients" in row:
