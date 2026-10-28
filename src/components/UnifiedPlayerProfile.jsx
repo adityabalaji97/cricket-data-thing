@@ -13,7 +13,6 @@ import CompetitionFilter from './CompetitionFilter';
 import TopInnings from './TopInnings';
 import BowlingMatchupMatrix from './BowlingMatchupMatrix';
 import PlayerDNASummary from './PlayerDNASummary';
-import PlayerDoppelgangers from './PlayerDoppelgangers';
 import TwinsSection from './playerProfile/TwinsSection';
 import VenueSectionTabs from './VenueSectionTabs';
 import VenueNotesDesktopNav from './VenueNotesDesktopNav';
@@ -469,17 +468,10 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
             <TwinsSection
               playerName={appliedPlayer}
               fallback={(
-              <PlayerDoppelgangers
-                playerName={appliedPlayer}
-                playerType={activeTab === 'bowling' ? 'bowler' : 'batter'}
-                startDate={appliedRange.start}
-                endDate={appliedRange.end}
-                leagues={appliedCompetitions.leagues}
-                includeInternational={appliedCompetitions.international}
-                topTeams={appliedCompetitions.topTeams}
-                fetchTrigger={fetchTrigger}
-                isMobile={isMobile}
-              />
+                <Typography variant="body2" color="text.secondary">
+                  Not enough cricket against strong sides since 2024 (120+ balls in two seasons) to find this player's
+                  doppelgängers.
+                </Typography>
               )}
             />
           </Box>
