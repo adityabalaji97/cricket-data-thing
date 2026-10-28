@@ -34,3 +34,38 @@ def test_part_time_bowler_is_not_an_allrounder():
 def test_all_t20_scope_is_not_internationals_only():
     assert scope_params("T20", "all") == {"leagues": [], "include_international": False}
     assert scope_params("T20", "strong")["top_teams"] == 12
+
+
+def test_floor_follows_the_period():
+    from services.qualification import min_balls
+
+    busy = [{"balls": 1000, "innings_count": 30}] * 9 + [{"balls": 50, "innings_count": 3}]
+    quiet = [{"balls": 400, "innings_count": 12}] * 9
+    assert min_balls(busy)["min_balls"] == 400  # 40% of the regulars' median; the 3-innings player isn't a regular
+    assert min_balls(quiet)["min_balls"] == 160
+    assert min_balls([{"balls": 100, "innings_count": 6}])["min_balls"] == 120  # the noise floor
+
+
+def _summary(metrics, seasons, allrounder=False):
+    from services.player_verdict import verdict_line
+
+    return verdict_line({
+        "roles": {"bowl": {"peers": {"qualified": True, "metrics": metrics}, "seasons": seasons}},
+        "primary_role": "bowl", "allrounder": allrounder, "has_wins_added": True,
+        "window": {"start_date": "2024-01-01"},
+    })
+
+
+def test_verdict_claims_best_rank_and_swing():
+    line = _summary(
+        [{"key": "wpa", "label": "Wins added", "rank": 36, "n": 213}, {"key": "dot_percentage", "label": "Dot balls %", "rank": 21, "n": 213}],
+        [{"year": 2025, "wpa": 1.99}, {"year": 2026, "wpa": -0.41}],
+        allrounder=True,
+    )
+    assert line == "Top 10% for dot balls with the ball. +2.0 wins added in 2025, \u22120.4 in 2026."
+
+
+def test_verdict_top_three_and_no_small_swing():
+    line = _summary([{"key": "wpa", "label": "Wins added", "rank": 2, "n": 213}],
+                    [{"year": 2025, "wpa": 1.4}, {"year": 2026, "wpa": 2.0}])
+    assert line == "2nd of 213 for wins added."

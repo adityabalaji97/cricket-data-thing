@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 from services.query_builder_v2 import run_deliveries_query
 from services.query_cache import cached_run
 
-SUMMARY_VERSION = "v1"
+SUMMARY_VERSION = "v2"  # v2: dynamic peer floors, identity, verdict line
 
 STRONG_T20_LEAGUES = [
     "IPL", "BBL", "PSL", "CPL", "SA20", "T20 Blast", "ILT20", "MLC", "BPL", "LPL", "Super Smash",
@@ -34,8 +34,10 @@ TOP_TEAMS = 12
 
 # Years of data the first screen covers when no dates are given (from 1 January).
 DEFAULT_YEARS = {"T20": 2, "ODI": 3}
-# A player needs this many balls in the window to be ranked among the peers.
-MIN_BALLS = {"T20": {"bowl": 600, "bat": 300}, "ODI": {"bowl": 500, "bat": 400}}
+# The peer pool's floor follows the window (services/qualification.py): 40% of the median balls of the role's
+# regulars, never below 120. Players under PREFILTER_BALLS can't move that median much and would make the pool
+# query too big to cache, so they're dropped first.
+PREFILTER_BALLS = 30
 # A role counts from this many balls in the window.
 ROLE_MIN_BALLS = 60
 # The second role makes the player an all-rounder when he does it in this share of the innings he
@@ -163,19 +165,39 @@ def _query(db, fmt: str, **params) -> List[Dict[str, Any]]:
     return list((result or {}).get("data") or [])
 
 
+def _peer_pool(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[str, Any]) -> Dict[str, Any]:
+    """The role's qualified players in the window, trimmed to the strip metrics, with the floor that qualified
+    them. Cached on its own: every player in the same format, scope and window shares it."""
+    from services.qualification import min_balls
+
+    r = ROLES[role]
+    keys = [k for k, _, _ in STRIPS[fmt][role]]
+
+    def run() -> Dict[str, Any]:
+        rows = [_with_economy(row) for row in _query(
+            db, fmt, group_by=[r["group"]], metrics_perspective=r["perspective"], min_balls=PREFILTER_BALLS,
+            **window, **scope,
+        )]
+        floor = min_balls(rows)
+        keep = [{"name": row.get(r["group"]), **{k: _num(row.get(k)) for k in keys}}
+                for row in rows if (row.get("balls") or 0) >= floor["min_balls"]]
+        return {**floor, "players": keep}
+
+    key = {"kind": "verdict_peer_pool", "v": SUMMARY_VERSION, "fmt": fmt, "role": role, **window, **scope}
+    return cached_run(db, key, run)
+
+
 def _peer_strips(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[str, Any],
                  me: Dict[str, Any]) -> Dict[str, Any]:
     r = ROLES[role]
-    peers = [_with_economy(row) for row in _query(
-        db, fmt, group_by=[r["group"]], metrics_perspective=r["perspective"],
-        min_balls=MIN_BALLS[fmt][role], **window, **scope,
-    )]
+    pool = _peer_pool(db, fmt, role, window, scope)
+    peers = pool["players"]
     name = me.get(r["group"])
-    qualified = any(p.get(r["group"]) == name for p in peers)
+    qualified = any(p["name"] == name for p in peers)
     strips = []
     for key, label, lower in STRIPS[fmt][role]:
         value = _num(me.get(key))
-        values = [v for v in (_num(p.get(key)) for p in peers) if v is not None]
+        values = [p[key] for p in peers if p.get(key) is not None]
         if value is None or not values:
             continue
         others = values if qualified else values + [value]
@@ -189,7 +211,8 @@ def _peer_strips(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[st
             "median": quantiles(values, 2)[1] if len(values) > 1 else values[0],
             "quantiles": [round(v, 3) for v in quantiles(values)],
         })
-    return {"qualified": qualified, "min_balls": MIN_BALLS[fmt][role], "pool": len(peers), "metrics": strips}
+    return {"qualified": qualified, "min_balls": pool["min_balls"], "median_balls": pool["median_balls"],
+            "pool": len(peers), "metrics": strips}
 
 
 def _role_block(db, fmt: str, role: str, player: str, window: Dict[str, Any],
@@ -243,6 +266,85 @@ def _form(db, fmt: str, player: str, end: date) -> Dict[str, Any]:
     return {"games": recent, "team": recent[-1]["team"] if recent else None}
 
 
+STYLE_WORDS = {
+    "RF": "right-arm fast", "RFM": "right-arm fast-medium", "RMF": "right-arm medium-fast", "RM": "right-arm medium",
+    "LF": "left-arm fast", "LFM": "left-arm fast-medium", "LMF": "left-arm medium-fast", "LM": "left-arm medium",
+    "OB": "off-spin", "LB": "leg-spin", "LBG": "leg-spin", "SLA": "left-arm orthodox", "LWS": "left-arm wrist spin",
+}
+METRIC_WORDS = {"wpa": "wins added", "dot_percentage": "dot balls", "economy": "economy",
+                "balls_per_dismissal": "balls per wicket", "strike_rate": "strike rate", "average": "average"}
+
+
+def _ordinal(n: int) -> str:
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def _signed(v: float) -> str:
+    return f"{v:+.1f}".replace("-", "\u2212")
+
+
+def _identity(db, fmt: str, player: str, name: str, roles: Dict[str, Any], window: Dict[str, Any]) -> Dict[str, Any]:
+    """National side (else main team), bowling style, batting hand and usual batting position."""
+    from sqlalchemy import text
+
+    out: Dict[str, Any] = {"side": None, "bowling_style": None, "bat_hand": None, "batting_position": None}
+    try:
+        out["side"] = db.execute(text(
+            "SELECT main_side FROM player_identity WHERE name = :n ORDER BY balls DESC LIMIT 1"), {"n": name}).scalar()
+    except Exception:
+        db.rollback()
+    if "bowl" in roles:
+        rows = _query(db, fmt, group_by=["bowl_style"], bowlers=[player], metrics_perspective="bowling", **window)
+        top = max(rows, key=lambda r: r.get("balls") or 0, default=None)
+        if top and top.get("bowl_style"):
+            out["bowling_style"] = STYLE_WORDS.get(top["bowl_style"], top["bowl_style"])
+    if "bat" in roles:
+        base = {"batters": [player], "metrics_perspective": "batting", **window}
+        hand = max(_query(db, fmt, group_by=["bat_hand"], **base), key=lambda r: r.get("balls") or 0, default=None)
+        pos = max(_query(db, fmt, group_by=["batting_position"], **base),
+                  key=lambda r: r.get("innings_count") or 0, default=None)
+        out["bat_hand"] = (hand or {}).get("bat_hand")
+        out["batting_position"] = (pos or {}).get("batting_position")
+    return out
+
+
+def verdict_line(summary: Dict[str, Any]) -> Optional[str]:
+    """One or two plain sentences from the ranks and the seasons (VERDICT_SCREEN_PLAN.md D4, first version).
+
+    The claim is the player's best rank among his peers (a rank in the top 3, else the top 10% or 25%, else the
+    rank itself). The second sentence is a swing of at least one win added between his last two seasons in his
+    main role (T20 only, where wins added exist)."""
+    roles = summary.get("roles") or {}
+    cands = []
+    for role, block in roles.items():
+        if not block["peers"]["qualified"]:
+            continue
+        for m in block["peers"]["metrics"]:
+            cands.append((m["rank"] / m["n"], m["rank"], role, m))
+    if not cands:
+        return None
+    share, rank, role, m = min(cands, key=lambda c: (c[0], c[1]))
+    words = METRIC_WORDS.get(m["key"], m["label"].lower())
+    if rank <= 3:
+        claim = f"{_ordinal(rank)} of {m['n']} for {words}"
+    elif share <= 0.10:
+        claim = f"Top 10% for {words}"
+    elif share <= 0.25:
+        claim = f"Top 25% for {words}"
+    else:
+        claim = f"{_ordinal(rank)} of {m['n']} for {words}"
+    if summary.get("allrounder"):
+        claim += " with the ball" if role == "bowl" else " with the bat"
+    claim += "."  # the window and scope sit on the chip beside it
+    primary = summary.get("primary_role")
+    seasons = [r for r in (roles.get(primary) or {}).get("seasons", []) if r.get("wpa") is not None]
+    if summary.get("has_wins_added") and len(seasons) >= 2:
+        a, b = seasons[-2], seasons[-1]
+        if abs(b["wpa"] - a["wpa"]) >= 1.0:
+            claim += f" {_signed(a['wpa'])} wins added in {a['year']}, {_signed(b['wpa'])} in {b['year']}."
+    return claim
+
+
 def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
                   start_date: Optional[date] = None, end_date: Optional[date] = None) -> Dict[str, Any]:
     default_start, default_end = default_window(fmt)
@@ -258,7 +360,7 @@ def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
 
     name = next((block["name"] for block in roles.values() if block.get("name")), player)
     form = _form(db, fmt, player, end)
-    return {
+    summary = {
         "player": name,
         "format": fmt,
         "scope": scope,
@@ -272,6 +374,9 @@ def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
         "has_wins_added": fmt == "T20",
         "version": SUMMARY_VERSION,
     }
+    summary["identity"] = _identity(db, fmt, player, name, roles, window) if roles else {}
+    summary["verdict"] = verdict_line(summary)
+    return summary
 
 
 def get_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
