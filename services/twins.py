@@ -45,8 +45,8 @@ _CACHE: Dict[Tuple, Tuple[float, Any]] = {}
 _TTL = 600
 
 LABELS = {
-    "position": "batting position", "balls_per_innings": "balls per innings", "share_powerplay": "share of balls in the powerplay",
-    "share_middle": "share in the middle overs", "share_death": "share at the death", "dot_pct": "dot %",
+    "position": "batting position", "balls_per_innings": "balls per innings", "share_powerplay": "powerplay share",
+    "share_middle": "middle-overs share", "share_death": "death share", "dot_pct": "dot %",
     "boundary_pct": "boundary %", "six_share": "sixes among boundaries", "sr_powerplay": "powerplay strike rate",
     "sr_middle": "middle-overs strike rate", "sr_death": "death strike rate", "control_pct": "control %",
     "sr_pace": "strike rate v pace", "sr_spin": "strike rate v spin", "bpd_pace": "balls per dismissal v pace",
@@ -285,6 +285,124 @@ def twins_for(db, player: str, unit: str = "window", period: Optional[str] = Non
     me = next(r for r in rows if r["player"] == out["player"] and r["period"] == period)
     by = {(r["player"], r["period"]): r for r in rows}
     for t in out["twins"]:
+        twin = by[(t["player"], t["period"])]
         t["gap_points"] = round(100 * t["distance"])
-        t["values"] = compare_values(me, by[(t["player"], t["period"])], role)
-    return {**out, "unit": unit, "pool": len(rows), "kind": "style"}
+        t["values"] = compare_values(me, twin, role)
+        t["compare"] = compare_rows(me, twin, role)
+    near = find_in(rows, out["player"], period, role, "style", MAP_N, same_period=(unit == "window"))["twins"]
+    stats = gap_stats(db, unit, role, scope)
+    nearest = out["twins"][0]["distance"] if out["twins"] else None
+    unique = bool(stats.get("p90") and nearest is not None and nearest > stats["p90"])
+    return {**out, "unit": unit, "pool": len(rows), "kind": "style",
+            "map": twin_map(me, [(t["distance"], by[(t["player"], t["period"])]) for t in near], role),
+            "typical_gap_points": round(100 * stats["median"]) if stats.get("median") else None,
+            "unique": unique}
+
+
+# ---- uniqueness (how far the nearest twin is, against everyone's) ---------------------------------------------------
+
+UNIQUE_QUANTILE = 0.9   # nearest twin further than 90% of players' nearest twins: "no close twin"
+GAP_SAMPLE = 300        # seasons pool (~7,000 player-seasons): the gap distribution from a sample
+
+
+def nearest_gap_stats(rows: List[Dict[str, Any]], role: str, same_period: bool, sample: int = GAP_SAMPLE) -> Dict[str, Any]:
+    """Median and 90th percentile of each player's nearest-twin distance in the pool (a sample of players for big
+    pools, each against the whole pool). Built nightly (scripts/build_player_vectors.py) into app_meta."""
+    import random
+
+    members = rows if len(rows) <= sample else random.Random(7).sample(rows, sample)
+    gaps = []
+    for r in members:
+        best = None
+        for o in rows:
+            if o["player"] == r["player"] or (same_period and o["period"] != r["period"]):
+                continue
+            if role in ("bowl", "allround") and r.get("kind") and o.get("kind") != r.get("kind"):
+                continue
+            d = distance(r, o, role, "style")
+            if d is not None and (best is None or d[0] < best):
+                best = d[0]
+        if best is not None:
+            gaps.append(best)
+    gaps.sort()
+    if not gaps:
+        return {}
+    at = lambda q: gaps[min(len(gaps) - 1, int(q * (len(gaps) - 1)))]  # noqa: E731
+    return {"median": round(at(0.5), 4), "p90": round(at(UNIQUE_QUANTILE), 4), "players": len(gaps)}
+
+
+def store_gap_stats(db, unit: str, scope: str = "strong") -> Dict[str, Any]:
+    import json
+    from sqlalchemy import text
+
+    out = {}
+    for role in ("bat", "bowl", "allround"):
+        _CACHE.pop((unit, role, scope), None)
+        rows = pool(db, unit, role, scope)
+        out[role] = nearest_gap_stats(rows, role, same_period=(unit == "window"))
+    db.execute(text("""
+        INSERT INTO app_meta (key, value, updated_at) VALUES (:k, :v, now())
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+    """), {"k": f"twins_gaps:{unit}:{scope}", "v": json.dumps(out)})
+    db.commit()
+    return out
+
+
+def gap_stats(db, unit: str, role: str, scope: str = "strong") -> Dict[str, Any]:
+    import json
+    from sqlalchemy import text
+
+    key = ("gaps", unit, scope)
+    hit = _CACHE.get(key)
+    if not hit or time.time() - hit[0] >= _TTL:
+        raw = db.execute(text("SELECT value FROM app_meta WHERE key = :k"), {"k": f"twins_gaps:{unit}:{scope}"}).scalar()
+        hit = (time.time(), json.loads(raw) if raw else {})
+        _CACHE[key] = hit
+    return hit[1].get(role) or {}
+
+
+# ---- the map (who sits where around the player) --------------------------------------------------------------------
+
+MAP_N = 24
+
+
+def twin_map(me: Dict[str, Any], near: List[Tuple[float, Dict[str, Any]]], role: str) -> List[Dict[str, Any]]:
+    """The nearest players around the player: radius = the true distance, angle from a 2-D classical MDS of the
+    group's pairwise distances (so players alike to each other sit on the same side)."""
+    import numpy as np
+
+    pts = [me] + [r for _, r in near]
+    k = len(pts)
+    if k < 3:
+        return [{"player": r["player"], "period": r["period"], "distance": round(d, 4), "angle": 0.0} for d, r in near]
+    dm = np.zeros((k, k))
+    for i in range(k):
+        for j in range(i + 1, k):
+            d = distance(pts[i], pts[j], role, "style")
+            dm[i, j] = dm[j, i] = d[0] if d else 0.5
+    j = np.eye(k) - np.ones((k, k)) / k
+    b = -0.5 * j @ (dm ** 2) @ j
+    vals, vecs = np.linalg.eigh(b)
+    order = np.argsort(vals)[::-1][:2]
+    xy = vecs[:, order] * np.sqrt(np.maximum(vals[order], 0))
+    cx, cy = xy[0]
+    out = []
+    for (d, r), (x, y) in zip(near, xy[1:]):
+        out.append({"player": r["player"], "period": r["period"], "distance": round(d, 4),
+                    "angle": round(math.degrees(math.atan2(y - cy, x - cx)), 1)})
+    return out
+
+
+def compare_rows(me: Dict[str, Any], twin: Dict[str, Any], role: str) -> List[Dict[str, Any]]:
+    """Both players' percentiles on every feature the style distance compared, in group order."""
+    rows = []
+    for prefix, g in _groups(role, "style"):
+        if g in TRACKED_GROUPS:
+            ta = (me.get("tracked") or {}).get(prefix[:-1]) if prefix else me.get("tracked_share")
+            tb = (twin.get("tracked") or {}).get(prefix[:-1]) if prefix else twin.get("tracked_share")
+            if (ta or 0) < TRACKED_MIN or (tb or 0) < TRACKED_MIN:
+                continue
+        for k in sorted(k for k in me["p"] if k.startswith(f"{prefix}{g}.") and k in twin["p"] and not _unreliable(k)):
+            rows.append({"feature": k, "group": f"{prefix}{g}", "label": label(k),
+                         "player": round(100 * me["p"][k]), "twin": round(100 * twin["p"][k])})
+    return rows

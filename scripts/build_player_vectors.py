@@ -80,6 +80,12 @@ def main() -> int:
                               {"s": args.scope, "p": period}).rowcount
             db.commit()
             log.info("dropped %d rows of older windows", gone)
+    # How far players' nearest twins usually are (the "no close twin" line on the profile): per unit and role.
+    from services.twins import store_gap_stats
+    for unit in sorted({u for u, *_ in jobs}):
+        t = time.time()
+        stats = store_gap_stats(db, unit, args.scope)
+        log.info("nearest-twin gaps %s: %s, %.0fs", unit, stats, time.time() - t)
     return 0
 
 

@@ -3,6 +3,7 @@ import { Box, Skeleton, Tooltip } from '@mui/material';
 import { Link } from 'react-router-dom';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
+import { TwinCompare, TwinMap } from './TwinViz';
 
 // "Plays like" (DOPPELGANGER_PLAN.md S5): the players whose game is closest over the last few seasons against strong
 // sides, from GET /twins/{name}. Matched on style only (usage, scoring shape, shot mix, matchups; for bowlers usage,
@@ -49,21 +50,27 @@ const TwinsSection = ({ playerName, fallback }) => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <Box>
-        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18 }}>Plays like</Box>
+        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18 }}>{d.unique ? 'No close twin' : 'Plays like'}</Box>
+        {d.unique && (
+          <Box sx={{ color: colors.textMed, fontSize: 13.5, mt: 0.5 }}>
+            {`The nearest, ${d.twins[0].player}, is ${d.twins[0].gap_points} points apart; most players have one within ${d.typical_gap_points}.`}
+          </Box>
+        )}
         <Box sx={{ color: colors.textLo, fontSize: 12.5 }}>
           {`Closest games among ${d.pool} ${d.role === 'bowl' ? 'bowlers' : d.role === 'allround' ? 'all-rounders' : 'batters'}`}
           {from ? `, ${from.slice(0, 4)} to ${to ? to.slice(0, 4) : 'now'}` : ''} · major leagues and top-12 T20Is
         </Box>
       </Box>
+      {d.map?.length > 0 && <TwinMap player={d.player} points={d.map} highlight={d.unique ? 3 : 5} />}
       {d.twins.map((t, i) => (
-        <Box key={t.player} sx={{ bgcolor: colors.surface1, border: `1px solid ${i === 0 ? 'rgba(182,242,74,0.45)' : colors.border}`, borderRadius: '14px', p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Box key={t.player} sx={{ bgcolor: colors.surface1, border: `1px solid ${i === 0 && !d.unique ? 'rgba(182,242,74,0.45)' : colors.border}`, borderRadius: '14px', p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
             <Box component={Link} to={`/player?name=${encodeURIComponent(t.player)}&autoload=true`}
               sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 17, color: colors.textHi, textDecoration: 'none', '&:hover': { color: colors.accent } }}>
               {t.player}
             </Box>
             <Tooltip enterTouchDelay={0} title="The typical gap between the two players' percentiles across the features compared: lower is closer.">
-              <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 11, color: i === 0 ? colors.accent : colors.textLo, whiteSpace: 'nowrap' }}>
+              <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 11, color: i === 0 && !d.unique ? colors.accent : colors.textLo, whiteSpace: 'nowrap' }}>
                 {t.gap_points} pts apart
               </Box>
             </Tooltip>
@@ -92,6 +99,7 @@ const TwinsSection = ({ playerName, fallback }) => {
               </React.Fragment>
             ))}
           </Box>
+          <TwinCompare player={d.player} twin={t.player} rows={t.compare} />
         </Box>
       ))}
     </Box>

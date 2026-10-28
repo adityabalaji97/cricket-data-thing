@@ -30,7 +30,7 @@ metrics, no usage, no shot mix, no era adjustment, and no explanation of why two
 | S3 | Validation: sanity twins, stability, a review list for the user | [~] 2026-10-28 stability/reliability done locally; 40-player review list after the production backfill |
 | S4 | API: `/twins/{player}` (season or window, role, style/value) | [x] 2026-10-28 (GET /twins/{name}) |
 | S5 | Profile "Similar players" section on the new engine | [x] 2026-10-28 (TwinsSection, old list as fallback) |
-| S6 | Visuals: percentile strip (reuse V3 PeerStrip), distance star, twin map | [ ] |
+| S6 | Visuals: percentile strip (reuse V3 PeerStrip), distance star, twin map | [~] 2026-10-28 twin map + compare strip on the profile; distance star waits for the posts |
 | S7 | Post/Reel template + the first 5 twins | [ ] |
 
 ## Validation findings (28 Oct 2026, local 2024-26)
