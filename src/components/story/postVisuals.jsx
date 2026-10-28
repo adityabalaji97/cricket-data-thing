@@ -1215,6 +1215,128 @@ const KeepTry = ({ payload }) => (
   </Box>
 );
 
+
+/**
+ * Statistical twins, step 1 ("the inputs"): one player's percentile on each feature the twin search compares, grouped,
+ * 0 to 100 against the pool. payload: {rows:[{label, group, value}], pool}
+ */
+const PercentileStrip = ({ payload }) => {
+  const rows = payload.rows || [];
+  const W = 300; const L = 128; const R = 26; const rowH = rows.length > 18 ? 13.5 : 16;
+  const groups = []; rows.forEach((r) => { if (!groups.length || groups[groups.length - 1].group !== r.group) groups.push({ group: r.group, rows: [] }); groups[groups.length - 1].rows.push(r); });
+  const H = rows.length * rowH + groups.length * 13 + 16;
+  const sx = (v) => L + (v / 100) * (W - L - R);
+  let y = 12;
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Percentiles" sx={{ width: '100%' }}>
+        {[0, 50, 100].map((t) => (
+          <text key={t} x={sx(t)} y="8" textAnchor="middle" style={{ ...mono, fontSize: 8, fill: colors.textFaint }}>{t}</text>
+        ))}
+        {groups.map((g) => {
+          const head = y + 9; y += 13;
+          return (
+            <g key={g.group}>
+              <text x="0" y={head} style={{ ...mono, fontSize: 7.5, letterSpacing: '0.1em', fill: colors.textLo }}>{g.group.toUpperCase()}</text>
+              {g.rows.map((r) => {
+                const cy = y + rowH / 2; y += rowH;
+                return (
+                  <g key={r.label}>
+                    <text x="0" y={cy + 3.2} style={{ fontFamily: fonts.body, fontSize: 9.5, fill: colors.textHi }}>{r.label}</text>
+                    <line x1={sx(0)} x2={sx(100)} y1={cy} y2={cy} stroke={colors.borderStrong} strokeWidth="1" />
+                    <line x1={sx(50)} x2={sx(50)} y1={cy - 3} y2={cy + 3} stroke={colors.textGhost} />
+                    <circle cx={sx(r.value)} cy={cy} r="3.6" fill={colors.accent} />
+                    <text x={W} y={cy + 3.2} textAnchor="end" style={{ ...mono, fontSize: 8.5, fill: colors.textMed }}>{Math.round(r.value)}</text>
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+};
+
+/**
+ * Statistical twins, step 2 ("the method"): the player at the centre, his nearest players on spokes whose length is the
+ * distance, labelled with it. payload: {center, spokes:[{name, distance, highlight?}]}
+ */
+const DistanceStar = ({ payload }) => {
+  const spokes = payload.spokes || [];
+  const W = 300; const c = W / 2; const R = 112;
+  const max = Math.max(...spokes.map((s) => s.distance));
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`-34 0 ${W + 68} ${W}`} role="img" aria-label={`Distances from ${payload.center}`} sx={{ width: '100%' }}>
+        {spokes.map((s, i) => {
+          const a = -Math.PI / 2 + (i / spokes.length) * 2 * Math.PI;
+          const r = 34 + (s.distance / max) * (R - 34);
+          const x = c + r * Math.cos(a); const y = c + r * Math.sin(a);
+          const mx = c + r * 0.58 * Math.cos(a); const my = c + r * 0.58 * Math.sin(a);
+          const lx = c + (r + 12) * Math.cos(a); const ly = c + (r + 12) * Math.sin(a);
+          const col = s.highlight ? colors.accent : colors.textLo;
+          return (
+            <g key={s.name}>
+              <line x1={c} y1={c} x2={x} y2={y} stroke={s.highlight ? colors.accent : colors.borderStrong} strokeWidth={s.highlight ? 1.6 : 1} />
+              <circle cx={x} cy={y} r={s.highlight ? 4.5 : 3.5} fill={col} />
+              <text x={mx} y={my - 3} textAnchor="middle" style={{ ...mono, fontSize: 8.5, fill: s.highlight ? colors.accent : colors.textMed }}>{s.distance}</text>
+              <text x={lx} y={ly + 3} textAnchor={Math.cos(a) > 0.3 ? 'start' : Math.cos(a) < -0.3 ? 'end' : 'middle'}
+                style={{ fontFamily: fonts.body, fontSize: 9.5, fontWeight: s.highlight ? 700 : 500, fill: s.highlight ? colors.textHi : colors.textMed }}>{s.label || surname(s.name)}</text>
+            </g>
+          );
+        })}
+        <circle cx={c} cy={c} r="9" fill={colors.accent} stroke={colors.bg} strokeWidth="2" />
+        <text x={c} y={c + 24} textAnchor="middle" style={{ fontFamily: fonts.display, fontSize: 12, fontWeight: 700, fill: colors.accent }}>{payload.center_label || surname(payload.center)}</text>
+      </Box>
+    </Box>
+  );
+};
+
+/**
+ * Statistical twins, step 3 ("the map"): every player in the pool at his true distance from the centre (rings every
+ * 10 points), angle from an MDS of their likeness to each other; brighter = closer. payload:
+ * {center, points:[{name, distance, angle, label?, highlight?}], ring_step}
+ */
+const TwinCloud = ({ payload }) => {
+  const pts = payload.points || [];
+  const W = 300; const c = W / 2; const R = 138;
+  const step = payload.ring_step || 10;
+  const outer = Math.ceil(Math.max(...pts.map((p) => p.distance)) / step) * step;
+  const rings = []; for (let r = step; r <= outer; r += step) rings.push(r);
+  const pos = (p) => { const rr = (p.distance / outer) * R; const a = (p.angle * Math.PI) / 180; return [c + rr * Math.cos(a), c - rr * Math.sin(a)]; };
+  const sorted = pts.slice().sort((a, b) => b.distance - a.distance);
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${W}`} role="img" aria-label={`Every batter around ${payload.center}`} sx={{ width: '100%' }}>
+        {rings.map((r) => (
+          <g key={r}>
+            <circle cx={c} cy={c} r={(r / outer) * R} fill="none" stroke={colors.borderStrong} strokeDasharray="2 3" />
+            {r <= (payload.label_rings_to || 40) && (
+              <text x={c + 3} y={c - (r / outer) * R - 2} style={{ ...mono, fontSize: 7.5, fill: colors.textFaint }}>{r} pts</text>
+            )}
+          </g>
+        ))}
+        {sorted.map((p) => {
+          const [x, y] = pos(p);
+          const near = 1 - p.distance / outer;
+          return <circle key={p.name} cx={x} cy={y} r={p.highlight ? 4.2 : 2.2} fill={p.highlight ? colors.textHi : colors.textLo}
+            opacity={p.highlight ? 1 : Math.max(0.15, near * near)} />;
+        })}
+        {pts.filter((p) => p.label).map((p) => {
+          const [x, y] = pos(p);
+          return (
+            <text key={`l-${p.name}`} x={x + (x >= c ? 7 : -7)} y={y + 3} textAnchor={x >= c ? 'start' : 'end'}
+              style={{ fontFamily: fonts.body, fontSize: 9.5, fontWeight: 700, fill: colors.textHi }}>{p.label}</text>
+          );
+        })}
+        <circle cx={c} cy={c} r="6" fill={colors.accent} stroke={colors.bg} strokeWidth="1.5" />
+        <text x={c} y={c + 17} textAnchor="middle" style={{ fontFamily: fonts.display, fontSize: 11, fontWeight: 700, fill: colors.accent }}>{payload.center_label || surname(payload.center)}</text>
+      </Box>
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
   recap_text: RecapText,
   score_race: ScoreRace,
@@ -1237,4 +1359,7 @@ export const POST_VISUALS = {
   pitch_map: PitchMap,
   metric_lines: MetricLines,
   keep_try: KeepTry,
+  percentile_strip: PercentileStrip,
+  distance_star: DistanceStar,
+  twin_cloud: TwinCloud,
 };
