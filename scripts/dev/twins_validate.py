@@ -36,7 +36,16 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--season", type=int, default=2025)
     parser.add_argument("--n", type=int, default=5)
+    parser.add_argument("--window", nargs=2, metavar=("START", "END"), help="test a career window instead of a season")
+    parser.add_argument("--half-floor", type=int, default=HALF_FLOOR)
+    parser.add_argument("--tracked-min", type=float)
+    parser.add_argument("--no-dropout", action="store_true")
+    parser.add_argument("--roles", default="bat,bowl")
+    parser.add_argument("--reliability", action="store_true")
     args = parser.parse_args()
+    import services.twins as twins_mod
+    if args.tracked_min is not None:
+        twins_mod.TRACKED_MIN = args.tracked_min
 
     from database import get_session
     from services.player_verdict import scope_params
@@ -45,21 +54,42 @@ def main() -> int:
     from services.twins_features import build_period
 
     db = next(get_session())
-    start, end = date(args.season, 1, 1), date(args.season, 12, 31)
+    start, end = ((date.fromisoformat(args.window[0]), date.fromisoformat(args.window[1])) if args.window
+                  else (date(args.season, 1, 1), date(args.season, 12, 31)))
     ids = sorted({str(r["match_id"]) for r in run_deliveries_query(
         db, fmt="T20", limit=100000, group_by=["match_id"], start_date=start, end_date=end,
         **scope_params("T20", "strong"))["data"]})
     halves = [ids[0::2], ids[1::2]]
     print(f"{args.season}: {len(ids)} matches, halves of {len(halves[0])} and {len(halves[1])}")
 
-    for role in ("bat", "bowl"):
+    for role in args.roles.split(","):
         built = []
         for i, half in enumerate(halves):
-            vectors, _ = build_period(db, role, start, end, match_ids=half, floor=HALF_FLOOR)
+            vectors, _ = build_period(db, role, start, end, match_ids=half, floor=args.half_floor)
             rows = rows_from(vectors, str(args.season))
             percentiles(rows)
             built.append(rows)
         both = {r["player"] for r in built[0]} & {r["player"] for r in built[1]}
+        # Each feature's split-half reliability: Pearson r of the raw value across players in both halves.
+        idx = [{r["player"]: r for r in b} for b in built]
+        keys = sorted({f"{g}.{k}" for r in built[0] for g, fs in r["features"].items() for k in fs})
+        rel = []
+        for key in keys:
+            g, k = key.split(".", 1)
+            pairs = [((idx[0][n]["features"].get(g) or {}).get(k), (idx[1][n]["features"].get(g) or {}).get(k)) for n in both]
+            pairs = [(a, b) for a, b in pairs if a is not None and b is not None]
+            if len(pairs) < 30:
+                continue
+            ma = sum(a for a, _ in pairs) / len(pairs)
+            mb = sum(b for _, b in pairs) / len(pairs)
+            cov = sum((a - ma) * (b - mb) for a, b in pairs)
+            va = sum((a - ma) ** 2 for a, _ in pairs) ** 0.5
+            vb = sum((b - mb) ** 2 for _, b in pairs) ** 0.5
+            if va and vb:
+                rel.append((cov / (va * vb), key, len(pairs)))
+        if getattr(args, "reliability", False):
+            for r, key, n_ in sorted(rel, reverse=True):
+                print(f"    r={r:+.2f}  {role} {key} (n={n_})")
         for kind in ("style", "value"):
             overlaps = []
             for name in both:
@@ -84,6 +114,8 @@ def main() -> int:
             print(f"  {role} {kind}: {len(overlaps)} players in both halves; top-{args.n} overlap {mean:.0%} "
                   f"(chance {chance:.1%}, {mean / chance if chance else 0:.0f}x)")
 
+        if args.no_dropout:
+            continue
         # Group drop-out on the full season.
         vectors, _ = build_period(db, role, start, end)
         rows = rows_from(vectors, str(args.season))

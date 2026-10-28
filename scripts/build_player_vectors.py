@@ -74,6 +74,12 @@ def main() -> int:
             write(db, unit, period, role, args.scope, vectors)
             log.info("%s %s %s: %d players, %d qualified (%s+ balls), %.0fs", unit, period, role, len(vectors),
                      len(qual["players"]), qual["floor"], time.time() - t)
+        if unit == "window":  # one career window at a time: drop yesterday's
+            from sqlalchemy import text
+            gone = db.execute(text("DELETE FROM player_vectors WHERE unit = 'window' AND scope = :s AND period <> :p"),
+                              {"s": args.scope, "p": period}).rowcount
+            db.commit()
+            log.info("dropped %d rows of older windows", gone)
     return 0
 
 

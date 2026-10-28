@@ -20,6 +20,21 @@ from typing import Any, Dict, List, Optional, Tuple
 from services.twins_features import GROUPS, TRACKED_GROUPS
 
 TRACKED_MIN = 0.7
+# Features whose split-half reliability over careers was under r = 0.4 (scripts/dev/twins_validate.py --reliability,
+# local 2024-26, 28 Oct 2026): matching on them is matching on noise. Impact and wins added per innings (r 0.02-0.09)
+# describe what happened but don't repeat, so they stay on the cards as context, never in the distance.
+UNRELIABLE = {
+    "bat": {"value.impact_per_innings", "value.wpa_per_innings", "value.raa_per_100_death", "value.average",
+            "scoring.sr_death", "matchups.bpd_pace", "matchups.bpd_spin", "shots.ramp_scoop"},
+    "bowl": {"value.wpa_per_innings", "value.balls_per_wicket", "value.economy_death", "value.economy_middle",
+             "value.economy_powerplay", "value.waa_per_over", "value.raa_per_over", "lines.wide_down_leg",
+             "outcomes.econ_v_lhb"},
+}
+
+
+def _unreliable(key: str) -> bool:
+    role, _, feature = key.rpartition(":")
+    return any(feature in UNRELIABLE[r] for r in ([role] if role else ("bat", "bowl")))
 MIN_GROUP_SHARE = 0.5  # a pair needs at least half its groups to be compared at all
 # A "worth like" twin carried at least this share of the player's workload (balls) in his season: a part-timer's one
 # lucky 150-ball season ranked level with Bumrah's 500 (Khushdil Shah as Bumrah's twin, first local run).
@@ -64,9 +79,12 @@ def _label(feature: str) -> str:
 def _load(db, unit: str, role: str, scope: str) -> List[Dict[str, Any]]:
     from sqlalchemy import text
 
-    rows = db.execute(text("""
+    # Careers: only the latest window built (the nightly job writes today's; older ones stay until the next run).
+    latest = "AND period = (SELECT period FROM player_vectors WHERE unit = 'window' AND role = :r AND scope = :s " \
+             "ORDER BY built_at DESC LIMIT 1)" if unit == "window" else ""
+    rows = db.execute(text(f"""
         SELECT period, player, balls, innings, kind, tracked_share, features FROM player_vectors
-        WHERE unit = :u AND role = :r AND scope = :s AND qualified
+        WHERE unit = :u AND role = :r AND scope = :s AND qualified {latest}
     """), {"u": unit, "r": role, "s": scope}).mappings().all()
     return [dict(r) for r in rows]
 
@@ -140,7 +158,7 @@ def distance(a: Dict[str, Any], b: Dict[str, Any], role: str, kind: str,
             tb = (b.get("tracked") or {}).get(prefix[:-1]) if prefix else b.get("tracked_share")
             if (ta or 0) < TRACKED_MIN or (tb or 0) < TRACKED_MIN:
                 continue
-        keys = [k for k in a["p"] if k.startswith(f"{prefix}{g}.") and k in b["p"]]
+        keys = [k for k in a["p"] if k.startswith(f"{prefix}{g}.") and k in b["p"] and not _unreliable(k)]
         if not keys:
             continue
         weight = 1.0
@@ -200,3 +218,73 @@ def find_in(rows: List[Dict[str, Any]], player: str, period: str, role: str = "b
         if len(twins) == n:
             break
     return {"player": me["player"], "period": period, "role": role, "kind": kind, "qualified": True, "twins": twins}
+
+
+# What each twin's card shows of value, side by side (not matched on: see UNRELIABLE).
+VALUE_SHOWN = {
+    "bat": [("value", "raa_per_100", "Runs above par per 100 balls"), ("value", "wpa_per_innings", "Wins added per innings"),
+            ("scoring", "boundary_pct", "Boundary %")],
+    "bowl": [("value", "economy", "Economy"), ("value", "wpa_per_innings", "Wins added per innings"),
+             ("outcomes", "dot_pct", "Dot balls %")],
+}
+
+
+def latest_window(db, scope: str = "strong") -> Optional[str]:
+    from sqlalchemy import text
+
+    return db.execute(text("SELECT period FROM player_vectors WHERE unit = 'window' AND scope = :s "
+                           "ORDER BY built_at DESC LIMIT 1"), {"s": scope}).scalar()
+
+
+def role_of(db, player: str, unit: str, period: str, scope: str = "strong") -> Optional[str]:
+    """'allround' when qualified in both roles with the second in 40%+ of the main role's innings, else the role
+    with more innings (qualified first)."""
+    rows = {r["role"]: r for r in pool_rows(db, player, unit, period, scope)}
+    q = {k: v for k, v in rows.items() if v["qualified"]}
+    if len(q) == 2 and min(q["bat"]["innings"], q["bowl"]["innings"]) >= 0.4 * max(q["bat"]["innings"], q["bowl"]["innings"]):
+        return "allround"
+    pick = q or rows
+    return max(pick, key=lambda r: pick[r]["innings"]) if pick else None
+
+
+def pool_rows(db, player: str, unit: str, period: str, scope: str):
+    from sqlalchemy import text
+
+    return [dict(r) for r in db.execute(text("""
+        SELECT role, innings, qualified FROM player_vectors
+        WHERE unit = :u AND period = :p AND scope = :s AND lower(player) = lower(:n)
+    """), {"u": unit, "p": period, "s": scope, "n": player}).mappings().all()]
+
+
+def compare_values(me: Dict[str, Any], twin: Dict[str, Any], role: str) -> List[Dict[str, Any]]:
+    roles = ["bat", "bowl"] if role == "allround" else [role]
+    out = []
+    for r in roles:
+        mf = me["features"].get(r, me["features"]) if role == "allround" else me["features"]
+        tf = twin["features"].get(r, twin["features"]) if role == "allround" else twin["features"]
+        for g, k, text_ in VALUE_SHOWN[r]:
+            out.append({"role": r, "key": k, "label": text_,
+                        "player": (mf.get(g) or {}).get(k), "twin": (tf.get(g) or {}).get(k)})
+    return out
+
+
+def twins_for(db, player: str, unit: str = "window", period: Optional[str] = None, role: Optional[str] = None,
+              n: int = 5, scope: str = "strong") -> Dict[str, Any]:
+    """The API's answer: "plays like" twins with their closest and furthest features, and both players' value side
+    by side. Careers (unit window) compare within the window; seasons compare across every season (cross-era)."""
+    period = period or (latest_window(db, scope) if unit == "window" else None)
+    if not period:
+        return {"player": player, "qualified": False, "twins": []}
+    role = role or role_of(db, player, unit, period, scope)
+    if not role:
+        return {"player": player, "period": period, "qualified": False, "twins": []}
+    rows = pool(db, unit, role, scope)
+    out = find_in(rows, player, period, role, "style", n, same_period=(unit == "window"))
+    if not out.get("qualified"):
+        return {**out, "unit": unit}
+    me = next(r for r in rows if r["player"] == out["player"] and r["period"] == period)
+    by = {(r["player"], r["period"]): r for r in rows}
+    for t in out["twins"]:
+        t["gap_points"] = round(100 * t["distance"])
+        t["values"] = compare_values(me, by[(t["player"], t["period"])], role)
+    return {**out, "unit": unit, "pool": len(rows), "kind": "style"}
