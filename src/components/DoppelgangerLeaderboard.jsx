@@ -1,395 +1,133 @@
-import React, { useMemo, useState } from 'react';
-import axios from 'axios';
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  Container,
-  Grid,
-  MenuItem,
-  
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TextField,
-  Typography,
-} from '@mui/material';
-import { useMediaQuery } from '@mui/material';
-import FilterSummary from './ui/FilterSummary';
-import ScrollTable from './ui/ScrollTable';
-import {
-  Legend,
-  PolarAngleAxis,
-  PolarGrid,
-  PolarRadiusAxis,
-  Radar,
-  RadarChart,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts';
+import React, { useEffect, useState } from 'react';
+import { Autocomplete, Box, Skeleton, TextField } from '@mui/material';
+import { Link } from 'react-router-dom';
 import config from '../config';
-import CompetitionFilter from './CompetitionFilter';
-import { apiErrorText } from '../utils/apiError';
+import { colors, fonts } from '../theme/hindsightDark';
+import TwinsSection from './playerProfile/TwinsSection';
 
-const TODAY = new Date().toISOString().split('T')[0];
-const DEFAULT_START = `${new Date().getFullYear() - 1}-01-01`;
+// Doppelgängers (DOPPELGANGER_PLAN.md): the statistical twins engine as a page. Pick any player for his twin map, or
+// browse the closest pairs and the players with no close twin, per role. Careers since Jan 2024 against strong sides
+// (major leagues + top-12 T20Is), matched on how a player plays: usage, scoring shape, shot mix and pace v spin for
+// batters; usage, lengths, lines and outcomes for bowlers.
 
-const PairRadar = ({ pair, radarMap }) => {
-  if (!pair || !radarMap) return null;
-  const p1 = radarMap[pair.player1];
-  const p2 = radarMap[pair.player2];
-  if (!p1 || !p2) return null;
-
-  const p2ByKey = new Map(p2.map((m) => [m.key, m]));
-  const chartData = p1
-    .map((m1) => {
-      const m2 = p2ByKey.get(m1.key);
-      if (!m2) return null;
-      return {
-        metric: m1.metric,
-        p1Pct: m1.percentile,
-        p2Pct: m2.percentile,
-        p1Raw: m1.raw_value,
-        p2Raw: m2.raw_value,
-        avg: m1.league_avg,
-      };
-    })
-    .filter(Boolean);
-
-  if (!chartData.length) return null;
-
-  return (
-    <Box sx={{ mt: 2 }}>
-      <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
-        Radar: {pair.player1} vs {pair.player2}
-      </Typography>
-      <Box sx={{ width: '100%', height: 380 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={chartData} outerRadius="68%">
-            <PolarGrid />
-            <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
-            <PolarRadiusAxis domain={[0, 100]} tickCount={6} tick={{ fontSize: 10 }} />
-            <Radar name={pair.player1} dataKey="p1Pct" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
-            <Radar name={pair.player2} dataKey="p2Pct" stroke="#f97316" fill="#f97316" fillOpacity={0.2} />
-            <Tooltip
-              labelFormatter={(label, payload) => {
-                const row = payload?.[0]?.payload;
-                return row ? `${label} (league avg ${row.avg})` : label;
-              }}
-              formatter={(value, name, ctx) => {
-                const row = ctx?.payload || {};
-                if (name === pair.player1) return [`${value}% (raw ${row.p1Raw})`, pair.player1];
-                if (name === pair.player2) return [`${value}% (raw ${row.p2Raw})`, pair.player2];
-                return [value, name];
-              }}
-            />
-            <Legend />
-          </RadarChart>
-        </ResponsiveContainer>
-      </Box>
-    </Box>
-  );
+const ROLES = [['bat', 'Batters'], ['bowl', 'Bowlers'], ['allround', 'All-rounders']];
+const COMMON_SURNAMES = new Set(['Sharma', 'Yadav', 'Singh', 'Kumar', 'Patel', 'Khan', 'Iyer', 'Pandya']);
+const short = (name) => {
+  const parts = name.split(' ');
+  const last = parts[parts.length - 1];
+  return parts.length > 1 && !COMMON_SURNAMES.has(last) ? last : parts[0];
 };
 
-const PairTable = ({ title, rows = [], role, selectedKey, onSelect }) => (
-  <Box>
-    <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
-    <ScrollTable paper variant="outlined">
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>#</TableCell>
-            <TableCell>Player 1</TableCell>
-            <TableCell>Player 2</TableCell>
-            <TableCell align="right">Distance</TableCell>
-            <TableCell align="right">{role === 'batter' ? 'Innings' : 'Balls'} (P1)</TableCell>
-            <TableCell align="right">{role === 'batter' ? 'Innings' : 'Balls'} (P2)</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row, idx) => {
-            const rowKey = `${row.player1}|${row.player2}|${row.distance}`;
-            return (
-            <TableRow
-              key={`${row.player1}-${row.player2}-${idx}`}
-              hover
-              selected={rowKey === selectedKey}
-              onClick={() => onSelect?.(row)}
-              sx={{ cursor: onSelect ? 'pointer' : 'default' }}
-            >
-              <TableCell>{idx + 1}</TableCell>
-              <TableCell>{row.player1}</TableCell>
-              <TableCell>{row.player2}</TableCell>
-              <TableCell align="right">{row.distance}</TableCell>
-              <TableCell align="right">{role === 'batter' ? row.player1_innings : row.player1_balls}</TableCell>
-              <TableCell align="right">{role === 'batter' ? row.player2_innings : row.player2_balls}</TableCell>
-            </TableRow>
-          )})}
-          {rows.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={6} align="center">No results</TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </ScrollTable>
+const playerLink = (name) => `/player?name=${encodeURIComponent(name)}&autoload=true`;
+
+const Row = ({ left, right, gap, note, accent }) => (
+  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, py: 1, borderBottom: `1px solid ${colors.border}` }}>
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ fontFamily: fonts.display, fontWeight: 600, fontSize: 15.5 }}>
+        <Box component={Link} to={playerLink(left)} sx={{ color: colors.textHi, textDecoration: 'none', '&:hover': { color: colors.accent } }}>{left}</Box>
+        {right && (
+          <>
+            <Box component="span" sx={{ color: colors.textLo, fontWeight: 500 }}>{' and '}</Box>
+            <Box component={Link} to={playerLink(right)} sx={{ color: colors.textHi, textDecoration: 'none', '&:hover': { color: colors.accent } }}>{right}</Box>
+          </>
+        )}
+      </Box>
+      {note && <Box sx={{ fontSize: 12, color: colors.textLo, mt: 0.25 }}>{note}</Box>}
+    </Box>
+    <Box sx={{ fontFamily: fonts.mono, fontSize: 12, color: accent ? colors.accent : colors.textMed, whiteSpace: 'nowrap' }}>{gap} pts</Box>
   </Box>
 );
 
-const RoleSection = ({ title, board, batterMetricHelp }) => {
-  const [selectedPair, setSelectedPair] = useState(null);
-  if (!board) return null;
-  const selectedKey = selectedPair ? `${selectedPair.player1}|${selectedPair.player2}|${selectedPair.distance}` : null;
-  return (
-    <Card variant="outlined">
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-          <Typography variant="h5">{title}</Typography>
-          <Chip size="small" label={`${board.qualified_players || 0} qualified`} />
-          {board.warning && <Chip size="small" color="warning" variant="outlined" label={board.warning} />}
-        </Box>
-        {board.distance_explanation && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>Distance Meaning</Typography>
-            <Typography variant="body2">{board.distance_explanation.summary}</Typography>
-            {board.role === 'batter' && batterMetricHelp && (
-              <Typography variant="body2" sx={{ mt: 0.5 }}>
-                {batterMetricHelp}
-              </Typography>
-            )}
-          </Alert>
-        )}
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <PairTable
-              title="Most Similar"
-              rows={board.most_similar}
-              role={board.role}
-              selectedKey={selectedKey}
-              onSelect={setSelectedPair}
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <PairTable
-              title="Most Dissimilar"
-              rows={board.most_dissimilar}
-              role={board.role}
-              selectedKey={selectedKey}
-              onSelect={setSelectedPair}
-            />
-          </Grid>
-        </Grid>
-        <PairRadar pair={selectedPair} radarMap={board.player_radar_metrics} />
-      </CardContent>
-    </Card>
-  );
-};
+const Block = ({ title, sub, children }) => (
+  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 19 }}>{title}</Box>
+    <Box sx={{ color: colors.textLo, fontSize: 12.5, mb: 0.5 }}>{sub}</Box>
+    {children}
+  </Box>
+);
 
 const DoppelgangerLeaderboard = () => {
-  const isMobile = useMediaQuery((theme) => theme.breakpoints.down('md'));
-  const [startDate, setStartDate] = useState(DEFAULT_START);
-  const [endDate, setEndDate] = useState(TODAY);
-  const [minBattingInnings, setMinBattingInnings] = useState(25);
-  const [minBowlingBalls, setMinBowlingBalls] = useState(240);
-  const [topPairs, setTopPairs] = useState(10);
-  const [batterMetricLevel, setBatterMetricLevel] = useState('bowling_type');
-  const [competitionFilters, setCompetitionFilters] = useState({
-    leagues: ['IPL', 'BBL', 'PSL', 'CPL', 'SA20'],
-    international: true,
-    topTeams: 10,
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [data, setData] = useState(null);
+  const [board, setBoard] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [role, setRole] = useState('bat');
+  const [players, setPlayers] = useState([]);
+  const [picked, setPicked] = useState(null);
 
-  const filterSummary = useMemo(() => {
-    const filters = data?.filters || null;
-    const summary = [];
-    const leagues = filters?.leagues ?? competitionFilters.leagues;
-    const includeInternational = filters?.include_international ?? competitionFilters.international;
-    const topTeams = filters?.top_teams ?? (competitionFilters.international ? competitionFilters.topTeams : null);
-    const usedDefaultPreset = filters?.default_leaderboard_preset_applied;
+  useEffect(() => {
+    fetch(`${config.API_URL}/twins/board`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then(setBoard)
+      .catch(() => setFailed(true));
+    fetch(`${config.API_URL}/players`).then((r) => r.json()).then(setPlayers).catch(() => {});
+  }, []);
 
-    if (usedDefaultPreset) {
-      summary.push('Default preset applied (Top 5 leagues + Top 10 internationals)');
-    }
-
-    if (Array.isArray(leagues) && leagues.length > 0) {
-      summary.push(`Leagues: ${leagues.join(', ')}`);
-    } else {
-      summary.push('Leagues: All leagues');
-    }
-
-    if (includeInternational) {
-      summary.push(`Internationals: Included${topTeams ? ` (Top ${topTeams} teams)` : ' (All teams)'}`);
-    } else {
-      summary.push('Internationals: Excluded');
-    }
-
-    return summary;
-  }, [competitionFilters, data]);
-
-  const fetchLeaderboard = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({
-        start_date: startDate,
-        end_date: endDate,
-        min_batting_innings: String(minBattingInnings),
-        min_bowling_balls: String(minBowlingBalls),
-        top_n_pairs: String(topPairs),
-        batter_metric_level: batterMetricLevel,
-      });
-      (competitionFilters.leagues || []).forEach((league) => params.append('leagues', league));
-      params.append('include_international', String(Boolean(competitionFilters.international)));
-      if (competitionFilters.international && competitionFilters.topTeams) {
-        params.append('top_teams', String(competitionFilters.topTeams));
-      }
-      const res = await axios.get(`${config.API_URL}/search/doppelgangers/leaderboard?${params.toString()}`);
-      setData(res.data);
-    } catch (err) {
-      setError(apiErrorText(err, null) || 'Failed to load doppelganger leaderboard');
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const b = board?.[role];
+  const who = role === 'bowl' ? 'bowlers' : role === 'allround' ? 'all-rounders' : 'batters';
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
-      <Typography variant="h4" sx={{ mb: 1, fontWeight: 700 }}>
-        Doppelganger Leaderboard
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-        Global most similar and most dissimilar batter/bowler pairs for a selected timeframe.
-      </Typography>
-      {/* The method notes used to be two banners filling a phone's first screen. */}
-      <Box component="details" sx={{ mb: 2, color: 'text.secondary', '& summary': { cursor: 'pointer', color: 'text.primary', fontWeight: 600, py: 0.5 } }}>
-        <summary>How it works</summary>
-        <Typography variant="body2" sx={{ mt: 1 }}>
-          Click a pair row to open a radar chart. Distance is computed as Euclidean distance on z-score normalized feature vectors, so lower values mean closer profiles.
-        </Typography>
-        <Typography variant="body2" sx={{ mt: 1 }}>
-          Batter metric level controls how granular batter doppelganger matching is. For each selected level, only batters with all required data for that level are included. Competition filters also reduce the qualified pool before distances are computed.
-        </Typography>
+    <Box sx={{ maxWidth: 720, mx: 'auto', px: 2, py: 2, display: 'flex', flexDirection: 'column', gap: 2.5, color: colors.textHi }}>
+      <Box>
+        <Box component="h1" sx={{ m: 0, fontFamily: fonts.display, fontWeight: 700, fontSize: 30, lineHeight: 1.1 }}>Doppelgängers</Box>
+        <Box sx={{ color: colors.textMed, fontSize: 14, mt: 0.75, maxWidth: '62ch' }}>
+          Who plays like whom. Each player is placed on how he plays (when he bats or bowls, how he scores or what he
+          concedes, his shot mix, lengths and lines) as percentiles of everyone in the pool, and matched to the
+          nearest. Careers since January 2024, in the major leagues and T20Is between top-12 sides.
+        </Box>
       </Box>
 
-      <FilterSummary
-        collapsed={isMobile && Boolean(data) && !loading}
-        title="Doppelganger filters"
-        summary={filterSummary.join(' · ')}
-        sheetTitle="Doppelganger filters"
-      >
-      <Box>
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-        {filterSummary.map((label) => (
-          <Chip key={label} label={label} size="small" variant="outlined" />
+      <Autocomplete
+        options={players}
+        value={picked}
+        onChange={(_, v) => setPicked(v)}
+        renderInput={(params) => <TextField {...params} label="Find a player's doppelgängers" size="small" />}
+        sx={{ maxWidth: 420 }}
+      />
+      {picked && (
+        <Box sx={{ border: `1px solid ${colors.borderStrong}`, borderRadius: '16px', p: 1.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1 }}>
+            <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>{picked}</Box>
+            <Box component={Link} to={playerLink(picked)} sx={{ fontSize: 12.5, color: colors.accent }}>Profile →</Box>
+          </Box>
+          <TwinsSection playerName={picked}
+            fallback={<Box sx={{ color: colors.textLo, fontSize: 13.5 }}>{`${picked} hasn't played enough against strong sides since 2024 (120+ balls in two seasons) to be matched.`}</Box>} />
+        </Box>
+      )}
+
+      <Box role="tablist" aria-label="Role" sx={{ display: 'inline-flex', alignSelf: 'flex-start', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
+        {ROLES.map(([key, name]) => (
+          <Box key={key} component="button" role="tab" aria-selected={role === key} onClick={() => setRole(key)}
+            sx={{
+              all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13.5, px: 1.75, py: '4px',
+              borderRadius: '999px', bgcolor: role === key ? colors.accent : 'transparent', color: role === key ? colors.bg : colors.textLo,
+              '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
+            }}>
+            {name}
+          </Box>
         ))}
       </Box>
 
-      <Card variant="outlined" sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={2}>
-              <TextField
-                label="Start Date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <TextField
-                label="End Date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <TextField
-                label="Min Batting Innings"
-                type="number"
-                value={minBattingInnings}
-                onChange={(e) => setMinBattingInnings(Math.max(1, Number(e.target.value) || 1))}
-                fullWidth
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <TextField
-                label="Min Bowling Balls"
-                type="number"
-                value={minBowlingBalls}
-                onChange={(e) => setMinBowlingBalls(Math.max(1, Number(e.target.value) || 1))}
-                fullWidth
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <TextField
-                label="Batter Metric Level"
-                select
-                value={batterMetricLevel}
-                onChange={(e) => setBatterMetricLevel(e.target.value)}
-                fullWidth
-              >
-                <MenuItem value="basic">Basic (core + phase)</MenuItem>
-                <MenuItem value="pace_spin">Intermediate (core + phase + pace/spin)</MenuItem>
-                <MenuItem value="bowling_type">Advanced (core + phase + pace/spin + bowling type)</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <TextField
-                label="Pairs"
-                type="number"
-                value={topPairs}
-                onChange={(e) => setTopPairs(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
-                fullWidth
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <CompetitionFilter
-                value={competitionFilters}
-                onFilterChange={setCompetitionFilters}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', alignItems: 'center' }}>
-              <Button variant="contained" onClick={fetchLeaderboard} fullWidth disabled={loading} data-filter-submit>
-                {loading ? 'Loading...' : 'Run'}
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-      </Box>
-      </FilterSummary>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      {!data && !loading && !error && (
-        <Alert severity="info">Choose a timeframe and cutoffs, then run the leaderboard.</Alert>
-      )}
-
-      {data && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <RoleSection title="Batters" board={data.batters} batterMetricHelp={data?.batter_metric_levels?.availability_rule} />
-          <RoleSection title="Bowlers" board={data.bowlers} />
+      {failed && <Box sx={{ color: colors.textLo }}>The doppelgängers board couldn't load. Try again in a minute.</Box>}
+      {!board && !failed && <Skeleton variant="rounded" height={320} sx={{ bgcolor: colors.surface2 }} />}
+      {b && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+          <Block title="Closest pairs" sub={`The most alike ${who}, of ${b.pool}. Most have a twin within ${b.typical_gap_points} points.`}>
+            {b.pairs.map((p, i) => (
+              <Row key={`${p.player}-${p.twin}`} left={p.player} right={p.twin} gap={p.gap_points} accent={i < 3}
+                note={p.same?.length ? `Same: ${p.same.join(', ')}` : null} />
+            ))}
+          </Block>
+          <Block title="No close twin" sub={`The ${who} furthest from anyone else: their game is their own.`}>
+            {b.unique.map((u) => (
+              <Row key={u.player} left={u.player} gap={u.gap_points} note={`Nearest: ${short(u.twin)}`} />
+            ))}
+          </Block>
         </Box>
       )}
-    </Container>
+      <Box sx={{ fontSize: 11.5, color: colors.textLo }}>
+        Gap: the typical percentile-point difference across the features compared, each group weighted equally. Shot-tracked
+        players are matched with each other. Data: Hindsight · Himanish Ganjoo &amp; TechRadar, Cricsheet.
+      </Box>
+    </Box>
   );
 };
 

@@ -4,9 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from sqlalchemy.orm import Session
 
 from database import get_session
-from services.twins import twins_for
+from services.twins import board, twins_for
 
 router = APIRouter(tags=["twins"])
+
+
+@router.get("/twins/board")
+def twins_board(response: Response, db: Session = Depends(get_session)):
+    """The doppelgangers page: per role (bat, bowl, allround), the closest pairs and the players with no close twin,
+    careers over the profile's window. Built nightly (scripts/build_player_vectors.py)."""
+    response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+    return board(db)
 
 
 @router.get("/twins/{player_name}")

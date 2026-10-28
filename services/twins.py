@@ -174,6 +174,19 @@ def distance(a: Dict[str, Any], b: Dict[str, Any], role: str, kind: str,
     return math.sqrt(total / used), diffs
 
 
+def _tracked(r: Dict[str, Any]) -> bool:
+    if r.get("tracked"):  # all-rounders: both roles
+        return all((v or 0) >= TRACKED_MIN for v in r["tracked"].values())
+    return (r.get("tracked_share") or 0) >= TRACKED_MIN
+
+
+def comparable(me: Dict[str, Any], other: Dict[str, Any]) -> bool:
+    """Shot-tracked players are matched only with each other, and the rest only with each other. Without this, a player missing the
+    tracked groups was compared on fewer groups, looked close to everyone, and became the nearest twin of half
+    the board (Aneurin Donald, 4 points from Abhishek, Arya and Allen)."""
+    return _tracked(me) == _tracked(other)  # both ways: an untracked player isn't matched with a tracked one either
+
+
 def find(db, player: str, period: str, role: str = "bat", kind: str = "style", n: int = 5, unit: str = "season",
          scope: str = "strong", same_period: bool = False) -> Dict[str, Any]:
     """The player's n nearest twins in the pool (every season, unless same_period), never himself."""
@@ -191,7 +204,7 @@ def find_in(rows: List[Dict[str, Any]], player: str, period: str, role: str = "b
         return {"player": player, "period": period, "role": role, "kind": kind, "twins": [], "qualified": False}
     out = []
     for r in rows:
-        if r["player"] == me["player"] or (same_period and r["period"] != period):
+        if r["player"] == me["player"] or (same_period and r["period"] != period) or not comparable(me, r):
             continue
         if kind == "style" and role in ("bowl", "allround") and me.get("kind") and r.get("kind") != me.get("kind"):
             continue
@@ -315,7 +328,7 @@ def nearest_gap_stats(rows: List[Dict[str, Any]], role: str, same_period: bool, 
     for r in members:
         best = None
         for o in rows:
-            if o["player"] == r["player"] or (same_period and o["period"] != r["period"]):
+            if o["player"] == r["player"] or (same_period and o["period"] != r["period"]) or not comparable(r, o):
                 continue
             if role in ("bowl", "allround") and r.get("kind") and o.get("kind") != r.get("kind"):
                 continue
@@ -406,3 +419,66 @@ def compare_rows(me: Dict[str, Any], twin: Dict[str, Any], role: str) -> List[Di
             rows.append({"feature": k, "group": f"{prefix}{g}", "label": label(k),
                          "player": round(100 * me["p"][k]), "twin": round(100 * twin["p"][k])})
     return rows
+
+
+# ---- the board (/doppelgangers): closest pairs and the players with no close twin -----------------------------------
+
+BOARD_N = 15
+
+
+def build_board(db, unit: str = "window", scope: str = "strong") -> Dict[str, Any]:
+    """Per role: every player's nearest twin, then the closest pairs (each pair once) and the players whose nearest
+    twin is furthest away. Careers only (the season pool is too big to compare all against all on request)."""
+    out = {}
+    for role in ("bat", "bowl", "allround"):
+        _CACHE.pop((unit, role, scope), None)
+        rows = pool(db, unit, role, scope)
+        nearest = []
+        for r in rows:
+            res = find_in(rows, r["player"], r["period"], role, "style", 1, same_period=(unit == "window"))
+            if res.get("twins"):
+                t = res["twins"][0]
+                nearest.append({"player": r["player"], "twin": t["player"], "gap_points": round(100 * t["distance"]),
+                                "distance": t["distance"], "same": [c["label"] for c in t["closest"][:2]]})
+        pairs, seen = [], set()
+        for n_ in sorted(nearest, key=lambda x: x["distance"]):
+            key = tuple(sorted((n_["player"], n_["twin"])))
+            if key in seen:
+                continue
+            seen.add(key)
+            pairs.append(n_)
+            if len(pairs) == BOARD_N:
+                break
+        unique = sorted(nearest, key=lambda x: -x["distance"])[:BOARD_N]
+        gaps = sorted(n_["distance"] for n_ in nearest)
+        out[role] = {"pool": len(rows), "pairs": pairs, "unique": unique,
+                     "typical_gap_points": round(100 * gaps[len(gaps) // 2]) if gaps else None}
+    return out
+
+
+def store_board(db, unit: str = "window", scope: str = "strong") -> Dict[str, Any]:
+    import json
+    from sqlalchemy import text
+
+    board = build_board(db, unit, scope)
+    db.execute(text("""
+        INSERT INTO app_meta (key, value, updated_at) VALUES (:k, :v, now())
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+    """), {"k": f"twins_board:{unit}:{scope}", "v": json.dumps(board)})
+    db.commit()
+    _CACHE.pop(("board", unit, scope), None)
+    return board
+
+
+def board(db, unit: str = "window", scope: str = "strong") -> Dict[str, Any]:
+    import json
+    from sqlalchemy import text
+
+    key = ("board", unit, scope)
+    hit = _CACHE.get(key)
+    if hit and time.time() - hit[0] < _TTL:
+        return hit[1]
+    raw = db.execute(text("SELECT value FROM app_meta WHERE key = :k"), {"k": f"twins_board:{unit}:{scope}"}).scalar()
+    value = json.loads(raw) if raw else store_board(db, unit, scope)
+    _CACHE[key] = (time.time(), value)
+    return value

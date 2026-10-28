@@ -86,6 +86,11 @@ def main() -> int:
         t = time.time()
         stats = store_gap_stats(db, unit, args.scope)
         log.info("nearest-twin gaps %s: %s, %.0fs", unit, stats, time.time() - t)
+        if unit == "window":  # the doppelgangers page
+            from services.twins import store_board
+            t = time.time()
+            b = store_board(db, unit, args.scope)
+            log.info("board: %s, %.0fs", {r: len(v["pairs"]) for r, v in b.items()}, time.time() - t)
     return 0
 
 
