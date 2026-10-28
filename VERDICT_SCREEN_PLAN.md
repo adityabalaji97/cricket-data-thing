@@ -17,11 +17,11 @@ for all-rounders especially. It must load in under a second on a phone before th
 | V0 | Sign off decisions D1–D6 (below) | [ ] |
 | V1 | Speed: remove the load waterfall (frontend only) | [x] 2026-10-26 (PR; ~3.3–4.9s → ~2.3–2.7s) |
 | V2 | `GET /player/{name}/summary` endpoint + edge cache | [x] 2026-10-26 (PR; D1–D3 as proposed) |
-| V2b | Dynamic peer floors (40% of the period's median, min 120) | [ ] |
-| V3 | Peer strips + season chart components | [ ] |
-| V4 | Verdict screen (T20) in UnifiedPlayerProfile | [ ] |
-| V5 | Verdict line rules + 50-player review list | [ ] |
-| V6 | Form chips by runs above par | [ ] |
+| V2b | Dynamic peer floors (40% of the period's median, min 120) | [x] 2026-10-28 (services/qualification.py; floors per season, cleared in 2+ seasons) |
+| V3 | Peer strips + season chart components | [x] 2026-10-28 (src/components/playerProfile/verdict/) |
+| V4 | Verdict screen (T20) in UnifiedPlayerProfile | [x] 2026-10-28 (T20 + ODI switch; Test greyed) |
+| V5 | Verdict line rules + 50-player review list | [~] 2026-10-28 rules v1 live (best rank + season swing); 50-player review list still to do |
+| V6 | Form chips by runs above par | [x] 2026-10-28 (chips by runs above par, glyphs, dashed where no par) |
 | V7 | Share image `/img/player/<id>.png` + OG tags | [ ] |
 | V8 | ODI variant | [ ] |
 | V9 | Pre-warm cache for upcoming fixtures' squads | [ ] |
@@ -76,8 +76,9 @@ Reference implementation of the numbers: `scripts/dev/verdict_mockup_data.py` (m
 The peer pools in `services/player_verdict.py` use fixed floors (`MIN_BALLS`: T20 600 bowling /
 300 batting; ODI 500 / 400). Switch them to the rule the statistical twins use
 (DOPPELGANGER_PLAN.md, user 2026-10-27):
-* For each role and window, take the players with 5+ innings. The floor is **40% of their median
-  balls**, never below 120.
+* For each role and **season** in the window, take the players with 5+ innings. That season's floor is **40% of
+  their median balls**, never below 120; a player must clear it in **2+ seasons** (user, 2026-10-28: one floor
+  over three seasons landed on 120 and let part-timers in).
 * A player under the floor is still ranked against the pool (as now, `qualified: false`).
 * Return the floor in `peers.min_balls`, and show it in the strip header ("v 213 bowlers, 380+
   balls").

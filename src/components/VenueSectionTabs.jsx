@@ -7,13 +7,16 @@ const VenueSectionTabs = ({ sections, activeSectionId, onSectionSelect }) => {
 
   useEffect(() => {
     const activeIndex = sections.findIndex(s => s.id === activeSectionId);
-    if (chipRefs.current[activeIndex]) {
-      chipRefs.current[activeIndex].scrollIntoView({
-        behavior: 'smooth',
-        inline: 'center',
-        block: 'nearest',
-      });
-    }
+    const chip = chipRefs.current[activeIndex];
+    if (!chip) return;
+    // Centre the chip in its own row, sideways only. scrollIntoView also scrolled the page down to the row
+    // whenever it sat below the fold (the player profile's verdict screen put it there on every load).
+    let row = chip.parentElement;
+    while (row && row !== document.body && row.scrollWidth <= row.clientWidth) row = row.parentElement;
+    if (!row || row === document.body) return;
+    const c = chip.getBoundingClientRect();
+    const r = row.getBoundingClientRect();
+    row.scrollTo({ left: row.scrollLeft + (c.left - r.left) - (row.clientWidth - c.width) / 2, behavior: 'smooth' });
   }, [activeSectionId, sections]);
 
   return (

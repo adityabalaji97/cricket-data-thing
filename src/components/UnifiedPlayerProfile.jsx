@@ -32,6 +32,7 @@ import useIsMobile from '../hooks/useIsMobile';
 import ImpactSection from './playerProfile/sections/ImpactSection';
 import FilterSummary, { joinSummary, summarizeCompetitions, summarizeDateRange } from './ui/FilterSummary';
 import usePlayerData from '../hooks/usePlayerData';
+import VerdictScreen from './playerProfile/verdict/VerdictScreen';
 import config from '../config';
 import { PROFILE_START_DATE } from '../utils/dateDefaults';
 
@@ -200,6 +201,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   const [globalRankPayload, setGlobalRankPayload] = useState(null);
   const [globalRankLoading, setGlobalRankLoading] = useState(false);
   const [globalRankFailed, setGlobalRankFailed] = useState(false);
+  const [verdictStatus, setVerdictStatus] = useState(null);
 
   const sectionRefs = useRef({});
 
@@ -385,6 +387,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
   const currentStats = activeTab === 'bowling' ? bowlingStats : battingStats;
   const currentDismissalStats = activeTab === 'bowling' ? bowlingDismissalStats : dismissalStats;
   const hasData = currentStats !== null;
+  const verdictOn = Boolean(applied?.player) && verdictStatus !== 'empty' && verdictStatus !== 'error';
 
   // Build section groups (mirrors VenueNotes pattern)
   const overviewTakeaway = (() => {
@@ -678,66 +681,76 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
     return [];
   }, [activeTab, battingStats, bowlingStats]);
 
+  // Filter bar: one summary line on phones once a profile is showing
+  const filterBar = (
+  <Box sx={{ px: { xs: 1.5, sm: 0 }, mb: 2 }}>
+    <FilterSummary
+      collapsed={isMobile && hasData}
+      title={selectedPlayer}
+      summary={joinSummary(
+        summarizeDateRange(dateRange.start, dateRange.end),
+        selectedVenue && selectedVenue !== 'All Venues' ? selectedVenue.split(',')[0] : null,
+        summarizeCompetitions(competitionFilters),
+      )}
+      sheetTitle="Player filters"
+    >
+    <Box>
+    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
+      <Autocomplete
+        value={selectedPlayer}
+        onChange={(_, newValue) => setSelectedPlayer(newValue)}
+        options={players}
+        sx={{ width: { xs: '100%', md: 300 } }}
+        getOptionLabel={(option) => typeof option === 'string' ? option : option || ''}
+        isOptionEqualToValue={(option, value) => option === value}
+        renderInput={(params) => <TextField {...params} label="Select Player" variant="outlined" required />}
+      />
+      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        <TextField
+          label="Start Date" type="date" value={dateRange.start}
+          onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+          InputLabelProps={{ shrink: true }}
+        />
+        <TextField
+          label="End Date" type="date" value={dateRange.end}
+          onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+          InputLabelProps={{ shrink: true }}
+        />
+        <Autocomplete
+          value={selectedVenue}
+          onChange={(_, newValue) => setSelectedVenue(newValue)}
+          options={venues}
+          sx={{ width: { xs: '100%', md: 250 } }}
+          renderInput={(params) => <TextField {...params} label="Select Venue" />}
+        />
+        <Button
+          variant="contained"
+          onClick={handleFetch}
+          disabled={!selectedPlayer || loading}
+          id="go-button"
+          data-filter-submit
+        >
+          GO
+        </Button>
+      </Box>
+    </Box>
+    <CompetitionFilter onFilterChange={setCompetitionFilters} isMobile={isMobile} value={competitionFilters} />
+    </Box>
+    </FilterSummary>
+  </Box>
+  );
+
   return (
     <Box sx={{ mx: { xs: 0, sm: 2 }, p: { xs: 0, sm: 2 }, maxWidth: 1400, margin: '0 auto' }}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* Filter Bar: one summary line on phones once a profile is showing */}
-      <Box sx={{ px: { xs: 1.5, sm: 0 }, mb: 2 }}>
-        <FilterSummary
-          collapsed={isMobile && hasData}
-          title={selectedPlayer}
-          summary={joinSummary(
-            summarizeDateRange(dateRange.start, dateRange.end),
-            selectedVenue && selectedVenue !== 'All Venues' ? selectedVenue.split(',')[0] : null,
-            summarizeCompetitions(competitionFilters),
-          )}
-          sheetTitle="Player filters"
-        >
-        <Box>
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
-          <Autocomplete
-            value={selectedPlayer}
-            onChange={(_, newValue) => setSelectedPlayer(newValue)}
-            options={players}
-            sx={{ width: { xs: '100%', md: 300 } }}
-            getOptionLabel={(option) => typeof option === 'string' ? option : option || ''}
-            isOptionEqualToValue={(option, value) => option === value}
-            renderInput={(params) => <TextField {...params} label="Select Player" variant="outlined" required />}
-          />
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <TextField
-              label="Start Date" type="date" value={dateRange.start}
-              onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="End Date" type="date" value={dateRange.end}
-              onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-            />
-            <Autocomplete
-              value={selectedVenue}
-              onChange={(_, newValue) => setSelectedVenue(newValue)}
-              options={venues}
-              sx={{ width: { xs: '100%', md: 250 } }}
-              renderInput={(params) => <TextField {...params} label="Select Venue" />}
-            />
-            <Button
-              variant="contained"
-              onClick={handleFetch}
-              disabled={!selectedPlayer || loading}
-              id="go-button"
-              data-filter-submit
-            >
-              GO
-            </Button>
-          </Box>
-        </Box>
-        <CompetitionFilter onFilterChange={setCompetitionFilters} isMobile={isMobile} value={competitionFilters} />
-        </Box>
-        </FilterSummary>
-      </Box>
+      {/* The verdict screen (VERDICT_SCREEN_PLAN.md V4) leads once a player is loaded; the filters below it drive
+          the detailed sections. Until it has something to show (or if it has nothing), the filters lead as before. */}
+      {!verdictOn && filterBar}
+      {applied?.player && (
+        <VerdictScreen key={applied.player} player={applied.player} onStatus={setVerdictStatus} />
+      )}
+      {verdictOn && filterBar}
 
       {/* Loading state */}
       {loading && (
@@ -763,17 +776,26 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
-              {/* Name and caption stack, so a phone never splits "V / Kohli Batting / Profile". */}
+              {/* Name and caption stack, so a phone never splits "V / Kohli Batting / Profile". With the verdict
+                  screen above, the name is already there: this row just labels the details. */}
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant={isMobile ? 'h5' : 'h4'} sx={{ fontWeight: 700, lineHeight: 1.15 }}>
-                  {selectedPlayer}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {activeTab === 'bowling' ? 'Bowling' : 'Batting'} profile
-                </Typography>
+                {verdictOn ? (
+                  <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.12em' }}>
+                    In detail
+                  </Typography>
+                ) : (
+                  <>
+                    <Typography variant={isMobile ? 'h5' : 'h4'} sx={{ fontWeight: 700, lineHeight: 1.15 }}>
+                      {selectedPlayer}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {activeTab === 'bowling' ? 'Bowling' : 'Batting'} profile
+                    </Typography>
+                  </>
+                )}
               </Box>
 
-              <ShareButton variant="icon" kind="player" title={`${selectedPlayer} on Hindsight`} />
+              {!verdictOn && <ShareButton variant="icon" kind="player" title={`${selectedPlayer} on Hindsight`} />}
               {showBattingTab && showBowlingTab && (
                 <ToggleButtonGroup
                   value={activeTab}
@@ -789,7 +811,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
               )}
             </Box>
 
-            <RecentFormStrip innings={recentInnings} mode={activeTab} isMobile={isMobile} />
+            {!verdictOn && <RecentFormStrip innings={recentInnings} mode={activeTab} isMobile={isMobile} />}
           </Box>
 
           {/* Section navigation + content */}
