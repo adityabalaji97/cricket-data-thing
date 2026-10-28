@@ -25,7 +25,8 @@ from typing import Any, Dict, List, Optional
 from services.query_builder_v2 import run_deliveries_query
 from services.query_cache import cached_run
 
-SUMMARY_VERSION = "v3"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons
+SUMMARY_VERSION = "v4"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons;
+# v4: all-rounders must qualify in both roles, the verdict claims from the main role
 
 STRONG_T20_LEAGUES = [
     "IPL", "BBL", "PSL", "CPL", "SA20", "T20 Blast", "ILT20", "MLC", "BPL", "LPL", "Super Smash",
@@ -321,8 +322,11 @@ def verdict_line(summary: Dict[str, Any]) -> Optional[str]:
     main role (T20 only, where wins added exist)."""
     roles = summary.get("roles") or {}
     cands = []
+    # The claim comes from the main role (a part-timer's few lucky wickets made Rachin Ravindra "1st for balls per
+    # wicket"); an all-rounder's other role counts too.
+    primary = summary.get("primary_role")
     for role, block in roles.items():
-        if not block["peers"]["qualified"]:
+        if not block["peers"]["qualified"] or (role != primary and not summary.get("allrounder")):
             continue
         for m in block["peers"]["metrics"]:
             cands.append((m["rank"] / m["n"], m["rank"], role, m))
@@ -330,7 +334,9 @@ def verdict_line(summary: Dict[str, Any]) -> Optional[str]:
         return None
     share, rank, role, m = min(cands, key=lambda c: (c[0], c[1]))
     words = METRIC_WORDS.get(m["key"], m["label"].lower())
-    if rank <= 3:
+    if rank == 1:
+        claim = f"Best of {m['n']} for {words}"
+    elif rank <= 3:
         claim = f"{_ordinal(rank)} of {m['n']} for {words}"
     elif share <= 0.10:
         claim = f"Top 10% for {words}"
@@ -341,7 +347,6 @@ def verdict_line(summary: Dict[str, Any]) -> Optional[str]:
     if summary.get("allrounder"):
         claim += " with the ball" if role == "bowl" else " with the bat"
     claim += "."  # the window and scope sit on the chip beside it
-    primary = summary.get("primary_role")
     seasons = [r for r in (roles.get(primary) or {}).get("seasons", []) if r.get("wpa") is not None]
     if summary.get("has_wins_added") and len(seasons) >= 2:
         a, b = seasons[-2], seasons[-1]
@@ -362,6 +367,11 @@ def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
     primary, allrounder = classify_roles(
         {role: block["overall"] for role, block in roles.items()}
     )
+    # The innings share alone made bowlers who bat at 9-10 all-rounders (Shaheen Afridi, Cummins, Harshit Rana in the
+    # 50-player review): the second role must also be one he's a regular in, i.e. qualify for its own peer pool.
+    other = next((r for r in roles if r != primary), None)
+    if allrounder and other and not roles[other]["peers"]["qualified"]:
+        allrounder = False
 
     name = next((block["name"] for block in roles.values() if block.get("name")), player)
     form = _form(db, fmt, player, end)

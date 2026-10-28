@@ -20,11 +20,11 @@ for all-rounders especially. It must load in under a second on a phone before th
 | V2b | Dynamic peer floors (40% of the period's median, min 120) | [x] 2026-10-28 (services/qualification.py; floors per season, cleared in 2+ seasons) |
 | V3 | Peer strips + season chart components | [x] 2026-10-28 (src/components/playerProfile/verdict/) |
 | V4 | Verdict screen (T20) in UnifiedPlayerProfile | [x] 2026-10-28 (T20 + ODI switch; Test greyed) |
-| V5 | Verdict line rules + 50-player review list | [~] 2026-10-28 rules v1 live (best rank + season swing); 50-player review list still to do |
+| V5 | Verdict line rules + 50-player review list | [~] 2026-10-28 rules v2 (all-rounders qualify in both roles; claim from the main role); review list docs/verdict_review.md awaits the user |
 | V6 | Form chips by runs above par | [x] 2026-10-28 (chips by runs above par, glyphs, dashed where no par) |
 | V7 | Share image `/img/player/<id>.png` + OG tags | [ ] |
 | V8 | ODI variant | [ ] |
-| V9 | Pre-warm cache for upcoming fixtures' squads | [ ] |
+| V9 | Pre-warm cache for upcoming fixtures' squads | [x] 2026-10-28 (scripts/warm_verdict.py, nightly; PR #229) |
 
 **Deadline: V1–V7 live by 9 Dec 2026, a week before the IPL 2027 auction (16 Dec, Goa). See SOCIAL_CALENDAR.md.**
 | T* | Tests: MULTI_FORMAT_PLAN chunks C0–C5, then a Test variant | [ ] |
