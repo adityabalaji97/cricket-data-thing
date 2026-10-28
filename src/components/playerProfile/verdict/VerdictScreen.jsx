@@ -89,8 +89,15 @@ const StripBlock = ({ role, block, keys, cue }) => {
   const who = role === 'bowl' ? 'bowlers' : 'batters';
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Eyebrow>
-        {`${ROLE_NAMES[role]} · v ${p.pool} ${who}, ${p.floor_label || `${p.min_balls}+ balls`}${p.qualified ? '' : ' · under the floor'}`}
+      {/* Who the player is ranked against on the left, the qualifying floor on the right: one line on a phone. */}
+      <Eyebrow right={(
+        <Tooltip title="Peers: players who cleared each season's floor (40% of that season's regulars' median balls, at least 120) in two or more seasons" enterTouchDelay={0}>
+          <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 9.5, color: colors.textFaint, whiteSpace: 'nowrap' }}>
+            {(p.floor_label || `${p.min_balls}+ balls`).replace(' balls in ', ' balls · ')}
+          </Box>
+        </Tooltip>
+      )}>
+        {`${ROLE_NAMES[role]} · v ${p.pool} ${who}${p.qualified ? '' : ' · below the floor'}`}
       </Eyebrow>
       {cue && <StripAxisCue />}
       {metrics.map((m) => <PeerStrip key={m.key} metric={m} />)}
