@@ -73,7 +73,42 @@ async function scorecardSummary(id) {
   };
 }
 
+const ORD = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}`;
+
+// The verdict screen's numbers (GET /player/{name}/summary, VERDICT_SCREEN_PLAN.md V7): the verdict line, wins added
+// by season for each role shown, and the player's three best ranks. Null when there's no summary (the old card).
+async function verdictSummary(name) {
+  const s = await getJSON(`/player/${encodeURIComponent(name)}/summary`, 8000);
+  if (!s || !s.roles || !Object.keys(s.roles).length) return null;
+  const main = s.primary_role;
+  const shown = [main, main === 'bowl' ? 'bat' : 'bowl'].filter((r) => s.roles[r] && (r === main || s.allrounder));
+  const ranks = shown.flatMap((r) => (s.roles[r].peers.qualified ? s.roles[r].peers.metrics : [])
+    .map((m) => ({ ...m, role: r })))
+    .sort((a, b) => a.rank / a.n - b.rank / b.n)
+    .slice(0, 3);
+  const id = s.identity || {};
+  const kicker = [id.side, id.bowling_style && shown.includes('bowl') ? id.bowling_style : null,
+    shown.includes('bat') && id.batting_position ? `bats #${id.batting_position}` : null].filter(Boolean).join(' · ');
+  const since = String(s.window.start_date).slice(0, 4);
+  const scope = `${s.format} · since ${since} · ${s.scope === 'strong' ? 'v strong sides' : 'every match'}`;
+  return {
+    kind: 'player',
+    title: `${s.player}: ${s.verdict || 'T20 verdict'} | ${SITE_NAME}`,
+    description: `${s.verdict ? `${s.verdict} ` : ''}${ranks.map((m) => `${m.label}: ${ORD(m.rank)} of ${m.n}`).join('. ')}. ${scope}.`,
+    card: {
+      kicker: kicker || 'Player',
+      headline: s.player,
+      verdict: s.verdict,
+      scope,
+      seasons: s.has_wins_added ? shown.map((r) => ({ role: r, rows: (s.roles[r].seasons || []).map((y) => ({ year: y.year, wpa: y.wpa })) })) : [],
+      ranks: ranks.map((m) => ({ label: m.label, rank: `${ORD(m.rank)} of ${m.n}`, role: m.role, top: m.rank / m.n <= 0.25 })),
+    },
+  };
+}
+
 async function playerSummary(name) {
+  const verdict = await verdictSummary(name).catch(() => null);
+  if (verdict) return verdict;
   const base = `format=T20&gender=male&group_by=year&limit=100`;
   let payload = await getJSON(`/query/deliveries?batters=${encodeURIComponent(name)}&${base}`, 8000);
   let role = 'batting';
