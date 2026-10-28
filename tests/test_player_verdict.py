@@ -69,3 +69,18 @@ def test_verdict_top_three_and_no_small_swing():
     line = _summary([{"key": "wpa", "label": "Wins added", "rank": 2, "n": 213}],
                     [{"year": 2025, "wpa": 1.4}, {"year": 2026, "wpa": 2.0}])
     assert line == "2nd of 213 for wins added."
+
+
+def test_qualifying_needs_two_seasons_over_their_floors():
+    from services.qualification import qualifying_players
+
+    rows = []
+    for year in (2024, 2025, 2026):
+        rows += [{"name": f"reg{i}", "year": year, "balls": 400, "innings_count": 12} for i in range(9)]
+    rows += [{"name": "parttimer", "year": 2025, "balls": 200, "innings_count": 8}]   # one season only
+    rows += [{"name": "returning", "year": 2024, "balls": 170, "innings_count": 6},
+             {"name": "returning", "year": 2026, "balls": 170, "innings_count": 6}]
+    q = qualifying_players(rows, "name")
+    assert q["floors"] == {"2024": 160, "2025": 160, "2026": 160}  # 40% of 400
+    assert "parttimer" not in q["players"] and "returning" in q["players"] and "reg0" in q["players"]
+    assert q["seasons_needed"] == 2

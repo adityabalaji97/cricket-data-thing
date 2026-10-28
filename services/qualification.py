@@ -25,3 +25,28 @@ def min_balls(rows: Iterable[Dict[str, Any]], balls_key: str = "balls",
     mid = median(regulars)
     return {"min_balls": max(NOISE_FLOOR, int(round(FLOOR_SHARE * mid))), "median_balls": int(round(mid)),
             "regulars": len(regulars)}
+
+
+def qualifying_players(rows: Iterable[Dict[str, Any]], name_key: str, year_key: str = "year",
+                       seasons_needed: int = 2) -> Dict[str, Any]:
+    """Players who clear their season's floor in at least `seasons_needed` seasons of a multi-season window (or in
+    every season, when the window has fewer). One floor across a three-season window landed on the noise floor and
+    let part-timers in; per season, a player has to be a regular more than once (the user, 2026-10-28).
+
+    rows: one per player per season, with balls and innings_count."""
+    by_year: Dict[Any, list] = {}
+    for r in rows:
+        by_year.setdefault(r.get(year_key), []).append(r)
+    floors = {y: min_balls(rs) for y, rs in by_year.items()}
+    need = min(seasons_needed, len(floors)) or 1
+    cleared: Dict[str, int] = {}
+    for y, rs in by_year.items():
+        floor = floors[y]["min_balls"]
+        for r in rs:
+            if (r.get("balls") or 0) >= floor:
+                cleared[r.get(name_key)] = cleared.get(r.get(name_key), 0) + 1
+    return {
+        "players": {n for n, c in cleared.items() if c >= need},
+        "floors": {str(y): f["min_balls"] for y, f in sorted(floors.items(), key=lambda kv: str(kv[0]))},
+        "seasons_needed": need,
+    }

@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 from services.query_builder_v2 import run_deliveries_query
 from services.query_cache import cached_run
 
-SUMMARY_VERSION = "v2"  # v2: dynamic peer floors, identity, verdict line
+SUMMARY_VERSION = "v3"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons
 
 STRONG_T20_LEAGUES = [
     "IPL", "BBL", "PSL", "CPL", "SA20", "T20 Blast", "ILT20", "MLC", "BPL", "LPL", "Super Smash",
@@ -34,9 +34,9 @@ TOP_TEAMS = 12
 
 # Years of data the first screen covers when no dates are given (from 1 January).
 DEFAULT_YEARS = {"T20": 2, "ODI": 3}
-# The peer pool's floor follows the window (services/qualification.py): 40% of the median balls of the role's
-# regulars, never below 120. Players under PREFILTER_BALLS can't move that median much and would make the pool
-# query too big to cache, so they're dropped first.
+# The peer pool's floor follows each season (services/qualification.py): 40% of the median balls of that season's
+# regulars, never below 120, cleared in at least two seasons of the window. Players under PREFILTER_BALLS in a season
+# can't move that median much and would make the pool query too big, so they're dropped first.
 PREFILTER_BALLS = 30
 # A role counts from this many balls in the window.
 ROLE_MIN_BALLS = 60
@@ -168,20 +168,24 @@ def _query(db, fmt: str, **params) -> List[Dict[str, Any]]:
 def _peer_pool(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[str, Any]) -> Dict[str, Any]:
     """The role's qualified players in the window, trimmed to the strip metrics, with the floor that qualified
     them. Cached on its own: every player in the same format, scope and window shares it."""
-    from services.qualification import min_balls
+    from services.qualification import qualifying_players
 
     r = ROLES[role]
     keys = [k for k, _, _ in STRIPS[fmt][role]]
 
     def run() -> Dict[str, Any]:
-        rows = [_with_economy(row) for row in _query(
-            db, fmt, group_by=[r["group"]], metrics_perspective=r["perspective"], min_balls=PREFILTER_BALLS,
-            **window, **scope,
-        )]
-        floor = min_balls(rows)
+        base = dict(metrics_perspective=r["perspective"], min_balls=PREFILTER_BALLS, **window, **scope)
+        seasons = _query(db, fmt, group_by=[r["group"], "year"], **base)
+        q = qualifying_players(seasons, r["group"])
+        rows = [_with_economy(row) for row in _query(db, fmt, group_by=[r["group"]], **base)]
         keep = [{"name": row.get(r["group"]), **{k: _num(row.get(k)) for k in keys}}
-                for row in rows if (row.get("balls") or 0) >= floor["min_balls"]]
-        return {**floor, "players": keep}
+                for row in rows if row.get(r["group"]) in q["players"]]
+        low, high = min(q["floors"].values(), default=0), max(q["floors"].values(), default=0)
+        floor_text = f"{low}+" if low == high else f"{low}–{high}+"
+        label = (f"{floor_text} balls in {q['seasons_needed']}+ seasons" if q["seasons_needed"] > 1
+                 else f"{floor_text} balls")
+        return {"min_balls": low, "floors": q["floors"], "seasons_needed": q["seasons_needed"],
+                "floor_label": label, "players": keep}
 
     key = {"kind": "verdict_peer_pool", "v": SUMMARY_VERSION, "fmt": fmt, "role": role, **window, **scope}
     return cached_run(db, key, run)
@@ -211,7 +215,8 @@ def _peer_strips(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[st
             "median": quantiles(values, 2)[1] if len(values) > 1 else values[0],
             "quantiles": [round(v, 3) for v in quantiles(values)],
         })
-    return {"qualified": qualified, "min_balls": pool["min_balls"], "median_balls": pool["median_balls"],
+    return {"qualified": qualified, "min_balls": pool["min_balls"], "floors": pool["floors"],
+            "seasons_needed": pool["seasons_needed"], "floor_label": pool["floor_label"],
             "pool": len(peers), "metrics": strips}
 
 

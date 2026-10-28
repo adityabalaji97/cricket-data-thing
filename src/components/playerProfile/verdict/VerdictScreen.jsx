@@ -90,7 +90,7 @@ const StripBlock = ({ role, block, keys, cue }) => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       <Eyebrow>
-        {`${ROLE_NAMES[role]} · v ${p.pool} ${who}, ${p.min_balls}+ balls${p.qualified ? '' : ' · under the floor'}`}
+        {`${ROLE_NAMES[role]} · v ${p.pool} ${who}, ${p.floor_label || `${p.min_balls}+ balls`}${p.qualified ? '' : ' · under the floor'}`}
       </Eyebrow>
       {cue && <StripAxisCue />}
       {metrics.map((m) => <PeerStrip key={m.key} metric={m} />)}
