@@ -22,7 +22,7 @@ for all-rounders especially. It must load in under a second on a phone before th
 | V4 | Verdict screen (T20) in UnifiedPlayerProfile | [x] 2026-10-28 (T20 + ODI switch; Test greyed) |
 | V5 | Verdict line rules + 50-player review list | [~] 2026-10-28 rules v1 live (best rank + season swing); 50-player review list still to do |
 | V6 | Form chips by runs above par | [x] 2026-10-28 (chips by runs above par, glyphs, dashed where no par) |
-| V7 | Share image `/img/player/<id>.png` + OG tags | [ ] |
+| V7 | Share image `/img/player/<id>.png` + OG tags | [x] 2026-10-28 (api/og.mjs verdict card + meta from /summary; PR) |
 | V8 | ODI variant | [ ] |
 | V9 | Pre-warm cache for upcoming fixtures' squads | [ ] |
 

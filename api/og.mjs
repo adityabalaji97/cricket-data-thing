@@ -61,7 +61,48 @@ function scorecardCard(card) {
   return frame(card.kicker, card.headline, h('div', { flexDirection: 'column' }, story, h('div', { alignItems: 'flex-end' }, scores, impact)));
 }
 
+const ROLE = { bowl: { colour: '#5b8def', name: 'Bowling' }, bat: { colour: '#c4850f', name: 'Batting' } };
+
+// The verdict screen as a link preview: the claim, wins added by season (bat and ball), the three best ranks.
+function verdictCard(card) {
+  const years = [...new Set(card.seasons.flatMap((s) => s.rows.map((r) => r.year)))].sort();
+  const max = Math.max(0.5, ...card.seasons.flatMap((s) => s.rows.map((r) => Math.abs(r.wpa || 0))));
+  const half = 150;
+  const seasonRows = years.length
+    ? h('div', { flexDirection: 'column', gap: 10, width: 560 },
+      h('div', { color: C.low, fontSize: 20, letterSpacing: 2 }, 'WINS ADDED BY SEASON'),
+      years.map((yr) => h('div', { alignItems: 'center', gap: 12 },
+        h('div', { width: 70, fontSize: 24, color: C.mid, fontWeight: 700 }, String(yr)),
+        h('div', { flexDirection: 'column', gap: 4 },
+          card.seasons.map((s) => {
+            const r = s.rows.find((x) => x.year === yr);
+            const v = r?.wpa || 0;
+            const w = Math.max(3, (Math.abs(v) / max) * half);
+            return h('div', { alignItems: 'center', width: half * 2 + 90 },
+              h('div', { width: half, justifyContent: 'flex-end' }, v < 0 ? h('div', { width: w, height: 14, background: ROLE[s.role].colour, borderRadius: 4 }) : null),
+              h('div', { width: 2, height: 18, background: 'rgba(255,255,255,0.3)' }),
+              h('div', { width: half }, v >= 0 ? h('div', { width: w, height: 14, background: ROLE[s.role].colour, borderRadius: 4 }) : null),
+              h('div', { fontSize: 20, color: C.mid, marginLeft: 8 }, `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)}`));
+          })))))
+    : null;
+  const ranks = h('div', { flexDirection: 'column', gap: 12, marginLeft: 'auto', width: 440 },
+    card.ranks.map((m) => h('div', { justifyContent: 'space-between', alignItems: 'center', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '12px 20px' },
+      h('div', { alignItems: 'center', gap: 10 },
+        h('div', { width: 12, height: 12, borderRadius: 3, background: ROLE[m.role].colour }),
+        h('div', { fontSize: 24, color: C.mid }, m.label)),
+      h('div', { fontSize: 30, fontWeight: 700, color: m.top ? C.lime : C.mid }, m.rank))));
+  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'sans-serif' },
+    h('div', { justifyContent: 'space-between', alignItems: 'center' },
+      h('div', { color: C.lime, fontSize: 24, letterSpacing: 4, fontWeight: 700 }, 'HINDSIGHT'),
+      h('div', { color: C.low, fontSize: 22 }, card.scope)),
+    h('div', { fontSize: 58, fontWeight: 700, marginTop: 22, lineHeight: 1.05 }, card.headline),
+    h('div', { color: C.low, fontSize: 24, marginTop: 6 }, card.kicker),
+    card.verdict ? h('div', { fontSize: 34, fontWeight: 700, marginTop: 20, lineHeight: 1.2, color: C.text }, card.verdict) : null,
+    h('div', { marginTop: 'auto', alignItems: 'flex-end' }, seasonRows, ranks));
+}
+
 function playerCard(card) {
+  if (card.ranks) return verdictCard(card);
   const stats = h('div', { gap: 22, marginTop: 30 },
     (card.stats || []).map((s) => h('div', { flexDirection: 'column', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '18px 24px', minWidth: 230 },
       h('div', { color: C.low, fontSize: 22 }, s.label),
