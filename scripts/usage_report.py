@@ -21,14 +21,14 @@ sys.path.insert(0, str(ROOT))
 # Rolling targets from the growth plan; the report flags the current stage's gap.
 TARGETS = [
     ("Next 4 weeks", {"users": 100}),
-    ("BBL / SA20 / ILT20 (Dec-Jan)", {"users": 500, "outside_sessions": 10}),
+    ("BBL / SA20 / ILT20 (Dec-Jan)", {"users": 500, "outside_conversations": 10}),
     ("IPL 2027 (Mar-May)", {"users": 3000}),
 ]
 
 COLUMNS = [
-    ("users", "WAU"), ("returning_users", "return"), ("sessions", "sess"), ("page_views", "views"),
+    ("users", "people"), ("crawler_visits", "crawlers"), ("returning_users", "return"), ("sessions", "sess"), ("page_views", "views"),
     ("query_runs", "queries"), ("nl_searches", "NL"), ("game_players", "gamers"), ("shares", "shares"),
-    ("calls", "MCP calls"), ("owner_calls", "MCP mine"), ("outside_sessions", "MCP convos"),
+    ("calls", "MCP calls"), ("owner_calls", "MCP mine"), ("outside_conversations", "MCP convos"),
 ]
 # Notes reach: posts and views, embeds on other sites (and visits they send), packs posted (and visits).
 NOTES_COLUMNS = [
