@@ -31,6 +31,8 @@ PERIOD = "career"
 SINCE = date(2015, 1, 1)
 COMMON_SURNAMES = {"Sharma", "Yadav", "Singh", "Kumar", "Patel", "Khan", "Iyer", "Pandya"}
 IPL = {"fmt": "T20", "leagues": ["IPL"]}
+BOTH = {"fmt": "T20", "leagues": ["IPL"], "include_international": True}   # IPL + every T20I
+SCOPE = "IPL and T20Is"
 INDIA_SINCE = {"fmt": "T20", "include_international": True, "start_date": SINCE}
 
 
@@ -115,22 +117,23 @@ def twins(db):
 # ---- the slides -------------------------------------------------------------------------------------------------
 
 def cover_card(db):
-    bat = {r["batter"]: r for r in q(db, group_by=["batter"], metrics_perspective="batting", min_runs=500, **IPL)}
-    bowl = {r["bowler"]: r for r in q(db, group_by=["bowler"], metrics_perspective="bowling", min_wickets=20, **IPL)}
+    bat = {r["batter"]: r for r in q(db, group_by=["batter"], metrics_perspective="batting", min_runs=500, **BOTH)}
+    bowl = {r["bowler"]: r for r in q(db, group_by=["bowler"], metrics_perspective="bowling", min_wickets=20, **BOTH)}
     both = {n: (bat[n]["runs"], bowl[n]["wickets"]) for n in bat if n in bowl}
-    elite = sorted((n for n, (r, w) in both.items() if r >= 2500 and w >= 75), key=lambda n: -both[n][0])
+    elite = sorted((n for n, (r, w) in both.items() if r >= 4000 and w >= 150), key=lambda n: -both[n][0])
     assert HP in elite, elite
-    side = sides(db)
-    indians = [n for n in elite if side.get(n) == "India"]
-    named = {n: i + 1 for i, n in enumerate([HP] + [n for n in elite if n != HP] + ["Axar Patel", "Sunil Narine"])}
+    named_list = [HP] + [n for n in elite if n != HP] + ["Shane Watson", "Andre Russell", "Axar Patel", "Shakib Al Hasan"]
+    named = {n: i + 1 for i, n in enumerate(dict.fromkeys(named_list)) if n in both}
     pts = [{"name": n, "x": r, "y": w, **({"highlight": True} if n == HP else {}),
             **({"label": named[n], "short": short(n)} if n in named else {})} for n, (r, w) in both.items()]
     runs, wkts = both[HP]
-    c = card("ipl-double", "scatter_plus",
-             f"Hardik Pandya: {runs:,} IPL runs, {wkts} wickets. One of {['', 'one', 'two', 'three'][len(indians)]} Indians past 2,500 and 75",
-             {"points": pts, "box": False, "x": {"label": "IPL runs", "format": "int"}, "y": {"label": "IPL wickets", "format": "int"}},
-             f"Every IPL player with 500+ runs and 20+ wickets · 2008 to Oct 2026")
-    return c, {"runs": runs, "wkts": wkts, "elite": elite, "indians": indians}
+    others = [n for n in elite if n != HP]
+    c = card("double", "scatter_plus",
+             f"{SCOPE}: only Hardik and {short(others[0])} have 4,000+ runs and 150+ wickets"
+             if len(others) == 1 else f"{SCOPE}: {len(elite)} players have 4,000+ runs and 150+ wickets",
+             {"points": pts, "box": False, "x": {"label": "runs", "format": "int"}, "y": {"label": "wickets", "format": "int"}},
+             f"Every player with 500+ runs and 20+ wickets · {SCOPE}, 2008 to Oct 2026")
+    return c, {"runs": runs, "wkts": wkts, "elite": elite, "others": others, "both": both}
 
 
 def star_card(t):
@@ -159,8 +162,8 @@ def india_card(t):
 
 
 def usage_card(db, players):
-    overall = {r["bowler"]: r for r in q(db, group_by=["bowler"], bowlers=players, metrics_perspective="bowling", **IPL)}
-    phase = q(db, group_by=["bowler", "phase"], bowlers=players, metrics_perspective="bowling", **IPL)
+    overall = {r["bowler"]: r for r in q(db, group_by=["bowler"], bowlers=players, metrics_perspective="bowling", **BOTH)}
+    phase = q(db, group_by=["bowler", "phase"], bowlers=players, metrics_perspective="bowling", **BOTH)
     per = {}
     for r in phase:
         inns = overall[r["bowler"]]["innings_count"] or 1
@@ -168,7 +171,7 @@ def usage_card(db, players):
     rows = [p for p in players if p in per]
     hp = per[HP]
     c = card("usage", "share_bars",
-             f"In the IPL Hardik bowls {sum(hp.values()):.0f} balls a game, in all three phases",
+             f"Hardik bowls {sum(hp.values()):.0f} balls a game, in all three phases",
              {"absolute": True, "format": "dec1", "label_width": 150,
               "groups": [{"key": "powerplay", "label": "Powerplay", "colour": "#5b8def"},
                          {"key": "middle", "label": "Middle overs", "colour": "#b6f24a"},
@@ -176,30 +179,33 @@ def usage_card(db, players):
               "rows": [{"name": p, "detail": f"{overall[p]['innings_count']} games",
                         "segments": [{"key": k, "value": per[p].get(k, 0)} for k in ("powerplay", "middle", "death")]}
                        for p in rows]},
-             "Balls bowled per IPL game, by phase · 2008 to Oct 2026")
+             f"Balls bowled per game, by phase · {SCOPE}, 2008 to Oct 2026")
     c["kicker"] = "How he's used"
     return c, {"per": per}
 
 
 def value_card(db, side):
-    bat = {r["batter"]: r for r in q(db, group_by=["batter"], batting_teams=["India"], metrics_perspective="batting", **INDIA_SINCE)}
-    bowl = {r["bowler"]: r for r in q(db, group_by=["bowler"], bowling_teams=["India"], metrics_perspective="bowling", **INDIA_SINCE)}
-    both = [n for n in bat if n in bowl and (bat[n]["innings_count"] or 0) >= 20 and (bowl[n]["innings_count"] or 0) >= 20]
-    # Every player named (seven or so): an unnamed dot on a seven-dot chart is a question.
-    names = {n: ({HP: "Hardik", "Washington Sundar": "Washington"}.get(n) or short(n)) for n in both}
-    order = [HP] + sorted((n for n in both if n != HP), key=lambda n: -(bowl[n]["wpa"] or 0))
-    labels = {n: i + 1 for i, n in enumerate(order)}
-    pts = [{"name": n, "x": round(bat[n]["wpa"] or 0, 2), "y": round(bowl[n]["wpa"] or 0, 2),
-            **({"highlight": True} if n == HP else {}), **({"label": labels[n], "short": names[n]} if n in labels else {})}
-           for n in both]
-    hb, hw = bat[HP]["wpa"], bowl[HP]["wpa"]
-    c = card("value", "scatter_plus",
-             f"For India, Hardik adds wins with both: {hb:+.1f} with the bat, {hw:+.1f} with the ball",
-             {"points": pts, "box": False, "x": {"label": "wins added, batting", "format": "signed1", "higher_better": True},
-              "y": {"label": "wins added, bowling", "format": "signed1"}},
-             f"India players with 20+ innings each way · T20Is since 2015")
+    """Wins added since 2015 split by competition: for India he's above par with both; in the IPL below par with both.
+    Combined (−0.7 bat, −0.8 ball) would hide the India role that makes teams want him."""
+    def one(**sc):
+        bt = q(db, group_by=["batter"], batters=[HP], metrics_perspective="batting", start_date=SINCE, **sc)[0]
+        sc_b = dict(sc)
+        if "batting_teams" in sc_b:
+            sc_b["bowling_teams"] = sc_b.pop("batting_teams")
+        bw = q(db, group_by=["bowler"], bowlers=[HP], metrics_perspective="bowling", start_date=SINCE, **sc_b)[0]
+        return bt["wpa"] or 0, bw["wpa"] or 0
+    ib, iw = one(fmt="T20", include_international=True, batting_teams=["India"])
+    pb, pw = one(**IPL)
+    rows = [{"name": "India, batting", "value": round(ib, 2), "highlight": True},
+            {"name": "India, bowling", "value": round(iw, 2), "highlight": True},
+            {"name": "IPL, batting", "value": round(pb, 2)},
+            {"name": "IPL, bowling", "value": round(pw, 2)}]
+    c = card("value", "metric_bars",
+             f"For India: {sg(ib)} bat, {sg(iw)} ball. In the IPL, below par with both",
+             {"metric": {"label": "Wins added", "format": "signed2", "signed": True}, "label_width": 130, "rows": rows},
+             "Wins added since 2015 (T20 Primer method) · India T20Is and the IPL")
     c["kicker"] = "The value"
-    return c, {"bat": {n: bat[n] for n in both}, "bowl": {n: bowl[n] for n in both}, "hb": hb, "hw": hw}
+    return c, {"hb": ib, "hw": iw, "pb": pb, "pw": pw}
 
 
 PERIODS = [("2015-16", 2015, 2016), ("2017-19", 2017, 2019), ("2020-22", 2020, 2022), ("2023-26", 2023, 2026)]
@@ -208,23 +214,22 @@ PERIODS = [("2015-16", 2015, 2016), ("2017-19", 2017, 2019), ("2020-22", 2020, 2
 def arc_card(db):
     """Wins added over four stretches of his IPL career, bat and ball together (a line chart of single seasons dropped
     below its axis; one bar per stretch reads in a glance and carries the split in its detail)."""
-    bat = {r["year"]: r for r in q(db, group_by=["year"], batters=[HP], metrics_perspective="batting", **IPL)}
-    bowl = {r["year"]: r for r in q(db, group_by=["year"], bowlers=[HP], metrics_perspective="bowling", **IPL)}
+    bat = {r["year"]: r for r in q(db, group_by=["year"], batters=[HP], metrics_perspective="batting", **BOTH)}
+    bowl = {r["year"]: r for r in q(db, group_by=["year"], bowlers=[HP], metrics_perspective="bowling", **BOTH)}
     rows = []
     for label, a, b_ in PERIODS:
         wb = sum((bat[y]["wpa"] or 0) for y in bat if a <= y <= b_)
         ww = sum((bowl[y]["wpa"] or 0) for y in bowl if a <= y <= b_)
-        rows.append({"name": label, "value": round(wb + ww, 2), "highlight": label == "2017-19",
-                     "detail": f"bat {wb:+.2f}, ball {ww:+.2f}"})
+        rows.append({"name": label, "value": round(wb + ww, 2), "detail": f"bat {sg(wb, 2)}, ball {sg(ww, 2)}"})
     best = max(rows, key=lambda r: r["value"])
-    assert best["name"] == "2017-19", rows
+    best["highlight"] = True
     c = card("arc", "metric_bars",
-             f"His IPL best: {sg(best['value'])} wins added in 2017-19. Since 2023: {sg(rows[-1]['value'])}",
+             f"His best: {sg(best['value'])} wins added in {best['name']}. Since 2023: {sg(rows[-1]['value'])}",
              {"metric": {"label": "Wins added, bat and ball", "format": "signed2", "signed": True}, "label_width": 110,
               "rows": rows},
-             "IPL seasons · he didn't bowl in 2020 or 2021")
+             f"{SCOPE} by season, grouped")
     c["kicker"] = "Both ways"
-    return c, {"rows": rows}
+    return c, {"rows": rows, "best": best}
 
 
 def build(db):
@@ -242,24 +247,27 @@ def build(db):
 
 
 def copy(b):
-    cn, t, un, vn = b["cn"], b["t"], b["un"], b["vn"]
+    cn, t, un, vn, an = b["cn"], b["t"], b["un"], b["vn"], b["an"]
     n0, n1 = t["near"][0]["player"], t["near"][1]["player"]
     i0, i1 = t["indians"][0], t["indians"][1]
-    hook = f"Hardik Pandya: {cn['runs']:,} IPL runs and {cn['wkts']} wickets. Is there anyone like him?"
+    o = cn["others"][0]
+    hook = f"Hardik Pandya: {cn['runs']:,} runs, {cn['wkts']} wickets in IPL and T20Is. Anyone like him?"
     caption = "\n\n".join([
-        f"Hardik Pandya has {cn['runs']:,} IPL runs and {cn['wkts']} IPL wickets. Only {', '.join([x for x in cn['elite'] if x != HP][:-1])} and {[x for x in cn['elite'] if x != HP][-1]} "
-        f"have passed 2,500 runs and 75 wickets too; among Indians, only {short([x for x in cn['indians'] if x != HP][0])}. "
-        "With trade talk around him, here's what makes him hard to replace.",
+        f"Hardik Pandya has {cn['runs']:,} runs and {cn['wkts']} wickets in the IPL and T20Is. Only {o} has also passed "
+        f"4,000 runs and 150 wickets ({cn['both'][o][0]:,} and {cn['both'][o][1]}). With trade talk around him, here's "
+        "what makes him hard to replace.",
         f"His statistical twins, careers since 2015 against strong sides: {n0} ({t['gap'][n0]} points) and {n1} "
         f"({t['gap'][n1]}). The nearest Indian is {i0} ({t['gap'][i0]}), then {i1} ({t['gap'][i1]}). Most pace-bowling "
         f"all-rounders have a twin within {t['typical']} points.",
-        f"How teams use him: {sum(un['per'][HP].values()):.0f} balls a game in the IPL, in the powerplay, the middle overs "
-        "and at the death.",
-        f"For India in T20Is since 2015 he has added {vn['hb']:+.2f} wins with the bat and {vn['hw']:+.2f} with the ball.",
-        "Both ways: his best IPL seasons were 2017 to 2019; since 2023 his wins added has been below par with bat and ball.",
+        f"How teams use him: {sum(un['per'][HP].values()):.0f} balls a game, in the powerplay, the middle overs and at "
+        "the death.",
+        f"The value, since 2015: for India he has added {sg(vn['hb'], 2)} wins with the bat and {sg(vn['hw'], 2)} with "
+        f"the ball. In the IPL, {sg(vn['pb'], 2)} and {sg(vn['pw'], 2)}.",
+        f"Both ways: his best stretch was {an['best']['name']} ({sg(an['best']['value'])} wins added); since 2023, "
+        f"{sg(an['rows'][-1]['value'])}.",
         "How it works: each player's game (when he bats and bowls, how he scores and what he concedes, his shots, lengths "
         "and lines) as percentiles of every pace-bowling all-rounder, then the typical gap between two players. "
-        "Wins added and Impact: T20 Primer method. Ball-by-ball data: Himanish Ganjoo & TechRadar, Cricsheet.",
+        "Wins added: T20 Primer method. Ball-by-ball data: Himanish Ganjoo & TechRadar, Cricsheet.",
         "Who's the next Hardik?",
         "Free ball-by-ball cricket stats: link in bio.\n.\n#HardikPandya #IPL #IPL2027 #TeamIndia #cricket",
     ])
@@ -268,23 +276,24 @@ def copy(b):
 
 def thread(b, link):
     """Hand-written, one tweet per slide (services/ig_x.x_thread garbles method posts)."""
-    cn, t, un, vn = b["cn"], b["t"], b["un"], b["vn"]
+    cn, t, un, vn, an = b["cn"], b["t"], b["un"], b["vn"], b["an"]
     n0, n1 = t["near"][0]["player"], t["near"][1]["player"]
     i0, i1 = t["indians"][0], t["indians"][1]
-    others = [x for x in cn["elite"] if x != HP]
+    o = cn["others"][0]
     hp = un["per"][HP]
     texts = [
-        f"Hardik Pandya: {cn['runs']:,} IPL runs and {cn['wkts']} wickets. Only {', '.join(others[:-1])} and {others[-1]} have also passed 2,500 "
-        f"runs and 75 wickets.\n\nIs there anyone like him? 🧵\n#HardikPandya #IPL",
+        f"Hardik Pandya: {cn['runs']:,} runs and {cn['wkts']} wickets in the IPL and T20Is. Only {o} has also passed "
+        f"4,000 and 150.\n\nIs there anyone like him? 🧵\n#HardikPandya #IPL",
         f"His closest statistical twins over his whole career: {n0}, {t['gap'][n0]} points away, and {n1}, "
         f"{t['gap'][n1]}.\n\nPace-bowling all-rounders, careers since 2015 v strong sides, matched on how they bat and bowl.",
         f"In India, the nearest is {i0} ({t['gap'][i0]} points). The next, {i1}, is {t['gap'][i1]} away. Most all-rounders "
         f"have a twin within {t['typical']}.",
-        f"How he's used: {sum(hp.values()):.0f} balls a game in the IPL, {hp.get('powerplay', 0)} in the powerplay, "
-        f"{hp.get('middle', 0)} in the middle overs, {hp.get('death', 0)} at the death.",
-        f"For India (T20Is since 2015) he adds wins with both: {vn['hb']:+.2f} with the bat, {vn['hw']:+.2f} with the ball.",
-        f"Both ways: his IPL best was 2017-19, {sg(b['an']['rows'][1]['value'])} wins added with bat and ball. Since 2023: "
-        f"{sg(b['an']['rows'][-1]['value'])}.",
+        f"How he's used: {sum(hp.values()):.0f} balls a game across the IPL and T20Is: {hp.get('powerplay', 0)} in the "
+        f"powerplay, {hp.get('middle', 0)} in the middle overs, {hp.get('death', 0)} at the death.",
+        f"The value since 2015: for India {sg(vn['hb'], 2)} wins added with the bat, {sg(vn['hw'], 2)} with the ball. In "
+        f"the IPL, below par with both: {sg(vn['pb'], 2)} and {sg(vn['pw'], 2)}.",
+        f"Both ways: his best stretch was {an['best']['name']}, {sg(an['best']['value'])} wins added. Since 2023: "
+        f"{sg(an['rows'][-1]['value'])}.",
         f"Who's the next Hardik?\n\nEvery player's doppelgängers, free: {link}\nData: @himganj153 & @TechRadar9",
     ]
     out = []
@@ -292,6 +301,18 @@ def thread(b, link):
         assert len(x) <= 280, (i, len(x), x)
         out.append({"n": i, "slide": i, "text": x})
     return out
+
+
+def reel_script(b):
+    """The voiced Reel's lines, from the same numbers as the slides (beats 1, 2, 4, 5, 6)."""
+    cn, t, un, vn, an = b["cn"], b["t"], b["un"], b["vn"], b["an"]
+    n0 = t["near"][0]["player"]
+    return {"hook": f"Hardik Pandya: {cn['runs']:,} runs and {cn['wkts']} wickets in the IPL and T20Is. Is there anyone like him?",
+            "lines": [f"Only {cn['others'][0]} has also passed 4,000 runs and 150 wickets.",
+                      f"Over his whole career, his closest statistical twin is {n0}, {t['gap'][n0]} points away.",
+                      f"He bowls {sum(un['per'][HP].values()):.0f} balls a game, in the powerplay, the middle overs and at the death.",
+                      "For India, he adds wins with the bat and the ball. In the IPL, he's below par with both.",
+                      f"His best stretch was {an['best']['name'].replace('-', ' to 20')}. Since 2023, the numbers have dipped."]}
 
 
 def slides_of(b, hook):
@@ -328,6 +349,8 @@ def main() -> int:
     th = thread(b, "hindsightcricket.com/doppelgangers")
     for t in th:
         print(f"--- tweet {t['n']} ({len(t['text'])})\n{t['text']}")
+    (HERE / "reel.json").write_text(json.dumps(reel_script(b), indent=1))
+    print("REEL:", json.dumps(reel_script(b)))
     (HERE / "slides.json").write_text(json.dumps({"slides": slides, "hook": hook, "caption": caption, "x": th},
                                                  default=str, indent=1))
     if problems or hp or not args.write:
