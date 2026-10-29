@@ -88,7 +88,7 @@ async function verdictSummary(name) {
     .slice(0, 3);
   const id = s.identity || {};
   const kicker = [id.side, id.bowling_style && shown.includes('bowl') ? id.bowling_style : null,
-    shown.includes('bat') && id.batting_position ? `bats #${id.batting_position}` : null].filter(Boolean).join(' · ');
+    shown.includes('bat') && id.batting_position ? (id.batting_position <= 2 ? 'opener' : `bats #${id.batting_position}`) : null].filter(Boolean).join(' · ');
   const since = String(s.window.start_date).slice(0, 4);
   const scope = `${s.format} · since ${since} · ${s.scope === 'strong' ? 'v strong sides' : 'every match'}`;
   return {

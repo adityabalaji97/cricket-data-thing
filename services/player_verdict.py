@@ -25,8 +25,8 @@ from typing import Any, Dict, List, Optional
 from services.query_builder_v2 import run_deliveries_query
 from services.query_cache import cached_run
 
-SUMMARY_VERSION = "v4"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons;
-# v4: all-rounders must qualify in both roles, the verdict claims from the main role
+SUMMARY_VERSION = "v5"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons;
+# v4: all-rounders must qualify in both roles, the verdict claims from the main role; v5: identity from indexed lookups
 
 STRONG_T20_LEAGUES = [
     "IPL", "BBL", "PSL", "CPL", "SA20", "T20 Blast", "ILT20", "MLC", "BPL", "LPL", "Super Smash",
@@ -290,27 +290,36 @@ def _signed(v: float) -> str:
 
 
 def _identity(db, fmt: str, player: str, name: str, roles: Dict[str, Any], window: Dict[str, Any]) -> Dict[str, Any]:
-    """National side (else main team), bowling style, batting hand and usual batting position."""
+    """National side (else main team), bowling style, batting hand and usual batting position, from indexed lookups
+    on the player's own rows. (Query-builder scans over the whole window, three per summary, were part of what stalled
+    the site on 29 Oct 2026 when several cold summaries built at once.)"""
     from sqlalchemy import text
+    from services.player_aliases import get_player_names
 
     out: Dict[str, Any] = {"side": None, "bowling_style": None, "bat_hand": None, "batting_position": None}
     try:
+        names = list({*(get_player_names(player, db).get("all_names") or []), player, name})
         out["side"] = db.execute(text(
             "SELECT main_side FROM player_identity WHERE name = :n ORDER BY balls DESC LIMIT 1"), {"n": name}).scalar()
+        start = str(window.get("start_date") or "2000-01-01")
+        mode = lambda sql: db.execute(text(sql), {"names": names, "fmt": fmt, "start": start}).scalar()  # noqa: E731
+        if "bowl" in roles:
+            style = mode("""SELECT bowl_style FROM (SELECT bowl_style FROM delivery_details
+                            WHERE bowl = ANY(:names) AND format = :fmt AND bowl_style IS NOT NULL
+                            AND match_date >= :start ORDER BY match_date DESC LIMIT 2000) x
+                            GROUP BY 1 ORDER BY count(*) DESC LIMIT 1""")
+            out["bowling_style"] = STYLE_WORDS.get(style, style) if style else None
+        if "bat" in roles:
+            out["bat_hand"] = mode("""SELECT bat_hand FROM (SELECT bat_hand FROM delivery_details
+                                      WHERE bat = ANY(:names) AND format = :fmt AND bat_hand IS NOT NULL
+                                      AND match_date >= :start ORDER BY match_date DESC LIMIT 2000) x
+                                      GROUP BY 1 ORDER BY count(*) DESC LIMIT 1""")
+            out["batting_position"] = mode("""SELECT batting_position FROM batting_stats
+                                              WHERE striker = ANY(:names) AND format = :fmt AND batting_position IS NOT NULL
+                                              AND match_id IN (SELECT id FROM matches WHERE date >= CAST(:start AS date))
+                                              GROUP BY 1 ORDER BY count(*) DESC LIMIT 1""")
     except Exception:
         db.rollback()
-    if "bowl" in roles:
-        rows = _query(db, fmt, group_by=["bowl_style"], bowlers=[player], metrics_perspective="bowling", **window)
-        top = max(rows, key=lambda r: r.get("balls") or 0, default=None)
-        if top and top.get("bowl_style"):
-            out["bowling_style"] = STYLE_WORDS.get(top["bowl_style"], top["bowl_style"])
-    if "bat" in roles:
-        base = {"batters": [player], "metrics_perspective": "batting", **window}
-        hand = max(_query(db, fmt, group_by=["bat_hand"], **base), key=lambda r: r.get("balls") or 0, default=None)
-        pos = max(_query(db, fmt, group_by=["batting_position"], **base),
-                  key=lambda r: r.get("innings_count") or 0, default=None)
-        out["bat_hand"] = (hand or {}).get("bat_hand")
-        out["batting_position"] = (pos or {}).get("batting_position")
     return out
 
 
@@ -394,12 +403,39 @@ def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
     return summary
 
 
+# Cold builds run one at a time per web process (two per dyno): each is a dozen heavy queries, and a few at once took
+# both workers and the database pool, so every request on the site timed out for minutes (29 Oct 2026). A request that
+# can't start within BUILD_WAIT_SECONDS is told the server is busy instead of queueing; the profile falls back to its
+# plain header. Cached summaries never wait.
+import threading  # noqa: E402
+
+_BUILD_SLOT = threading.BoundedSemaphore(1)
+BUILD_WAIT_SECONDS = 20
+
+
+class SummaryBusy(RuntimeError):
+    pass
+
+
 def get_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
                 start_date: Optional[date] = None, end_date: Optional[date] = None) -> Dict[str, Any]:
     """build_summary through the persistent result cache (fresh after every data load)."""
+    from services.query_cache import cached_get
+
     key = {"kind": "player_verdict", "v": SUMMARY_VERSION, "player": player.strip().lower(),
            "fmt": fmt, "scope": scope, "start_date": start_date, "end_date": end_date}
     if end_date is None:
         # A default window ends today; key it by day so it rolls over.
         key["day"] = date.today()
-    return cached_run(db, key, lambda: build_summary(db, player, fmt, scope, start_date, end_date))
+    hit = cached_get(db, key)
+    if hit is not None:
+        return hit
+    # Give the connection back before waiting: a request queued here held one "idle in transaction", and a handful of
+    # those emptied the pool (the 29 Oct outage).
+    db.rollback()
+    if not _BUILD_SLOT.acquire(timeout=BUILD_WAIT_SECONDS):
+        raise SummaryBusy("another player summary is being built")
+    try:
+        return cached_run(db, key, lambda: build_summary(db, player, fmt, scope, start_date, end_date))
+    finally:
+        _BUILD_SLOT.release()

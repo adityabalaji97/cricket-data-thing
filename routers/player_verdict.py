@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from sqlalchemy.orm import Session
 
 from database import get_session
-from services.player_verdict import get_summary
+from services.player_verdict import SummaryBusy, get_summary
 
 router = APIRouter(tags=["player"])
 
@@ -25,7 +25,12 @@ def player_summary(
 ):
     """The player profile's first screen in one call (VERDICT_SCREEN_PLAN.md, V2): both roles'
     seasons, phases, peer ranks with the peer distribution, and the last 8 matches."""
-    summary = get_summary(db, player_name, format, scope, start_date, end_date)
+    try:
+        summary = get_summary(db, player_name, format, scope, start_date, end_date)
+    except SummaryBusy:
+        response.headers["Retry-After"] = "10"
+        raise HTTPException(status_code=503, detail="Busy building another player's summary; try again in a few seconds",
+                            headers={"Retry-After": "10"})
     if not summary.get("roles"):
         raise HTTPException(status_code=404, detail=f"No {format} data for {player_name} in this window")
     # The result cache makes repeat calls cheap; the CDN holds it for an hour and serves a stale copy

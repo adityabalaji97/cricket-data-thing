@@ -46,7 +46,11 @@ const identityLine = (s) => {
   if (id.bowling_style && s.roles.bowl && (s.primary_role === 'bowl' || s.allrounder)) parts.push(id.bowling_style);
   if (s.roles.bat && id.batting_position) {
     const hand = id.bat_hand === 'LHB' ? 'left-hand ' : '';
-    parts.push(s.primary_role === 'bat' && !s.allrounder ? `${hand}bat, usually #${id.batting_position}` : `bats #${id.batting_position}`);
+    // #1 and #2 are both openers (the scorecard lists the non-striker second).
+    const opener = id.batting_position <= 2;
+    parts.push(s.primary_role === 'bat' && !s.allrounder
+      ? (opener ? `${hand}opener` : `${hand}bat, usually #${id.batting_position}`)
+      : (opener ? 'opens' : `bats #${id.batting_position}`));
   }
   return parts.filter(Boolean).join(' · ');
 };
