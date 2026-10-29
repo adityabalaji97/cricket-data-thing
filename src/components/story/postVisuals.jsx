@@ -1308,7 +1308,7 @@ const TwinCloud = ({ payload }) => {
   const sorted = pts.slice().sort((a, b) => b.distance - a.distance);
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <Box component="svg" viewBox={`0 0 ${W} ${W}`} role="img" aria-label={`Every batter around ${payload.center}`} sx={{ width: '100%' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${W}`} role="img" aria-label={`Every player around ${payload.center}`} sx={{ width: '100%', maxHeight: 320 }}>
         {rings.map((r) => (
           <g key={r}>
             <circle cx={c} cy={c} r={(r / outer) * R} fill="none" stroke={colors.borderStrong} strokeDasharray="2 3" />
