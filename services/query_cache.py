@@ -71,6 +71,19 @@ def cache_key(params: Dict[str, Any], version: str) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
+def cached_get(db, params: Dict[str, Any]) -> Any:
+    """The cached result for these params under the current data version, or None (no computing)."""
+    if not enabled():
+        return None
+    try:
+        row = db.execute(text("SELECT result FROM query_cache WHERE key = :k"),
+                         {"k": cache_key(params, data_version(db))}).first()
+        return row[0] if row is not None and isinstance(row[0], dict) else None
+    except Exception:
+        db.rollback()
+        return None
+
+
 def cached_run(db, params: Dict[str, Any], run: Callable[[], Any]) -> Any:
     if not enabled():
         return run()
