@@ -25,8 +25,11 @@ from typing import Any, Dict, List, Optional
 from services.query_builder_v2 import run_deliveries_query
 from services.query_cache import cached_run
 
-SUMMARY_VERSION = "v5"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons;
-# v4: all-rounders must qualify in both roles, the verdict claims from the main role; v5: identity from indexed lookups
+# Peer pools carry their own version, so a change to the summary's wording doesn't throw away the pools (career pools
+# take minutes to build and are only built nightly).
+POOL_VERSION = "v5"
+SUMMARY_VERSION = "v6"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons;
+# v4: all-rounders must qualify in both roles, the verdict claims from the main role; v5: identity from indexed lookups; v6: finer verdict ranks
 
 STRONG_T20_LEAGUES = [
     "IPL", "BBL", "PSL", "CPL", "SA20", "T20 Blast", "ILT20", "MLC", "BPL", "LPL", "Super Smash",
@@ -201,7 +204,7 @@ def _peer_pool(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[str,
         return {"min_balls": low, "floors": q["floors"], "seasons_needed": q["seasons_needed"],
                 "floor_label": label, "players": keep}
 
-    key = {"kind": "verdict_peer_pool", "v": SUMMARY_VERSION, "fmt": fmt, "role": role, **window, **scope}
+    key = {"kind": "verdict_peer_pool", "v": POOL_VERSION, "fmt": fmt, "role": role, **window, **scope}
     if not build:
         from services.query_cache import cached_get
         hit = cached_get(db, key)
@@ -343,6 +346,12 @@ def _identity(db, fmt: str, player: str, name: str, roles: Dict[str, Any], windo
     return out
 
 
+# The verdict's precision (the user, 30 Oct 2026: 6th of 331 read "Top 10%", which undersold a top-2% bowler). The top
+# ten get their exact rank; beyond that the nearest of these steps.
+EXACT_RANKS = 10
+TOP_STEPS = (1, 2, 3, 5, 10, 15, 20, 25, 30, 40, 50)
+
+
 def verdict_line(summary: Dict[str, Any]) -> Optional[str]:
     """One or two plain sentences from the ranks and the seasons (VERDICT_SCREEN_PLAN.md D4, first version).
 
@@ -363,14 +372,13 @@ def verdict_line(summary: Dict[str, Any]) -> Optional[str]:
         return None
     share, rank, role, m = min(cands, key=lambda c: (c[0], c[1]))
     words = METRIC_WORDS.get(m["key"], m["label"].lower())
+    step = next((x for x in TOP_STEPS if 100 * share <= x), None)
     if rank == 1:
         claim = f"Best of {m['n']} for {words}"
-    elif rank <= 3:
+    elif rank <= EXACT_RANKS:
         claim = f"{_ordinal(rank)} of {m['n']} for {words}"
-    elif share <= 0.10:
-        claim = f"Top 10% for {words}"
-    elif share <= 0.25:
-        claim = f"Top 25% for {words}"
+    elif step:
+        claim = f"Top {step}% for {words}"
     else:
         claim = f"{_ordinal(rank)} of {m['n']} for {words}"
     if summary.get("allrounder"):

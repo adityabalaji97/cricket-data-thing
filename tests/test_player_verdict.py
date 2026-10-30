@@ -98,10 +98,23 @@ def test_claim_ignores_a_part_time_role_and_best_reads_naturally():
         },
         "primary_role": "bat", "allrounder": False, "has_wins_added": True, "window": {"start_date": "2024-01-01"},
     })
-    assert line == "Top 25% for average."
+    assert line == "Top 15% for average."  # 40th of 339
     line = verdict_line({
         "roles": {"bat": {"peers": {"qualified": True, "metrics": [{"key": "average", "label": "Average", "rank": 1, "n": 339}]},
                           "seasons": []}},
         "primary_role": "bat", "allrounder": False, "has_wins_added": True, "window": {"start_date": "2024-01-01"},
     })
     assert line == "Best of 339 for average."
+
+
+def test_verdict_precision():
+    from services.player_verdict import verdict_line
+
+    def line(rank, n):
+        return verdict_line({"roles": {"bowl": {"peers": {"qualified": True, "metrics": [
+            {"key": "wpa", "label": "Wins added", "rank": rank, "n": n}]}, "seasons": []}},
+            "primary_role": "bowl", "allrounder": False, "has_wins_added": True, "window": {"start_date": "2024-01-01"}})
+    assert line(6, 331) == "6th of 331 for wins added."      # top 2%: the exact rank, not "Top 10%"
+    assert line(27, 331) == "Top 10% for wins added."
+    assert line(125, 331) == "Top 40% for wins added."
+    assert line(250, 331) == "250th of 331 for wins added."
