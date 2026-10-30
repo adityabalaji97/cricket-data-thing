@@ -58,13 +58,14 @@ def main() -> int:
     db = next(get_session())
     t0 = time.time()
     if not args.dry_run:
-        for fmt in ("T20", "ODI"):
-            start, end = default_window(fmt)
+        # Career pools (since 2015) are only ever built here: a profile request never builds one (PoolsCold).
+        for fmt, period in (("T20", "recent"), ("ODI", "recent"), ("T20", "career"), ("ODI", "career")):
+            start, end = default_window(fmt, period=period)
             for role in ("bowl", "bat"):
                 t = time.time()
                 pool = _peer_pool(db, fmt, role, {"start_date": start, "end_date": end}, scope_params(fmt, "strong"))
-                log.info("pool %s %s: %d players (%s), %.1fs", fmt, role, len(pool["players"]), pool["floor_label"],
-                         time.time() - t)
+                log.info("pool %s %s %s: %d players (%s), %.1fs", fmt, period, role, len(pool["players"]),
+                         pool["floor_label"], time.time() - t)
 
     teams = app.get_teams(db=db)
     now = datetime.now(timezone.utc)

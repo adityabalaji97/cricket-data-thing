@@ -469,7 +469,7 @@ const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
               playerName={appliedPlayer}
               fallback={(
                 <Typography variant="body2" color="text.secondary">
-                  Not enough cricket against strong sides since 2024 (120+ balls in two seasons) to find this player's
+                  Not enough cricket against strong sides since 2015 (120+ balls in two seasons) to find this player's
                   doppelgängers.
                 </Typography>
               )}

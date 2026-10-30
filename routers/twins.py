@@ -21,8 +21,9 @@ def twins_board(response: Response, db: Session = Depends(get_session)):
 def player_twins(
     response: Response,
     player_name: str = Path(..., description="The player's name as the site shows it"),
-    unit: Literal["window", "season"] = Query(default="window", description="window = careers over the profile's "
-                                              "default window; season = one season against every season since 2015"),
+    unit: Literal["window", "career", "season"] = Query(default="window", description="window = the last few seasons "
+                                              "(the profile's Recent); career = since 2015; season = one season against "
+                                              "every season since 2015"),
     season: Optional[str] = Query(default=None, description="With unit=season, e.g. 2025"),
     role: Optional[Literal["bat", "bowl", "allround"]] = Query(default=None, description="Default: the player's role"),
     n: int = Query(default=5, ge=1, le=20),

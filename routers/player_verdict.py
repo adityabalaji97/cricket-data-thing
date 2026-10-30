@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from sqlalchemy.orm import Session
 
 from database import get_session
-from services.player_verdict import SummaryBusy, get_summary
+from services.player_verdict import PoolsCold, SummaryBusy, get_summary
 
 router = APIRouter(tags=["player"])
 
@@ -19,14 +19,19 @@ def player_summary(
         default="strong",
         description="strong = major leagues + T20Is between top-12 sides (ODIs: top-12 sides); all = every match",
     ),
-    start_date: Optional[date] = Query(default=None, description="Window start (default: 1 Jan, 2 years back for T20, 3 for ODI)"),
+    period: Literal["recent", "career"] = Query(default="recent", description="recent = since 1 Jan two years back (T20) "
+                                                "or three (ODI); career = since 2015"),
+    start_date: Optional[date] = Query(default=None, description="Window start (overrides the period's)"),
     end_date: Optional[date] = Query(default=None, description="Window end (default: today)"),
     db: Session = Depends(get_session),
 ):
     """The player profile's first screen in one call (VERDICT_SCREEN_PLAN.md, V2): both roles'
     seasons, phases, peer ranks with the peer distribution, and the last 8 matches."""
     try:
-        summary = get_summary(db, player_name, format, scope, start_date, end_date)
+        summary = get_summary(db, player_name, format, scope, start_date, end_date, period)
+    except PoolsCold:
+        raise HTTPException(status_code=503, detail="Career numbers are still being built; try again in a minute",
+                            headers={"Retry-After": "60"})
     except SummaryBusy:
         response.headers["Retry-After"] = "10"
         raise HTTPException(status_code=503, detail="Busy building another player's summary; try again in a few seconds",

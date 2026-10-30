@@ -89,7 +89,7 @@ const DoppelgangerLeaderboard = () => {
             <Box component={Link} to={playerLink(picked)} sx={{ fontSize: 12.5, color: colors.accent }}>Profile →</Box>
           </Box>
           <TwinsSection playerName={picked}
-            fallback={<Box sx={{ color: colors.textLo, fontSize: 13.5 }}>{`${picked} hasn't played enough against strong sides since 2024 (120+ balls in two seasons) to be matched.`}</Box>} />
+            fallback={<Box sx={{ color: colors.textLo, fontSize: 13.5 }}>{`${picked} hasn't played enough against strong sides since 2015 (120+ balls in two seasons) to be matched.`}</Box>} />
         </Box>
       )}
 

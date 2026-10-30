@@ -184,6 +184,7 @@ jobs:
         run: |
           python scripts/build_player_vectors.py
           python scripts/build_player_vectors.py --window
+          python scripts/build_player_vectors.py --career
 
       # Reddit/X-ready content packs for newly loaded matches (services/content_packs.py): record
       # and career-best stats plus the win-probability series, queued in /admin for a human to

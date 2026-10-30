@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Box, Skeleton, Tooltip } from '@mui/material';
 import { Link } from 'react-router-dom';
 import config from '../../config';
@@ -28,27 +28,60 @@ const surname = (name) => {
   return COMMON_SURNAMES.has(last) ? parts[0] : last;
 };
 
+const UNITS = [['window', 'Recent'], ['career', 'Career']];
+
 const TwinsSection = ({ playerName, fallback }) => {
   const [state, setState] = useState({ status: 'loading', data: null });
+  // Recent (since 2024) by default; a player not in that pool tries Career (since 2015) before the fallback.
+  const [unit, setUnit] = useState('window');
+  const autoCareer = useRef(false);
 
   useEffect(() => {
     if (!playerName) return undefined;
     let cancelled = false;
     setState({ status: 'loading', data: null });
-    fetch(`${config.API_URL}/twins/${encodeURIComponent(playerName)}?n=5`)
+    fetch(`${config.API_URL}/twins/${encodeURIComponent(playerName)}?n=5&unit=${unit}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((data) => { if (!cancelled) setState({ status: 'ready', data }); })
-      .catch(() => { if (!cancelled) setState({ status: 'none', data: null }); });
+      .catch(() => {
+        if (cancelled) return;
+        if (unit === 'window' && !autoCareer.current) {
+          autoCareer.current = true;
+          setUnit('career');
+        } else {
+          setState({ status: 'none', data: null });
+        }
+      });
     return () => { cancelled = true; };
-  }, [playerName]);
+  }, [playerName, unit]);
+
+  const unitSwitch = (
+    <Box role="tablist" aria-label="Period" sx={{ display: 'inline-flex', alignSelf: 'flex-start', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
+      {UNITS.map(([key, name]) => (
+        <Box key={key} component="button" role="tab" aria-selected={key === unit} onClick={() => setUnit(key)}
+          sx={{
+            all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 12.5, px: 1.4, py: '2px',
+            borderRadius: '999px', bgcolor: key === unit ? colors.textHi : 'transparent', color: key === unit ? colors.bg : colors.textLo,
+            '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
+          }}>
+          {name}
+        </Box>
+      ))}
+    </Box>
+  );
 
   if (state.status === 'loading') return <Skeleton variant="rounded" height={160} sx={{ bgcolor: colors.surface2 }} />;
-  if (state.status !== 'ready' || !state.data.twins?.length) return fallback || null;
+  if (state.status !== 'ready' || !state.data.twins?.length) {
+    // A player who has a pool on one side gets the switch to try the other.
+    return autoCareer.current ? <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>{unitSwitch}{fallback || null}</Box>
+      : (fallback || null);
+  }
 
   const d = state.data;
   const [from, to] = (d.period || '').split('..');
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      {unitSwitch}
       <Box>
         <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18 }}>{d.unique ? 'No close twin' : 'Plays like'}</Box>
         {d.unique && (

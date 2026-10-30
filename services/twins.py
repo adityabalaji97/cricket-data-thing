@@ -80,8 +80,8 @@ def _load(db, unit: str, role: str, scope: str) -> List[Dict[str, Any]]:
     from sqlalchemy import text
 
     # Careers: only the latest window built (the nightly job writes today's; older ones stay until the next run).
-    latest = "AND period = (SELECT period FROM player_vectors WHERE unit = 'window' AND role = :r AND scope = :s " \
-             "ORDER BY built_at DESC LIMIT 1)" if unit == "window" else ""
+    latest = "AND period = (SELECT period FROM player_vectors WHERE unit = :u AND role = :r AND scope = :s " \
+             "ORDER BY built_at DESC LIMIT 1)" if unit in ("window", "career") else ""
     rows = db.execute(text(f"""
         SELECT period, player, balls, innings, kind, tracked_share, features FROM player_vectors
         WHERE unit = :u AND role = :r AND scope = :s AND qualified {latest}
@@ -242,11 +242,11 @@ VALUE_SHOWN = {
 }
 
 
-def latest_window(db, scope: str = "strong") -> Optional[str]:
+def latest_window(db, scope: str = "strong", unit: str = "window") -> Optional[str]:
     from sqlalchemy import text
 
-    return db.execute(text("SELECT period FROM player_vectors WHERE unit = 'window' AND scope = :s "
-                           "ORDER BY built_at DESC LIMIT 1"), {"s": scope}).scalar()
+    return db.execute(text("SELECT period FROM player_vectors WHERE unit = :u AND scope = :s "
+                           "ORDER BY built_at DESC LIMIT 1"), {"u": unit, "s": scope}).scalar()
 
 
 def role_of(db, player: str, unit: str, period: str, scope: str = "strong") -> Optional[str]:
@@ -285,14 +285,15 @@ def twins_for(db, player: str, unit: str = "window", period: Optional[str] = Non
               n: int = 5, scope: str = "strong") -> Dict[str, Any]:
     """The API's answer: "plays like" twins with their closest and furthest features, and both players' value side
     by side. Careers (unit window) compare within the window; seasons compare across every season (cross-era)."""
-    period = period or (latest_window(db, scope) if unit == "window" else None)
+    windowed = unit in ("window", "career")
+    period = period or (latest_window(db, scope, unit) if windowed else None)
     if not period:
         return {"player": player, "qualified": False, "twins": []}
     role = role or role_of(db, player, unit, period, scope)
     if not role:
         return {"player": player, "period": period, "qualified": False, "twins": []}
     rows = pool(db, unit, role, scope)
-    out = find_in(rows, player, period, role, "style", n, same_period=(unit == "window"))
+    out = find_in(rows, player, period, role, "style", n, same_period=windowed)
     if not out.get("qualified"):
         return {**out, "unit": unit}
     me = next(r for r in rows if r["player"] == out["player"] and r["period"] == period)
@@ -302,7 +303,7 @@ def twins_for(db, player: str, unit: str = "window", period: Optional[str] = Non
         t["gap_points"] = round(100 * t["distance"])
         t["values"] = compare_values(me, twin, role)
         t["compare"] = compare_rows(me, twin, role)
-    near = find_in(rows, out["player"], period, role, "style", MAP_N, same_period=(unit == "window"))["twins"]
+    near = find_in(rows, out["player"], period, role, "style", MAP_N, same_period=windowed)["twins"]
     stats = gap_stats(db, unit, role, scope)
     nearest = out["twins"][0]["distance"] if out["twins"] else None
     unique = bool(stats.get("p90") and nearest is not None and nearest > stats["p90"])
@@ -352,7 +353,7 @@ def store_gap_stats(db, unit: str, scope: str = "strong") -> Dict[str, Any]:
     for role in ("bat", "bowl", "allround"):
         _CACHE.pop((unit, role, scope), None)
         rows = pool(db, unit, role, scope)
-        out[role] = nearest_gap_stats(rows, role, same_period=(unit == "window"))
+        out[role] = nearest_gap_stats(rows, role, same_period=unit in ("window", "career"))
     db.execute(text("""
         INSERT INTO app_meta (key, value, updated_at) VALUES (:k, :v, now())
         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()

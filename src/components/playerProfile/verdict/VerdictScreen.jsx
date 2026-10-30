@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Box, Skeleton, Tooltip } from '@mui/material';
 import config from '../../../config';
 import { colors, fonts } from '../../../theme/hindsightDark';
@@ -109,26 +109,43 @@ const StripBlock = ({ role, block, keys, cue }) => {
   );
 };
 
-const useSummary = (player, fmt) => {
+const useSummary = (player, fmt, period) => {
   const [state, setState] = useState({ status: 'loading', data: null });
   useEffect(() => {
     if (!player) return undefined;
     let cancelled = false;
     setState({ status: 'loading', data: null });
-    fetch(`${config.API_URL}/player/${encodeURIComponent(player)}/summary?format=${fmt}`)
+    fetch(`${config.API_URL}/player/${encodeURIComponent(player)}/summary?format=${fmt}&period=${period}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((data) => { if (!cancelled) setState({ status: 'ready', data }); })
-      .catch((e) => { if (!cancelled) setState({ status: e === 404 ? 'empty' : 'error', data: null }); });
+      .catch((e) => {
+        if (!cancelled) setState({ status: e === 404 ? 'empty' : e === 503 ? 'busy' : 'error', data: null });
+      });
     return () => { cancelled = true; };
-  }, [player, fmt]);
+  }, [player, fmt, period]);
   return state;
 };
 
+const PERIOD_TABS = [['recent', 'Recent'], ['career', 'Career']];
+
 const VerdictScreen = ({ player, onStatus }) => {
   const [fmt, setFmt] = useState('T20');
-  const { status, data: s } = useSummary(player, fmt);
+  // Recent (the last few seasons) by default; a player with nothing recent (retired, or out since 2024) opens on
+  // Career, since 2015 (VERDICT_SCREEN_PLAN.md V10).
+  const [period, setPeriod] = useState('recent');
+  const autoCareer = useRef(false);
+  const { status, data: s } = useSummary(player, fmt, period);
+  // T20 Recent with nothing to show is the one case the page falls back to its old header.
+  const hidden = status !== 'ready' && status !== 'loading' && fmt === 'T20' && period === 'recent';
 
-  useEffect(() => { if (onStatus && fmt === 'T20') onStatus(status); }, [status, fmt, onStatus]);
+  useEffect(() => {
+    if (status === 'empty' && fmt === 'T20' && period === 'recent' && !autoCareer.current) {
+      autoCareer.current = true;
+      setPeriod('career');
+      return;
+    }
+    if (onStatus && fmt === 'T20') onStatus(hidden ? status : status === 'loading' ? 'loading' : 'ready');
+  }, [status, fmt, period, hidden, onStatus]);
 
   const header = (name, meta) => (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5 }}>
@@ -158,6 +175,19 @@ const VerdictScreen = ({ player, onStatus }) => {
           <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: 600, fontSize: 13, px: 1.5, py: '3px', color: colors.textGhost }}>Test</Box>
         </Tooltip>
       </Box>
+      <Box role="tablist" aria-label="Period" sx={{ display: 'inline-flex', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
+        {PERIOD_TABS.map(([key, name]) => (
+          <Box key={key} component="button" role="tab" aria-selected={key === period} onClick={() => setPeriod(key)}
+            sx={{
+              all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13, letterSpacing: '0.04em',
+              px: 1.5, py: '3px', borderRadius: '999px',
+              bgcolor: key === period ? colors.textHi : 'transparent', color: key === period ? colors.bg : colors.textLo,
+              '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
+            }}>
+            {name}
+          </Box>
+        ))}
+      </Box>
       {chip && (
         <Tooltip title={chip.long} enterTouchDelay={0}>
           <Box component="span" sx={{ fontSize: 12, color: colors.textLo }}>{chip.short}</Box>
@@ -184,12 +214,17 @@ const VerdictScreen = ({ player, onStatus }) => {
     );
   }
   if (status !== 'ready') {
-    if (fmt === 'T20') return null; // the page falls back to its old header
+    if (hidden) return null; // the page falls back to its old header
+    const when = period === 'career' ? 'since 2015' : `in the last ${fmt === 'ODI' ? 'three' : 'two'} years`;
+    const message = status === 'empty' ? `No ${fmt}s for ${player} ${when} against strong sides.`
+      : status === 'busy' ? (period === 'career' ? 'Career numbers are still being built. Try again in a minute.'
+        : 'Busy building another player. Try again in a few seconds.')
+        : "This couldn't load just now. Try again shortly.";
     return wrap(
       <>
         {header(player)}
         {formatSwitch(null)}
-        <Box sx={{ color: colors.textLo, fontSize: 14 }}>No {fmt}s for {player} in the last three years.</Box>
+        <Box sx={{ color: colors.textLo, fontSize: 14 }}>{message}</Box>
       </>,
     );
   }
