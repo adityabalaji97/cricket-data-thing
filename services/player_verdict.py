@@ -76,9 +76,21 @@ ROLES = {
 }
 
 
-def default_window(fmt: str, today: Optional[date] = None) -> tuple[date, date]:
+# "Career": everything since 2015, when Impact, win probability and ball tracking start (VERDICT_SCREEN_PLAN.md V10).
+CAREER_START = date(2015, 1, 1)
+PERIODS = ("recent", "career")
+
+
+def default_window(fmt: str, today: Optional[date] = None, period: str = "recent") -> tuple[date, date]:
     today = today or date.today()
+    if period == "career":
+        return CAREER_START, today
     return date(today.year - DEFAULT_YEARS[fmt], 1, 1), today
+
+
+class PoolsCold(RuntimeError):
+    """A career peer pool isn't built yet. They're built nightly (scripts/warm_verdict.py): over eleven seasons a cold
+    build can outrun Heroku's 30-second request limit, so a profile request never builds one."""
 
 
 def scope_params(fmt: str, scope: str) -> Dict[str, Any]:
@@ -166,7 +178,8 @@ def _query(db, fmt: str, **params) -> List[Dict[str, Any]]:
     return list((result or {}).get("data") or [])
 
 
-def _peer_pool(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[str, Any]) -> Dict[str, Any]:
+def _peer_pool(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[str, Any],
+               build: bool = True) -> Dict[str, Any]:
     """The role's qualified players in the window, trimmed to the strip metrics, with the floor that qualified
     them. Cached on its own: every player in the same format, scope and window shares it."""
     from services.qualification import qualifying_players
@@ -189,13 +202,19 @@ def _peer_pool(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[str,
                 "floor_label": label, "players": keep}
 
     key = {"kind": "verdict_peer_pool", "v": SUMMARY_VERSION, "fmt": fmt, "role": role, **window, **scope}
+    if not build:
+        from services.query_cache import cached_get
+        hit = cached_get(db, key)
+        if hit is None:
+            raise PoolsCold(f"{fmt} {role} pool for {window} not built yet")
+        return hit
     return cached_run(db, key, run)
 
 
 def _peer_strips(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[str, Any],
-                 me: Dict[str, Any]) -> Dict[str, Any]:
+                 me: Dict[str, Any], build: bool = True) -> Dict[str, Any]:
     r = ROLES[role]
-    pool = _peer_pool(db, fmt, role, window, scope)
+    pool = _peer_pool(db, fmt, role, window, scope, build)
     peers = pool["players"]
     name = me.get(r["group"])
     qualified = any(p["name"] == name for p in peers)
@@ -222,7 +241,7 @@ def _peer_strips(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[st
 
 
 def _role_block(db, fmt: str, role: str, player: str, window: Dict[str, Any],
-                scope: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+                scope: Dict[str, Any], build_pools: bool = True) -> Optional[Dict[str, Any]]:
     r = ROLES[role]
     base = {r["filter"]: [player], "metrics_perspective": r["perspective"], **window, **scope}
     overall_rows = _query(db, fmt, group_by=[r["group"]], **base)
@@ -238,13 +257,14 @@ def _role_block(db, fmt: str, role: str, player: str, window: Dict[str, Any],
         "overall": _slim(me, []),
         "seasons": [_slim(row, ["year"]) for row in years],
         "phases": [_slim(row, ["phase"]) for row in phases],
-        "peers": _peer_strips(db, fmt, role, window, scope, me),
+        "peers": _peer_strips(db, fmt, role, window, scope, me, build_pools),
     }
 
 
-def _form(db, fmt: str, player: str, end: date) -> Dict[str, Any]:
+def _form(db, fmt: str, player: str, end: date, since: Optional[date] = None) -> Dict[str, Any]:
     """Last FORM_GAMES matches in the format, bat and ball joined, whatever the scope (D3)."""
-    window = {"start_date": end - timedelta(days=FORM_LOOKBACK_DAYS), "end_date": end}
+    # Career: his last games whenever they were (a retired player's last 18 months are empty).
+    window = {"start_date": since or end - timedelta(days=FORM_LOOKBACK_DAYS), "end_date": end}
     every = scope_params(fmt, "all")
     games: Dict[str, Dict[str, Any]] = {}
     for role in ("bowl", "bat"):
@@ -365,13 +385,14 @@ def verdict_line(summary: Dict[str, Any]) -> Optional[str]:
 
 
 def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
-                  start_date: Optional[date] = None, end_date: Optional[date] = None) -> Dict[str, Any]:
-    default_start, default_end = default_window(fmt)
+                  start_date: Optional[date] = None, end_date: Optional[date] = None,
+                  period: str = "recent", build_pools: bool = True) -> Dict[str, Any]:
+    default_start, default_end = default_window(fmt, period=period)
     start, end = start_date or default_start, end_date or default_end
     window = {"start_date": start, "end_date": end}
     params = scope_params(fmt, scope)
 
-    roles = {role: _role_block(db, fmt, role, player, window, params) for role in ("bowl", "bat")}
+    roles = {role: _role_block(db, fmt, role, player, window, params, build_pools) for role in ("bowl", "bat")}
     roles = {k: v for k, v in roles.items() if v}
     primary, allrounder = classify_roles(
         {role: block["overall"] for role, block in roles.items()}
@@ -383,7 +404,7 @@ def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
         allrounder = False
 
     name = next((block["name"] for block in roles.values() if block.get("name")), player)
-    form = _form(db, fmt, player, end)
+    form = _form(db, fmt, player, end, start if period == "career" else None)
     summary = {
         "player": name,
         "format": fmt,
@@ -396,6 +417,7 @@ def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
         "roles": roles,
         "form": form["games"],
         "has_wins_added": fmt == "T20",
+        "period": period,
         "version": SUMMARY_VERSION,
     }
     summary["identity"] = _identity(db, fmt, player, name, roles, window) if roles else {}
@@ -418,12 +440,15 @@ class SummaryBusy(RuntimeError):
 
 
 def get_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
-                start_date: Optional[date] = None, end_date: Optional[date] = None) -> Dict[str, Any]:
+                start_date: Optional[date] = None, end_date: Optional[date] = None,
+                period: str = "recent", build_pools: Optional[bool] = None) -> Dict[str, Any]:
     """build_summary through the persistent result cache (fresh after every data load)."""
     from services.query_cache import cached_get
 
     key = {"kind": "player_verdict", "v": SUMMARY_VERSION, "player": player.strip().lower(),
-           "fmt": fmt, "scope": scope, "start_date": start_date, "end_date": end_date}
+           "fmt": fmt, "scope": scope, "start_date": start_date, "end_date": end_date, "period": period}
+    if build_pools is None:  # career pools come from the nightly warm, never a profile request
+        build_pools = period != "career"
     if end_date is None:
         # A default window ends today; key it by day so it rolls over.
         key["day"] = date.today()
@@ -436,6 +461,6 @@ def get_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
     if not _BUILD_SLOT.acquire(timeout=BUILD_WAIT_SECONDS):
         raise SummaryBusy("another player summary is being built")
     try:
-        return cached_run(db, key, lambda: build_summary(db, player, fmt, scope, start_date, end_date))
+        return cached_run(db, key, lambda: build_summary(db, player, fmt, scope, start_date, end_date, period, build_pools))
     finally:
         _BUILD_SLOT.release()

@@ -24,6 +24,7 @@ for all-rounders especially. It must load in under a second on a phone before th
 | V6 | Form chips by runs above par | [x] 2026-10-28 (chips by runs above par, glyphs, dashed where no par) |
 | V7 | Share image `/img/player/<id>.png` + OG tags | [x] 2026-10-28 (api/og.mjs verdict card + meta from /summary; PR) |
 | V8 | ODI variant | [ ] |
+| V10 | Recent / Career switch (career since 2015; auto for players with nothing recent) | [x] 2026-10-30 (PR) |
 | V9 | Pre-warm cache for upcoming fixtures' squads | [x] 2026-10-28 (scripts/warm_verdict.py, nightly; PR #229) |
 
 **Deadline: V1–V7 live by 9 Dec 2026, a week before the IPL 2027 auction (16 Dec, Goa). See SOCIAL_CALENDAR.md.**

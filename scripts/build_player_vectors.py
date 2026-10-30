@@ -49,6 +49,7 @@ def main() -> int:
     parser.add_argument("--season", type=int)
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--window", action="store_true")
+    parser.add_argument("--career", action="store_true", help="careers since 2015 (the profile's Career switch)")
     parser.add_argument("--scope", default="strong", choices=["strong", "all"])
     args = parser.parse_args()
 
@@ -62,7 +63,10 @@ def main() -> int:
     if args.window:
         start, end = default_window("T20", today)
         jobs.append(("window", f"{start.isoformat()}..{end.isoformat()}", start, end))
-    else:
+    if args.career:
+        start, end = default_window("T20", today, period="career")
+        jobs.append(("career", f"{start.isoformat()}..{end.isoformat()}", start, end))
+    if not (args.window or args.career):
         seasons = ([args.season] if args.season else
                    list(range(FIRST_SEASON, today.year + 1)) if args.all else [today.year - 1, today.year])
         jobs += [("season", str(y), date(y, 1, 1), min(date(y, 12, 31), today)) for y in seasons]
@@ -74,10 +78,10 @@ def main() -> int:
             write(db, unit, period, role, args.scope, vectors)
             log.info("%s %s %s: %d players, %d qualified (%s+ balls), %.0fs", unit, period, role, len(vectors),
                      len(qual["players"]), qual["floor"], time.time() - t)
-        if unit == "window":  # one career window at a time: drop yesterday's
+        if unit in ("window", "career"):  # one window at a time: drop yesterday's
             from sqlalchemy import text
-            gone = db.execute(text("DELETE FROM player_vectors WHERE unit = 'window' AND scope = :s AND period <> :p"),
-                              {"s": args.scope, "p": period}).rowcount
+            gone = db.execute(text("DELETE FROM player_vectors WHERE unit = :u AND scope = :s AND period <> :p"),
+                              {"u": unit, "s": args.scope, "p": period}).rowcount
             db.commit()
             log.info("dropped %d rows of older windows", gone)
     # How far players' nearest twins usually are (the "no close twin" line on the profile): per unit and role.

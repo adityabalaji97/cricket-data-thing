@@ -78,7 +78,9 @@ const ORD = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ({ 1: 'st', 2:
 // The verdict screen's numbers (GET /player/{name}/summary, VERDICT_SCREEN_PLAN.md V7): the verdict line, wins added
 // by season for each role shown, and the player's three best ranks. Null when there's no summary (the old card).
 async function verdictSummary(name) {
-  const s = await getJSON(`/player/${encodeURIComponent(name)}/summary`, 8000);
+  // Recent first; a player with nothing recent (retired) gets his career (since 2015).
+  const s = (await getJSON(`/player/${encodeURIComponent(name)}/summary`, 8000))
+    || (await getJSON(`/player/${encodeURIComponent(name)}/summary?period=career`, 8000));
   if (!s || !s.roles || !Object.keys(s.roles).length) return null;
   const main = s.primary_role;
   const shown = [main, main === 'bowl' ? 'bat' : 'bowl'].filter((r) => s.roles[r] && (r === main || s.allrounder));
