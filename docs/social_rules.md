@@ -77,7 +77,7 @@ One term per idea, the same everywhere: cards, captions, threads, Reels.
 
 - A reply to a viral take is one tweet under 280 characters with four image cards.
 - A thread's first tweet carries the lead chart (slide 2) with the hook and its claim, not a text-only cover: X gives native images more reach, and the first 30 minutes decide most of it. Links only in the last tweet.
-- In a thread, a player's first mention is a hashtag; each tweet ends with the lead tag and #CricketTwitter; credit @himganj153 and @TechRadar9; the last tweet links the post's page.
+- In a thread, a player's first mention is a hashtag; each tweet ends with the lead tag and #CricketTwitter; credit @himganj153 and @TechRadar9; the last tweet links the post's page. Hand-written threads go through services/ig_x.hand_thread (it applies the tags), and social_rules.thread_problems checks them before a post is queued.
 
 ## Appeal
 

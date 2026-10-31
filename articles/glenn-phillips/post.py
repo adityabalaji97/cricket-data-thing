@@ -17,6 +17,8 @@ import sys
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
+from sqlalchemy import text  # noqa: E402
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
@@ -40,6 +42,8 @@ LENGTHS = ["FULL", "GOOD_LENGTH", "SHORT_OF_A_GOOD_LENGTH"]  # spinners rarely b
 FAMILIES = [("DRIVE", "Drives"), ("PULL_HOOK", "Pulls"), ("CUT", "Cuts"), ("FLICK_GLANCE", "Flicks"),
             ("WORK_PUSH", "Pushes"), ("SLOG", "Slogs"), ("DEFENCE", "Defence")]
 LONG_OFF = 5  # wagon zone, right-hander
+
+THREAD_PLAYERS = [GP, "Axar Patel"]  # each one's first mention in the thread becomes a hashtag
 
 
 def sg(v, d=1):
@@ -308,7 +312,7 @@ def thread(b, link):
     lead, rb, top = st["lead"], st["runs_best"], hn["top"]
     texts = [
         f"82*, 70, 17, 107. Glenn Phillips has {rb['runs']} runs in 4 T20Is v India, the most he's made in any 4 straight "
-        f"T20 innings. {sg(lead['raa'], 0)} runs above par: his best T20I run by {st['gap']:.0f}. 🧵\n#NZvIND",
+        f"T20 innings. {sg(lead['raa'], 0)} runs above par: his best T20I run by {st['gap']:.0f}. 🧵",
         f"The {top[0]['runs']} in Auckland was {sg(top[0]['raa'], 0)} runs above par, his best T20I innings. Next best: "
         f"{top[1]['runs']} v {top[1]['opp']}, {when(top[1]['date'])} ({sg(top[1]['raa'], 0)}).",
         f"Faster in every phase. Powerplay: {ph['s']['powerplay']['strike_rate']:.0f} runs per 100 balls, from "
@@ -327,11 +331,9 @@ def thread(b, link):
         f"Since 2024, spin on a good length holds him to {pl['gl']['strike_rate']:.0f}. Axar got him that way in game 3.",
         f"Spin, early, on a good length?\n\nEvery ball, free: {link}\nData: @himganj153 & @TechRadar9",
     ]
-    out = []
-    for n_, x in enumerate(texts, 1):
-        assert len(x) <= 280, (n_, len(x), x)
-        out.append({"n": n_, "slide": n_, "text": x})
-    return out
+    from services.ig_x import hand_thread
+
+    return hand_thread(texts, copy(b)[1], THREAD_PLAYERS)
 
 
 def reel_script(b):
@@ -358,11 +360,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--base", default=SITE)
+    parser.add_argument("--thread-only", action="store_true", help="replace the queued pack's X thread, nothing else")
     args = parser.parse_args()
     if args.write:
         assert "localhost" not in os.environ.get("DATABASE_URL", ""), "--write is production: leave DATABASE_URL unset"
     from database import get_session
-    from services.social_rules import findings, hook_problem
+    from services.social_rules import findings, hook_problem, thread_problems
 
     db = next(get_session())
     b = build(db)
@@ -379,12 +382,23 @@ def main() -> int:
     th = thread(b, "hindsightcricket.com")
     for t in th:
         print(f"--- tweet {t['n']} ({len(t['text'])})\n{t['text']}")
+    tp = thread_problems(th, THREAD_PLAYERS)
+    print("thread:", tp or "ok")
+    if args.thread_only and not tp:
+        from database import engine
+        from services.ig_backlog import set_thread
+        from services.ig_links import post_link
+
+        with engine.begin() as conn:
+            fact = conn.execute(text("SELECT facts FROM content_packs WHERE angle_key = :k"), {"k": f"ig:{KEY}"}).scalar()
+            print("thread replaced:", set_thread(conn, KEY, thread(b, post_link(fact))), "pack")
+        return 0
     (HERE / "reel.json").write_text(json.dumps(reel_script(b), indent=1))
     print("REEL:", json.dumps(reel_script(b)))
     (HERE / "slides.json").write_text(json.dumps({"slides": slides, "hook": hook, "caption": caption, "x": th},
                                                  default=str, indent=1))
-    if problems or hp or not args.write:
-        return 1 if (problems or hp) else 0
+    if problems or hp or tp or not args.write:
+        return 1 if (problems or hp or tp) else 0
 
     from database import engine
     from services import ig_backlog, ig_carousel, ig_slides
