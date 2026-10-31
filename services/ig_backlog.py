@@ -965,3 +965,11 @@ def reels_pending() -> Dict[str, Any]:
     made = [cid for cid, n in rows if n and ig_slides.reel_from_stored(cid, n)]
     voiced = [cid for cid, n in unvoiced if n and cid not in made and ig_slides.reel_from_stored(cid, n)]
     return {"made": len(made), "missing": len(rows) - len(made), "voiced": len(voiced), "unvoiced": len(unvoiced) - len(voiced)}
+
+
+def set_thread(conn, key: str, tweets: List[Dict[str, Any]]) -> int:
+    """Replace a queued pack's X thread (facts.x) without re-rendering its slides or Reel. Returns the rows updated."""
+    return conn.execute(text("""
+        UPDATE content_packs SET facts = jsonb_set(COALESCE(facts, '{}'::jsonb), '{x}', CAST(:x AS jsonb))
+        WHERE angle_key = :k
+    """), {"k": f"ig:{key}", "x": json.dumps(tweets)}).rowcount

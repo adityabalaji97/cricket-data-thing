@@ -164,6 +164,25 @@ def lint_slides(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> Lis
     return [f"Slide {f['slide']}: {f['message']}" if f["slide"] else f["message"] for f in findings(slides, kind)]
 
 
+def thread_problems(tweets: List[Dict[str, Any]], players: Optional[List[str]] = None) -> List[str]:
+    """X thread rules a thread breaks (docs/social_rules.md, X): every tweet ends with #CricketTwitter, every named
+    player is a hashtag at least once, and no tweet is over 280. services/ig_x.hand_thread applies them."""
+    from services.ig_x import ALWAYS_TAG, LIMIT, weight
+
+    out = []
+    for t in tweets or []:
+        text = t.get("text") or ""
+        if ALWAYS_TAG.lower() not in text.lower():
+            out.append(f"tweet {t.get('n')}: no {ALWAYS_TAG}")
+        if weight(text) > LIMIT:
+            out.append(f"tweet {t.get('n')}: {weight(text)} characters")
+    joined = " ".join(t.get("text") or "" for t in tweets or [])
+    for name in players or []:
+        if "#" + re.sub(r"[^A-Za-z0-9]", "", name) not in joined:
+            out.append(f"{name} is never a hashtag")
+    return out
+
+
 def hook_problem(hook: str) -> Optional[str]:
     """Why a Reel hook breaks the Reel rules (a number, no metric names), or None."""
     h = (hook or "").strip()
