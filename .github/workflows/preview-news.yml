@@ -29,6 +29,7 @@ jobs:
       # Talking points from the headlines (scripts/build_storylines.py, chunk 2): one model call a fixture, Jev ranks
       # them, the top 5 wait 'pending' in /admin/storylines. Nothing reaches a preview until approved there.
       - name: Talking points
+        if: ${{ vars.AUTO_POSTS == '1' }}  # automatic posts are off (PITCH_BRIEF_PLAN.md); set AUTO_POSTS=1 to restore
         continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -36,6 +37,7 @@ jobs:
         run: python scripts/build_storylines.py
       # Approved points answered again from the data (chunk 3): the numbers move with every match.
       - name: Re-test approved storylines
+        if: ${{ vars.AUTO_POSTS == '1' }}  # automatic posts are off (PITCH_BRIEF_PLAN.md); set AUTO_POSTS=1 to restore
         continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

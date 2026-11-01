@@ -13,6 +13,8 @@ on:
 
 jobs:
   radar:
+    # automatic posts are off (PITCH_BRIEF_PLAN.md); set the AUTO_POSTS repository variable to 1 to restore
+    if: ${{ vars.AUTO_POSTS == '1' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
