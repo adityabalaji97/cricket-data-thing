@@ -34,7 +34,7 @@ FINAL = date(2026, 3, 8)  # the World Cup final, Ahmedabad
 SINCE = {**T20I, "start_date": FINAL + timedelta(days=1), "end_date": date(2026, 10, 31)}
 UP_TO = {**T20I, "start_date": YEAR_START, "end_date": FINAL}
 TODAY = "4 off 10"  # Sanju in Hamilton today (user, 1 Nov 2026): text only
-THREAD_PLAYERS = [SANJU, VAIBHAV, ABHISHEK]  # each one's first mention in the thread becomes a hashtag
+THREAD_PLAYERS = OPENERS  # each one's first mention in the thread becomes a hashtag
 TEAM_SHORT = {"India": "IND", "England": "ENG", "New Zealand": "NZ", "West Indies": "WI", "Australia": "AUS",
               "South Africa": "RSA", "Pakistan": "PAK", "Sri Lanka": "SL", "Afghanistan": "AFG"}
 CITY = {"Eden Gardens": "Kolkata", "Wankhede Stadium": "Mumbai", "Narendra Modi Stadium": "Ahmedabad"}
@@ -71,25 +71,37 @@ def short(name):
 
 # ---- slides -----------------------------------------------------------------------------------------------------
 
-def scores_card(db):
-    """Every opener's innings since the World Cup final, as shares: 50+, 10-49, under 10."""
-    rows, raw = [], {}
+def after10_card(db):
+    """Each opener's typical (median) innings after 10 balls since the World Cup final: his running Impact (runs against
+    par for the match situation, the wicket's cost included) at his 10th ball, or at the end of a shorter innings.
+    Per-ball Impact is ball_metrics', the same numbers the query builder sums."""
+    import statistics
+
+    rows_ = db.execute(text("""
+        SELECT d.bat, d.p_match, d.inns, d.ball_id, b.impact
+        FROM delivery_details d JOIN ball_metrics b ON b.delivery_id = d.id
+        WHERE d.bat = ANY(:p) AND d.competition = 'T20I' AND d.ballfaced = 1
+          AND d.match_date >= :a AND d.match_date <= :b
+        ORDER BY d.bat, d.p_match, d.inns, d.ball_id"""),
+        {"p": OPENERS, "a": str(SINCE["start_date"]), "b": str(SINCE["end_date"])}).mappings().all()
+    run = {}
+    for r in rows_:
+        key = (r["bat"], r["p_match"], r["inns"])
+        balls = run.setdefault(key, [])
+        balls.append((balls[-1] if balls else 0.0) + (r["impact"] or 0.0))
+    raw = {}
     for p in OPENERS:
-        inns = q(db, batters=[p], group_by=["match_id"], **SINCE)
-        n = len(inns)
-        low = sum(1 for r in inns if r["runs"] < 10)
-        big = sum(1 for r in inns if r["runs"] >= 50)
-        raw[p] = {"n": n, "low": low, "big": big}
-        rows.append({"name": short(p), "detail": f"{n} innings",
-                     "segments": [{"key": "big", "value": round(100 * big / n)},
-                                  {"key": "mid", "value": 100 - round(100 * big / n) - round(100 * low / n)},
-                                  {"key": "low", "value": round(100 * low / n)}]})
-    s = raw[SANJU]
-    c = card("scores", "share_bars",
-             f"Sanju Samson: single figures in {s['low']} of {s['n']} T20Is since the World Cup final",
-             {"groups": [{"key": "big", "label": "50+"}, {"key": "mid", "label": "10-49"}, {"key": "low", "label": "Under 10"}],
-              "format": "pct0", "rows": rows},
-             "India's openers in T20Is, 9 Mar to 31 Oct 2026 · share of innings by score")
+        at10 = [b[min(9, len(b) - 1)] for (who, _m, _i), b in run.items() if who == p]
+        raw[p] = {"median": statistics.median(at10), "n": len(at10), "ahead": sum(1 for v in at10 if v > 0)}
+    rows = [{"name": short(p), "value": round(raw[p]["median"], 1), "highlight": p == SANJU,
+             "detail": f"{raw[p]['n']} innings"} for p in sorted(OPENERS, key=lambda p: -raw[p]["median"])]
+    s, a = raw[SANJU]["median"], raw[ABHISHEK]["median"]
+    assert s < 0 < a, "the comparison the cover makes no longer holds"
+    c = card("after10", "metric_bars",
+             f"After 10 balls, Sanju's typical innings has cost India {abs(s):.0f} runs; Abhishek's adds {a:.0f}",
+             {"metric": {"label": "Runs against par after 10 balls, typical innings", "format": "signed1"},
+              "label_width": 150, "rows": rows},
+             "T20Is since the World Cup final · median innings · runs against par, wicket cost included")
     return c, raw
 
 
@@ -134,25 +146,6 @@ def par_card(db):
     return c, {"since": since, "up": up}
 
 
-def start_card(db):
-    """The first 10 balls of every innings since the final: strike rate against balls per dismissal, India's top order."""
-    rows = [r for r in q(db, group_by=["batter"], batting_teams=["India"], dimension_filters=["batter_ball_number:lte:10"],
-                         min_balls=40, **SINCE) if r["wickets"]]
-    pts = []
-    for i, r in enumerate(sorted(rows, key=lambda r: -r["strike_rate"]), 1):
-        pts.append({"name": r["batter"], "short": short(r["batter"]), "x": round(r["balls"] / r["wickets"], 1),
-                    "y": round(r["strike_rate"]), "highlight": r["batter"] == SANJU})
-    for n, p in enumerate([p for p in pts if not p["highlight"]][:5], 1):
-        p["label"] = n
-    s = next(p for p in pts if p["highlight"])
-    c = card("start", "scatter_plus",
-             f"Sanju's first 10 balls: {s['y']} runs per 100, {s['x']:.0f} balls per wicket",
-             {"x": {"label": "balls per dismissal", "format": "dec1", "higher_better": True},
-              "y": {"label": "strike rate", "format": "int", "higher_better": True}, "points": pts, "box": True},
-             "First 10 balls of each innings · India in T20Is since 9 Mar 2026 · 40+ balls", kicker="The start")
-    return c, {"s": s, "pts": pts}
-
-
 def wins_card(db, since):
     rows = [{"name": short(p), "value": round(since[p]["wpa"], 2), "highlight": p == SANJU} for p in
             sorted(OPENERS, key=lambda p: -since[p]["wpa"])]
@@ -168,30 +161,35 @@ def wins_card(db, since):
 
 
 def build(db):
-    lead, sc = scores_card(db)
+    lead, a10 = after10_card(db)
     wc, wn = worldcup_card(db)
     par, pr = par_card(db)
-    start, st = start_card(db)
     wins, wi = wins_card(db, pr["since"])
-    return {"lead": lead, "cards": [wc, par, start, wins], "sc": sc, "wn": wn, "pr": pr, "st": st, "wi": wi}
+    return {"lead": lead, "cards": [wc, par, wins], "a10": a10, "wn": wn, "pr": pr, "wi": wi}
+
+
+def _r(v):
+    return f"{abs(v):.0f}"
 
 
 def copy(b):
-    sc, wn, pr, st, wi = (b[k] for k in ("sc", "wn", "pr", "st", "wi"))
+    a10, wn, pr, wi = (b[k] for k in ("a10", "wn", "pr", "wi"))
     s, v, a = pr["since"][SANJU], pr["since"][VAIBHAV], pr["since"][ABHISHEK]
-    low, n = sc[SANJU]["low"], sc[SANJU]["n"]
-    hook = f"Sanju Samson: {TODAY} today, single figures in {low + 1} of {n + 1} T20Is since the World Cup final"
+    t = {p: a10[p]["median"] for p in OPENERS}
+    hook = f"After 10 balls, Sanju's typical innings has cost India {_r(t[SANJU])} runs. Abhishek's has added {_r(t[ABHISHEK])}."
     caption = "\n\n".join([
-        f"Sanju Samson made {TODAY} opening in Hamilton today. Since the World Cup final in March, that's single figures "
-        f"in {low + 1} of {n + 1} T20Is (today's match isn't in our ball-by-ball yet; the charts run to 31 Oct).",
-        f"The case for him first: 97, 89 and 89 in his last three World Cup innings, {wn['share']:.0f}% of his runs above "
-        f"par this year. India won all three.",
+        f"Sanju Samson made {TODAY} opening in Hamilton today. Since the World Cup final, his typical T20I innings has "
+        f"cost India {_r(t[SANJU])} runs by the time he's faced 10 balls. Abhishek Sharma's has added {_r(t[ABHISHEK])}, "
+        f"Ishan Kishan's {_r(t[ISHAN])}, and Vaibhav Sooryavanshi's has about broken even.",
+        "(Runs against par for the match situation, with the cost of a wicket included; the typical innings is the "
+        "middle one. Today's match isn't in our ball-by-ball yet: the charts run to 31 Oct.)",
+        f"The case for him: 97, 89 and 89 in his last three World Cup innings, {wn['share']:.0f}% of his runs above par "
+        f"this year. India won all three.",
         f"Since the final he's {sg(s['raa_per_100'], 0)} runs above par per 100 balls (he was "
-        f"{sg(pr['up']['raa_per_100'], 0)} up to it). Vaibhav Sooryavanshi, in {v['innings_count']} T20Is, is "
-        f"{sg(v['raa_per_100'], 0)}; Abhishek Sharma {sg(a['raa_per_100'], 0)}.",
-        f"The start is the difference: in his first 10 balls Sanju scores at {st['s']['y']}, with "
-        f"{st['s']['x']:.0f} balls per wicket. Since the final his batting has taken {abs(wi['s']) * 100:.0f} percentage points off "
-        f"India's win chances; Vaibhav's has added {wi['v'] * 100:.0f}.",
+        f"{sg(pr['up']['raa_per_100'], 0)} up to it). Vaibhav, in {v['innings_count']} T20Is, is "
+        f"{sg(v['raa_per_100'], 0)}; Abhishek {sg(a['raa_per_100'], 0)}. Sanju's batting has taken "
+        f"{abs(wi['s']) * 100:.0f} percentage points off India's win chances since the final; Vaibhav's has added "
+        f"{wi['v'] * 100:.0f}.",
         "T20Is to 31 Oct 2026. Runs above par and wins added: T20 Primer method. Ball-by-ball data: Himanish Ganjoo & "
         "TechRadar, Cricsheet.",
         "Sanju or Vaibhav at the top?",
@@ -201,18 +199,18 @@ def copy(b):
 
 
 def thread(b, link):
-    sc, wn, pr, st, wi = (b[k] for k in ("sc", "wn", "pr", "st", "wi"))
+    a10, wn, pr, wi = (b[k] for k in ("a10", "wn", "pr", "wi"))
     s, v, a = pr["since"][SANJU], pr["since"][VAIBHAV], pr["since"][ABHISHEK]
-    low, n = sc[SANJU]["low"], sc[SANJU]["n"]
+    t = {p: a10[p]["median"] for p in OPENERS}
     texts = [
-        f"Sanju Samson made {TODAY} today. Since the World Cup final: single figures in {low + 1} of {n + 1} T20Is. 🧵",
-        f"The case for him: 97, 89 and 89 in his last three World Cup innings, {wn['share']:.0f}% of his runs above par "
+        f"Sanju Samson made {TODAY} today. After 10 balls, his typical innings since the World Cup final has cost India "
+        f"{_r(t[SANJU])} runs. Abhishek Sharma's has added {_r(t[ABHISHEK])}. 🧵",
+        f"Runs against par for the match situation, wicket cost included. Ishan Kishan: {sg(t[ISHAN], 0)}. Vaibhav "
+        f"Sooryavanshi: about even ({a10[VAIBHAV]['n']} innings).",
+        f"The case for Sanju: 97, 89 and 89 in his last three World Cup innings, {wn['share']:.0f}% of his runs above par "
         f"this year. India won all three.",
         f"Since the final: Sanju {sg(s['raa_per_100'], 0)} runs above par per 100 balls (from "
-        f"{sg(pr['up']['raa_per_100'], 0)}). Vaibhav Sooryavanshi {sg(v['raa_per_100'], 0)} in {v['innings_count']} T20Is. "
-        f"Abhishek Sharma {sg(a['raa_per_100'], 0)}.",
-        f"The start is the gap: in his first 10 balls Sanju scores at {st['s']['y']}, with {st['s']['x']:.0f} "
-        f"balls per wicket.",
+        f"{sg(pr['up']['raa_per_100'], 0)}). Vaibhav {sg(v['raa_per_100'], 0)}. Abhishek {sg(a['raa_per_100'], 0)}.",
         f"Wins added since the final: Vaibhav {sg(wi['v'], 2)}, Sanju {sg(wi['s'], 2)}. His batting has taken "
         f"{abs(wi['s']) * 100:.0f} percentage points off India's win chances.",
         f"Sanju or Vaibhav at the top?\n\nEvery ball, free: {link}\nData: @himganj153 & @TechRadar9",
@@ -223,16 +221,17 @@ def thread(b, link):
 
 
 def reel_script(b):
-    sc, wn, pr, st, wi = (b[k] for k in ("sc", "wn", "pr", "st", "wi"))
+    a10, wn, pr, wi = (b[k] for k in ("a10", "wn", "pr", "wi"))
     s, v = pr["since"][SANJU], pr["since"][VAIBHAV]
-    low, n = sc[SANJU]["low"], sc[SANJU]["n"]
-    return {"hook": f"Sanju Samson made 4 off 10 today. That's {low + 1} single-figure scores in {n + 1} innings since the World Cup final.",
-            "lines": ["Before that: 97, 89 and 89 in his last three World Cup innings. India won all three.",
-                      f"Since the final, he's {s['raa_per_100']:.0f} runs above par per 100 balls. "
-                      f"Vaibhav Sooryavanshi is {v['raa_per_100']:.0f}.",
-                      f"In his first 10 balls, Sanju scores at {st['s']['y']} and falls every {st['s']['x']:.0f} balls.",
-                      f"Since the final, his batting has taken {abs(wi['s']) * 100:.0f} percentage points off India's "
-                      f"win chances. Vaibhav's has added {wi['v'] * 100:.0f}."]}
+    t = {p: a10[p]["median"] for p in OPENERS}
+    return {"hook": f"Sanju Samson made 4 off 10 today. After 10 balls, his typical innings costs India {_r(t[SANJU])} runs. "
+                    f"Abhishek's adds {_r(t[ABHISHEK])}.",
+            "lines": ["Ishan adds one. Vaibhav Sooryavanshi breaks about even.",
+                      "The case for Sanju: 97, 89 and 89 in his last three World Cup innings. India won all three.",
+                      f"But since the final, he's {s['raa_per_100']:.0f} runs above par per 100 balls. "
+                      f"Vaibhav is {v['raa_per_100']:.0f}.",
+                      f"And his batting has taken {abs(wi['s']) * 100:.0f} percentage points off India's win chances. "
+                      f"Vaibhav's has added {wi['v'] * 100:.0f}."]}
 
 
 def slides_of(b, hook):
@@ -310,7 +309,7 @@ def main() -> int:
     print(f"rendered {len(r['ok'])}/{n}" + (f", failed {r['failed']}" if r["failed"] else "") + f"; layout {r.get('layout') or 'clean'}")
     # Reels are always voiced (the user's rule): the hand script replaces whatever the render stored.
     env = {**os.environ, "REEL_V2": "1", "REEL_AB": "0"}
-    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "2,3,4,5",
+    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "1,2,3,4",
                            "--script", str(HERE / "reel.json"), "--close", "Sanju or Vaibhav at the top?", "--base", args.base,
                            "--store"], env=env, capture_output=True, text=True)
     ok = "stored as the post's Reel" in done.stdout
