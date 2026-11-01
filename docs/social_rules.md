@@ -83,3 +83,9 @@ One term per idea, the same everywhere: cards, captions, threads, Reels.
 
 - What draws strangers on Instagram (77-83% of views come from non-followers through the Reels tab): one named player with one striking number, such as a record, a home-ground figure, or two innings compared.
 - What doesn't: ground statistics, a result already seen the night before, or a debate that is trending on X but needs our own metric to explain.
+
+## Reel insights (1 Nov 2026)
+
+- Views follow the share still watching after the first second: about 70% or more held means 1.1k-1.9k views; about 50-55% means 340-820. Nearly every view is from a non-follower (about 80% from the Reels tab, 20% from Explore).
+- Open on an Indian player's name and a striking claim in the first second. Openings on another team ("New Zealand made 259") or on nostalgia ("4 years ago today") lost viewers.
+
