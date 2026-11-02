@@ -299,6 +299,21 @@ def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[
     return tweets
 
 
+def hand_thread(texts: List[str], caption: str, players: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    """A hand-written thread with the thread rules applied (docs/social_rules.md, X): each player's first mention as a
+    hashtag, and every tweet ending with the post's lead tag (the caption's first tag, e.g. #NZvIND) and
+    #CricketTwitter. Write the texts without those tags; a tweet that no longer fits raises, so it gets rewritten,
+    not cut."""
+    tags = " ".join(thread_tags(caption))
+    out = []
+    for n, text in enumerate(tag_players(texts, players or []), start=1):
+        tweet = f"{text.rstrip()}\n{tags}"
+        if _weight(tweet) > LIMIT:
+            raise ValueError(f"tweet {n} is {_weight(tweet)} characters with its tags ({LIMIT} max): {tweet!r}")
+        out.append({"n": n, "slide": n, "text": tweet})
+    return out
+
+
 def weight(text: str) -> int:
     """A tweet's length as X counts it (links as 23)."""
     return _weight(text)

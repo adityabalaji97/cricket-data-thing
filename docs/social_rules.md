@@ -77,9 +77,15 @@ One term per idea, the same everywhere: cards, captions, threads, Reels.
 
 - A reply to a viral take is one tweet under 280 characters with four image cards.
 - A thread's first tweet carries the lead chart (slide 2) with the hook and its claim, not a text-only cover: X gives native images more reach, and the first 30 minutes decide most of it. Links only in the last tweet.
-- In a thread, a player's first mention is a hashtag; each tweet ends with the lead tag and #CricketTwitter; credit @himganj153 and @TechRadar9; the last tweet links the post's page.
+- In a thread, a player's first mention is a hashtag; each tweet ends with the lead tag and #CricketTwitter; credit @himganj153 and @TechRadar9; the last tweet links the post's page. Hand-written threads go through services/ig_x.hand_thread (it applies the tags), and social_rules.thread_problems checks them before a post is queued.
 
 ## Appeal
 
 - What draws strangers on Instagram (77-83% of views come from non-followers through the Reels tab): one named player with one striking number, such as a record, a home-ground figure, or two innings compared.
 - What doesn't: ground statistics, a result already seen the night before, or a debate that is trending on X but needs our own metric to explain.
+
+## Reel insights (1 Nov 2026)
+
+- Views follow the share still watching after the first second: about 70% or more held means 1.1k-1.9k views; about 50-55% means 340-820. Nearly every view is from a non-follower (about 80% from the Reels tab, 20% from Explore).
+- Open on an Indian player's name and a striking claim in the first second. Openings on another team ("New Zealand made 259") or on nostalgia ("4 years ago today") lost viewers.
+

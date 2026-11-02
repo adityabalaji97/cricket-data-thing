@@ -1337,6 +1337,93 @@ const TwinCloud = ({ payload }) => {
   );
 };
 
+
+/**
+ * Every game of a stretch in order, two lanes on one x-axis: the top lane a per-game rate (India's runs an over),
+ * each dot filled when a marked player played and hollow when he didn't; the bottom lane a signed per-game value
+ * (No. 5-8 Impact) as bars from zero. Periods are shaded and labelled, and each lane carries its period averages as
+ * dashed lines with their values, so cause (who played) and effect (what moved) read as one picture.
+ * payload: {games:[{label, period, top, bottom, marked}], periods:[{key, label}], top:{label, format, higher_better},
+ *           bottom:{label, format}, marked_label, unmarked_label}
+ */
+const GameTimeline = ({ payload }) => {
+  const { games, periods } = payload;
+  const W = 300; const L = 4; const R = 4; const n = games.length;
+  const T1 = 28; const H1 = 92; const GAP = 30; const T2 = T1 + H1 + GAP; const H2 = 92; const H = T2 + H2 + 6;
+  const x = (i) => L + ((i + 0.5) / n) * (W - L - R);
+  const bw = Math.max(1.2, ((W - L - R) / n) * 0.62);
+  const tops = games.map((g) => g.top).filter((v) => v != null);
+  const tmin = Math.floor(Math.min(...tops)); const tmax = Math.ceil(Math.max(...tops));
+  const ty = (v) => T1 + H1 - ((v - tmin) / (tmax - tmin || 1)) * H1;
+  const bots = games.map((g) => g.bottom ?? 0);
+  const bmax = Math.max(1, ...bots.map(Math.abs));
+  const by0 = T2 + H2 / 2;
+  const by = (v) => by0 - (v / bmax) * (H2 / 2);
+  const spans = periods.map((p) => {
+    const idx = games.map((g, i) => (g.period === p.key ? i : -1)).filter((i) => i >= 0);
+    const avg = (k) => {
+      const vals = idx.map((i) => games[i][k]).filter((v) => v != null);
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    };
+    return { ...p, i0: idx[0], i1: idx[idx.length - 1], n: idx.length, topAvg: avg('top'), botAvg: avg('bottom') };
+  }).filter((p) => p.n);
+  const edge = (i) => L + (i / n) * (W - L - R);
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+        aria-label={`${payload.top.label} and ${payload.bottom.label}, game by game: ${spans.map((p) => `${p.label} ${fmt(p.topAvg, payload.top.format)} and ${fmt(p.botAvg, payload.bottom.format)}`).join('; ')}`}>
+        {spans.map((p, k) => (
+          <g key={p.key}>
+            <rect x={edge(p.i0)} y={T1 - 22} width={edge(p.i1 + 1) - edge(p.i0)} height={H - T1 + 22}
+              fill={k % 2 ? 'transparent' : colors.surface2} />
+            {/* The first and last bands' labels hug their outer edges so a narrow band's label never leaves the frame. */}
+            <text x={k === 0 ? edge(p.i0) + 2 : k === spans.length - 1 ? edge(p.i1 + 1) - 2 : (edge(p.i0) + edge(p.i1 + 1)) / 2}
+              y={T1 - 12} textAnchor={k === 0 ? 'start' : k === spans.length - 1 ? 'end' : 'middle'}
+              style={{ fontFamily: fonts.body, fontSize: 8.5, fontWeight: 600, fill: colors.textMed }}>{p.label}</text>
+          </g>
+        ))}
+        <text x={L} y={T1 - 1} style={{ ...mono, fontSize: 8.5, fill: colors.textLo }}>{payload.top.label}</text>
+        <text x={L} y={T2 - 6} style={{ ...mono, fontSize: 8.5, fill: colors.textLo }}>{payload.bottom.label}</text>
+        <line x1={L} x2={W - R} y1={by0} y2={by0} stroke={colors.borderStrong} />
+        {games.map((g, i) => (g.top == null ? null : (
+          <circle key={`t${i}`} cx={x(i)} cy={ty(g.top)} r="2.3" fill={g.marked ? colors.accent : colors.bg}
+            stroke={g.marked ? colors.accent : colors.textLo} strokeWidth="1">
+            <title>{`${g.label}: ${fmt(g.top, payload.top.format)}${g.marked ? ` · ${payload.marked_label}` : ''}`}</title>
+          </circle>
+        )))}
+        {games.map((g, i) => {
+          const v = g.bottom ?? 0;
+          return (
+            <rect key={`b${i}`} x={x(i) - bw / 2} y={Math.min(by(v), by0)} width={bw} height={Math.max(0.6, Math.abs(by(v) - by0))}
+              rx="0.8" fill={v >= 0 ? colors.accent : colors.red} fillOpacity="0.85">
+              <title>{`${g.label}: ${fmt(v, payload.bottom.format)}`}</title>
+            </rect>
+          );
+        })}
+        {spans.map((p) => (
+          <g key={`avg${p.key}`}>
+            {p.topAvg != null && (
+              <>
+                <line x1={edge(p.i0) + 2} x2={edge(p.i1 + 1) - 2} y1={ty(p.topAvg)} y2={ty(p.topAvg)} stroke={colors.textHi} strokeDasharray="3 2" strokeWidth="1.2" />
+                <text x={(edge(p.i0) + edge(p.i1 + 1)) / 2} y={Math.max(T1 + 8, ty(p.topAvg) - 4)} textAnchor="middle"
+                  style={{ ...mono, fontSize: 10, fontWeight: 700, fill: colors.textHi, paintOrder: 'stroke', stroke: colors.bg, strokeWidth: 3 }}>{fmt(p.topAvg, payload.top.format)}</text>
+              </>
+            )}
+            {p.botAvg != null && (
+              <>
+                <line x1={edge(p.i0) + 2} x2={edge(p.i1 + 1) - 2} y1={by(p.botAvg)} y2={by(p.botAvg)} stroke={colors.textHi} strokeDasharray="3 2" strokeWidth="1.2" />
+                <text x={(edge(p.i0) + edge(p.i1 + 1)) / 2} y={p.botAvg >= 0 ? Math.max(T2 + 8, by(p.botAvg) - 4) : Math.min(T2 + H2, by(p.botAvg) + 11)} textAnchor="middle"
+                  style={{ ...mono, fontSize: 10, fontWeight: 700, fill: colors.textHi, paintOrder: 'stroke', stroke: colors.bg, strokeWidth: 3 }}>{fmt(p.botAvg, payload.bottom.format)}</text>
+              </>
+            )}
+          </g>
+        ))}
+      </Box>
+      <Legend items={[[payload.marked_label, colors.accent], [payload.unmarked_label, 'ring']]} />
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
   recap_text: RecapText,
   score_race: ScoreRace,
@@ -1362,4 +1449,5 @@ export const POST_VISUALS = {
   percentile_strip: PercentileStrip,
   distance_star: DistanceStar,
   twin_cloud: TwinCloud,
+  game_timeline: GameTimeline,
 };
