@@ -218,6 +218,7 @@ jobs:
       # Previews for India's fixtures and for internationals between two top-20 sides (one extra in the feed a day,
       # the rest optional); recaps stay India's. Jev ranks each post's deeper cut.
       - name: Instagram match-day posts
+        if: ${{ vars.AUTO_POSTS == '1' }}  # automatic posts are off (PITCH_BRIEF_PLAN.md); set AUTO_POSTS=1 to restore
         continue-on-error: true
         env:
           # Reel v2 (services/ig_reel_v2.py): on when the REEL_V2 repository variable is 1; voiced with OpenAI TTS.
@@ -231,6 +232,7 @@ jobs:
       # On this day (scripts/ig_on_this_day.py): tomorrow's look back at the best past match on that calendar day,
       # queued for 9 am IST and rendered; its Reel comes with the upkeep step's --reels-pending.
       - name: Instagram On this day
+        if: ${{ vars.AUTO_POSTS == '1' }}  # automatic posts are off (PITCH_BRIEF_PLAN.md); set AUTO_POSTS=1 to restore
         continue-on-error: true
         env:
           CHROME: google-chrome
@@ -240,6 +242,7 @@ jobs:
       # then a deeper cut still titled with its whole sentence (made before 23 Oct 2026)
       # gets its short claim for the next 3 days' posts, re-rendered; then Reels for anything rendered without one.
       - name: Instagram queue upkeep
+        if: ${{ vars.AUTO_POSTS == '1' }}  # automatic posts are off (PITCH_BRIEF_PLAN.md); set AUTO_POSTS=1 to restore
         continue-on-error: true
         env:
           REEL_V2: ${{ vars.REEL_V2 }}
@@ -255,6 +258,7 @@ jobs:
       # Today's posts rebuilt with the data just loaded; a post whose numbers moved is rebuilt in place (slides, Reel,
       # X and YouTube copy), and admin shows what changed (services/ig_check.py). Posted posts are never touched.
       - name: Morning check of today's posts
+        if: ${{ vars.AUTO_POSTS == '1' }}  # automatic posts are off (PITCH_BRIEF_PLAN.md); set AUTO_POSTS=1 to restore
         continue-on-error: true
         env:
           # Reel v2 (services/ig_reel_v2.py): on when the REEL_V2 repository variable is 1; voiced with OpenAI TTS.

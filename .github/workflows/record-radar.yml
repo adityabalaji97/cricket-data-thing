@@ -15,7 +15,8 @@ on:
 
 jobs:
   radar:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # automatic posts are off (PITCH_BRIEF_PLAN.md); set the AUTO_POSTS repository variable to 1 to restore
+    if: ${{ vars.AUTO_POSTS == '1' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
