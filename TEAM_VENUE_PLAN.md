@@ -142,10 +142,16 @@ Removed:
 | T3 | Team page: summary and cards; old sections and their unused components removed | [ ] |
 | Z  | One-line check at 390px on 4 teams and 4 grounds; per-card share images | [ ] |
 
-## Open questions
+## Decisions (user, 3 Nov 2026)
 
-* A franchise's peers are the sides in its league. An international side's peers are the top-12 T20I sides. Is that
-  right?
-* Default window: since Jan 2024 (as the player verdict), or the last three seasons of the ground's main competition?
-* Team page for IPL sides: tie in the retention/auction data (SOCIAL_CALENDAR.md) after the 16 Dec auction, or keep
-  it out of the page?
+* **Peers:** a franchise is ranked against the sides in its league, and an international side against the top-12 T20I
+  sides.
+* **Window:** since Jan 2024 by default, the same as the player verdict.
+* **IPL team pages:** they take the retention and auction data after the 16 Dec auction.
+
+Mockups (S0, real data): https://claude.ai/artifact/JzAUEhHBqCi8Mw2JVGCG49.
+
+* **Phones:** Wankhede and Chinnaswamy, built from the preview's real ground cards, and CSK and India.
+* **Builder:** scratchpad build_tv_mock.py, which reads tv_data.py's numbers.
+* **Venue summary:** it will use the preview's par (the T20 Primer method), so it agrees with the par card. The mockup
+  shows the plain average first innings.
