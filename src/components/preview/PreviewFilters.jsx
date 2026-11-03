@@ -11,6 +11,7 @@
  * impossible to answer, which is the one thing A6 has to guarantee.
  */
 
+import { useNavigate } from 'react-router-dom';
 import React from 'react';
 import {
   Alert,
@@ -111,6 +112,7 @@ const PreviewFilters = ({
   selectedTeam2,
   setSelectedTeam2,
 }) => {
+  const navigate = useNavigate();
   // A preview describes one fixture, so it is always a single format -- "All formats" is
   // excluded here, unlike the query builder where comparing across formats is the point.
   // Mixing a T20 and an ODI record at the same ground averages into something that
@@ -297,6 +299,11 @@ const PreviewFilters = ({
             <Button
               variant="contained"
               onClick={() => {
+                // A ground with no teams is the venue page (TEAM_VENUE_PLAN.md G2); two teams make the preview here.
+                if (selectedVenue && selectedVenue !== 'All Venues' && !(selectedTeam1 && selectedTeam2)) {
+                  navigate(`/venue?venue=${encodeURIComponent(selectedVenue)}`);
+                  return;
+                }
                 hasFetchedRef.current = false;
                 setShowVisualizations(true);
               }}

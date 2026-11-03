@@ -4,7 +4,7 @@ import { colors, fonts } from '../../../theme/hindsightDark';
 
 // The filters behind the profile's filters icon (PROFILE_SIMPLIFY_PLAN.md P1): one window and scope for the whole
 // page (the verdict, its peers, plays like and the role cards). Format, period (recent, career or custom dates) and
-// strong sides or every match.
+// strong sides or every match (the player page only: showScope).
 
 const Seg = ({ label, options, value, onChange, light }) => (
   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -24,7 +24,7 @@ const Seg = ({ label, options, value, onChange, light }) => (
   </Box>
 );
 
-const ProfileFilters = ({ open, onClose, value, onApply }) => {
+const ProfileFilters = ({ open, onClose, value, onApply, showScope = true }) => {
   const [draft, setDraft] = useState(value);
   useEffect(() => { if (open) setDraft(value); }, [open, value]);
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
@@ -47,8 +47,10 @@ const ProfileFilters = ({ open, onClose, value, onApply }) => {
             ))}
           </Box>
         )}
-        <Seg label="Against" light value={draft.scope} onChange={(scope) => set({ scope })}
-          options={[['strong', 'Strong sides'], ['all', 'Every match']]} />
+        {showScope && (
+          <Seg label="Against" light value={draft.scope} onChange={(scope) => set({ scope })}
+            options={[['strong', 'Strong sides'], ['all', 'Every match']]} />
+        )}
         <Box component="button" type="button" disabled={!customOk} onClick={() => { onApply(draft); onClose(); }}
           sx={{
             all: 'unset', cursor: customOk ? 'pointer' : 'default', textAlign: 'center', bgcolor: customOk ? colors.accent : colors.borderStrong,

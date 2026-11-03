@@ -26,7 +26,8 @@ const keepInChart = (e) => {
 
 // exportMode (Instagram slides, src/components/ig/IgSlide.jsx): the card fills the image, no info button; `corner`
 // (e.g. "2 / 7") takes the button's place.
-const StoryCard = ({ card, width, height, exportMode = false, corner = null }) => {
+// onPage (the venue page): the page foot carries the brand and credit, so the card drops its own line.
+const StoryCard = ({ card, width, height, exportMode = false, corner = null, onPage = false }) => {
   const [infoOpen, setInfoOpen] = useState(false);
   const hasSheet = Boolean(card.info || (card.help && !card.help_on_card));
   const [overflow, setOverflow] = useState(false);
@@ -125,9 +126,11 @@ const StoryCard = ({ card, width, height, exportMode = false, corner = null }) =
           )}
         </Typography>
         {/* One line, always: the brand and the data credit. */}
-        <Typography noWrap sx={{ fontSize: 11, color: colors.textFaint, lineHeight: 1.35, mt: 0.25 }}>
-          {CARD_BRAND} · {CARD_CREDITS}
-        </Typography>
+        {!onPage && (
+          <Typography noWrap sx={{ fontSize: 11, color: colors.textFaint, lineHeight: 1.35, mt: 0.25 }}>
+            {CARD_BRAND} · {CARD_CREDITS}
+          </Typography>
+        )}
       </Box>
 
       {hasSheet && !exportMode && (
