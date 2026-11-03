@@ -1343,7 +1343,7 @@ const TwinCloud = ({ payload }) => {
  * each dot filled when a marked player played and hollow when he didn't; the bottom lane a signed per-game value
  * (No. 5-8 Impact) as bars from zero. Periods are shaded and labelled, and each lane carries its period averages as
  * dashed lines with their values, so cause (who played) and effect (what moved) read as one picture.
- * payload: {games:[{label, period, top, bottom, marked}], periods:[{key, label}], top:{label, format, higher_better},
+ * payload: {games:[{label, period, top, bottom, marked, note?}], periods:[{key, label}], top:{label, format, higher_better},
  *           bottom:{label, format}, marked_label, unmarked_label}
  */
 const GameTimeline = ({ payload }) => {
@@ -1418,8 +1418,13 @@ const GameTimeline = ({ payload }) => {
             )}
           </g>
         ))}
+        {/* A named game ({note: "118 off 61"}) is labelled beside its top dot, on the side away from the near edge. */}
+        {games.map((g, i) => (g.note && g.top != null ? (
+          <text key={`n${i}`} x={x(i) + (i < n * 0.25 ? 5 : -5)} y={ty(g.top) + 3.5} textAnchor={i < n * 0.25 ? 'start' : 'end'}
+            style={{ fontFamily: fonts.body, fontSize: 9.5, fontWeight: 700, fill: colors.textHi, paintOrder: 'stroke', stroke: colors.bg, strokeWidth: 3 }}>{g.note}</text>
+        ) : null))}
       </Box>
-      <Legend items={[[payload.marked_label, colors.accent], [payload.unmarked_label, 'ring']]} />
+      {payload.marked_label && <Legend items={[[payload.marked_label, colors.accent], [payload.unmarked_label, 'ring']]} />}
     </Box>
   );
 };
