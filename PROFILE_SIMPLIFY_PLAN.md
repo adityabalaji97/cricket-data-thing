@@ -44,6 +44,10 @@ once at the foot of the page (user, 3 Nov 2026).
 * The start card is an interactive chart by ball of the innings: strike rate so far and on that ball; drag across to
   read each ball (strike rate, runs v par for the typical innings, innings still going).
 
+* No sentence wraps at phone width (390px): the verdict is rank | short description rows ("2nd of 321 | Boundary %,
+  v spin · 33%"); twins show two traits in short words; notes, legends and the page credit are one line each. P7 checks
+  it with a text-line count at 390px, plus chart labels inside their charts.
+
 ## Chunks
 
 | # | Chunk | Status |
