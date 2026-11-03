@@ -306,12 +306,14 @@ const VerdictScreen = ({ player, win, onWindow, onFilters, onSummary }) => {
           keys={s.allrounder && i > 0 ? roles[role].peers.metrics.filter((m) => m.key !== 'wpa').map((m) => m.key) : null} />
       ))}
 
-      {!s.allrounder && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Eyebrow>{main === 'bowl' ? 'Economy' : 'Strike rate'} by phase</Eyebrow>
-          <PhaseCells block={roles[main]} role={main} fmt={fmt} />
+      {/* Every role shown gets its phases: an all-rounder's batting by phase is nowhere else on the page (Livingstone,
+          3 Nov 2026), the role cards carry phases for bowling only. */}
+      {shown.map((role) => (
+        <Box key={`ph-${role}`} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Eyebrow>{role === 'bowl' ? 'Economy' : 'Strike rate'} by phase</Eyebrow>
+          <PhaseCells block={roles[role]} role={role} fmt={fmt} />
         </Box>
-      )}
+      ))}
 
       {s.form?.length > 0 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
