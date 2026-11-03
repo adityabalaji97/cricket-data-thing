@@ -353,7 +353,8 @@ def reel_script(b):
     n = len(sc["both"])
     return {"hook": f"Kuldeep Yadav added more IPL wins than Rishabh Pant in all {n} seasons they both played. "
                     "Delhi just swapped them.",
-            "lines": [f"Lucknow paid {mn['final']:.0f} crore for Pant after {mn['bids']} bids.",
+            "lines": [f"Plus {sc['tot_k']:.1f} wins for Kuldeep, minus {abs(sc['tot_p']):.1f} for Pant.",
+                      f"Lucknow paid {mn['final']:.0f} crore for Pant after {mn['bids']} bids.",
                       f"He was below par in {iv['below']} of his {iv['luck']} innings there, but still made "
                       f"{iv['top']}.",
                       f"At the Kotla he's {pgv['kot']['raa_per_100']:.0f} runs above par per 100 balls.",
@@ -435,9 +436,10 @@ def main() -> int:
     print(f"queued ig:{KEY} for {today} · carousel {carousel['id']} ({n} slides)")
     r = ig_slides.render(carousel["id"], n, args.base)
     print(f"rendered {len(r['ok'])}/{n}" + (f", failed {r['failed']}" if r["failed"] else "") + f"; layout {r.get('layout') or 'clean'}")
-    # Reels are always voiced (the user's rule): the hand script replaces whatever the render stored.
+    # Reels are always voiced (the user's rule): the hand script replaces whatever the render stored. The first beat is
+    # the cover, the chart the hook is about; the Reel ends on --close, spoken.
     env = {**os.environ, "REEL_V2": "1", "REEL_AB": "0"}
-    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "2,3,4,6,7",
+    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "1,2,3,4,6,7",
                            "--script", str(HERE / "reel.json"), "--close", "Who won the trade?", "--base", args.base,
                            "--store"], env=env, capture_output=True, text=True)
     ok = "stored as the post's Reel" in done.stdout

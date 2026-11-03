@@ -10,7 +10,8 @@ A Reel v2 (services/ig_reel_v2.py) for one queued post, out of the A/B: the post
 --beats: slide numbers to use (the first opens the Reel); default: services/ig_reel_v2.beats. With --store the Reel
 replaces the post's in ig_reels, facts.reel records the script, and the caption gets the AI-voice line.
 --script: a JSON file {"hook": "...", "lines": ["...", ...]} spoken word for word, one line per beat (the first beat
-carries the hook and its line); needs --beats or --cards.
+carries the hook and its line, so make it the slide the hook is about, usually the cover, 1); needs --beats or
+--cards. --close is appended to a hand script's last line.
 Voice and style: REEL_VOICE / REEL_TONE.
 """
 from __future__ import annotations
@@ -60,7 +61,12 @@ def main() -> int:
         if not plan or len(sc.get("lines") or []) != len(plan["beats"]):
             print("--script needs --beats or --cards, and one line per beat")
             return 1
-        plan = {**plan, "script": {"hook": sc["hook"], "lines": sc["lines"]}, "source": "hand",
+        lines = list(sc["lines"])
+        # The closing question is spoken last, word for word. The script writer is told to end on it; a hand script
+        # has to be given it here, or --close does nothing (the Pant-Kuldeep Reel, 3 Nov 2026).
+        if args.close and not lines[-1].rstrip().endswith(args.close.strip()):
+            lines[-1] = f"{lines[-1].rstrip()} {args.close.strip()}"
+        plan = {**plan, "script": {"hook": sc["hook"], "lines": lines}, "source": "hand",
                 "length": "long" if args.long else "short"}
     out = Path(args.out) if args.out else None
     made = R.make(cid, slides, base=args.base or R.SITE, store=args.store, out=out, plan=plan,
