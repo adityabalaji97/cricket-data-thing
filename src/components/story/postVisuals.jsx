@@ -1424,6 +1424,70 @@ const GameTimeline = ({ payload }) => {
   );
 };
 
+
+/**
+ * An auction bidding war, bid by bid: the price as a step line, each rise coloured by the franchise that made that bid,
+ * with the moments that decided it (a right-to-match, the winning jump) marked and named.
+ * payload: {bids:[{n, team, price}], teams:[{key, label, colour?}], unit, marks:[{n, text}],
+ *           phases?:[{from, to, label}]} (phases: stretches of the war shaded and named, e.g. who was bidding against whom)
+ */
+const BidTrail = ({ payload }) => {
+  const { bids, teams } = payload;
+  const W = 300; const H = 214; const L = 34; const R = 10; const T = 16; const B = 186;
+  const n = bids.length;
+  const top = Math.ceil(Math.max(...bids.map((b) => b.price)) / 5) * 5;
+  const sx = (i) => L + ((i - 1) / Math.max(1, n - 1)) * (W - L - R);
+  const sy = (v) => B - (v / top) * (B - T);
+  const colourOf = Object.fromEntries(teams.map((t) => [t.key, t.colour || teamColour(t.key, colors.textMed)]));
+  const ticks = [0, ...Array.from({ length: Math.floor(top / 10) }, (_, k) => (k + 1) * 10).filter((v) => v < top), top];
+  const counts = Object.fromEntries(teams.map((t) => [t.key, bids.filter((b) => b.team === t.key).length]));
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+        aria-label={`${n} bids from ${fmt(bids[0].price, 'dec2')} to ${fmt(bids[n - 1].price, 'dec2')} ${payload.unit}: ${(payload.marks || []).map((m) => m.text).join('; ')}`}>
+        {ticks.map((v) => (
+          <g key={v}>
+            <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke={colors.border} />
+            <text x={L - 5} y={sy(v) + 3.5} textAnchor="end" style={{ ...mono, fontSize: 9.5, fill: colors.textLo }}>{v}</text>
+          </g>
+        ))}
+        <text x={L} y={T - 5} style={{ ...mono, fontSize: 9, fill: colors.textLo }}>{`↑ ${payload.unit}`}</text>
+        <text x={W - R} y={H - 4} textAnchor="end" style={{ ...mono, fontSize: 9, fill: colors.textLo }}>{`bid ${n} →`}</text>
+        <text x={L} y={H - 4} style={{ ...mono, fontSize: 9, fill: colors.textLo }}>bid 1</text>
+        {(payload.phases || []).map((ph, k) => (
+          <g key={`p${k}`}>
+            <rect x={sx(ph.from) - 1} y={T} width={Math.max(2, sx(ph.to) - sx(ph.from) + 2)} height={B - T}
+              fill={k % 2 ? 'transparent' : colors.surface2} />
+            <text x={(sx(ph.from) + sx(ph.to)) / 2} y={B - 6} textAnchor="middle"
+              style={{ fontFamily: fonts.body, fontSize: 9.5, fontWeight: 600, fill: colors.textMed }}>{ph.label}</text>
+          </g>
+        ))}
+        {ticks.map((v) => <line key={`g${v}`} x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke={colors.border} />)}
+        <path d={bids.map((b, i) => (i ? `L${sx(b.n)},${sy(bids[i - 1].price)} L${sx(b.n)},${sy(b.price)}` : `M${sx(b.n)},${sy(b.price)}`)).join(' ')}
+          fill="none" stroke={colors.textLo} strokeWidth="1.4" />
+        {bids.map((b) => (
+          <circle key={`d${b.n}`} cx={sx(b.n)} cy={sy(b.price)} r="2.2" fill={colourOf[b.team] || colors.textMed}>
+            <title>{`Bid ${b.n}: ${b.team} ${fmt(b.price, 'dec2')}`}</title>
+          </circle>
+        ))}
+        {(payload.marks || []).map((m) => {
+          const b = bids.find((x) => x.n === m.n);
+          if (!b) return null;
+          const x = sx(b.n); const y = sy(b.price);
+          return (
+            <g key={`m${m.n}`}>
+              <circle cx={x} cy={y} r="4" fill="none" stroke={colors.textHi} strokeWidth="1.5" />
+              <text x={x - 7} y={y + 4} textAnchor="end"
+                style={{ fontFamily: fonts.body, fontSize: 10.5, fontWeight: 700, fill: colors.textHi, paintOrder: 'stroke', stroke: colors.bg, strokeWidth: 3 }}>{m.text}</text>
+            </g>
+          );
+        })}
+      </Box>
+      <Legend items={teams.filter((t) => counts[t.key]).map((t) => [`${t.label} ${counts[t.key]}`, colourOf[t.key]])} />
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
   recap_text: RecapText,
   score_race: ScoreRace,
@@ -1450,4 +1514,5 @@ export const POST_VISUALS = {
   distance_star: DistanceStar,
   twin_cloud: TwinCloud,
   game_timeline: GameTimeline,
+  bid_trail: BidTrail,
 };
