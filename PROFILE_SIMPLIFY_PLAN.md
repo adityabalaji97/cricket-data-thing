@@ -31,14 +31,25 @@ Mockups with real data: the "Player profile, simplified" artifact (scratchpad bu
 Each card: kicker, claim title written from the numbers, one chart, a one-line scope + credit footer, a share button
 (link to the card's anchor, with its own preview image later).
 
+## Decisions from the mockup review (user, 3 Nov 2026)
+
+* The verdict is a list, one stat per line ("2nd of 339 for wins added", "2nd of 321 for boundary % v spin (33%)"),
+  not a sentence. The backend keeps `verdict` for previews and adds the lines.
+* Cards have no separate claim line: the card's name ("Plays like", "His start") is its title.
+* Plays like: a lime chevron on each row opens that twin's comparison; no "tap for details" note.
+* A gear beside the name opens the filters (format, period or custom dates, strong sides or every match,
+  competitions), applied to the whole page.
+* The start card is an interactive chart by ball of the innings: strike rate so far and on that ball; drag across to
+  read each ball (strike rate, runs v par for the typical innings, innings still going).
+
 ## Chunks
 
 | # | Chunk | Status |
 |---|---|---|
 | P0 | Remove the cut sections, the filter bar and their now-unused components and endpoints calls; the page reads the verdict's window | [ ] |
-| P1 | Card shell: kicker, claim title, chart slot, scope/credit footer, share button; one window/scope from the verdict switches | [ ] |
+| P1 | Card shell: name as title, chart slot, scope/credit footer, share button; the gear's filters set one window/scope for the page; verdict as a list | [ ] |
 | P2 | Backend: one `/player/{name}/cards` endpoint (role cards' numbers for the verdict window, cached with the summary, warmed nightly) | [ ] |
-| P3 | Batter cards: start, shot map (slimmed ShotMapSection), bowling families, how he gets out | [ ] |
+| P3 | Batter cards: start (interactive by-ball chart), shot map (slimmed ShotMapSection), bowling families, how he gets out | [ ] |
 | P4 | Bowler cards: pitch map (fix the load failure), by phase, right v left, how he takes wickets | [ ] |
 | P5 | All-rounder: both sets, main role first, a switch; Plays like slimmed | [ ] |
 | P6 | Per-card share: anchor links and a per-card preview image (api/og.mjs) | [ ] |
