@@ -95,12 +95,13 @@ async function verdictSummary(name) {
   const scope = `${s.format} · since ${since} · ${s.scope === 'strong' ? 'v strong sides' : 'every match'}`;
   return {
     kind: 'player',
-    title: `${s.player}: ${s.verdict || 'T20 verdict'} | ${SITE_NAME}`,
+    // The title and the image take the headline (the standouts make the full line too long for either).
+    title: `${s.player}: ${s.verdict_headline || s.verdict || 'T20 verdict'} | ${SITE_NAME}`,
     description: `${s.verdict ? `${s.verdict} ` : ''}${ranks.map((m) => `${m.label}: ${ORD(m.rank)} of ${m.n}`).join('. ')}. ${scope}.`,
     card: {
       kicker: kicker || 'Player',
       headline: s.player,
-      verdict: s.verdict,
+      verdict: s.verdict_headline || s.verdict,
       scope,
       seasons: s.has_wins_added ? shown.map((r) => ({ role: r, rows: (s.roles[r].seasons || []).map((y) => ({ year: y.year, wpa: y.wpa })) })) : [],
       ranks: ranks.map((m) => ({ label: m.label, rank: `${ORD(m.rank)} of ${m.n}`, role: m.role, top: m.rank / m.n <= 0.25 })),

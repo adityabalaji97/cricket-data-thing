@@ -385,18 +385,24 @@ def search_entities(query: str, db: Session, limit: int = 10) -> List[Dict]:
         # Each has: name, display_name, details_name, type
         results.extend(players)
 
-        # Namesakes (player_identity, PLAYER_IDS_PLAN.md): a name several players share lists each of them, the lesser
-        # known with his side ("Rohit Sharma (Indonesia)"), which is also the name to use everywhere for him.
+        # player_identity (PLAYER_IDS_PLAN.md) holds every player in the ball-by-ball feed by id. Two kinds come from it:
+        # namesakes, a name several players share, each listed and the lesser known with his side ("Rohit Sharma
+        # (Indonesia)"), which is also the name to use everywhere for him; and players the players table never got,
+        # because it is built from Cricsheet's balls and the feed carries newer players first (Kartik Sharma, CSK 2026:
+        # 3,411 such players on 3 Nov 2026).
         try:
-            seen = {(p.get("display_name") or p["name"]).lower() for p in players}
+            seen = {n.lower() for p in players for n in (p.get("display_name"), p["name"]) if n}
             for row in db.execute(text("""
-                SELECT display_name, main_side, last_date FROM player_identity
-                WHERE display_name <> name AND LOWER(display_name) LIKE :search_pattern
+                SELECT display_name, name, main_side, last_date FROM player_identity
+                WHERE LOWER(display_name) LIKE :search_pattern
                 ORDER BY balls DESC LIMIT :limit
             """), params).fetchall():
-                if row.display_name.lower() not in seen:
-                    results.append({"name": row.display_name, "display_name": row.display_name, "type": "player",
-                                    "namesake": True, "side": row.main_side})
+                namesake = row.display_name != row.name
+                if row.display_name.lower() in seen or (not namesake and row.name.lower() in seen):
+                    continue
+                seen.add(row.display_name.lower())
+                results.append({"name": row.display_name, "display_name": row.display_name, "type": "player",
+                                "side": row.main_side, **({"namesake": True} if namesake else {})})
         except Exception:  # no player_identity (before migration 026)
             db.rollback()
         

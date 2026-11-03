@@ -1,3 +1,4 @@
+import re
 from email.mime import base
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -308,6 +309,30 @@ async def db_error_middleware(request, call_next):
         )
 
 
+
+
+#: Edge caching for the read-only calls every page makes (and that crawlers make for each of the ~14k scorecards in
+#: the sitemaps): a cached response is served by Vercel's CDN without running the /api proxy function, whose CPU time
+#: is the free tier's limit. Matches load in the nightly refresh, so a scorecard is never live.
+_DAY = "public, max-age=300, s-maxage=86400, stale-while-revalidate=86400"
+_HOUR = "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400"
+_EDGE_CACHE = [(re.compile(r"^/(venues|teams|formats)/?$"), _DAY),
+               (re.compile(r"^/matches/[^/]+/(scorecard|recap)/?$"), _HOUR)]
+
+
+def cache_policy(path: str):
+    """The Cache-Control for a GET of `path`, or None to leave the response uncached."""
+    return next((policy for pattern, policy in _EDGE_CACHE if pattern.match(path)), None)
+
+
+@app.middleware("http")
+async def edge_cache_middleware(request, call_next):
+    response = await call_next(request)
+    if request.method == "GET" and response.status_code == 200 and "cache-control" not in response.headers:
+        policy = cache_policy(request.url.path)
+        if policy:
+            response.headers["Cache-Control"] = policy
+    return response
 
 
 @app.get("/")

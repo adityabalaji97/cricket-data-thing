@@ -1,5 +1,8 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Disallow: /admin
+# Crawlers rendering the sitemap pages called the API through a Vercel function on every page, using up the free
+# tier's CPU (Nov 2026). Pages are still indexed from their server-rendered titles and descriptions.
+Disallow: /api/
 
 Sitemap: https://hindsightcricket.com/sitemap.xml

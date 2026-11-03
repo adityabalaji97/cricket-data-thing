@@ -52,7 +52,8 @@ def main() -> int:
     import main as app
     from database import get_session
     from services.fixture_scraper import fetch_upcoming_fixtures
-    from services.player_verdict import _peer_pool, default_window, get_summary, scope_params
+    from services.player_cards import get_cards
+    from services.player_verdict import _peer_pool, _split_pool, default_window, get_summary, scope_params
     from scripts.warm_previews import site_team
 
     db = next(get_session())
@@ -66,6 +67,11 @@ def main() -> int:
                 pool = _peer_pool(db, fmt, role, {"start_date": start, "end_date": end}, scope_params(fmt, "strong"))
                 log.info("pool %s %s %s: %d players (%s), %.1fs", fmt, period, role, len(pool["players"]),
                          pool["floor_label"], time.time() - t)
+                # The splits behind the verdict's standouts (T20 only), from the same window and players.
+                splits = _split_pool(db, fmt, role, {"start_date": start, "end_date": end}, scope_params(fmt, "strong"),
+                                     [p["name"] for p in pool["players"]])
+                if splits:
+                    log.info("splits %s %s %s: %d", fmt, period, role, len(splits["splits"]))
 
     teams = app.get_teams(db=db)
     now = datetime.now(timezone.utc)
@@ -89,6 +95,7 @@ def main() -> int:
             continue
         try:
             get_summary(db, name, fmt)
+            get_cards(db, name, fmt)  # the role cards below the verdict (PROFILE_SIMPLIFY_PLAN.md P2)
             built += 1
         except Exception as exc:  # one player's failure never blocks the rest
             db.rollback()
