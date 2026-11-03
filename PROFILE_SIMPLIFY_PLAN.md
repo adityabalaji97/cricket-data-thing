@@ -28,8 +28,8 @@ Mockups with real data: the "Player profile, simplified" artifact (scratchpad bu
      wickets.
 4. **Footer**: one "dig deeper in the query builder" link, credits.
 
-Each card: kicker, claim title written from the numbers, one chart, a one-line scope + credit footer, a share button
-(link to the card's anchor, with its own preview image later).
+Each card: its name as the title, one chart, a one-line scope + credit footer, a share button (link to the card's
+anchor, with its own preview image later).
 
 ## Decisions from the mockup review (user, 3 Nov 2026)
 
