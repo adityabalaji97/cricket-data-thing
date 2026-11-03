@@ -148,7 +148,7 @@ def innings_card(db):
              {"games": games, "periods": [{"key": k_, "label": k_} for k_ in periods],
               "top": {"label": "Runs, each innings", "format": "int"},
               "bottom": {"label": "Runs above par", "format": "signed1"}},
-             "Rishabh Pant, every IPL innings 2022-26 · didn't play 2023 · dashed: each season's average",
+             "Pant's IPL innings, 2022-26 · missed 2023 · dashed: season average",
              kicker="Highs among the lows")
     opp = {TEAM.get(r["bowling_team"], r["bowling_team"]) for r in highs}
     both = (f"{note(highs[0])} and {note(highs[1])}, both against {opp.pop()}" if len(opp) == 1

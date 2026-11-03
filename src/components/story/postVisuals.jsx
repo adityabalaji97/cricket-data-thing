@@ -1418,11 +1418,17 @@ const GameTimeline = ({ payload }) => {
             )}
           </g>
         ))}
-        {/* A named game ({note: "118 off 61"}) is labelled beside its top dot, on the side away from the near edge. */}
-        {games.map((g, i) => (g.note && g.top != null ? (
-          <text key={`n${i}`} x={x(i) + (i < n * 0.25 ? 5 : -5)} y={ty(g.top) + 3.5} textAnchor={i < n * 0.25 ? 'start' : 'end'}
-            style={{ fontFamily: fonts.body, fontSize: 9.5, fontWeight: 700, fill: colors.textHi, paintOrder: 'stroke', stroke: colors.bg, strokeWidth: 3 }}>{g.note}</text>
-        ) : null))}
+        {/* A named game ({note: "118 off 61"}) is labelled at the end of its bar, the label leaning inward near the edges. */}
+        {games.map((g, i) => {
+          if (!g.note) return null;
+          const v = g.bottom ?? 0;
+          const anchor = i < n * 0.2 ? 'start' : i > n * 0.8 ? 'end' : 'middle';
+          return (
+            <text key={`n${i}`} x={x(i) + (anchor === 'start' ? -bw / 2 : anchor === 'end' ? bw / 2 : 0)}
+              y={v >= 0 ? by(v) - 4 : by(v) + 11} textAnchor={anchor}
+              style={{ fontFamily: fonts.body, fontSize: 9.5, fontWeight: 700, fill: colors.textHi, paintOrder: 'stroke', stroke: colors.bg, strokeWidth: 3 }}>{g.note}</text>
+          );
+        })}
       </Box>
       {payload.marked_label && <Legend items={[[payload.marked_label, colors.accent], [payload.unmarked_label, 'ring']]} />}
     </Box>
