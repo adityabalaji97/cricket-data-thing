@@ -28,7 +28,7 @@ from services.query_cache import cached_run
 # Peer pools carry their own version, so a change to the summary's wording doesn't throw away the pools (career pools
 # take minutes to build and are only built nightly).
 POOL_VERSION = "v5"
-SUMMARY_VERSION = "v7"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons;
+SUMMARY_VERSION = "v8"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons;
 # v4: all-rounders must qualify in both roles, the verdict claims from the main role; v5: identity from indexed lookups; v6: finer verdict ranks
 
 STRONG_T20_LEAGUES = [
@@ -501,6 +501,47 @@ def verdict_line(summary: Dict[str, Any], with_standouts: bool = True) -> Option
     return claim
 
 
+# The verdict as one stat per row (PROFILE_SIMPLIFY_PLAN.md: user, 3 Nov 2026): rank | short description, each
+# fitting one line at phone width. Short words for the splits keep "Boundary %, middle overs · 30%" on one line.
+SHORT_WHERE = {"in the powerplay": "powerplay", "in the middle overs": "middle overs", "at the death": "death",
+               "against pace": "v pace", "against spin": "v spin", "to right-handers": "v right-handers",
+               "to left-handers": "v left-handers"}
+SHORT_WORDS = {"false shots forced": "false shots"}
+
+
+def _rank_text(rank: int, n: int, share: float) -> str:
+    if rank == 1:
+        return "Best"
+    if rank <= EXACT_RANKS:
+        return f"{_ordinal(rank)} of {n}"
+    step = next((x for x in TOP_STEPS if 100 * share <= x), None)
+    return f"Top {step}%" if step else f"{_ordinal(rank)} of {n}"
+
+
+def verdict_rows(summary: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """[{rank, what, lead}]: the headline rank first, then each standout."""
+    head = verdict_line(summary, with_standouts=False)
+    if not head:
+        return []
+    claim = head.split(".")[0]
+    rank, _, what = claim.partition(" for ")
+    what = what.replace(" with the bat", " (bat)").replace(" with the ball", " (ball)")
+    rows = [{"rank": rank, "what": what[:1].upper() + what[1:], "lead": True}]
+    roles = summary.get("roles") or {}
+    primary = summary.get("primary_role")
+    for r_ in ([primary] + ([r for r in roles if r != primary] if summary.get("allrounder") else [])):
+        block = roles.get(r_) or {}
+        if not block.get("peers", {}).get("qualified"):
+            continue
+        for f in (block.get("standouts") or [])[: 1 if summary.get("allrounder") else STANDOUTS_MAX]:
+            value = (f"{f['value']:.0f}%" if f["format"] == "pct" else f"{f['value']:.1f}" if f["format"] == "dec1"
+                     else f"{f['value']:.0f}")
+            words = SHORT_WORDS.get(f["words"], f["words"])
+            rows.append({"rank": _rank_text(f["rank"], f["n"], f["share"]), "lead": False,
+                         "what": f"{words[:1].upper() + words[1:]}, {SHORT_WHERE.get(f['where'], f['where'])} · {value}"})
+    return rows
+
+
 def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
                   start_date: Optional[date] = None, end_date: Optional[date] = None,
                   period: str = "recent", build_pools: bool = True) -> Dict[str, Any]:
@@ -541,6 +582,7 @@ def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
     summary["verdict"] = verdict_line(summary)
     # Link previews draw the line large on a 1200x630 image: they take the headline without the standouts.
     summary["verdict_headline"] = verdict_line(summary, with_standouts=False)
+    summary["verdict_rows"] = verdict_rows(summary)
     return summary
 
 

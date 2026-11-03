@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from sqlalchemy.orm import Session
 
 from database import get_session
+from services.player_cards import CardsBusy, get_cards
 from services.player_verdict import PoolsCold, SummaryBusy, get_summary
 
 router = APIRouter(tags=["player"])
@@ -42,3 +43,27 @@ def player_summary(
     # while it refetches, so a data load shows up within the hour.
     response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
     return summary
+
+
+@router.get("/player/{player_name}/cards")
+def player_cards(
+    response: Response,
+    player_name: str = Path(..., description="Any spelling of the player's name"),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    scope: Literal["strong", "all"] = Query(default="strong"),
+    period: Literal["recent", "career"] = Query(default="recent"),
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    db: Session = Depends(get_session),
+):
+    """The profile's role cards (PROFILE_SIMPLIFY_PLAN.md P2) for the verdict's window: batters' start, scoring areas,
+    bowling types and dismissals; bowlers' line and length, phases, left v right and wickets."""
+    try:
+        cards = get_cards(db, player_name, format, scope, start_date, end_date, period)
+    except CardsBusy:
+        raise HTTPException(status_code=503, detail="Busy building another player's cards; try again in a few seconds",
+                            headers={"Retry-After": "10"})
+    if not cards.get("roles"):
+        raise HTTPException(status_code=404, detail=f"No {format} data for {player_name} in this window")
+    response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+    return cards
