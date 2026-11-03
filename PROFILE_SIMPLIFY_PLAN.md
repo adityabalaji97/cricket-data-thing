@@ -28,8 +28,10 @@ Mockups with real data: the "Player profile, simplified" artifact (scratchpad bu
      wickets.
 4. **Footer**: one "dig deeper in the query builder" link, credits.
 
-Each card: its name as the title, one chart, a one-line scope + credit footer, a share button (link to the card's
-anchor, with its own preview image later).
+Each card: its name as the title, one chart, a share button (link to the card's anchor, with its own preview image
+later), and a short note only where it adds something ("15+ balls a cell", "run-outs not counted"). No site name,
+link or data credit on cards, and no repeat of the page's window: the logo carries the brand and the data credit sits
+once at the foot of the page (user, 3 Nov 2026).
 
 ## Decisions from the mockup review (user, 3 Nov 2026)
 
