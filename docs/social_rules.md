@@ -41,7 +41,7 @@ One term per idea, the same everywhere: cards, captions, threads, Reels.
 ## Numbers
 
 - Every number on a slide comes from the query builder; code writes titles from the numbers. Figures from elsewhere are credited text, never charted, and only used once confirmed.
-- T20 posts lead with Impact and win probability added (WPA); strike rate and average are context. ODIs have no Impact.
+- T20 posts about what happened (a match, a season, a player's value) lead with Impact and win probability added (WPA); strike rate and average are context. "How good is he" posts lead with the stable measures instead: strike rate and boundary % by phase and v pace/spin for batters; economy, dot % and false shots forced for bowlers; wickets only over big samples. Impact and WPA barely repeat from one half of a season to the other (3 Nov 2026 test: 0.0-0.17), so they describe value, not skill. ODIs have no Impact.
 - Say what a stat means and whether it reflects skill before using it (luck-driven stats, like "conversion", are out).
 - A claim must be exactly true for its whole scope: "every year" only if every year in the table holds; "among India's pacers" never becomes "no one".
 - A team total never stands in for one player: split it to show whose numbers moved.

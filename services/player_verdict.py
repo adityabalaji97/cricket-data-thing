@@ -28,7 +28,7 @@ from services.query_cache import cached_run
 # Peer pools carry their own version, so a change to the summary's wording doesn't throw away the pools (career pools
 # take minutes to build and are only built nightly).
 POOL_VERSION = "v5"
-SUMMARY_VERSION = "v6"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons;
+SUMMARY_VERSION = "v7"  # v2: dynamic peer floors, identity, verdict line; v3: floors per season, 2+ seasons;
 # v4: all-rounders must qualify in both roles, the verdict claims from the main role; v5: identity from indexed lookups; v6: finer verdict ranks
 
 STRONG_T20_LEAGUES = [
@@ -255,12 +255,16 @@ def _role_block(db, fmt: str, role: str, player: str, window: Dict[str, Any],
         return None
     years = sorted(_query(db, fmt, group_by=["year"], **base), key=lambda row: row.get("year") or 0)
     phases = _query(db, fmt, group_by=["phase"], **base)
+    peers = _peer_strips(db, fmt, role, window, scope, me, build_pools)
+    pool_names = [p["name"] for p in _peer_pool(db, fmt, role, window, scope, build_pools)["players"]]
+    split_pool = _split_pool(db, fmt, role, window, scope, pool_names, build_pools)
     return {
         "name": me.get(r["group"]),
+        "standouts": standouts(split_pool, role, me.get(r["group"])) if peers["qualified"] else [],
         "overall": _slim(me, []),
         "seasons": [_slim(row, ["year"]) for row in years],
         "phases": [_slim(row, ["phase"]) for row in phases],
-        "peers": _peer_strips(db, fmt, role, window, scope, me, build_pools),
+        "peers": peers,
     }
 
 
@@ -309,6 +313,8 @@ def _ordinal(n: int) -> str:
 
 
 def _signed(v: float) -> str:
+    if round(v, 1) == 0:
+        return "0.0"  # no sign on a value that rounds to zero ("−0.0")
     return f"{v:+.1f}".replace("-", "\u2212")
 
 
@@ -348,11 +354,106 @@ def _identity(db, fmt: str, player: str, name: str, roles: Dict[str, Any], windo
 
 # The verdict's precision (the user, 30 Oct 2026: 6th of 331 read "Top 10%", which undersold a top-2% bowler). The top
 # ten get their exact rank; beyond that the nearest of these steps.
+# ---- standouts: where a player ranks highest on informative splits (by phase, v pace/spin, v left/right-handers) ----
+# Only stable, skill-like measures (strike rate and boundary % for batters; economy, dot % and false shots forced for
+# bowlers; balls per wicket only on big samples): wins added and Impact barely repeat from one half of a season to
+# the other (3 Nov 2026 test), so they describe value, not skill, and stay in the headline only.
+SPLIT_VERSION = "s1"
+SPLIT_DIMS = {"bat": ["phase", "bowl_kind"], "bowl": ["phase", "bat_hand"]}
+SPLIT_WORDS = {"powerplay": "in the powerplay", "middle": "in the middle overs", "death": "at the death",
+               "pace bowler": "against pace", "spin bowler": "against spin",
+               "RHB": "to right-handers", "LHB": "to left-handers"}
+# (key, words, lower_is_better, min balls in the split, format)
+SPLIT_METRICS = {
+    "bat": [("strike_rate", "strike rate", False, 120, "int"), ("boundary_percentage", "boundary %", False, 120, "pct")],
+    "bowl": [("economy", "economy", True, 120, "dec1"), ("dot_percentage", "dot %", False, 120, "pct"),
+             ("false_shot_percentage", "false shots forced", False, 120, "pct"),
+             ("balls_per_dismissal", "balls per wicket", True, 300, "int")],
+}
+STANDOUT_TOP = 0.10   # a split counts only in the top 10% of its pool
+STANDOUT_MIN_POOL = 20
+STANDOUTS_MAX = 2
+
+
+def _split_rows(row: Dict[str, Any]) -> Dict[str, Any]:
+    out = {"balls": _num(row.get("balls")) or 0}
+    for key in ("strike_rate", "boundary_percentage", "dot_percentage", "balls_per_dismissal"):
+        out[key] = _num(row.get(key))
+    runs, balls = _num(row.get("runs")), _num(row.get("balls"))
+    out["economy"] = 6 * runs / balls if runs is not None and balls else None
+    ctl, cov = _num(row.get("control_percentage")), _num(row.get("control_coverage_pct"))
+    out["false_shot_percentage"] = 100 - ctl if ctl is not None and (cov or 0) >= 80 else None
+    return out
+
+
+def _split_pool(db, fmt: str, role: str, window: Dict[str, Any], scope: Dict[str, Any], players: List[str],
+                build: bool = True) -> Optional[Dict[str, Any]]:
+    """Every qualified player's rows by phase and by the second split (pace/spin, or right/left-handed batters).
+    Cached on its own key; None when it isn't built yet and building isn't allowed (the line then has no standouts)."""
+    if fmt != "T20":
+        return None
+    r = ROLES[role]
+    key = {"kind": "verdict_split_pool", "v": SPLIT_VERSION, "fmt": fmt, "role": role, **window, **scope}
+
+    def run() -> Dict[str, Any]:
+        keep = set(players)
+        out: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        base = dict(metrics_perspective=r["perspective"], min_balls=PREFILTER_BALLS, **window, **scope)
+        for dim in SPLIT_DIMS[role]:
+            for row in _query(db, fmt, group_by=[r["group"], dim], **base):
+                name, value = row.get(r["group"]), row.get(dim)
+                if name in keep and value in SPLIT_WORDS:
+                    out.setdefault(f"{dim}:{value}", {})[name] = _split_rows(row)
+        return {"splits": out}
+
+    if not build:
+        from services.query_cache import cached_get
+        return cached_get(db, key)
+    return cached_run(db, key, run)
+
+
+def standouts(pool: Optional[Dict[str, Any]], role: str, name: str) -> List[Dict[str, Any]]:
+    """The player's best splits: top 10% of a pool of 20+, ranked by how high he sits, at most one per split."""
+    if not pool:
+        return []
+    found = []
+    for split, rows in pool["splits"].items():
+        me = rows.get(name)
+        if not me:
+            continue
+        for key, words, lower, min_balls, fmt_ in SPLIT_METRICS[role]:
+            value = me.get(key)
+            if value is None or me["balls"] < min_balls:
+                continue
+            values = [row[key] for row in rows.values() if row.get(key) is not None and row["balls"] >= min_balls]
+            if len(values) < STANDOUT_MIN_POOL:
+                continue
+            rank = rank_among(values, value, lower)
+            share = rank / len(values)
+            if share <= STANDOUT_TOP:
+                found.append({"split": split, "where": SPLIT_WORDS[split.split(":", 1)[1]], "key": key, "words": words,
+                              "value": round(value, 2), "format": fmt_, "rank": rank, "n": len(values),
+                              "share": round(share, 4)})
+    best: Dict[str, Dict[str, Any]] = {}
+    for f in sorted(found, key=lambda f: (f["share"], f["rank"])):
+        best.setdefault(f["split"], f)
+    return sorted(best.values(), key=lambda f: (f["share"], f["rank"]))[:STANDOUTS_MAX]
+
+
+def _standout_text(f: Dict[str, Any]) -> str:
+    value = (f"{f['value']:.0f}" if f["format"] == "int" else f"{f['value']:.0f}%" if f["format"] == "pct"
+             else f"{f['value']:.1f}")
+    step = next((x for x in TOP_STEPS if 100 * f["share"] <= x), None)
+    rank = (f"best of {f['n']}" if f["rank"] == 1 else f"{_ordinal(f['rank'])} of {f['n']}" if f["rank"] <= EXACT_RANKS
+            else f"top {step}%")
+    return f"{f['words']} {f['where']} ({value}, {rank})"
+
+
 EXACT_RANKS = 10
 TOP_STEPS = (1, 2, 3, 5, 10, 15, 20, 25, 30, 40, 50)
 
 
-def verdict_line(summary: Dict[str, Any]) -> Optional[str]:
+def verdict_line(summary: Dict[str, Any], with_standouts: bool = True) -> Optional[str]:
     """One or two plain sentences from the ranks and the seasons (VERDICT_SCREEN_PLAN.md D4, first version).
 
     The claim is the player's best rank among his peers (a rank in the top 3, else the top 10% or 25%, else the
@@ -384,6 +485,14 @@ def verdict_line(summary: Dict[str, Any]) -> Optional[str]:
     if summary.get("allrounder"):
         claim += " with the ball" if role == "bowl" else " with the bat"
     claim += "."  # the window and scope sit on the chip beside it
+    picks = []
+    for r_ in ([primary] + ([r for r in roles if r != primary] if summary.get("allrounder") else [])):
+        block = roles.get(r_) or {}
+        if block.get("peers", {}).get("qualified"):
+            # An all-rounder gets one from each role, a specialist up to two from his own.
+            picks += (block.get("standouts") or [])[: 1 if summary.get("allrounder") else STANDOUTS_MAX]
+    if picks and with_standouts:
+        claim += " Stands out for " + " and ".join(_standout_text(f) for f in picks) + "."
     seasons = [r for r in (roles.get(primary) or {}).get("seasons", []) if r.get("wpa") is not None]
     if summary.get("has_wins_added") and len(seasons) >= 2:
         a, b = seasons[-2], seasons[-1]
@@ -430,6 +539,8 @@ def build_summary(db, player: str, fmt: str = "T20", scope: str = "strong",
     }
     summary["identity"] = _identity(db, fmt, player, name, roles, window) if roles else {}
     summary["verdict"] = verdict_line(summary)
+    # Link previews draw the line large on a 1200x630 image: they take the headline without the standouts.
+    summary["verdict_headline"] = verdict_line(summary, with_standouts=False)
     return summary
 
 
