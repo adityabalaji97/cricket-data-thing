@@ -1,890 +1,175 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import ShareButton from './ui/ShareButton';
-import {
-  Box, Button, Typography, TextField, CircularProgress,
-  Alert, Autocomplete, ToggleButtonGroup, ToggleButton, Card, Chip, LinearProgress,
-  useMediaQuery, useTheme
-} from '@mui/material';
-import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  LineChart, Line, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis,
-} from 'recharts';
-import CompetitionFilter from './CompetitionFilter';
-import TopInnings from './TopInnings';
-import BowlingMatchupMatrix from './BowlingMatchupMatrix';
-import PlayerDNASummary from './PlayerDNASummary';
-import TwinsSection from './playerProfile/TwinsSection';
-import VenueSectionTabs from './VenueSectionTabs';
-import VenueNotesDesktopNav from './VenueNotesDesktopNav';
-import OverviewSection from './playerProfile/sections/OverviewSection';
-import PerformanceSection from './playerProfile/sections/PerformanceSection';
-import DismissalSection from './playerProfile/sections/DismissalSection';
-import VisualizationsSection from './playerProfile/sections/VisualizationsSection';
-import ExploreSection from './playerProfile/sections/ExploreSection';
-import RecentFormStrip from './playerProfile/RecentFormStrip';
-import PlayerGlance, { BowlerGlance } from './playerProfile/PlayerGlance';
-import ShotMapSection from './playerProfile/sections/ShotMapSection';
-import AdvancedBowlingAnalyticsSection from './playerProfile/AdvancedBowlingAnalyticsSection';
-import BoundaryAnalysis from './BoundaryAnalysis';
-import LazySection from './ui/LazySection';
-import CollapsibleSection, { openSection } from './ui/CollapsibleSection';
-import useIsMobile from '../hooks/useIsMobile';
-import ImpactSection from './playerProfile/sections/ImpactSection';
-import FilterSummary, { joinSummary, summarizeCompetitions, summarizeDateRange } from './ui/FilterSummary';
-import usePlayerData from '../hooks/usePlayerData';
-import VerdictScreen from './playerProfile/verdict/VerdictScreen';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Autocomplete, Box, Skeleton, TextField } from '@mui/material';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../config';
-import { PROFILE_START_DATE } from '../utils/dateDefaults';
+import { colors, fonts } from '../theme/hindsightDark';
+import VerdictScreen, { windowQuery } from './playerProfile/verdict/VerdictScreen';
+import PlaysLikeCard from './playerProfile/cards/PlaysLikeCard';
+import ProfileFilters from './playerProfile/cards/ProfileFilters';
+import { RoleCardSet } from './playerProfile/cards/RoleCards';
 
-const DEFAULT_START_DATE = PROFILE_START_DATE;
-const TODAY = new Date().toISOString().split('T')[0];
+// The player profile, simplified (PROFILE_SIMPLIFY_PLAN.md, agreed 3 Nov 2026): the verdict, who he plays like, then
+// four cards for his role (both sets for an all-rounder, main role first, with a switch). One window and scope for
+// the whole page, set by the verdict's pills and the filters icon and kept in the address bar, so a shared link opens
+// the same view. Each card fits one phone screenshot and shares on its own; the data credit sits once at the foot.
+// Every other section of the old page was removed: the query builder and the connector still reach that data.
 
-const GlobalRankTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
+const DEFAULT_WINDOW = { fmt: 'T20', period: 'recent', scope: 'strong', start: null, end: null };
+
+const readWindow = (search) => {
+  const q = new URLSearchParams(search);
+  const fmt = q.get('format') === 'ODI' ? 'ODI' : 'T20';
+  const start = q.get('start_date'); const end = q.get('end_date');
+  const period = start ? 'custom' : q.get('period') === 'career' ? 'career' : 'recent';
+  return { fmt, period, scope: q.get('scope') === 'all' ? 'all' : 'strong', start: start || null, end: end || null };
+};
+
+const writeSearch = (name, w) => {
+  const q = new URLSearchParams({ name });
+  if (w.fmt !== 'T20') q.set('format', w.fmt);
+  if (w.period === 'career') q.set('period', 'career');
+  if (w.period === 'custom') {
+    if (w.start) q.set('start_date', w.start);
+    if (w.end) q.set('end_date', w.end);
+  }
+  if (w.scope !== 'strong') q.set('scope', w.scope);
+  return `?${q.toString()}`;
+};
+
+/** The role cards' numbers for the page's window (GET /player/{name}/cards); a busy server is retried twice. */
+const useCards = (player, win) => {
+  const query = windowQuery(win);
+  const [state, setState] = useState({ status: 'loading', data: null });
+  useEffect(() => {
+    if (!player) return undefined;
+    let cancelled = false;
+    let timer = null;
+    setState({ status: 'loading', data: null });
+    const load = (attempt) => {
+      fetch(`${config.API_URL}/player/${encodeURIComponent(player)}/cards?${query}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then((data) => { if (!cancelled) setState({ status: 'ready', data }); })
+        .catch((e) => {
+          if (cancelled) return;
+          if (e === 503 && attempt < 2) timer = setTimeout(() => load(attempt + 1), 8000);
+          else setState({ status: e === 404 ? 'empty' : 'error', data: null });
+        });
+    };
+    load(0);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [player, query]);
+  return state;
+};
+
+const RoleSwitch = ({ order, value, onChange }) => (
+  <Box role="tablist" aria-label="Cards first" sx={{ display: 'inline-flex', alignSelf: 'flex-start', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
+    {order.map((r) => (
+      <Box key={r} component="button" type="button" role="tab" aria-selected={r === value} onClick={() => onChange(r)}
+        sx={{
+          all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 700, fontSize: 14, px: 1.75, py: '4px', borderRadius: '999px',
+          bgcolor: r === value ? colors.accent : 'transparent', color: r === value ? colors.bg : colors.textMed,
+          '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
+        }}>
+        {r === 'bat' ? 'Batting' : 'Bowling'}
+      </Box>
+    ))}
+  </Box>
+);
+
+const PlayerPicker = () => {
+  const navigate = useNavigate();
+  const [players, setPlayers] = useState([]);
+  useEffect(() => {
+    fetch(`${config.API_URL}/players`).then((r) => r.json()).then(setPlayers).catch(() => setPlayers([]));
+  }, []);
   return (
-    <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
-      <Typography variant="caption" sx={{ display: 'block', fontWeight: 700 }}>{label}</Typography>
-      <Typography variant="caption" sx={{ display: 'block' }}>
-        Score: {payload[0].value ?? 'N/A'}
-      </Typography>
+    <Box sx={{ px: 2, pt: 3, display: 'flex', flexDirection: 'column', gap: 1.5, maxWidth: 520, mx: 'auto', color: colors.textHi }}>
+      <Box component="h1" sx={{ m: 0, fontFamily: fonts.display, fontWeight: 700, fontSize: 28 }}>Player profile</Box>
+      <Box sx={{ color: colors.textLo, fontSize: 14 }}>Is the hype fair? Pick a player.</Box>
+      <Autocomplete options={players} onChange={(_, v) => v && navigate(`/player?name=${encodeURIComponent(v)}`)}
+        renderInput={(params) => <TextField {...params} label="Player" autoFocus />} />
     </Box>
   );
 };
 
-const GlobalT20RankSection = ({ mode, rankPayload, loading, failed }) => {
-  const modePayload = mode === 'bowling' ? rankPayload?.bowling : rankPayload?.batting;
-  const ranking = modePayload?.ranking;
-  const trajectory = (modePayload?.trajectory || []).slice(-6).map((point) => ({
-    ...point,
-    label: point.date ? point.date.slice(2, 7) : '--',
-    score: point.quality_score,
-  }));
-  const hasTrajectoryValues = trajectory.some((point) => point.score !== null && point.score !== undefined);
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-        <CircularProgress size={20} />
-      </Box>
-    );
-  }
-
-  if (failed) {
-    return (
-      <Typography variant="body2" color="text.secondary">
-        Couldn&apos;t load the global ranking. Long date windows can take too long to compute;
-        try a shorter range.
-      </Typography>
-    );
-  }
-
-  if (!ranking) {
-    // Used to say only "no ranking found", which read like missing data for players like Kohli.
-    return (
-      <Typography variant="body2" color="text.secondary">
-        Not ranked in this window. The global T20 ranking covers men&apos;s T20 players with at
-        least 50 balls {mode === 'bowling' ? 'bowled' : 'faced'} at each length (full, good, short
-        of good{mode === 'bowling' ? '' : ', short'}) in the selected dates; a longer window
-        usually qualifies more players.
-      </Typography>
-    );
-  }
-
-  return (
-    <Box sx={{ display: 'grid', gap: 1.25 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Box
-          sx={{
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            bgcolor: 'primary.main',
-            color: 'primary.contrastText',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            fontSize: '0.78rem',
-          }}
-        >
-          {ranking.rank}
-        </Box>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, flex: 1 }}>
-          Global T20 Rank
-        </Typography>
-        <Chip
-          size="small"
-          color="primary"
-          label={`Quality ${Number(ranking.quality_score || 0).toFixed(1)}`}
-          sx={{ fontWeight: 700 }}
-        />
-      </Box>
-
-      {[
-        { label: 'Quality', value: ranking.quality_score },
-        { label: 'Strike Factor', value: ranking.strike_factor },
-        { label: 'Control Factor', value: ranking.control_factor },
-      ].map((metric) => (
-        <Box key={metric.label}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" color="text.secondary">{metric.label}</Typography>
-            <Typography variant="caption" sx={{ fontWeight: 700 }}>{Number(metric.value || 0).toFixed(1)}</Typography>
-          </Box>
-          <LinearProgress
-            variant="determinate"
-            value={Math.max(0, Math.min(100, Number(metric.value || 0)))}
-            sx={{ height: 6, borderRadius: 999, mt: 0.25 }}
-          />
-        </Box>
-      ))}
-
-      <Box>
-        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
-          Last 6 Months
-        </Typography>
-        <Box sx={{ mt: 0.5, height: 120, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75 }}>
-          {hasTrajectoryValues ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trajectory} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis hide domain={[0, 100]} />
-                <RechartsTooltip content={<GlobalRankTooltip />} />
-                <Line type="monotone" dataKey="score" stroke="#1976d2" strokeWidth={2} dot={false} connectNulls />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Typography variant="caption" color="text.secondary">No trajectory data</Typography>
-            </Box>
-          )}
-        </Box>
-      </Box>
-    </Box>
-  );
-};
-
-const UnifiedPlayerProfile = ({ isMobile: isMobileProp }) => {
-  const theme = useTheme();
-  const isMobileMedia = useMediaQuery(theme.breakpoints.down('md'));
-  const isMobile = isMobileProp ?? isMobileMedia;
-  // Page layout (folded sections + chip nav) runs to md, so portrait tablets (600-899px) no longer
-  // get the desktop 240px sidebar squeezed beside the cards. Charts still size on isMobile.
-  const { isCompact } = useIsMobile();
-
+const UnifiedPlayerProfile = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const name = new URLSearchParams(location.search).get('name');
+  const [win, setWin] = useState(() => readWindow(location.search));
+  const [summary, setSummary] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [first, setFirst] = useState(null);
 
-  const getQueryParam = (param) => {
-    const searchParams = new URLSearchParams(location.search);
-    return searchParams.get(param);
-  };
+  // A new player (search, a twin's link) starts from the address bar's window.
+  useEffect(() => { setWin(readWindow(location.search)); setSummary(null); setFirst(null); }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [dateRange, setDateRange] = useState({ start: DEFAULT_START_DATE, end: TODAY });
-  const [selectedVenue, setSelectedVenue] = useState("All Venues");
-  const [players, setPlayers] = useState([]);
-  const [venues, setVenues] = useState([]);
-  const [competitionFilters, setCompetitionFilters] = useState({
-    leagues: [],
-    international: false,
-    topTeams: 10
-  });
-  const [activeTab, setActiveTab] = useState('batting');
-  const [shouldFetch, setShouldFetch] = useState(false);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [activeSectionId, setActiveSectionId] = useState('glance');
-  const [fetchTrigger, setFetchTrigger] = useState(0);
-  // The filters as of the last GO. Sections read these, not the live form: they used to refetch on
-  // every date keystroke and venue pick while the user was still editing (and while the phone
-  // filter sheet was open), before GO.
-  const [applied, setApplied] = useState(null);
-  const [globalRankPayload, setGlobalRankPayload] = useState(null);
-  const [globalRankLoading, setGlobalRankLoading] = useState(false);
-  const [globalRankFailed, setGlobalRankFailed] = useState(false);
-  const [verdictStatus, setVerdictStatus] = useState(null);
-
-  const sectionRefs = useRef({});
-
-  const {
-    battingStats, bowlingStats, dismissalStats, bowlingDismissalStats,
-    playerType, loading, dismissalLoading, error, fetchPlayerType, fetchAllData
-  } = usePlayerData(selectedPlayer, dateRange, selectedVenue, competitionFilters);
-
-  const showBattingTab = useMemo(() => {
-    if (playerType) return playerType.has_batting_data;
-    return battingStats !== null;
-  }, [playerType, battingStats]);
-
-  const showBowlingTab = useMemo(() => {
-    if (playerType) return playerType.has_bowling_data;
-    return bowlingStats !== null;
-  }, [playerType, bowlingStats]);
-
-  // Read the link first and start the profile straight away; the players and venues lists only feed
-  // the pickers, so they load in the background. Waiting for the 162 KB players list held every
-  // shared link up by about a second.
-  useEffect(() => {
-    const playerNameFromURL = getQueryParam('name');
-    const tabFromURL = getQueryParam('tab');
-    const startDateFromURL = getQueryParam('start_date');
-    const endDateFromURL = getQueryParam('end_date');
-    const venueFromURL = getQueryParam('venue');
-
-    if (tabFromURL === 'bowling') setActiveTab('bowling');
-    if (startDateFromURL || endDateFromURL) {
-      setDateRange({
-        start: startDateFromURL || DEFAULT_START_DATE,
-        end: endDateFromURL || TODAY
-      });
-    }
-    if (venueFromURL) setSelectedVenue(venueFromURL);
-    // The API resolves any spelling, so the URL name is used as given; the picker gets it added
-    // below if its list spells the player differently.
-    if (playerNameFromURL) setSelectedPlayer(playerNameFromURL);
-    setInitialLoadComplete(true);
-
-    const fetchLists = async () => {
-      try {
-        const [playersRes, venuesRes] = await Promise.all([
-          fetch(`${config.API_URL}/players`),
-          fetch(`${config.API_URL}/venues`)
-        ]);
-        const playersList = await playersRes.json();
-        setVenues(['All Venues', ...await venuesRes.json()]);
-
-        // The picker lists one canonical spelling per player, but links from elsewhere (query
-        // builder, matchups, old shares) carry legacy spellings ("V Kohli"). Keep the URL's
-        // spelling selected (the profile is already loading under it) and add it to the options.
-        if (playerNameFromURL && !playersList.some((p) => p === playerNameFromURL)) {
-          setPlayers([...playersList, playerNameFromURL]);
-        } else {
-          setPlayers(playersList);
-        }
-      } catch (err) {
-        console.error('Error fetching initial data:', err);
-      }
-    };
-    fetchLists();
-  }, []);
-
-  useEffect(() => {
-    if (selectedPlayer) fetchPlayerType();
-  }, [selectedPlayer, fetchPlayerType]);
-
-  useEffect(() => {
-    setGlobalRankPayload(null);
-  }, [selectedPlayer]);
-
-  useEffect(() => {
-    if (!playerType) return;
-    if (!playerType.has_batting_data && playerType.has_bowling_data) {
-      setActiveTab('bowling');
-      return;
-    }
-    if (playerType.has_batting_data && !playerType.has_bowling_data) {
-      setActiveTab('batting');
-    }
-  }, [playerType]);
-
-  // Players who do both open on their main role: a link without ?tab= for a specialist bowler
-  // (Bumrah) opened his batting profile. Bowling wins when he has bowled more than twice the balls
-  // he has faced. Decided once per loaded player, and never over an explicit ?tab= or a tap.
-  const roleChosenFor = useRef(null);
-  useEffect(() => {
-    if (!applied?.player || roleChosenFor.current === applied.player) return;
-    // Wait for both fetches: deciding on the first one to land saw 0 balls bowled.
-    if (loading || (!battingStats && !bowlingStats)) return;
-    roleChosenFor.current = applied.player;
-    if (getQueryParam('tab')) return;
-    // Batting overall has no balls field; runs x 100 / strike rate gives balls faced.
-    const bo = battingStats?.overall;
-    const faced = bo?.balls ?? (bo?.strike_rate ? ((bo.runs || 0) * 100) / bo.strike_rate : 0);
-    const bowled = bowlingStats?.overall?.balls ?? 0;
-    if (bowled > 2 * faced) setActiveTab('bowling');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applied, battingStats, bowlingStats, loading]);
-
-  // A shared link (?autoload=true) loads once, at once. The old 500ms pause bought nothing, and a
-  // player with no data no longer re-triggers it.
-  const autoloaded = useRef(false);
-  useEffect(() => {
-    if (autoloaded.current || !initialLoadComplete || !selectedPlayer) return;
-    if (getQueryParam('autoload') !== 'true') return;
-    autoloaded.current = true;
-    setShouldFetch(true);
-  }, [initialLoadComplete, selectedPlayer]);
-
-  useEffect(() => {
-    if (!initialLoadComplete) return;
-    const searchParams = new URLSearchParams();
-    if (selectedPlayer) searchParams.set('name', selectedPlayer);
-    if (selectedVenue !== 'All Venues') searchParams.set('venue', selectedVenue);
-    if (dateRange.start !== DEFAULT_START_DATE) searchParams.set('start_date', dateRange.start);
-    if (dateRange.end !== TODAY) searchParams.set('end_date', dateRange.end);
-    if (activeTab === 'bowling') searchParams.set('tab', 'bowling');
-    if (battingStats || bowlingStats) searchParams.set('autoload', 'true');
-    const newUrl = searchParams.toString() ? `?${searchParams.toString()}` : '';
-    navigate(newUrl, { replace: true });
-  }, [selectedPlayer, selectedVenue, dateRange, activeTab, battingStats, bowlingStats, initialLoadComplete, navigate]);
-
-  useEffect(() => {
-    if (shouldFetch && selectedPlayer) {
-      fetchAllData();
-      setApplied({ player: selectedPlayer, dateRange, venue: selectedVenue, competitionFilters });
-      setFetchTrigger(prev => prev + 1);
-      setShouldFetch(false);
-    }
-  }, [shouldFetch, selectedPlayer, fetchAllData, dateRange, selectedVenue, competitionFilters]);
-
-  useEffect(() => {
-    if (!applied?.player || fetchTrigger <= 0) return;
-
-    let cancelled = false;
-
-    const fetchGlobalRanking = async () => {
-      try {
-        setGlobalRankLoading(true);
-        setGlobalRankFailed(false);
-        const params = new URLSearchParams();
-        params.set('start_date', applied.dateRange.start);
-        params.set('end_date', applied.dateRange.end);
-        params.set('snapshots', '6');
-        params.set('mode', activeTab === 'bowling' ? 'bowling' : 'batting');
-
-        const response = await fetch(
-          `${config.API_URL}/rankings/player/${encodeURIComponent(applied.player)}?${params.toString()}`,
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        if (!cancelled) setGlobalRankPayload(data);
-      } catch (err) {
-        console.error('Failed to fetch global rank payload', err);
-        if (!cancelled) {
-          setGlobalRankPayload(null);
-          setGlobalRankFailed(true);
-        }
-      } finally {
-        if (!cancelled) setGlobalRankLoading(false);
-      }
-    };
-
-    fetchGlobalRanking();
-    return () => { cancelled = true; };
-  }, [applied, fetchTrigger, activeTab]);
-
-  const handleFetch = () => {
-    if (!selectedPlayer) return;
-    setShouldFetch(true);
-  };
-
-  const handleTabChange = (_, newTab) => {
-    if (newTab !== null) {
-      setActiveTab(newTab);
-      setActiveSectionId('glance');
-    }
-  };
-
-  const currentStats = activeTab === 'bowling' ? bowlingStats : battingStats;
-  const currentDismissalStats = activeTab === 'bowling' ? bowlingDismissalStats : dismissalStats;
-  const hasData = currentStats !== null;
-  const verdictOn = Boolean(applied?.player) && verdictStatus !== 'empty' && verdictStatus !== 'error';
-
-  // Build section groups (mirrors VenueNotes pattern)
-  const overviewTakeaway = (() => {
-    const o = currentStats?.overall;
-    if (!o) return undefined;
-    if (activeTab === 'bowling') {
-      return `${o.wickets || 0} wickets at economy ${(o.economy_rate || 0).toFixed(2)} in ${o.matches || 0} matches`;
-    }
-    return `${o.runs || 0} runs at average ${(o.average || 0).toFixed(1)}, strike rate ${(o.strike_rate || 0).toFixed(1)}`;
-  })();
-
-  const sectionGroups = useMemo(() => {
-    if (!hasData || !applied) return [];
-    const { player: appliedPlayer, dateRange: appliedRange, venue: appliedVenue, competitionFilters: appliedCompetitions } = applied;
-
-    const groups = [
-      {
-        id: 'glance',
-        label: 'At a glance',
-        defaultOpen: true,
-        takeaway: activeTab === 'batting'
-          ? 'Runs, best phase, pace v spin, toughest bowling type'
-          : 'Wickets, wicket phase, control, left v right',
-        content: activeTab === 'batting' ? <PlayerGlance stats={currentStats} /> : <BowlerGlance stats={currentStats} />,
-      },
-      {
-        id: 'overview',
-        label: 'Overview',
-        defaultOpen: false,
-        takeaway: overviewTakeaway,
-        content: <OverviewSection stats={currentStats} mode={activeTab} />,
-      },
-      {
-        id: 'impact',
-        label: 'Impact',
-        defaultOpen: true,
-        takeaway: 'Runs added compared with an average player in the same situations',
-        content: (
-          <ImpactSection
-            playerName={appliedPlayer}
-            mode={activeTab}
-            dateRange={appliedRange}
-            selectedVenue={appliedVenue}
-            competitionFilters={appliedCompetitions}
-          />
-        ),
-      },
-      {
-        id: 'global-rank',
-        label: 'Global T20 Rank',
-        takeaway: 'Where the player ranks among T20 players worldwide',
-        content: (
-          <GlobalT20RankSection
-            mode={activeTab}
-            rankPayload={globalRankPayload}
-            loading={globalRankLoading}
-            failed={globalRankFailed}
-          />
-        ),
-      },
-      {
-        id: 'dna',
-        label: 'DNA & Similar',
-        takeaway: 'Playing style in words, and who plays most like this player',
-        content: (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <PlayerDNASummary
-              playerName={appliedPlayer}
-              playerType={activeTab === 'bowling' ? 'bowler' : 'batter'}
-              startDate={appliedRange.start}
-              endDate={appliedRange.end}
-              leagues={appliedCompetitions.leagues}
-              includeInternational={appliedCompetitions.international}
-              topTeams={appliedCompetitions.topTeams}
-              venue={appliedVenue !== 'All Venues' ? appliedVenue : undefined}
-              fetchTrigger={fetchTrigger}
-            />
-            <TwinsSection
-              playerName={appliedPlayer}
-              fallback={(
-                <Typography variant="body2" color="text.secondary">
-                  Not enough cricket against strong sides since 2015 (120+ balls in two seasons) to find this player's
-                  doppelgängers.
-                </Typography>
-              )}
-            />
-          </Box>
-        ),
-      },
-      {
-        id: 'shot-map',
-        label: 'Shot map',
-        defaultOpen: true,
-        takeaway: 'Where he scores, and what he is bowled',
-        content: (
-          <ShotMapSection
-            playerName={appliedPlayer}
-            dateRange={appliedRange}
-            selectedVenue={appliedVenue}
-            competitionFilters={appliedCompetitions}
-            isMobile={isMobile}
-          />
-        ),
-      },
-      {
-        id: 'performance',
-        label: 'Performance',
-        takeaway: 'By phase, against pace and spin, by line and length',
-        content: (
-          <PerformanceSection
-            stats={currentStats}
-            mode={activeTab}
-            isMobile={isMobile}
-            playerName={appliedPlayer}
-            dateRange={appliedRange}
-            selectedVenue={appliedVenue}
-            competitionFilters={appliedCompetitions}
-          />
-        ),
-      },
-    ];
-
-    // Matchups — batting only
-    if (activeTab === 'batting' && battingStats) {
-      groups.push({
-        id: 'matchups',
-        label: 'Matchups',
-        takeaway: 'Against each bowling type',
-        content: (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <BowlingMatchupMatrix stats={battingStats} />
-            <TopInnings innings={battingStats.innings || []} count={10} />
-          </Box>
-        ),
-      });
-    }
-
-    groups.push({
-      id: 'advanced-analytics',
-      label: 'Advanced Analytics',
-      takeaway: 'Pressure, spells and rolling form',
-      content: (
-        activeTab === 'bowling' ? (
-          <AdvancedBowlingAnalyticsSection
-            playerName={appliedPlayer}
-            dateRange={appliedRange}
-            selectedVenue={appliedVenue}
-            competitionFilters={appliedCompetitions}
-            isMobile={isMobile}
-            // LazySection already defers the mount until the section nears the viewport. Gating
-            // on the *active* section blanked the content as soon as you scrolled past it.
-            enabled
-          />
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            Advanced analytics in this section are currently available for bowling view.
-          </Typography>
-        )
-      ),
+  const changeWindow = useCallback((patch) => {
+    setWin((w) => {
+      const next = { ...w, ...patch };
+      if (patch.period && patch.period !== 'custom') { next.start = null; next.end = null; }
+      navigate({ search: writeSearch(name, next), hash: '' }, { replace: true });
+      return next;
     });
+  }, [name, navigate]);
 
-    groups.push({
-      id: 'boundaries',
-      label: 'Boundaries',
-      takeaway: 'How often boundaries come, by phase and bowler type',
-      content: (
-        <BoundaryAnalysis
-          context={activeTab === 'bowling' ? 'bowler' : 'batter'}
-          name={appliedPlayer}
-          startDate={appliedRange.start}
-          endDate={appliedRange.end}
-          leagues={appliedCompetitions.leagues}
-          includeInternational={appliedCompetitions.international}
-          isMobile={isMobile}
-        />
-      ),
-    });
+  useEffect(() => { if (name) document.title = `${name} · Hindsight`; }, [name]);
 
-    groups.push({
-      id: 'dismissals',
-      label: activeTab === 'bowling' ? 'Wickets' : 'Dismissals',
-      takeaway: 'How and where wickets fall',
-      content: (
-        <DismissalSection
-          dismissalData={currentDismissalStats}
-          loading={dismissalLoading}
-          mode={activeTab}
-          playerName={appliedPlayer}
-          dateRange={appliedRange}
-          selectedVenue={appliedVenue}
-          competitionFilters={appliedCompetitions}
-          isMobile={isMobile}
-        />
-      ),
-    });
+  const cards = useCards(name, win);
+  const onSummary = useCallback((s) => setSummary(s), []);
 
-    groups.push({
-      id: 'visualizations',
-      label: 'Visualizations',
-      takeaway: 'Innings by innings: scores, strike rate, consistency',
-      content: (
-        <VisualizationsSection
-          stats={currentStats}
-          mode={activeTab}
-          appliedPlayer={appliedPlayer}
-          dateRange={appliedRange}
-          selectedVenue={appliedVenue}
-          competitionFilters={appliedCompetitions}
-        />
-      ),
-    });
+  // The roles the verdict shows: the main one, plus the other for an all-rounder.
+  const order = useMemo(() => {
+    if (!summary) return [];
+    const roles = Object.keys(summary.roles || {});
+    const main = summary.primary_role;
+    const other = roles.find((r) => r !== main);
+    return summary.allrounder && other ? [main, other] : [main];
+  }, [summary]);
+  const lead = first && order.includes(first) ? first : order[0];
+  const shown = lead ? [lead, ...order.filter((r) => r !== lead)] : [];
 
-    groups.push({
-      id: 'explore',
-      label: 'Explore',
-      takeaway: 'Ready-made questions for the query builder',
-      content: (
-        <ExploreSection
-          playerName={appliedPlayer}
-          mode={activeTab}
-          dateRange={appliedRange}
-          venue={appliedVenue}
-        />
-      ),
-    });
-
-    // The shot map is batting-only (bowlers keep line & length in Performance).
-    return activeTab === 'batting' ? groups : groups.filter((g) => g.id !== 'shot-map');
-  }, [
-    hasData, currentStats, currentDismissalStats, dismissalLoading, activeTab, battingStats,
-    applied, isMobile, fetchTrigger, overviewTakeaway,
-    globalRankPayload, globalRankLoading, globalRankFailed,
-  ]);
-
-  // Scroll to section handler
-  const handleSectionSelect = useCallback((sectionId) => {
-    setActiveSectionId(sectionId);
-    if (isCompact) {
-      // Opens the folded section, then scrolls to it.
-      openSection(`section-${sectionId}`);
-      return;
-    }
-    const el = sectionRefs.current[sectionId];
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [isCompact]);
-
-  // Reset active section on tab change or new data
+  // A shared card link (#pitch, #start...) scrolls to its card once the cards are drawn.
   useEffect(() => {
-    setActiveSectionId('glance');
-  }, [activeTab, selectedPlayer]);
+    if (cards.status !== 'ready' || !location.hash) return;
+    const el = document.getElementById(location.hash.slice(1));
+    if (el) el.scrollIntoView({ block: 'start' });
+  }, [cards.status, location.hash]);
 
-  // IntersectionObserver for auto-tracking active section
-  useEffect(() => {
-    if (!sectionGroups.length) return undefined;
+  if (!name) return <PlayerPicker />;
 
-    const visibleSections = new Map();
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        const sectionId = entry.target.dataset.sectionId;
-        if (!sectionId) return;
-        if (entry.isIntersecting) {
-          visibleSections.set(sectionId, entry.intersectionRatio);
-        } else {
-          visibleSections.delete(sectionId);
-        }
-      });
-
-      const nextActive = [...visibleSections.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-      if (nextActive) setActiveSectionId(nextActive);
-    }, {
-      rootMargin: '-15% 0px -60% 0px',
-      threshold: [0.1, 0.35, 0.6],
-    });
-
-    sectionGroups.forEach((group) => {
-      const el = sectionRefs.current[group.id];
-      if (el) observer.observe(el);
-    });
-
-    return () => observer.disconnect();
-  }, [sectionGroups]);
-
-  // Get recent innings for the form strip
-  const recentInnings = useMemo(() => {
-    // Innings arrive newest first, every one in the window (100+ for a long range); the strip is
-    // for recent form, so it shows the last 10.
-    if (activeTab === 'bowling' && bowlingStats?.innings) return bowlingStats.innings.slice(0, 10);
-    if (activeTab === 'batting' && battingStats?.innings) return battingStats.innings.slice(0, 10);
-    return [];
-  }, [activeTab, battingStats, bowlingStats]);
-
-  // Filter bar: one summary line on phones once a profile is showing
-  const filterBar = (
-  <Box sx={{ px: { xs: 1.5, sm: 0 }, mb: 2 }}>
-    <FilterSummary
-      collapsed={isMobile && hasData}
-      title={selectedPlayer}
-      summary={joinSummary(
-        summarizeDateRange(dateRange.start, dateRange.end),
-        selectedVenue && selectedVenue !== 'All Venues' ? selectedVenue.split(',')[0] : null,
-        summarizeCompetitions(competitionFilters),
-      )}
-      sheetTitle="Player filters"
-    >
-    <Box>
-    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
-      <Autocomplete
-        value={selectedPlayer}
-        onChange={(_, newValue) => setSelectedPlayer(newValue)}
-        options={players}
-        sx={{ width: { xs: '100%', md: 300 } }}
-        getOptionLabel={(option) => typeof option === 'string' ? option : option || ''}
-        isOptionEqualToValue={(option, value) => option === value}
-        renderInput={(params) => <TextField {...params} label="Select Player" variant="outlined" required />}
-      />
-      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        <TextField
-          label="Start Date" type="date" value={dateRange.start}
-          onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-          InputLabelProps={{ shrink: true }}
-        />
-        <TextField
-          label="End Date" type="date" value={dateRange.end}
-          onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-          InputLabelProps={{ shrink: true }}
-        />
-        <Autocomplete
-          value={selectedVenue}
-          onChange={(_, newValue) => setSelectedVenue(newValue)}
-          options={venues}
-          sx={{ width: { xs: '100%', md: 250 } }}
-          renderInput={(params) => <TextField {...params} label="Select Venue" />}
-        />
-        <Button
-          variant="contained"
-          onClick={handleFetch}
-          disabled={!selectedPlayer || loading}
-          id="go-button"
-          data-filter-submit
-        >
-          GO
-        </Button>
-      </Box>
-    </Box>
-    <CompetitionFilter onFilterChange={setCompetitionFilters} isMobile={isMobile} value={competitionFilters} />
-    </Box>
-    </FilterSummary>
-  </Box>
-  );
-
+  const qb = `/query?batters=${encodeURIComponent(name)}`;
   return (
-    <Box sx={{ mx: { xs: 0, sm: 2 }, p: { xs: 0, sm: 2 }, maxWidth: 1400, margin: '0 auto' }}>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+    <Box sx={{ maxWidth: 560, mx: 'auto', pb: 3, color: colors.textHi }}>
+      <VerdictScreen key={name} player={name} win={win} onWindow={changeWindow} onFilters={() => setFiltersOpen(true)} onSummary={onSummary} />
 
-      {/* The verdict screen (VERDICT_SCREEN_PLAN.md V4) leads once a player is loaded; the filters below it drive
-          the detailed sections. Until it has something to show (or if it has nothing), the filters lead as before. */}
-      {!verdictOn && filterBar}
-      {applied?.player && (
-        <VerdictScreen key={applied.player} player={applied.player} onStatus={setVerdictStatus} />
-      )}
-      {verdictOn && filterBar}
+      <Box sx={{ px: 2, display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+        {win.fmt === 'T20' && <PlaysLikeCard player={name} unit={win.period === 'career' ? 'career' : 'window'} />}
 
-      {/* Loading state */}
-      {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress />
+        {shown.length > 1 && <RoleSwitch order={order} value={lead} onChange={setFirst} />}
+        {cards.status === 'loading' && summary && (
+          <>
+            <Skeleton variant="rounded" height={240} sx={{ bgcolor: colors.surface2, borderRadius: '18px' }} />
+            <Skeleton variant="rounded" height={200} sx={{ bgcolor: colors.surface2, borderRadius: '18px' }} />
+          </>
+        )}
+        {cards.status === 'ready' && shown.map((role) => (
+          <RoleCardSet key={role} role={role} player={name} data={cards.data.roles[role]} hand={summary?.identity?.bat_hand} />
+        ))}
+        {cards.status === 'error' && (
+          <Box sx={{ color: colors.textLo, fontSize: 13.5 }}>The detailed cards couldn't load just now. Try again shortly.</Box>
+        )}
+
+        <Box component={Link} to={qb} sx={{ textAlign: 'center', color: colors.accent, fontSize: 14, textDecoration: 'none', pt: 1, whiteSpace: 'nowrap' }}>
+          Dig deeper in the query builder →
         </Box>
-      )}
+        <Box sx={{ borderTop: `1px solid ${colors.border}`, pt: 1.5, textAlign: 'center', fontSize: 11.5, color: colors.textLo, lineHeight: 1.6 }}>
+          <Box sx={{ whiteSpace: 'nowrap' }}>Data: Himanish Ganjoo &amp; TechRadar, Cricsheet</Box>
+          <Box sx={{ whiteSpace: 'nowrap' }}>Metrics: Himanish Ganjoo&apos;s T20 Primer</Box>
+        </Box>
+      </Box>
 
-      {/* Main content */}
-      {hasData && !loading && (
-        <>
-          {/* Header area */}
-          <Box
-            sx={{
-              mb: { xs: 0.5, sm: 2.5 },
-              px: { xs: 1.5, sm: 3 },
-              py: { xs: 0.5, sm: 2.5 },
-              border: isMobile ? 'none' : '1px solid',
-              borderColor: 'divider',
-              borderRadius: isMobile ? 0 : 3,
-              boxShadow: isMobile ? 'none' : 1,
-              bgcolor: isMobile ? 'transparent' : 'background.paper',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
-              {/* Name and caption stack, so a phone never splits "V / Kohli Batting / Profile". With the verdict
-                  screen above, the name is already there: this row just labels the details. */}
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                {verdictOn ? (
-                  <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.12em' }}>
-                    In detail · T20s
-                  </Typography>
-                ) : (
-                  <>
-                    <Typography variant={isMobile ? 'h5' : 'h4'} sx={{ fontWeight: 700, lineHeight: 1.15 }}>
-                      {selectedPlayer}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {activeTab === 'bowling' ? 'Bowling' : 'Batting'} profile
-                    </Typography>
-                  </>
-                )}
-              </Box>
-
-              {!verdictOn && <ShareButton variant="icon" kind="player" title={`${selectedPlayer} on Hindsight`} />}
-              {showBattingTab && showBowlingTab && (
-                <ToggleButtonGroup
-                  value={activeTab}
-                  exclusive
-                  onChange={handleTabChange}
-                  size="small"
-                  fullWidth={isMobile}
-                  sx={{ flexShrink: 0, flexBasis: { xs: '100%', sm: 'auto' } }}
-                >
-                  <ToggleButton value="batting" sx={{ px: 2 }}>Batting</ToggleButton>
-                  <ToggleButton value="bowling" sx={{ px: 2 }}>Bowling</ToggleButton>
-                </ToggleButtonGroup>
-              )}
-            </Box>
-
-            {!verdictOn && <RecentFormStrip innings={recentInnings} mode={activeTab} isMobile={isMobile} />}
-          </Box>
-
-          {/* Section navigation + content */}
-          {isCompact ? (
-            <>
-              <VenueSectionTabs
-                sections={sectionGroups.map(({ id, label }) => ({ id, label }))}
-                activeSectionId={activeSectionId}
-                onSectionSelect={handleSectionSelect}
-              />
-              {/* Phones and portrait tablets: each section folds to its title and a one-line
-                  takeaway; Overview and Impact start open. A section mounts (and fetches) the
-                  first time it is opened. */}
-              <Box sx={{ display: 'flex', flexDirection: 'column', px: 1, pb: 2 }}>
-                {sectionGroups.map((section) => (
-                  <Box
-                    key={`${activeTab}-${section.id}`}
-                    ref={(el) => { sectionRefs.current[section.id] = el; }}
-                    data-section-id={section.id}
-                  >
-                    <CollapsibleSection
-                      id={`section-${section.id}`}
-                      title={section.label}
-                      takeaway={section.takeaway}
-                      defaultOpen={Boolean(section.defaultOpen)}
-                    >
-                      {section.content}
-                    </CollapsibleSection>
-                  </Box>
-                ))}
-              </Box>
-            </>
-          ) : (
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: '240px minmax(0, 1fr)',
-                gap: 3,
-                alignItems: 'start',
-              }}
-            >
-              <VenueNotesDesktopNav
-                sections={sectionGroups.map(({ id, label }) => ({ id, label }))}
-                activeSectionId={activeSectionId}
-                onSectionSelect={handleSectionSelect}
-              />
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {sectionGroups.map((section, index) => (
-                  <Box
-                    key={section.id}
-                    ref={(el) => { sectionRefs.current[section.id] = el; }}
-                    data-section-id={section.id}
-                    sx={{ scrollMarginTop: '88px' }}
-                  >
-                    <Card
-                      sx={{
-                        p: 3,
-                        borderRadius: 3,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        boxShadow: 1,
-                      }}
-                    >
-                      <Typography variant="h5" sx={{ mb: 2.5, fontWeight: 700 }}>
-                        {section.label}
-                      </Typography>
-                      <LazySection eager={index < 2}>{section.content}</LazySection>
-                    </Card>
-                  </Box>
-                ))}
-              </Box>
-            </Box>
-          )}
-        </>
-      )}
+      <ProfileFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} value={win} onApply={(w) => changeWindow(w)} />
     </Box>
   );
 };

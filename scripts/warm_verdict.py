@@ -52,6 +52,7 @@ def main() -> int:
     import main as app
     from database import get_session
     from services.fixture_scraper import fetch_upcoming_fixtures
+    from services.player_cards import get_cards
     from services.player_verdict import _peer_pool, _split_pool, default_window, get_summary, scope_params
     from scripts.warm_previews import site_team
 
@@ -94,6 +95,7 @@ def main() -> int:
             continue
         try:
             get_summary(db, name, fmt)
+            get_cards(db, name, fmt)  # the role cards below the verdict (PROFILE_SIMPLIFY_PLAN.md P2)
             built += 1
         except Exception as exc:  # one player's failure never blocks the rest
             db.rollback()

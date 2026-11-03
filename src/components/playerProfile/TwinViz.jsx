@@ -74,8 +74,9 @@ export const TwinMap = ({ player, points, highlight = 5 }) => {
   );
 };
 
-export const TwinCompare = ({ player, twin, rows }) => {
-  const [open, setOpen] = useState(false);
+// alwaysOpen: the profile's "plays like" rows open with a chevron of their own, so the comparison shows without its button.
+export const TwinCompare = ({ player, twin, rows, alwaysOpen = false }) => {
+  const [open, setOpen] = useState(alwaysOpen);
   if (!rows?.length) return null;
   const groups = [];
   rows.forEach((r) => {
@@ -87,10 +88,12 @@ export const TwinCompare = ({ player, twin, rows }) => {
   const track = (v) => LW + 8 + (v / 100) * (W - LW - 16);
   return (
     <Box>
-      <Box component="button" onClick={() => setOpen(!open)} aria-expanded={open}
-        sx={{ all: 'unset', cursor: 'pointer', fontSize: 12, color: colors.accent, '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>
-        {open ? 'Hide the comparison' : `Compare all ${rows.length} features`}
-      </Box>
+      {!alwaysOpen && (
+        <Box component="button" onClick={() => setOpen(!open)} aria-expanded={open}
+          sx={{ all: 'unset', cursor: 'pointer', fontSize: 12, color: colors.accent, '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>
+          {open ? 'Hide the comparison' : `Compare all ${rows.length} features`}
+        </Box>
+      )}
       {open && (
         <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box sx={{ display: 'flex', gap: 1.5, fontSize: 11.5, color: colors.textLo }}>
