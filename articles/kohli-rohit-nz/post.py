@@ -31,7 +31,11 @@ ROHIT, KOHLI = "Rohit Sharma", "Virat Kohli"
 PLAYERS = [ROHIT, KOHLI]
 THREAD_PLAYERS = [ROHIT, KOHLI]
 ODI = {"fmt": "ODI", "include_international": True, "leagues": [], "metrics_perspective": "batting", "limit": 1000}
-ELSEWHERE = (date(2014, 1, 1), date(2020, 12, 31))   # the years of their New Zealand tours with ball tracking
+ELSEWHERE = (date(2014, 1, 1), date(2020, 12, 31))
+# The opener at Eden Park, 4 Nov 2026, before it reached the ball-by-ball data: credited text, never charted
+# (docs/social_rules.md). ESPNcricinfo scorecard, match 1539437.
+TODAY = ("Today at Eden Park: Rohit 0 off 6, caught off Jamieson in the first over; Kohli 74 off 51 with 13 fours as "
+         "India chased 143 (DLS) to win by five wickets. Scorecard: ESPNcricinfo.")   # the years of their New Zealand tours with ball tracking
 LEN_KEYS = ("YORKER", "FULL", "GOOD_LENGTH", "SHORT_OF_A_GOOD_LENGTH", "SHORT", "FULL_TOSS")
 
 
@@ -179,6 +183,7 @@ def copy(b):
         f"Where the runs go has changed. Kohli scored {kb[0]}% of his New Zealand runs behind square on the off side; this "
         f"year {kb[1]}%. Rohit has gone square: {r['now']['zones'].get(7, 0)}% of his runs now come through point, from "
         f"{r['nz']['zones'].get(7, 0)}%.",
+        TODAY,
         f"Both ways: Rohit still edges, misses or mistimes {r['now']['false_shots']:.0f}% of balls, as he did in New Zealand "
         f"({r['nz']['false_shots']:.0f}%). He's scoring faster off the same risk. Kohli is down to {k['now']['false_shots']:.0f}%.",
         "ODIs only. New Zealand: their innings there from 2009 to 2020 (line and length tracked from 2015). Ball-by-ball "
@@ -204,6 +209,7 @@ def thread(b, link):
         f"{r['nz']['zones'].get(7, 0)}% then, {r['now']['zones'].get(7, 0)}% now.",
         f"Both ways: Rohit still edges, misses or mistimes {r['now']['false_shots']:.0f}% of balls, as in New Zealand. Kohli is "
         f"down to {k['now']['false_shots']:.0f}%.",
+        "Today at Eden Park: Rohit 0 off 6, caught off Jamieson. Kohli 74 off 51, 13 fours, as India won by five wickets.",
         f"Will it be different this time?\n\nEvery ball, free: {link}\nData: @himganj153 & @TechRadar9",
     ]
     from services.ig_x import hand_thread
