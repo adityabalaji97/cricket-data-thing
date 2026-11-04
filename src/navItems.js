@@ -23,7 +23,7 @@ export const NAV_ITEMS = [
   { path: '/graphics', label: 'Make a Graphic', title: 'Make a Graphic', group: 'explore' },
   { path: '/scorecards', label: 'Scorecards', title: 'Scorecards', group: 'explore' },
   { path: '/notes', label: 'Notes', title: 'Notes', group: 'explore' },
-  { path: '/team', label: 'Team Profile', title: 'Team Profile', t20Only: true, group: 'explore' },
+  { path: '/team', label: 'Teams', title: 'Team', group: 'explore' },
   { path: '/team-comparison', label: 'Team Comparison', title: 'Team Comparison', t20Only: true, group: 'compare' },
   { path: '/doppelgangers', label: 'Doppelgangers', title: 'Doppelgangers', t20Only: true, group: 'compare' },
   { path: '/ipl-predictions', label: 'IPL Predictions', title: 'IPL Predictions', t20Only: true, group: 'play' },

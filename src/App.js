@@ -21,7 +21,8 @@ import LandingPage from './components/LandingPage';
 import UnifiedPlayerProfile from './components/UnifiedPlayerProfile';
 import BatterComparison from './components/BatterComparison';
 import QueryBuilder from './components/QueryBuilder'; // Import the new QueryBuilder component
-import TeamProfile from './components/TeamProfile';
+import TeamPage from './components/pages/TeamPage';
+import VenuePage from './components/pages/VenuePage';
 import TeamComparison from './components/TeamComparison';
 import DoppelgangerLeaderboard from './components/DoppelgangerLeaderboard';
 import IPLPredictions from './components/IPLPredictions';
@@ -198,6 +199,9 @@ const AppContent = () => {
   const hasFetchedRef = useRef(false);
   const dateManuallyAdjustedRef = useRef(false);
   const isQueryRoute = location.pathname === '/query';
+  // A ground with no teams is the venue page (TEAM_VENUE_PLAN.md G2); two teams make it the match preview.
+  const venueOnly = location.pathname === '/venue' && Boolean(getQueryParam('venue'))
+    && !getQueryParam('team1') && !getQueryParam('team2');
 
 
 
@@ -529,6 +533,7 @@ const AppContent = () => {
 
   // Create page title based on current tab
   const getPageTitle = () => {
+    if (venueOnly) return 'Venue';
     return getPageTitleForPath(location.pathname);
   };
 
@@ -715,7 +720,7 @@ const AppContent = () => {
         <Route path="/comparison" element={<MensT20Scope><BatterComparison /></MensT20Scope>} />
         <Route path="/matchups" element={<MensT20Scope><MatchupsTab isMobile={isMobile} /></MensT20Scope>} />
         <Route path="/query" element={<QueryBuilder isMobile={isMobile} />} />
-        <Route path="/team" element={<MensT20Scope><TeamProfile isMobile={isMobile} /></MensT20Scope>} />
+        <Route path="/team" element={<TeamPage />} />
         <Route path="/team-comparison" element={<MensT20Scope><TeamComparison /></MensT20Scope>} />
         <Route path="/doppelgangers" element={<MensT20Scope><DoppelgangerLeaderboard /></MensT20Scope>} />
         <Route path="/ipl-predictions" element={<MensT20Scope><IPLPredictions /></MensT20Scope>} />
@@ -738,7 +743,7 @@ const AppContent = () => {
         <Route path="/g/:id" element={<React.Suspense fallback={null}><GraphicPage /></React.Suspense>} />
         <Route path="/links" element={<React.Suspense fallback={null}><IgLinks /></React.Suspense>} />
         <Route path="/graphics" element={<React.Suspense fallback={null}><GraphicsLanding /></React.Suspense>} />
-        <Route path="/venue" element={
+        <Route path="/venue" element={venueOnly ? <VenuePage /> : (
           <Box sx={{ my: { xs: 1.5, md: 3 }, bgcolor: 'background.default', color: 'text.primary' }}>
             <PreviewFilters
               error={error}
@@ -790,7 +795,7 @@ const AppContent = () => {
               </>
             )}
           </Box>
-        } />
+        )} />
       </Routes>
       {!location.pathname.startsWith('/wrapped') && (
         <Box

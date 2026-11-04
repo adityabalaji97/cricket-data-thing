@@ -177,6 +177,12 @@ jobs:
         continue-on-error: true
         run: python scripts/warm_verdict.py --hours 36
 
+      # The venue and team pages (TEAM_VENUE_PLAN.md) are 15-30 s cold: build the likeliest ones (fixtures in the next
+      # 48 hours, the IPL, then every ground and side with a T20 in the last month), capped at 40 minutes.
+      - name: Warm venue and team pages
+        continue-on-error: true
+        run: python scripts/warm_pages.py --hours 48 --max-minutes 40
+
       # Statistical twins (DOPPELGANGER_PLAN.md): the feature vectors for the current and previous season, and for the
       # profile's career window (one window kept). ~10 queries per role and period. Never blocks the rest of the run.
       - name: Statistical twins vectors
