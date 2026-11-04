@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Tooltip } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import { colors, fonts } from '../../../theme/hindsightDark';
 import { getTeamAbbr } from '../../../utils/teamAbbreviations';
 
@@ -25,7 +26,8 @@ const short = (team) => {
 };
 
 // The last 8 games, coloured by runs above par (bat and ball together), never by wickets alone: a 0/16 in four overs
-// is a good spell. Games with no par (The Hundred, ODIs) stay neutral with a dashed edge.
+// is a good spell. Games with no par (The Hundred, ODIs) stay neutral with a dashed edge. Each chip opens the match's
+// scorecard.
 const FormChips = ({ games }) => {
   if (!games || !games.length) return null;
   return (
@@ -40,12 +42,16 @@ const FormChips = ({ games }) => {
           ? 'No par for this match'
           : `${g.raa > 0 ? '+' : ''}${g.raa.toFixed(1)} runs above par`;
         return (
-          <Tooltip key={g.match_id} enterTouchDelay={0} placement="top"
-            title={`v ${g.opponent} · ${g.date} · ${g.competition}. ${parts.join('; ')}. ${par}.`}>
-            <Box tabIndex={0} sx={{
-              borderRadius: '8px', py: '3px', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0,
-              bgcolor: st.bg, border: `1px ${t === 'none' ? 'dashed' : 'solid'} ${st.border}`,
-            }}>
+          <Tooltip key={g.match_id} placement="top"
+            title={`v ${g.opponent} · ${g.date} · ${g.competition}. ${parts.join('; ')}. ${par}. Tap for the scorecard.`}>
+            <Box component={RouterLink} to={`/scorecard/${g.match_id}`}
+              aria-label={`v ${g.opponent}, ${g.date}: scorecard`}
+              sx={{
+                borderRadius: '8px', py: '3px', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0,
+                bgcolor: st.bg, border: `1px ${t === 'none' ? 'dashed' : 'solid'} ${st.border}`,
+                color: colors.textHi, textDecoration: 'none',
+                '&:hover, &:focus-visible': { borderColor: colors.accent, outline: 'none' },
+              }}>
               <Box component="span" sx={{ fontSize: 8, lineHeight: 1, height: 9, color: st.glyphColour }}>{st.glyph}</Box>
               {g.bowl && (
                 <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: 600, fontSize: 12.5, lineHeight: 1.15, whiteSpace: 'nowrap' }}>

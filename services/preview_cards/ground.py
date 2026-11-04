@@ -83,7 +83,7 @@ def what_wins(ctx) -> Optional[Card]:
         title = f"{line} has won {won} of {len(above)} times here{when}"
     else:
         title = f"Nobody has posted {line} here{when}"
-    points = [{"year": m.year, "total": m.first["runs"], "won": m.result == "bat",
+    points = [{"match_id": m.id, "year": m.year, "total": m.first["runs"], "won": m.result == "bat",
                "recent": since is None or m.year >= since} for m in full]
     # At an IPL ground hosting an international, most dots are IPL innings: say so, and count the huge ones.
     comps = {m.first.get("competition") for m in full}

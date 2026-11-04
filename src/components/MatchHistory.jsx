@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
     Box,
     Button,
@@ -110,7 +111,12 @@ const MatchCompactRow = ({ match, indexPrefix, isMobile }) => {
     return (
         <Box
             key={`${indexPrefix}-${match?.id || match?.date || 'match'}`}
+            // A row with the match's id opens its scorecard.
+            {...(match?.match_id ? { component: RouterLink, to: `/scorecard/${match.match_id}`, 'aria-label': 'Open the scorecard' } : {})}
             sx={{
+                color: 'inherit',
+                textDecoration: 'none',
+                ...(match?.match_id ? { cursor: 'pointer', '&:hover, &:focus-visible': { borderColor: hsColors.accent } } : {}),
                 px: 1,
                 py: 0.75,
                 borderRadius: 1.25,

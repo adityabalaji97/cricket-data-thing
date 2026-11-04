@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
-PAGE_VERSION = "v4"
+PAGE_VERSION = "v5"
 PEER_MIN_BALLS = 600          # a side needs this many balls in a phase to be ranked in it
 TOP_BAT_BALLS, TOP_BOWL_BALLS = 60, 120
 POSITIONS = 8
@@ -121,7 +121,7 @@ def results(db, team: str, scope, peers: List[str]) -> Dict[str, Any]:
         if scope["kind"] == "international" and opp not in peer_set:
             continue  # internationals count matches between the top sides only
         result = None if not r["winner"] else ("won" if r["winner"] in names else "lost")
-        games.append({"date": str(r["d"]), "opp": opp, "opp_short": _short(opp), "first": mine_first, "result": result,
+        games.append({"match_id": str(r["p_match"]), "date": str(r["d"]), "opp": opp, "opp_short": _short(opp), "first": mine_first, "result": result,
                       "score": f"{r['r1']}" if mine_first else f"{r['r2']}/{r['w2']}", "ground": r["ground"]})
     decided = [g for g in games if g["result"]]
     opp = defaultdict(lambda: {"won": 0, "lost": 0})

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Autocomplete, Box, TextField } from '@mui/material';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import ProfileCard from '../playerProfile/cards/ProfileCard';
@@ -44,8 +44,10 @@ const LastGames = ({ games }) => (
       {games.map((g) => {
         const tone = g.result === 'won' ? colors.accent : g.result === 'lost' ? colors.red : colors.textLo;
         return (
-          <Box key={`${g.date}-${g.opp}`} title={`${g.date}: v ${g.opp}, ${g.result || 'no result'}`}
-            sx={{ border: `1px solid ${g.result ? tone : colors.borderStrong}`, borderRadius: '8px', textAlign: 'center', py: 0.5, minWidth: 0 }}>
+          <Box key={`${g.date}-${g.opp}`} title={`${g.date}: v ${g.opp}, ${g.result || 'no result'} · scorecard`}
+            {...(g.match_id ? { component: Link, to: `/scorecard/${g.match_id}` } : {})}
+            sx={{ border: `1px solid ${g.result ? tone : colors.borderStrong}`, borderRadius: '8px', textAlign: 'center', py: 0.5, minWidth: 0,
+              textDecoration: 'none', color: 'inherit', '&:hover, &:focus-visible': { bgcolor: colors.surface2, outline: 'none' } }}>
             <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 16, color: tone }}>{g.result === 'won' ? 'W' : g.result === 'lost' ? 'L' : '–'}</Box>
             <Box sx={{ fontFamily: fonts.mono, fontSize: 10, color: colors.textLo, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.opp_short}</Box>
           </Box>

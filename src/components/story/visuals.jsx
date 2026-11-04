@@ -172,12 +172,16 @@ const TotalsScatter = ({ payload }) => {
             <text x={W - right} y={y(payload.line) - 5} textAnchor="end" style={{ ...svgText, fill: colors.textMed }}>{payload.line}</text>
           </>
         )}
-        {payload.points.map((p, i) => (
-          <circle key={i} cx={x(p.year, i)} cy={y(p.total)} r="4.5" fill={p.won ? SERIES[0] : SERIES[1]}
-            fillOpacity={p.recent ? 0.95 : 0.3} stroke={colors.surface1} strokeWidth="1.5">
-            <title>{`${p.year}: ${p.total}, ${p.won ? 'defended' : 'chased down'}`}</title>
-          </circle>
-        ))}
+        {payload.points.map((p, i) => {
+          const dot = (
+            <circle cx={x(p.year, i)} cy={y(p.total)} r="4.5" fill={p.won ? SERIES[0] : SERIES[1]}
+              fillOpacity={p.recent ? 0.95 : 0.3} stroke={colors.surface1} strokeWidth="1.5">
+              <title>{`${p.year}: ${p.total}, ${p.won ? 'defended' : 'chased down'}${p.match_id ? ' · tap for the scorecard' : ''}`}</title>
+            </circle>
+          );
+          // Each dot is a match: tapping it opens the scorecard.
+          return p.match_id ? <a key={i} href={`/scorecard/${p.match_id}`} style={{ cursor: 'pointer' }}>{dot}</a> : <g key={i}>{dot}</g>;
+        })}
         {years.map((yr) => (
           <text key={yr} x={x(yr, 5)} y={H - 6} textAnchor="middle" style={{ ...svgText, fill: colors.textFaint }}>{`'${String(yr).slice(2)}`}</text>
         ))}
