@@ -1499,6 +1499,63 @@ const BidTrail = ({ payload }) => {
   );
 };
 
+/**
+ * Where the runs went, then and now: two scoring wheels side by side, each wedge shaded by its share of the batter's
+ * runs (behind the batter at the top, a right-hander's leg side on the right), the share written in it. Zones named in
+ * `highlight` are outlined in both wheels, so the eye goes to what moved.
+ * payload: {hand:'RHB'|'LHB', pair:[{label, zones:{1..8: pct}}, {label, zones}], highlight?:[zone], note?}
+ */
+const ZONE_NAMES = { 1: 'Fine leg', 2: 'Square leg', 3: 'Midwicket', 4: 'Long on', 5: 'Long off', 6: 'Cover', 7: 'Point', 8: 'Third man' };
+const ZonePair = ({ payload }) => {
+  const lefty = payload.hand === 'LHB';
+  const order = lefty ? [1, 8, 7, 6, 5, 4, 3, 2] : [8, 1, 2, 3, 4, 5, 6, 7];
+  const hi = new Set(payload.highlight || []);
+  const max = Math.max(...payload.pair.flatMap((p) => Object.values(p.zones)));
+  const rad = (deg) => (deg * Math.PI) / 180;
+  const centre = (i) => -112.5 + i * 45;
+  const wheel = (p, ox) => {
+    const cx = ox; const cy = 92; const R = 66;
+    const wedge = (i) => {
+      const a0 = rad(centre(i) - 22.5); const a1 = rad(centre(i) + 22.5);
+      return `M${cx},${cy} L${cx + R * Math.cos(a0)},${cy + R * Math.sin(a0)} A${R},${R} 0 0 1 ${cx + R * Math.cos(a1)},${cy + R * Math.sin(a1)} Z`;
+    };
+    return (
+      <g key={p.label}>
+        {order.map((zn, i) => {
+          const v = p.zones[zn] ?? p.zones[String(zn)] ?? 0;
+          const a = rad(centre(i)); const lx = cx + R * 0.66 * Math.cos(a); const ly = cy + R * 0.66 * Math.sin(a);
+          return (
+            <g key={zn}>
+              <path d={wedge(i)} fill={colors.accent} fillOpacity={0.08 + (0.62 * v) / max}
+                stroke={hi.has(zn) ? colors.textHi : colors.surface1} strokeWidth={hi.has(zn) ? 2 : 1.5}>
+                <title>{`${p.label}, ${ZONE_NAMES[zn]}: ${v}% of runs`}</title>
+              </path>
+              <text x={lx} y={ly + 4} textAnchor="middle"
+                style={{ fontFamily: fonts.mono, fontSize: 11, fontWeight: hi.has(zn) ? 700 : 500, fill: colors.textHi, paintOrder: 'stroke', stroke: colors.bg, strokeWidth: 2.5 }}>
+                {`${v}%`}
+              </text>
+            </g>
+          );
+        })}
+        <rect x={cx - 3} y={cy - 9} width="6" height="18" rx="2" fill="#c8b48a" />
+        <text x={cx} y={cy + R + 22} textAnchor="middle" style={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 14, fill: colors.textHi }}>{p.label}</text>
+      </g>
+    );
+  };
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Box component="svg" viewBox="0 0 300 186" role="img" sx={{ width: '100%' }}
+        aria-label={payload.pair.map((p) => `${p.label}: ${Object.entries(p.zones).map(([z, v]) => `${ZONE_NAMES[z]} ${v}%`).join(', ')}`).join('; ')}>
+        {wheel(payload.pair[0], 76)}
+        {wheel(payload.pair[1], 224)}
+      </Box>
+      <Typography sx={{ fontSize: 12.5, color: colors.textLo, mt: 0.5, whiteSpace: 'nowrap' }}>
+        {payload.note || `Share of runs · behind the batter at the top, leg side on the ${lefty ? 'left' : 'right'}`}
+      </Typography>
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
   recap_text: RecapText,
   score_race: ScoreRace,
@@ -1526,4 +1583,5 @@ export const POST_VISUALS = {
   twin_cloud: TwinCloud,
   game_timeline: GameTimeline,
   bid_trail: BidTrail,
+  zone_pair: ZonePair,
 };
