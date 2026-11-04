@@ -24,6 +24,13 @@ set -euo pipefail
 #      default -- a needless build costs a minute, a wrongly skipped one ships nothing and
 #      is invisible until someone notices the site is stale.
 
+# Only main deploys (4 Nov 2026). Branch previews were never opened -- changes are checked locally before merging --
+# and each one is kept as a deployment: ~260 previews took the free plan's 10 GB of deployment storage to the limit.
+if [[ -n "${VERCEL_GIT_COMMIT_REF:-}" && "${VERCEL_GIT_COMMIT_REF}" != "main" ]]; then
+  echo "Branch ${VERCEL_GIT_COMMIT_REF} is not main; previews are off. Skipping."
+  exit 0
+fi
+
 BASE_REF="${VERCEL_GIT_PREVIOUS_SHA:-}"
 HEAD_REF="${VERCEL_GIT_COMMIT_SHA:-HEAD}"
 
