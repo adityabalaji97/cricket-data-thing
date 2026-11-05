@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
-PAGE_VERSION = "v2"
+PAGE_VERSION = "v3"
 #: The page's cards: the par card, then the ground chapter.
 CARD_IDS = ("par", "totals", "results", "innings-shape", "phases", "pace-spin", "boundary-zones", "dismissals",
             "winning-phases", "recent-results")

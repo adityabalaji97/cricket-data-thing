@@ -1604,6 +1604,7 @@ def get_match_history(
         def format_match(match):
             match_scores = scores.get(match.id, {})
             return {
+                "match_id": str(match.id),  # the scorecard's id (/scorecard/:id): match rows link to it
                 "date": match.date.isoformat(),
                 "team1": teams_mapping.get(match.team1, match.team1),
                 "team2": teams_mapping.get(match.team2, match.team2),
