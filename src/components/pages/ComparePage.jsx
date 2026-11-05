@@ -4,18 +4,24 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import ProfileCard from '../playerProfile/cards/ProfileCard';
-import { formatMetric, ordinal } from '../playerProfile/verdict/verdictFormat';
+import { ordinal, signed } from '../playerProfile/verdict/verdictFormat';
 import { Eyebrow, PageFooter, PageSkeleton, usePageData } from '../pageKit/pageKit';
 
 // Compare (the menu overhaul, 5 Nov 2026): one page in place of Batter Comparison, Matchups, Team Comparison and the
-// Doppelgangers leaderboard. Two players side by side on the player profile's own peer strips (same pool, same window,
-// so both dots sit on one spread), or a batter against a bowler from the query builder.
+// Doppelgangers leaderboard. Two players side by side on every ranked measure from /player-compare (overall, by phase,
+// by opponent; same pool, same window, so both dots sit on one spread), or a batter against a bowler from the query builder.
 
 const A_COL = colors.accent;
 const B_COL = '#5b9bf0';
 const ROLE_NAMES = { bat: 'Batting', bowl: 'Bowling' };
 // "Sharma" alone could be anyone: an initial and the surname.
 const shortName = (n) => { const w = (n || '').split(' '); return w.length > 1 ? `${w[0][0]} ${w[w.length - 1]}` : n; };
+// Column heads for a pair: first names ("Jasprit", "Arshdeep"), unless a name starts with initials or the two clash.
+const pairNames = (a, b) => {
+  const first = (n) => { const w = (n || '').split(' '); return w.length > 1 && !/^[A-Z]{1,3}$/.test(w[0]) ? w[0] : null; };
+  const fa = first(a); const fb = first(b);
+  return fa && fb && fa !== fb ? [fa, fb] : [shortName(a), shortName(b)];
+};
 
 const usePlayers = () => {
   const [players, setPlayers] = useState([]);
@@ -49,41 +55,49 @@ const Picker = ({ label, value, onChange, options, colour }) => (
     sx={{ flex: 1, minWidth: 0 }} />
 );
 
-/** One metric, both players: their values and ranks, two dots on the pool's spread (better to the right). */
-const PairStrip = ({ ma, mb }) => {
+// Each measure arrives with its own format from /player-compare.
+const FORMATS = {
+  signed2: (v) => signed(v, 2), signed1: (v) => signed(v, 1), int: (v) => String(Math.round(v)),
+  dec1: (v) => v.toFixed(1), dec2: (v) => v.toFixed(2), pct: (v) => `${v.toFixed(1)}%`,
+};
+const show = (m, v) => (v === null || v === undefined ? '–' : (FORMATS[m.format] || FORMATS.dec1)(v));
+
+/** One measure, both players: their values and ranks, two dots on the pool's spread (better to the right). */
+const PairStrip = ({ m }) => {
   const W = 343; const H = 16;
-  const q = ma.quantiles || [];
+  const q = m.quantiles || [];
+  const va = m.a.value; const vb = m.b.value;
   const at = (f) => q[Math.min(q.length - 1, Math.max(0, Math.round(f * (q.length - 1))))];
-  const lo = Math.min(at(0.02), ma.value, mb.value);
-  const hi = Math.max(at(0.98), ma.value, mb.value);
+  const lo = Math.min(at(0.02), va, vb);
+  const hi = Math.max(at(0.98), va, vb);
   const span = hi - lo || 1;
   const x = (v) => {
     const t = (Math.min(hi, Math.max(lo, v)) - lo) / span;
-    return 6 + (ma.lower_is_better ? 1 - t : t) * (W - 12);
+    return 6 + (m.lower_is_better ? 1 - t : t) * (W - 12);
   };
-  const aBetter = ma.rank < mb.rank;
-  const cell = (m, col, better) => (
+  const aBetter = m.a.rank < m.b.rank;
+  const cell = (p, col, better) => (
     <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, justifyContent: 'flex-end', minWidth: 0, whiteSpace: 'nowrap' }}>
       <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: better ? 700 : 500, fontSize: 15, color: better ? col : colors.textMed }}>
-        {formatMetric(m.key, m.value)}
+        {show(m, p.value)}
       </Box>
-      <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 10, color: colors.textLo }}>{ordinal(m.rank)}</Box>
+      <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 10, color: colors.textLo }}>{ordinal(p.rank)}</Box>
     </Box>
   );
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: '3px', py: 0.5 }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 86px 86px', columnGap: 1, alignItems: 'baseline' }}>
-        <Box component="span" sx={{ color: colors.textMed, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ma.label}</Box>
-        {cell(ma, A_COL, aBetter)}
-        {cell(mb, B_COL, !aBetter && ma.rank !== mb.rank)}
+        <Box component="span" sx={{ color: colors.textMed, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</Box>
+        {cell(m.a, A_COL, aBetter)}
+        {cell(m.b, B_COL, !aBetter && m.a.rank !== m.b.rank)}
       </Box>
       {q.length > 0 && (
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" aria-hidden="true">
           <rect x="0" y="7" width={W} height="2" rx="1" fill={colors.surface2} />
           {q.map((v, i) => <rect key={i} x={x(v) - 0.5} y="4" width="1" height="8" fill={colors.textGhost} opacity="0.8" />)}
-          <rect x={x(ma.median) - 0.75} y="0" width="1.5" height={H} fill={colors.textLo} />
-          <circle cx={x(mb.value)} cy="8" r="5" fill={B_COL} stroke={colors.bg} strokeWidth="2" />
-          <circle cx={x(ma.value)} cy="8" r="5" fill={A_COL} stroke={colors.bg} strokeWidth="2" />
+          <rect x={x(m.median) - 0.75} y="0" width="1.5" height={H} fill={colors.textLo} />
+          <circle cx={x(vb)} cy="8" r="5" fill={B_COL} stroke={colors.bg} strokeWidth="2" />
+          <circle cx={x(va)} cy="8" r="5" fill={A_COL} stroke={colors.bg} strokeWidth="2" />
         </svg>
       )}
     </Box>
@@ -91,16 +105,15 @@ const PairStrip = ({ ma, mb }) => {
 };
 
 const PlayersTab = ({ a, b, fmt, setParams, players }) => {
-  const sa = usePageData(a ? `/player/${encodeURIComponent(a)}/summary` : null, `format=${fmt}`);
-  const sb = usePageData(b ? `/player/${encodeURIComponent(b)}/summary` : null, `format=${fmt}`);
-  const shared = useMemo(() => {
-    if (sa.status !== 'ready' || sb.status !== 'ready') return [];
-    const ra = sa.data.roles || {}; const rb = sb.data.roles || {};
-    const order = [sa.data.primary_role, sa.data.primary_role === 'bat' ? 'bowl' : 'bat'];
-    return order.filter((r) => ra[r] && rb[r] && ra[r].peers?.qualified && rb[r].peers?.qualified);
-  }, [sa, sb]);
+  const c = usePageData(a && b ? '/player-compare' : null, `a=${encodeURIComponent(a || '')}&b=${encodeURIComponent(b || '')}&format=${fmt}`);
+  const roles = c.status === 'ready' ? c.data.roles || {} : {};
+  const shared = ['bat', 'bowl'].filter((r) => roles[r]);
   const [role, setRole] = useState(null);
+  const [section, setSection] = useState('Overall');
   const shown = shared.includes(role) ? role : shared[0];
+  const sections = shown ? roles[shown].sections : [];
+  const sec = sections.find((s) => s.title === section) || sections[0];
+  const [na, nb] = shown ? pairNames(roles[shown].a, roles[shown].b) : [a, b];
 
   return (
     <>
@@ -109,30 +122,40 @@ const PlayersTab = ({ a, b, fmt, setParams, players }) => {
         <Picker label="Player 2" value={b} onChange={(v) => setParams({ b: v || '' })} options={players} colour={B_COL} />
       </Box>
       {(!a || !b) && <Box sx={{ color: colors.textLo, fontSize: 14 }}>Pick two players to put them side by side.</Box>}
-      {a && b && (sa.status !== 'ready' || sb.status !== 'ready') && (
-        [sa, sb].some((s) => s.status === 'empty' || s.status === 'error')
-          ? <Box sx={{ color: colors.textLo, fontSize: 14 }}>{`One of them has no ${fmt}s against strong sides since Jan ${new Date().getFullYear() - 2}.`}</Box>
+      {a && b && c.status !== 'ready' && (
+        c.status === 'empty' || c.status === 'error'
+          ? <Box sx={{ color: colors.textLo, fontSize: 14 }}>This couldn't load just now. Try again shortly.</Box>
           : <PageSkeleton />
       )}
-      {sa.status === 'ready' && sb.status === 'ready' && (
+      {c.status === 'ready' && (
         !shown ? (
-          <Box sx={{ color: colors.textLo, fontSize: 14 }}>They don't share a role to compare: one bats, the other bowls. Try the batter v bowler tab.</Box>
+          <Box sx={{ color: colors.textLo, fontSize: 14 }}>
+            {`They don't share a role with enough ${fmt}s against strong sides since Jan ${c.data.window?.start_date?.slice(0, 4)}. If one bats and the other bowls, try the batter v bowler tab.`}
+          </Box>
         ) : (
           <ProfileCard id="compare" title={`${ROLE_NAMES[shown]}, side by side`} player={`${a} v ${b}`}
-            note={`${sa.data.roles[shown].peers.metrics[0]?.n || ''} players since Jan ${sa.data.window?.start_date?.slice(0, 4)} · ${sa.data.scope_label}`}>
-            {shared.length > 1 && <Pills label="Role" items={shared.map((r) => [r, ROLE_NAMES[r]])} value={shown} onChange={setRole} />}
+            note={`Ranked among ${roles[shown].pool} players since Jan ${c.data.window.start_date.slice(0, 4)} · ${c.data.scope_label}`}>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              {shared.length > 1 && <Pills label="Role" items={shared.map((r) => [r, ROLE_NAMES[r]])} value={shown} onChange={setRole} />}
+              {sections.length > 1 && <Pills label="Measures" items={sections.map((s) => [s.title, s.title])} value={sec.title} onChange={setSection} />}
+            </Box>
             <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 86px 86px', columnGap: 1, fontSize: 12.5, fontWeight: 700 }}>
               <span />
-              <Box component={Link} to={`/player?name=${encodeURIComponent(a)}`} sx={{ color: A_COL, textAlign: 'right', textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{shortName(a)}</Box>
-              <Box component={Link} to={`/player?name=${encodeURIComponent(b)}`} sx={{ color: B_COL, textAlign: 'right', textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{shortName(b)}</Box>
+              <Box component={Link} to={`/player?name=${encodeURIComponent(a)}`} sx={{ color: A_COL, textAlign: 'right', textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{na}</Box>
+              <Box component={Link} to={`/player?name=${encodeURIComponent(b)}`} sx={{ color: B_COL, textAlign: 'right', textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nb}</Box>
             </Box>
-            {sa.data.roles[shown].peers.metrics.map((ma) => {
-              const mb = sb.data.roles[shown].peers.metrics.find((m) => m.key === ma.key);
-              return mb ? <PairStrip key={ma.key} ma={ma} mb={mb} /> : null;
-            })}
+            {sec.groups.map((g) => (
+              <Box key={g.label || 'all'} sx={{ display: 'flex', flexDirection: 'column' }}>
+                {g.label && <Box sx={{ mt: 0.75 }}><Eyebrow>{g.label}</Eyebrow></Box>}
+                {g.metrics.map((m) => <PairStrip key={m.key} m={m} />)}
+              </Box>
+            ))}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', fontFamily: fonts.mono, fontSize: 9.5, color: colors.textFaint }}>
               <span>← worse</span><span>│ median</span><span>better →</span>
             </Box>
+            {sec.title !== 'Overall' && (
+              <Box sx={{ fontSize: 11.5, color: colors.textLo }}>Phases and opponents need 60 balls each; a missing row means one of them has fewer there.</Box>
+            )}
           </ProfileCard>
         )
       )}
