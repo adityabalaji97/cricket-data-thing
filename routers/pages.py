@@ -59,3 +59,12 @@ def team_page(
         raise HTTPException(status_code=404, detail=f"No {format} matches for {team} in this window")
     response.headers["Cache-Control"] = CACHE
     return page
+
+
+@router.get("/query-suggestions")
+def query_suggestions(response: Response, db: Session = Depends(get_session)):
+    """Questions about the next fixture for the query builder's empty screen, in its format and our data's names."""
+    from services.query_suggestions import suggestions
+
+    response.headers["Cache-Control"] = "public, max-age=600, s-maxage=1800, stale-while-revalidate=86400"
+    return suggestions(db)

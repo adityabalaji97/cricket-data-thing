@@ -34,7 +34,8 @@ export const perspectiveOf = (filters, groupBy) => {
   const f = filters || {}; const g = groupBy || [];
   if (f.metrics_perspective === 'bowling') return 'bowl';
   if (f.metrics_perspective === 'batting') return 'bat';
-  const bowlingSide = (f.bowlers || []).length || g.includes('bowler') || g.includes('bowling_team');
+  // Splits by who bowled (pace or spin, bowling type, bowler) read from the bowling side unless a batter is named.
+  const bowlingSide = (f.bowlers || []).length || ['bowler', 'bowling_team', 'bowl_kind', 'bowl_style'].some((k) => g.includes(k));
   const battingSide = (f.batters || []).length || g.includes('batter') || g.includes('batting_team') || g.includes('partnership');
   return bowlingSide && !battingSide ? 'bowl' : 'bat';
 };
@@ -87,7 +88,10 @@ export const shapeAnswer = (data, filters, groupBy, measure = null) => {
   const g0 = groupBy || [];
   const g = g0.length > 1 ? g0.filter((k) => new Set((data || []).map((r) => r[k])).size > 1) : g0;
   const persp = perspectiveOf(filters, g0);
-  const mKey = ASKABLE.includes(measure) ? measure : measureFor(persp, g);
+  // A count (wickets) ranks people; across categories (pace v spin) it mostly measures who bowled more, so a rate.
+  const rankedShape = g.length === 1 && RANKED.includes(g[0]);
+  const asked = ASKABLE.includes(measure) && (measure !== 'wickets' || rankedShape) ? measure : null;
+  const mKey = asked || measureFor(persp, g);
   const M = MEASURES[mKey];
   const lowerBetter = M.better === 'lower';
   const all = (data || []).filter((r) => r && (r.balls || 0) > 0);
@@ -185,8 +189,11 @@ export const shapeAnswer = (data, filters, groupBy, measure = null) => {
     const rows = [...all].sort((a, b) => (g[0] === 'phase' ? (order[a.phase] ?? 9) - (order[b.phase] ?? 9) : b.balls - a.balls));
     const best = rows.reduce((p, r) => ((lowerBetter ? metricOf(r, mKey) < metricOf(p, mKey) : metricOf(r, mKey) > metricOf(p, mKey)) ? r : p), rows[0]);
     const worst = rows.reduce((p, r) => ((lowerBetter ? metricOf(r, mKey) > metricOf(p, mKey) : metricOf(r, mKey) < metricOf(p, mKey)) ? r : p), rows[0]);
-    const sentence = [S(`${subject ? `${subject}: ` : ''}${lowerBetter ? 'cheapest' : 'best'} ${M.short === 'SR' ? 'strike rate' : M.label.toLowerCase()} `),
-      S(`${rowLabel(best, g).toLowerCase()} (${val(best)})`, true), S(best !== worst ? `, ${lowerBetter ? 'dearest' : 'lowest'} ${rowLabel(worst, g).toLowerCase()} (${val(worst)}).` : '.')];
+    const lab = (r) => rowLabel(r, g);
+    const sentence = mKey === 'economy'
+      ? [S(`${subject ? `${subject}: ` : ''}`), S(`${lab(best)} went for ${val(best)} an over`, true), S(best !== worst ? `, ${lab(worst)} ${val(worst)}.` : '.')]
+      : [S(`${subject ? `${subject}: ` : ''}${M.label.toLowerCase()} `), S(`${val(best)} (${lab(best)})`, true),
+        S(best !== worst ? `, ${val(worst)} (${lab(worst)}).` : '.')];
     return {
       type: 'bars', measure: mKey, sentence,
       chart: {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Autocomplete, Box, TextField } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
+import { rememberEntity } from '../../utils/recentEntities';
 import { colors, fonts } from '../../theme/hindsightDark';
 import ProfileCard from '../playerProfile/cards/ProfileCard';
 import ProfileFilters from '../playerProfile/cards/ProfileFilters';
@@ -268,6 +269,7 @@ const TeamPage = () => {
   useEffect(() => { if (team) document.title = `${team} · Hindsight`; }, [team]);
   // The page names the side as the data does ("CSK" in a link opens Chennai Super Kings).
   const { status, data } = usePageData(team ? '/team-page' : null, `team=${encodeURIComponent(team || '')}&${windowQuery(win)}`);
+  useEffect(() => { if (data?.team) rememberEntity('team', data.team); }, [data?.team]);
 
   useEffect(() => {
     if (status !== 'ready' || !location.hash) return;

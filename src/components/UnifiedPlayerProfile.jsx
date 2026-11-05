@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Autocomplete, Box, Skeleton, TextField } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../config';
+import { rememberEntity } from '../utils/recentEntities';
 import { colors, fonts } from '../theme/hindsightDark';
 import VerdictScreen, { windowQuery } from './playerProfile/verdict/VerdictScreen';
 import PlaysLikeCard from './playerProfile/cards/PlaysLikeCard';
@@ -113,7 +114,7 @@ const UnifiedPlayerProfile = () => {
     });
   }, [name, navigate]);
 
-  useEffect(() => { if (name) document.title = `${name} · Hindsight`; }, [name]);
+  useEffect(() => { if (name) { document.title = `${name} · Hindsight`; rememberEntity('player', name); } }, [name]);
 
   const cards = useCards(name, win);
   const onSummary = useCallback((s) => setSummary(s), []);
